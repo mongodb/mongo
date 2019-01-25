@@ -353,8 +353,13 @@ void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob
     }
     bob->appendNumber("fetchedMissingDocs", _initialSyncState->fetchedMissingDocs);
     bob->appendNumber("appliedOps", _initialSyncState->appliedOps);
-    if (!_initialSyncState->beginTimestamp.isNull()) {
-        bob->append("initialSyncOplogStart", _initialSyncState->beginTimestamp);
+    if (!_initialSyncState->beginApplyingTimestamp.isNull()) {
+        bob->append("initialSyncOplogStart", _initialSyncState->beginApplyingTimestamp);
+    }
+    // Only include the beginFetchingTimestamp if it's different from the beginApplyingTimestamp.
+    if (!_initialSyncState->beginFetchingTimestamp.isNull() &&
+        _initialSyncState->beginFetchingTimestamp != _initialSyncState->beginApplyingTimestamp) {
+        bob->append("initialSyncOplogFetchingStart", _initialSyncState->beginFetchingTimestamp);
     }
     if (!_initialSyncState->stopTimestamp.isNull()) {
         bob->append("initialSyncOplogEnd", _initialSyncState->stopTimestamp);
@@ -590,14 +595,6 @@ void InitialSyncer::_chooseSyncSourceCallback(
 
     _syncSource = syncSource.getValue();
 
-    // Create oplog applier.
-    auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
-    OplogApplier::Options options;
-    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
-    options.missingDocumentSourceForInitialSync = _syncSource;
-    _oplogApplier = _dataReplicatorExternalState->makeOplogApplier(
-        _oplogBuffer.get(), _observer.get(), consistencyMarkers, _storage, options, _writerPool);
-
     // Schedule rollback ID checker.
     _rollbackChecker = stdx::make_unique<RollbackChecker>(_exec, _syncSource);
     auto scheduleResult = _rollbackChecker->reset([=](const RollbackChecker::Result& result) {
@@ -640,6 +637,25 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
     return _storage->dropReplicatedDatabases(opCtx.get());
 }
 
+Status InitialSyncer::_scheduleGetBeginFetchingOpTime_inlock(
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    // We will ultimately be getting oldestActiveOplogEntryOpTime from the transactions field in
+    // serverStatus to use as the beginFetchingTimestamp. Also, we project out the metrics and
+    // wiredTiger fields because we don't need them and they're very large.
+    executor::RemoteCommandRequest request(
+        _syncSource,
+        "admin",
+        BSON("serverStatus" << 1 << "transactions" << 1 << "metrics" << 0 << "wiredTiger" << 0),
+        nullptr);
+
+    auto scheduleResultSW = _exec->scheduleRemoteCommand(
+        request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackData) {
+            _getBeginFetchingOpTimeCallback(callbackData.response, onCompletionGuard);
+        });
+
+    return scheduleResultSW.getStatus();
+}
+
 void InitialSyncer::_rollbackCheckerResetCallback(
     const RollbackChecker::Result& result, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -650,11 +666,40 @@ void InitialSyncer::_rollbackCheckerResetCallback(
         return;
     }
 
+    status = _scheduleGetBeginFetchingOpTime_inlock(onCompletionGuard);
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
+        return;
+    }
+}
+
+void InitialSyncer::_getBeginFetchingOpTimeCallback(
+    const executor::TaskExecutor::ResponseStatus& response,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    auto status = _checkForShutdownAndConvertStatus_inlock(
+        response.status,
+        "error while getting oldest active transaction timestamp for begin fetching timestamp");
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
+        return;
+    }
+
+    invariant(response.data.hasField("transactions"));
+
+    // Only set beginFetchingOpTime if the oldestActiveOplogEntryTimestamp actually exists.
+    OpTime beginFetchingOpTime = OpTime();
+    if (response.data["transactions"].embeddedObject().hasField("oldestActiveOplogEntryOpTime")) {
+        beginFetchingOpTime = repl::OpTime::parse(
+            response.data["transactions"]["oldestActiveOplogEntryOpTime"].Obj());
+    }
+
     status = _scheduleLastOplogEntryFetcher_inlock(
         [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
             mongo::Fetcher::NextAction*,
-            mongo::BSONObjBuilder*) {
-            _lastOplogEntryFetcherCallbackForBeginTimestamp(response, onCompletionGuard);
+            mongo::BSONObjBuilder*) mutable {
+            _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
+                response, onCompletionGuard, beginFetchingOpTime);
         });
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
@@ -662,9 +707,10 @@ void InitialSyncer::_rollbackCheckerResetCallback(
     }
 }
 
-void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
+void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
     const StatusWith<Fetcher::QueryResponse>& result,
-    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OpTime& beginFetchingOpTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     auto status = _checkForShutdownAndConvertStatus_inlock(
         result.getStatus(), "error while getting last oplog entry for begin timestamp");
@@ -695,23 +741,23 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
     readConcernBob.append("afterClusterTime", lastOpTime.getTimestamp());
     readConcernBob.done();
 
-    _fCVFetcher =
-        stdx::make_unique<Fetcher>(_exec,
-                                   _syncSource,
-                                   NamespaceString::kServerConfigurationNamespace.db().toString(),
-                                   queryBob.obj(),
-                                   [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
-                                       mongo::Fetcher::NextAction*,
-                                       mongo::BSONObjBuilder*) {
-                                       _fcvFetcherCallback(response, onCompletionGuard, lastOpTime);
-                                   },
-                                   ReadPreferenceSetting::secondaryPreferredMetadata(),
-                                   RemoteCommandRequest::kNoTimeout /* find network timeout */,
-                                   RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-                                   RemoteCommandRetryScheduler::makeRetryPolicy(
-                                       numInitialSyncOplogFindAttempts.load(),
-                                       executor::RemoteCommandRequest::kNoTimeout,
-                                       RemoteCommandRetryScheduler::kAllRetriableErrors));
+    _fCVFetcher = stdx::make_unique<Fetcher>(
+        _exec,
+        _syncSource,
+        NamespaceString::kServerConfigurationNamespace.db().toString(),
+        queryBob.obj(),
+        [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
+            mongo::Fetcher::NextAction*,
+            mongo::BSONObjBuilder*) mutable {
+            _fcvFetcherCallback(response, onCompletionGuard, lastOpTime, beginFetchingOpTime);
+        },
+        ReadPreferenceSetting::secondaryPreferredMetadata(),
+        RemoteCommandRequest::kNoTimeout /* find network timeout */,
+        RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
+        RemoteCommandRetryScheduler::makeRetryPolicy(
+            numInitialSyncOplogFindAttempts.load(),
+            executor::RemoteCommandRequest::kNoTimeout,
+            RemoteCommandRetryScheduler::kAllRetriableErrors));
     Status scheduleStatus = _fCVFetcher->schedule();
     if (!scheduleStatus.isOK()) {
         _fCVFetcher.reset();
@@ -722,7 +768,8 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
 
 void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>& result,
                                         std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-                                        const OpTime& lastOpTime) {
+                                        const OpTime& lastOpTime,
+                                        OpTime& beginFetchingOpTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     auto status = _checkForShutdownAndConvertStatus_inlock(
         result.getStatus(), "error while getting the remote feature compatibility version");
@@ -790,12 +837,41 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
             _databasesClonerCallback(status, onCompletionGuard);
         }));
 
-    _initialSyncState->beginTimestamp = lastOpTime.getTimestamp();
+    // Create oplog applier.
+    auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
+    OplogApplier::Options options;
+    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
+    options.missingDocumentSourceForInitialSync = _syncSource;
+    options.beginApplyingOpTime = lastOpTime;
+    _oplogApplier = _dataReplicatorExternalState->makeOplogApplier(
+        _oplogBuffer.get(), _observer.get(), consistencyMarkers, _storage, options, _writerPool);
+
+    const auto beginApplyingTimestamp = lastOpTime.getTimestamp();
+    _initialSyncState->beginApplyingTimestamp = beginApplyingTimestamp;
+
+    // If there is no beginFetchingOpTime, then it means that there were no open active transactions
+    // with an oplog entry so we can safely start fetching at the same point that we are applying
+    // from.
+    if (beginFetchingOpTime.isNull()) {
+        _initialSyncState->beginFetchingTimestamp = beginApplyingTimestamp;
+        beginFetchingOpTime = lastOpTime;
+    } else {
+        _initialSyncState->beginFetchingTimestamp = beginFetchingOpTime.getTimestamp();
+    }
+
+    invariant(_initialSyncState->beginApplyingTimestamp >=
+                  _initialSyncState->beginFetchingTimestamp,
+              str::stream() << "beginApplyingTimestamp was less than beginFetchingTimestamp. "
+                               "beginApplyingTimestamp: "
+                            << _initialSyncState->beginApplyingTimestamp.toBSON()
+                            << " beginFetchingTimestamp: "
+                            << _initialSyncState->beginFetchingTimestamp.toBSON());
 
     invariant(!result.getValue().documents.empty());
-    LOG(2) << "Setting begin timestamp to " << _initialSyncState->beginTimestamp
+    LOG(2) << "Setting begin applying timestamp to " << _initialSyncState->beginApplyingTimestamp
            << " using last oplog entry: " << redact(result.getValue().documents.front())
-           << ", ns: " << _opts.localOplogNS;
+           << ", ns: " << _opts.localOplogNS << " and the begin fetching timestamp to "
+           << _initialSyncState->beginFetchingTimestamp;
 
 
     const auto configResult = _dataReplicatorExternalState->getCurrentConfig();
@@ -809,7 +885,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     const auto& config = configResult.getValue();
     _oplogFetcher = stdx::make_unique<OplogFetcher>(
         _exec,
-        lastOpTime,
+        beginFetchingOpTime,
         _syncSource,
         _opts.remoteOplogNS,
         config,
@@ -823,7 +899,8 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
             return _enqueueDocuments(first, last, info);
         },
         [=](const Status& s) { _oplogFetcherCallback(s, onCompletionGuard); },
-        initialSyncOplogFetcherBatchSize);
+        initialSyncOplogFetcherBatchSize,
+        OplogFetcher::StartingPoint::kEnqueueFirstDoc);
 
     LOG(2) << "Starting OplogFetcher: " << _oplogFetcher->toString();
 
@@ -961,7 +1038,10 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         optime = optimeStatus.getValue();
         _initialSyncState->stopTimestamp = optime.getTimestamp();
 
-        if (_initialSyncState->beginTimestamp != _initialSyncState->stopTimestamp) {
+        // If the beginFetchingTimestamp is different from the stopTimestamp, it indicates that
+        // there are oplog entries fetched by the oplog fetcher that need to be written to the oplog
+        // and/or there are operations that need to be applied.
+        if (_initialSyncState->beginFetchingTimestamp != _initialSyncState->stopTimestamp) {
             invariant(_lastApplied.isNull());
             _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(lock, onCompletionGuard);
             return;
@@ -1106,6 +1186,17 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
     _initialSyncState->appliedOps += numApplied;
     _lastApplied = lastApplied;
     _opts.setMyLastOptime(_lastApplied, ReplicationCoordinator::DataConsistency::Inconsistent);
+
+    // Update oplog visibility after applying a batch so that while applying transaction oplog
+    // entries, the TransactionHistoryIterator can get earlier oplog entries associated with the
+    // transaction. Note that setting the oplog visibility timestamp here will be safe even if
+    // initial sync was restarted because until initial sync ends, no one else will try to read our
+    // oplog. It is also safe even if we tried to read from our own oplog because we never try to
+    // read from the oplog before applying at least one batch and therefore setting a value for the
+    // oplog visibility timestamp.
+    auto opCtx = makeOpCtx();
+    const bool orderedCommit = true;
+    _storage->oplogDiskLocRegister(opCtx.get(), lastApplied.getTimestamp(), orderedCommit);
 
     auto fetchCount = _fetchCount.load();
     if (fetchCount > 0) {
@@ -1369,11 +1460,11 @@ void InitialSyncer::_checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
     }
 
     // Basic sanity check on begin/stop timestamps.
-    if (_initialSyncState->beginTimestamp > _initialSyncState->stopTimestamp) {
+    if (_initialSyncState->beginApplyingTimestamp > _initialSyncState->stopTimestamp) {
         std::string msg = str::stream()
             << "Possible rollback on sync source " << _syncSource.toString() << ". Currently at "
             << _initialSyncState->stopTimestamp.toBSON() << ". Started at "
-            << _initialSyncState->beginTimestamp.toBSON();
+            << _initialSyncState->beginApplyingTimestamp.toBSON();
         error() << msg;
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(
             lock, Status(ErrorCodes::OplogOutOfOrder, msg));
@@ -1381,11 +1472,13 @@ void InitialSyncer::_checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
     }
 
     if (_lastApplied.isNull()) {
-        // Check if any ops occurred while cloning.
-        invariant(_initialSyncState->beginTimestamp < _initialSyncState->stopTimestamp);
-        log() << "Applying operations until " << _initialSyncState->stopTimestamp.toBSON()
-              << " before initial sync can complete. (starting at "
-              << _initialSyncState->beginTimestamp.toBSON() << ")";
+        // Check if any ops occurred while cloning or any ops need to be fetched.
+        invariant(_initialSyncState->beginFetchingTimestamp < _initialSyncState->stopTimestamp);
+        log() << "Writing to the oplog and applying operations until "
+              << _initialSyncState->stopTimestamp.toBSON()
+              << " before initial sync can complete. (started fetching at "
+              << _initialSyncState->beginFetchingTimestamp.toBSON() << " and applying at "
+              << _initialSyncState->beginApplyingTimestamp.toBSON() << ")";
         // Fall through to scheduling _getNextApplierBatchCallback().
     } else if (_lastApplied.getTimestamp() >= _initialSyncState->stopTimestamp) {
         // Check for rollback if we have applied far enough to be consistent.

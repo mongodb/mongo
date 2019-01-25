@@ -40,6 +40,36 @@
 
 namespace mongo {
 
+/**
+ * Helper that will find the previous oplog entry for that transaction, transform it to be a normal
+ * applyOps command and applies the oplog entry. Currently used for oplog application of a
+ * commitTransaction oplog entry during recovery, rollback and initial sync.
+ */
+Status _applyTransactionFromOplogChain(OperationContext* opCtx,
+                                       const repl::OplogEntry& entry,
+                                       repl::OplogApplication::Mode mode) {
+    invariant(mode == repl::OplogApplication::Mode::kRecovering ||
+              mode == repl::OplogApplication::Mode::kInitialSync);
+
+    // Since the TransactionHistoryIterator uses DBDirectClient, it cannot come with snapshot
+    // isolation.
+    invariant(!opCtx->recoveryUnit()->getPointInTimeReadTimestamp());
+
+    // Get the corresponding prepareTransaction oplog entry.
+    const auto prepareOpTime = entry.getPrevWriteOpTimeInTransaction();
+    invariant(prepareOpTime);
+    TransactionHistoryIterator iter(prepareOpTime.get());
+    invariant(iter.hasNext());
+    const auto prepareOplogEntry = iter.next(opCtx);
+
+    // Transform prepare command into a normal applyOps command.
+    const auto prepareCmd = prepareOplogEntry.getOperationToApply().removeField("prepare");
+
+    BSONObjBuilder resultWeDontCareAbout;
+    return applyOps(
+        opCtx, entry.getNss().db().toString(), prepareCmd, mode, &resultWeDontCareAbout);
+}
+
 Status applyCommitTransaction(OperationContext* opCtx,
                               const repl::OplogEntry& entry,
                               repl::OplogApplication::Mode mode) {
@@ -63,26 +93,13 @@ Status applyCommitTransaction(OperationContext* opCtx,
             return Status::OK();
         }
 
-        // Since the TransactionHistoryIterator uses DBDirectClient, it cannot come with snapshot
-        // isolation.
-        invariant(!opCtx->recoveryUnit()->getPointInTimeReadTimestamp());
-
-        // Get the corresponding prepareTransaction oplog entry.
-        const auto prepareOpTime = entry.getPrevWriteOpTimeInTransaction();
-        invariant(prepareOpTime);
-        TransactionHistoryIterator iter(prepareOpTime.get());
-        invariant(iter.hasNext());
-        const auto prepareOplogEntry = iter.next(opCtx);
-
-        // Transform prepare command into a normal applyOps command.
-        const auto prepareCmd = prepareOplogEntry.getOperationToApply().removeField("prepare");
-
-        BSONObjBuilder resultWeDontCareAbout;
-        return applyOps(
-            opCtx, entry.getNss().db().toString(), prepareCmd, mode, &resultWeDontCareAbout);
+        return _applyTransactionFromOplogChain(opCtx, entry, mode);
     }
 
-    // TODO: SERVER-36492 Only run on secondary until we support initial sync.
+    if (mode == repl::OplogApplication::Mode::kInitialSync) {
+        return _applyTransactionFromOplogChain(opCtx, entry, mode);
+    }
+
     invariant(mode == repl::OplogApplication::Mode::kSecondary);
 
     // Transaction operations are in its own batch, so we can modify their opCtx.

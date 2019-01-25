@@ -296,7 +296,11 @@ private:
      *         |
      *         |
      *         V
-     *    _lastOplogEntryFetcherCallbackForBeginTimestamp()
+     *   _getBeginFetchingTimestampCallback()
+     *         |
+     *         |
+     *         V
+     *    _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp()
      *         |
      *         |
      *         V
@@ -399,10 +403,27 @@ private:
      * setting a reference point for the state of the sync source's oplog when data cloning
      * completes.
      */
-    void _lastOplogEntryFetcherCallbackForBeginTimestamp(
+    void _lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
         const StatusWith<Fetcher::QueryResponse>& result,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+        OpTime& beginFetchingOpTime);
 
+    /**
+     * Callback that gets the oldestActiveOplogEntryOptime from the transactions field in the
+     * serverStatus response, which refers to the optime of the oldest active transaction with an
+     * oplog entry. It will be used as the beginFetchingTimestamp.
+     */
+    void _getBeginFetchingOpTimeCallback(const executor::TaskExecutor::ResponseStatus& response,
+                                         std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Schedules a remote command to call serverStatus on the sync source. From the response, we
+     * will be able to get the oldestActiveOplogEntryOptime from the transactions field, which
+     * refers to the optime of the oldest active transaction with an oplog entry. It will be used as
+     * the beginFetchingTimestamp.
+     */
+    Status _scheduleGetBeginFetchingOpTime_inlock(
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Callback for the '_fCVFetcher'. A successful response lets us check if the remote node
@@ -410,7 +431,8 @@ private:
      */
     void _fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>& result,
                              std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-                             const OpTime& lastOpTime);
+                             const OpTime& lastOpTime,
+                             OpTime& beginFetchingOpTime);
 
     /**
      * Callback for oplog fetcher.

@@ -90,6 +90,13 @@ public:
     };
 
     /**
+     * An enum that indicates if we want to skip the first document during oplog fetching or not.
+     * Currently, the only time we don't want to skip the first document is during initial sync
+     * if there was an oldest active transaction timestamp.
+     */
+    enum class StartingPoint { kSkipFirstDoc, kEnqueueFirstDoc };
+
+    /**
      * Type of function that accepts a pair of iterators into a range of operations
      * within the current batch of results and copies the operations into
      * a buffer to be consumed by the next stage of the replication process.
@@ -125,7 +132,8 @@ public:
                  DataReplicatorExternalState* dataReplicatorExternalState,
                  EnqueueDocumentsFn enqueueDocumentsFn,
                  OnShutdownCallbackFn onShutdownCallbackFn,
-                 const int batchSize);
+                 const int batchSize,
+                 StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
 
     virtual ~OplogFetcher();
 
@@ -176,6 +184,9 @@ private:
     const EnqueueDocumentsFn _enqueueDocumentsFn;
     const Milliseconds _awaitDataTimeout;
     const int _batchSize;
+
+    // Indicates if we want to skip the first document during oplog fetching or not.
+    StartingPoint _startingPoint;
 };
 
 }  // namespace repl

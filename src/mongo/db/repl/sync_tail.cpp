@@ -69,8 +69,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/session_update_tracker.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -547,106 +545,6 @@ private:
 
     StringMap<CollectionProperties> _cache;
 };
-
-/**
- * ops - This only modifies the isForCappedCollection field on each op. It does not alter the ops
- *      vector in any other way.
- * writerVectors - Set of operations for each worker thread to apply.
- * derivedOps - If provided, this function inserts a decomposition of applyOps operations
- *      and instructions for updating the transactions table.
- * sessionUpdateTracker - if provided, keeps track of session info from ops.
- */
-void fillWriterVectors(OperationContext* opCtx,
-                       MultiApplier::Operations* ops,
-                       std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                       std::vector<MultiApplier::Operations>* derivedOps,
-                       SessionUpdateTracker* sessionUpdateTracker) {
-    const auto serviceContext = opCtx->getServiceContext();
-    const auto storageEngine = serviceContext->getStorageEngine();
-
-    const bool supportsDocLocking = storageEngine->supportsDocLocking();
-    const uint32_t numWriters = writerVectors->size();
-
-    CachedCollectionProperties collPropertiesCache;
-
-    for (auto&& op : *ops) {
-        auto hashedNs = StringMapHasher().hashed_key(op.getNss().ns());
-        // Reduce the hash from 64bit down to 32bit, just to allow combinations with murmur3 later
-        // on. Bit depth not important, we end up just doing integer modulo with this in the end.
-        // The hash function should provide entropy in the lower bits as it's used in hash tables.
-        uint32_t hash = static_cast<uint32_t>(hashedNs.hash());
-
-        // We need to track all types of ops, including type 'n' (these are generated from chunk
-        // migrations).
-        if (sessionUpdateTracker) {
-            if (auto newOplogWrites = sessionUpdateTracker->updateOrFlush(op)) {
-                derivedOps->emplace_back(std::move(*newOplogWrites));
-                fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
-            }
-        }
-
-        if (op.isCrudOpType()) {
-            auto collProperties = collPropertiesCache.getCollectionProperties(opCtx, hashedNs);
-
-            // For doc locking engines, include the _id of the document in the hash so we get
-            // parallelism even if all writes are to a single collection.
-            //
-            // For capped collections, this is illegal, since capped collections must preserve
-            // insertion order.
-            if (supportsDocLocking && !collProperties.isCapped) {
-                BSONElement id = op.getIdElement();
-                BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
-                                                    collProperties.collator);
-                const size_t idHash = elementHasher.hash(id);
-                MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
-            }
-
-            if (op.getOpType() == OpTypeEnum::kInsert && collProperties.isCapped) {
-                // Mark capped collection ops before storing them to ensure we do not attempt to
-                // bulk insert them.
-                op.isForCappedCollection = true;
-            }
-        }
-
-        // Extract applyOps operations and fill writers with extracted operations using this
-        // function.
-        if (op.getCommandType() == OplogEntry::CommandType::kApplyOps && !op.shouldPrepare()) {
-            try {
-                derivedOps->emplace_back(ApplyOps::extractOperations(op));
-
-                // Nested entries cannot have different session updates.
-                fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
-            } catch (...) {
-                fassertFailedWithStatusNoTrace(
-                    50711,
-                    exceptionToStatus().withContext(str::stream()
-                                                    << "Unable to extract operations from applyOps "
-                                                    << redact(op.toBSON())));
-            }
-            continue;
-        }
-
-        auto& writer = (*writerVectors)[hash % numWriters];
-        if (writer.empty()) {
-            writer.reserve(8);  // Skip a few growth rounds
-        }
-        writer.push_back(&op);
-    }
-}
-
-void fillWriterVectors(OperationContext* opCtx,
-                       MultiApplier::Operations* ops,
-                       std::vector<MultiApplier::OperationPtrs>* writerVectors,
-                       std::vector<MultiApplier::Operations>* derivedOps) {
-    SessionUpdateTracker sessionUpdateTracker;
-    fillWriterVectors(opCtx, ops, writerVectors, derivedOps, &sessionUpdateTracker);
-
-    auto newOplogWrites = sessionUpdateTracker.flushAll();
-    if (!newOplogWrites.empty()) {
-        derivedOps->emplace_back(std::move(newOplogWrites));
-        fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
-    }
-}
 
 void tryToGoLiveAsASecondary(OperationContext* opCtx,
                              ReplicationCoordinator* replCoord,
@@ -1295,6 +1193,113 @@ Status multiSyncApply(OperationContext* opCtx,
     return Status::OK();
 }
 
+
+/**
+ * ops - This only modifies the isForCappedCollection field on each op. It does not alter the ops
+ *      vector in any other way.
+ * writerVectors - Set of operations for each worker thread to apply.
+ * derivedOps - If provided, this function inserts a decomposition of applyOps operations
+ *      and instructions for updating the transactions table.
+ * sessionUpdateTracker - if provided, keeps track of session info from ops.
+ */
+void SyncTail::_fillWriterVectors(OperationContext* opCtx,
+                                  MultiApplier::Operations* ops,
+                                  std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                                  std::vector<MultiApplier::Operations>* derivedOps,
+                                  SessionUpdateTracker* sessionUpdateTracker) {
+    const auto serviceContext = opCtx->getServiceContext();
+    const auto storageEngine = serviceContext->getStorageEngine();
+
+    const bool supportsDocLocking = storageEngine->supportsDocLocking();
+    const uint32_t numWriters = writerVectors->size();
+
+    CachedCollectionProperties collPropertiesCache;
+
+    for (auto&& op : *ops) {
+        // If the operation's optime is before or the same as the beginApplyingOpTime we don't want
+        // to apply it, so don't include it in writerVectors.
+        if (op.getOpTime() <= _options.beginApplyingOpTime) {
+            continue;
+        }
+
+        auto hashedNs = StringMapHasher().hashed_key(op.getNss().ns());
+        // Reduce the hash from 64bit down to 32bit, just to allow combinations with murmur3 later
+        // on. Bit depth not important, we end up just doing integer modulo with this in the end.
+        // The hash function should provide entropy in the lower bits as it's used in hash tables.
+        uint32_t hash = static_cast<uint32_t>(hashedNs.hash());
+
+        // We need to track all types of ops, including type 'n' (these are generated from chunk
+        // migrations).
+        if (sessionUpdateTracker) {
+            if (auto newOplogWrites = sessionUpdateTracker->updateOrFlush(op)) {
+                derivedOps->emplace_back(std::move(*newOplogWrites));
+                _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
+            }
+        }
+
+        if (op.isCrudOpType()) {
+            auto collProperties = collPropertiesCache.getCollectionProperties(opCtx, hashedNs);
+
+            // For doc locking engines, include the _id of the document in the hash so we get
+            // parallelism even if all writes are to a single collection.
+            //
+            // For capped collections, this is illegal, since capped collections must preserve
+            // insertion order.
+            if (supportsDocLocking && !collProperties.isCapped) {
+                BSONElement id = op.getIdElement();
+                BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
+                                                    collProperties.collator);
+                const size_t idHash = elementHasher.hash(id);
+                MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
+            }
+
+            if (op.getOpType() == OpTypeEnum::kInsert && collProperties.isCapped) {
+                // Mark capped collection ops before storing them to ensure we do not attempt to
+                // bulk insert them.
+                op.isForCappedCollection = true;
+            }
+        }
+
+        // Extract applyOps operations and fill writers with extracted operations using this
+        // function.
+        if (op.getCommandType() == OplogEntry::CommandType::kApplyOps && !op.shouldPrepare()) {
+            try {
+                derivedOps->emplace_back(ApplyOps::extractOperations(op));
+
+                // Nested entries cannot have different session updates.
+                _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
+            } catch (...) {
+                fassertFailedWithStatusNoTrace(
+                    50711,
+                    exceptionToStatus().withContext(str::stream()
+                                                    << "Unable to extract operations from applyOps "
+                                                    << redact(op.toBSON())));
+            }
+            continue;
+        }
+
+        auto& writer = (*writerVectors)[hash % numWriters];
+        if (writer.empty()) {
+            writer.reserve(8);  // Skip a few growth rounds
+        }
+        writer.push_back(&op);
+    }
+}
+
+void SyncTail::_fillWriterVectors(OperationContext* opCtx,
+                                  MultiApplier::Operations* ops,
+                                  std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                                  std::vector<MultiApplier::Operations>* derivedOps) {
+    SessionUpdateTracker sessionUpdateTracker;
+    _fillWriterVectors(opCtx, ops, writerVectors, derivedOps, &sessionUpdateTracker);
+
+    auto newOplogWrites = sessionUpdateTracker.flushAll();
+    if (!newOplogWrites.empty()) {
+        derivedOps->emplace_back(std::move(newOplogWrites));
+        _fillWriterVectors(opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
+    }
+}
+
 StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
     invariant(!ops.empty());
 
@@ -1338,7 +1343,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         std::vector<MultiApplier::Operations> derivedOps;
 
         std::vector<MultiApplier::OperationPtrs> writerVectors(_writerPool->getStats().numThreads);
-        fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
+        _fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for writes to finish before applying ops.
         _writerPool->waitForIdle();

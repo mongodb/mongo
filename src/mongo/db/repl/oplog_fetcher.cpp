@@ -323,7 +323,8 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
                            DataReplicatorExternalState* dataReplicatorExternalState,
                            EnqueueDocumentsFn enqueueDocumentsFn,
                            OnShutdownCallbackFn onShutdownCallbackFn,
-                           const int batchSize)
+                           const int batchSize,
+                           StartingPoint startingPoint)
     : AbstractOplogFetcher(executor,
                            lastFetched,
                            source,
@@ -337,7 +338,8 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
       _dataReplicatorExternalState(dataReplicatorExternalState),
       _enqueueDocumentsFn(enqueueDocumentsFn),
       _awaitDataTimeout(calculateAwaitDataTimeout(config)),
-      _batchSize(batchSize) {
+      _batchSize(batchSize),
+      _startingPoint(startingPoint) {
 
     invariant(config.isInitialized());
     invariant(enqueueDocumentsFn);
@@ -444,8 +446,11 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
 
         LOG(1) << "oplog fetcher successfully fetched from " << _getSource();
 
-        // If this is the first batch and no rollback is needed, skip the first document.
-        firstDocToApply++;
+        // If this is the first batch, no rollback is needed and we don't want to enqueue the first
+        // document, skip it.
+        if (_startingPoint == StartingPoint::kSkipFirstDoc) {
+            firstDocToApply++;
+        }
     }
 
     auto validateResult =

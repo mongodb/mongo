@@ -35,6 +35,7 @@ global:
 
 imports:
   - "mongo/idl/basic_types.idl"
+  - "mongo/db/repl/replication_types.idl"
 
 structs:
 
@@ -82,7 +83,7 @@ structs:
       currentPrepared:
         type: long
         default: 0
-      oldestActiveOplogEntryTimestamp:
-        type: timestamp
+      oldestActiveOplogEntryOpTime:
+        type: optime
       oldestOpenUnpreparedReadTimestamp:
         type: timestamp

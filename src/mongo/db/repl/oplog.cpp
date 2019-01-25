@@ -1846,12 +1846,13 @@ Status applyCommand_inlock(OperationContext* opCtx,
     }
 
     // The feature compatibility version in the server configuration collection cannot change during
-    // initial sync.
-    // We do not attempt to parse the whitelisted ops because they do not have a collection
-    // namespace. If we drop the 'admin' database we will also log a 'drop' oplog entry for each
-    // collection dropped. 'applyOps' will try to apply each individual operation, and those
-    // will be caught then if they are a problem.
-    auto whitelistedOps = std::vector<std::string>{"dropDatabase", "applyOps", "dbCheck"};
+    // initial sync. We do not attempt to parse the whitelisted ops because they do not have a
+    // collection namespace. If we drop the 'admin' database we will also log a 'drop' oplog entry
+    // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
+    // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
+    // won't ever change the server configuration collection.
+    auto whitelistedOps = std::vector<std::string>{
+        "dropDatabase", "applyOps", "dbCheck", "commitTransaction", "abortTransaction"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
          whitelistedOps.end()) &&

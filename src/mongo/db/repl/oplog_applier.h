@@ -68,6 +68,10 @@ public:
         // For initial sync only. If an update fails, the missing document is fetched from
         // this sync source to insert into the local collection.
         boost::optional<HostAndPort> missingDocumentSourceForInitialSync;
+
+        // Used to determine which operations should be applied. Only initial sync will set this to
+        // be something other than the null optime.
+        OpTime beginApplyingOpTime = OpTime();
     };
 
     /**

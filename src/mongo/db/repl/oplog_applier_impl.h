@@ -73,6 +73,10 @@ private:
 
     // Used to run oplog application loop.
     std::unique_ptr<SyncTail> _syncTail;
+
+    // Used to determine which operations should be applied during initial sync. If this is null,
+    // we will apply all operations that were fetched.
+    OpTime _beginApplyingOpTime = OpTime();
 };
 
 }  // namespace repl

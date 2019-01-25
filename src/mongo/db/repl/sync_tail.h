@@ -41,6 +41,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -225,7 +226,9 @@ public:
 
     /**
      * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
-     * using a set of threads to apply the operations.
+     * using a set of threads to apply the operations. It will only apply (but will
+     * still write to the oplog) oplog entries with a timestamp greater than or equal to the
+     * beginApplyingTimestamp.
      *
      * If the batch application is successful, returns the optime of the last op applied, which
      * should be the last op in the batch.
@@ -249,6 +252,17 @@ private:
     void _oplogApplication(OplogBuffer* oplogBuffer,
                            ReplicationCoordinator* replCoord,
                            OpQueueBatcher* batcher) noexcept;
+
+    void _fillWriterVectors(OperationContext* opCtx,
+                            MultiApplier::Operations* ops,
+                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                            std::vector<MultiApplier::Operations>* derivedOps,
+                            SessionUpdateTracker* sessionUpdateTracker);
+
+    void _fillWriterVectors(OperationContext* opCtx,
+                            MultiApplier::Operations* ops,
+                            std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                            std::vector<MultiApplier::Operations>* derivedOps);
 
     OplogApplier::Observer* const _observer;
     ReplicationConsistencyMarkers* const _consistencyMarkers;

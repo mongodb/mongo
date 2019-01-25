@@ -52,10 +52,14 @@ struct InitialSyncState {
     InitialSyncState(std::unique_ptr<DatabasesCloner> cloner) : dbsCloner(std::move(cloner)){};
 
     std::unique_ptr<DatabasesCloner>
-        dbsCloner;             // Cloner for all databases included in initial sync.
-    Timestamp beginTimestamp;  // Timestamp from the latest entry in oplog when started.
-    Timestamp stopTimestamp;   // Referred to as minvalid, or the place we can transition states.
-    Timer timer;               // Timer for timing how long each initial sync attempt takes.
+        dbsCloner;                     // Cloner for all databases included in initial sync.
+    Timestamp beginApplyingTimestamp;  // Timestamp from the latest entry in oplog when started. It
+                                       // is also the timestamp after which we will start applying
+                                       // operations during initial sync.
+    Timestamp beginFetchingTimestamp;  // Timestamp from the earliest active transaction that had an
+                                       // oplog entry.
+    Timestamp stopTimestamp;  // Referred to as minvalid, or the place we can transition states.
+    Timer timer;              // Timer for timing how long each initial sync attempt takes.
     size_t fetchedMissingDocs = 0;
     size_t appliedOps = 0;
 };

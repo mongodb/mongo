@@ -507,6 +507,14 @@ BSONObj makeRollbackCheckerResponse(int rollbackId) {
 }
 
 /**
+ * Generates a serverStatus response with an 'oldestActiveOplogEntryOpTime' field.
+ */
+BSONObj makeServerStatusResponse(OpTime oldestActiveTxnOpTime) {
+    return BSON("ok" << 1 << "transactions"
+                     << BSON("oldestActiveOplogEntryOpTime" << oldestActiveTxnOpTime));
+}
+
+/**
  * Generates a cursor response for a Fetcher to consume.
  */
 RemoteCommandResponse makeCursorResponse(CursorId cursorId,
@@ -1156,6 +1164,67 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughRollbackCheckerCallbackError
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 }
 
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampScheduleError) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    // Getting the begin fetching timestamp is the only time a serverStatus command is sent, so we
+    // reject the serverStatus command and save the request for inspection at the end of this test
+    // case.
+    executor::RemoteCommandRequest request;
+    _executorProxy->shouldFailScheduleRemoteCommandRequest =
+        [&request](const executor::RemoteCommandRequest& requestToSend) {
+            request = requestToSend;
+            return "serverStatus" == requestToSend.cmdObj.firstElement().fieldNameStringData();
+        };
+
+    HostAndPort syncSource("localhost", 12345);
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+    }
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+
+    ASSERT_EQUALS(syncSource, request.target);
+    ASSERT_EQUALS(NamespaceString::kAdminDb, request.dbname);
+    assertRemoteCommandNameEquals("serverStatus", request);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampCallbackError) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        net->runReadyNetworkOperations();
+
+        assertRemoteCommandNameEquals(
+            "serverStatus",
+            net->scheduleErrorResponse(
+                Status(ErrorCodes::OperationFailed, "serverStatus command failed at sync source")));
+        net->runReadyNetworkOperations();
+    }
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherScheduleError) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -1179,6 +1248,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
     }
 
@@ -1205,6 +1279,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherCallbac
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         assertRemoteCommandNameEquals(
@@ -1231,6 +1310,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastOplogEntryFetcherOnShutdown) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         ASSERT_TRUE(net->hasReadyRequests());
@@ -1257,6 +1341,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1280,6 +1369,11 @@ TEST_F(InitialSyncerTest,
 
     // Base rollback ID.
     net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+    // Send an empty optime as the response to the serverStatus request, which will cause the
+    // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+    auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+    assertRemoteCommandNameEquals("serverStatus", request);
     net->runReadyNetworkOperations();
 
     // Last oplog entry first attempt - retriable error.
@@ -1308,6 +1402,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1334,6 +1433,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1371,6 +1475,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1397,12 +1506,17 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
-        auto request = assertRemoteCommandNameEquals(
+        request = assertRemoteCommandNameEquals(
             "find",
             net->scheduleErrorResponse(
                 Status(ErrorCodes::OperationFailed, "find command failed at sync source")));
@@ -1427,6 +1541,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsFCVFetcherOnShutdown) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1454,6 +1573,11 @@ TEST_F(InitialSyncerTest, InitialSyncerResendsFindCommandIfFCVFetcherReturnsRetr
 
     // Base rollback ID.
     net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+    // Send an empty optime as the response to the serverStatus request, which will cause the
+    // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+    auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+    assertRemoteCommandNameEquals("serverStatus", request);
     net->runReadyNetworkOperations();
 
     // Last oplog entry.
@@ -1485,6 +1609,11 @@ void InitialSyncerTest::runInitialSyncWithBadFCVResponse(std::vector<BSONObj> do
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1548,6 +1677,11 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1594,6 +1728,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1631,6 +1770,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1646,7 +1790,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
         net->runReadyNetworkOperations();
 
         // Oplog tailing query.
-        auto request = assertRemoteCommandNameEquals(
+        request = assertRemoteCommandNameEquals(
             "find", net->scheduleErrorResponse(Status(ErrorCodes::OperationFailed, "dead cursor")));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->runReadyNetworkOperations();
@@ -1676,10 +1820,15 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
-        auto request =
+        request =
             assertRemoteCommandNameEquals("find",
                                           net->scheduleSuccessfulResponse(makeCursorResponse(
                                               0LL, _options.localOplogNS, {makeOplogEntryObj(1)})));
@@ -1730,6 +1879,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1744,14 +1898,13 @@ TEST_F(
 
         // Oplog tailing query.
         // Simulate cursor closing on sync source.
-        auto request =
-            assertRemoteCommandNameEquals("find",
-                                          net->scheduleSuccessfulResponse(makeCursorResponse(
-                                              0LL,
-                                              _options.localOplogNS,
-                                              {makeOplogEntryObj(1),
-                                               makeOplogEntryObj(2, OpTypeEnum::kCommand),
-                                               makeOplogEntryObj(3, OpTypeEnum::kCommand)})));
+        request = assertRemoteCommandNameEquals("find",
+                                                net->scheduleSuccessfulResponse(makeCursorResponse(
+                                                    0LL,
+                                                    _options.localOplogNS,
+                                                    {makeOplogEntryObj(1),
+                                                     makeOplogEntryObj(2, OpTypeEnum::kCommand),
+                                                     makeOplogEntryObj(3, OpTypeEnum::kCommand)})));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->runReadyNetworkOperations();
 
@@ -1783,6 +1936,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1797,14 +1955,13 @@ TEST_F(
 
         // Oplog tailing query.
         // Simulate cursor closing on sync source.
-        auto request =
-            assertRemoteCommandNameEquals("find",
-                                          net->scheduleSuccessfulResponse(makeCursorResponse(
-                                              0LL,
-                                              _options.localOplogNS,
-                                              {makeOplogEntryObj(1),
-                                               makeOplogEntryObj(2, OpTypeEnum::kCommand),
-                                               makeOplogEntryObj(3, OpTypeEnum::kCommand)})));
+        request = assertRemoteCommandNameEquals("find",
+                                                net->scheduleSuccessfulResponse(makeCursorResponse(
+                                                    0LL,
+                                                    _options.localOplogNS,
+                                                    {makeOplogEntryObj(1),
+                                                     makeOplogEntryObj(2, OpTypeEnum::kCommand),
+                                                     makeOplogEntryObj(3, OpTypeEnum::kCommand)})));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->runReadyNetworkOperations();
 
@@ -1844,6 +2001,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1884,6 +2046,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1921,6 +2088,11 @@ TEST_F(InitialSyncerTest, InitialSyncerIgnoresLocalDatabasesWhenCloningDatabases
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1937,7 +2109,7 @@ TEST_F(InitialSyncerTest, InitialSyncerIgnoresLocalDatabasesWhenCloningDatabases
 
         // Oplog tailing query.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -1984,6 +2156,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2007,7 +2184,7 @@ TEST_F(InitialSyncerTest,
 
         // Oplog tailing query.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -2053,6 +2230,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBothOplogFetcherAndDatabasesCloner
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2102,6 +2284,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2141,6 +2328,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2158,7 +2350,7 @@ TEST_F(InitialSyncerTest,
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -2196,6 +2388,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2206,7 +2403,7 @@ TEST_F(InitialSyncerTest,
 
         // Quickest path to a successful DatabasesCloner completion is to respond to the
         // listDatabases with an empty list of database names.
-        auto request = assertRemoteCommandNameEquals(
+        request = assertRemoteCommandNameEquals(
             "listDatabases", net->scheduleSuccessfulResponse(makeListDatabasesResponse({})));
         net->runReadyNetworkOperations();
 
@@ -2246,6 +2443,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2262,7 +2464,7 @@ TEST_F(InitialSyncerTest,
 
         // Save request for OplogFetcher's oplog tailing query. This request will be canceled.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         auto oplogFetcherNetworkOperationIterator = noi;
@@ -2307,6 +2509,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2324,7 +2531,7 @@ TEST_F(
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
+        request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
@@ -2360,6 +2567,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2377,7 +2589,7 @@ TEST_F(InitialSyncerTest,
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -2426,6 +2638,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2443,7 +2660,7 @@ TEST_F(
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -2495,6 +2712,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2512,7 +2734,7 @@ TEST_F(
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -2564,6 +2786,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2581,7 +2808,7 @@ TEST_F(
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -2615,6 +2842,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2632,7 +2864,7 @@ TEST_F(
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -2671,6 +2903,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2688,7 +2925,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
 
@@ -2728,6 +2965,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherC
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2744,7 +2986,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherC
 
         // Save request for OplogFetcher's oplog tailing query. This request will be canceled.
         auto noi = net->getNextReadyRequest();
-        auto request = assertRemoteCommandNameEquals("find", noi->getRequest());
+        request = assertRemoteCommandNameEquals("find", noi->getRequest());
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         auto oplogFetcherNetworkOperationIterator = noi;
@@ -2790,6 +3032,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2807,7 +3054,7 @@ TEST_F(InitialSyncerTest,
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
+        request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
@@ -2843,6 +3090,11 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2855,8 +3107,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         // database names, we'll simulate copying a single database with a single collection on the
         // sync source.
         NamespaceString nss("a.a");
-        auto request =
-            net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
+        request = net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
         assertRemoteCommandNameEquals("listDatabases", request);
         net->runReadyNetworkOperations();
 
@@ -2930,6 +3181,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2947,7 +3203,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
+        request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
@@ -2987,6 +3243,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3004,7 +3265,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
+        request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
@@ -3044,6 +3305,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3061,7 +3327,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
         // We do not have to respond to the OplogFetcher's oplog tailing query. Blackhole and move
         // on to the DatabasesCloner's request.
         auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
+        request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("tailable"));
         net->blackHole(noi);
@@ -3103,6 +3369,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3119,7 +3390,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
 
         // OplogFetcher's oplog tailing query. Return bad oplog entry that will be added to the
         // oplog buffer and processed by _getNextApplierBatch_inlock().
-        auto request = assertRemoteCommandNameEquals(
+        request = assertRemoteCommandNameEquals(
             "find",
             net->scheduleSuccessfulResponse(makeCursorResponse(
                 1LL, _options.localOplogNS, {oplogEntry, oplogEntryWithInconsistentVersion})));
@@ -3170,6 +3441,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3186,7 +3462,7 @@ TEST_F(
 
         // OplogFetcher's oplog tailing query. Return bad oplog entry that will be added to the
         // oplog buffer and processed by _getNextApplierBatch_inlock().
-        auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
+        request = net->scheduleSuccessfulResponse(makeCursorResponse(
             1LL, _options.localOplogNS, {oplogEntry, oplogEntryWithInconsistentVersion}));
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
@@ -3228,6 +3504,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3244,7 +3525,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
 
         // OplogFetcher's oplog tailing query. Save for later.
         auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
+        request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         auto oplogFetcherNoi = noi;
@@ -3302,6 +3583,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3317,7 +3603,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
         net->runReadyNetworkOperations();
 
         // OplogFetcher's oplog tailing query. Provide enough operations to trigger MultiApplier.
-        auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
+        request = net->scheduleSuccessfulResponse(makeCursorResponse(
             1LL, _options.localOplogNS, {makeOplogEntryObj(1), makeOplogEntryObj(2)}));
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
@@ -3351,6 +3637,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3367,7 +3658,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
 
         // OplogFetcher's oplog tailing query. Save for later.
         auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
+        request = noi->getRequest();
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
         auto oplogFetcherNoi = noi;
@@ -3406,6 +3697,11 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3422,7 +3718,7 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
 
         // OplogFetcher's oplog tailing query. Response has enough operations to reach
         // end timestamp.
-        auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
+        request = net->scheduleSuccessfulResponse(makeCursorResponse(
             1LL, _options.localOplogNS, {makeOplogEntryObj(1), lastOp.toBSON()}));
         assertRemoteCommandNameEquals("find", request);
         ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
@@ -3498,6 +3794,11 @@ TEST_F(InitialSyncerTest,
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3510,8 +3811,7 @@ TEST_F(InitialSyncerTest,
         // database names, we'll simulate copying a single database with a single collection on the
         // sync source.
         NamespaceString nss("a.a");
-        auto request =
-            net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
+        request = net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
         assertRemoteCommandNameEquals("listDatabases", request);
         net->runReadyNetworkOperations();
 
@@ -3612,6 +3912,11 @@ TEST_F(
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3628,7 +3933,7 @@ TEST_F(
 
         // OplogFetcher's oplog tailing query. Response has enough operations to reach
         // end timestamp.
-        auto request = net->scheduleSuccessfulResponse(
+        request = net->scheduleSuccessfulResponse(
             makeCursorResponse(1LL,
                                _options.localOplogNS,
                                {makeOplogEntryObj(1), makeOplogEntryObj(2), lastOp.toBSON()}));
@@ -3703,6 +4008,11 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3713,7 +4023,7 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
 
         // Ignore listDatabases request.
         auto noi = net->getNextReadyRequest();
-        auto request = noi->getRequest();
+        request = noi->getRequest();
         assertRemoteCommandNameEquals("listDatabases", request);
         net->blackHole(noi);
 
@@ -3761,6 +4071,11 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3810,6 +4125,11 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         // Base rollback ID.
         auto request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
         assertRemoteCommandNameEquals("replSetGetRBID", request);
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -4020,6 +4340,11 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+
+        // Send an empty optime as the response to the serverStatus request, which will cause the
+        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
+        assertRemoteCommandNameEquals("serverStatus", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -4030,8 +4355,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
 
         // listDatabases
         NamespaceString nss("a.a");
-        auto request =
-            net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
+        request = net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
         assertRemoteCommandNameEquals("listDatabases", request);
         net->runReadyNetworkOperations();
 

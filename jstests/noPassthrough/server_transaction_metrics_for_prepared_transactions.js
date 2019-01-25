@@ -88,7 +88,7 @@
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentPrepared", 1);
 
-    assert.eq(newStatus.transactions.oldestActiveOplogEntryTimestamp, prepareTimestampForCommit);
+    assert.eq(newStatus.transactions.oldestActiveOplogEntryOpTime.ts, prepareTimestampForCommit);
     // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
     // has been prepared.
     assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
@@ -137,7 +137,7 @@
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentPrepared", 1);
 
-    assert.eq(newStatus.transactions.oldestActiveOplogEntryTimestamp, prepareTimestampForAbort);
+    assert.eq(newStatus.transactions.oldestActiveOplogEntryOpTime.ts, prepareTimestampForAbort);
     // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
     // has been prepared.
     assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));

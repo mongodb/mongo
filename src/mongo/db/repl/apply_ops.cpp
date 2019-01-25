@@ -322,14 +322,16 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 }
 
 /**
- * Make sure that if we are in replication recovery, we don't apply the prepare transaction oplog
- * entry as part of recovery until the very end of recovery. Otherwise, only apply the prepare
- * transaction oplog entry if we are a secondary.
+ * Make sure that if we are in replication recovery or initial sync, we don't apply the prepare
+ * transaction oplog entry until we either see a commit transaction oplog entry or are at the very
+ * end of recovery/initial sync. Otherwise, only apply the prepare transaction oplog entry if we are
+ * a secondary.
  */
 Status _applyPrepareTransactionOplogEntry(OperationContext* opCtx,
                                           const repl::OplogEntry& entry,
                                           repl::OplogApplication::Mode oplogApplicationMode) {
-    // Wait until the end of recovery to apply the operations from the prepared transaction.
+    // Don't apply the operations from the prepared transaction until either we see a commit
+    // transaction oplog entry during recovery or are at the end of recovery.
     if (oplogApplicationMode == OplogApplication::Mode::kRecovering) {
         if (!serverGlobalParams.enableMajorityReadConcern) {
             error() << "Cannot replay a prepared transaction when 'enableMajorityReadConcern' is "
@@ -339,12 +341,19 @@ Status _applyPrepareTransactionOplogEntry(OperationContext* opCtx,
         fassert(50964, serverGlobalParams.enableMajorityReadConcern);
         return Status::OK();
     }
+
+    // Don't apply the operations from the prepared transaction until either we see a commit
+    // transaction oplog entry during the oplog application phase of initial sync or are at the end
+    // of initial sync.
+    if (oplogApplicationMode == OplogApplication::Mode::kInitialSync) {
+        return Status::OK();
+    }
+
     // Return error if run via applyOps command.
     uassert(50945,
             "applyOps with prepared flag is only used internally by secondaries.",
             oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
 
-    // TODO: SERVER-36492 Only run on secondary until we support initial sync.
     invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
 
     return _applyPrepareTransaction(opCtx, entry, oplogApplicationMode);
