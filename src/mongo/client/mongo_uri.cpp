@@ -430,7 +430,7 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
                               str::stream() << "Hostname " << target << " is not within the domain "
                                             << domain);
                 }
-                return HostAndPort(srv.host, srv.port);
+                return HostAndPort(target.noncanonicalName(), srv.port);
             });
     }
 

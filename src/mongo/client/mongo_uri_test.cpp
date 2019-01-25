@@ -805,7 +805,7 @@ TEST(MongoURI, srvRecordTest) {
          "",
          "",
          "",
-         {{"localhost.test.build.10gen.cc.", 27017}, {"localhost.test.build.10gen.cc.", 27018}},
+         {{"localhost.test.build.10gen.cc", 27017}, {"localhost.test.build.10gen.cc", 27018}},
          {{"ssl", "true"}},
          success},
 
@@ -815,7 +815,7 @@ TEST(MongoURI, srvRecordTest) {
          "",
          "",
          "",
-         {{"localhost.test.build.10gen.cc.", 27017}, {"localhost.test.build.10gen.cc.", 27018}},
+         {{"localhost.test.build.10gen.cc", 27017}, {"localhost.test.build.10gen.cc", 27018}},
          {{"ssl", "false"}},
          success},
 
@@ -826,7 +826,7 @@ TEST(MongoURI, srvRecordTest) {
          "",
          "",
          {
-             {"localhost.sub.test.build.10gen.cc.", 27017},
+             {"localhost.sub.test.build.10gen.cc", 27017},
          },
          {
              {"ssl", "true"}, {"replicaSet", "repl0"},
@@ -840,7 +840,7 @@ TEST(MongoURI, srvRecordTest) {
          "",
          "",
          {
-             {"localhost.sub.test.build.10gen.cc.", 27017},
+             {"localhost.sub.test.build.10gen.cc", 27017},
          },
          {
              {"ssl", "true"}, {"replicaSet", "repl0"},
@@ -853,7 +853,7 @@ TEST(MongoURI, srvRecordTest) {
          "user",
          "password",
          "database",
-         {{"localhost.test.build.10gen.cc.", 27018}, {"localhost.test.build.10gen.cc.", 27019}},
+         {{"localhost.test.build.10gen.cc", 27018}, {"localhost.test.build.10gen.cc", 27019}},
          {{"someOption", "someValue"}, {"someOtherOption", "someOtherValue"}, {"ssl", "true"}},
          success},
 
@@ -864,7 +864,7 @@ TEST(MongoURI, srvRecordTest) {
          "user",
          "password",
          "database",
-         {{"localhost.test.build.10gen.cc.", 27017}},
+         {{"localhost.test.build.10gen.cc", 27017}},
          {{"someOption", "someValue"}, {"someOtherOption", "someOtherValue"}, {"ssl", "true"}},
          success},
 
@@ -875,7 +875,7 @@ TEST(MongoURI, srvRecordTest) {
          "user",
          "password",
          "database",
-         {{"localhost.test.build.10gen.cc.", 27017}},
+         {{"localhost.test.build.10gen.cc", 27017}},
          {{"someOption", "someValue"},
           {"someOtherOption", "someOtherValue"},
           {"replicaSet", "repl0"},
@@ -889,7 +889,7 @@ TEST(MongoURI, srvRecordTest) {
          "user",
          "password",
          "database",
-         {{"localhost.test.build.10gen.cc.", 27017}},
+         {{"localhost.test.build.10gen.cc", 27017}},
          {{"someOption", "someValue"},
           {"someOtherOption", "someOtherValue"},
           {"replicaSet", "repl0"},
