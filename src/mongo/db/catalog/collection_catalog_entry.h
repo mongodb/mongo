@@ -46,8 +46,30 @@ class Collection;
 class IndexDescriptor;
 class OperationContext;
 
+// Indicates which protocol an index build is using.
+enum class IndexBuildProtocol {
+    /**
+     * Refers to the pre-FCV 4.2 index build protocol for building indexes in replica sets.
+     * Index builds must complete on the primary before replicating, and are not resumable in
+     * any scenario.
+     */
+    kSinglePhase,
+    /**
+     * Refers to the FCV 4.2 two-phase index build protocol for building indexes in replica
+     * sets. Indexes are built simultaneously on all nodes and are resumable during the draining
+     * phase.
+     */
+    kTwoPhase
+};
+
 class CollectionCatalogEntry {
 public:
+    /**
+     * Incremented when breaking changes are made to the index build procedure so that other servers
+     * know whether or not to resume or discard unfinished index builds.
+     */
+    static const int kIndexBuildVersion = 1;
+
     CollectionCatalogEntry(StringData ns) : _ns(ns) {}
     virtual ~CollectionCatalogEntry() {}
 
@@ -123,9 +145,57 @@ public:
 
     virtual Status prepareForIndexBuild(OperationContext* opCtx,
                                         const IndexDescriptor* spec,
+                                        IndexBuildProtocol indexBuildProtocol,
                                         bool isBackgroundSecondaryBuild) = 0;
 
+    /**
+     * Returns whether or not the index is being built with the two-phase index build procedure.
+     */
+    virtual bool isTwoPhaseIndexBuild(OperationContext* opCtx, StringData indexName) const = 0;
+
+    /**
+     * Returns the server-compatibility version of the index build procedure.
+     */
+    virtual long getIndexBuildVersion(OperationContext* opCtx, StringData indexName) const = 0;
+
+    /**
+     * Indicate that a build index is now in the "scanning" phase of a hybrid index build. The
+     * 'constraintViolationsIdent' is only used for unique indexes.
+     *
+     * It is only valid to call this when the index is using the kTwoPhase IndexBuildProtocol.
+     */
+    virtual void setIndexBuildScanning(OperationContext* opCtx,
+                                       StringData indexName,
+                                       std::string sideWritesIdent,
+                                       boost::optional<std::string> constraintViolationsIdent) = 0;
+
+    /**
+     * Returns whether or not this index is building in the "scanning" phase.
+     */
+    virtual bool isIndexBuildScanning(OperationContext* opCtx, StringData indexName) const = 0;
+
+    /**
+     * Indicate that a build index is now in the "draining" phase of a hybrid index build.
+     *
+     * It is only valid to call this when the index is using the kTwoPhase IndexBuildProtocol.
+     */
+    virtual void setIndexBuildDraining(OperationContext* opCtx, StringData indexName) = 0;
+
+    /**
+     * Returns whether or not this index is building in the "draining" phase.
+     */
+    virtual bool isIndexBuildDraining(OperationContext* opCtx, StringData indexName) const = 0;
+
+    /**
+     * Indicate that an index build is completed and the index is ready to use.
+     */
     virtual void indexBuildSuccess(OperationContext* opCtx, StringData indexName) = 0;
+
+    virtual boost::optional<std::string> getSideWritesIdent(OperationContext* opCtx,
+                                                            StringData indexName) const = 0;
+
+    virtual boost::optional<std::string> getConstraintViolationsIdent(
+        OperationContext* opCtx, StringData indexName) const = 0;
 
     /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
      * The specified index must already contain an expireAfterSeconds field, and the value in

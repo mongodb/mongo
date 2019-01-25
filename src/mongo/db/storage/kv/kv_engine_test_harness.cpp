@@ -358,13 +358,16 @@ TEST(KVCatalogTest, Idx1) {
 
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = "a.b";
-        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
-                                                                            << "foo"),
-                                                                       false,
-                                                                       RecordId(),
-                                                                       false,
-                                                                       KVPrefix::kNotPrefixed,
-                                                                       false));
+
+        BSONCollectionCatalogEntry::IndexMetaData imd;
+        imd.spec = BSON("name"
+                        << "foo");
+        imd.ready = false;
+        imd.head = RecordId();
+        imd.multikey = false;
+        imd.prefix = KVPrefix::kNotPrefixed;
+        imd.isBackgroundSecondaryBuild = false;
+        md.indexes.push_back(imd);
         catalog->putMetaData(&opCtx, "a.b", md);
         uow.commit();
     }
@@ -388,13 +391,16 @@ TEST(KVCatalogTest, Idx1) {
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = "a.b";
         catalog->putMetaData(&opCtx, "a.b", md);  // remove index
-        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
-                                                                            << "foo"),
-                                                                       false,
-                                                                       RecordId(),
-                                                                       false,
-                                                                       KVPrefix::kNotPrefixed,
-                                                                       false));
+
+        BSONCollectionCatalogEntry::IndexMetaData imd;
+        imd.spec = BSON("name"
+                        << "foo");
+        imd.ready = false;
+        imd.head = RecordId();
+        imd.multikey = false;
+        imd.prefix = KVPrefix::kNotPrefixed;
+        imd.isBackgroundSecondaryBuild = false;
+        md.indexes.push_back(imd);
         catalog->putMetaData(&opCtx, "a.b", md);
         uow.commit();
     }
@@ -436,13 +442,16 @@ TEST(KVCatalogTest, DirectoryPerDb1) {
 
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = "a.b";
-        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
-                                                                            << "foo"),
-                                                                       false,
-                                                                       RecordId(),
-                                                                       false,
-                                                                       KVPrefix::kNotPrefixed,
-                                                                       false));
+
+        BSONCollectionCatalogEntry::IndexMetaData imd;
+        imd.spec = BSON("name"
+                        << "foo");
+        imd.ready = false;
+        imd.head = RecordId();
+        imd.multikey = false;
+        imd.prefix = KVPrefix::kNotPrefixed;
+        imd.isBackgroundSecondaryBuild = false;
+        md.indexes.push_back(imd);
         catalog->putMetaData(&opCtx, "a.b", md);
         ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "a/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
@@ -481,13 +490,16 @@ TEST(KVCatalogTest, Split1) {
 
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = "a.b";
-        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
-                                                                            << "foo"),
-                                                                       false,
-                                                                       RecordId(),
-                                                                       false,
-                                                                       KVPrefix::kNotPrefixed,
-                                                                       false));
+
+        BSONCollectionCatalogEntry::IndexMetaData imd;
+        imd.spec = BSON("name"
+                        << "foo");
+        imd.ready = false;
+        imd.head = RecordId();
+        imd.multikey = false;
+        imd.prefix = KVPrefix::kNotPrefixed;
+        imd.isBackgroundSecondaryBuild = false;
+        md.indexes.push_back(imd);
         catalog->putMetaData(&opCtx, "a.b", md);
         ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "index/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
@@ -526,13 +538,16 @@ TEST(KVCatalogTest, DirectoryPerAndSplit1) {
 
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = "a.b";
-        md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
-                                                                            << "foo"),
-                                                                       false,
-                                                                       RecordId(),
-                                                                       false,
-                                                                       KVPrefix::kNotPrefixed,
-                                                                       false));
+
+        BSONCollectionCatalogEntry::IndexMetaData imd;
+        imd.spec = BSON("name"
+                        << "foo");
+        imd.ready = false;
+        imd.head = RecordId();
+        imd.multikey = false;
+        imd.prefix = KVPrefix::kNotPrefixed;
+        imd.isBackgroundSecondaryBuild = false;
+        md.indexes.push_back(imd);
         catalog->putMetaData(&opCtx, "a.b", md);
         ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "a/index/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
@@ -576,13 +591,16 @@ TEST(KVCatalogTest, RestartForPrefixes) {
 
             BSONCollectionCatalogEntry::MetaData md;
             md.ns = "a.b";
-            md.indexes.push_back(BSONCollectionCatalogEntry::IndexMetaData(BSON("name"
-                                                                                << "foo"),
-                                                                           false,
-                                                                           RecordId(),
-                                                                           false,
-                                                                           fooIndexPrefix,
-                                                                           false));
+
+            BSONCollectionCatalogEntry::IndexMetaData imd;
+            imd.spec = BSON("name"
+                            << "foo");
+            imd.ready = false;
+            imd.head = RecordId();
+            imd.multikey = false;
+            imd.prefix = fooIndexPrefix;
+            imd.isBackgroundSecondaryBuild = false;
+            md.indexes.push_back(imd);
             md.prefix = abCollPrefix;
             catalog->putMetaData(&opCtx, "a.b", md);
             uow.commit();

@@ -70,7 +70,7 @@ public:
 
     /**
      * Given a set of duplicate keys, record the keys for later verification by a call to
-     * checkConstraints();
+     * checkDuplicateKeyConstraints();
      */
     Status recordDuplicateKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys);
 
@@ -108,6 +108,10 @@ public:
       * that were tracked during the build.
       */
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
+
+    const std::string& getSideWritesTableIdent() const;
+
+    const std::string& getConstraintViolationsTableIdent() const;
 
 private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;

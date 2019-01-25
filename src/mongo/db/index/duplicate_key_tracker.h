@@ -72,6 +72,10 @@ public:
      */
     bool areAllConstraintsChecked(OperationContext* opCtx) const;
 
+    const std::string& getConstraintsTableIdent() const {
+        return _keyConstraintsTable->rs()->getIdent();
+    }
+
 private:
     const IndexCatalogEntry* _indexCatalogEntry;
 

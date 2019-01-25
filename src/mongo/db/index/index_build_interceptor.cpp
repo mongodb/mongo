@@ -80,6 +80,15 @@ bool IndexBuildInterceptor::areAllConstraintsChecked(OperationContext* opCtx) co
     return _duplicateKeyTracker->areAllConstraintsChecked(opCtx);
 }
 
+const std::string& IndexBuildInterceptor::getSideWritesTableIdent() const {
+    return _sideWritesTable->rs()->getIdent();
+}
+
+const std::string& IndexBuildInterceptor::getConstraintViolationsTableIdent() const {
+    return _duplicateKeyTracker->getConstraintsTableIdent();
+}
+
+
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    const InsertDeleteOptions& options) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());

@@ -140,7 +140,9 @@ public:
         DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
         CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
         const bool isBackgroundSecondaryBuild = false;
-        auto ret = cce->prepareForIndexBuild(opCtx, descriptor.get(), isBackgroundSecondaryBuild);
+        const auto protocol = IndexBuildProtocol::kSinglePhase;
+        auto ret = cce->prepareForIndexBuild(
+            opCtx, descriptor.get(), protocol, isBackgroundSecondaryBuild);
         if (!ret.isOK()) {
             return ret;
         }

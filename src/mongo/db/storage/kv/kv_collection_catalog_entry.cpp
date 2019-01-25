@@ -217,12 +217,20 @@ Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData
 
 Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
                                                       const IndexDescriptor* spec,
+                                                      IndexBuildProtocol indexBuildProtocol,
                                                       bool isBackgroundSecondaryBuild) {
     MetaData md = _getMetaData(opCtx);
 
     KVPrefix prefix = KVPrefix::getNextPrefix(ns());
-    IndexMetaData imd(
-        spec->infoObj(), false, RecordId(), false, prefix, isBackgroundSecondaryBuild);
+    IndexMetaData imd;
+    imd.spec = spec->infoObj();
+    imd.ready = false;
+    imd.head = RecordId();
+    imd.multikey = false;
+    imd.prefix = prefix;
+    imd.isBackgroundSecondaryBuild = isBackgroundSecondaryBuild;
+    imd.runTwoPhaseBuild = indexBuildProtocol == IndexBuildProtocol::kTwoPhase;
+
     if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
         const auto feature =
             KVCatalog::FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;
@@ -254,12 +262,95 @@ Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
     return status;
 }
 
+bool KVCollectionCatalogEntry::isTwoPhaseIndexBuild(OperationContext* opCtx,
+                                                    StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].runTwoPhaseBuild;
+}
+
+long KVCollectionCatalogEntry::getIndexBuildVersion(OperationContext* opCtx,
+                                                    StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].versionOfBuild;
+}
+
+void KVCollectionCatalogEntry::setIndexBuildScanning(
+    OperationContext* opCtx,
+    StringData indexName,
+    std::string sideWritesIdent,
+    boost::optional<std::string> constraintViolationsIdent) {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    invariant(!md.indexes[offset].ready);
+    invariant(!md.indexes[offset].buildPhase);
+    invariant(md.indexes[offset].runTwoPhaseBuild);
+
+    md.indexes[offset].buildPhase = kIndexBuildScanning.toString();
+    md.indexes[offset].sideWritesIdent = sideWritesIdent;
+    md.indexes[offset].constraintViolationsIdent = constraintViolationsIdent;
+    _catalog->putMetaData(opCtx, ns().toString(), md);
+}
+
+bool KVCollectionCatalogEntry::isIndexBuildScanning(OperationContext* opCtx,
+                                                    StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].buildPhase == kIndexBuildScanning.toString();
+}
+
+void KVCollectionCatalogEntry::setIndexBuildDraining(OperationContext* opCtx,
+                                                     StringData indexName) {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    invariant(!md.indexes[offset].ready);
+    invariant(md.indexes[offset].runTwoPhaseBuild);
+    invariant(md.indexes[offset].buildPhase == kIndexBuildScanning.toString());
+
+    md.indexes[offset].buildPhase = kIndexBuildDraining.toString();
+    _catalog->putMetaData(opCtx, ns().toString(), md);
+}
+
+bool KVCollectionCatalogEntry::isIndexBuildDraining(OperationContext* opCtx,
+                                                    StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].buildPhase == kIndexBuildDraining.toString();
+}
+
 void KVCollectionCatalogEntry::indexBuildSuccess(OperationContext* opCtx, StringData indexName) {
     MetaData md = _getMetaData(opCtx);
     int offset = md.findIndexOffset(indexName);
     invariant(offset >= 0);
     md.indexes[offset].ready = true;
+    md.indexes[offset].runTwoPhaseBuild = false;
+    md.indexes[offset].buildPhase = boost::none;
+    md.indexes[offset].sideWritesIdent = boost::none;
+    md.indexes[offset].constraintViolationsIdent = boost::none;
     _catalog->putMetaData(opCtx, ns().toString(), md);
+}
+
+boost::optional<std::string> KVCollectionCatalogEntry::getSideWritesIdent(
+    OperationContext* opCtx, StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].sideWritesIdent;
+}
+
+boost::optional<std::string> KVCollectionCatalogEntry::getConstraintViolationsIdent(
+    OperationContext* opCtx, StringData indexName) const {
+    MetaData md = _getMetaData(opCtx);
+    int offset = md.findIndexOffset(indexName);
+    invariant(offset >= 0);
+    return md.indexes[offset].constraintViolationsIdent;
 }
 
 void KVCollectionCatalogEntry::updateTTLSetting(OperationContext* opCtx,

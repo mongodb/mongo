@@ -47,6 +47,9 @@ namespace mongo {
  */
 class BSONCollectionCatalogEntry : public CollectionCatalogEntry {
 public:
+    static const StringData kIndexBuildScanning;
+    static const StringData kIndexBuildDraining;
+
     BSONCollectionCatalogEntry(StringData ns);
 
     virtual ~BSONCollectionCatalogEntry() {}
@@ -82,14 +85,6 @@ public:
 
     struct IndexMetaData {
         IndexMetaData() {}
-        IndexMetaData(
-            BSONObj s, bool r, RecordId h, bool m, KVPrefix prefix, bool isBackgroundSecondaryBuild)
-            : spec(s),
-              ready(r),
-              head(h),
-              multikey(m),
-              prefix(prefix),
-              isBackgroundSecondaryBuild(isBackgroundSecondaryBuild) {}
 
         void updateTTLSetting(long long newExpireSeconds);
 
@@ -98,11 +93,18 @@ public:
         }
 
         BSONObj spec;
-        bool ready;
+        bool ready = false;
         RecordId head;
-        bool multikey;
+        bool multikey = false;
         KVPrefix prefix = KVPrefix::kNotPrefixed;
-        bool isBackgroundSecondaryBuild;
+        bool isBackgroundSecondaryBuild = false;
+
+        long versionOfBuild = kIndexBuildVersion;
+        // If true, a two-phase index build is in progress, false otherwise.
+        bool runTwoPhaseBuild = false;
+        boost::optional<std::string> buildPhase;
+        boost::optional<std::string> constraintViolationsIdent;
+        boost::optional<std::string> sideWritesIdent;
 
         // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in
         // the index key pattern. Each element in the vector is an ordered set of positions
