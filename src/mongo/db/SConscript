@@ -521,6 +521,7 @@ env.Library(
         'service_context.cpp',
         'server_recovery.cpp',
         'unclean_shutdown.cpp',
+        'repl_set_member_in_standalone_mode.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_id',
