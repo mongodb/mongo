@@ -167,20 +167,24 @@
                 });
             } else {
                 // If majority reads are not supported, then our only option is to poll for the
-                // lastOpCommitted on the secondary to catch up.
+                // appliedOpTime on the secondary to catch up.
                 assert.soon(
                     function() {
                         const rsStatus =
                             assert.commandWorked(db.adminCommand({replSetGetStatus: 1}));
-                        const committedOpTime = rsStatus.optimes.lastCommittedOpTime;
-                        if (bsonWoCompare(committedOpTime.ts, clusterTime) >= 0) {
+
+                        // The 'atClusterTime' waits for the appliedOpTime to advance to
+                        // 'clusterTime'.
+                        const appliedOpTime = rsStatus.optimes.appliedOpTime;
+                        if (bsonWoCompare(appliedOpTime.ts, clusterTime) >= 0) {
                             debugInfo.push({
                                 "node": db.getMongo(),
                                 "session": session,
-                                "committedOpTime": committedOpTime.ts
+                                "appliedOpTime": appliedOpTime.ts
                             });
                         }
-                        return bsonWoCompare(committedOpTime.ts, clusterTime) >= 0;
+
+                        return bsonWoCompare(appliedOpTime.ts, clusterTime) >= 0;
                     },
                     "The majority commit point on secondary " + i + " failed to reach " +
                         clusterTime,
