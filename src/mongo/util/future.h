@@ -1097,6 +1097,29 @@ public:
     }
 
     /**
+     * Similar to the first two onErrors, but only calls the callback if the category matches
+     * the template parameter. Otherwise lets the error propagate unchanged.
+     */
+    template <ErrorCategory category, typename Func>
+        Future<T> onErrorCategory(Func&& func) && noexcept {
+        using Result = RawNormalizedCallResult<Func, Status>;
+        static_assert(
+            std::is_same<Result, T>::value || std::is_same<Result, Future<T>>::value ||
+                (std::is_same<T, FakeVoid>::value && std::is_same<Result, Future<void>>::value),
+            "func passed to Future<T>::onErrorCategory must return T, StatusWith<T>, or Future<T>");
+
+        if (_immediate || (isReady() && _shared->status.isOK()))
+            return std::move(*this);
+
+        return std::move(*this).onError([func =
+                                             std::forward<Func>(func)](Status && status) mutable {
+            if (!ErrorCodes::isA<category>(status.code()))
+                uassertStatusOK(status);
+            return throwingCall(func, std::move(status));
+        });
+    }
+
+    /**
      * TODO do we need a version of then/onError like onCompletion() that handles both success and
      * Failure, but doesn't end the chain like getAsync()? Right now we don't, and we can add one if
      * we do.

@@ -529,6 +529,50 @@ TEST(Future, Fail_onErrorCodeMismatch) {
     });
 }
 
+TEST(Future, Success_onErrorCategory) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            ASSERT_EQ(
+                                std::move(fut)
+                                    .onErrorCategory<ErrorCategory::NetworkError>([](Status) {
+                                        FAIL("onErrorCategory<category>() callback was called");
+                                        return 0;
+                                    })
+                                    .then([](int i) { return i + 2; })
+                                    .get(),
+                                3);
+                        });
+}
+
+TEST(Future, Fail_onErrorCategoryMatch) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        auto res = std::move(fut)
+                       .onError([](Status s) {
+                           ASSERT_EQ(s, failStatus());
+                           return StatusWith<int>(ErrorCodes::HostUnreachable, "");
+                       })
+                       .onErrorCategory<ErrorCategory::NetworkError>(
+                           [](Status&&) { return StatusWith<int>(3); })
+                       .getNoThrow();
+        ASSERT_EQ(res, 3);
+    });
+}
+
+TEST(Future, Fail_onErrorCategoryMismatch) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onErrorCategory<ErrorCategory::NetworkError>([](Status s) -> int {
+                          FAIL("Why was this called?") << s;
+                          MONGO_UNREACHABLE;
+                      })
+                      .onError([](Status s) {
+                          ASSERT_EQ(s, failStatus());
+                          return 3;
+                      })
+                      .getNoThrow(),
+                  3);
+    });
+}
 
 TEST(Future, Success_tap) {
     FUTURE_SUCCESS_TEST([] { return 1; },
