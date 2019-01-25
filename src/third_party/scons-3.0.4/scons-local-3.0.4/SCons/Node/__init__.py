@@ -1486,7 +1486,7 @@ class Node(object, with_metaclass(NoSlotsPyPy)):
                     result = True
             except DeciderNeedsNode as e:
                 if e.decider(self, prev_ni, node=node):
-                    if t: Trace(': %s changed' % child)
+                    if t: Trace(': in DeciderNeedsNode logic %s changed' % child)
                     result = True
 
         if self.has_builder():
