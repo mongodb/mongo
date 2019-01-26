@@ -88,9 +88,9 @@ KVStorageEngine::KVStorageEngine(
       _options(std::move(options)),
       _databaseCatalogEntryFactory(std::move(databaseCatalogEntryFactory)),
       _dropPendingIdentReaper(engine),
-      _oldestTimestampListener(
-          TimestampMonitor::TimestampType::kOldest,
-          [this](Timestamp timestamp) { _onOldestTimestampChanged(timestamp); }),
+      _minOfCheckpointAndOldestTimestampListener(
+          TimestampMonitor::TimestampType::kMinOfCheckpointAndOldest,
+          [this](Timestamp timestamp) { _onMinOfCheckpointAndOldestTimestampChanged(timestamp); }),
       _supportsDocLocking(_engine->supportsDocLocking()),
       _supportsDBLocking(_engine->supportsDBLocking()),
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
@@ -476,7 +476,7 @@ std::string KVStorageEngine::getFilesystemPathForDb(const std::string& dbName) c
 
 void KVStorageEngine::cleanShutdown() {
     if (_timestampMonitor) {
-        _timestampMonitor->removeListener(&_oldestTimestampListener);
+        _timestampMonitor->removeListener(&_minOfCheckpointAndOldestTimestampListener);
     }
 
     for (DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it) {
@@ -500,7 +500,7 @@ void KVStorageEngine::finishInit() {
         _timestampMonitor = std::make_unique<TimestampMonitor>(
             _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
         _timestampMonitor->startup();
-        _timestampMonitor->addListener(&_oldestTimestampListener);
+        _timestampMonitor->addListener(&_minOfCheckpointAndOldestTimestampListener);
     }
 }
 
@@ -794,17 +794,18 @@ void KVStorageEngine::addDropPendingIdent(const Timestamp& dropTimestamp,
     _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident);
 }
 
-void KVStorageEngine::_onOldestTimestampChanged(const Timestamp& oldestTimestamp) {
-    if (oldestTimestamp.isNull()) {
+void KVStorageEngine::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {
+    if (timestamp.isNull()) {
         return;
     }
+
     // No drop-pending idents present if getEarliestDropTimestamp() returns boost::none.
     if (auto earliestDropTimestamp = _dropPendingIdentReaper.getEarliestDropTimestamp()) {
-        if (oldestTimestamp > *earliestDropTimestamp) {
-            log() << "Removing drop-pending idents with drop timestamps before: "
-                  << oldestTimestamp;
+        if (timestamp > *earliestDropTimestamp) {
+            log() << "Removing drop-pending idents with drop timestamps before timestamp "
+                  << timestamp;
             auto opCtx = cc().makeOperationContext();
-            _dropPendingIdentReaper.dropIdentsOlderThan(opCtx.get(), oldestTimestamp);
+            _dropPendingIdentReaper.dropIdentsOlderThan(opCtx.get(), timestamp);
         }
     }
 }
@@ -814,6 +815,11 @@ KVStorageEngine::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRu
     _currentTimestamps.checkpoint = _engine->getCheckpointTimestamp();
     _currentTimestamps.oldest = _engine->getOldestTimestamp();
     _currentTimestamps.stable = _engine->getStableTimestamp();
+    _currentTimestamps.minOfCheckpointAndOldest =
+        (_currentTimestamps.checkpoint.isNull() ||
+         (_currentTimestamps.checkpoint > _currentTimestamps.oldest))
+        ? _currentTimestamps.oldest
+        : _currentTimestamps.checkpoint;
 }
 
 KVStorageEngine::TimestampMonitor::~TimestampMonitor() {
@@ -826,29 +832,37 @@ void KVStorageEngine::TimestampMonitor::startup() {
     invariant(!_running);
 
     log() << "Timestamp monitor starting";
-    PeriodicRunner::PeriodicJob job("TimestampMonitor",
-                                    [&](Client* client) {
-                                        Timestamp checkpoint = _engine->getCheckpointTimestamp();
-                                        Timestamp oldest = _engine->getOldestTimestamp();
-                                        Timestamp stable = _engine->getStableTimestamp();
+    PeriodicRunner::PeriodicJob job(
+        "TimestampMonitor",
+        [&](Client* client) {
+            Timestamp checkpoint = _engine->getCheckpointTimestamp();
+            Timestamp oldest = _engine->getOldestTimestamp();
+            Timestamp stable = _engine->getStableTimestamp();
+            Timestamp minOfCheckpointAndOldest =
+                (checkpoint.isNull() || (checkpoint > oldest)) ? oldest : checkpoint;
 
-                                        // Notify listeners if the timestamps changed.
-                                        if (_currentTimestamps.checkpoint != checkpoint) {
-                                            _currentTimestamps.checkpoint = checkpoint;
-                                            notifyAll(TimestampType::kCheckpoint, checkpoint);
-                                        }
+            // Notify listeners if the timestamps changed.
+            if (_currentTimestamps.checkpoint != checkpoint) {
+                _currentTimestamps.checkpoint = checkpoint;
+                notifyAll(TimestampType::kCheckpoint, checkpoint);
+            }
 
-                                        if (_currentTimestamps.oldest != oldest) {
-                                            _currentTimestamps.oldest = oldest;
-                                            notifyAll(TimestampType::kOldest, oldest);
-                                        }
+            if (_currentTimestamps.oldest != oldest) {
+                _currentTimestamps.oldest = oldest;
+                notifyAll(TimestampType::kOldest, oldest);
+            }
 
-                                        if (_currentTimestamps.stable != stable) {
-                                            _currentTimestamps.stable = stable;
-                                            notifyAll(TimestampType::kStable, stable);
-                                        }
-                                    },
-                                    Seconds(1));
+            if (_currentTimestamps.stable != stable) {
+                _currentTimestamps.stable = stable;
+                notifyAll(TimestampType::kStable, stable);
+            }
+
+            if (_currentTimestamps.minOfCheckpointAndOldest != minOfCheckpointAndOldest) {
+                _currentTimestamps.minOfCheckpointAndOldest = minOfCheckpointAndOldest;
+                notifyAll(TimestampType::kMinOfCheckpointAndOldest, minOfCheckpointAndOldest);
+            }
+        },
+        Seconds(1));
     _periodicRunner->scheduleJob(std::move(job));
     _running = true;
 }

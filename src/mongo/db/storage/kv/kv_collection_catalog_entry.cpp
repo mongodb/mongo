@@ -96,7 +96,7 @@ public:
         auto storageEngine = engine->getStorageEngine();
         if (storageEngine->supportsPendingDrops() && commitTimestamp) {
             log() << "Deferring ident drop for " << _ident << " (" << _indexNss
-                  << ") with commit timestamp: " << commitTimestamp->toBSON();
+                  << ") with commit timestamp: " << commitTimestamp;
             engine->addDropPendingIdent(*commitTimestamp, _indexNss, _ident);
         } else {
             auto kvEngine = engine->getEngine();

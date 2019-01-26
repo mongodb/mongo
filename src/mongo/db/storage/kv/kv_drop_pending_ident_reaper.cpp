@@ -110,14 +110,12 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             const auto& nss = identInfo.nss;
             const auto& ident = identInfo.ident;
             log() << "Completing drop for ident " << ident << " (ns: " << nss
-                  << ") with drop timestamp " << dropTimestamp << " (checkpointed timestamp: " << ts
-                  << ")";
+                  << ") with drop timestamp " << dropTimestamp;
             WriteUnitOfWork wuow(opCtx);
             auto status = _engine->dropIdent(opCtx, ident);
             if (!status.isOK()) {
                 severe() << "Failed to remove drop-pending ident " << ident << "(ns: " << nss
-                         << ") with drop timestamp " << dropTimestamp
-                         << " (checkpointed timestamp: " << ts << "): " << status;
+                         << ") with drop timestamp " << dropTimestamp << ": " << status;
                 fassertFailedNoTrace(51022);
             }
             wuow.commit();

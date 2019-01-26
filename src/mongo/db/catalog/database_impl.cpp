@@ -619,7 +619,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         auto commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
         log() << "dropCollection: " << fullns << " (" << uuidString
               << ") - storage engine will take ownership of drop-pending collection with optime "
-              << dropOpTime << " and commit timestamp " << commitTimestamp.toBSON();
+              << dropOpTime << " and commit timestamp " << commitTimestamp;
         return _finishDropCollection(opCtx, fullns, collection);
     }
 
