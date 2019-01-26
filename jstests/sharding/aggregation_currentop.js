@@ -734,8 +734,6 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     assert.commandWorked(sessionDB.adminCommand(
         {setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
 
-    const timeBeforeTransactionStarts = new ISODate();
-
     // Start but do not complete a transaction.
     assert.commandWorked(sessionDB.runCommand({
         insert: "test",
@@ -773,7 +771,6 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     assert.eq(transactionDocument.parameters.autocommit, false);
     assert.eq(transactionDocument.parameters.readConcern, {level: "snapshot"});
     assert.gte(transactionDocument.readTimestamp, operationTime);
-    assert.gte(ISODate(transactionDocument.startWallClockTime), timeBeforeTransactionStarts);
     // We round timeOpenMicros up to the nearest multiple of 1000 to avoid occasional assertion
     // failures caused by timeOpenMicros having microsecond precision while
     // timeBeforeCurrentOp/timeAfterTransactionStarts only have millisecond precision.
@@ -781,6 +778,9 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000);
     assert.gte(transactionDocument.timeActiveMicros, 0);
     assert.gte(transactionDocument.timeInactiveMicros, 0);
+    // Not worried about its specific value, validate that in general we return some non-zero &
+    // valid time greater than epoch time.
+    assert.gt(ISODate(transactionDocument.startWallClockTime), ISODate("1970-01-01T00:00:00.000Z"));
     assert.eq(
         ISODate(transactionDocument.expiryTime).getTime(),
         ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000);
