@@ -509,6 +509,23 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
                                stitch_support_v1_status* status);
 
 /**
+ * Return the document that would result from an {upsert: true} update operation that must perform
+ * an upsert. The resulting document is based on the match predicate in the associated matcher and
+ * on the update document. There is no "input document," like in stitch_support_v1_apply(), because
+ * upserts occur when no input document is found by the match predicate.
+ *
+ * This operation requires an update object that has an associated matcher. Returns a pointer to the
+ * output buffer on success or, on error, returns NULL and populates the 'status' object. The caller
+ * is responsible for destroying the result buffer with stitch_support_v1_bson_free().
+ *
+ * Note that, although a database upsert operations guarantees that the inserted document will have
+ * an '_id' field, this function does not populate an '_id' field if one is not in the match or
+ * update document.
+ */
+STITCH_SUPPORT_API uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(
+    stitch_support_v1_update* const update, stitch_support_v1_status* status);
+
+/**
  * Free the memory of a BSON buffer returned by stitch_support_v1_projection_apply() or
  * stitch_support_v1_update_apply(). This function can be safely called on a NULL pointer.
  *

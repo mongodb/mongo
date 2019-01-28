@@ -296,6 +296,49 @@ protected:
         return ss.str();
     }
 
+    auto checkUpsert(const char* expr, const char* match) {
+        stitch_support_v1_matcher* matcher =
+            stitch_support_v1_matcher_create(lib, toBSONForAPI(match).first, nullptr, nullptr);
+        ASSERT(matcher);
+        ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
+
+        stitch_support_v1_update* update = stitch_support_v1_update_create(
+            lib, toBSONForAPI(expr).first, nullptr, matcher, nullptr, status);
+        ON_BLOCK_EXIT([update] { stitch_support_v1_update_destroy(update); });
+
+        uint8_t* upsertResult = stitch_support_v1_update_upsert(update, status);
+        ASSERT(upsertResult);
+        ON_BLOCK_EXIT([upsertResult] { stitch_support_v1_bson_free(upsertResult); });
+
+        return std::string(fromBSONForAPI(upsertResult));
+    }
+
+    auto checkUpsertStatus(const char* expr, const char* match) {
+        auto updateStatus = stitch_support_v1_status_create();
+        ON_BLOCK_EXIT([updateStatus] { stitch_support_v1_status_destroy(updateStatus); });
+
+        stitch_support_v1_matcher* matcher =
+            stitch_support_v1_matcher_create(lib, toBSONForAPI(match).first, nullptr, nullptr);
+        ASSERT(matcher);
+        ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
+
+        stitch_support_v1_update* update = stitch_support_v1_update_create(
+            lib, toBSONForAPI(expr).first, nullptr, matcher, nullptr, updateStatus);
+
+        if (!update) {
+            ASSERT_EQ(STITCH_SUPPORT_V1_ERROR_EXCEPTION,
+                      stitch_support_v1_status_get_error(updateStatus));
+            // Make sure that we get a proper code back but don't worry about its exact value.
+            ASSERT_NE(0, stitch_support_v1_status_get_code(updateStatus));
+        } else {
+            ON_BLOCK_EXIT([update] { stitch_support_v1_update_destroy(update); });
+            auto upsertResult = stitch_support_v1_update_upsert(update, updateStatus);
+            ASSERT_NE(0, stitch_support_v1_status_get_code(updateStatus));
+            ASSERT(!upsertResult);
+        }
+        return std::string(stitch_support_v1_status_get_explanation(updateStatus));
+    }
+
     stitch_support_v1_status* status = nullptr;
     stitch_support_v1_lib* lib = nullptr;
     stitch_support_v1_update_details* updateDetails = nullptr;
@@ -472,6 +515,11 @@ TEST_F(StitchSupportTest, TestUpdateRespectsTheCollation) {
     ASSERT_EQ("[a]", getModifiedPaths());
 }
 
+TEST_F(StitchSupportTest, TestUpdateWithSetOnInsert) {
+    ASSERT_EQ("{ \"a\" : 1 }", checkUpdate("{$setOnInsert: {a: 2}}", "{a: 1}"));
+    ASSERT_EQ("[a]", getModifiedPaths());
+}
+
 TEST_F(StitchSupportTest, TestUpdateProducesProperStatus) {
     ASSERT_EQ("Unknown modifier: $bogus", checkUpdateStatus("{$bogus: {a: 2}}", "{a: 1}"));
     ASSERT_EQ("Updating the path 'a' would create a conflict at 'a'",
@@ -483,6 +531,18 @@ TEST_F(StitchSupportTest, TestUpdateProducesProperStatus) {
     ASSERT_EQ("Update created a conflict at 'a.0'",
               checkUpdateStatus(
                   "{$set: {'a.$[i]': 2, 'a.$[j]': 3}}", "{a: [0]}", nullptr, " [{i: 0}, {j:0}]"));
+}
+
+TEST_F(StitchSupportTest, TestUpsert) {
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : 1 }", checkUpsert("{$set: {a: 1}}", "{_id: 1}"));
+    ASSERT_EQ("{ \"a\" : 2 }", checkUpsert("{$set: {a: 2}}", "{a: 1}"));
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : 1 }", checkUpsert("{$setOnInsert: {a: 1}}", "{_id: 1}"));
+    ASSERT_EQ("{ \"_id\" : 1, \"b\" : 1 }", checkUpsert("{$inc: {b: 1}}", "{_id: 1, a: {$gt: 2}}"));
+}
+
+TEST_F(StitchSupportTest, TestUpsertProducesProperStatus) {
+    ASSERT_EQ("Cannot apply array updates to non-array element a: 1",
+              checkUpsertStatus("{$set: {'a.$[].b': 1}}", "{a: 1}"));
 }
 
 }  // namespace

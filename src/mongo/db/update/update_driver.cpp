@@ -244,6 +244,7 @@ Status UpdateDriver::update(StringData matchedField,
                             mutablebson::Document* doc,
                             bool validateForStorage,
                             const FieldRefSet& immutablePaths,
+                            bool isInsert,
                             BSONObj* logOpRec,
                             bool* docWasModified,
                             FieldRefSetWithStorage* modifiedPaths) {
@@ -256,7 +257,7 @@ Status UpdateDriver::update(StringData matchedField,
 
     UpdateNode::ApplyParams applyParams(doc->root(), immutablePaths);
     applyParams.matchedField = matchedField;
-    applyParams.insert = _insert;
+    applyParams.insert = isInsert;
     applyParams.fromOplogApplication = _fromOplogApplication;
     applyParams.validateForStorage = validateForStorage;
     applyParams.indexData = _indexedFields;

@@ -570,6 +570,7 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
                                                     &mutableDoc,
                                                     false /* validateForStorage */,
                                                     immutablePaths,
+                                                    false /* isInsert */,
                                                     nullptr /* logOpRec*/,
                                                     &docWasModified,
                                                     &modifiedPaths));
@@ -587,6 +588,39 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
             update_details->modifiedPaths = modifiedPaths.serialize();
         }
 
+        return mongo::toInterfaceType(output);
+    });
+}
+
+uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update* const update,
+                                                        stitch_support_v1_status* status) {
+    return enterCXX(mongo::getStatusImpl(status), [&] {
+        mongo::FieldRefSet immutablePaths;  //  Empty set
+        bool docWasModified = false;
+
+        mongo::mutablebson::Document mutableDoc(mongo::BSONObj(),
+                                                mongo::mutablebson::Document::kInPlaceDisabled);
+
+        uassertStatusOK(update->updateDriver.populateDocumentWithQueryFields(
+            update->opCtx.get(), *update->matcher->matcher.getQuery(), immutablePaths, mutableDoc));
+
+        uassertStatusOK(update->updateDriver.update(mongo::StringData() /* matchedField */,
+                                                    &mutableDoc,
+                                                    false /* validateForStorage */,
+                                                    immutablePaths,
+                                                    true /* isInsert */,
+                                                    nullptr /* logOpRec */,
+                                                    &docWasModified,
+                                                    nullptr /*modifiedPaths*/));
+
+        auto outputObj = mutableDoc.getObject();
+        size_t outputSize = static_cast<size_t>(outputObj.objsize());
+        auto output = new (std::nothrow) char[outputSize];
+
+        uassert(
+            mongo::ErrorCodes::ExceededMemoryLimit, "Failed to allocate memory for upsert", output);
+
+        static_cast<void>(std::copy_n(outputObj.objdata(), outputSize, output));
         return mongo::toInterfaceType(output);
     });
 }

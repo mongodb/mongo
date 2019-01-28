@@ -221,6 +221,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
     Status status = Status::OK();
     const bool validateForStorage = getOpCtx()->writesAreReplicated() && _enforceOkForStorage;
+    const bool isInsert = false;
     FieldRefSet immutablePaths;
     if (getOpCtx()->writesAreReplicated() && !request->isFromMigration()) {
         auto immutablePathsVector = getImmutableFields(getOpCtx(), request->getNamespaceString());
@@ -232,8 +233,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     }
     if (!driver->needMatchDetails()) {
         // If we don't need match details, avoid doing the rematch
-        status = driver->update(
-            StringData(), &_doc, validateForStorage, immutablePaths, &logObj, &docWasModified);
+        status = driver->update(StringData(),
+                                &_doc,
+                                validateForStorage,
+                                immutablePaths,
+                                isInsert,
+                                &logObj,
+                                &docWasModified);
     } else {
         // If there was a matched field, obtain it.
         MatchDetails matchDetails;
@@ -246,8 +252,13 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (matchDetails.hasElemMatchKey())
             matchedField = matchDetails.elemMatchKey();
 
-        status = driver->update(
-            matchedField, &_doc, validateForStorage, immutablePaths, &logObj, &docWasModified);
+        status = driver->update(matchedField,
+                                &_doc,
+                                validateForStorage,
+                                immutablePaths,
+                                isInsert,
+                                &logObj,
+                                &docWasModified);
     }
 
     if (!status.isOK()) {
@@ -379,7 +390,6 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     // oplog record, then. We also set the context of the update driver to the INSERT_CONTEXT.
     // Some mods may only work in that context (e.g. $setOnInsert).
     driver->setLogOp(false);
-    driver->setInsert(true);
 
     FieldRefSet immutablePaths;
     if (!isInternalRequest) {
@@ -404,10 +414,12 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     // Apply the update modifications here. Do not validate for storage, since we will validate the
     // entire document after the update. However, we ensure that no immutable fields are updated.
     const bool validateForStorage = false;
+    const bool isInsert = true;
     if (isInternalRequest) {
         immutablePaths.clear();
     }
-    Status updateStatus = driver->update(StringData(), doc, validateForStorage, immutablePaths);
+    Status updateStatus =
+        driver->update(StringData(), doc, validateForStorage, immutablePaths, isInsert);
     if (!updateStatus.isOK()) {
         uasserted(16836, updateStatus.reason());
     }
