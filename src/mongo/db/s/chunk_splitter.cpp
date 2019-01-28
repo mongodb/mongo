@@ -398,15 +398,19 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
             return;
         }
 
-        // Tries to move the top chunk out of the shard to prevent the hot spot from staying on a
-        // single shard. This is based on the assumption that succeeding inserts will fall on the
-        // top chunk.
-        moveChunk(opCtx.get(), nss, topChunkMinKey);
+        try {
+            // Tries to move the top chunk out of the shard to prevent the hot
+            // spot from staying on a single shard. This is based on the
+            // assumption that succeeding inserts will fall on the top chunk.
+            moveChunk(opCtx.get(), nss, topChunkMinKey);
+        } catch (const DBException& ex) {
+            log() << "Top-chunk optimization failed to move chunk "
+                  << redact(ChunkRange(min, max).toString()) << " in collection " << nss
+                  << " after a successful split" << causedBy(redact(ex.toStatus()));
+        }
     } catch (const DBException& ex) {
         log() << "Unable to auto-split chunk " << redact(ChunkRange(min, max).toString())
-              << " in nss " << nss << causedBy(redact(ex.toStatus()));
-    } catch (const std::exception& e) {
-        log() << "caught exception while splitting chunk: " << redact(e.what());
+              << " in namespace " << nss << causedBy(redact(ex.toStatus()));
     }
 }
 

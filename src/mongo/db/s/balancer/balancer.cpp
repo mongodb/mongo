@@ -283,7 +283,7 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
 
 void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-    balancerConfig->refreshAndCheck(opCtx).transitional_ignore();
+    balancerConfig->refreshAndCheck(opCtx).ignore();
 
     const auto mode = balancerConfig->getBalancerMode();
 
@@ -395,7 +395,7 @@ void Balancer::_mainThread() {
             _endRound(opCtx.get(),
                       _balancedLastTime ? kShortBalanceRoundInterval
                                         : kBalanceRoundDefaultInterval);
-        } catch (const std::exception& e) {
+        } catch (const DBException& e) {
             log() << "caught exception while doing balance: " << e.what();
 
             // Just to match the opening statement if in log level 1
@@ -406,7 +406,7 @@ void Balancer::_mainThread() {
 
             ShardingLogging::get(opCtx.get())
                 ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
-                .transitional_ignore();
+                .ignore();
 
             // Sleep a fair amount before retrying because of the error
             _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
