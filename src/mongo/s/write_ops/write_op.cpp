@@ -118,10 +118,21 @@ static bool isRetryErrCode(int errCode) {
         errCode == ErrorCodes::CannotImplicitlyCreateCollection;
 }
 
+static bool errorsAllSame(const vector<ChildWriteOp const*>& errOps) {
+    auto errCode = errOps.front()->error->toStatus().code();
+    if (std::all_of(++errOps.begin(), errOps.end(), [errCode](const ChildWriteOp* errOp) {
+            return errOp->error->toStatus().code() == errCode;
+        })) {
+        return true;
+    }
+
+    return false;
+}
+
 // Aggregate a bunch of errors for a single op together
 static void combineOpErrors(const vector<ChildWriteOp const*>& errOps, WriteErrorDetail* error) {
-    // Special case single response
-    if (errOps.size() == 1) {
+    // Special case single response or all errors are the same
+    if (errOps.size() == 1 || errorsAllSame(errOps)) {
         errOps.front()->error->cloneTo(error);
         return;
     }
