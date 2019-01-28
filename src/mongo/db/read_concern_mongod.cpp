@@ -133,13 +133,16 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
     // one that waits for the notification gets the later clusterTime, so when the request finishes
     // it needs to be repeated with the later time.
     while (clusterTime > lastAppliedOpTime) {
-        auto shardingState = ShardingState::get(opCtx);
         // standalone replica set, so there is no need to advance the OpLog on the primary.
-        if (!shardingState->enabled()) {
+        if (serverGlobalParams.clusterRole == ClusterRole::None) {
             return Status::OK();
         }
 
-        auto myShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->shardId());
+        bool isConfig = (serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        auto myShard = isConfig ? Grid::get(opCtx)->shardRegistry()->getConfigShard()
+                                : Grid::get(opCtx)->shardRegistry()->getShard(
+                                      opCtx, ShardingState::get(opCtx)->shardId());
+
         if (!myShard.isOK()) {
             return myShard.getStatus();
         }

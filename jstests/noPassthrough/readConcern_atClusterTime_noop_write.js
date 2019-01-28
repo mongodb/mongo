@@ -37,41 +37,73 @@
     st.ensurePrimaryShard(testDB1.getName(), st.shard1.shardName);
     assert.commandWorked(testDB1.createCollection("coll1"));
 
-    // Perform a write on shard 0 and get its op time.
-    let res = assert.commandWorked(testDB0.runCommand({insert: "coll0", documents: [{_id: 0}]}));
-    assert(res.hasOwnProperty("operationTime"), tojson(res));
-    let clusterTime = res.operationTime;
+    const PropagationPreferenceOptions = Object.freeze({kShard: 0, kConfig: 1});
 
-    // Propagate 'clusterTime' to shard 1. This ensures that its next write will be at time >=
-    // 'clusterTime'.
-    testDB1.coll1.find().itcount();
+    let testNoopWrite = (fromDbName, fromColl, toRS, toDbName, toColl, propagationPreference) => {
+        const fromDBFromMongos = st.s.getDB(fromDbName);
+        const toDBFromMongos = st.s.getDB(toDbName);
+        const configFromMongos = st.s.getDB("config");
 
-    // Attempt a snapshot read at 'clusterTime' on shard 1. Test that it performs a noop write to
-    // advance its lastApplied optime past 'clusterTime'. The snapshot read itself may fail if the
-    // noop write advances the node's majority commit point past 'clusterTime' and it releases that
-    // snapshot.  Test reading from the primary.
-    const shard1Session =
-        st.rs1.getPrimary().getDB("test1").getMongo().startSession({causalConsistency: false});
-    shard1Session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
-    res = shard1Session.getDatabase("test1").runCommand({find: "coll1"});
-    if (res.ok === 0) {
-        assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld);
-        assert.commandFailedWithCode(shard1Session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
-    } else {
-        shard1Session.commitTransaction();
-    }
-    const shard1PrimaryOpTime = getLastOpTime(st.rs1.getPrimary()).ts;
-    assert.gte(shard1PrimaryOpTime, clusterTime);
+        const oplog = toRS.getPrimary().getCollection("local.oplog.rs");
+        let findRes =
+            oplog.findOne({o: {$eq: {"noop write for afterClusterTime read concern": 1}}});
+        assert(!findRes);
 
-    // Perform a write on shard 1 and get its op time.
-    res = assert.commandWorked(testDB1.runCommand({insert: "coll1", documents: [{_id: 0}]}));
-    assert(res.hasOwnProperty("operationTime"), tojson(res));
-    clusterTime = res.operationTime;
+        // Perform a write on the fromDB and get its op time.
+        let res = assert.commandWorked(
+            fromDBFromMongos.runCommand({insert: fromColl, documents: [{_id: 0}]}));
+        assert(res.hasOwnProperty("operationTime"), tojson(res));
+        let clusterTime = res.operationTime;
 
-    // Propagate 'clusterTime' to shard 0. This ensures that its next write will be at time >=
-    // 'clusterTime'.
-    testDB0.coll0.find().readPref('secondary').itcount();
+        // Propagate 'clusterTime' to toRS or the config server. This ensures that its next
+        // write will be at time >= 'clusterTime'. We cannot use toDBFromMongos to propagate
+        // 'clusterTime' to the config server, because mongos only routes to the config server
+        // for the 'config' and 'admin' databases.
+        if (propagationPreference == PropagationPreferenceOptions.kConfig) {
+            configFromMongos.coll1.find().itcount();
+        } else {
+            toDBFromMongos.toColl.find().itcount();
+        }
+
+        // Attempt a snapshot read at 'clusterTime' on toRS. Test that it performs a noop write
+        // to advance its lastApplied optime past 'clusterTime'. The snapshot read itself may
+        // fail if the noop write advances the node's majority commit point past 'clusterTime'
+        // and it releases that snapshot.
+        const toRSSession = toRS.getPrimary().getDB(toDBFromMongos).getMongo().startSession({
+            causalConsistency: false
+        });
+
+        toRSSession.startTransaction(
+            {readConcern: {level: "snapshot", atClusterTime: clusterTime}});
+        res = toRSSession.getDatabase(toDBFromMongos).runCommand({find: toColl});
+        if (res.ok === 0) {
+            assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld);
+            assert.commandFailedWithCode(toRSSession.abortTransaction_forTesting(),
+                                         ErrorCodes.NoSuchTransaction);
+        } else {
+            toRSSession.commitTransaction();
+        }
+
+        const toRSOpTime = getLastOpTime(toRS.getPrimary()).ts;
+
+        assert.gte(toRSOpTime, clusterTime);
+
+        findRes = oplog.findOne({o: {$eq: {"noop write for afterClusterTime read concern": 1}}});
+        assert(findRes);
+    };
+
+    //
+    // Test noop write. Read from the destination shard.
+    //
+
+    testNoopWrite("test0", "coll0", st.rs1, "test1", "coll1", PropagationPreferenceOptions.kShard);
+
+    //
+    // Test noop write. Read from the config server's primary.
+    //
+
+    testNoopWrite(
+        "test0", "coll2", st.configRS, "test1", "coll3", PropagationPreferenceOptions.kConfig);
 
     st.stop();
 }());
