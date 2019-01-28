@@ -40,16 +40,6 @@
             db.runCommand(commandWithSession),
             "failed to run command " + cmd + " with session without being logged in");
 
-        // Test that we can run a pre-auth command with a session while
-        // multiple users are logged in (and the session gets ignored)
-        db.auth("lily", "pwd");
-        admin.auth("admin", "pwd");
-        assert.commandWorked(admin.runCommand(command),
-                             "failed to run command " + cmd + " with multiple users logged in");
-        assert.commandWorked(
-            admin.runCommand(commandWithSession),
-            "failed to run command " + cmd + " with session with multiple users logged in");
-
         db.logout();
         admin.logout();
     };

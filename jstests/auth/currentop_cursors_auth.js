@@ -152,6 +152,9 @@
         // Clean up the cursors so that they don't affect subsequent tests.
         assert.commandWorked(
             db.runCommand({killCursors: coll.getName(), cursors: [cursorId, secondCursorId]}));
+
+        // Make sure to logout to allow __system user to use the implicit session.
+        assert.commandWorked(adminDB.logout());
     }
 
     jsTestLog("Running cursor tests on mongoD");
