@@ -5,6 +5,8 @@ Serves as an alternative to process.py.
 
 from __future__ import absolute_import
 
+import sys
+
 try:
     import grpc
 except ImportError:
@@ -52,19 +54,28 @@ class Process(_process.Process):
     def stop(self, kill=False):
         """Terminate the process."""
         signal = self.jasper_pb2.Signals.Value("TERMINATE")
-        if kill:
+        if sys.platform == "win32":
+            if not kill:
+                event_name = self.jasper_pb2.EventName(value="Global\\Mongo_" + str(self.pid))
+                signal_event = self._stub.SignalEvent(event_name)
+                if signal_event.success:
+                    wait = self._stub.Wait(self._id, timeout=60)
+                    if wait.success:
+                        return
+            clean_termination_params = self.jasper_pb2.SignalTriggerParams(
+                processID=self._id,
+                signalTriggerID=self.jasper_pb2.SignalTriggerID.Value("CLEANTERMINATION"))
+            self._stub.RegisterSignalTriggerID(clean_termination_params)
+        elif kill:
             signal = self.jasper_pb2.Signals.Value("KILL")
 
         signal_process = self.jasper_pb2.SignalProcess(ProcessID=self._id, signal=signal)
-        try:
-            val = self._stub.Signal(signal_process)
-            if not val.success:
-                raise OSError("Unable to stop process %d." % self.pid)
-        except grpc.RpcError as err:
-            err.details = err.details()
-            if "cannot signal a process that has terminated" not in err.details \
-                    and "os: process already finished" not in err.details:
-                raise
+        val = self._stub.Signal(signal_process)
+        if not val.success \
+                and "cannot signal a process that has terminated" not in val.text \
+                and "os: process already finished" not in val.text:
+            raise OSError("Failed to signal Jasper process with pid {}: {}".format(
+                self.pid, val.text))
 
     def poll(self):
         """Poll."""
@@ -77,12 +88,9 @@ class Process(_process.Process):
     def wait(self):
         """Wait until process has terminated and all output has been consumed by the logger pipes."""
         if self._return_code is None:
-            try:
-                wait = self._stub.Wait(self._id)
-                self._return_code = wait.exit_code
-            except grpc.RpcError as err:
-                if "problem encountered while waiting: operation failed" not in err.details():
-                    raise
-                wait = self._stub.Get(self._id)
-                self._return_code = wait.exit_code
+            wait = self._stub.Wait(self._id)
+            if not wait.success:
+                raise OSError("Failed to wait on process with pid {}: {}.".format(
+                    self.pid, wait.text))
+            self._return_code = wait.exit_code
         return self._return_code

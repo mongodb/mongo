@@ -139,7 +139,6 @@ message ProcessTags {
 
 message JasperProcessID {
   string value = 1;
-
 }
 
 message OperationOutcome {
@@ -181,23 +180,39 @@ message ArchiveOptions {
 }
 
 message DownloadInfo {
-  string url = 1;
-  string path = 2;
-  ArchiveOptions archive_opts = 3;
+    string url = 1;
+    string path = 2;
+    ArchiveOptions archive_opts = 3;
 }
 
 message BuildloggerURLs {
     repeated string urls = 1;
 }
 
+enum SignalTriggerID {
+  NONE = 0;
+  CLEANTERMINATION = 1;
+}
+
+message SignalTriggerParams {
+  JasperProcessID processID = 1;
+  SignalTriggerID signalTriggerID = 2;
+}
+
+message EventName {
+  string value = 1;
+}
+
 service JasperProcessManager {
-  rpc Status(google.protobuf.Empty) returns  (StatusResponse);
+  rpc Status(google.protobuf.Empty) returns (StatusResponse);
   rpc Create(CreateOptions) returns (ProcessInfo);
   rpc List(Filter) returns (stream ProcessInfo);
   rpc Group(TagName) returns (stream ProcessInfo);
   rpc Get(JasperProcessID) returns (ProcessInfo);
   rpc Wait(JasperProcessID) returns (OperationOutcome);
+  rpc Respawn(JasperProcessID) returns (ProcessInfo);
   rpc Signal(SignalProcess) returns (OperationOutcome);
+  rpc Clear(google.protobuf.Empty) returns (OperationOutcome);
   rpc Close(google.protobuf.Empty) returns (OperationOutcome);
   rpc TagProcess(ProcessTags) returns (OperationOutcome);
   rpc ResetTags(JasperProcessID) returns (OperationOutcome);
@@ -206,4 +221,6 @@ service JasperProcessManager {
   rpc DownloadMongoDB(MongoDBDownloadOptions) returns (OperationOutcome);
   rpc ConfigureCache(CacheOptions) returns (OperationOutcome);
   rpc GetBuildloggerURLs(JasperProcessID) returns (BuildloggerURLs);
+  rpc RegisterSignalTriggerID(SignalTriggerParams) returns (OperationOutcome);
+  rpc SignalEvent(EventName) returns (OperationOutcome);
 }
