@@ -389,7 +389,7 @@ public:
     mutable std::unique_ptr<Timestamp> stableTimestamp = std::make_unique<Timestamp>();
 };
 
-class TimestampKVEngineTest : public unittest::Test, ScopedGlobalServiceContextForTest {
+class TimestampKVEngineTest : public ServiceContextMongoDTest {
 public:
     using TimestampType = KVStorageEngine::TimestampMonitor::TimestampType;
     using TimestampListener = KVStorageEngine::TimestampMonitor::TimestampListener;
@@ -398,11 +398,6 @@ public:
      * Create an instance of the KV Storage Engine so that we have a timestamp monitor operating.
      */
     TimestampKVEngineTest() {
-        // Set up the periodic runner for background job execution.
-        auto runner = makePeriodicRunner(getServiceContext());
-        runner->startup();
-        getServiceContext()->setPeriodicRunner(std::move(runner));
-
         KVStorageEngineOptions options{
             /*directoryPerDB=*/false, /*directoryForIndexes=*/false, /*forRepair=*/false};
         _storageEngine = std::make_unique<KVStorageEngine>(new TimestampMockKVEngine, options);

@@ -38,6 +38,7 @@
 
 #include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
@@ -835,9 +836,30 @@ void KVStorageEngine::TimestampMonitor::startup() {
     PeriodicRunner::PeriodicJob job(
         "TimestampMonitor",
         [&](Client* client) {
-            Timestamp checkpoint = _engine->getCheckpointTimestamp();
-            Timestamp oldest = _engine->getOldestTimestamp();
-            Timestamp stable = _engine->getStableTimestamp();
+            {
+                stdx::lock_guard<stdx::mutex> lock(_monitorMutex);
+                if (_listeners.empty()) {
+                    return;
+                }
+            }
+
+            Timestamp checkpoint = _currentTimestamps.checkpoint;
+            Timestamp oldest = _currentTimestamps.oldest;
+            Timestamp stable = _currentTimestamps.stable;
+
+            // Take a global lock in MODE_IS while fetching timestamps to guarantee that
+            // rollback-to-stable isn't running concurrently.
+            {
+                auto opCtx = client->makeOperationContext();
+                Lock::GlobalLock lock(opCtx.get(), MODE_IS);
+
+                // The checkpoint timestamp is not cached in mongod and needs to be fetched with a
+                // call into WiredTiger, all the other timestamps are cached in mongod.
+                checkpoint = _engine->getCheckpointTimestamp();
+                oldest = _engine->getOldestTimestamp();
+                stable = _engine->getStableTimestamp();
+            }
+
             Timestamp minOfCheckpointAndOldest =
                 (checkpoint.isNull() || (checkpoint > oldest)) ? oldest : checkpoint;
 
@@ -863,6 +885,7 @@ void KVStorageEngine::TimestampMonitor::startup() {
             }
         },
         Seconds(1));
+
     _periodicRunner->scheduleJob(std::move(job));
     _running = true;
 }
