@@ -81,7 +81,8 @@ class TransportLayerASIO::BatonASIO : public NetworkingBaton {
     struct EventFDHolder {
         EventFDHolder() : fd(::eventfd(0, EFD_CLOEXEC)) {
             if (fd < 0) {
-                severe() << "error in eventfd: " << errnoWithDescription(errno);
+                auto ewd = errnoWithDescription();
+                severe() << "error in eventfd: " << ewd;
                 fassertFailed(50833);
             }
         }
