@@ -37,7 +37,7 @@
         }));
 
         //
-        // Can restart a transaction that is in progress.
+        // Cannot restart a transaction that is in progress.
         //
 
         txnNumber++;
@@ -48,12 +48,13 @@
             startTransaction: true
         }));
 
-        assert.commandWorked(directDB.runCommand({
+        assert.commandFailedWithCode(directDB.runCommand({
             find: collName,
             txnNumber: NumberLong(txnNumber),
             autocommit: false,
             startTransaction: true
-        }));
+        }),
+                                     50911);
 
         //
         // Cannot restart a transaction that has completed a retryable write.

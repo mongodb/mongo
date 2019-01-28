@@ -163,22 +163,26 @@ public:
 
     /**
      * Updates the transaction state to allow for a retry of the current command on a stale version
-     * error. Will throw if the transaction cannot be continued.
+     * error. This includes sending abortTransaction to all cleared participants. Will throw if the
+     * transaction cannot be continued.
      */
-    void onStaleShardOrDbError(StringData cmdName, const Status& errorStatus);
+    void onStaleShardOrDbError(OperationContext* opCtx,
+                               StringData cmdName,
+                               const Status& errorStatus);
 
     /**
      * Resets the transaction state to allow for a retry attempt. This includes clearing all
-     * participants, clearing the coordinator, and resetting the global read timestamp. Will throw
-     * if the transaction cannot be continued.
+     * participants, clearing the coordinator, resetting the global read timestamp, and sending
+     * abortTransaction to all cleared participants. Will throw if the transaction cannot be
+     * continued.
      */
-    void onSnapshotError(const Status& errorStatus);
+    void onSnapshotError(OperationContext* opCtx, const Status& errorStatus);
 
     /**
      * Updates the transaction tracking state to allow for a retry attempt on a view resolution
-     * error.
+     * error. This includes sending abortTransaction to all cleared participants.
      */
-    void onViewResolutionError(const NamespaceString& nss);
+    void onViewResolutionError(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Sets the atClusterTime for the current transaction to the latest time in the router's logical
@@ -276,9 +280,22 @@ private:
     bool _canContinueOnSnapshotError() const;
 
     /**
-     * Removes all participants created during the current statement from the participant list.
+     * Throws NoSuchTransaction if the response from abortTransaction failed with a code other than
+     * NoSuchTransaction. Does not check for write concern errors.
      */
-    void _clearPendingParticipants();
+    void _assertAbortStatusIsOkOrNoSuchTransaction(
+        const AsyncRequestsSender::Response& response) const;
+
+    /**
+     * Returns all participants created during the current statement.
+     */
+    std::vector<ShardId> _getPendingParticipants() const;
+
+    /**
+     * Removes all participants created during the current statement from the participant list and
+     * sends abortTransaction to each. Waits for all responses before returning.
+     */
+    void _clearPendingParticipants(OperationContext* opCtx);
 
     /**
      * Creates a new participant for the shard.

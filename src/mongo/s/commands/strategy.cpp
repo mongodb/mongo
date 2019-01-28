@@ -495,7 +495,7 @@ void runCommand(OperationContext* opCtx,
                     auto abortGuard = makeGuard(
                         [&] { txnRouter->implicitlyAbortTransaction(opCtx, ex.toStatus()); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
-                    txnRouter->onStaleShardOrDbError(commandName, ex.toStatus());
+                    txnRouter->onStaleShardOrDbError(opCtx, commandName, ex.toStatus());
                     abortGuard.dismiss();
                 }
 
@@ -514,7 +514,7 @@ void runCommand(OperationContext* opCtx,
                     auto abortGuard = makeGuard(
                         [&] { txnRouter->implicitlyAbortTransaction(opCtx, ex.toStatus()); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
-                    txnRouter->onStaleShardOrDbError(commandName, ex.toStatus());
+                    txnRouter->onStaleShardOrDbError(opCtx, commandName, ex.toStatus());
                     abortGuard.dismiss();
                 }
 
@@ -531,7 +531,7 @@ void runCommand(OperationContext* opCtx,
                     auto abortGuard = makeGuard(
                         [&] { txnRouter->implicitlyAbortTransaction(opCtx, ex.toStatus()); });
                     handleCanRetryInTransaction(opCtx, txnRouter, canRetry, ex);
-                    txnRouter->onSnapshotError(ex.toStatus());
+                    txnRouter->onSnapshotError(opCtx, ex.toStatus());
                     abortGuard.dismiss();
                 }
 

@@ -459,11 +459,10 @@ void TransactionParticipant::beginOrContinue(TxnNumber txnNumber,
                 "transaction number",
                 serverGlobalParams.clusterRole != ClusterRole::None);
 
-        // The active transaction number can only be reused if the transaction is not in a state
-        // that indicates it has been involved in a two phase commit. In normal operation this check
-        // should never fail.
-        const auto restartableStates =
-            TransactionState::kInProgress | TransactionState::kAbortedWithoutPrepare;
+        // The active transaction number can only be reused if the transaction is aborted and has
+        // not been involved in a two phase commit. Assuming routers target primaries in increasing
+        // order of term and in the absence of byzantine messages, this check should never fail.
+        const auto restartableStates = TransactionState::kAbortedWithoutPrepare;
         uassert(50911,
                 str::stream() << "Cannot start a transaction at given transaction number "
                               << txnNumber

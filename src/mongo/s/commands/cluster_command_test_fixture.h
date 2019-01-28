@@ -63,7 +63,7 @@ protected:
 
     void runCommandSuccessful(BSONObj cmd, bool isTargeted);
 
-    void runCommandOneError(BSONObj cmd, ErrorCodes::Error code, bool isTargeted);
+    void runTxnCommandOneError(BSONObj cmd, ErrorCodes::Error code, bool isTargeted);
 
     void runCommandInspectRequests(BSONObj cmd, InspectionCallback cb, bool isTargeted);
 

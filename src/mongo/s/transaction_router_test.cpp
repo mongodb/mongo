@@ -34,7 +34,9 @@
 #include <set>
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/session_catalog_router.h"
@@ -61,6 +63,7 @@ protected:
     const HostAndPort hostAndPort2 = HostAndPort("shard2:1234");
 
     const ShardId shard3 = ShardId("shard3");
+    const HostAndPort hostAndPort3 = HostAndPort("shard3:1234");
 
     const StringMap<repl::ReadConcernLevel> supportedNonSnapshotRCLevels = {
         {"local", repl::ReadConcernLevel::kLocalReadConcern},
@@ -78,8 +81,9 @@ protected:
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
-        ShardingTestFixture::addRemoteShards(
-            {std::make_tuple(shard1, hostAndPort1), std::make_tuple(shard2, hostAndPort2)});
+        ShardingTestFixture::addRemoteShards({std::make_tuple(shard1, hostAndPort1),
+                                              std::make_tuple(shard2, hostAndPort2),
+                                              std::make_tuple(shard3, hostAndPort3)});
 
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
@@ -88,6 +92,44 @@ protected:
         auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
+    }
+
+    /**
+     * Verifies "abortTransaction" is sent to each expected HostAndPort with the given lsid and
+     * txnNumber. The aborts may come in any order.
+     */
+    void expectAbortTransactions(std::set<HostAndPort> expectedHostAndPorts,
+                                 LogicalSessionId lsid,
+                                 TxnNumber txnNum,
+                                 BSONObj abortResponse = BSON("ok" << 1)) {
+        std::set<HostAndPort> seenHostAndPorts;
+        int numExpectedAborts = static_cast<int>(expectedHostAndPorts.size());
+        for (int i = 0; i < numExpectedAborts; i++) {
+            onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+                seenHostAndPorts.insert(request.target);
+
+                ASSERT_EQ(NamespaceString::kAdminDb, request.dbname);
+
+                auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+                ASSERT_EQ(cmdName, "abortTransaction");
+
+                auto osi = OperationSessionInfoFromClient::parse("expectAbortTransaction"_sd,
+                                                                 request.cmdObj);
+
+                ASSERT(osi.getSessionId());
+                ASSERT_EQ(lsid.getId(), osi.getSessionId()->getId());
+
+                ASSERT(osi.getTxnNumber());
+                ASSERT_EQ(txnNum, *osi.getTxnNumber());
+
+                ASSERT(osi.getAutocommit());
+                ASSERT_FALSE(*osi.getAutocommit());
+
+                return abortResponse;
+            });
+        }
+
+        ASSERT(expectedHostAndPorts == seenHostAndPorts);
     }
 };
 
@@ -106,6 +148,10 @@ protected:
         _routerOpCtxSession.reset();
 
         TransactionRouterTest::tearDown();
+    }
+
+    const LogicalSessionId& getSessionId() {
+        return *operationContext()->getLogicalSessionId();
     }
 
 private:
@@ -836,7 +882,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
 
     // Simulate a snapshot error.
-    txnRouter.onSnapshotError(kDummyStatus);
+    auto future = launchAsync([&] { txnRouter.onSnapshotError(operationContext(), kDummyStatus); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
+    future.timed_get(kFutureTimeout);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -933,7 +981,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipa
     // Simulate a snapshot error and an internal retry that only re-targets one of the original two
     // shards.
 
-    txnRouter.onSnapshotError(kDummyStatus);
+    auto future = launchAsync([&] { txnRouter.onSnapshotError(operationContext(), kDummyStatus); });
+    expectAbortTransactions({hostAndPort1, hostAndPort2}, getSessionId(), txnNum);
+    future.timed_get(kFutureTimeout);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -970,21 +1020,23 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnSnapshotErrorThrowsAfterFirstC
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     // Should not throw.
-    txnRouter.onSnapshotError(kDummyStatus);
+    txnRouter.onSnapshotError(operationContext(), kDummyStatus);
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
-    ASSERT_THROWS_CODE(
-        txnRouter.onSnapshotError(kDummyStatus), AssertionException, ErrorCodes::NoSuchTransaction);
+    ASSERT_THROWS_CODE(txnRouter.onSnapshotError(operationContext(), kDummyStatus),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
 
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
-    ASSERT_THROWS_CODE(
-        txnRouter.onSnapshotError(kDummyStatus), AssertionException, ErrorCodes::NoSuchTransaction);
+    ASSERT_THROWS_CODE(txnRouter.onSnapshotError(operationContext(), kDummyStatus),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreatedAt) {
@@ -1059,7 +1111,10 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     // Simulate stale error and internal retry that only re-targets one of the original shards.
 
-    txnRouter.onStaleShardOrDbError("find", kDummyStatus);
+    auto future = launchAsync(
+        [&] { txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus); });
+    expectAbortTransactions({hostAndPort1, hostAndPort2}, getSessionId(), txnNum);
+    future.timed_get(kFutureTimeout);
 
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
@@ -1106,7 +1161,10 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClea
     txnRouter.attachTxnFieldsIfNeeded(shard2, {});
     txnRouter.attachTxnFieldsIfNeeded(shard3, {});
 
-    txnRouter.onStaleShardOrDbError("find", kDummyStatus);
+    auto future = launchAsync(
+        [&] { txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus); });
+    expectAbortTransactions({hostAndPort2, hostAndPort3}, getSessionId(), txnNum);
+    future.timed_get(kFutureTimeout);
 
     // Shards 2 and 3 must start a transaction, but shard 1 must not.
     ASSERT_FALSE(txnRouter.attachTxnFieldsIfNeeded(shard1, {})["startTransaction"].trueValue());
@@ -1137,7 +1195,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     ASSERT_GT(laterTime, kInMemoryLogicalTime);
     LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(laterTime);
 
-    txnRouter.onStaleShardOrDbError("find", kDummyStatus);
+    txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     BSONObj expectedReadConcern = BSON("level"
@@ -1150,7 +1208,11 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                                          << "test"));
     ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
 
-    txnRouter.onViewResolutionError(kViewNss);
+    auto future =
+        launchAsync([&] { txnRouter.onViewResolutionError(operationContext(), kViewNss); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
+    future.timed_get(kFutureTimeout);
+
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
@@ -1170,14 +1232,14 @@ TEST_F(TransactionRouterTestWithDefaultSession, WritesCanOnlyBeRetriedIfFirstOve
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
-
     for (auto writeCmd : writeCmds) {
-        txnRouter.onStaleShardOrDbError(writeCmd, kDummyStatus);  // Should not throw.
+        txnRouter.onStaleShardOrDbError(
+            operationContext(), writeCmd, kDummyStatus);  // Should not throw.
     }
 
     for (auto cmd : otherCmds) {
-        txnRouter.onStaleShardOrDbError(cmd, kDummyStatus);  // Should not throw.
+        txnRouter.onStaleShardOrDbError(
+            operationContext(), cmd, kDummyStatus);  // Should not throw.
     }
 
     // Advance to the next command.
@@ -1187,13 +1249,15 @@ TEST_F(TransactionRouterTestWithDefaultSession, WritesCanOnlyBeRetriedIfFirstOve
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
 
     for (auto writeCmd : writeCmds) {
-        ASSERT_THROWS_CODE(txnRouter.onStaleShardOrDbError(writeCmd, kDummyStatus),
-                           AssertionException,
-                           ErrorCodes::NoSuchTransaction);
+        ASSERT_THROWS_CODE(
+            txnRouter.onStaleShardOrDbError(operationContext(), writeCmd, kDummyStatus),
+            AssertionException,
+            ErrorCodes::NoSuchTransaction);
     }
 
     for (auto cmd : otherCmds) {
-        txnRouter.onStaleShardOrDbError(cmd, kDummyStatus);  // Should not throw.
+        txnRouter.onStaleShardOrDbError(
+            operationContext(), cmd, kDummyStatus);  // Should not throw.
     }
 }
 
@@ -1306,7 +1370,10 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
     // Simulate a view resolution error on the first client statement that leads to a retry which
     // targets the same shard.
 
-    txnRouter.onViewResolutionError(kViewNss);
+    auto future =
+        launchAsync([&] { txnRouter.onViewResolutionError(operationContext(), kViewNss); });
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
+    future.timed_get(kFutureTimeout);
 
     // The only participant was the coordinator, so it should have been reset.
     ASSERT_FALSE(txnRouter.getCoordinatorId());
@@ -1326,7 +1393,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
 
     // Simulate a view resolution error.
 
-    txnRouter.onViewResolutionError(kViewNss);
+    future = launchAsync([&] { txnRouter.onViewResolutionError(operationContext(), kViewNss); });
+    expectAbortTransactions({hostAndPort2}, getSessionId(), txnNum);
+    future.timed_get(kFutureTimeout);
 
     // Only the new participant shard was reset.
     firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});
@@ -1538,7 +1607,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernHasNoAtClu
         ASSERT_FALSE(txnRouter.getAtClusterTime());
 
         // Can't continue on snapshot errors.
-        ASSERT_THROWS_CODE(txnRouter.onSnapshotError(kDummyStatus),
+        ASSERT_THROWS_CODE(txnRouter.onSnapshotError(operationContext(), kDummyStatus),
                            AssertionException,
                            ErrorCodes::NoSuchTransaction);
     }
@@ -1617,6 +1686,96 @@ TEST_F(TransactionRouterTestWithDefaultSession, NonSnapshotReadConcernLevelsPres
         ASSERT_BSONOBJ_EQ(BSON("level" << rcIt.first << "afterOpTime" << opTime),
                           newCmd["readConcern"].Obj());
     }
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       AbortBetweenStatementRetriesIgnoresNoSuchTransaction) {
+    TxnNumber txnNum{3};
+
+    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+
+    //
+    // NoSuchTransaction is ignored when it is the top-level error code.
+    //
+
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+
+    auto future = launchAsync([&] { txnRouter.onSnapshotError(operationContext(), kDummyStatus); });
+
+    auto noSuchTransactionError = [&] {
+        BSONObjBuilder bob;
+        CommandHelpers::appendCommandStatusNoThrow(bob,
+                                                   Status(ErrorCodes::NoSuchTransaction, "dummy"));
+        return bob.obj();
+    }();
+
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum, noSuchTransactionError);
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       AbortBetweenStatementRetriesUsesIdempotentRetryPolicy) {
+    TxnNumber txnNum{3};
+
+    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+
+    //
+    // Retryable top-level error.
+    //
+
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+
+    auto future = launchAsync([&] { txnRouter.onSnapshotError(operationContext(), kDummyStatus); });
+
+    auto retryableError = [&] {
+        BSONObjBuilder bob;
+        CommandHelpers::appendCommandStatusNoThrow(
+            bob, Status(ErrorCodes::InterruptedDueToStepDown, "dummy"));
+        return bob.obj();
+    }();
+
+    // The first abort fails with a retryable error, which should be retried.
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum, retryableError);
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       AbortBetweenStatementRetriesFailsWithNoSuchTransactionOnUnexpectedErrors) {
+    TxnNumber txnNum{3};
+
+    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+
+    //
+    // Non-retryable top-level error.
+    //
+
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+
+    auto future = launchAsync([&] {
+        ASSERT_THROWS_CODE(txnRouter.onSnapshotError(operationContext(), kDummyStatus),
+                           AssertionException,
+                           ErrorCodes::NoSuchTransaction);
+    });
+    auto abortError = [&] {
+        BSONObjBuilder bob;
+        CommandHelpers::appendCommandStatusNoThrow(bob, Status(ErrorCodes::InternalError, "dummy"));
+        return bob.obj();
+    }();
+    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum, abortError);
+
+    future.timed_get(kFutureTimeout);
 }
 
 // Begins a transaction with snapshot level read concern and sets a default cluster time.

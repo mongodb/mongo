@@ -1303,7 +1303,7 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
  */
 class ShardedClusterParticipantTest : public TxnParticipantTest {
 protected:
-    void canSpecifyStartTransactionOnInProgressTxn() {
+    void cannotSpecifyStartTransactionOnInProgressTxn() {
         auto autocommit = false;
         auto startTransaction = true;
         auto sessionCheckout = checkOutSession();
@@ -1311,8 +1311,10 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx());
         ASSERT(txnParticipant->inMultiDocumentTransaction());
 
-        txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction);
-        ASSERT(txnParticipant->inMultiDocumentTransaction());
+        ASSERT_THROWS_CODE(
+            txnParticipant->beginOrContinue(*opCtx()->getTxnNumber(), autocommit, startTransaction),
+            AssertionException,
+            50911);
     }
 
     void canSpecifyStartTransactionOnAbortedTxn() {
@@ -1420,8 +1422,8 @@ protected:
     }
 };
 
-TEST_F(ShardTxnParticipantTest, CanSpecifyStartTransactionOnInProgressTxn) {
-    canSpecifyStartTransactionOnInProgressTxn();
+TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnInProgressTxn) {
+    cannotSpecifyStartTransactionOnInProgressTxn();
 }
 
 TEST_F(ShardTxnParticipantTest, CanSpecifyStartTransactionOnAbortedTxn) {
@@ -1460,8 +1462,8 @@ protected:
     }
 };
 
-TEST_F(ConfigTxnParticipantTest, CanSpecifyStartTransactionOnInProgressTxn) {
-    canSpecifyStartTransactionOnInProgressTxn();
+TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnInProgressTxn) {
+    cannotSpecifyStartTransactionOnInProgressTxn();
 }
 
 TEST_F(ConfigTxnParticipantTest, CanSpecifyStartTransactionOnAbortedTxn) {

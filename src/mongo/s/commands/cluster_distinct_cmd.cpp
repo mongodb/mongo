@@ -201,7 +201,7 @@ public:
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                txnRouter->onViewResolutionError(nss);
+                txnRouter->onViewResolutionError(opCtx, nss);
             }
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
