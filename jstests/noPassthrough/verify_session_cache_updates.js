@@ -29,9 +29,9 @@
         var session = conn.startSession();
         verify(conn, 0);
 
-        // running a non-session updating command doesn't touch
-        session.getDatabase("admin").runCommand("getLastError");
-        verify(conn, 0);
+        // running a command that doesn't require auth does touch
+        session.getDatabase("admin").runCommand("isMaster");
+        verify(conn, 1);
 
         // running a session updating command does touch
         session.getDatabase("admin").runCommand({serverStatus: 1});

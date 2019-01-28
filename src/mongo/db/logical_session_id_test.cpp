@@ -379,5 +379,22 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTooLongName) {
     ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
 }
 
+TEST_F(LogicalSessionIdTest, MultipleUsersPerSessionIsNotAllowed) {
+    addSimpleUser(UserName("simple", "test"));
+    addSimpleUser(UserName("simple", "test2"));
+
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(initializeOperationSessionInfo(
+                           _opCtx.get(),
+                           BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL),
+                           true,
+                           true,
+                           true),
+                       AssertionException,
+                       ErrorCodes::Unauthorized);
+}
+
 }  // namespace
 }  // namespace mongo
