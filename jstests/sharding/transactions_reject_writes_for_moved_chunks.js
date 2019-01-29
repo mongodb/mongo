@@ -104,15 +104,48 @@
             // when the shard prepares the transaction.
             assert.commandWorked(
                 st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
+
+            // Flush metadata on the destination shard so the next request doesn't encounter
+            // StaleConfig. The router refreshes after moving a chunk, so it will already be fresh.
+            assert.commandWorked(
+                st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
         }
 
-        // Should fail with NoSuchTransaction, because the write fails with a snapshot error, which
-        // won't be retryable because we're on a subsequent statement.
-        assert.commandFailedWithCode(sessionDB.runCommand(cmdTargetChunk2),
-                                     ErrorCodes.NoSuchTransaction,
-                                     "expected write to second chunk to fail, case: " +
-                                         testCaseName + ", cmd: " + tojson(cmdTargetChunk2) +
-                                         ", moveChunkBack: " + moveChunkBack);
+        // The write should always fail, but the particular error varies.
+        const res = assert.commandFailed(sessionDB.runCommand(cmdTargetChunk2),
+                                         "expected write to second chunk to fail, case: " +
+                                             testCaseName + ", cmd: " + tojson(cmdTargetChunk2) +
+                                             ", moveChunkBack: " + moveChunkBack);
+
+        const errMsg = "write to second chunk failed with unexpected error, res: " + tojson(res) +
+            ", case: " + testCaseName + ", cmd: " + tojson(cmdTargetChunk2) + ", moveChunkBack: " +
+            moveChunkBack;
+
+        // On slow hosts, this request can always fail with SnapshotTooOld or StaleChunkHistory if
+        // a migration takes long enough.
+        const expectedCodes = [ErrorCodes.SnapshotTooOld, ErrorCodes.StaleChunkHistory];
+
+        if (testCaseName === "insert") {
+            // Insert always inserts a new document, so the only typical error is MigrationConflict.
+            expectedCodes.push(ErrorCodes.MigrationConflict);
+            assert.commandFailedWithCode(res, expectedCodes, errMsg);
+        } else {
+            // The other commands modify an existing document so they may also fail with
+            // WriteConflict, depending on when orphaned documents are modified.
+
+            if (moveChunkBack) {
+                // Orphans from the first migration must have been deleted before the chunk was
+                // moved back, so the only typical error is WriteConflict.
+                expectedCodes.push(ErrorCodes.WriteConflict);
+            } else {
+                // If the chunk wasn't moved back, the write races with the range deleter. If the
+                // range deleter has not run, the write should fail with MigrationConflict,
+                // otherwise with WriteConflict, so both codes are acceptable.
+                expectedCodes.push(ErrorCodes.WriteConflict, ErrorCodes.MigrationConflict);
+            }
+            assert.commandFailedWithCode(res, expectedCodes, errMsg);
+        }
+        assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
         // The commit should fail because the earlier write failed.
         assert.commandFailedWithCode(session.commitTransaction_forTesting(),

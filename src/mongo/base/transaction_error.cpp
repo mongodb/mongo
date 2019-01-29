@@ -37,16 +37,17 @@ bool isTransientTransactionError(ErrorCodes::Error code,
     bool isTransient;
     switch (code) {
         case ErrorCodes::WriteConflict:
-        case ErrorCodes::SnapshotUnavailable:
         case ErrorCodes::LockTimeout:
         case ErrorCodes::PreparedTransactionInProgress:
-        case ErrorCodes::StaleConfig:
             isTransient = true;
             break;
         default:
             isTransient = false;
             break;
     }
+
+    isTransient |= ErrorCodes::isSnapshotError(code) || ErrorCodes::isNeedRetargettingError(code) ||
+        code == ErrorCodes::StaleDbVersion;
 
     if (isCommitTransaction) {
         // On NoSuchTransaction it's safe to retry the whole transaction only if the data cannot be

@@ -213,8 +213,7 @@
 
     // Targets Shard2, which is stale.
     res = assert.commandFailedWithCode(
-        sessionDB.runCommand({insert: collName, documents: [{_id: 7}]}),
-        ErrorCodes.NoSuchTransaction);
+        sessionDB.runCommand({insert: collName, documents: [{_id: 7}]}), ErrorCodes.StaleConfig);
     assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     // The transaction should have been implicitly aborted on all shards.
@@ -224,7 +223,7 @@
                                  ErrorCodes.NoSuchTransaction);
 
     //
-    // NoSuchTransaction should be returned if the router exhausts its retries.
+    // The final StaleConfig error should be returned if the router exhausts its retries.
     //
 
     // Move a chunk to Shard0 to make it stale.
@@ -244,8 +243,9 @@
 
     // Targets all shards. Shard0 is stale and won't refresh its metadata, so mongos should exhaust
     // its retries and implicitly abort the transaction.
-    assert.commandFailedWithCode(sessionDB.runCommand({find: collName}),
-                                 ErrorCodes.NoSuchTransaction);
+    res = assert.commandFailedWithCode(sessionDB.runCommand({find: collName}),
+                                       ErrorCodes.StaleConfig);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     // Verify the shards that did not return an error were also aborted.
     assertNoSuchTransactionOnAllShards(

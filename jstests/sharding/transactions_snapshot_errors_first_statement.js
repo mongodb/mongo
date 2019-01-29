@@ -94,8 +94,7 @@
             setFailCommandOnShards(st, "alwaysOn", [commandName], errorCode, numShardsToError);
 
             session.startTransaction({readConcern: {level: "snapshot"}});
-            const res = assert.commandFailedWithCode(sessionDB.runCommand(commandBody),
-                                                     ErrorCodes.NoSuchTransaction);
+            const res = assert.commandFailedWithCode(sessionDB.runCommand(commandBody), errorCode);
             assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
             unsetFailCommandOnEachShard(st, numShardsToError);

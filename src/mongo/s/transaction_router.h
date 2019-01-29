@@ -156,6 +156,22 @@ public:
     BSONObj attachTxnFieldsIfNeeded(const ShardId& shardId, const BSONObj& cmdObj);
 
     /**
+     * Returns true if the current transaction can retry on a stale version error from a contacted
+     * shard. This is always true except for an error received by a write that is not the first
+     * overall statement in the sharded transaction. This is because the entire command will be
+     * retried, and shards that were not stale and are targeted again may incorrectly execute the
+     * command a second time.
+     *
+     * Note: Even if this method returns true, the retry attempt may still fail, e.g. if one of the
+     * shards that returned a stale version error was involved in a previously completed a statement
+     * for this transaction.
+     *
+     * TODO SERVER-37207: Change batch writes to retry only the failed writes in a batch, to allow
+     * retrying writes beyond the first overall statement.
+     */
+    bool canContinueOnStaleShardOrDbError(StringData cmdName) const;
+
+    /**
      * Updates the transaction state to allow for a retry of the current command on a stale version
      * error. This includes sending abortTransaction to all cleared participants. Will throw if the
      * transaction cannot be continued.
@@ -163,6 +179,12 @@ public:
     void onStaleShardOrDbError(OperationContext* opCtx,
                                StringData cmdName,
                                const Status& errorStatus);
+
+    /**
+     * Returns true if the current transaction can retry on a snapshot error. This is only true on
+     * the first command recevied for a transaction.
+     */
+    bool canContinueOnSnapshotError() const;
 
     /**
      * Resets the transaction state to allow for a retry attempt. This includes clearing all
@@ -227,6 +249,19 @@ public:
      */
     void appendRecoveryToken(BSONObjBuilder* builder) const;
 
+    /**
+     * Returns a string with the active transaction's transaction number and logical session id
+     * (i.e. the transaction id).
+     */
+    std::string txnIdToString() const;
+
+    /**
+     * Returns the statement id of the latest received command for this transaction.
+     */
+    StmtId getLatestStmtId() const {
+        return _latestStmtId;
+    }
+
 private:
     // Shortcut to obtain the id of the session under which this transaction router runs
     const LogicalSessionId& _sessionId() const;
@@ -250,28 +285,6 @@ private:
      */
     void _setAtClusterTime(const boost::optional<LogicalTime>& afterClusterTime,
                            LogicalTime candidateTime);
-
-    /**
-     * Returns true if the current transaction can retry on a stale version error from a contacted
-     * shard. This is always true except for an error received by a write that is not the first
-     * overall statement in the sharded transaction. This is because the entire command will be
-     * retried, and shards that were not stale and are targeted again may incorrectly execute the
-     * command a second time.
-     *
-     * Note: Even if this method returns true, the retry attempt may still fail, e.g. if one of the
-     * shards that returned a stale version error was involved in a previously completed a statement
-     * for this transaction.
-     *
-     * TODO SERVER-37207: Change batch writes to retry only the failed writes in a batch, to allow
-     * retrying writes beyond the first overall statement.
-     */
-    bool _canContinueOnStaleShardOrDbError(StringData cmdName) const;
-
-    /**
-     * Returns true if the current transaction can retry on a snapshot error. This is only true on
-     * the first command recevied for a transaction.
-     */
-    bool _canContinueOnSnapshotError() const;
 
     /**
      * Throws NoSuchTransaction if the response from abortTransaction failed with a code other than
@@ -301,12 +314,6 @@ private:
      * matches the transaction's.
      */
     void _verifyParticipantAtClusterTime(const Participant& participant);
-
-    /**
-     * Returns a string with the active transaction's transaction number and logical session id
-     * (i.e. the transaction id).
-     */
-    std::string _txnIdToString() const;
 
     // The currently active transaction number on this transaction router (i.e. on the session)
     TxnNumber _txnNumber{kUninitializedTxnNumber};
