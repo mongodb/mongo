@@ -87,11 +87,6 @@ public:
         void incrementKeysDeleted(long long n);
 
         /**
-         * Increments nmoved by n.
-         */
-        void incrementNmoved(long long n);
-
-        /**
          * Increments ninserted by n.
          */
         void incrementNinserted(long long n);
@@ -118,8 +113,6 @@ public:
         boost::optional<long long> ninserted;
         boost::optional<long long> ndeleted;
 
-        // Updates resulted in a move (moves are expensive).
-        boost::optional<long long> nmoved;
         // Number of index keys inserted.
         boost::optional<long long> keysInserted;
         // Number of index keys removed.

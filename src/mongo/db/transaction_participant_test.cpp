@@ -2431,8 +2431,6 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponS
     txnParticipant->getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nModified = 1;
     CurOp::get(opCtx())->debug().additiveMetrics.nModified = 1;
     CurOp::get(opCtx())->debug().additiveMetrics.ninserted = 4;
-    txnParticipant->getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nmoved = 3;
-    CurOp::get(opCtx())->debug().additiveMetrics.nmoved = 2;
     txnParticipant->getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysInserted =
         1;
     CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
@@ -2514,8 +2512,6 @@ TEST_F(TransactionsMetricsTest, AdditiveMetricsObjectsShouldBeAddedTogetherUponA
     txnParticipant->getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nModified = 0;
     CurOp::get(opCtx())->debug().additiveMetrics.nModified = 3;
     CurOp::get(opCtx())->debug().additiveMetrics.ndeleted = 5;
-    txnParticipant->getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.nmoved = 0;
-    CurOp::get(opCtx())->debug().additiveMetrics.nmoved = 2;
     txnParticipant->getSingleTransactionStatsForTest().getOpDebug()->additiveMetrics.keysInserted =
         1;
     CurOp::get(opCtx())->debug().additiveMetrics.keysInserted = 1;
@@ -2955,7 +2951,6 @@ void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
     CurOp::get(opCtx)->debug().additiveMetrics.nModified = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.ninserted = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.ndeleted = metricValue;
-    CurOp::get(opCtx)->debug().additiveMetrics.nmoved = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.keysInserted = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.keysDeleted = metricValue;
     CurOp::get(opCtx)->debug().additiveMetrics.prepareReadConflicts = metricValue;
@@ -2985,9 +2980,8 @@ void buildSingleTransactionStatsString(StringBuilder* sb, const int metricValue)
     (*sb) << " keysExamined:" << metricValue << " docsExamined:" << metricValue
           << " nMatched:" << metricValue << " nModified:" << metricValue
           << " ninserted:" << metricValue << " ndeleted:" << metricValue
-          << " nmoved:" << metricValue << " keysInserted:" << metricValue
-          << " keysDeleted:" << metricValue << " prepareReadConflicts:" << metricValue
-          << " writeConflicts:" << metricValue;
+          << " keysInserted:" << metricValue << " keysDeleted:" << metricValue
+          << " prepareReadConflicts:" << metricValue << " writeConflicts:" << metricValue;
 }
 
 /*
@@ -3080,7 +3074,7 @@ std::string buildTransactionInfoString(
     // parameters:{ lsid: { id: UUID("f825288c-100e-49a1-9fd7-b95c108049e6"), uid: BinData(0,
     // E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855) }, txnNumber: 1,
     // autocommit: false }, readTimestamp:Timestamp(0, 0), keysExamined:1 docsExamined:1 nMatched:1
-    // nModified:1 ninserted:1 ndeleted:1 nmoved:1 keysInserted:1 keysDeleted:1
+    // nModified:1 ninserted:1 ndeleted:1 keysInserted:1 keysDeleted:1
     // prepareReadConflicts:1 writeConflicts:1 terminationCause:committed timeActiveMicros:3
     // timeInactiveMicros:2 numYields:0 locks:{ Global: { acquireCount: { r: 6, w: 4 } }, Database:
     // { acquireCount: { r: 1, w: 1, W: 2 } }, Collection: { acquireCount: { R: 1 } }, oplog: {

@@ -639,7 +639,6 @@ string OpDebug::report(Client* client,
     OPDEBUG_TOSTRING_HELP_BOOL(upsert);
     OPDEBUG_TOSTRING_HELP_BOOL(cursorExhausted);
 
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("nmoved", additiveMetrics.nmoved);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("prepareReadConflicts", additiveMetrics.prepareReadConflicts);
@@ -731,7 +730,6 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_BOOL(upsert);
     OPDEBUG_APPEND_BOOL(cursorExhausted);
 
-    OPDEBUG_APPEND_OPTIONAL("nmoved", additiveMetrics.nmoved);
     OPDEBUG_APPEND_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
     OPDEBUG_APPEND_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
     OPDEBUG_APPEND_OPTIONAL("prepareReadConflicts", additiveMetrics.prepareReadConflicts);
@@ -811,7 +809,6 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     nModified = addOptionalLongs(nModified, otherMetrics.nModified);
     ninserted = addOptionalLongs(ninserted, otherMetrics.ninserted);
     ndeleted = addOptionalLongs(ndeleted, otherMetrics.ndeleted);
-    nmoved = addOptionalLongs(nmoved, otherMetrics.nmoved);
     keysInserted = addOptionalLongs(keysInserted, otherMetrics.keysInserted);
     keysDeleted = addOptionalLongs(keysDeleted, otherMetrics.keysDeleted);
     prepareReadConflicts =
@@ -823,8 +820,7 @@ bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) {
     return keysExamined == otherMetrics.keysExamined && docsExamined == otherMetrics.docsExamined &&
         nMatched == otherMetrics.nMatched && nModified == otherMetrics.nModified &&
         ninserted == otherMetrics.ninserted && ndeleted == otherMetrics.ndeleted &&
-        nmoved == otherMetrics.nmoved && keysInserted == otherMetrics.keysInserted &&
-        keysDeleted == otherMetrics.keysDeleted &&
+        keysInserted == otherMetrics.keysInserted && keysDeleted == otherMetrics.keysDeleted &&
         prepareReadConflicts == otherMetrics.prepareReadConflicts &&
         writeConflicts == otherMetrics.writeConflicts;
 }
@@ -850,13 +846,6 @@ void OpDebug::AdditiveMetrics::incrementKeysDeleted(long long n) {
     *keysDeleted += n;
 }
 
-void OpDebug::AdditiveMetrics::incrementNmoved(long long n) {
-    if (!nmoved) {
-        nmoved = 0;
-    }
-    *nmoved += n;
-}
-
 void OpDebug::AdditiveMetrics::incrementNinserted(long long n) {
     if (!ninserted) {
         ninserted = 0;
@@ -880,7 +869,6 @@ string OpDebug::AdditiveMetrics::report() const {
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nModified", nModified);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("ninserted", ninserted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("ndeleted", ndeleted);
-    OPDEBUG_TOSTRING_HELP_OPTIONAL("nmoved", nmoved);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysInserted", keysInserted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysDeleted", keysDeleted);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("prepareReadConflicts", prepareReadConflicts);
