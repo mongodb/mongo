@@ -16,13 +16,15 @@
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
     function assertPrepareConflict(filter, clusterTime) {
+        // Use a 5 second timeout so that there is enough time for the prepared transaction to
+        // release its locks and for the command to obtain those locks.
         assert.commandFailedWithCode(
             // Use afterClusterTime read to make sure that it will block on a prepare conflict.
             testDB.runCommand({
                 find: collName,
                 filter: filter,
                 readConcern: {afterClusterTime: clusterTime},
-                maxTimeMS: 1000
+                maxTimeMS: 5000
             }),
             ErrorCodes.MaxTimeMSExpired);
 
