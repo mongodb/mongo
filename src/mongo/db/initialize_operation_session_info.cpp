@@ -43,6 +43,7 @@ namespace mongo {
 OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
                                                               const BSONObj& requestBody,
                                                               bool requiresAuth,
+                                                              bool attachToOpCtx,
                                                               bool isReplSetMemberOrMongos,
                                                               bool supportsDocLocking) {
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
@@ -88,7 +89,15 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
             return {};
         }
 
-        opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
+        // If osi lsid includes the uid, makeLogicalSessionId will also verify that the hash
+        // matches with the current user logged in.
+        auto lsid = makeLogicalSessionId(osi.getSessionId().get(), opCtx);
+
+        if (!attachToOpCtx) {
+            return {};
+        }
+
+        opCtx->setLogicalSessionId(std::move(lsid));
         uassertStatusOK(lsc->vivify(opCtx, opCtx->getLogicalSessionId().get()));
     } else {
         uassert(ErrorCodes::InvalidOptions,

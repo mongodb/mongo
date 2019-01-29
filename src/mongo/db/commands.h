@@ -397,6 +397,16 @@ public:
                                      rpc::ReplyBuilderInterface* replyBuilder,
                                      const Command& command);
 
+    /**
+     * If true, the logical sessions attached to the command request will be attached to the
+     * request's operation context. Note that returning false can potentially strip the logical
+     * session from the request in multi-staged invocations, like for example, mongos -> mongod.
+     * This can have security implications so think carefully before returning false.
+     */
+    virtual bool attachLogicalSessionsToOpCtx() const {
+        return true;
+    }
+
 private:
     // The full name of the command
     const std::string _name;

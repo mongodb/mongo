@@ -564,6 +564,7 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx,
             request.body,
             command->requiresAuth(),
+            command->attachLogicalSessionsToOpCtx(),
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
             opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking());
 

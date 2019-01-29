@@ -378,8 +378,12 @@ void runCommand(OperationContext* opCtx,
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
 
-    auto osi =
-        initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
+    auto osi = initializeOperationSessionInfo(opCtx,
+                                              request.body,
+                                              command->requiresAuth(),
+                                              command->attachLogicalSessionsToOpCtx(),
+                                              true,
+                                              true);
     validateSessionOptions(osi, command->getName(), nss.db());
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
