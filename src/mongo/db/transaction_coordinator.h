@@ -226,8 +226,9 @@ inline logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
                                             const txn::CommitDecision& decision) {
     // clang-format off
     switch (decision) {
-        case txn::CommitDecision::kCommit:  stream.stream() << "kCommit"; break;
-        case txn::CommitDecision::kAbort:   stream.stream() << "kAbort"; break;
+        case txn::CommitDecision::kCommit:     stream.stream() << "kCommit"; break;
+        case txn::CommitDecision::kAbort:      stream.stream() << "kAbort"; break;
+        case txn::CommitDecision::kCanceled:   stream.stream() << "kCanceled"; break;
     };
     // clang-format on
     return stream;

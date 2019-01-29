@@ -280,6 +280,11 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
                         ? std::max(result.maxPrepareTimestamp, next.prepareTimestamp)
                         : next.prepareTimestamp;
                     break;
+                case PrepareVote::kCanceled:
+                    // PrepareVote is just an alias for CommitDecision, so we need to include this
+                    // branch as part of the switch statement, but CommitDecision::kCanceled will
+                    // never be a valid response to prepare so this path is unreachable.
+                    MONGO_UNREACHABLE;
             }
 
             return txn::ShouldStopIteration::kNo;

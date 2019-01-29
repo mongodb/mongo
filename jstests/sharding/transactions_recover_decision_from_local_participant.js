@@ -11,6 +11,9 @@
 
     // The test modifies config.transactions, which must be done outside of a session.
     TestData.disableImplicitSessions = true;
+    // Reducing this from the resmoke default, which is several hours, so that tests that rely on a
+    // transaction coordinator being canceled after a timeout happen in a reasonable amount of time.
+    TestData.transactionLifetimeLimitSeconds = 60;
 
     let st =
         new ShardingTest({shards: 2, rs: {nodes: 2}, mongos: 2, other: {rsOptions: {verbose: 2}}});
@@ -41,7 +44,27 @@
                                                                 writeConcern));
     };
 
-    const startNewTransactionThroughMongos = function() {
+    const startNewSingleShardTransactionThroughMongos = function() {
+        const updateDocumentOnShard0 = {
+            q: {x: -1},
+            u: {"$set": {lastTxnNumber: txnNumber}},
+            upsert: true
+        };
+
+        let res = assert.commandWorked(testDB.runCommand({
+            update: 'user',
+            updates: [updateDocumentOnShard0],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            startTransaction: true
+        }));
+
+        assert.neq(null, res.recoveryToken);
+        return res.recoveryToken;
+    };
+
+    const startNewCrossShardTransactionThroughMongos = function() {
         const updateDocumentOnShard0 = {
             q: {x: -1},
             u: {"$set": {lastTxnNumber: txnNumber}},
@@ -92,7 +115,7 @@
             "coordinateCommit sent after coordinator finished coordinating an abort decision.");
         ++txnNumber;
 
-        let recoveryToken = startNewTransactionThroughMongos();
+        let recoveryToken = startNewCrossShardTransactionThroughMongos();
         assert.commandWorked(st.rs0.getPrimary().adminCommand({
             abortTransaction: 1,
             lsid: lsid,
@@ -115,7 +138,7 @@
             "coordinateCommit sent after coordinator finished coordinating a commit decision.");
         ++txnNumber;
 
-        recoveryToken = startNewTransactionThroughMongos();
+        recoveryToken = startNewCrossShardTransactionThroughMongos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -129,7 +152,7 @@
             "coordinateCommit sent after coordinator finished coordinating a commit decision but coordinator node can't majority commit writes");
         ++txnNumber;
 
-        recoveryToken = startNewTransactionThroughMongos();
+        recoveryToken = startNewCrossShardTransactionThroughMongos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -181,7 +204,7 @@
         jsTest.log(
             "coordinateCommit sent for higher transaction number than participant has seen.");
         ++txnNumber;
-        recoveryToken = startNewTransactionThroughMongos();
+        recoveryToken = startNewCrossShardTransactionThroughMongos();
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber + 1, participantList),
                                      ErrorCodes.NoSuchTransaction);
 
@@ -204,6 +227,49 @@
     lsid = {id: UUID()};
     txnNumber = 0;
     runTest([]);
+
+    /**
+     * Test that commit recovery succeeds with a single-shard transaction that has already
+     * committed.
+     */
+    (function() {
+        lsid = {id: UUID()};
+        txnNumber = 0;
+
+        // Start single-shard transaction so that coordinateCommit is not necessary for commit.
+        let recoveryToken = startNewSingleShardTransactionThroughMongos();
+
+        // Commit the transaction from the first mongos.
+        assert.commandWorked(testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            recoveryToken: recoveryToken
+        }));
+
+        // Try to recover decision from other mongos. This should block until the coordinator is
+        // removed and then return the commit decision (which was commit).
+        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
+    }());
+
+    /**
+     * Test that commit recovery succeeds with a multi-shard transaction for which commit is never
+     * sent.
+     */
+    (function() {
+        lsid = {id: UUID()};
+        txnNumber = 0;
+
+        // Start transaction and run CRUD ops on several shards.
+        let recoveryToken = startNewCrossShardTransactionThroughMongos();
+
+        // Try to recover decision from other mongos. This should block until the transaction
+        // coordinator is canceled after transactionLifetimeLimitSeconds, after which it should
+        // abort the local participant and return NoSuchTransaction.
+        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    })();
 
     st.stop();
 })();

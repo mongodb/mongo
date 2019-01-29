@@ -176,6 +176,8 @@ Future<void> TransactionCoordinator::onCompletion() {
 void TransactionCoordinator::cancelIfCommitNotYetStarted() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_state == CoordinatorState::kInit) {
+        invariant(!_finalDecisionPromise.getFuture().isReady());
+        _finalDecisionPromise.emplaceValue(txn::CommitDecision::kCanceled);
         _transitionToDone(std::move(lk));
     }
 }
@@ -195,6 +197,8 @@ Future<void> TransactionCoordinator::_sendDecisionToParticipants(
         case txn::CommitDecision::kAbort:
             _state = CoordinatorState::kAborting;
             return _driver.sendAbort(participantShards, _lsid, _txnNumber);
+        case txn::CommitDecision::kCanceled:
+            MONGO_UNREACHABLE;
     };
     MONGO_UNREACHABLE;
 };

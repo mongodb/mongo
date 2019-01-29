@@ -46,6 +46,7 @@ namespace txn {
 enum class CommitDecision {
     kCommit,
     kAbort,
+    kCanceled,
 };
 
 /**

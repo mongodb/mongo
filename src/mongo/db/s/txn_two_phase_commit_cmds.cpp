@@ -244,6 +244,9 @@ public:
                 // The commit coordination is still ongoing. Block waiting for the decision.
                 auto commitDecision = commitDecisionFuture->get(opCtx);
                 switch (commitDecision) {
+                    case txn::CommitDecision::kCanceled:
+                        // Continue on to recover the commit decision from disk.
+                        break;
                     case txn::CommitDecision::kAbort:
                         uasserted(ErrorCodes::NoSuchTransaction, "Transaction was aborted");
                     case txn::CommitDecision::kCommit:

@@ -382,6 +382,24 @@ TEST_F(TransactionCoordinatorServiceTest, RecoverCommitJoinsOngoingCoordinationT
               static_cast<int>(commitDecisionFuture2.get()));
 }
 
+TEST_F(TransactionCoordinatorServiceTest,
+       RecoverCommitWorksIfCommitNeverReceivedAndCoordinationCanceled) {
+    auto coordinatorService = TransactionCoordinatorService::get(operationContext());
+
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, kCommitDeadline);
+
+    auto commitDecisionFuture =
+        *coordinatorService->recoverCommit(operationContext(), _lsid, _txnNumber);
+
+    // Cancel previous coordinator by creating a new coordinator at a higher txn number.
+    coordinatorService->createCoordinator(
+        operationContext(), _lsid, _txnNumber + 1, kCommitDeadline);
+
+
+    ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
+              static_cast<int>(txn::CommitDecision::kCanceled));
+}
+
 TEST_F(
     TransactionCoordinatorServiceTest,
     CreateCoordinatorWithHigherTxnNumberThanExistingButNotYetCommittingTxnCancelsPreviousTxnAndSucceeds) {

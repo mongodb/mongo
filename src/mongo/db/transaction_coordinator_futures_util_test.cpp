@@ -300,7 +300,7 @@ TEST_F(DoWhileTest, LoopBodyExecutesAtLeastOnceWithBackoff) {
 TEST_F(DoWhileTest, LoopBodyExecutesManyIterationsWithoutBackoff) {
     AsyncWorkScheduler async(getServiceContext());
 
-    int remainingLoops = 100'000;
+    int remainingLoops = 1000;
     auto future = doWhile(async,
                           boost::none,
                           [&remainingLoops](const StatusWith<int>& status) {
