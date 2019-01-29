@@ -142,7 +142,6 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
             _replaceCurrentPlan(_queuedData);
             return NEED_TIME;
         case PlanStage::FAILURE:
-        case PlanStage::DEAD:
             // Either of these cause us to immediately end the trial phase and switch to the backup.
             BSONObj statusObj;
             WorkingSetCommon::getStatusMemberObject(*_ws, *out, &statusObj);

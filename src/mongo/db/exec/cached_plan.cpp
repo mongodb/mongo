@@ -148,17 +148,6 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             const bool shouldCache = false;
             return replan(yieldPolicy, shouldCache);
-        } else if (PlanStage::DEAD == state) {
-            BSONObj statusObj;
-            invariant(WorkingSet::INVALID_ID != id);
-            WorkingSetCommon::getStatusMemberObject(*_ws, id, &statusObj);
-
-            LOG(1) << "Execution of cached plan failed: PlanStage died"
-                   << ", query: " << redact(_canonicalQuery->toStringShort())
-                   << " planSummary: " << Explain::getPlanSummary(child().get())
-                   << " status: " << redact(statusObj);
-
-            return WorkingSetCommon::getMemberObjectStatus(statusObj);
         } else {
             invariant(PlanStage::NEED_TIME == state);
         }

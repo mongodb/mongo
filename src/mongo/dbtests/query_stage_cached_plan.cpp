@@ -132,7 +132,6 @@ public:
             state = cachedPlanStage->work(&id);
 
             ASSERT_NE(state, PlanStage::FAILURE);
-            ASSERT_NE(state, PlanStage::DEAD);
 
             if (state == PlanStage::ADVANCED) {
                 WorkingSetMember* member = ws.get(id);

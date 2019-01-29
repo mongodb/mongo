@@ -208,9 +208,9 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialPlanDies) {
     auto trialPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
     auto backupPlan = std::make_unique<QueuedDataStage>(opCtx(), ws());
 
-    // Seed the trial plan with 2 results followed by a PlanStage::DEAD.
+    // Seed the trial plan with 2 results followed by a PlanStage::FAILURE.
     queueData({BSON("_id" << 0), BSON("_id" << 1)}, trialPlan.get());
-    trialPlan->pushBack(PlanStage::DEAD);
+    trialPlan->pushBack(PlanStage::FAILURE);
 
     // Seed the backup plan with 20 different results, so that we can validate that we see the
     // correct dataset once the trial phase is complete.
@@ -220,8 +220,8 @@ TEST_F(TrialStageTest, AdoptsBackupPlanIfTrialPlanDies) {
     }
     queueData(backupResults, backupPlan.get());
 
-    // We schedule the trial to run for 10 works. Because we will encounter a PlanStage::DEAD before
-    // this point, the trial will complete early and the backup plan will be adopted.
+    // We schedule the trial to run for 10 works. Because we will encounter a PlanStage::FAILURE
+    // before this point, the trial will complete early and the backup plan will be adopted.
     auto trialStage = std::make_unique<TrialStage>(
         opCtx(), ws(), std::move(trialPlan), std::move(backupPlan), 10, 0.75);
 

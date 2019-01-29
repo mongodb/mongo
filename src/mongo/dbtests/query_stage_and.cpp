@@ -142,7 +142,6 @@ public:
 
             // We shouldn't fail or be dead.
             ASSERT(PlanStage::FAILURE != status);
-            ASSERT(PlanStage::DEAD != status);
 
             if (PlanStage::ADVANCED != status) {
                 continue;
@@ -805,9 +804,9 @@ public:
 
         const BSONObj dataObj = fromjson("{'foo': 'bar'}");
 
-        // Confirm PlanStage::DEAD when children contain the following WorkingSetMembers:
+        // Confirm PlanStage::FAILURE when children contain the following WorkingSetMembers:
         //     Child1:  Data
-        //     Child2:  NEED_TIME, DEAD
+        //     Child2:  NEED_TIME, FAILURE
         {
             WorkingSet ws;
             const auto andHashStage = make_unique<AndHashStage>(&_opCtx, &ws);
@@ -824,7 +823,7 @@ public:
 
             auto childStage2 = make_unique<QueuedDataStage>(&_opCtx, &ws);
             childStage2->pushBack(PlanStage::NEED_TIME);
-            childStage2->pushBack(PlanStage::DEAD);
+            childStage2->pushBack(PlanStage::FAILURE);
 
             andHashStage->addChild(childStage1.release());
             andHashStage->addChild(childStage2.release());
@@ -835,11 +834,11 @@ public:
                 state = andHashStage->work(&id);
             }
 
-            ASSERT_EQ(PlanStage::DEAD, state);
+            ASSERT_EQ(PlanStage::FAILURE, state);
         }
 
-        // Confirm PlanStage::DEAD when children contain the following WorkingSetMembers:
-        //     Child1:  Data, DEAD
+        // Confirm PlanStage::FAILURE when children contain the following WorkingSetMembers:
+        //     Child1:  Data, FAILURE
         //     Child2:  Data
         {
             WorkingSet ws;
@@ -855,7 +854,7 @@ public:
                 ws.transitionToRecordIdAndObj(id);
                 childStage1->pushBack(id);
             }
-            childStage1->pushBack(PlanStage::DEAD);
+            childStage1->pushBack(PlanStage::FAILURE);
 
             auto childStage2 = make_unique<QueuedDataStage>(&_opCtx, &ws);
             {
@@ -876,12 +875,12 @@ public:
                 state = andHashStage->work(&id);
             }
 
-            ASSERT_EQ(PlanStage::DEAD, state);
+            ASSERT_EQ(PlanStage::FAILURE, state);
         }
 
-        // Confirm PlanStage::DEAD when children contain the following WorkingSetMembers:
+        // Confirm PlanStage::FAILURE when children contain the following WorkingSetMembers:
         //     Child1:  Data
-        //     Child2:  Data, DEAD
+        //     Child2:  Data, FAILURE
         {
             WorkingSet ws;
             const auto andHashStage = make_unique<AndHashStage>(&_opCtx, &ws);
@@ -905,7 +904,7 @@ public:
                 ws.transitionToRecordIdAndObj(id);
                 childStage2->pushBack(id);
             }
-            childStage2->pushBack(PlanStage::DEAD);
+            childStage2->pushBack(PlanStage::FAILURE);
 
             andHashStage->addChild(childStage1.release());
             andHashStage->addChild(childStage2.release());
@@ -916,7 +915,7 @@ public:
                 state = andHashStage->work(&id);
             }
 
-            ASSERT_EQ(PlanStage::DEAD, state);
+            ASSERT_EQ(PlanStage::FAILURE, state);
         }
     }
 };

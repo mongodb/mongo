@@ -163,10 +163,6 @@ public:
         // on the WSM that the held WSID refers to.
         NEED_YIELD,
 
-        // Something went wrong but it's not an internal error.  Perhaps our collection was
-        // dropped or state deleted.
-        DEAD,
-
         // Something has gone unrecoverably wrong.  Stop running this query.
         // If the out parameter does not refer to an invalid working set member,
         // call WorkingSetCommon::getStatusMemberObject() to get details on the failure.
@@ -184,8 +180,6 @@ public:
             return "NEED_TIME";
         } else if (NEED_YIELD == state) {
             return "NEED_YIELD";
-        } else if (DEAD == state) {
-            return "DEAD";
         } else {
             verify(FAILURE == state);
             return "FAILURE";

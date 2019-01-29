@@ -92,7 +92,6 @@ public:
         BSONArrayBuilder arr(bob.subarrayStart("output"));
         while (state != PlanStage::IS_EOF) {
             state = ess.work(&id);
-            ASSERT_NE(state, PlanStage::DEAD);
             ASSERT_NE(state, PlanStage::FAILURE);
             if (state == PlanStage::ADVANCED) {
                 WorkingSetMember* member = ws.get(id);

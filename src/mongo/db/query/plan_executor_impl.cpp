@@ -626,7 +626,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             }
             return waitResult;
         } else {
-            invariant(PlanStage::DEAD == code || PlanStage::FAILURE == code);
+            invariant(PlanStage::FAILURE == code);
 
             if (NULL != objOut) {
                 BSONObj statusObj;
@@ -635,7 +635,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
                 *objOut = Snapshotted<BSONObj>(SnapshotId(), statusObj);
             }
 
-            return (PlanStage::DEAD == code) ? PlanExecutor::DEAD : PlanExecutor::FAILURE;
+            return PlanExecutor::FAILURE;
         }
     }
 }

@@ -88,7 +88,6 @@ public:
 
             // There are certain states we shouldn't get.
             ASSERT_NE(PlanStage::IS_EOF, state);
-            ASSERT_NE(PlanStage::DEAD, state);
             ASSERT_NE(PlanStage::FAILURE, state);
         }
 

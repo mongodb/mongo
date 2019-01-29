@@ -151,7 +151,7 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
             _resultIterator = _data.begin();
             _sorted = true;
             return PlanStage::NEED_TIME;
-        } else if (PlanStage::FAILURE == code || PlanStage::DEAD == code) {
+        } else if (PlanStage::FAILURE == code) {
             // The stage which produces a failure is responsible for allocating a working set member
             // with error details.
             invariant(WorkingSet::INVALID_ID != id);

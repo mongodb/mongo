@@ -68,7 +68,7 @@ PlanStage::StageState LimitStage::doWork(WorkingSetID* out) {
     if (PlanStage::ADVANCED == status) {
         *out = id;
         --_numToReturn;
-    } else if (PlanStage::FAILURE == status || PlanStage::DEAD == status) {
+    } else if (PlanStage::FAILURE == status) {
         // The stage which produces a failure is responsible for allocating a working set member
         // with error details.
         invariant(WorkingSet::INVALID_ID != id);
