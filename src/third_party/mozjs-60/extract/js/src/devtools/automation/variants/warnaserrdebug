@@ -1,4 +1,0 @@
-{
-    "configure-args": "--enable-warnings-as-errors",
-    "debug": true
-}

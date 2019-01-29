@@ -484,7 +484,7 @@ var ReplSetTest = function(opts) {
             member._id = i;
 
             member.host = this.host;
-            if (!member.host.includes('/')) {
+            if (!member.host.contains('/')) {
                 member.host += ":" + this.ports[i];
             }
 
@@ -2279,15 +2279,6 @@ var ReplSetTest = function(opts) {
 
         // Turn off periodic noop writes for replica sets by default.
         options.setParameter = options.setParameter || {};
-        if (typeof(options.setParameter) === "string") {
-            var eqIdx = options.setParameter.indexOf("=");
-            if (eqIdx != -1) {
-                var param = options.setParameter.substring(0, eqIdx);
-                var value = options.setParameter.substring(eqIdx + 1);
-                options.setParameter = {};
-                options.setParameter[param] = value;
-            }
-        }
         options.setParameter.writePeriodicNoops = options.setParameter.writePeriodicNoops || false;
 
         // We raise the number of initial sync connect attempts for tests that disallow chaining.

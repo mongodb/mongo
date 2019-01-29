@@ -81,29 +81,27 @@ class ConfigExpandRestServer {
 }
 
 function makeReflectionCmd(arg, opts = {}) {
-    return function(arg, opts) {
-        'use strict';
+    'use strict';
 
-        load('jstests/libs/python.js');
-        let cmd = getPython3Binary();
-        if (_isWindows()) {
-            cmd = '"' + cmd + '"';
-        }
-        cmd += ' jstests/noPassthrough/libs/configExpand/reflect.py';
+    load('jstests/libs/python.js');
+    let cmd = getPython3Binary();
+    if (_isWindows()) {
+        cmd = '"' + cmd + '"';
+    }
+    cmd += ' jstests/noPassthrough/libs/configExpand/reflect.py';
 
-        if (opts.sleep && (opts.sleep > 0)) {
-            cmd += ' -s ' + Number(opts.sleep);
-        }
+    if (opts.sleep && (opts.sleep > 0)) {
+        cmd += ' -s ' + Number(opts.sleep);
+    }
 
-        // Escape arguments to the shell by wrapping in OS appropriate quotes.
-        if (_isWindows()) {
-            cmd += ' ' + arg.split('"').map(v => '"' + v + '"').join('\\"');
-        } else {
-            cmd += ' ' + arg.split("'").map(v => "'" + v + "'").join("\\'");
-        }
+    // Escape arguments to the shell by wrapping in OS appropriate quotes.
+    if (_isWindows()) {
+        cmd += ' ' + arg.split('"').map(v => '"' + v + '"').join('\\"');
+    } else {
+        cmd += ' ' + arg.split("'").map(v => "'" + v + "'").join("\\'");
+    }
 
-        return cmd;
-    }.call(this, arg, opts);
+    return cmd;
 }
 
 function jsToYaml(config, toplevel = true) {

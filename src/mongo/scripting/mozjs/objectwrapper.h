@@ -86,9 +86,12 @@ public:
         void set(JSContext* cx, JS::HandleObject o, JS::HandleValue value);
         bool has(JSContext* cx, JS::HandleObject o);
         bool hasOwn(JSContext* cx, JS::HandleObject o);
-        void define(
-            JSContext* cx, JS::HandleObject o, unsigned attrs, JSNative getter, JSNative setter);
-        void define(JSContext* cx, JS::HandleObject o, JS::HandleValue value, unsigned attrs);
+        void define(JSContext* cx,
+                    JS::HandleObject o,
+                    JS::HandleValue value,
+                    unsigned attrs,
+                    JSNative getter,
+                    JSNative setter);
         void del(JSContext* cx, JS::HandleObject o);
         std::string toString(JSContext* cx);
         StringData toStringData(JSContext* cx, JSStringWrapper* jsstr);
@@ -127,8 +130,11 @@ public:
     /**
      * See JS_DefineProperty for what sort of attributes might be useful
      */
-    void defineProperty(Key key, unsigned attrs, JSNative getter, JSNative setter);
-    void defineProperty(Key key, JS::HandleValue value, unsigned attrs);
+    void defineProperty(Key key,
+                        JS::HandleValue value,
+                        unsigned attrs,
+                        JSNative getter = nullptr,
+                        JSNative setter = nullptr);
 
     void deleteProperty(Key key);
 
