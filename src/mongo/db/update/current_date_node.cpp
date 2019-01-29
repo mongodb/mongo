@@ -105,4 +105,18 @@ void CurrentDateNode::setValueForNewElement(mutablebson::Element* element) const
     setValue(element, _typeIsDate);
 }
 
+BSONObj CurrentDateNode::operatorValue() const {
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder subBuilder(bob.subobjStart(""));
+        {
+            if (_typeIsDate)
+                subBuilder << kType << kDate;
+            else
+                subBuilder << kType << kTimestamp;
+        }
+    }
+    return bob.obj();
+}
+
 }  // namespace mongo

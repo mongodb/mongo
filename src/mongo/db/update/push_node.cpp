@@ -34,6 +34,7 @@
 #include <numeric>
 
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/update/update_internal_node.h"
@@ -191,8 +192,36 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
     return Status::OK();
 }
 
+BSONObj PushNode::operatorValue() const {
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder subBuilder(bob.subobjStart(""));
+        {
+            // This serialization function always produces $each regardless of whether the input
+            // contained it.
+            BSONObjBuilder eachBuilder(subBuilder.subarrayStart("$each"));
+            for (const auto value : _valuesToPush)
+                eachBuilder << value;
+        }
+        if (_slice)
+            subBuilder << "$slice" << _slice.get();
+        if (_position)
+            subBuilder << "$position" << _position.get();
+        if (_sort) {
+            // The sort pattern is stored in a dummy enclosing object that we must unwrap.
+            if (_sort->useWholeValue)
+                subBuilder << "$sort" << _sort->sortPattern.firstElement();
+            else
+                subBuilder << "$sort" << _sort->sortPattern;
+        }
+    }
+    return bob.obj();
+}
+
 ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
-    mutablebson::Element* array, long long position, const std::vector<BSONElement>& valuesToPush) {
+    mutablebson::Element* array,
+    boost::optional<long long> position,
+    const std::vector<BSONElement>& valuesToPush) {
     if (valuesToPush.empty()) {
         return ModifyResult::kNoOp;
     }
@@ -210,15 +239,15 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
     if (arraySize == 0) {
         invariant(array->pushBack(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
-    } else if (position > arraySize) {
+    } else if (!position || position.get() > arraySize) {
         invariant(array->pushBack(firstElementToInsert));
         result = ModifyResult::kArrayAppendUpdate;
-    } else if (position > 0) {
-        auto insertAfter = getNthChild(*array, position - 1);
+    } else if (position.get() > 0) {
+        auto insertAfter = getNthChild(*array, position.get() - 1);
         invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
-    } else if (position < 0 && -position < arraySize) {
-        auto insertAfter = getNthChild(*array, arraySize - (-position) - 1);
+    } else if (position.get() < 0 && -position.get() < arraySize) {
+        auto insertAfter = getNthChild(*array, arraySize - (-position.get()) - 1);
         invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
     } else {
@@ -267,20 +296,22 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
         sortChildren(*element, *_sort);
     }
 
-    // std::abs(LLONG_MIN) results in undefined behavior on 2's complement systems because the
-    // absolute value of LLONG_MIN cannot be represented in a 'long long'.
-    const auto sliceAbs = _slice == std::numeric_limits<decltype(_slice)>::min()
-        ? std::abs(_slice + 1)
-        : std::abs(_slice);
+    if (_slice) {
+        // std::abs(LLONG_MIN) results in undefined behavior on 2's complement systems because the
+        // absolute value of LLONG_MIN cannot be represented in a 'long long'.
+        const auto sliceAbs = _slice.get() == std::numeric_limits<decltype(_slice)>::min()
+            ? std::abs(_slice.get() + 1)
+            : std::abs(_slice.get());
 
-    while (static_cast<long long>(countChildren(*element)) > sliceAbs) {
-        result = ModifyResult::kNormalUpdate;
-        if (_slice >= 0) {
-            invariant(element->popBack());
-        } else {
-            // A negative value in '_slice' trims the array down to abs(_slice) but removes entries
-            // from the front of the array instead of the back.
-            invariant(element->popFront());
+        while (static_cast<long long>(countChildren(*element)) > sliceAbs) {
+            result = ModifyResult::kNormalUpdate;
+            if (_slice.get() >= 0) {
+                invariant(element->popBack());
+            } else {
+                // A negative value in '_slice' trims the array down to abs(_slice) but removes
+                // entries from the front of the array instead of the back.
+                invariant(element->popFront());
+            }
         }
     }
 

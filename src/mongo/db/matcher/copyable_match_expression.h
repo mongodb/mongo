@@ -87,6 +87,10 @@ public:
         return &(*_matchExpr);
     }
 
+    auto inputBSON() const {
+        return _matchAST;
+    }
+
 private:
     BSONObj _matchAST;
     std::shared_ptr<const ExtensionsCallback> _extensionsCallback;

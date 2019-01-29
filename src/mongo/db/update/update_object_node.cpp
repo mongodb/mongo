@@ -31,6 +31,7 @@
 
 #include "mongo/db/update/update_object_node.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/update/field_checker.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_array_node.h"
@@ -179,6 +180,13 @@ void applyChild(const UpdateNode& child,
             applyParams->pathToCreate->clear();
         }
     }
+}
+
+BSONObj makeBSONForOperator(const std::vector<std::pair<std::string, BSONObj>>& updatesForOp) {
+    BSONObjBuilder bob;
+    for (const auto & [ path, value ] : updatesForOp)
+        bob << path << value.firstElement();
+    return bob.obj();
 }
 
 }  // namespace
@@ -368,6 +376,22 @@ void UpdateObjectNode::setChild(std::string field, std::unique_ptr<UpdateNode> c
         invariant(_children.find(field) == _children.end());
         _children[std::move(field)] = std::move(child);
     }
+}
+
+BSONObj UpdateObjectNode::serialize() const {
+    std::map<std::string, std::vector<std::pair<std::string, BSONObj>>> operatorOrientedUpdates;
+
+    BSONObjBuilder bob;
+
+    for (const auto & [ pathPrefix, child ] : _children) {
+        auto path = FieldRef(pathPrefix);
+        child->produceSerializationMap(&path, &operatorOrientedUpdates);
+    }
+
+    for (const auto & [ op, updates ] : operatorOrientedUpdates)
+        bob << op << makeBSONForOperator(updates);
+
+    return bob.obj();
 }
 
 UpdateNode::ApplyResult UpdateObjectNode::apply(ApplyParams applyParams) const {

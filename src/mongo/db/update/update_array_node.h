@@ -31,6 +31,8 @@
 
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
@@ -78,6 +80,16 @@ public:
     UpdateNode* getChild(const std::string& field) const final;
 
     void setChild(std::string field, std::unique_ptr<UpdateNode> child) final;
+
+    void produceSerializationMap(
+        FieldRef* currentPath,
+        std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
+            operatorOrientedUpdates) const final {
+        for (const auto & [ pathSuffix, child ] : _children) {
+            FieldRefTempAppend tempAppend(*currentPath, toArrayFilterIdentifier(pathSuffix));
+            child->produceSerializationMap(currentPath, operatorOrientedUpdates);
+        }
+    }
 
 private:
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& _arrayFilters;

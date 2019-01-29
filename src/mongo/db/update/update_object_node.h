@@ -31,6 +31,8 @@
 
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonelement.h"
@@ -97,6 +99,27 @@ public:
     UpdateNode* getChild(const std::string& field) const final;
 
     void setChild(std::string field, std::unique_ptr<UpdateNode> child) final;
+
+    /**
+     * Gather all update operators in the subtree rooted from this into a BSONObj in the format of
+     * the update command's update parameter.
+     */
+    BSONObj serialize() const;
+
+    void produceSerializationMap(
+        FieldRef* currentPath,
+        std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
+            operatorOrientedUpdates) const final {
+        for (const auto & [ pathSuffix, child ] : _children) {
+            FieldRefTempAppend tempAppend(*currentPath, pathSuffix);
+            child->produceSerializationMap(currentPath, operatorOrientedUpdates);
+        }
+        // Object nodes have a positional child that must be accounted for.
+        if (_positionalChild) {
+            FieldRefTempAppend tempAppend(*currentPath, "$");
+            _positionalChild->produceSerializationMap(currentPath, operatorOrientedUpdates);
+        }
+    }
 
 private:
     std::map<std::string, clonable_ptr<UpdateNode>> _children;

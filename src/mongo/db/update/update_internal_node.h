@@ -77,6 +77,13 @@ public:
 
 protected:
     /**
+     * Helper for subclass implementations needing to produce the syntax for applied array filters.
+     */
+    static std::string toArrayFilterIdentifier(const std::string& fieldName) {
+        return "$[" + fieldName + "]";
+    }
+
+    /**
      * Helper for subclass implementations of createUpdateNodeByMerging. Any UpdateNode value whose
      * key is only in 'leftMap' or only in 'rightMap' is cloned and added to the output map. If the
      * key is in both maps, the two UpdateNodes are merged and added to the output map. If

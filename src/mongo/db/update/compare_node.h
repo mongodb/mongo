@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -65,6 +66,21 @@ protected:
     }
 
 private:
+    StringData operatorName() const final {
+        switch (_mode) {
+            case CompareMode::kMax:
+                return "$max";
+            case CompareMode::kMin:
+                return "$min";
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    BSONObj operatorValue() const final {
+        return BSON("" << _val);
+    }
+
     CompareMode _mode;
     BSONElement _val;
     const CollatorInterface* _collator = nullptr;

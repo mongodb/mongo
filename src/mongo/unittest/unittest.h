@@ -99,7 +99,7 @@
 #define ASSERT_GTE(a, b) ASSERT_COMPARISON_(kGe, a, b)
 
 /**
- * Binary comparison utility macro.  Do not use directly.
+ * Binary comparison utility macro. Do not use directly.
  */
 #define ASSERT_COMPARISON_(OP, a, b)                                                           \
     if (auto ca = ::mongo::unittest::ComparisonAssertion<::mongo::unittest::ComparisonOp::OP>( \
@@ -111,6 +111,22 @@
  * values.
  */
 #define ASSERT_APPROX_EQUAL(a, b, ABSOLUTE_ERR) ASSERT_LTE(std::abs((a) - (b)), ABSOLUTE_ERR)
+
+/**
+ * Assert a function call returns its input unchanged.
+ */
+#define ASSERT_IDENTITY(INPUT, FUNCTION)                                                      \
+    [&](auto&& v) {                                                                           \
+        if (auto ca =                                                                         \
+                ::mongo::unittest::ComparisonAssertion<::mongo::unittest::ComparisonOp::kEq>( \
+                    __FILE__,                                                                 \
+                    __LINE__,                                                                 \
+                    #INPUT,                                                                   \
+                    #FUNCTION "(" #INPUT ")",                                                 \
+                    v,                                                                        \
+                    FUNCTION(std::forward<decltype(v)>(v))))                                  \
+            ca.failure().stream();                                                            \
+    }(INPUT)
 
 /**
  * Verify that the evaluation of "EXPRESSION" throws an exception of type EXCEPTION_TYPE.

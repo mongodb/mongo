@@ -160,6 +160,25 @@ bool SafeNum::isIdentical(const SafeNum& rhs) const {
     }
 }
 
+void SafeNum::toBSON(StringData fieldName, BSONObjBuilder* bob) const {
+    switch (_type) {
+        case BSONType::NumberInt:
+            bob->append(fieldName, _value.int32Val);
+            return;
+        case BSONType::NumberLong:
+            bob->append(fieldName, _value.int64Val);
+            return;
+        case BSONType::NumberDouble:
+            bob->append(fieldName, _value.doubleVal);
+            return;
+        case BSONType::NumberDecimal:
+            bob->append(fieldName, Decimal128(_value.decimalVal));
+            return;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 int64_t SafeNum::getInt64(const SafeNum& snum) {
     switch (snum._type) {
         case NumberInt:

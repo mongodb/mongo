@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "mongo/db/update/update_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -60,6 +65,20 @@ public:
      * a noop.
      */
     ApplyResult apply(ApplyParams applyParams) const final;
+
+    BSONObj serialize() const {
+        return _val;
+    }
+
+    /**
+     * ObjectReplaceNode is never part of an update operator tree so this method cannot be called.
+     */
+    virtual void produceSerializationMap(
+        FieldRef* currentPath,
+        std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
+            operatorOrientedUpdates) const {
+        MONGO_UNREACHABLE;
+    }
 
 private:
     // Object to replace with.

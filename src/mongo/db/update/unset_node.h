@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -63,6 +64,15 @@ public:
 
     bool allowNonViablePath() const final {
         return true;
+    }
+
+private:
+    StringData operatorName() const final {
+        return "$unset";
+    }
+
+    BSONObj operatorValue() const final {
+        return BSON("" << 1);
     }
 };
 

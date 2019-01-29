@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/array_culling_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -50,6 +51,10 @@ public:
     }
 
 private:
+    StringData operatorName() const final {
+        return "$pullAll";
+    }
+
     /**
      * An implementation of ArrayCullingNode::ElementMatcher whose match() function returns true iff
      * its input element is exactly equal to any element from a set of candidate elements.

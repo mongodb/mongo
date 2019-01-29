@@ -69,9 +69,20 @@ protected:
         virtual std::unique_ptr<ElementMatcher> clone() const = 0;
         virtual bool match(const mutablebson::ConstElement& element) = 0;
         virtual void setCollator(const CollatorInterface* collator) = 0;
+        /**
+         * Retrieve the value the matcher applies as a single-element BSONObj with an empty string
+         * as the keyname. For example, for the input syntax: { $pull: { votes: { $gte: 6 } } },
+         * this function would return: { "": { $gte: 6 } } in BSON.
+         */
+        virtual BSONObj value() const = 0;
     };
 
     clonable_ptr<ElementMatcher> _matcher;
+
+private:
+    BSONObj operatorValue() const final {
+        return _matcher->value();
+    }
 };
 
 }  // namespace mongo

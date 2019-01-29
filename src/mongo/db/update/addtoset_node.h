@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -57,6 +61,27 @@ protected:
     }
 
 private:
+    StringData operatorName() const final {
+        return "$addToSet";
+    }
+
+    BSONObj operatorValue() const final {
+        if (_elements.size() == 1) {
+            return BSON("" << _elements[0]);
+        } else {
+            BSONObjBuilder bob;
+            {
+                BSONObjBuilder subBuilder(bob.subobjStart(""));
+                {
+                    BSONObjBuilder eachBuilder(subBuilder.subarrayStart("$each"));
+                    for (const auto element : _elements)
+                        eachBuilder << element;
+                }
+            }
+            return bob.obj();
+        }
+    }
+
     // The array of elements to be added.
     std::vector<BSONElement> _elements;
 

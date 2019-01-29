@@ -31,6 +31,7 @@
 
 #include "mongo/db/update/pullall_node.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
@@ -58,6 +59,16 @@ public:
     }
 
 private:
+    BSONObj value() const final {
+        BSONObjBuilder bob;
+        {
+            BSONArrayBuilder subarrayBuilder(bob.subarrayStart(""));
+            for (const auto element : _elementsToMatch)
+                subarrayBuilder << element;
+        }
+        return bob.obj();
+    }
+
     std::vector<BSONElement> _elementsToMatch;
     const CollatorInterface* _collator;
 };

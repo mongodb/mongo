@@ -33,6 +33,7 @@
 #include <limits>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/push_sorter.h"
 #include "mongo/stdx/memory.h"
@@ -41,9 +42,6 @@ namespace mongo {
 
 class PushNode final : public ModifierNode {
 public:
-    PushNode()
-        : _slice(std::numeric_limits<long long>::max()),
-          _position(std::numeric_limits<long long>::max()) {}
     Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) final;
 
     std::unique_ptr<UpdateNode> clone() const final {
@@ -72,9 +70,15 @@ protected:
 
 
 private:
+    StringData operatorName() const final {
+        return "$push";
+    }
+
+    BSONObj operatorValue() const final;
+
     // A helper for performPush().
     static ModifyResult insertElementsWithPosition(mutablebson::Element* array,
-                                                   long long position,
+                                                   boost::optional<long long> position,
                                                    const std::vector<BSONElement>& valuesToPush);
 
     /**
@@ -99,8 +103,8 @@ private:
     static const StringData kPositionClauseName;
 
     std::vector<BSONElement> _valuesToPush;
-    long long _slice;
-    long long _position;
+    boost::optional<long long> _slice;
+    boost::optional<long long> _position;
     boost::optional<PatternElementCmp> _sort;
 };
 

@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -58,6 +63,14 @@ public:
     ApplyResult apply(ApplyParams applyParams) const final {
         return ApplyResult::noopResult();
     }
+
+    /**
+     * These internally-generated nodes do not need to be serialized.
+     */
+    void produceSerializationMap(
+        FieldRef* currentPath,
+        std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
+            operatorOrientedUpdates) const final {}
 };
 
 }  // namespace mongo

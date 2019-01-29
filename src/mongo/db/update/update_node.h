@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/mutable/element.h"
@@ -161,6 +165,21 @@ public:
                                                                  const UpdateNode& rightNode,
                                                                  FieldRef* pathTaken);
 
+    /**
+     * Produces a map of serialization components for an update. The map is indexed according to
+     * operator name. The value of each map entry is a vector of operator components. These two
+     * components are an operator field, which is a string representing a path, and an operator
+     * value, which is a BSONObj of the arguments to the operation. 'currentPath' keeps running
+     * track of the full path to the current node. Note that, although produceSerializationMap()
+     * mutates its 'currentPath' FieldRef for use in recursive calls, it always restores the
+     * original value before the function returns so the caller will witness no change.
+     */
+    virtual void produceSerializationMap(
+        FieldRef* currentPath,
+        std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
+            operatorOrientedUpdates) const = 0;
+
+public:
     const Context context;
     const Type type;
 };

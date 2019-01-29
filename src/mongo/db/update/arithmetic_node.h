@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -61,6 +62,20 @@ protected:
     }
 
 private:
+    StringData operatorName() const final {
+        switch (_op) {
+            case ArithmeticNode::ArithmeticOp::kAdd:
+                return "$inc";
+            case ArithmeticNode::ArithmeticOp::kMultiply:
+                return "$mul";
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    BSONObj operatorValue() const final {
+        return BSON("" << _val);
+    }
+
     ArithmeticOp _op;
     BSONElement _val;
 };

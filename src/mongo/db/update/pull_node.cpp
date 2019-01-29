@@ -40,7 +40,7 @@ namespace mongo {
  * The ObjectMatcher is used when the $pull condition is specified as an object and the first field
  * of that object is not an operator (like $gt).
  */
-class PullNode::ObjectMatcher final : public PullNode::ElementMatcher {
+class PullNode::ObjectMatcher final : public ArrayCullingNode::ElementMatcher {
 public:
     ObjectMatcher(BSONObj matchCondition, const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : _matchExpr(matchCondition,
@@ -65,6 +65,10 @@ public:
     }
 
 private:
+    BSONObj value() const final {
+        return BSON("" << _matchExpr.inputBSON());
+    }
+
     CopyableMatchExpression _matchExpr;
 };
 
@@ -75,7 +79,7 @@ private:
  * empty object so that we are comparing the MatchCondition and the array element at the same level.
  * This hack allows us to use a MatchExpression to check a BSONElement.
  */
-class PullNode::WrappedObjectMatcher final : public PullNode::ElementMatcher {
+class PullNode::WrappedObjectMatcher final : public ArrayCullingNode::ElementMatcher {
 public:
     WrappedObjectMatcher(BSONElement matchCondition,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
@@ -98,6 +102,10 @@ public:
     }
 
 private:
+    BSONObj value() const final {
+        return _matchExpr.inputBSON();
+    }
+
     CopyableMatchExpression _matchExpr;
 };
 
@@ -105,7 +113,7 @@ private:
  * The EqualityMatcher is used when the condition is a primitive value or an array value. We require
  * an exact match.
  */
-class PullNode::EqualityMatcher final : public PullNode::ElementMatcher {
+class PullNode::EqualityMatcher final : public ArrayCullingNode::ElementMatcher {
 public:
     EqualityMatcher(BSONElement modExpr, const CollatorInterface* collator)
         : _modExpr(modExpr), _collator(collator) {}
@@ -123,6 +131,10 @@ public:
     }
 
 private:
+    BSONObj value() const final {
+        return BSON("" << _modExpr);
+    }
+
     BSONElement _modExpr;
     const CollatorInterface* _collator;
 };

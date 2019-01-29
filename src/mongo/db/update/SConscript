@@ -149,7 +149,10 @@ env.Library(
 
 env.CppUnitTest(
     target='update_driver_test',
-    source='update_driver_test.cpp',
+    source=[
+        'update_driver_test.cpp',
+        'update_serialization_test.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
         '$BUILD_DIR/mongo/db/query/query_planner',
@@ -157,4 +160,3 @@ env.CppUnitTest(
         'update_driver',
     ],
 )
-

@@ -46,17 +46,6 @@ const char* getNameForOp(ArithmeticNode::ArithmeticOp op) {
             MONGO_UNREACHABLE;
     }
 }
-
-const char* getModifierNameForOp(ArithmeticNode::ArithmeticOp op) {
-    switch (op) {
-        case ArithmeticNode::ArithmeticOp::kAdd:
-            return "$inc";
-        case ArithmeticNode::ArithmeticOp::kMultiply:
-            return "$mul";
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
 }  // namespace
 
 Status ArithmeticNode::init(BSONElement modExpr,
@@ -80,7 +69,7 @@ ModifierNode::ModifyResult ArithmeticNode::updateExistingElement(
     if (!element->isNumeric()) {
         auto idElem = mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
         uasserted(ErrorCodes::TypeMismatch,
-                  str::stream() << "Cannot apply " << getModifierNameForOp(_op)
+                  str::stream() << "Cannot apply " << operatorName()
                                 << " to a value of non-numeric type. {"
                                 << (idElem.ok() ? idElem.toString() : "no id")
                                 << "} has the field '"
@@ -107,7 +96,7 @@ ModifierNode::ModifyResult ArithmeticNode::updateExistingElement(
     } else if (!valueToSet.isValid()) {
         auto idElem = mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
         uasserted(ErrorCodes::BadValue,
-                  str::stream() << "Failed to apply " << getModifierNameForOp(_op)
+                  str::stream() << "Failed to apply " << operatorName()
                                 << " operations to current value ("
                                 << originalValue.debugString()
                                 << ") for document {"

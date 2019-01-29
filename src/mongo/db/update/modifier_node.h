@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -144,7 +150,6 @@ protected:
         return false;
     }
 
-
     /**
      * When allowCreation() returns false, ModiferNode::apply() calls this method when determining
      * if an update to a non-existent path is a no-op or an error. When allowNonViablePath() is
@@ -168,7 +173,28 @@ protected:
         return false;
     }
 
+    void produceSerializationMap(
+        FieldRef* currentPath,
+        std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
+            operatorOrientedUpdates) const override {
+        (*operatorOrientedUpdates)[operatorName().rawData()].emplace_back(
+            currentPath->dottedField(), operatorValue());
+    }
+
 private:
+    /**
+     * Retrieve the name of the operator this node represents in input syntax. For example, for the
+     * input syntax: {$set: {a: 3}}, this function would return "$set".
+     */
+    virtual StringData operatorName() const = 0;
+
+    /**
+     * Retrieve the value this operator applies as a single-element BSONObj with an empty string as
+     * the keyname. For example, for the input syntax: {$set: {a: 3}}, this function would return:
+     * {"": 3} in BSON.
+     */
+    virtual BSONObj operatorValue() const = 0;
+
     ApplyResult applyToNonexistentElement(ApplyParams applyParams) const;
     ApplyResult applyToExistingElement(ApplyParams applyParams) const;
 };

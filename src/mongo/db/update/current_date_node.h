@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/stdx/memory.h"
 
@@ -57,6 +58,12 @@ protected:
     }
 
 private:
+    StringData operatorName() const final {
+        return "$currentDate";
+    }
+
+    BSONObj operatorValue() const final;
+
     // If true, the current date should be expressed as a Date. If false, a Timestamp.
     bool _typeIsDate;
 };

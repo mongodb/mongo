@@ -39,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/update/modifier_table.h"
+#include "mongo/db/update/object_replace_node.h"
 #include "mongo/db/update/update_object_node.h"
 #include "mongo/db/update_index_data.h"
 
@@ -140,6 +141,15 @@ public:
 
     bool needMatchDetails() const {
         return _positional;
+    }
+
+    /**
+     * Serialize the update expression to BSON. Output of this method is expected to, when parsed,
+     * produce a logically equivalent update expression.
+     */
+    BSONObj serialize() const {
+        return _replacementMode ? static_cast<ObjectReplaceNode*>(_root.get())->serialize()
+                                : static_cast<UpdateObjectNode*>(_root.get())->serialize();
     }
 
     /**
