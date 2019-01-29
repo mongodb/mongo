@@ -68,7 +68,8 @@
                       tojson(newStats));
     }
 
-    const rst = new ReplSetTest({nodes: 2});
+    const rst = new ReplSetTest(
+        {nodes: 2, nodeOptions: {setParameter: 'reportOpWriteConcernCountersInServerStatus=true'}});
     rst.startSet();
     let config = rst.getReplSetConfig();
     config.members[1].priority = 0;
