@@ -135,7 +135,8 @@ public:
     void appendInfo(BSONObjBuilder* builder) const;
 
     /**
-     * Returns true if any of clusterTime,  opTime or level arguments are set.
+     * Returns true if any of clusterTime, opTime or level arguments are set. Does not differentiate
+     * between an unspecified read concern and an empty one (i.e. an empty BSON object).
      */
     bool isEmpty() const;
 

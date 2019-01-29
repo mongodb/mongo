@@ -68,7 +68,14 @@ bool isTransactionCommand(const BSONObj& cmd) {
         cmdName == "prepareTransaction";
 }
 
+/**
+ * Attaches the given atClusterTime to the readConcern object in the given command object, removing
+ * afterClusterTime if present. Assumes the given command object has a readConcern field and has
+ * readConcern level snapshot.
+ */
 BSONObj appendAtClusterTimeToReadConcern(BSONObj cmdObj, LogicalTime atClusterTime) {
+    dassert(cmdObj.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
+
     BSONObjBuilder cmdAtClusterTimeBob;
     for (auto&& elem : cmdObj) {
         if (elem.fieldNameStringData() == repl::ReadConcernArgs::kReadConcernFieldName) {
@@ -82,15 +89,9 @@ BSONObj appendAtClusterTimeToReadConcern(BSONObj cmdObj, LogicalTime atClusterTi
                 }
             }
 
-            // Transactions will upconvert a read concern with afterClusterTime but no level to have
-            // level snapshot, so a command may have a read concern field with no level.
-            //
-            // TODO SERVER-37237: Once read concern handling has been consolidated on mongos, this
-            // assertion can probably be removed.
-            if (!readConcernBob.hasField(repl::ReadConcernArgs::kLevelFieldName)) {
-                readConcernBob.append(repl::ReadConcernArgs::kLevelFieldName,
-                                      kReadConcernLevelSnapshotName);
-            }
+            dassert(readConcernBob.hasField(repl::ReadConcernArgs::kLevelFieldName) &&
+                    readConcernBob.asTempObj()[repl::ReadConcernArgs::kLevelFieldName].String() ==
+                        kReadConcernLevelSnapshotName);
 
             readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
                                   atClusterTime.asTimestamp());
@@ -110,13 +111,7 @@ BSONObj appendReadConcernForTxn(BSONObj cmd,
     if (cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName)) {
         repl::ReadConcernArgs existingReadConcernArgs;
         dassert(existingReadConcernArgs.initialize(cmd));
-        // There may be no read concern level if the user only specified afterClusterTime and the
-        // transaction provided the default level.
-        //
-        // TODO SERVER-37237: Once read concern handling has been consolidated on mongos, this
-        // assertion can probably be simplified or removed.
-        dassert(existingReadConcernArgs.getLevel() == readConcernArgs.getLevel() ||
-                !existingReadConcernArgs.hasLevel());
+        dassert(existingReadConcernArgs.getLevel() == readConcernArgs.getLevel());
 
         return atClusterTime ? appendAtClusterTimeToReadConcern(std::move(cmd), *atClusterTime)
                              : cmd;
@@ -133,8 +128,10 @@ BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
                                                repl::ReadConcernArgs readConcernArgs,
                                                boost::optional<LogicalTime> atClusterTime,
                                                bool doAppendStartTransaction) {
-    auto cmdWithReadConcern =
-        appendReadConcernForTxn(std::move(cmd), readConcernArgs, atClusterTime);
+    auto cmdWithReadConcern = !readConcernArgs.isEmpty()
+        ? appendReadConcernForTxn(std::move(cmd), readConcernArgs, atClusterTime)
+        : std::move(cmd);
+
     BSONObjBuilder bob(std::move(cmdWithReadConcern));
 
     if (doAppendStartTransaction) {
@@ -236,10 +233,6 @@ void TransactionRouter::AtClusterTime::setTime(LogicalTime atClusterTime, StmtId
     _stmtIdSelectedAt = currentStmtId;
 }
 
-bool TransactionRouter::AtClusterTime::isSet() const {
-    return _atClusterTime != LogicalTime::kUninitialized;
-}
-
 bool TransactionRouter::AtClusterTime::canChange(StmtId currentStmtId) const {
     return _stmtIdSelectedAt == kUninitializedStmtId || _stmtIdSelectedAt == currentStmtId;
 }
@@ -278,16 +271,6 @@ BSONObj TransactionRouter::attachTxnFieldsIfNeeded(const ShardId& shardId, const
     return txnPart.attachTxnFieldsIfNeeded(cmdObj, true);
 }
 
-void TransactionRouter::_verifyReadConcern() {
-    if (!_isRecoveringCommit) {
-        invariant(!_readConcernArgs.isEmpty());
-    }
-
-    if (_atClusterTime) {
-        invariant(_atClusterTime->isSet());
-    }
-}
-
 void TransactionRouter::_verifyParticipantAtClusterTime(const Participant& participant) {
     const auto& participantAtClusterTime = participant.sharedOptions.atClusterTime;
     invariant(participantAtClusterTime);
@@ -298,8 +281,6 @@ TransactionRouter::Participant* TransactionRouter::getParticipant(const ShardId&
     const auto iter = _participants.find(shard.toString());
     if (iter == _participants.end())
         return nullptr;
-
-    _verifyReadConcern();
 
     if (_atClusterTime) {
         _verifyParticipantAtClusterTime(iter->second);
@@ -316,11 +297,10 @@ TransactionRouter::Participant& TransactionRouter::_createParticipant(const Shar
         _coordinatorId = shard.toString();
     }
 
-    _verifyReadConcern();
-
-    auto sharedOptions = _atClusterTime
-        ? SharedTransactionOptions{_txnNumber, _readConcernArgs, _atClusterTime->getTime()}
-        : SharedTransactionOptions{_txnNumber, _readConcernArgs, boost::none};
+    SharedTransactionOptions sharedOptions = {
+        _txnNumber,
+        _readConcernArgs,
+        _atClusterTime ? boost::optional<LogicalTime>(_atClusterTime->getTime()) : boost::none};
 
     auto resultPair =
         _participants.try_emplace(shard.toString(),
@@ -514,15 +494,11 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
                 txnNumber > _txnNumber);
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        if (!readConcernArgs.hasLevel()) {
-            // Transactions started without a readConcern level will use snapshot as the default.
-            uassertStatusOK(readConcernArgs.upconvertReadConcernLevelToSnapshot());
-        } else {
-            uassert(ErrorCodes::InvalidOptions,
-                    "The first command in a transaction cannot specify a readConcern level other "
-                    "than local, majority, or snapshot",
+        uassert(ErrorCodes::InvalidOptions,
+                "The first command in a transaction cannot specify a readConcern level other "
+                "than local, majority, or snapshot",
+                !readConcernArgs.hasLevel() ||
                     isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel()));
-        }
         _readConcernArgs = readConcernArgs;
     } else if (action == TransactionActions::kCommit) {
         uassert(ErrorCodes::TransactionTooOld,

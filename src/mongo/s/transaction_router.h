@@ -118,11 +118,6 @@ public:
         void setTime(LogicalTime atClusterTime, StmtId currentStmtId);
 
         /**
-         * True if the timestamp has been set to a non-null value.
-         */
-        bool isSet() const;
-
-        /**
          * True if the timestamp can be changed by a command running at the given statement id.
          */
         bool canChange(StmtId currentStmtId) const;
@@ -301,12 +296,6 @@ private:
      * Creates a new participant for the shard.
      */
     Participant& _createParticipant(const ShardId& shard);
-
-    /**
-     * Asserts the transaction has a valid read concern and, if the read concern level is snapshot,
-     * has selected a non-null atClusterTime.
-     */
-    void _verifyReadConcern();
 
     /**
      * If the transaction's read concern level is snapshot, asserts the participant's atClusterTime

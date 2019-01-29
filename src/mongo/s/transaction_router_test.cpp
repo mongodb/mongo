@@ -544,7 +544,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotSpecifyReadConcernAfterFir
         ErrorCodes::InvalidOptions);
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession, UpconvertToSnapshotIfNoReadConcernLevelGiven) {
+TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughNoReadConcernToParticipants) {
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
 
     TxnNumber txnNum{3};
@@ -556,11 +556,6 @@ TEST_F(TransactionRouterTestWithDefaultSession, UpconvertToSnapshotIfNoReadConce
 
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
-                                  << "readConcern"
-                                  << BSON("level"
-                                          << "snapshot"
-                                          << "atClusterTime"
-                                          << kInMemoryLogicalTime.asTimestamp())
                                   << "startTransaction"
                                   << true
                                   << "coordinator"
@@ -577,7 +572,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, UpconvertToSnapshotIfNoReadConce
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
-       UpconvertToSnapshotIfNoReadConcernLevelButHasAfterClusterTime) {
+       PassesThroughNoReadConcernLevelToParticipantsWithAfterClusterTime) {
     LogicalTime kAfterClusterTime(Timestamp(10, 1));
     repl::ReadConcernArgs::get(operationContext()) =
         repl::ReadConcernArgs(kAfterClusterTime, boost::none);
@@ -592,10 +587,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     BSONObj expectedNewObj = BSON("insert"
                                   << "test"
                                   << "readConcern"
-                                  << BSON("level"
-                                          << "snapshot"
-                                          << "atClusterTime"
-                                          << kAfterClusterTime.asTimestamp())
+                                  << BSON("afterClusterTime" << kAfterClusterTime.asTimestamp())
                                   << "startTransaction"
                                   << true
                                   << "coordinator"
@@ -644,20 +636,6 @@ TEST_F(TransactionRouterTestWithDefaultSession, RejectUnsupportedLevelsWithAfter
     for (auto readConcernLevel : unsupportedRCLevels) {
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::OpTime(Timestamp(10, 1), 2), readConcernLevel);
-
-        TxnNumber txnNum{3};
-        auto& txnRouter(*TransactionRouter::get(operationContext()));
-        ASSERT_THROWS_CODE(
-            txnRouter.beginOrContinueTxn(
-                operationContext(), txnNum, TransactionRouter::TransactionActions::kStart),
-            DBException,
-            ErrorCodes::InvalidOptions);
-    }
-
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::OpTime(Timestamp(10, 1), 2), boost::none);
-
-    {
 
         TxnNumber txnNum{3};
         auto& txnRouter(*TransactionRouter::get(operationContext()));
@@ -1822,21 +1800,6 @@ TEST_F(TransactionRouterTestWithDefaultSessionAndStartedSnapshot,
                                                          << BSON("level"
                                                                  << "snapshot"
                                                                  << "afterClusterTime"
-                                                                 << existingAfterClusterTime)));
-
-    ASSERT_BSONOBJ_EQ(rcLatestInMemoryAtClusterTime, newCmd["readConcern"].Obj());
-}
-
-TEST_F(TransactionRouterTestWithDefaultSessionAndStartedSnapshot,
-       AddingAtClusterTimeAddsLevelSnapshotIfNotThere) {
-    const Timestamp existingAfterClusterTime(1, 1);
-
-    auto& txnRouter(*TransactionRouter::get(operationContext()));
-    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(shard1,
-                                                    BSON("aggregate"
-                                                         << "testColl"
-                                                         << "readConcern"
-                                                         << BSON("afterClusterTime"
                                                                  << existingAfterClusterTime)));
 
     ASSERT_BSONOBJ_EQ(rcLatestInMemoryAtClusterTime, newCmd["readConcern"].Obj());

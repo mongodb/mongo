@@ -20,7 +20,12 @@
         // Set up the collection.
         assert.writeOK(sessionColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
-        session.startTransaction({readConcern: {level: level}});
+        if (level) {
+            session.startTransaction({readConcern: {level: level}});
+        } else {
+            session.startTransaction();
+        }
+
         const res = sessionDB.runCommand({find: collName});
         if (supported) {
             assert.commandWorked(res,
@@ -38,6 +43,10 @@
 
         session.endSession();
     }
+
+    // Starting a txn with no read concern level is allowed.
+    runTest(undefined, {causalConsistency: false}, true /*supported*/);
+    runTest(undefined, {causalConsistency: true}, true /*supported*/);
 
     const kSupportedLevels = ["local", "majority", "snapshot"];
     for (let level of kSupportedLevels) {
