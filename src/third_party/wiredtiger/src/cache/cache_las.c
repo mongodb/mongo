@@ -727,12 +727,13 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 			    upd->type == WT_UPDATE_MODIFY)) {
 				las_value.size = 0;
 				cursor->set_value(cursor, upd->txnid,
-				    upd->timestamp, upd->prepare_state,
-				    WT_UPDATE_BIRTHMARK, &las_value);
+				    upd->timestamp, upd->durable_timestamp,
+				    upd->prepare_state, WT_UPDATE_BIRTHMARK,
+				    &las_value);
 			} else
 				cursor->set_value(cursor, upd->txnid,
-				    upd->timestamp, upd->prepare_state,
-				    upd->type, &las_value);
+				    upd->timestamp, upd->durable_timestamp,
+				    upd->prepare_state, upd->type, &las_value);
 
 			/*
 			 * Using update looks a little strange because the keys
@@ -978,7 +979,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_ITEM las_key, las_value;
 	WT_ITEM *sweep_key;
 	WT_TXN_ISOLATION saved_isolation;
-	wt_timestamp_t las_timestamp;
+	wt_timestamp_t durable_timestamp, las_timestamp;
 	uint64_t cnt, remove_cnt, las_pageid, saved_pageid, visit_cnt;
 	uint64_t las_counter, las_txnid;
 	uint32_t las_id, session_flags;
@@ -1102,8 +1103,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * Remove all entries for a key once they have aged out and are
 		 * no longer needed.
 		 */
-		WT_ERR(cursor->get_value(cursor, &las_txnid,
-		    &las_timestamp, &prepare_state, &upd_type, &las_value));
+		WT_ERR(cursor->get_value(
+		    cursor, &las_txnid, &las_timestamp,
+		    &durable_timestamp, &prepare_state, &upd_type, &las_value));
 
 		/*
 		 * Check to see if the page or key has changed this iteration,

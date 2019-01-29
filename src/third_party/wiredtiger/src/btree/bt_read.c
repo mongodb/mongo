@@ -123,7 +123,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_ITEM las_key, las_value;
 	WT_PAGE *page;
 	WT_UPDATE *first_upd, *last_upd, *upd;
-	wt_timestamp_t las_timestamp;
+	wt_timestamp_t durable_timestamp, las_timestamp;
 	size_t incr, total_incr;
 	uint64_t current_recno, las_counter, las_pageid, las_txnid, recno;
 	uint32_t las_id, session_flags;
@@ -183,20 +183,14 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 		/* Allocate the WT_UPDATE structure. */
 		WT_ERR(cursor->get_value(
 		    cursor, &las_txnid, &las_timestamp,
-		    &prepare_state, &upd_type, &las_value));
+		    &durable_timestamp, &prepare_state, &upd_type, &las_value));
 		WT_ERR(__wt_update_alloc(
 		    session, &las_value, &upd, &incr, upd_type));
 		total_incr += incr;
 		upd->txnid = las_txnid;
 		upd->timestamp = las_timestamp;
 		upd->prepare_state = prepare_state;
-		/*
-		 * Use the commit timestamp as the durable timestamp, since
-		 * non durable committed updates don't currently get written to
-		 * lookaside, so the two timestamps should always be identical.
-		 */
-		if (prepare_state != WT_PREPARE_INPROGRESS)
-			upd->durable_timestamp = upd->timestamp;
+		upd->durable_timestamp = durable_timestamp;
 
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:

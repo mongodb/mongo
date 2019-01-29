@@ -119,12 +119,6 @@ __global_once(void)
 
 	TAILQ_INIT(&__wt_process.connqh);
 
-#if defined(HAVE_PAGE_VERSION_TS)
-	__wt_process.page_version_ts = true;
-#else
-	__wt_process.page_version_ts = false;
-#endif
-
 	__wt_process.checksum = wiredtiger_crc32c_func();
 
 	__global_calibrate_ticks();

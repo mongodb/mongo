@@ -778,6 +778,9 @@ config_pct(void)
 static void
 config_prepare(void)
 {
+	/* WT-4537: REMOVE when that merges */
+	config_single("prepare=off", 0);
+
 	/*
 	 * We cannot prepare a transaction if logging is configured, or if
 	 * timestamps are not configured.

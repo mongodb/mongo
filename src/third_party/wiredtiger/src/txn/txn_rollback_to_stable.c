@@ -20,7 +20,7 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_ITEM las_key, las_value;
 	WT_TXN_GLOBAL *txn_global;
-	wt_timestamp_t las_timestamp, rollback_timestamp;
+	wt_timestamp_t durable_timestamp, las_timestamp, rollback_timestamp;
 	uint64_t las_counter, las_pageid, las_total, las_txnid;
 	uint32_t las_id, session_flags;
 	uint8_t prepare_state, upd_type;
@@ -59,8 +59,9 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 		if (__bit_test(conn->stable_rollback_bitstring, las_id))
 			continue;
 
-		WT_ERR(cursor->get_value(cursor, &las_txnid,
-		    &las_timestamp, &prepare_state, &upd_type, &las_value));
+		WT_ERR(cursor->get_value(
+		    cursor, &las_txnid, &las_timestamp,
+		    &durable_timestamp, &prepare_state, &upd_type, &las_value));
 
 		/*
 		 * Entries with no timestamp will have a timestamp of zero,
@@ -456,12 +457,12 @@ __txn_rollback_to_stable_check(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_rollback_to_stable --
+ * __txn_rollback_to_stable --
  *	Rollback all in-memory state related to timestamps more recent than
  *	the passed in timestamp.
  */
-int
-__wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -510,5 +511,28 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 
 err:	F_CLR(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
 	__wt_free(session, conn->stable_rollback_bitstring);
+	return (ret);
+}
+
+/*
+ * __wt_txn_rollback_to_stable --
+ *	Rollback all in-memory state related to timestamps more recent than
+ *	the passed in timestamp.
+ */
+int
+__wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_DECL_RET;
+
+	/*
+	 * Don't use the connection's default session: we are working on data
+	 * handles and (a) don't want to cache all of them forever, plus (b)
+	 * can't guarantee that no other method will be called concurrently.
+	 */
+	WT_RET(__wt_open_internal_session(S2C(session),
+	    "txn rollback_to_stable", true, 0, &session));
+	ret = __txn_rollback_to_stable(session, cfg);
+	WT_TRET(session->iface.close(&session->iface, NULL));
+
 	return (ret);
 }
