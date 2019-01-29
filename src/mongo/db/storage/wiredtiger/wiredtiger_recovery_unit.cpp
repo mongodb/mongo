@@ -393,7 +393,9 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             _isTimestamped = true;
         }
 
-        wtRet = s->commit_transaction(s, nullptr);
+        const std::string conf = _durableTimestamp.isNull() ? "" : "durable_timestamp=" +
+                integerToHex(_durableTimestamp.asULL());
+        wtRet = s->commit_transaction(s, conf.c_str());
         LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
         wtRet = s->rollback_transaction(s, nullptr);
@@ -425,6 +427,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _lastTimestampSet = boost::none;
 
     _prepareTimestamp = Timestamp();
+    _durableTimestamp = Timestamp();
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
@@ -627,6 +630,21 @@ void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
 
 Timestamp WiredTigerRecoveryUnit::getCommitTimestamp() const {
     return _commitTimestamp;
+}
+
+void WiredTigerRecoveryUnit::setDurableTimestamp(Timestamp timestamp) {
+    invariant(
+        _durableTimestamp.isNull(),
+        str::stream() << "Trying to reset durable timestamp when it was already set. wasSetTo: "
+                      << _durableTimestamp.toString()
+                      << " setTo: "
+                      << timestamp.toString());
+
+    _durableTimestamp = timestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::getDurableTimestamp() const {
+    return _durableTimestamp;
 }
 
 void WiredTigerRecoveryUnit::clearCommitTimestamp() {

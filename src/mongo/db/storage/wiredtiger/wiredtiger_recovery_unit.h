@@ -128,6 +128,10 @@ public:
 
     Timestamp getCommitTimestamp() const override;
 
+    void setDurableTimestamp(Timestamp timestamp) override;
+
+    Timestamp getDurableTimestamp() const override;
+
     void setPrepareTimestamp(Timestamp timestamp) override;
 
     Timestamp getPrepareTimestamp() const override;
@@ -293,6 +297,7 @@ private:
     WiredTigerBeginTxnBlock::IgnorePrepared _ignorePrepared{
         WiredTigerBeginTxnBlock::IgnorePrepared::kIgnore};
     Timestamp _commitTimestamp;
+    Timestamp _durableTimestamp;
     Timestamp _prepareTimestamp;
     boost::optional<Timestamp> _lastTimestampSet;
     uint64_t _mySnapshotId;

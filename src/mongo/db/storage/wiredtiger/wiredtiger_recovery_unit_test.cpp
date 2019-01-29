@@ -583,6 +583,43 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
     ASSERT(ru->getReadOnce());
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, CommitWithDurableTimestamp) {
+    auto opCtx = clientAndCtx1.second.get();
+    Timestamp ts1(3, 3);
+    Timestamp ts2(5, 5);
+
+    opCtx->recoveryUnit()->setCommitTimestamp(ts1);
+    opCtx->recoveryUnit()->setDurableTimestamp(ts2);
+    auto durableTs = opCtx->recoveryUnit()->getDurableTimestamp();
+    ASSERT_EQ(ts2, durableTs);
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        wuow.commit();
+    }
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, CommitWithoutDurableTimestamp) {
+    auto opCtx = clientAndCtx1.second.get();
+    Timestamp ts1(5, 5);
+    opCtx->recoveryUnit()->setCommitTimestamp(ts1);
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        wuow.commit();
+    }
+}
+
+DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
+             SetDurableTimestampTwice,
+             "Trying to reset durable timestamp when it was already set.") {
+    auto opCtx = clientAndCtx1.second.get();
+    Timestamp ts1(3, 3);
+    Timestamp ts2(5, 5);
+    opCtx->recoveryUnit()->setDurableTimestamp(ts1);
+    opCtx->recoveryUnit()->setDurableTimestamp(ts2);
+}
+
 DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,
              RollbackHandlerAbortsOnTxnOpen,
              "rollback handler reopened transaction") {

@@ -240,6 +240,12 @@ public:
     virtual void setCommitTimestamp(Timestamp timestamp) {}
 
     /**
+     * Sets a timestamp that decides when all the future writes on this RecoveryUnit will be
+     * durable.
+     */
+    virtual void setDurableTimestamp(Timestamp timestamp) {}
+
+    /**
      * Clears the commit timestamp that was set by setCommitTimestamp(). This must be called outside
      * of a WUOW. This must be called when a commit timestamp is set.
      */
@@ -249,6 +255,13 @@ public:
      * Returns the commit timestamp. Can be called at any time.
      */
     virtual Timestamp getCommitTimestamp() const {
+        return {};
+    }
+
+    /**
+     * Returns the durable timestamp.
+     */
+    virtual Timestamp getDurableTimestamp() const {
         return {};
     }
 
