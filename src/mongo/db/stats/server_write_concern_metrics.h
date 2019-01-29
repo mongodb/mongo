@@ -54,10 +54,7 @@ public:
      * 'writeConcernOptions'.
      */
     void recordWriteConcernForInserts(const WriteConcernOptions& writeConcernOptions,
-                                      size_t numInserts) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-        _insertMetrics.recordWriteConcern(writeConcernOptions, numInserts);
-    }
+                                      size_t numInserts);
 
     /**
      * Updates the insert metrics according to the 'w' value of 'writeConcernOptions'.
@@ -69,18 +66,12 @@ public:
     /**
      * Updates the update metrics according to the 'w' value of 'writeConcernOptions'.
      */
-    void recordWriteConcernForUpdate(const WriteConcernOptions& writeConcernOptions) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-        _updateMetrics.recordWriteConcern(writeConcernOptions);
-    }
+    void recordWriteConcernForUpdate(const WriteConcernOptions& writeConcernOptions);
 
     /**
      * Updates the delete metrics according to the 'w' value of 'writeConcernOptions'.
      */
-    void recordWriteConcernForDelete(const WriteConcernOptions& writeConcernOptions) {
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
-        _deleteMetrics.recordWriteConcern(writeConcernOptions);
-    }
+    void recordWriteConcernForDelete(const WriteConcernOptions& writeConcernOptions);
 
     BSONObj toBSON() const;
 

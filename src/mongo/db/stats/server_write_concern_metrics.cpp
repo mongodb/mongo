@@ -34,9 +34,16 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
+
+// opWriteConcernCounters are not tracked unless 'reportOpWriteConcernCountersInServerStatus' is
+// true. This is false by default because the mutex acquisition impacts performance when SSL is
+// disabled. (When SSL is enabled, other mutexes dominate.)
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(reportOpWriteConcernCountersInServerStatus, bool, false);
+
 namespace {
 const auto ServerWriteConcernMetricsDecoration =
     ServiceContext::declareDecoration<ServerWriteConcernMetrics>();
@@ -50,7 +57,41 @@ ServerWriteConcernMetrics* ServerWriteConcernMetrics::get(OperationContext* opCt
     return get(opCtx->getServiceContext());
 }
 
+void ServerWriteConcernMetrics::recordWriteConcernForInserts(
+    const WriteConcernOptions& writeConcernOptions, size_t numInserts) {
+    if (!reportOpWriteConcernCountersInServerStatus) {
+        return;
+    }
+
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    _insertMetrics.recordWriteConcern(writeConcernOptions, numInserts);
+}
+
+void ServerWriteConcernMetrics::recordWriteConcernForUpdate(
+    const WriteConcernOptions& writeConcernOptions) {
+    if (!reportOpWriteConcernCountersInServerStatus) {
+        return;
+    }
+
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    _updateMetrics.recordWriteConcern(writeConcernOptions);
+}
+
+void ServerWriteConcernMetrics::recordWriteConcernForDelete(
+    const WriteConcernOptions& writeConcernOptions) {
+    if (!reportOpWriteConcernCountersInServerStatus) {
+        return;
+    }
+
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    _deleteMetrics.recordWriteConcern(writeConcernOptions);
+}
+
 BSONObj ServerWriteConcernMetrics::toBSON() const {
+    if (!reportOpWriteConcernCountersInServerStatus) {
+        return BSONObj();
+    }
+
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     BSONObjBuilder builder;
@@ -117,7 +158,10 @@ public:
     ~OpWriteConcernCountersSSS() override = default;
 
     bool includeByDefault() const override {
-        return true;
+        // When 'reportOpWriteConcernCountersInServerStatus' is false, do not include this section
+        // unless requested by the user. Even if the user requests the section, it will not be
+        // included because an empty BSONObj is generated for the section.
+        return reportOpWriteConcernCountersInServerStatus;
     }
 
     BSONObj generateSection(OperationContext* opCtx,
