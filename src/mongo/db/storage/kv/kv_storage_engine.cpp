@@ -350,6 +350,7 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
         std::vector<std::string> vec = _catalog->getAllIdents(opCtx);
         catalogIdents.insert(vec.begin(), vec.end());
     }
+    std::set<std::string> internalIdentsToDrop;
 
     auto dropPendingIdents = _dropPendingIdentReaper.getAllIdents();
 
@@ -357,6 +358,13 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
     // the case of a collection or index creation being rolled back.
     for (const auto& it : engineIdents) {
         if (catalogIdents.find(it) != catalogIdents.end()) {
+            continue;
+        }
+
+        // Internal idents are dropped at the end after those left over from index builds are
+        // identified.
+        if (_catalog->isInternalIdent(it)) {
+            internalIdentsToDrop.insert(it);
             continue;
         }
 
@@ -428,6 +436,31 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
                 continue;
             }
 
+            // If this index was draining, do not delete any internal idents that it may have owned.
+            // Instead, the idents can be used later on to resume draining instead of a
+            // performing a full rebuild. This is only done for background secondary builds, because
+            // the index must be rebuilt, and it is dropped otherwise.
+            // TODO: SERVER-37952 Do not drop these idents for background index builds on
+            // primaries once index builds are resumable from draining.
+            if (!indexMetaData.ready && indexMetaData.isBackgroundSecondaryBuild &&
+                indexMetaData.buildPhase ==
+                    BSONCollectionCatalogEntry::kIndexBuildDraining.toString()) {
+
+                if (indexMetaData.constraintViolationsIdent) {
+                    auto it = internalIdentsToDrop.find(*indexMetaData.constraintViolationsIdent);
+                    if (it != internalIdentsToDrop.end()) {
+                        internalIdentsToDrop.erase(it);
+                    }
+                }
+
+                if (indexMetaData.sideWritesIdent) {
+                    auto it = internalIdentsToDrop.find(*indexMetaData.sideWritesIdent);
+                    if (it != internalIdentsToDrop.end()) {
+                        internalIdentsToDrop.erase(it);
+                    }
+                }
+            }
+
             // If the index was kicked off as a background secondary index build, replication
             // recovery will not run into the oplog entry to recreate the index. If the index
             // table is not found, or the index build did not successfully complete, this code
@@ -466,6 +499,13 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
             _catalog->putMetaData(opCtx, coll, metaData);
             wuow.commit();
         }
+    }
+
+    for (auto&& temp : internalIdentsToDrop) {
+        log() << "Dropping internal ident: " << temp;
+        WriteUnitOfWork wuow(opCtx);
+        fassert(51063, _engine->dropIdent(opCtx, temp));
+        wuow.commit();
     }
 
     return ret;
@@ -668,7 +708,7 @@ Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const std::st
 std::unique_ptr<TemporaryRecordStore> KVStorageEngine::makeTemporaryRecordStore(
     OperationContext* opCtx) {
     std::unique_ptr<RecordStore> rs =
-        _engine->makeTemporaryRecordStore(opCtx, _catalog->newTempIdent());
+        _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalIdent());
     LOG(1) << "created temporary record store: " << rs->getIdent();
     return std::make_unique<TemporaryKVRecordStore>(opCtx, getEngine(), std::move(rs));
 }

@@ -125,7 +125,23 @@ public:
     /**
      * Create an index with a key of `{<key>: 1}` and a `name` of <key>.
      */
-    Status createIndex(OperationContext* opCtx, NamespaceString collNs, std::string key) {
+    Status createIndex(OperationContext* opCtx,
+                       NamespaceString collNs,
+                       std::string key,
+                       bool isBackgroundSecondaryBuild) {
+        auto ret = startIndexBuild(opCtx, collNs, key, isBackgroundSecondaryBuild);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        indexBuildSuccess(opCtx, collNs, key);
+        return Status::OK();
+    }
+
+    Status startIndexBuild(OperationContext* opCtx,
+                           NamespaceString collNs,
+                           std::string key,
+                           bool isBackgroundSecondaryBuild) {
         Collection* coll = nullptr;
         BSONObjBuilder builder;
         {
@@ -139,17 +155,34 @@ public:
 
         DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
         CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
-        const bool isBackgroundSecondaryBuild = false;
-        const auto protocol = IndexBuildProtocol::kSinglePhase;
+        const auto protocol = IndexBuildProtocol::kTwoPhase;
         auto ret = cce->prepareForIndexBuild(
             opCtx, descriptor.get(), protocol, isBackgroundSecondaryBuild);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        cce->indexBuildSuccess(opCtx, key);
-        return Status::OK();
+        return ret;
     }
+
+    void indexBuildScan(OperationContext* opCtx,
+                        NamespaceString collNs,
+                        std::string key,
+                        std::string sideWritesIdent,
+                        std::string constraintViolationsIdent) {
+        DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
+        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
+        cce->setIndexBuildScanning(opCtx, key, sideWritesIdent, constraintViolationsIdent);
+    }
+
+    void indexBuildDrain(OperationContext* opCtx, NamespaceString collNs, std::string key) {
+        DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
+        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
+        cce->setIndexBuildDraining(opCtx, key);
+    }
+
+    void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
+        DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
+        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
+        cce->indexBuildSuccess(opCtx, key);
+    }
+
 
     KVStorageEngine* _storageEngine;
 };
@@ -188,7 +221,8 @@ TEST_F(KVStorageEngineTest, ReconcileIdentsTest) {
     ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
 
     // Create a catalog entry for the `_id` index. Drop the created the table.
-    ASSERT_OK(createIndex(opCtx.get(), NamespaceString("db.coll1"), "_id"));
+    ASSERT_OK(createIndex(
+        opCtx.get(), NamespaceString("db.coll1"), "_id", false /* isBackgroundSecondaryBuild */));
     ASSERT_OK(dropIndexTable(opCtx.get(), NamespaceString("db.coll1"), "_id"));
     // The reconcile response should include this index as needing to be rebuilt.
     auto reconcileStatus = reconcile(opCtx.get());
@@ -260,6 +294,85 @@ TEST_F(KVStorageEngineTest, TemporaryDropsItself) {
 
     // The temporary record store RAII class should drop itself.
     ASSERT(!identExists(opCtx.get(), ident));
+}
+
+TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTables) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString ns("db.coll1");
+    const std::string indexName("a_1");
+
+    auto swIdentName = createCollection(opCtx.get(), ns);
+    ASSERT_OK(swIdentName);
+
+    const bool isBackgroundSecondaryBuild = false;
+    ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild));
+
+    auto sideWrites = makeTemporary(opCtx.get());
+    auto constraintViolations = makeTemporary(opCtx.get());
+
+    const auto indexIdent =
+        _storageEngine->getCatalog()->getIndexIdent(opCtx.get(), ns.ns(), indexName);
+
+    indexBuildScan(opCtx.get(),
+                   ns,
+                   indexName,
+                   sideWrites->rs()->getIdent(),
+                   constraintViolations->rs()->getIdent());
+    indexBuildDrain(opCtx.get(), ns, indexName);
+
+    auto reconcileStatus = reconcile(opCtx.get());
+    ASSERT_OK(reconcileStatus.getStatus());
+    ASSERT(!identExists(opCtx.get(), indexIdent));
+
+    // Because this non-backgroundSecondary index is unfinished, reconcile will drop the index.
+    ASSERT_EQUALS(0UL, reconcileStatus.getValue().size());
+
+    // The owning index was dropped, and so should its temporary tables.
+    ASSERT(!identExists(opCtx.get(), sideWrites->rs()->getIdent()));
+    ASSERT(!identExists(opCtx.get(), constraintViolations->rs()->getIdent()));
+}
+
+TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSecondary) {
+    auto opCtx = cc().makeOperationContext();
+
+    const NamespaceString ns("db.coll1");
+    const std::string indexName("a_1");
+
+    auto swIdentName = createCollection(opCtx.get(), ns);
+    ASSERT_OK(swIdentName);
+
+    const bool isBackgroundSecondaryBuild = true;
+    ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild));
+
+    auto sideWrites = makeTemporary(opCtx.get());
+    auto constraintViolations = makeTemporary(opCtx.get());
+
+    const auto indexIdent =
+        _storageEngine->getCatalog()->getIndexIdent(opCtx.get(), ns.ns(), indexName);
+
+    indexBuildScan(opCtx.get(),
+                   ns,
+                   indexName,
+                   sideWrites->rs()->getIdent(),
+                   constraintViolations->rs()->getIdent());
+    indexBuildDrain(opCtx.get(), ns, indexName);
+
+    auto reconcileStatus = reconcile(opCtx.get());
+    ASSERT_OK(reconcileStatus.getStatus());
+    ASSERT(identExists(opCtx.get(), indexIdent));
+
+    // Because this backgroundSecondary index is unfinished, reconcile will identify that it should
+    // be rebuilt.
+    ASSERT_EQUALS(1UL, reconcileStatus.getValue().size());
+    StorageEngine::CollectionIndexNamePair& toRebuild = reconcileStatus.getValue()[0];
+    ASSERT_EQUALS(ns.toString(), toRebuild.first);
+    ASSERT_EQUALS(indexName, toRebuild.second);
+
+    // Because these temporary idents were associated with an in-progress index build, they are not
+    // dropped.
+    ASSERT(identExists(opCtx.get(), sideWrites->rs()->getIdent()));
+    ASSERT(identExists(opCtx.get(), constraintViolations->rs()->getIdent()));
 }
 
 TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphans) {

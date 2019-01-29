@@ -94,6 +94,8 @@ public:
 
     bool isUserDataIdent(StringData ident) const;
 
+    bool isInternalIdent(StringData ident) const;
+
     bool isCollectionIdent(StringData ident) const;
 
     FeatureTracker* getFeatureTracker() const {
@@ -116,9 +118,9 @@ public:
     std::string getFilesystemPathForDb(const std::string& dbName) const;
 
     /**
-     * Generate a temporary ident name.
+     * Generate an internal ident name.
      */
-    std::string newTempIdent();
+    std::string newInternalIdent();
 
 private:
     class AddIdentChange;

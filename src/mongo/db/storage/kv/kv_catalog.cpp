@@ -60,6 +60,7 @@ const char kIsFeatureDocumentFieldName[] = "isFeatureDoc";
 const char kNamespaceFieldName[] = "ns";
 const char kNonRepairableFeaturesFieldName[] = "nonRepairable";
 const char kRepairableFeaturesFieldName[] = "repairable";
+const char kInternalIdentPrefix[] = "internal-";
 
 void appendPositionsOfBitsSet(uint64_t value, StringBuilder* sb) {
     invariant(sb);
@@ -340,9 +341,9 @@ bool KVCatalog::_hasEntryCollidingWithRand() const {
     return false;
 }
 
-std::string KVCatalog::newTempIdent() {
+std::string KVCatalog::newInternalIdent() {
     StringBuilder buf;
-    buf << "temp-";
+    buf << kInternalIdentPrefix;
     buf << _next.fetchAndAdd(1) << '-' << _rand;
     return buf.str();
 }
@@ -636,17 +637,20 @@ std::vector<std::string> KVCatalog::getAllIdents(OperationContext* opCtx) const 
 }
 
 bool KVCatalog::isUserDataIdent(StringData ident) const {
-    // Indexes, collections, and temporary RecordStore idents are all candidates for dropping when
-    // the storage engine's metadata does not align with the catalog metadata.
+    // Indexes and collections are candidates for dropping when the storage engine's metadata does
+    // not align with the catalog metadata.
     return ident.find("index-") != std::string::npos || ident.find("index/") != std::string::npos ||
-        ident.find("temp-") != std::string::npos ||
         ident.find("collection-") != std::string::npos ||
         ident.find("collection/") != std::string::npos;
 }
 
+bool KVCatalog::isInternalIdent(StringData ident) const {
+    return ident.find(kInternalIdentPrefix) != std::string::npos;
+}
+
 bool KVCatalog::isCollectionIdent(StringData ident) const {
-    // Temporary RecordStores idents prefixed "temp-" should not be considered collections, because
-    // they are not eligible for orphan recovery.
+    // Internal idents prefixed "internal-" should not be considered collections, because
+    // they are not eligible for orphan recovery through repair.
     return ident.find("collection-") != std::string::npos ||
         ident.find("collection/") != std::string::npos;
 }
