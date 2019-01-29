@@ -30,8 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+
+#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 

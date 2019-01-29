@@ -42,8 +42,8 @@ struct WriteConcernOptions {
 public:
     enum class SyncMode { UNSET, NONE, FSYNC, JOURNAL };
 
-    static const int kNoTimeout;
-    static const int kNoWaiting;
+    static constexpr int kNoTimeout = 0;
+    static constexpr int kNoWaiting = -1;
 
     static const BSONObj Default;
     static const BSONObj Acknowledged;
@@ -51,14 +51,14 @@ public:
     static const BSONObj Majority;
     static const BSONObj InternalMajorityNoSnapshot;
 
-    static const StringData kWriteConcernField;
+    static constexpr StringData kWriteConcernField = "writeConcern"_sd;
     static const char kMajority[];                    // = "majority"
     static const char kInternalMajorityNoSnapshot[];  // = "internalMajorityNoSnapshot"
 
-    static const Seconds kWriteConcernTimeoutSystem;
-    static const Seconds kWriteConcernTimeoutMigration;
-    static const Seconds kWriteConcernTimeoutSharding;
-    static const Seconds kWriteConcernTimeoutUserCommand;
+    static constexpr Seconds kWriteConcernTimeoutSystem{15};
+    static constexpr Seconds kWriteConcernTimeoutMigration{30};
+    static constexpr Seconds kWriteConcernTimeoutSharding{60};
+    static constexpr Seconds kWriteConcernTimeoutUserCommand{60};
 
     WriteConcernOptions() {
         reset();
