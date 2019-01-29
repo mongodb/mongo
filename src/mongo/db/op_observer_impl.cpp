@@ -435,10 +435,40 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
+                                       const NamespaceString& nss,
                                        CollectionUUID collUUID,
-                                       const BSONObj& indexInfo,
+                                       const UUID& indexBuildUUID,
+                                       const std::vector<BSONObj>& indexes,
                                        bool fromMigrate) {
-    // TODO (SERVER-39067): Not yet implemented.
+    BSONObjBuilder oplogEntryBuilder;
+    oplogEntryBuilder.append("abortIndexBuild", nss.coll());
+
+    indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
+
+    BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
+    for (auto indexDoc : indexes) {
+        BSONObjBuilder builder;
+        for (const auto& e : indexDoc) {
+            if (e.fieldNameStringData() != "ns"_sd)
+                builder.append(e);
+        }
+        indexesArr.append(builder.obj());
+    }
+    indexesArr.done();
+
+    logOperation(opCtx,
+                 "c",
+                 nss.getCommandNS(),
+                 collUUID,
+                 oplogEntryBuilder.done(),
+                 nullptr,
+                 fromMigrate,
+                 getWallClockTimeForOpLog(opCtx),
+                 {},
+                 kUninitializedStmtId,
+                 {},
+                 false /* prepare */,
+                 OplogSlot());
 }
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,

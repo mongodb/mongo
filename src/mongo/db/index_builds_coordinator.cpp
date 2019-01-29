@@ -176,8 +176,8 @@ Future<void> IndexBuildsCoordinator::abortIndexBuildByName(
     return std::move(pf.future);
 }
 
-Future<void> IndexBuildsCoordinator::abortIndexBuildByUUID(const UUID& buildUUID,
-                                                           const std::string& reason) {
+Future<void> IndexBuildsCoordinator::abortIndexBuildByBuildUUID(const UUID& buildUUID,
+                                                                const std::string& reason) {
     // TODO: not yet implemented. Some code to make it compile.
     auto pf = makePromiseFuture<void>();
     auto promise = std::move(pf.promise);

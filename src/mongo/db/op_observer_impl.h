@@ -62,8 +62,10 @@ public:
                             bool fromMigrate) final;
 
     void onAbortIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
                            CollectionUUID collUUID,
-                           const BSONObj& indexInfo,
+                           const UUID& indexBuildUUID,
+                           const std::vector<BSONObj>& indexes,
                            bool fromMigrate) final;
 
     void onInserts(OperationContext* opCtx,

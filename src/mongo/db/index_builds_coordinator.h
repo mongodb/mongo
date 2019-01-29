@@ -188,7 +188,7 @@ public:
      *
      * TODO: This is not yet implemented.
      */
-    Future<void> abortIndexBuildByUUID(const UUID& buildUUID, const std::string& reason);
+    Future<void> abortIndexBuildByBuildUUID(const UUID& buildUUID, const std::string& reason);
 
     /**
      * Signal replica set member state changes that affect cross replica set index building.

@@ -303,6 +303,15 @@ Status commitIndexBuild(OperationContext* opCtx,
         opCtx, statusWithIndexes.getValue(), indexBuildUUID);
 }
 
+Status abortIndexBuild(OperationContext* opCtx,
+                       const UUID& indexBuildUUID,
+                       OplogApplication::Mode mode) {
+    // Wait until the index build finishes aborting.
+    Future<void> abort = IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
+        indexBuildUUID, "abortIndexBuild oplog entry encountered");
+    return abort.waitNoThrow();
+}
+
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
@@ -1026,7 +1035,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          BSONElement first = cmd.firstElement();
          invariant(first.fieldNameStringData() == "commitIndexBuild");
          uassert(ErrorCodes::InvalidNamespace,
-                 "createIndexes value must be a string",
+                 "commitIndexBuild value must be a string",
                  first.type() == mongo::String);
 
          auto buildUUIDElem = cmd.getField("indexBuildUUID");
@@ -1054,8 +1063,53 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OpTime& opTme,
          const OplogEntry& entry,
          OplogApplication::Mode mode) -> Status {
-         // TODO (SERVER-39067): Not yet implemented.
-         return Status::OK();
+         // {
+         //     "abortIndexBuild" : "coll",
+         //     "indexBuildUUID" : <UUID>,
+         //     "indexes" : [
+         //         {
+         //             "key" : {
+         //                 "x" : 1
+         //             },
+         //             "name" : "x_1",
+         //             "v" : 2
+         //         },
+         //         {
+         //             "key" : {
+         //                 "k" : 1
+         //             },
+         //             "name" : "k_1",
+         //             "v" : 2
+         //         }
+         //     ]
+         // }
+
+         // Ensure that the first element is the 'abortIndexBuild' field.
+         BSONElement first = cmd.firstElement();
+         invariant(first.fieldNameStringData() == "abortIndexBuild");
+         uassert(ErrorCodes::InvalidNamespace,
+                 "abortIndexBuild value must be a string specifying the collection name",
+                 first.type() == mongo::String);
+
+         auto buildUUIDElem = cmd.getField("indexBuildUUID");
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'abortIndexBuild' oplog entry, missing required field "
+                 "'indexBuildUUID'.",
+                 buildUUIDElem.eoo());
+         UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
+
+         // We require the indexes field to ensure that rollback via refetch knows the appropriate
+         // indexes to rebuild.
+         auto indexesElem = cmd.getField("indexes");
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'abortIndexBuild' oplog entry, missing required field 'indexes'.",
+                 indexesElem.eoo());
+         uassert(ErrorCodes::BadValue,
+                 "Error parsing 'abortIndexBuild' oplog entry, field 'indexes' must be an array of "
+                 "index names.",
+                 indexesElem.type() == Array);
+
+         return abortIndexBuild(opCtx, indexBuildUUID, mode);
      }}},
     {"collMod",
      {[](OperationContext* opCtx,

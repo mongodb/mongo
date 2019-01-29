@@ -185,6 +185,48 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
     ASSERT_BSONOBJ_EQ(commitIndexBuildCmd, o);
 }
 
+TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    auto uuid = CollectionUUID::gen();
+    NamespaceString nss("test.coll");
+    UUID indexBuildUUID = UUID::gen();
+
+    BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
+                               << "x_1"
+                               << "v"
+                               << 2);
+    BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
+                               << "a_1"
+                               << "v"
+                               << 2);
+    std::vector<BSONObj> specs = {specX, specA};
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onAbortIndexBuild(
+            opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
+        wunit.commit();
+    }
+
+    // Create expected abortIndexBuild command.
+    BSONObjBuilder abortIndexBuildBuilder;
+    abortIndexBuildBuilder.append("abortIndexBuild", nss.coll());
+    indexBuildUUID.appendToBuilder(&abortIndexBuildBuilder, "indexBuildUUID");
+    BSONArrayBuilder indexesArr(abortIndexBuildBuilder.subarrayStart("indexes"));
+    indexesArr.append(specX);
+    indexesArr.append(specA);
+    indexesArr.done();
+    BSONObj abortIndexBuildCmd = abortIndexBuildBuilder.done();
+
+    // Ensure the abortIndexBuild fields were correctly set.
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+    auto o = oplogEntry.getObjectField("o");
+    ASSERT_BSONOBJ_EQ(abortIndexBuildCmd, o);
+}
+
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
