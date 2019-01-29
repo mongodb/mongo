@@ -586,6 +586,15 @@ Status SSLX509Name::normalizeStrings() {
                 case kASN1UniversalString:
                 case kASN1BMPString:
                 case kASN1OctetString: {
+                    // Technically https://tools.ietf.org/html/rfc5280#section-4.1.2.4 requires
+                    // that DN component values must be at least 1 code point long, but we've
+                    // supported empty components before (see SERVER-39107) so we special-case
+                    // normalizing empty values to an empty UTF-8 string
+                    if (entry.value.empty()) {
+                        entry.type = kASN1UTF8String;
+                        break;
+                    }
+
                     auto res = icuX509DNPrep(entry.value);
                     if (!res.isOK()) {
                         return res.getStatus();
