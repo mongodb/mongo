@@ -366,7 +366,7 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                              const BSONObj& defaultCollation,
                                              bool unique,
                                              const vector<BSONObj>& splitPoints,
-                                             const bool distributeInitialChunks,
+                                             bool isFromMapReduce,
                                              const ShardId& dbPrimaryShardId) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -376,14 +376,23 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
     // Fail if there are partially written chunks from a previous failed shardCollection.
     checkForExistingChunks(opCtx, nss);
 
+    // Prior to 4.0.5, zones cannot be taken into account at collection sharding time, so ignore
+    // them and let the balancer apply them later
+    const std::vector<TagsType> treatAsNoZonesDefined;
+
+    // Map/reduce with output to sharded collection ignores consistency checks and requires the
+    // initial chunks to be spread across shards unconditionally
+    const bool treatAsEmpty = isFromMapReduce;
+
     // Record start in changelog
     {
         BSONObjBuilder collectionDetail;
         collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
         collectionDetail.append("collection", nss.ns());
-        if (uuid) {
+        if (uuid)
             uuid->appendToBuilder(&collectionDetail, "uuid");
-        }
+        collectionDetail.append("empty", treatAsEmpty);
+        collectionDetail.append("fromMapReduce", isFromMapReduce);
         collectionDetail.append("primary", primaryShard->toString());
         collectionDetail.append("numChunks", static_cast<int>(splitPoints.size() + 1));
         uassertStatusOK(catalogClient->logChange(opCtx,
@@ -400,19 +409,13 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
                                               ->makeFromBSON(defaultCollation));
     }
 
-    std::vector<TagsType> tags;
-    // Since this code runs on the config server, we cannot guarantee that the collection is still
-    // empty by the time the metadata is written so always assume we are sharding a non-empty
-    // collection.
-    bool isEmpty = false;
     const auto initialChunks = InitialSplitPolicy::createFirstChunks(opCtx,
                                                                      nss,
                                                                      fieldsAndOrder,
                                                                      dbPrimaryShardId,
                                                                      splitPoints,
-                                                                     tags,
-                                                                     distributeInitialChunks,
-                                                                     isEmpty);
+                                                                     treatAsNoZonesDefined,
+                                                                     treatAsEmpty);
 
     InitialSplitPolicy::writeFirstChunksToConfig(opCtx, initialChunks);
 

@@ -347,7 +347,7 @@ selector:
   - jstests/sharding/mongos_query_comment.js
   - jstests/sharding/kill_op_overflow.js
   - jstests/sharding/mongos_local_explain.js
-  - jstests/sharding/add_shard_to_zone.js
+  - jstests/sharding/add_and_remove_shard_from_zone.js
   - jstests/sharding/authwhere.js
   - jstests/sharding/authmr.js
   - jstests/sharding/sessions_collection_auto_healing.js
@@ -355,7 +355,6 @@ selector:
   - jstests/sharding/read_does_not_create_namespaces.js
   - jstests/sharding/ismaster.js
   - jstests/sharding/balancer_shell_commands.js
-  - jstests/sharding/remove_shard_from_zone.js
   - jstests/sharding/forget_mr_temp_ns.js
   - jstests/sharding/auth_sharding_cmd_metadata.js
   - jstests/sharding/autodiscover_config_rs_from_secondary.js

@@ -278,34 +278,32 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
     const ShardId& primaryShardId,
     const std::vector<BSONObj>& splitPoints,
     const std::vector<TagsType>& tags,
-    const bool distributeInitialChunks,
-    const bool isEmpty,
-    const int numContiguousChunksPerShard) {
+    bool isEmpty,
+    int numContiguousChunksPerShard) {
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot generate initial chunks based on both split points and zones",
+            tags.empty() || splitPoints.empty());
+
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
 
-    std::vector<BSONObj> finalSplitPoints;
+    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
 
-    if (splitPoints.empty() && tags.empty()) {
-        // If neither split points nor tags were specified use the shard's data distribution to
-        // determine them
-        auto primaryShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
-
-        // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
-        // the splitVector command and affects the number of chunks returned, has been loaded.
-        uassertStatusOK(Grid::get(opCtx)->getBalancerConfiguration()->refreshAndCheck(opCtx));
-
-        if (!isEmpty) {
-            finalSplitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
-                opCtx,
-                primaryShardId,
-                nss,
-                shardKeyPattern,
-                ChunkRange(keyPattern.globalMin(), keyPattern.globalMax()),
-                Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-                0));
-        }
+    // On which shards are the generated chunks allowed to be placed
+    std::vector<ShardId> shardIds;
+    if (isEmpty) {
+        shardRegistry->getAllShardIdsNoReload(&shardIds);
     } else {
+        shardIds.push_back(primaryShardId);
+    }
+
+    ShardCollectionConfig initialChunks;
+
+    // If split points are requested, they take precedence over zones
+    if (!splitPoints.empty()) {
+        std::vector<BSONObj> finalSplitPoints;
+
         // Make sure points are unique and ordered
         auto orderedPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
@@ -316,27 +314,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
         for (const auto& splitPoint : orderedPts) {
             finalSplitPoints.push_back(splitPoint);
         }
-    }
 
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "cannot generate initial chunks based on both split points and tags",
-            tags.empty() || finalSplitPoints.empty());
-
-    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
-
-    // If docs already exist for the collection, must use primary shard, otherwise defer to
-    // passed-in distribution option.
-    std::vector<ShardId> shardIds;
-
-    if (isEmpty && distributeInitialChunks) {
-        Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
-    } else {
-        shardIds.push_back(primaryShardId);
-    }
-
-    ShardCollectionConfig initialChunks;
-
-    if (tags.empty()) {
         initialChunks = generateShardCollectionInitialChunks(nss,
                                                              shardKeyPattern,
                                                              primaryShardId,
@@ -344,9 +322,55 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
                                                              finalSplitPoints,
                                                              shardIds,
                                                              numContiguousChunksPerShard);
-    } else if (!isEmpty) {
-        // For a non-empty collection, create one chunk on the primary shard and leave it to the
-        // balancer to do the zone split and rebalancing
+    }
+    // If zones are defined, use the zones
+    else if (!tags.empty()) {
+        if (isEmpty) {
+            initialChunks = generateShardCollectionInitialZonedChunks(
+                nss, shardKeyPattern, validAfter, tags, getTagToShardIds(opCtx, tags), shardIds);
+        } else {
+            // For a non-empty collection, create one chunk on the primary shard and leave it to the
+            // balancer to do the zone splitting and placement
+            ChunkVersion version(1, 0, OID::gen());
+            appendChunk(nss,
+                        keyPattern.globalMin(),
+                        keyPattern.globalMax(),
+                        &version,
+                        validAfter,
+                        primaryShardId,
+                        &initialChunks.chunks);
+        }
+    }
+    // If neither split points nor zones are available and the collection is not empty, ask the
+    // shard to select split points based on the data distribution
+    else if (!isEmpty) {
+        auto primaryShard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+
+        // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
+        // the splitVector command and affects the number of chunks returned, has been loaded.
+        const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+        uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
+
+        const auto shardSelectedSplitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
+            opCtx,
+            primaryShardId,
+            nss,
+            shardKeyPattern,
+            ChunkRange(keyPattern.globalMin(), keyPattern.globalMax()),
+            balancerConfig->getMaxChunkSizeBytes(),
+            0));
+
+        initialChunks = generateShardCollectionInitialChunks(nss,
+                                                             shardKeyPattern,
+                                                             primaryShardId,
+                                                             validAfter,
+                                                             shardSelectedSplitPoints,
+                                                             shardIds,
+                                                             numContiguousChunksPerShard);
+    }
+    // For empty collection, just create a single chunk
+    else {
         ChunkVersion version(1, 0, OID::gen());
         appendChunk(nss,
                     keyPattern.globalMin(),
@@ -355,9 +379,6 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunks(
                     validAfter,
                     primaryShardId,
                     &initialChunks.chunks);
-    } else {
-        initialChunks = generateShardCollectionInitialZonedChunks(
-            nss, shardKeyPattern, validAfter, tags, getTagToShardIds(opCtx, tags), shardIds);
     }
 
     LOG(0) << "Created " << initialChunks.chunks.size() << " chunk(s) for: " << nss

@@ -120,8 +120,12 @@ public:
         const std::vector<ShardId>& shardIdsForGaps);
 
     /**
-     * Creates the first chunks for a newly sharded collection.
-     * Returns the created chunks.
+     * Generates a list with what are the most optimal first chunks and placement for a newly
+     * sharded collection.
+     *
+     * If the collection 'isEmpty', chunks will be spread across all available (appropriate based on
+     * zoning rules) shards. Otherwise, they will all end up on the primary shard after which the
+     * balancer will take care of properly distributing them around.
      */
     static ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
@@ -129,9 +133,8 @@ public:
                                                    const ShardId& primaryShardId,
                                                    const std::vector<BSONObj>& splitPoints,
                                                    const std::vector<TagsType>& tags,
-                                                   const bool distributeInitialChunks,
-                                                   const bool isEmpty,
-                                                   const int numContiguousChunksPerShard = 1);
+                                                   bool isEmpty,
+                                                   int numContiguousChunksPerShard = 1);
 
     /**
      * Writes to the config server the first chunks for a newly sharded collection.
