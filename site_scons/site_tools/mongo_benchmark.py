@@ -22,7 +22,7 @@ def benchmark_list_builder_action(env, target, source):
 def build_benchmark(env, target, source, **kwargs):
 
     bmEnv = env.Clone()
-    bmEnv.InjectThirdPartyIncludePaths(libraries=['benchmark'])
+    bmEnv.InjectThirdParty(libraries=['benchmark'])
 
     if bmEnv.TargetOSIs('windows'):
         bmEnv.Append(LIBS=["ShLwApi.lib"])

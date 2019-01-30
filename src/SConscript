@@ -15,7 +15,7 @@ env.SConscript('third_party/SConscript', exports=['env'])
 # and modules. Ideally, pcre wouldn't be here, but enough things require it
 # now that it seems hopeless to remove it now.
 env = env.Clone()
-env.InjectThirdPartyIncludePaths(libraries=[
+env.InjectThirdParty(libraries=[
     'abseil-cpp',
     'boost',
     'pcre',

@@ -9,6 +9,8 @@ try:
 except ValueError:
     pass
 
+env.InjectThirdParty('yaml', 'CPPDEFINES')
+
 env.Library("yaml",
             [
              "src/binary.cpp",

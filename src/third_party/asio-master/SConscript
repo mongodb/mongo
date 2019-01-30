@@ -7,7 +7,7 @@ asio_src = [
     "asio/src/asio.cpp",
 ]
 
-env.InjectThirdPartyIncludePaths(libraries=['boost'])
+env.InjectThirdParty(libraries=['boost'])
 
 env.Library(
     target="asio",

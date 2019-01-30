@@ -285,7 +285,7 @@ env.Library(
 )
 
 yamlEnv = env.Clone()
-yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+yamlEnv.InjectThirdParty(libraries=['yaml'])
 yamlEnv.Library(
     target='security_file',
     source=[

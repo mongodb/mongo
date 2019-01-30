@@ -2,7 +2,7 @@ Import("env")
 
 env = env.Clone()
 
-env.InjectThirdPartyIncludePaths(libraries=['abseil-cpp'])
+env.InjectThirdParty(libraries=['abseil-cpp'])
 
 env.Library(
     target="absl_hash",

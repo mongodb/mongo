@@ -30,7 +30,7 @@ env.Library(
 )
 
 tlEnv = env.Clone()
-tlEnv.InjectThirdPartyIncludePaths(libraries=['asio'])
+tlEnv.InjectThirdParty(libraries=['asio'])
 
 tlEnv.Library(
     target='transport_layer_manager',
@@ -208,7 +208,7 @@ env.CppUnitTest(
 )
 
 zlibEnv = env.Clone()
-zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib', 'zstd', 'snappy'])
+zlibEnv.InjectThirdParty(libraries=['zlib', 'zstd', 'snappy'])
 zlibEnv.Library(
     target='message_compressor',
     source=[

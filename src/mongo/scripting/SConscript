@@ -59,15 +59,20 @@ env.Library(
 
 if usemozjs:
     scriptingEnv = env.Clone()
-    scriptingEnv.InjectThirdPartyIncludePaths(libraries=['mozjs'])
+    scriptingEnv.InjectThirdParty(libraries=['mozjs'])
 
     # TODO: get rid of all of this /FI and -include stuff and migrate to a shim
     # header we include in all of our files.
     if env.TargetOSIs('windows'):
-        scriptingEnv.Append(CCFLAGS=[
-            '/FI', 'js-config.h',
-            '/FI', 'js/RequiredDefines.h',
-        ])
+        scriptingEnv.Append(
+            CCFLAGS=[
+                '/FI', 'js-config.h',
+                '/FI', 'js/RequiredDefines.h',
+            ],
+            CPPDEFINES=[
+                '_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING',
+            ]
+        )
     else:
         scriptingEnv.Append(
             CCFLAGS=[

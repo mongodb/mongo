@@ -357,7 +357,7 @@ env.Library(
 )
 
 pipelineeEnv = env.Clone()
-pipelineeEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+pipelineeEnv.InjectThirdParty(libraries=['snappy'])
 pipelineeEnv.Library(
     target='pipeline',
     source=[

@@ -96,7 +96,7 @@ env.CppUnitTest(
 )
 
 asioEnv = env.Clone()
-asioEnv.InjectThirdPartyIncludePaths('asio')
+asioEnv.InjectThirdParty('asio')
 
 asioEnv.CppIntegrationTest(
     target='ugly_bson_integration_test',

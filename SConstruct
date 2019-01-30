@@ -1615,8 +1615,9 @@ elif env.TargetOSIs('windows'):
 
     # Temporary fixes to allow compilation with VS2017
     env.Append(CPPDEFINES=[
-        "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS",
-        "_SILENCE_FPOS_SEEKPOS_DEPRECATION_WARNING",
+        "_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING",
+        "_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING",
+        "_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING",
     ])
 
     # /EHsc exception handling style for visual studio
@@ -2406,7 +2407,7 @@ def doConfigure(myenv):
         conf.Finish()
 
     if myenv.ToolchainIs('msvc'):
-        myenv.AppendUnique(CXXFLAGS=['/Zc:__cplusplus'])
+        myenv.AppendUnique(CCFLAGS=['/Zc:__cplusplus', '/permissive-'])
         if get_option('cxx-std') == "17":
             myenv.AppendUnique(CCFLAGS=['/std:c++17'])
     else:

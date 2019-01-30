@@ -96,7 +96,7 @@ void RemoteCommandTargeterFactoryMock::removeTargeterToReturn(const ConnectionSt
     MockTargetersMap::iterator it = _mockTargeters.find(connStr);
 
     invariant(it != _mockTargeters.end());
-    invariant(it->second.unique());
+    invariant(it->second.use_count() == 1);
 
     _mockTargeters.erase(it);
 }

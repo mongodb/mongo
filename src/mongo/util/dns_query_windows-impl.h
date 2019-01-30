@@ -154,8 +154,14 @@ public:
     explicit DNSResponse(std::string service, PDNS_RECORDA initialResults)
         : _service(std::move(service)), _results(initialResults, freeDnsRecord) {}
 
-    class iterator : public std::iterator<std::forward_iterator_tag, ResourceRecord> {
+    class iterator {
     public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = ResourceRecord;
+        using difference_type = std::ptrdiff_t;
+        using pointer = value_type*;
+        using reference = value_type&;
+
         const ResourceRecord& operator*() {
             this->_populate();
             return this->_storage;

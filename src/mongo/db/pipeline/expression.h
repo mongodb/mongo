@@ -597,10 +597,10 @@ public:
      * off the timezone if not specified.
      */
     Value serialize(bool explain) const final {
+        auto timezone = _timeZone ? _timeZone->serialize(explain) : Value();
         return Value(Document{
             {_opName,
-             Document{{"date", _date->serialize(explain)},
-                      {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()}}}});
+             Document{{"date", _date->serialize(explain)}, {"timezone", std::move(timezone)}}}});
     }
 
     boost::intrusive_ptr<Expression> optimize() final {

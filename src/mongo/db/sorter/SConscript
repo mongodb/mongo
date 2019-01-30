@@ -3,7 +3,7 @@ Import("env")
 env = env.Clone()
 
 sorterEnv = env.Clone()
-sorterEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+sorterEnv.InjectThirdParty(libraries=['snappy'])
 sorterEnv.CppUnitTest('sorter_test',
                       'sorter_test.cpp',
                        LIBDEPS=['$BUILD_DIR/mongo/db/service_context',

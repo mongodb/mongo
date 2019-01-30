@@ -2,7 +2,7 @@ Import("env")
 
 env = env.Clone()
 
-env.InjectThirdPartyIncludePaths(libraries=['boost'])
+env.InjectThirdParty(libraries=['boost'])
 
 if env.TargetOSIs('windows'):
     # C4141: 'inline': used more than once

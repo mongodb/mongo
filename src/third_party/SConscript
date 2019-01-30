@@ -20,107 +20,130 @@ tomcryptSuffix = '-1.18.2'
 benchmarkSuffix = '-1.4.1'
 sqliteSuffix = '-amalgamation-3260000'
 
-thirdPartyIncludePathList = [
-    ('s2', '#/src/third_party/s2'),
-    ('timelib', '#/src/third_party/timelib' + timelibSuffix),
-]
+thirdPartyEnvironmentModifications = {
+   's2' : {
+        'CPPPATH' : ['#src/third_party/s2'],
+   },
+   'timelib' : {
+        'CPPPATH' : ['#/src/third_party/timelib' + timelibSuffix],
+   }
+}
 
 if not use_system_version_of_library('tcmalloc'):
-    thirdPartyIncludePathList.append(
-        ('gperftools', '#/src/third_party/gperftools' + gperftoolsSuffix + '/src'))
+    thirdPartyEnvironmentModifications['gperftools'] = {
+        'CPPPATH' : ['#/src/third_party/gperftools' + gperftoolsSuffix + '/src'],
+    }
 
 if not use_system_version_of_library('pcre'):
-    thirdPartyIncludePathList.append(
-        ('pcre', '#/src/third_party/pcre' + pcreSuffix))
+    thirdPartyEnvironmentModifications['pcre'] = {
+        'CPPPATH' : ['#/src/third_party/pcre' + pcreSuffix],
+    }
 
 if not use_system_version_of_library('boost'):
-    thirdPartyIncludePathList.append(
-        ('boost', '#/src/third_party/boost' + boostSuffix))
+    thirdPartyEnvironmentModifications['boost'] = {
+        'CPPPATH' : ['#/src/third_party/boost' + boostSuffix],
+    }
 
 if not use_system_version_of_library('abseil-cpp'):
-    thirdPartyIncludePathList.append(
-        ('abseil-cpp', '#/src/third_party/abseil-cpp-master/abseil-cpp'))
+    thirdPartyEnvironmentModifications['abseil-cpp'] = {
+        'CPPPATH' : ['#/src/third_party/abseil-cpp-master/abseil-cpp'],
+    }
 
 if not use_system_version_of_library('snappy'):
-    thirdPartyIncludePathList.append(
-        ('snappy', '#/src/third_party/snappy' + snappySuffix))
+    thirdPartyEnvironmentModifications['snappy'] = {
+        'CPPPATH' : ['#/src/third_party/snappy' + snappySuffix],
+    }
 
 # Valgrind is a header only include as valgrind.h includes everything we need
 if not use_system_version_of_library('valgrind'):
-    thirdPartyIncludePathList.append(
-        ('valgrind', '#/src/third_party/valgrind-3.14.0/include'))
+    thirdPartyEnvironmentModifications['valgrind'] = {
+        'CPPPATH' : ['#/src/third_party/valgrind-3.14.0/include'],
+    }
 
 if not use_system_version_of_library('zlib'):
-    thirdPartyIncludePathList.append(
-        ('zlib', '#/src/third_party/zlib' + zlibSuffix))
+    thirdPartyEnvironmentModifications['zlib'] = {
+        'CPPPATH' : ['#/src/third_party/zlib' + zlibSuffix],
+    }
 
 if not use_system_version_of_library('zstd'):
-    thirdPartyIncludePathList.append(
-        ('zstd', '#/src/third_party/zstandard' + zstdSuffix + '/zstd/lib'))
+    thirdPartyEnvironmentModifications['zstd'] = {
+        'CPPPATH' : ['#/src/third_party/zstandard' + zstdSuffix + '/zstd/lib'],
+    }
 
 if not use_system_version_of_library('sqlite'):
-    thirdPartyIncludePathList.append(
-        ('sqlite', '#/src/third_party/sqlite' + sqliteSuffix + '/sqlite'))
+    thirdPartyEnvironmentModifications['sqlite'] = {
+        'CPPPATH' : ['#/src/third_party/sqlite' + sqliteSuffix + '/sqlite'],
+    }
 
 if not use_system_version_of_library('google-benchmark'):
-    thirdPartyIncludePathList.append(
-        ('benchmark', '#/src/third_party/benchmark' + benchmarkSuffix + '/benchmark/include'))
+    thirdPartyEnvironmentModifications['benchmark'] = {
+        'CPPPATH' : ['#/src/third_party/benchmark' + benchmarkSuffix + '/benchmark/include'],
+    }
 
 # TODO: figure out if we want to offer system versions of mozjs.  Mozilla
 # hasn't offered a source tarball since 24, but in theory they could.
 #
 #if not use_system_version_of_library('mozjs'):
 if True:
-    thirdPartyIncludePathList.append(
-        ('mozjs', ['#/src/third_party/mozjs' + mozjsSuffix + '/include',
-                   '#/src/third_party/mozjs' + mozjsSuffix + '/mongo_sources',
-                   '#/src/third_party/mozjs' + mozjsSuffix + '/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + "/include",
-        ]))
+    thirdPartyEnvironmentModifications['mozjs'] = {
+        'CPPPATH' : [
+            '#/src/third_party/mozjs' + mozjsSuffix + '/include',
+            '#/src/third_party/mozjs' + mozjsSuffix + '/mongo_sources',
+            '#/src/third_party/mozjs' + mozjsSuffix + '/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + "/include",
+        ],
+    }
 
 if "tom" in env["MONGO_CRYPTO"]:
-    thirdPartyIncludePathList.append(
-        ('tomcrypt', ['#/src/third_party/tomcrypt' + tomcryptSuffix + '/src/headers',
-    ]))
-
+    thirdPartyEnvironmentModifications['tomcrypt'] = {
+        'CPPPATH' : ['#/src/third_party/tomcrypt' + tomcryptSuffix + '/src/headers'],
+    }
 
 if not use_system_version_of_library('stemmer'):
-    thirdPartyIncludePathList.append(
-        ('stemmer', '#/src/third_party/libstemmer_c/include'))
+    thirdPartyEnvironmentModifications['stemmer'] = {
+        'CPPPATH' : ['#/src/third_party/libstemmer_c/include'],
+    }
 
 # Note that the wiredtiger.h header is generated, so
 # we want to look for it in the build directory not
 # the source directory.
 if wiredtiger and not use_system_version_of_library('wiredtiger'):
-    thirdPartyIncludePathList.append(
-        ('wiredtiger', '$BUILD_DIR/third_party/wiredtiger'))
+    thirdPartyEnvironmentModifications['wiredtiger'] = {
+        'CPPPATH' : ['$BUILD_DIR/third_party/wiredtiger'],
+    }
 
 if not use_system_version_of_library('yaml'):
-    thirdPartyIncludePathList.append(
-        ('yaml', '#/src/third_party/yaml-cpp' + yamlSuffix + '/include'))
+    thirdPartyEnvironmentModifications['yaml'] = {
+        'CPPPATH' : ['#/src/third_party/yaml-cpp' + yamlSuffix + '/include'],
+        'CPPDEFINES' : ['_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING'] if env.ToolchainIs('msvc') else [],
+    }
 
 if not use_system_version_of_library('asio'):
-    thirdPartyIncludePathList.append(
-        ('asio', '#/src/third_party/asio-master/asio/include'))
+    thirdPartyEnvironmentModifications['asio'] = {
+        'CPPPATH' : ['#/src/third_party/asio-master/asio/include'],
+    }
 
 if not use_system_version_of_library('intel_decimal128'):
-    thirdPartyIncludePathList.append(
-        ('intel_decimal128', '#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'))
+    thirdPartyEnvironmentModifications['intel_decimal128'] = {
+        'CPPPATH' : ['#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'],
+    }
 
 if not use_system_version_of_library('icu'):
-    thirdPartyIncludePathList.append(
-        ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source/common'))
-    thirdPartyIncludePathList.append(
-        ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source/i18n'))
+    thirdPartyEnvironmentModifications['icu'] = {
+        'CPPPATH' : ['#/src/third_party/icu4c' + icuSuffix + '/source/common',
+                     '#/src/third_party/icu4c' + icuSuffix + '/source/i18n'],
+    }
 
-def injectAllThirdPartyIncludePaths(thisEnv):
-    thisEnv.PrependUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
+def injectThirdParty(thisEnv, libraries=[], parts=[]):
+    libraries = thisEnv.Flatten([libraries])
+    parts = thisEnv.Flatten([parts])
+    for lib in libraries:
+        if not parts:
+            thisEnv.PrependUnique(**thirdPartyEnvironmentModifications[lib])
+        else:
+            for part in parts:
+                thisEnv.PrependUnique({part : thirdPartyEnvironmentModifications[lib][part]})
 
-def injectThirdPartyIncludePaths(thisEnv, libraries):
-    thisEnv.PrependUnique(CPPPATH=[
-        entry[1] for entry in thirdPartyIncludePathList if entry[0] in libraries])
-
-env.AddMethod(injectAllThirdPartyIncludePaths, 'InjectAllThirdPartyIncludePaths')
-env.AddMethod(injectThirdPartyIncludePaths, 'InjectThirdPartyIncludePaths')
+env.AddMethod(injectThirdParty, 'InjectThirdParty')
 
 env = env.Clone()
 
@@ -129,7 +152,7 @@ murmurEnv.SConscript('murmurhash3/SConscript', exports={ 'env' : murmurEnv })
 
 
 s2Env = env.Clone()
-s2Env.InjectThirdPartyIncludePaths(libraries=['s2', 'boost', 'abseil-cpp'])
+s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp'])
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
 
@@ -142,7 +165,7 @@ if use_system_version_of_library("pcre"):
         ])
 else:
     pcreEnv = env.Clone()
-    pcreEnv.InjectThirdPartyIncludePaths(libraries=['pcre'])
+    pcreEnv.InjectThirdParty(libraries=['pcre'])
     pcreEnv.SConscript('pcre' + pcreSuffix + '/SConscript', exports={ 'env' : pcreEnv })
     pcreEnv = pcreEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -171,7 +194,7 @@ if use_system_version_of_library("boost"):
 else:
     boostDirectory = 'boost' + boostSuffix
     boostEnv = env.Clone()
-    boostEnv.InjectThirdPartyIncludePaths(libraries=['boost'])
+    boostEnv.InjectThirdParty(libraries=['boost'])
     boostEnv.SConscript(boostDirectory + '/SConscript', exports={ 'env' : boostEnv })
     boostEnv = boostEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -197,7 +220,7 @@ if use_system_version_of_library("abseil-cpp"):
 else:
     abseilDirectory = 'abseil-cpp-master'
     abseilEnv = env.Clone()
-    abseilEnv.InjectThirdPartyIncludePaths(libraries=['abseil-cpp'])
+    abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
     abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={ 'env' : abseilEnv })
     abseilEnv = abseilEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -218,7 +241,7 @@ if use_system_version_of_library("snappy"):
         ])
 else:
     snappyEnv = env.Clone()
-    snappyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+    snappyEnv.InjectThirdParty(libraries=['snappy'])
     snappyEnv.InjectMongoIncludePaths()
     snappyEnv.SConscript('snappy' + snappySuffix + '/SConscript', exports={ 'env' : snappyEnv })
     snappyEnv = snappyEnv.Clone(
@@ -239,7 +262,7 @@ if use_system_version_of_library("zlib"):
         ])
 else:
     zlibEnv = env.Clone()
-    zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
+    zlibEnv.InjectThirdParty(libraries=['zlib'])
     zlibEnv.SConscript('zlib' + zlibSuffix + '/SConscript', exports={ 'env' : zlibEnv })
     zlibEnv = zlibEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -259,7 +282,7 @@ if use_system_version_of_library("zstd"):
         ])
 else:
     zstdEnv = env.Clone()
-    zstdEnv.InjectThirdPartyIncludePaths(libraries=['zstd'])
+    zstdEnv.InjectThirdParty(libraries=['zstd'])
     zstdEnv.SConscript('zstandard' + zstdSuffix + '/SConscript', exports={ 'env' : zstdEnv })
     zstdEnv = zstdEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -279,7 +302,7 @@ if use_system_version_of_library("google-benchmark"):
         ])
 else:
     benchmarkEnv = env.Clone()
-    benchmarkEnv.InjectThirdPartyIncludePaths(libraries=['benchmark'])
+    benchmarkEnv.InjectThirdParty(libraries=['benchmark'])
     benchmarkEnv.SConscript(
         'benchmark' + benchmarkSuffix + '/SConscript',
         exports={ 'env' : benchmarkEnv })
@@ -332,7 +355,7 @@ if (gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]):
             ])
     else:
         gperftoolsEnv = env.Clone()
-        gperftoolsEnv.InjectThirdPartyIncludePaths(libraries=['gperftools'])
+        gperftoolsEnv.InjectThirdParty(libraries=['gperftools'])
         gperftoolsEnv.SConscript('gperftools' + gperftoolsSuffix + '/SConscript', exports={ 'env' : gperftoolsEnv })
         gperftoolsEnv = gperftoolsEnv.Clone(
             LIBDEPS_INTERFACE=[
@@ -353,7 +376,7 @@ if use_system_version_of_library("stemmer"):
         ])
 else:
     stemmerEnv = env.Clone()
-    stemmerEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
+    stemmerEnv.InjectThirdParty(libraries=['stemmer'])
     stemmerEnv.SConscript('libstemmer_c/SConscript', exports={ 'env' : stemmerEnv })
     stemmerEnv = stemmerEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -374,7 +397,7 @@ if use_system_version_of_library("yaml"):
         ])
 else:
     yamlEnv = env.Clone()
-    yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml', 'boost'])
+    yamlEnv.InjectThirdParty(libraries=['yaml', 'boost'])
     yamlEnv.SConscript('yaml-cpp' + yamlSuffix + '/SConscript', exports={ 'env' : yamlEnv })
     yamlEnv = yamlEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -388,7 +411,7 @@ yamlEnv.Library(
     ])
 
 timelibEnv = env.Clone();
-timelibEnv.InjectThirdPartyIncludePaths(libraries=['timelib'])
+timelibEnv.InjectThirdParty(libraries=['timelib'])
 timelibEnv.SConscript('timelib' + timelibSuffix + '/SConscript', exports={ 'env' : timelibEnv })
 timelibEnv = timelibEnv.Clone(
     LIBDEPS_INTERFACE=[
@@ -409,7 +432,7 @@ if wiredtiger:
             ])
     else:
         wiredtigerEnv = env.Clone()
-        wiredtigerEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
+        wiredtigerEnv.InjectThirdParty(libraries=['wiredtiger'])
         wiredtigerEnv.SConscript('wiredtiger/SConscript', exports={ 'env' : wiredtigerEnv })
         wiredtigerEnv = wiredtigerEnv.Clone(
             LIBDEPS_INTERFACE=[
@@ -429,7 +452,7 @@ if use_system_version_of_library("sqlite"):
         ])
 else:
     sqliteEnv = env.Clone()
-    sqliteEnv.InjectThirdPartyIncludePaths(libraries=['sqlite'])
+    sqliteEnv.InjectThirdParty(libraries=['sqlite'])
     sqliteEnv.SConscript('sqlite' + sqliteSuffix + '/SConscript', exports={ 'env' : sqliteEnv })
     sqliteEnv = sqliteEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -449,7 +472,7 @@ if use_system_version_of_library("asio"):
     asioEnv = env.Clone()
 else:
     asioEnv = env.Clone()
-    asioEnv.InjectThirdPartyIncludePaths(libraries=['asio'])
+    asioEnv.InjectThirdParty(libraries=['asio'])
     asioEnv.SConscript('asio-master/SConscript', exports={ 'env' : asioEnv })
     asioEnv = asioEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -469,7 +492,7 @@ if use_system_version_of_library("intel_decimal128"):
 	])
 else:
     intelDecimal128Env = env.Clone()
-    intelDecimal128Env.InjectThirdPartyIncludePaths(libraries=['intel_decimal128'])
+    intelDecimal128Env.InjectThirdParty(libraries=['intel_decimal128'])
     intelDecimal128Env.SConscript('IntelRDFPMathLib20U1/SConscript', exports={ 'env' : intelDecimal128Env })
     intelDecimal128Env = intelDecimal128Env.Clone(
 	LIBDEPS_INTERFACE=[
@@ -491,7 +514,7 @@ if use_system_version_of_library("icu"):
         ])
 else:
     icuEnv = env.Clone()
-    icuEnv.InjectThirdPartyIncludePaths(libraries=['icu'])
+    icuEnv.InjectThirdParty(libraries=['icu'])
     icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
     icuEnv = icuEnv.Clone(
         LIBDEPS_INTERFACE=[

@@ -94,7 +94,7 @@ env.CppUnitTest(
 )
 
 serveronlyEnv = env.Clone()
-serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+serveronlyEnv.InjectThirdParty(libraries=['snappy'])
 serveronlyEnv.Library(
     target="index_access_method",
     source=[

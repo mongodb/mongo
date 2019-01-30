@@ -148,7 +148,7 @@ env.Library(
 )
 
 clientDriverEnv = env.Clone()
-clientDriverEnv.InjectThirdPartyIncludePaths('asio')
+clientDriverEnv.InjectThirdParty('asio')
 
 clientDriverEnv.Library(
     target='clientdriver_minimal',

@@ -53,7 +53,7 @@ env.Library(
 )
 
 bmEnv = env.Clone()
-bmEnv.InjectThirdPartyIncludePaths(libraries=['benchmark'])
+bmEnv.InjectThirdParty(libraries=['benchmark'])
 bmEnv.Library(
     target='benchmark_main',
     source=[

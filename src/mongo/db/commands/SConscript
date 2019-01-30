@@ -512,7 +512,7 @@ env.Library(
 
 if has_option('use-cpu-profiler'):
     profEnv = env.Clone()
-    profEnv.InjectThirdPartyIncludePaths('gperftools')
+    profEnv.InjectThirdParty('gperftools')
     profEnv.Library(
         target='cpuprofiler',
         source=[

@@ -58,7 +58,7 @@ env.SConscript(
 )
 
 yamlEnv = env.Clone()
-yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+yamlEnv.InjectThirdParty(libraries=['yaml'])
 
 env.Library(
     target='embedded',

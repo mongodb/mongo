@@ -37,7 +37,7 @@ generateStopWordsList = env.Command( [ "stop_words_list.h", "stop_words_list.cpp
 env.Alias('generated-sources', generateStopWordsList)
 
 baseEnv=env.Clone()
-baseEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
+baseEnv.InjectThirdParty(libraries=['stemmer'])
 baseEnv.Library('base_fts', [
         'fts_index_format.cpp',
         'fts_matcher.cpp',

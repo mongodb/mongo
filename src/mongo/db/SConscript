@@ -7,7 +7,7 @@ env = env.Clone()
 
 # Ideally 's2' would be scoped narrowly but it is spammed in all over the place by
 # db/geo unfortunately.
-env.InjectThirdPartyIncludePaths(libraries=[
+env.InjectThirdParty(libraries=[
     's2',
 ])
 
@@ -1279,7 +1279,7 @@ env.Library(
 )
 
 envWithAsio = env.Clone()
-envWithAsio.InjectThirdPartyIncludePaths(libraries=['asio'])
+envWithAsio.InjectThirdParty(libraries=['asio'])
 
 envWithAsio.CppUnitTest(
     target='logical_session_id_test',
@@ -1966,7 +1966,7 @@ env.Library(
 )
 
 asioEnv = env.Clone()
-asioEnv.InjectThirdPartyIncludePaths('asio')
+asioEnv.InjectThirdParty('asio')
 
 asioEnv.CppIntegrationTest(
     target='nesting_depth_test',

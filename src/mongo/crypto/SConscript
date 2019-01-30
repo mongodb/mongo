@@ -24,7 +24,7 @@ env.Library('sha256_block',
 
 if "tom" in env["MONGO_CRYPTO"]:
     tomEnv = env.Clone()
-    tomEnv.InjectThirdPartyIncludePaths(libraries=['tomcrypt'])
+    tomEnv.InjectThirdParty(libraries=['tomcrypt'])
     tomEnv.Append(
         CPPDEFINES=[
             'LTC_NO_PROTOTYPES',

@@ -8,7 +8,7 @@ Import("use_system_version_of_library")
 
 env = env.Clone()
 
-env.InjectThirdPartyIncludePaths('asio')
+env.InjectThirdParty('asio')
 
 env.SConscript(
     dirs=[
@@ -380,7 +380,7 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
     if not use_system_version_of_library('tcmalloc'):
 
         # Add in the include path for our vendored tcmalloc.
-        tcmspEnv.InjectThirdPartyIncludePaths('gperftools')
+        tcmspEnv.InjectThirdParty('gperftools')
 
         # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
         # level configure check, though its effects should still be scoped just to these files.
@@ -393,7 +393,7 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
 
     if not use_system_version_of_library('valgrind'):
         # Include valgrind since tcmalloc disables itself while running under valgrind
-        tcmspEnv.InjectThirdPartyIncludePaths('valgrind')
+        tcmspEnv.InjectThirdParty('valgrind')
 
     tcmspEnv.Library(
         target='tcmalloc_set_parameter',
@@ -512,7 +512,7 @@ if has_option('use-cpu-profiler'):
     )
 
     if not use_system_version_of_library('tcmalloc'):
-        quick_exit_env.InjectThirdPartyIncludePaths(
+        quick_exit_env.InjectThirdParty(
             'gperftools'
         )
 
@@ -822,7 +822,7 @@ if not use_system_version_of_library("icu"):
     )
     icuEnv.Alias("generated-sources", generateICUInit)
 
-    icuEnv.InjectThirdPartyIncludePaths("icu")
+    icuEnv.InjectThirdParty("icu")
     # Since we are injecting the third-party ICU headers, we must also copy the same defines that we
     # use to configure ICU when building ICU sources. See comment in
     # src/third_party/icu4c-57.1/source/SConscript.

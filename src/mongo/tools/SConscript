@@ -6,7 +6,7 @@ Import('get_option')
 env = env.Clone()
 
 yamlEnv = env.Clone()
-yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+yamlEnv.InjectThirdParty(libraries=['yaml'])
 
 mongobridge = env.Program(
     target="mongobridge",

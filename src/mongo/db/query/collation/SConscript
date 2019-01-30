@@ -126,7 +126,7 @@ env.CppUnitTest(
 icuEnv = env.Clone()
 
 if not use_system_version_of_library("icu"):
-    icuEnv.InjectThirdPartyIncludePaths("icu")
+    icuEnv.InjectThirdParty("icu")
     # Since we are injecting the third-party ICU headers, we must also copy the same defines that we
     # use to configure ICU when building ICU sources. See comment in
     # src/third_party/icu4c-57.1/source/SConscript.

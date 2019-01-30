@@ -3,7 +3,7 @@ Import("mobile_se")
 env = env.Clone()
 
 
-env.InjectThirdPartyIncludePaths(libraries=['sqlite'])
+env.InjectThirdParty(libraries=['sqlite'])
 
 env.Library(
     target='storage_mobile_core',

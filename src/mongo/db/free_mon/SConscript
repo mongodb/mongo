@@ -5,7 +5,7 @@ Import("free_monitoring")
 env = env.Clone()
 
 fmEnv = env.Clone()
-fmEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+fmEnv.InjectThirdParty(libraries=['snappy'])
 
 fmEnv.Library(
     target='free_mon',

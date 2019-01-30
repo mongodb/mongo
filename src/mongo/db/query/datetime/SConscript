@@ -5,7 +5,7 @@ Import('env')
 env = env.Clone()
 
 timeZoneEnv = env.Clone()
-timeZoneEnv.InjectThirdPartyIncludePaths(libraries=['timelib'])
+timeZoneEnv.InjectThirdParty(libraries=['timelib'])
 timeZoneEnv.Library(
     target='date_time_support',
     source=[
