@@ -104,6 +104,13 @@ public:
 
     Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions&) const override;
 
+    Status checkIfCommitQuorumCanBeSatisfied(
+        const CommitQuorumOptions& commitQuorum) const override;
+
+    StatusWith<bool> checkIfCommitQuorumIsSatisfied(
+        const CommitQuorumOptions& commitQuorum,
+        const std::vector<HostAndPort>& commitReadyMembers) const override;
+
     void setMyLastAppliedOpTime(const repl::OpTime&) override;
     void setMyLastDurableOpTime(const repl::OpTime&) override;
 

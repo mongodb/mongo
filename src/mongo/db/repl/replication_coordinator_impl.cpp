@@ -42,6 +42,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -3116,6 +3117,51 @@ Status ReplicationCoordinatorImpl::_checkIfWriteConcernCanBeSatisfied_inlock(
 
     invariant(getReplicationMode() == modeReplSet);
     return _rsConfig.checkIfWriteConcernCanBeSatisfied(writeConcern);
+}
+
+Status ReplicationCoordinatorImpl::checkIfCommitQuorumCanBeSatisfied(
+    const CommitQuorumOptions& commitQuorum) const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _checkIfCommitQuorumCanBeSatisfied(lock, commitQuorum);
+}
+
+Status ReplicationCoordinatorImpl::_checkIfCommitQuorumCanBeSatisfied(
+    WithLock, const CommitQuorumOptions& commitQuorum) const {
+    if (getReplicationMode() == modeNone) {
+        return Status(ErrorCodes::NoReplicationEnabled,
+                      "No replication enabled when checking if commit quorum can be satisfied");
+    }
+
+    invariant(getReplicationMode() == modeReplSet);
+
+    std::vector<MemberConfig> memberConfig(_rsConfig.membersBegin(), _rsConfig.membersEnd());
+
+    // We need to ensure that the 'commitQuorum' can be satisfied by all the members of this
+    // replica set.
+    bool commitQuorumCanBeSatisfied =
+        _topCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum, memberConfig);
+    if (!commitQuorumCanBeSatisfied) {
+        return Status(ErrorCodes::UnsatisfiableCommitQuorum,
+                      str::stream() << "Commit quorum cannot be satisfied with the current replica "
+                                    << "set configuration");
+    }
+    return Status::OK();
+}
+
+StatusWith<bool> ReplicationCoordinatorImpl::checkIfCommitQuorumIsSatisfied(
+    const CommitQuorumOptions& commitQuorum,
+    const std::vector<HostAndPort>& commitReadyMembers) const {
+    // If the 'commitQuorum' cannot be satisfied with all the members of this replica set, we
+    // need to inform the caller to avoid hanging while waiting for satisfiability of the
+    // 'commitQuorum' with 'commitReadyMembers' due to replica set reconfigurations.
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    Status status = _checkIfCommitQuorumCanBeSatisfied(lock, commitQuorum);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Return whether or not the 'commitQuorum' is satisfied by the 'commitReadyMembers'.
+    return _topCoord->checkIfCommitQuorumIsSatisfied(commitQuorum, commitReadyMembers);
 }
 
 WriteConcernOptions ReplicationCoordinatorImpl::getGetLastErrorDefault() {
