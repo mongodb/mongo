@@ -898,6 +898,7 @@ Timestamp TransactionParticipant::prepareTransaction(OperationContext* opCtx,
     if (prepareOptime) {
         // On secondary, we just prepare the transaction and discard the buffered ops.
         prepareOplogSlot = OplogSlot(*prepareOptime, 0);
+        _prepareOpTime = *prepareOptime;
     } else {
         // On primary, we reserve an optime, prepare the transaction and write the oplog entry.
         //

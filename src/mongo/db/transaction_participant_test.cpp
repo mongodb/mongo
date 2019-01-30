@@ -3873,5 +3873,26 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
 }
 
+TEST_F(TxnParticipantTest, PrepareTransactionAsSecondarySetsThePrepareOpTime) {
+    const auto prepareOpTime = repl::OpTime({3, 2}, 0);
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant->unstashTransactionResources(opCtx(), "commitTransaction");
+    const auto prepareTimestamp = txnParticipant->prepareTransaction(opCtx(), prepareOpTime);
+    ASSERT(txnParticipant->transactionIsPrepared());
+    ASSERT_EQ(prepareTimestamp, prepareOpTime.getTimestamp());
+    ASSERT_EQ(txnParticipant->getPrepareOpTime(), prepareOpTime);
+
+    // If _prepareOptime was not set and was null, then commitPreparedTransaction would falsely
+    // succeed everytime. We set the commitTimestamp to be less than the prepareTimestamp to make
+    // sure this is not the case.
+    const auto commitTimestamp =
+        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() - 1);
+    ASSERT_THROWS_CODE(txnParticipant->commitPreparedTransaction(opCtx(), commitTimestamp),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
 }  // namespace
 }  // namespace mongo
