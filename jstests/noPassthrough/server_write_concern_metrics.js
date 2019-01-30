@@ -1,5 +1,5 @@
 // Tests writeConcern metrics in the serverStatus output.
-// @tags: [requires_persistence, requires_replication]
+// @tags: [requires_persistence, requires_journaling, requires_replication]
 (function() {
     "use strict";
 
