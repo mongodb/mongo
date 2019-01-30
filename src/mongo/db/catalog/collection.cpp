@@ -39,22 +39,7 @@
 namespace mongo {
 
 std::string CompactOptions::toString() const {
-    std::stringstream ss;
-    ss << "paddingMode: ";
-    switch (paddingMode) {
-        case NONE:
-            ss << "NONE";
-            break;
-        case PRESERVE:
-            ss << "PRESERVE";
-            break;
-        case MANUAL:
-            ss << "MANUAL (" << paddingBytes << " + ( doc * " << paddingFactor << ") )";
-    }
-
-    ss << " validateDocuments: " << validateDocuments;
-
-    return ss.str();
+    return str::stream() << " validateDocuments: " << validateDocuments;
 }
 
 //

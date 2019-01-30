@@ -81,8 +81,7 @@ public:
         return "compact collection\n"
                "warning: this operation locks the database and is slow. you can cancel with "
                "killOp()\n"
-               "{ compact : <collection_name>, [force:<bool>], [validate:<bool>],\n"
-               "  [paddingFactor:<num>], [paddingBytes:<num>] }\n"
+               "{ compact : <collection_name>, [force:<bool>], [validate:<bool>] }\n"
                "  force - allows to run on a replica set primary\n"
                "  validate - check records are noncorrupt before adding to newly compacting "
                "extents. slower but safer (defaults to true in this version)\n";
@@ -116,31 +115,6 @@ public:
         }
 
         CompactOptions compactOptions;
-
-        if (cmdObj["preservePadding"].trueValue()) {
-            compactOptions.paddingMode = CompactOptions::PRESERVE;
-            if (cmdObj.hasElement("paddingFactor") || cmdObj.hasElement("paddingBytes")) {
-                errmsg = "cannot mix preservePadding and paddingFactor|paddingBytes";
-                return false;
-            }
-        } else if (cmdObj.hasElement("paddingFactor") || cmdObj.hasElement("paddingBytes")) {
-            compactOptions.paddingMode = CompactOptions::MANUAL;
-            if (cmdObj.hasElement("paddingFactor")) {
-                compactOptions.paddingFactor = cmdObj["paddingFactor"].Number();
-                if (compactOptions.paddingFactor < 1 || compactOptions.paddingFactor > 4) {
-                    errmsg = "invalid padding factor";
-                    return false;
-                }
-            }
-            if (cmdObj.hasElement("paddingBytes")) {
-                compactOptions.paddingBytes = cmdObj["paddingBytes"].numberInt();
-                if (compactOptions.paddingBytes < 0 ||
-                    compactOptions.paddingBytes > (1024 * 1024)) {
-                    errmsg = "invalid padding bytes";
-                    return false;
-                }
-            }
-        }
 
         if (cmdObj.hasElement("validate"))
             compactOptions.validateDocuments = cmdObj["validate"].trueValue();
