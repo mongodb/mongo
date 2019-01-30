@@ -3,6 +3,7 @@
 from __future__ import absolute_import
 
 import fnmatch
+import os.path
 import unittest
 
 import buildscripts.resmokelib.parser as parser
@@ -166,6 +167,14 @@ class TestTestList(unittest.TestCase):
         test_list = selector._TestList(self.test_file_explorer, roots, tests_are_files=False)
         selected, excluded = test_list.get_tests()
         self.assertEqual(roots, selected)
+        self.assertEqual([], excluded)
+
+    def test_roots_normpath(self):
+        roots = ["dir/a/abc.js", "dir/b/xyz.js"]
+        test_list = selector._TestList(self.test_file_explorer, roots, tests_are_files=False)
+        selected, excluded = test_list.get_tests()
+        for root_file, selected_file in zip(roots, selected):
+            self.assertEqual(os.path.normpath(root_file), selected_file)
         self.assertEqual([], excluded)
 
     def test_roots_with_glob(self):
@@ -563,7 +572,7 @@ class TestFilterTests(unittest.TestCase):
             selected)
         self.assertEqual(["dir/subdir2/test21.js"], excluded)
 
-    def test_json_shcema_include_files(self):
+    def test_json_schema_include_files(self):
         config = {
             "roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"],
             "include_files": ["dir/subdir2/test21.js"]

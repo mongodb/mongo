@@ -165,7 +165,7 @@ class _TestList(object):
             else:
                 if not self._test_file_explorer.isfile(test):
                     raise ValueError("Unrecognized test file: {}".format(test))
-                expanded_tests.append(test)
+                expanded_tests.append(os.path.normpath(test))
         return expanded_tests
 
     def include_files(self, include_files, force=False):
