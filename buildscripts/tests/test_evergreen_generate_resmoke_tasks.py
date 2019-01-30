@@ -335,6 +335,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options.use_large_distro = None
         options.use_multiversion = False
         options.is_patch = True
+        options.repeat_suites = 1
 
         return options
 
@@ -433,6 +434,24 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         cfg_mock = Mock()
         cfg_generator._add_dependencies(cfg_mock)
         self.assertEqual(4, cfg_mock.dependency.call_count)
+
+    def test_evg_config_has_timeouts_for_repeated_suites(self):
+        options = self.generate_mock_options()
+        options.repeat_suites = 5
+        suites = self.generate_mock_suites(3)
+
+        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+
+        self.assertEqual(len(config["tasks"]), len(suites) + 1)
+        command1 = config["tasks"][0]["commands"][2]
+        self.assertIn(" --repeatSuites=5 ", command1["vars"]["resmoke_args"])
+        self.assertIn(options.resmoke_args, command1["vars"]["resmoke_args"])
+        timeout_cmd = config["tasks"][0]["commands"][0]
+        self.assertEqual("timeout.update", timeout_cmd["command"])
+        expected_timeout = grt.calculate_timeout(suites[0].max_runtime, 3) * 5
+        self.assertEqual(expected_timeout, timeout_cmd["params"]["timeout_secs"])
+        expected_exec_timeout = grt.calculate_timeout(suites[0].get_runtime(), 3) * 5
+        self.assertEqual(expected_exec_timeout, timeout_cmd["params"]["exec_timeout_secs"])
 
 
 class NormalizeTestNameTest(unittest.TestCase):
