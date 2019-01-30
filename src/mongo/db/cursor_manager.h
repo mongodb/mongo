@@ -73,31 +73,6 @@ public:
      */
     static CursorManager* getGlobalCursorManager();
 
-    /**
-     * Appends the sessions that have open cursors on the global cursor manager and across
-     * all collection-level cursor managers to the given set of lsids.
-     */
-    static void appendAllActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids);
-
-    /**
-     * Returns a list of GenericCursors for all idle cursors on global cursor manager. Does not
-     * include currently pinned cursors. 'userMode': If auth is on, calling with userMode as
-     * kExcludeOthers will cause this function to only return cursors owned by the caller. If auth
-     * is off, this argument does not matter.
-     *
-     * TODO SERVER-37454: This method should become non-static now that there are no more
-     * per-collection cursor managers.
-     */
-    static std::vector<GenericCursor> getIdleCursors(
-        OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode);
-
-    /**
-     * Kills cursors with matching logical sessions. Returns a pair with the overall Status of the
-     * operation and the number of cursors successfully killed.
-     */
-    static std::pair<Status, int> killCursorsWithMatchingSessions(
-        OperationContext* opCtx, const SessionKiller::Matcher& matcher);
-
     static int killCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
 
     static bool killCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id);
@@ -112,16 +87,6 @@ public:
      * cursor managers.
      */
     static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, Date_t now);
-
-    /**
-     * This method is deprecated. Do not add new call sites.
-     *
-     * TODO SERVER-39065: Delete this method.
-     */
-    static Status withCursorManager(OperationContext* opCtx,
-                                    CursorId id,
-                                    const NamespaceString& nss,
-                                    stdx::function<Status(CursorManager*)> callback);
 
     CursorManager();
 
@@ -187,11 +152,13 @@ public:
     void appendActiveSessions(LogicalSessionIdSet* lsids) const;
 
     /**
-     * Appends all idle (non-pinned) cursors in this cursor manager to the output vector.
+     * Returns a vector of all idle (non-pinned) cursors in this cursor manager.
+     *
+     * If auth is on, calling with 'userMode' as 'kExcludeOthers' will cause this function to only
+     * return cursors owned by the caller. If auth is off, this argument does not matter.
      */
-    void appendIdleCursors(AuthorizationSession* ctxAuth,
-                           MongoProcessInterface::CurrentOpUserMode userMode,
-                           std::vector<GenericCursor>* cursors) const;
+    std::vector<GenericCursor> getIdleCursors(
+        OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) const;
 
     /*
      * Returns a list of all open cursors for the given session.
@@ -202,6 +169,13 @@ public:
      * Returns the number of ClientCursors currently registered.
      */
     std::size_t numCursors() const;
+
+    /**
+     * Kills cursors in this cursor manager with matching logical sessions. Returns a pair with the
+     * overall Status of the operation and the number of cursors successfully killed.
+     */
+    std::pair<Status, int> killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                           const SessionKiller::Matcher& matcher);
 
 private:
     static constexpr int kNumPartitions = 16;

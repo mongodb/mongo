@@ -673,9 +673,10 @@ std::pair<Status, int> ClusterCursorManager::killCursorsWithMatchingSessions(
         uassertStatusOK(mgr.killCursor(opCtx, getNamespaceForCursorId(id).get(), id));
     };
 
-    auto visitor = makeKillSessionsCursorManagerVisitor(opCtx, matcher, std::move(eraser));
-    visitor(*this);
-    return std::make_pair(visitor.getStatus(), visitor.getCursorsKilled());
+    auto bySessionCursorKiller = makeKillCursorsBySessionAdaptor(opCtx, matcher, std::move(eraser));
+    bySessionCursorKiller(*this);
+    return std::make_pair(bySessionCursorKiller.getStatus(),
+                          bySessionCursorKiller.getCursorsKilled());
 }
 
 stdx::unordered_set<CursorId> ClusterCursorManager::getCursorsForSession(

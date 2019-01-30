@@ -72,18 +72,6 @@ public:
     ~GlobalCursorIdCache();
 
     /**
-     * Returns a unique 32-bit identifier to be used as the first 32 bits of all cursor ids for a
-     * new CursorManager.
-     */
-    uint32_t registerCursorManager(const NamespaceString& nss);
-
-    /**
-     * Must be called when a CursorManager is deleted. 'id' must be the identifier returned by
-     * registerCursorManager().
-     */
-    void deregisterCursorManager(uint32_t id, const NamespaceString& nss);
-
-    /**
      * works globally
      */
     bool killCursor(OperationContext* opCtx, CursorId id, bool checkAuth);
@@ -91,9 +79,6 @@ public:
     void appendStats(BSONObjBuilder& builder);
 
     std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
-
-    template <typename Visitor>
-    void visitAllCursorManagers(OperationContext* opCtx, Visitor* visitor);
 
     int64_t nextSeed();
 
@@ -137,34 +122,6 @@ int64_t GlobalCursorIdCache::nextSeed() {
     return _secureRandom->nextInt64();
 }
 
-uint32_t GlobalCursorIdCache::registerCursorManager(const NamespaceString& nss) {
-    static const uint32_t kMaxIds = 1000 * 1000 * 1000;
-    static_assert((kMaxIds & (0b11 << 30)) == 0,
-                  "the first two bits of a collection identifier must always be zeroes");
-
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-
-    fassert(17359, _idToNss.size() < kMaxIds);
-
-    for (uint32_t i = 0; i <= kMaxIds; i++) {
-        uint32_t id = ++_nextId;
-        if (id == 0)
-            continue;
-        if (_idToNss.count(id) > 0)
-            continue;
-        _idToNss[id] = nss;
-        return id;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
-void GlobalCursorIdCache::deregisterCursorManager(uint32_t id, const NamespaceString& nss) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-    invariant(nss == _idToNss[id]);
-    _idToNss.erase(id);
-}
-
 bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool checkAuth) {
     // Figure out what the namespace of this cursor is.
     NamespaceString nss;
@@ -191,18 +148,17 @@ bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool 
 
     // Check if we are authorized to kill this cursor.
     if (checkAuth) {
-        auto status = CursorManager::withCursorManager(
-            opCtx, id, nss, [nss, id, opCtx](CursorManager* manager) {
-                auto ccPin = manager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
-                if (!ccPin.isOK()) {
-                    return ccPin.getStatus();
-                }
-                AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
-                auto cursorOwner = ccPin.getValue().getCursor()->getAuthenticatedUsers();
-                return as->checkAuthForKillCursors(nss, cursorOwner);
-            });
-        if (!status.isOK()) {
-            audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, status.code());
+        auto ccPin = globalCursorManager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
+        if (!ccPin.isOK()) {
+            audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, ccPin.getStatus().code());
+            return false;
+        }
+
+        AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
+        auto cursorOwner = ccPin.getValue().getCursor()->getAuthenticatedUsers();
+        auto authStatus = as->checkAuthForKillCursors(nss, cursorOwner);
+        if (!authStatus.isOK()) {
+            audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, authStatus.code());
             return false;
         }
     }
@@ -220,30 +176,8 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
 
 }  // namespace
 
-template <typename Visitor>
-void GlobalCursorIdCache::visitAllCursorManagers(OperationContext* opCtx, Visitor* visitor) {
-    (*visitor)(*globalCursorManager);
-}
-
-// ---
-
 CursorManager* CursorManager::getGlobalCursorManager() {
     return globalCursorManager.get();
-}
-
-void CursorManager::appendAllActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids) {
-    auto visitor = [&](CursorManager& mgr) { mgr.appendActiveSessions(lsids); };
-    globalCursorIdCache->visitAllCursorManagers(opCtx, &visitor);
-}
-
-std::vector<GenericCursor> CursorManager::getIdleCursors(
-    OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) {
-    std::vector<GenericCursor> cursors;
-    AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
-    auto visitor = [&](CursorManager& mgr) { mgr.appendIdleCursors(ctxAuth, userMode, &cursors); };
-    globalCursorIdCache->visitAllCursorManagers(opCtx, &visitor);
-
-    return cursors;
 }
 
 std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
@@ -252,10 +186,11 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
         uassertStatusOK(mgr.killCursor(opCtx, id, true));
     };
 
-    auto visitor = makeKillSessionsCursorManagerVisitor(opCtx, matcher, std::move(eraser));
-    globalCursorIdCache->visitAllCursorManagers(opCtx, &visitor);
+    auto bySessionCursorKiller = makeKillCursorsBySessionAdaptor(opCtx, matcher, std::move(eraser));
+    bySessionCursorKiller(*this);
 
-    return std::make_pair(visitor.getStatus(), visitor.getCursorsKilled());
+    return std::make_pair(bySessionCursorKiller.getStatus(),
+                          bySessionCursorKiller.getCursorsKilled());
 }
 
 std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* opCtx, Date_t now) {
@@ -278,14 +213,6 @@ bool CursorManager::killCursorGlobalIfAuthorized(OperationContext* opCtx, Cursor
 }
 bool CursorManager::killCursorGlobal(OperationContext* opCtx, CursorId id) {
     return globalCursorIdCache->killCursor(opCtx, id, false);
-}
-
-Status CursorManager::withCursorManager(OperationContext* opCtx,
-                                        CursorId id,
-                                        const NamespaceString& nss,
-                                        stdx::function<Status(CursorManager*)> callback) {
-    auto cursorManager = CursorManager::getGlobalCursorManager();
-    return callback(cursorManager);
 }
 
 // --------------------------
@@ -426,9 +353,11 @@ void CursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
     }
 }
 
-void CursorManager::appendIdleCursors(AuthorizationSession* ctxAuth,
-                                      MongoProcessInterface::CurrentOpUserMode userMode,
-                                      std::vector<GenericCursor>* cursors) const {
+std::vector<GenericCursor> CursorManager::getIdleCursors(
+    OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) const {
+    std::vector<GenericCursor> cursors;
+    AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
+
     auto allPartitions = _cursorMap->lockAllPartitions();
     for (auto&& partition : allPartitions) {
         for (auto&& entry : partition) {
@@ -444,9 +373,11 @@ void CursorManager::appendIdleCursors(AuthorizationSession* ctxAuth,
             if (cursor->_operationUsingCursor) {
                 continue;
             }
-            cursors->emplace_back(cursor->toGenericCursor());
+            cursors.emplace_back(cursor->toGenericCursor());
         }
     }
+
+    return cursors;
 }
 
 stdx::unordered_set<CursorId> CursorManager::getCursorsForSession(LogicalSessionId lsid) const {

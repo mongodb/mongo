@@ -105,7 +105,8 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
     killSessionsAbortUnpreparedTransactions(opCtx, matcher);
     uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
 
-    auto res = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
+    auto res =
+        CursorManager::getGlobalCursorManager()->killCursorsWithMatchingSessions(opCtx, matcher);
     uassertStatusOK(res.first);
 
     return {std::vector<HostAndPort>{}};

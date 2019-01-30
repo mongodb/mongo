@@ -67,11 +67,7 @@ public:
 private:
     Status _checkAuth(Client* client, const NamespaceString& nss, CursorId id) const final {
         auto opCtx = client->getOperationContext();
-        const auto check = [opCtx, id](CursorManager* manager) {
-            return manager->checkAuthForKillCursors(opCtx, id);
-        };
-
-        return CursorManager::withCursorManager(opCtx, id, nss, check);
+        return CursorManager::getGlobalCursorManager()->checkAuthForKillCursors(opCtx, id);
     }
 
     Status _killCursor(OperationContext* opCtx,
@@ -87,10 +83,8 @@ private:
                                  dbProfilingLevel);
         }
 
-        return CursorManager::withCursorManager(
-            opCtx, id, nss, [opCtx, id](CursorManager* manager) {
-                return manager->killCursor(opCtx, id, true /* shouldAudit */);
-            });
+        auto cursorManager = CursorManager::getGlobalCursorManager();
+        return cursorManager->killCursor(opCtx, id, true /* shouldAudit */);
     }
 } killCursorsCmd;
 
