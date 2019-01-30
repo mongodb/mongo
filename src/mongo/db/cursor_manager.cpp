@@ -65,19 +65,6 @@ using std::vector;
 constexpr int CursorManager::kNumPartitions;
 
 namespace {
-uint32_t idFromCursorId(CursorId id) {
-    uint64_t x = static_cast<uint64_t>(id);
-    x = x >> 32;
-    return static_cast<uint32_t>(x);
-}
-
-CursorId cursorIdFromParts(uint32_t collectionIdentifier, uint32_t cursor) {
-    // The leading two bits of a non-global CursorId should be 0.
-    invariant((collectionIdentifier & (0b11 << 30)) == 0);
-    CursorId x = static_cast<CursorId>(collectionIdentifier) << 32;
-    x |= cursor;
-    return x;
-}
 
 class GlobalCursorIdCache {
 public:
@@ -484,35 +471,38 @@ size_t CursorManager::numCursors() const {
 
 CursorId CursorManager::allocateCursorId_inlock() {
     for (int i = 0; i < 10000; i++) {
-        // The leading two bits of a CursorId are used to determine if the cursor is registered on
-        // the global cursor manager.
-        CursorId id;
-        if (isGlobalManager()) {
-            // This is the global cursor manager, so generate a random number and make sure the
-            // first two bits are 01.
-            uint64_t mask = 0x3FFFFFFFFFFFFFFF;
-            uint64_t bitToSet = 1ULL << 62;
-            id = ((_random->nextInt64() & mask) | bitToSet);
-        } else {
-            // The first 2 bits are 0, the next 30 bits are the collection identifier, the next 32
-            // bits are random.
-            uint32_t myPart = static_cast<uint32_t>(_random->nextInt32());
-            id = cursorIdFromParts(_collectionCacheRuntimeId, myPart);
+        CursorId id = _random->nextInt64();
+
+        // A cursor id of zero is reserved to indicate that the cursor has been closed. If the
+        // random number generator gives us zero, then try again.
+        if (id == 0) {
+            continue;
         }
+
+        // Avoid negative cursor ids by taking the absolute value. If the cursor id is the minimum
+        // representable negative number, then just generate another random id.
+        if (id == std::numeric_limits<CursorId>::min()) {
+            continue;
+        }
+        id = std::abs(id);
+
         auto partition = _cursorMap->lockOnePartition(id);
-        if (partition->count(id) == 0)
+        if (partition->count(id) == 0) {
+            // The cursor id is not already in use, so return it. Even though we drop the lock on
+            // the '_cursorMap' partition, another thread cannot register a cursor with the same id
+            // because we still hold '_registrationLock'.
             return id;
+        }
+
+        // The cursor id is already in use. Generate another random id.
     }
+
+    // We failed to generate a unique cursor id.
     fassertFailed(17360);
 }
 
 ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
                                               ClientCursorParams&& cursorParams) {
-    // TODO SERVER-37455: Cursors should only ever be registered against the global cursor manager.
-    // Follow-up work is required to actually delete the concept of a per-collection cursor manager
-    // from the code base.
-    invariant(isGlobalManager());
-
     // Avoid computing the current time within the critical section.
     auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
 
@@ -564,8 +554,7 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id, bool shou
     auto it = lockedPartition->find(id);
     if (it == lockedPartition->end()) {
         if (shouldAudit) {
-            audit::logKillCursorsAuthzCheck(
-                opCtx->getClient(), _nss, id, ErrorCodes::CursorNotFound);
+            audit::logKillCursorsAuthzCheck(opCtx->getClient(), {}, id, ErrorCodes::CursorNotFound);
         }
         return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
     }
@@ -582,14 +571,14 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id, bool shou
         }
 
         if (shouldAudit) {
-            audit::logKillCursorsAuthzCheck(opCtx->getClient(), _nss, id, ErrorCodes::OK);
+            audit::logKillCursorsAuthzCheck(opCtx->getClient(), cursor->nss(), id, ErrorCodes::OK);
         }
         return Status::OK();
     }
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> ownedCursor(cursor);
 
     if (shouldAudit) {
-        audit::logKillCursorsAuthzCheck(opCtx->getClient(), _nss, id, ErrorCodes::OK);
+        audit::logKillCursorsAuthzCheck(opCtx->getClient(), cursor->nss(), id, ErrorCodes::OK);
     }
 
     deregisterAndDestroyCursor(std::move(lockedPartition), opCtx, std::move(ownedCursor));

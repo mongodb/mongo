@@ -56,31 +56,6 @@ namespace mongo {
 namespace {
 const NamespaceString kTestNss{"test.collection"};
 
-TEST(CursorManagerTest, IsGloballyManagedCursorShouldReturnFalseIfLeadingBitsAreZeroes) {
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x0000000000000000));
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x000000000FFFFFFF));
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x000000007FFFFFFF));
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x0FFFFFFFFFFFFFFF));
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x3FFFFFFFFFFFFFFF));
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x3dedbeefdeadbeef));
-}
-
-TEST(CursorManagerTest, IsGloballyManagedCursorShouldReturnTrueIfLeadingBitsAreZeroAndOne) {
-    ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x4FFFFFFFFFFFFFFF));
-    ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x5FFFFFFFFFFFFFFF));
-    ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x6FFFFFFFFFFFFFFF));
-    ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x7FFFFFFFFFFFFFFF));
-    ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x4000000000000000));
-    ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x4dedbeefdeadbeef));
-}
-
-TEST(CursorManagerTest, IsGloballyManagedCursorShouldReturnFalseIfLeadingBitIsAOne) {
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(~0LL));
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0xFFFFFFFFFFFFFFFF));
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x8FFFFFFFFFFFFFFF));
-    ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x8dedbeefdeadbeef));
-}
-
 class CursorManagerTest : public unittest::Test {
 public:
     CursorManagerTest()
@@ -145,20 +120,6 @@ class CursorManagerTestCustomOpCtx : public CursorManagerTest {
         _queryServiceContext->getClient()->setOperationContext(_opCtx.get());
     }
 };
-
-TEST_F(CursorManagerTest, GlobalCursorManagerShouldReportOwnershipOfCursorsItCreated) {
-    for (int i = 0; i < 1000; i++) {
-        auto cursorPin = CursorManager::getGlobalCursorManager()->registerCursor(
-            _opCtx.get(),
-            {makeFakePlanExecutor(),
-             NamespaceString{"test.collection"},
-             {},
-             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-             BSONObj(),
-             ClientCursorParams::LockPolicy::kLocksInternally});
-        ASSERT_TRUE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
-    }
-}
 
 /**
  * Test that an attempt to kill a pinned cursor succeeds.

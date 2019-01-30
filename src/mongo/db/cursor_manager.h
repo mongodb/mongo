@@ -98,18 +98,6 @@ public:
     static std::pair<Status, int> killCursorsWithMatchingSessions(
         OperationContext* opCtx, const SessionKiller::Matcher& matcher);
 
-    /**
-     * This method is deprecated. Do not add new call sites.
-     *
-     * TODO SERVER-37452: Delete this method.
-     */
-    static bool isGloballyManagedCursor(CursorId cursorId) {
-        // The first two bits are 01 for globally managed cursors, and 00 for cursors owned by a
-        // collection. The leading bit is always 0 so that CursorIds do not appear as negative.
-        const long long mask = static_cast<long long>(0b11) << 62;
-        return (cursorId & mask) == (static_cast<long long>(0b01) << 62);
-    }
-
     static int killCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
 
     static bool killCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id);
@@ -234,16 +222,6 @@ private:
                std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
 
     bool cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now);
-
-    bool isGlobalManager() const {
-        return _nss.isEmpty();
-    }
-
-    // No locks are needed to consult these data members.
-    //
-    // TODO SERVER-37452: Delete these data members.
-    const NamespaceString _nss;
-    const uint32_t _collectionCacheRuntimeId = 0;
 
     // A CursorManager holds a pointer to all open ClientCursors. ClientCursors are owned by the
     // CursorManager, except when they are in use by a ClientCursorPin. When in use by a pin, an
