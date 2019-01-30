@@ -21,7 +21,7 @@ mkdir -p bin
 ec=0
 for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongoreplay; do
         echo "Building ${i}..."
-        go build -o "bin/$i" -ldflags "$(print_ldflags)" -tags "$(print_tags $tags)" "$i/main/$i.go" || { echo "Error building $i"; ec=1; break; }
+        go build -o "bin/$i" $(buildflags) -ldflags "$(print_ldflags)" -tags "$(print_tags $tags)" "$i/main/$i.go" || { echo "Error building $i"; ec=1; break; }
         ./bin/$i --version | head -1
 done
 

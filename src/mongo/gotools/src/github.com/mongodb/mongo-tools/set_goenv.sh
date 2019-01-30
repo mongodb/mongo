@@ -11,14 +11,25 @@ set_goenv() {
     UNAME_S=$(PATH="/usr/bin:/bin" uname -s)
     case $UNAME_S in
         CYGWIN*)
-            PREF_GOROOT="c:/golang/go1.10"
-            PREF_PATH="/cygdrive/c/golang/go1.10/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH"
+            PREF_GOROOT="c:/golang/go1.11"
+            PREF_PATH="/cygdrive/c/golang/go1.11/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH"
         ;;
         *)
-            PREF_GOROOT="/opt/golang/go1.10"
+            PREF_GOROOT="/opt/golang/go1.11"
             # XXX might not need mongodbtoolchain anymore
             PREF_PATH="$PREF_GOROOT/bin:/opt/mongodbtoolchain/v2/bin/:$PATH"
         ;;
+    esac
+
+    # Set OS-level compilation flags
+    case $UNAME_S in
+        'CYGWIN*')
+            export CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"
+            ;;
+        'Darwin')
+            export CGO_CFLAGS="-mmacosx-version-min=10.11"
+            export CGO_LDFLAGS="-mmacosx-version-min=10.11"
+            ;;
     esac
 
     # XXX Setting the compiler might not be necessary anymore now that we're
@@ -92,4 +103,16 @@ print_tags() {
         ;;
     esac
     echo "$tags"
+}
+
+# On linux, we want to set buildmode=pie for ASLR support
+buildflags() {
+    flags=""
+    UNAME_S=$(PATH="/usr/bin:/bin" uname -s)
+    case $UNAME_S in
+        Linux)
+            flags="-buildmode=pie"
+        ;;
+    esac
+    echo "$flags"
 }

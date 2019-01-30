@@ -56,3 +56,40 @@ func TestSkipCollection(t *testing.T) {
 	})
 
 }
+
+type testTable struct {
+	db     string
+	coll   string
+	output bool
+}
+
+func TestShouldSkipSystemNamespace(t *testing.T) {
+	tests := []testTable{
+		testTable{
+			db:     "test",
+			coll:   "system",
+			output: false,
+		},
+		testTable{
+			db:     "test",
+			coll:   "system.nonsense",
+			output: true,
+		},
+		testTable{
+			db:     "test",
+			coll:   "system.js",
+			output: false,
+		},
+		testTable{
+			db:     "test",
+			coll:   "test",
+			output: false,
+		},
+	}
+
+	for _, testVals := range tests {
+		if shouldSkipSystemNamespace(testVals.db, testVals.coll) != testVals.output {
+			t.Errorf("%s.%s should have been %v but failed\n", testVals.db, testVals.coll, testVals.output)
+		}
+	}
+}

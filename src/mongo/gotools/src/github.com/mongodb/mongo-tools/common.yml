@@ -283,7 +283,7 @@ functions:
         GOROOT="" set_goenv || exit
         go version
         env | grep ^GO
-        go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags failpoints ${build_tags})" -o bin/${tool} ${tool}/main/${tool}.go
+        go build $(buildflags) -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags failpoints ${build_tags})" -o bin/${tool} ${tool}/main/${tool}.go
         ./bin/${tool} --version
 
   "download mongod":
@@ -372,7 +372,7 @@ functions:
         . ./set_goenv.sh
         GOROOT="" set_goenv || exit
         cd ${package}
-        go test -ldflags "$(print_ldflags)" ${coverage_args} ${args} -tags "$(print_tags ${build_tags})" -test.v > unit.suite
+        go test $(buildflags) -ldflags "$(print_ldflags)" ${coverage_args} ${args} -tags "$(print_tags ${build_tags})" -test.v > unit.suite
         export exitcode=$?
         cat unit.suite
         cp unit.suite $basedir/.
@@ -750,7 +750,7 @@ functions:
         set -e
         . ./set_goenv.sh
         GOROOT="" set_goenv || exit
-        ${environment_vars} go test -ldflags "$(print_ldflags)" ${additional_args} -v > ${filename}.suite
+        ${environment_vars} go test $(buildflags) -ldflags "$(print_ldflags)" ${additional_args} -v > ${filename}.suite
 
 
 pre:
@@ -2015,7 +2015,7 @@ buildvariants:
     mongo_edition: "enterprise"
     build_tags: "sasl ssl"
     arch: "linux/x86_64"
-    args: "-race"
+    args: "-buildmode=default -race"
     excludes: requires_large_ram
     integration_test_args: integration
   tasks: *ubuntu1404_race_tasks

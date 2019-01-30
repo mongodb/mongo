@@ -539,8 +539,9 @@ functions:
         fi
 
         for i in $build_tools; do
-            go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../mongo-tools/$i${exe|}" $i/main/$i.go
+            go build $(buildflags) -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../../mongo-tools/$i${exe|}" $i/main/$i.go
             "../../../../../../mongo-tools/$i${exe|}" --version
+            file "../../../../../../mongo-tools/$i${exe|}"
         done
 
   "send benchmark results" :
