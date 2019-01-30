@@ -65,13 +65,31 @@ env.Library(
 )
 
 env.Library(
+    target='commit_quorum_options',
+    source=[
+        'commit_quorum_options.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+    ],
+)
+
+env.CppUnitTest(
+    target='commit_quorum_options_test',
+    source='commit_quorum_options_test.cpp',
+    LIBDEPS=[
+        'commit_quorum_options',
+    ],
+)
+
+env.Library(
     target='commit_quorum_idl',
     source=[
         env.Idlc('commit_quorum.idl')[0],
     ],
     LIBDEPS=[
+        'commit_quorum_options',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

@@ -90,7 +90,7 @@ public:
 
     Status setCommitQuorum(const NamespaceString& nss,
                            const std::vector<StringData>& indexNames,
-                           const WriteConcernOptions& newCommitQuorum) override;
+                           const CommitQuorumOptions& newCommitQuorum) override;
 
 private:
     /**

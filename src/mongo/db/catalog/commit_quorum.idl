@@ -29,12 +29,13 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/write_concern_options.h"
+        - "mongo/db/catalog/commit_quorum_options.h"
 
 types:
     CommitQuorum:
         bson_serialization_type: object
-        description: "CommitQuorum type that shadows the behaviour of WriteConcernOptions."
-        cpp_type: "mongo::WriteConcernOptions"
-        serializer: "mongo::WriteConcernOptions::toBSON"
-        deserializer: "mongo::WriteConcernOptions::deserializerForIDL"
+        description: "CommitQuorumOptions defines the required quorum for the index builds to 
+                      commit."
+        cpp_type: "mongo::CommitQuorumOptions"
+        serializer: "mongo::CommitQuorumOptions::toBSON"
+        deserializer: "mongo::CommitQuorumOptions::deserializerForIDL"

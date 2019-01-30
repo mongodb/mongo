@@ -98,7 +98,7 @@ Status IndexBuildsCoordinatorEmbedded::voteCommitIndexBuild(const UUID& buildUUI
 
 Status IndexBuildsCoordinatorEmbedded::setCommitQuorum(const NamespaceString& nss,
                                                        const std::vector<StringData>& indexNames,
-                                                       const WriteConcernOptions& newCommitQuorum) {
+                                                       const CommitQuorumOptions& newCommitQuorum) {
     MONGO_UNREACHABLE;
 }
 
