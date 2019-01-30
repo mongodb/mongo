@@ -1,6 +1,6 @@
 #!/bin/bash
 # This script downloads and imports gperftools.
-# It can be run on Linux or Mac OS X.
+# It can be run on Linux, Windows WSL or Mac OS X.
 # The actual integration via SConscript is not done by this script
 #
 # NOTES
@@ -20,12 +20,38 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-VERSION=2.7
+# convenience shell functions
+function log2floor () { 
+  local x=0 
+  local y=$((($1)>>1))
+  while [ $y -gt 0 ]; do 
+    x=$((x+1)) 
+    y=$((y>>1)) 
+  done 
+  echo $x 
+}
+
+function set_define () {
+    # change any line matching the macro name, surrounded by spaces,
+    # to be a #define of that macro to the specified value.
+    echo "/ $1 /c\\"
+    echo "#define $1 $2"
+}
+
 NAME=gperftools
-TARBALL=$NAME-$VERSION.tar.gz
-TARBALL_DIR=$NAME-$VERSION
-TEMP_DIR=$(mktemp -d /tmp/gperftools.XXXXXX)
+VERSION=2.7
+REVISION=$VERSION-mongodb
+
+# If WSL, get Windows temp directory
+if $(grep -q Microsoft /proc/version); then
+    TEMP_DIR=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
+else
+    TEMP_DIR="/tmp"
+fi
+TEMP_DIR=$(mktemp -d $TEMP_DIR/$NAME.XXXXXX)
 trap "rm -rf $TEMP_DIR" EXIT
+
+SRC_DIR=$TEMP_DIR/$NAME
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
 UNAME=$(uname | tr A-Z a-z)
 UNAME_PROCESSOR=$(uname -p)
@@ -38,27 +64,42 @@ fi
 
 TARGET_UNAME=${UNAME}_${UNAME_PROCESSOR}
 
-if [ ! -f $TARBALL ]; then
-    wget https://github.com/gperftools/gperftools/releases/download/$NAME-$VERSION/$NAME-$VERSION.tar.gz
+git clone https://github.com/mongodb-labs/gperftools.git -c core.autocrlf=false $TEMP_DIR
+
+pushd $TEMP_DIR
+git checkout $REVISION
+
+./autogen.sh
+
+if [ "$UNAME_PROCESSOR" = "ppc64le" ]; then
+    PAGE_SIZE_KB=64
+    MAX_SIZE_KB=64
+else
+    PAGE_SIZE_KB=4
+    MAX_SIZE_KB=16
 fi
 
-tar -zxvf $TARBALL
-
-rm -rf $TEMP_DIR
-mv $TARBALL_DIR $TEMP_DIR
+env PATH=/opt/mongodbtoolchain/v3/bin:$PATH \
+    ./configure \
+    --enable-tcmalloc-aggressive-merge \
+    --with-tcmalloc-pagesize=$PAGE_SIZE_KB \
+    --with-tcmalloc-maxsize=$MAX_SIZE_KB
 
 # Do a deep copy if this is the first time
 if [ ! -d $DEST_DIR ]; then
     cp -r $TEMP_DIR $DEST_DIR || true
 
-    # Copy over the Windows header to our directory structure
-    mkdir $DEST_DIR/build_windows_x86_64
-    cp $TEMP_DIR/src/windows/config.h $DEST_DIR/build_windows_x86_64
+    DEST_CONFIG_DIR=$DEST_DIR/build_windows_x86_64
+    mkdir $DEST_CONFIG_DIR
+    sed "
+    $(set_define TCMALLOC_ENABLE_LIBC_OVERRIDE 0)
+    $(set_define TCMALLOC_AGGRESSIVE_MERGE 1)
+    $(set_define TCMALLOC_PAGE_SIZE_SHIFT $(log2floor $((PAGE_SIZE_KB*1024))))
+    $(set_define TCMALLOC_MAX_SIZE_KB ${MAX_SIZE_KB})
+    " \
+    < $TEMP_DIR/src/windows/config.h \
+    > $DEST_CONFIG_DIR/config.h
 fi
-
-# Generate Config.h & tcmalloc.h
-cd $TEMP_DIR
-./configure
 
 # Adjust config.h, See note 2 at top of file
 mkdir $DEST_DIR/build_$TARGET_UNAME || true
@@ -79,15 +120,17 @@ if [ ! -d $DEST_DIR/src/gperftools/tcmalloc.h ]; then
     done
 fi
 
+popd
+
 # Prune sources
-cd $DEST_DIR
-rm -rf $DEST_DIR/benchmark
-rm -rf $DEST_DIR/doc
-rm -rf $DEST_DIR/m4
-rm -rf $DEST_DIR/packages
-rm -rf $DEST_DIR/src/tests
-rm -rf $DEST_DIR/vsprojects
-rm -f $DEST_DIR/Makefile* $DEST_DIR/config* $DEST_DIR/*sh
-rm -f $DEST_DIR/compile* $DEST_DIR/depcomp $DEST_DIR/libtool
-rm -f $DEST_DIR/test-driver $DEST_DIR/*.m4 $DEST_DIR/missing
-rm -f $DEST_DIR/*.sln
+pushd $DEST_DIR
+rm -rf autom4te.cache
+rm -rf .git
+rm -f src/config.h
+rm -f compile*
+rm -f depcomp 
+rm -f libtool
+rm -f test-driver 
+rm -f *.m4 
+rm -f missing
+popd
