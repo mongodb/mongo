@@ -729,7 +729,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
             UserName name = user->getName();
             UserHandle updatedUser;
 
-            auto swUser = authMan.acquireUser(opCtx, name);
+            auto swUser = authMan.acquireUserForSessionRefresh(opCtx, name, user->getID());
             auto& status = swUser.getStatus();
             switch (status.code()) {
                 case ErrorCodes::OK: {

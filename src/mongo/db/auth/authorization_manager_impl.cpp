@@ -456,6 +456,8 @@ Status AuthorizationManagerImpl::_initializeUserFromPrivilegeDocument(User* user
                                                 << "\"");
     }
 
+    user->setID(parser.extractUserIDFromUserDocument(privDoc));
+
     Status status = parser.initializeUserCredentialsFromUserDocument(user, privDoc);
     if (!status.isOK()) {
         return status;
@@ -574,6 +576,23 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
     }
 
     return user;
+}
+
+StatusWith<UserHandle> AuthorizationManagerImpl::acquireUserForSessionRefresh(
+    OperationContext* opCtx, const UserName& userName, const User::UserId& uid) {
+    auto swUserHandle = acquireUser(opCtx, userName);
+    if (!swUserHandle.isOK()) {
+        return swUserHandle.getStatus();
+    }
+
+    auto ret = std::move(swUserHandle.getValue());
+    if (uid != ret->getID()) {
+        return {ErrorCodes::UserNotFound,
+                str::stream() << "User id from privilege document '" << userName.toString()
+                              << "' does not match user id in session."};
+    }
+
+    return ret;
 }
 
 StatusWith<UserHandle> AuthorizationManagerImpl::_acquireUserSlowPath(CacheGuard& guard,

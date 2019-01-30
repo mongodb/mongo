@@ -99,6 +99,7 @@ public:
 
     static MONGO_DECLARE_SHIM(()->std::unique_ptr<AuthorizationManager>) create;
 
+    static constexpr StringData USERID_FIELD_NAME = "userId"_sd;
     static constexpr StringData USER_NAME_FIELD_NAME = "user"_sd;
     static constexpr StringData USER_DB_FIELD_NAME = "db"_sd;
     static constexpr StringData ROLE_NAME_FIELD_NAME = "role"_sd;
@@ -265,6 +266,13 @@ public:
      */
     virtual StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
                                                const UserName& userName) = 0;
+
+    /**
+     * Validate the ID associated with a known user while refreshing session cache.
+     */
+    virtual StatusWith<UserHandle> acquireUserForSessionRefresh(OperationContext* opCtx,
+                                                                const UserName& userName,
+                                                                const User::UserId& uid) = 0;
 
     /**
      * Marks the given user as invalid and removes it from the user cache.

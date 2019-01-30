@@ -102,6 +102,12 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
+    StatusWith<UserHandle> acquireUserForSessionRefresh(OperationContext*,
+                                                        const UserName&,
+                                                        const User::UserId&) override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
     void invalidateUserByName(OperationContext*, const UserName& user) override {
         UASSERT_NOT_IMPLEMENTED;
     }

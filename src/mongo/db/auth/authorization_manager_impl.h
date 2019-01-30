@@ -118,6 +118,9 @@ public:
                                     std::vector<BSONObj>* result) override;
 
     StatusWith<UserHandle> acquireUser(OperationContext* opCtx, const UserName& userName) override;
+    StatusWith<UserHandle> acquireUserForSessionRefresh(OperationContext* opCtx,
+                                                        const UserName& userName,
+                                                        const User::UserId& uid) override;
 
     void invalidateUserByName(OperationContext* opCtx, const UserName& user) override;
 
