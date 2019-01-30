@@ -1,0 +1,39 @@
+autospider.py is intended both as the harness for running automation builds, as
+well as a way to easily reproduce automation builds on a developer workstation.
+Some brave souls also use it as the basis for doing their normal local builds.
+
+Basic usage:
+
+  ./js/src/devtools/automation/autospider.py plain
+
+The script may be run from any directory. This will configure and build the
+source, then run a series of tests. See the --help message for many different
+ways of suppressing various actions or changing the output.
+
+The different possible build+test configurations are controlled mostly by JSON
+files in a variants/ directory (eg there is a .../variants/plain file for the
+above command).
+
+In automation, the test jobs will run with a dynamically loaded library that
+catches crashes and generates minidumps, so that autospider.py can produce a
+readable stack trace at the end of the run. Currently this library is only
+available on linux64, and is built via the following procedure:
+
+    % git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+    % export PATH=$PATH:$(pwd)/depot_tools
+    % mkdir breakpad
+    % cd breakpad
+    # python must be python2.7
+    % fetch breakpad
+    % cd src
+    % git fetch https://github.com/hotsphink/breakpad injector
+    % git checkout FETCH_HEAD
+    % cd ..
+    % mkdir obj
+    % cd obj
+    # Possibly set $PATH to include a recent gcc
+    % ../src/configure --enable-static
+    % mkdir ../root
+    % make install DESTDIR=$(pwd)/../root
+
+The shared library will now be in root/usr/local/lib64/libbreakpadinjector.so

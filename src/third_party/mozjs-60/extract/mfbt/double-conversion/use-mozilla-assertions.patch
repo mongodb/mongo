@@ -1,0 +1,47 @@
+diff --git a/mfbt/double-conversion/double-conversion/utils.h b/mfbt/double-conversion/double-conversion/utils.h
+--- a/mfbt/double-conversion/double-conversion/utils.h
++++ b/mfbt/double-conversion/double-conversion/utils.h
+@@ -26,38 +26,38 @@
+ // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #ifndef DOUBLE_CONVERSION_UTILS_H_
+ #define DOUBLE_CONVERSION_UTILS_H_
+ 
+ #include <cstdlib>
+ #include <cstring>
+ 
+-#include <cassert>
++#include "mozilla/Assertions.h"
+ #ifndef ASSERT
+ #define ASSERT(condition)         \
+-    assert(condition);
++    MOZ_ASSERT(condition)
+ #endif
+ #ifndef UNIMPLEMENTED
+-#define UNIMPLEMENTED() (abort())
++#define UNIMPLEMENTED() MOZ_CRASH()
+ #endif
+ #ifndef DOUBLE_CONVERSION_NO_RETURN
+ #ifdef _MSC_VER
+ #define DOUBLE_CONVERSION_NO_RETURN __declspec(noreturn)
+ #else
+ #define DOUBLE_CONVERSION_NO_RETURN __attribute__((noreturn))
+ #endif
+ #endif
+ #ifndef UNREACHABLE
+ #ifdef _MSC_VER
+ void DOUBLE_CONVERSION_NO_RETURN abort_noreturn();
+-inline void abort_noreturn() { abort(); }
++inline void abort_noreturn() { MOZ_CRASH(); }
+ #define UNREACHABLE()   (abort_noreturn())
+ #else
+-#define UNREACHABLE()   (abort())
++#define UNREACHABLE()   MOZ_CRASH()
+ #endif
+ #endif
+ 
+ 
+ // Double operations detection based on target architecture.
+ // Linux uses a 80bit wide floating point stack on x86. This induces double
+ // rounding, which in turn leads to wrong results.
+ // An easy way to test if the floating-point operations are correct is to

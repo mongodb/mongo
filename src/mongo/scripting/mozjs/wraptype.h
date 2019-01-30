@@ -64,7 +64,7 @@
     };
 
 #define MONGO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, flags) \
-    JS_FS(#name, smUtils::wrapFunction<Functions::name>, 0, flags)
+    JS_FN(#name, smUtils::wrapFunction<Functions::name>, 0, flags)
 
 #define MONGO_ATTACH_JS_FUNCTION(name) MONGO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, 0)
 
@@ -161,7 +161,11 @@ bool enumerate(JSContext* cx,
 };
 
 template <typename T>
-bool getProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::MutableHandleValue vp) {
+bool getProperty(JSContext* cx,
+                 JS::HandleObject obj,
+                 JS::HandleValue receiver,
+                 JS::HandleId id,
+                 JS::MutableHandleValue vp) {
     if (JSID_IS_SYMBOL(id)) {
         // Just default to the SpiderMonkey's standard implementations for Symbol methods
         vp.setUndefined();
@@ -169,7 +173,7 @@ bool getProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::Mutab
     }
 
     try {
-        T::getProperty(cx, obj, id, vp);
+        T::getProperty(cx, obj, id, receiver, vp);
         return true;
     } catch (...) {
         mongoToJSException(cx);
@@ -192,10 +196,11 @@ template <typename T>
 bool setProperty(JSContext* cx,
                  JS::HandleObject obj,
                  JS::HandleId id,
-                 JS::MutableHandleValue vp,
+                 JS::HandleValue vp,
+                 JS::HandleValue receiver,
                  JS::ObjectOpResult& result) {
     try {
-        T::setProperty(cx, obj, id, vp, result);
+        T::setProperty(cx, obj, id, vp, receiver, result);
         return true;
     } catch (...) {
         mongoToJSException(cx);
@@ -231,34 +236,53 @@ public:
           _constructor(),
           _jsclass({T::className,
                     T::classFlags,
-                    T::addProperty != BaseInfo::addProperty ? smUtils::addProperty<T> : nullptr,
-                    T::delProperty != BaseInfo::delProperty ? smUtils::delProperty<T> : nullptr,
-                    T::getProperty != BaseInfo::getProperty ? smUtils::getProperty<T> : nullptr,
-                    T::setProperty != BaseInfo::setProperty ? smUtils::setProperty<T> : nullptr,
-                    // We don't use the regular enumerate because we want the fancy new one
-                    nullptr,
-                    T::resolve != BaseInfo::resolve ? smUtils::resolve<T> : nullptr,
-                    T::mayResolve != BaseInfo::mayResolve ? T::mayResolve : nullptr,
-                    T::finalize != BaseInfo::finalize ? T::finalize : nullptr,
-                    T::call != BaseInfo::call ? smUtils::call<T> : nullptr,
-                    T::hasInstance != BaseInfo::hasInstance ? smUtils::hasInstance<T> : nullptr,
-                    T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
-                    nullptr}) {
-        _installEnumerate(T::enumerate != BaseInfo::enumerate ? smUtils::enumerate<T> : nullptr);
+                    &_jsclassOps,
+                    JS_NULL_CLASS_SPEC,
+                    JS_NULL_CLASS_EXT,
+                    &_jsoOps}),
+          _jsclassOps({T::addProperty != BaseInfo::addProperty ? smUtils::addProperty<T> : nullptr,
+                       T::delProperty != BaseInfo::delProperty ? smUtils::delProperty<T> : nullptr,
+                       nullptr,  // enumerate
+                       T::enumerate != BaseInfo::enumerate ? smUtils::enumerate<T>
+                                                           : nullptr,  // newEnumerate
+                       T::resolve != BaseInfo::resolve ? smUtils::resolve<T> : nullptr,
+                       T::mayResolve != BaseInfo::mayResolve ? T::mayResolve : nullptr,
+                       T::finalize != BaseInfo::finalize ? T::finalize : nullptr,
+                       T::call != BaseInfo::call ? smUtils::call<T> : nullptr,
+                       T::hasInstance != BaseInfo::hasInstance ? smUtils::hasInstance<T> : nullptr,
+                       T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
+                       nullptr}),  // trace
+          _jsoOps({
+              nullptr,  // lookupProperty
+              nullptr,  // defineProperty
+              nullptr,  // hasProperty
+              T::getProperty != BaseInfo::getProperty ? smUtils::getProperty<T>
+                                                      : nullptr,  // getProperty
+              T::setProperty != BaseInfo::setProperty ? smUtils::setProperty<T>
+                                                      : nullptr,  // setProperty
+              nullptr,                                            // getOwnPropertyDescriptor
+              nullptr,                                            // deleteProperty
+              nullptr,                                            // getElements
+              nullptr                                             // funToString
+          }) {
 
         // The global object is different.  We need it for basic setup
         // before the other types are installed.  Might as well just do it
         // in the constructor.
         if (T::classFlags & JSCLASS_GLOBAL_FLAGS) {
-            _jsclass.trace = JS_GlobalObjectTraceHook;
+            _jsclassOps.trace = JS_GlobalObjectTraceHook;
 
             JS::RootedObject proto(_context);
 
             JSAutoRequest ar(_context);
 
+            JS::CompartmentOptions options;
             _proto.init(_context,
-                        _assertPtr(JS_NewGlobalObject(
-                            _context, &_jsclass, nullptr, JS::DontFireOnNewGlobalHook)));
+                        _assertPtr(JS_NewGlobalObject(_context,
+                                                      js::Jsvalify(&_jsclass),
+                                                      nullptr,
+                                                      JS::DontFireOnNewGlobalHook,
+                                                      options)));
 
             JSAutoCompartment ac(_context, _proto);
             _installFunctions(_proto, T::freeFunctions);
@@ -290,7 +314,7 @@ public:
      * types without a constructor or inside the constructor
      */
     void newObject(JS::MutableHandleObject out) {
-        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, &_jsclass, _proto)));
+        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, js::Jsvalify(&_jsclass), _proto)));
     }
 
     void newObject(JS::MutableHandleValue out) {
@@ -301,7 +325,7 @@ public:
     }
 
     void newObjectWithProto(JS::MutableHandleObject out, JS::HandleObject proto) {
-        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, &_jsclass, proto)));
+        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, js::Jsvalify(&_jsclass), proto)));
     }
 
     void newObjectWithProto(JS::MutableHandleValue out, JS::HandleObject proto) {
@@ -346,7 +370,7 @@ public:
 
     // instanceOf doesn't go up the prototype tree.  It's a lower level more specific match
     bool instanceOf(JS::HandleObject obj) {
-        return JS_InstanceOf(_context, obj, &_jsclass, nullptr);
+        return JS_InstanceOf(_context, obj, js::Jsvalify(&_jsclass), nullptr);
     }
 
     bool instanceOf(JS::HandleValue value) {
@@ -359,7 +383,7 @@ public:
     }
 
     const JSClass* getJSClass() const {
-        return &_jsclass;
+        return js::Jsvalify(&_jsclass);
     }
 
     JS::HandleObject getProto() const {
@@ -383,7 +407,7 @@ private:
                         _context,
                         global,
                         parent,
-                        &_jsclass,
+                        js::Jsvalify(&_jsclass),
                         T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
                         0,
                         nullptr,
@@ -405,7 +429,7 @@ private:
 
         // See newObject() for why we have to do this dance with the explicit
         // SetPrototype
-        _proto.init(_context, _assertPtr(JS_NewObject(_context, &_jsclass)));
+        _proto.init(_context, _assertPtr(JS_NewObject(_context, js::Jsvalify(&_jsclass))));
         if (parent.get() && !JS_SetPrototype(_context, _proto, parent))
             throwCurrentJSException(
                 _context, ErrorCodes::JSInterpreterFailure, "Failed to set prototype");
@@ -475,23 +499,6 @@ private:
             _context, ErrorCodes::JSInterpreterFailure, "Failed to define functions");
     }
 
-    // We have to do this awkward dance to set the new style enumeration.
-    // You used to be able to set this with JSCLASS_NEW_ENUMERATE in class
-    // flags, in the future you'll probably only set ObjectOps, but for now
-    // we have this.  There are a host of static_asserts in js/Class.h that
-    // ensure that these two structures are equal.
-    //
-    // This is a landmine to watch out for during upgrades
-    using enumerateT = bool (*)(JSContext*, JS::HandleObject, JS::AutoIdVector&, bool);
-    void _installEnumerate(enumerateT enumerate) {
-        if (!enumerate)
-            return;
-
-        auto implClass = reinterpret_cast<js::Class*>(&_jsclass);
-
-        implClass->ops.enumerate = enumerate;
-    }
-
     // This is for inheriting from something other than Object
     void _inheritFrom(const char* name, JS::HandleObject global, JS::MutableHandleObject out) {
         if (!name)
@@ -548,7 +555,9 @@ private:
     JSContext* _context;
     JS::PersistentRootedObject _proto;
     JS::PersistentRootedObject _constructor;
-    JSClass _jsclass;
+    js::Class _jsclass;
+    js::ClassOps _jsclassOps;
+    js::ObjectOps _jsoOps;
 };
 
 }  // namespace mozjs

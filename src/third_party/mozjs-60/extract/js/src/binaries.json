@@ -1,0 +1,20 @@
+{
+    "programs": [
+        {
+            "install_target": "dist/bin", 
+            "kind": "host", 
+            "program": "nsinstall_real", 
+            "relobjdir": "config"
+        }
+    ], 
+    "shared_libraries": [
+        {
+            "basename": "js", 
+            "import_name": "libmozjs-60.so", 
+            "install_target": "dist/bin", 
+            "lib_name": "libmozjs-60.so", 
+            "relobjdir": "js/src/build", 
+            "soname": "libmozjs-60.so"
+        }
+    ]
+}

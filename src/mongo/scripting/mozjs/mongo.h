@@ -43,7 +43,7 @@ namespace mozjs {
  * info type with common code and differentiate with varying constructors.
  */
 struct MongoBase : public BaseInfo {
-    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(auth);

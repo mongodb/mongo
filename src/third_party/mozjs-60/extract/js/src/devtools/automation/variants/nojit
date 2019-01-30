@@ -1,0 +1,4 @@
+{
+    "configure-args": "--disable-ion --enable-warnings-as-errors",
+    "optimize": true
+}

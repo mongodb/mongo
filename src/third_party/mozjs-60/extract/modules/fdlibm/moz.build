@@ -1,0 +1,67 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS += [
+    'fdlibm.h',
+]
+
+FINAL_LIBRARY = 'js'
+
+if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
+    CXXFLAGS += [
+        '-Wno-parentheses',
+        '-Wno-sign-compare',
+    ]
+
+if CONFIG['CC_TYPE'] == 'clang':
+    CXXFLAGS += [
+        '-Wno-dangling-else',
+    ]
+
+if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
+    CXXFLAGS += [
+        '-wd4018', # signed/unsigned mismatch
+        '-wd4146', # unary minus operator applied to unsigned type
+        '-wd4305', # truncation from 'double' to 'const float'
+        '-wd4723', # potential divide by 0
+        '-wd4756', # overflow in constant arithmetic
+    ]
+
+SOURCES += [
+    'e_acos.cpp',
+    'e_acosh.cpp',
+    'e_asin.cpp',
+    'e_atan2.cpp',
+    'e_atanh.cpp',
+    'e_cosh.cpp',
+    'e_exp.cpp',
+    'e_hypot.cpp',
+    'e_log.cpp',
+    'e_log10.cpp',
+    'e_log2.cpp',
+    'e_pow.cpp',
+    'e_sinh.cpp',
+    'e_sqrt.cpp',
+    'k_exp.cpp',
+    's_asinh.cpp',
+    's_atan.cpp',
+    's_cbrt.cpp',
+    's_ceil.cpp',
+    's_ceilf.cpp',
+    's_copysign.cpp',
+    's_expm1.cpp',
+    's_fabs.cpp',
+    's_floor.cpp',
+    's_floorf.cpp',
+    's_log1p.cpp',
+    's_nearbyint.cpp',
+    's_rint.cpp',
+    's_rintf.cpp',
+    's_scalbn.cpp',
+    's_tanh.cpp',
+    's_trunc.cpp',
+    's_truncf.cpp',
+]

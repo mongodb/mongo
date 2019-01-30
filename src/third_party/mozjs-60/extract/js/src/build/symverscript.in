@@ -1,0 +1,4 @@
+#filter substitution
+@VERSION@ {
+    global: *;
+};

@@ -1,0 +1,11 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: SpiderMonkey 60.3.0
+Description: The Mozilla library for JavaScript
+Version: 60.3.0
+
+Libs: -L${libdir} -lmozjs-60
+Cflags: -include ${includedir}/mozjs-60/js/RequiredDefines.h -I${includedir}/mozjs-60

@@ -89,7 +89,7 @@ void NativeFunctionInfo::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromBSONElement(out.firstElement(), out, false);
 }
 
-void NativeFunctionInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void NativeFunctionInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto holder = static_cast<NativeHolder*>(JS_GetPrivate(obj));
 
     if (holder)

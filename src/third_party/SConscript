@@ -11,7 +11,7 @@ snappySuffix = '-1.1.7'
 zlibSuffix = '-1.2.11'
 zstdSuffix = '-1.3.7'
 pcreSuffix = "-8.42"
-mozjsSuffix = '-45'
+mozjsSuffix = '-60'
 yamlSuffix = '-0.6.2'
 icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.7' if env['MONGO_ALLOCATOR'] == "tcmalloc-experimental" else '-2.5'

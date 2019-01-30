@@ -143,7 +143,7 @@ void endSession(SessionHolder* holder) {
 
 }  // namespace
 
-void SessionInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void SessionInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto holder = getHolder(obj);
 
     if (holder) {

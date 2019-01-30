@@ -109,7 +109,7 @@ std::string* getEncoded(JSObject* thisv) {
 
 }  // namespace
 
-void BinDataInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void BinDataInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto str = getEncoded(obj);
 
     if (str) {

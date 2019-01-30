@@ -258,16 +258,6 @@ void* js_realloc(void* p, size_t bytes) {
         [](void* ptr, size_t b) { return std::realloc(ptr, b); }, p, bytes);
 }
 
-char* js_strdup(const char* s) {
-    size_t bytes = std::strlen(s) + 1;
+void js::InitMallocAllocator() {}
 
-    char* new_s = static_cast<char*>(js_malloc(bytes));
-
-    if (!new_s) {
-        return nullptr;
-    }
-
-    std::memcpy(new_s, s, bytes);
-
-    return new_s;
-}
+void js::ShutDownMallocAllocator() {}

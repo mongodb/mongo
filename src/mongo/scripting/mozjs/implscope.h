@@ -33,6 +33,7 @@
 #include <jsapi.h>
 #include <vm/PosixNSPR.h>
 
+
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/scripting/mozjs/bindata.h"
 #include "mongo/scripting/mozjs/bson.h"
@@ -47,6 +48,7 @@
 #include "mongo/scripting/mozjs/dbref.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/scripting/mozjs/error.h"
+#include "mongo/scripting/mozjs/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/global.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/jsthread.h"
@@ -393,9 +395,8 @@ private:
     struct MozJSEntry;
     friend struct MozJSEntry;
 
-    static void _reportError(JSContext* cx, const char* message, JSErrorReport* report);
     static bool _interruptCallback(JSContext* cx);
-    static void _gcCallback(JSRuntime* rt, JSGCStatus status, void* data);
+    static void _gcCallback(JSContext* rt, JSGCStatus status, void* data);
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
 
     void installDBAccess();
@@ -407,7 +408,6 @@ private:
     ASANHandles _asanHandles;
     MozJSScriptEngine* _engine;
     MozRuntime _mr;
-    JSRuntime* _runtime;
     JSContext* _context;
     WrapType<GlobalInfo> _globalProto;
     JS::HandleObject _global;
@@ -464,9 +464,10 @@ inline MozJSImplScope* getScope(JSContext* cx) {
     return static_cast<MozJSImplScope*>(JS_GetContextPrivate(cx));
 }
 
-inline MozJSImplScope* getScope(JSFreeOp* fop) {
-    return static_cast<MozJSImplScope*>(JS_GetRuntimePrivate(fop->runtime()));
+inline MozJSImplScope* getScope(js::FreeOp* fop) {
+    return getScope(freeOpToJSContext(fop));
 }
+
 
 }  // namespace mozjs
 }  // namespace mongo

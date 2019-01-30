@@ -1,0 +1,38 @@
+diff --git a/mfbt/double-conversion/double-conversion/utils.h b/mfbt/double-conversion/double-conversion/utils.h
+--- a/mfbt/double-conversion/double-conversion/utils.h
++++ b/mfbt/double-conversion/double-conversion/utils.h
+@@ -93,34 +93,18 @@ inline void abort_noreturn() { abort(); 
+ #endif
+ 
+ #if defined(__GNUC__)
+ #define DOUBLE_CONVERSION_UNUSED __attribute__((unused))
+ #else
+ #define DOUBLE_CONVERSION_UNUSED
+ #endif
+ 
+-#if defined(_WIN32) && !defined(__MINGW32__)
+-
+-typedef signed char int8_t;
+-typedef unsigned char uint8_t;
+-typedef short int16_t;  // NOLINT
+-typedef unsigned short uint16_t;  // NOLINT
+-typedef int int32_t;
+-typedef unsigned int uint32_t;
+-typedef __int64 int64_t;
+-typedef unsigned __int64 uint64_t;
+-// intptr_t and friends are defined in crtdefs.h through stdio.h.
+-
+-#else
+-
+ #include <stdint.h>
+ 
+-#endif
+-
+ typedef uint16_t uc16;
+ 
+ // The following macro works on both 32 and 64-bit platforms.
+ // Usage: instead of writing 0x1234567890123456
+ //      write UINT64_2PART_C(0x12345678,90123456);
+ #define UINT64_2PART_C(a, b) (((static_cast<uint64_t>(a) << 32) + 0x##b##u))
+ 
+ 

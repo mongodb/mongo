@@ -1,0 +1,6 @@
+{
+    "configure-args": "--enable-simulator=arm --target=i686-apple-darwin10.0.0 --host=i686-apple-darwin10.0.0",
+    "optimize": true,
+    "debug": true,
+    "bits": 32
+}

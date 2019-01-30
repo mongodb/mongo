@@ -69,7 +69,7 @@ void DBRefInfo::construct(JSContext* cx, JS::CallArgs args) {
     args.rval().setObjectOrNull(out);
 }
 
-void DBRefInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void DBRefInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     BSONInfo::finalize(fop, obj);
 }
 
@@ -83,9 +83,10 @@ void DBRefInfo::enumerate(JSContext* cx,
 void DBRefInfo::setProperty(JSContext* cx,
                             JS::HandleObject obj,
                             JS::HandleId id,
-                            JS::MutableHandleValue vp,
+                            JS::HandleValue vp,
+                            JS::HandleValue receiver,
                             JS::ObjectOpResult& result) {
-    BSONInfo::setProperty(cx, obj, id, vp, result);
+    BSONInfo::setProperty(cx, obj, id, vp, receiver, result);
 }
 
 void DBRefInfo::delProperty(JSContext* cx,

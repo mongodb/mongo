@@ -31,7 +31,7 @@
 var {ErrorCodes, ErrorCodeStrings} = (function() {
     const handler = {
         get: function(obj, prop) {
-            if (prop !== Symbol.toPrimitive && prop in obj === false && prop in Object === false) {
+            if (typeof prop !== "symbol" && prop in obj === false && prop in Object === false) {
                 throw new Error('Unknown Error Code: ' + prop.toString());
             }
 

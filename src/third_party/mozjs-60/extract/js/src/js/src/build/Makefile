@@ -1,0 +1,110 @@
+# THIS FILE WAS AUTOMATICALLY GENERATED. DO NOT MODIFY BY HAND.
+DEPTH := ../../..
+topobjdir := /home/ec2-user/src/mongo/src/third_party/mozjs-60/mozilla-release/js/src
+topsrcdir := /home/ec2-user/src/mongo/src/third_party/mozjs-60/mozilla-release
+srcdir := /home/ec2-user/src/mongo/src/third_party/mozjs-60/mozilla-release/js/src/build
+VPATH := /home/ec2-user/src/mongo/src/third_party/mozjs-60/mozilla-release/js/src/build
+relativesrcdir := js/src/build
+include $(DEPTH)/config/autoconf.mk
+# -*- Mode: makefile -*-
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Ensure symbol versions of shared library on Linux do not conflict
+# with those in libxul.
+ifeq (Linux,$(OS_TARGET))
+
+symverscript: symverscript.in
+	$(call py_action,preprocessor, \
+		-DVERSION='$(subst -,_,$(LIBRARY_NAME))' $< -o $@)
+
+EXTRA_DEPS += symverscript
+endif
+
+include $(topsrcdir)/config/rules.mk
+
+# check_vanilla_allocations.py is tailored to Linux, so only run it there.
+# That should be enough to catch any problems.
+check-vanilla-allocations:
+	$(PYTHON) $(topsrcdir)/config/check_vanilla_allocations.py $(REAL_LIBRARY)
+
+# The "aggressive" variant will likely fail on some compiler/platform
+# combinations, but is worth running by hand every once in a while.
+check-vanilla-allocations-aggressive:
+	$(PYTHON) $(topsrcdir)/config/check_vanilla_allocations.py --aggressive $(REAL_LIBRARY)
+
+ifeq ($(OS_ARCH),Linux)
+ifeq (,$(filter -flto,$(COMPUTED_CFLAGS) $(COMPUTED_CXXFLAGS) $(COMPUTED_LDFLAGS)))
+check:: check-vanilla-allocations
+endif
+endif
+
+$(LIBRARY_NAME).pc: js.pc
+	cp $^ $@
+
+# Install versioned file, for parallel installability in Linux distributions
+install:: $(LIBRARY_NAME).pc
+	cp $^ $(JS_LIBRARY_NAME).pc
+	$(SYSINSTALL) $(JS_LIBRARY_NAME).pc $(DESTDIR)$(libdir)/pkgconfig
+
+install:: ../js-config.h
+	$(SYSINSTALL) $^ $(DESTDIR)$(includedir)/$(JS_LIBRARY_NAME)
+
+######################################################
+# BEGIN SpiderMonkey header installation
+#
+# Mozilla/Gecko/Firefox mostly doesn't concern itself with defining a sensible
+# install target, because it's shipping primarily packaged builds.  And even if
+# it did, those builds wouldn't really have reason to include header files.  So
+# we have to install public headers ourselves, rather than using something from
+# config/rules.mk or similar.
+#
+# The overall directory structure of the installed headers looks like so:
+#
+#   $(includedir)/
+#      $(JS_LIBRARY_NAME)/
+#        jsapi.h, jspubtd.h, etc. (all of EXPORTS)
+#        js/
+#          js/public/* headers (all are public)
+#        ds/
+#          js/src/ds/* public headers
+#        gc/
+#          js/src/gc/* public headers
+#        mozilla/
+#          mfbt headers
+#
+
+install::
+	$(call py_action,process_install_manifest,--track install_dist_include.track --no-symlinks $(DESTDIR)$(includedir)/$(JS_LIBRARY_NAME) $(DEPTH)/_build_manifests/install/dist_include)
+
+#
+# END SpiderMonkey header installation
+#############################################
+
+# Install versioned script, for parallel installability in Linux distributions
+install:: js-config
+	cp $^ js$(MOZJS_MAJOR_VERSION)-config
+	$(SYSINSTALL) js$(MOZJS_MAJOR_VERSION)-config $(DESTDIR)$(bindir)
+
+# Use install_name_tool to set the install_name properly for standalone
+# installed libraries on macOS
+install:: $(REAL_LIBRARY) $(SHARED_LIBRARY) $(IMPORT_LIBRARY)
+ifneq (,$(REAL_LIBRARY))
+	$(SYSINSTALL) $(REAL_LIBRARY) $(DESTDIR)$(libdir)
+	mv -f $(DESTDIR)$(libdir)/$(REAL_LIBRARY) $(subst $(STATIC_LIBRARY_NAME),$(LIBRARY_NAME),$(DESTDIR)$(libdir)/$(REAL_LIBRARY))
+endif
+ifneq (,$(SHARED_LIBRARY))
+	$(SYSINSTALL) $(SHARED_LIBRARY) $(DESTDIR)$(libdir)
+ifeq ($(OS_ARCH),Darwin)
+	install_name_tool -id $(abspath $(libdir)/$(SHARED_LIBRARY)) $(DESTDIR)$(libdir)/$(SHARED_LIBRARY)
+endif
+endif
+ifneq (,$(IMPORT_LIBRARY))
+ifneq ($(IMPORT_LIBRARY),$(SHARED_LIBRARY))
+	$(SYSINSTALL) $(IMPORT_LIBRARY) $(DESTDIR)$(libdir)
+endif
+endif
+
+include $(topsrcdir)/config/recurse.mk

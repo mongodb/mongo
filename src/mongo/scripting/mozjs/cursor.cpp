@@ -66,7 +66,7 @@ DBClientCursor* getCursor(JS::CallArgs& args) {
 
 }  // namespace
 
-void CursorInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+void CursorInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto cursor = static_cast<CursorInfo::CursorHolder*>(JS_GetPrivate(obj));
 
     if (cursor) {

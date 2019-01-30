@@ -1,0 +1,84 @@
+<html>
+<head>
+  <title>GC uBench</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+  <!-- Include benchmark modules. -->
+  <script>var tests = new Map();</script>
+  <script src="benchmarks/noAllocation.js"></script>
+  <script src="benchmarks/globalArrayNewObject.js"></script>
+  <script src="benchmarks/globalArrayArrayLiteral.js"></script>
+  <script src="benchmarks/globalArrayLargeArray.js"></script>
+  <script src="benchmarks/globalArrayLargeObject.js"></script>
+  <script src="benchmarks/globalArrayObjectLiteral.js"></script>
+  <script src="benchmarks/globalArrayReallocArray.js"></script>
+  <script src="benchmarks/globalArrayBuffer.js"></script>
+  <script src="benchmarks/globalArrayFgFinalized.js"></script>
+  <script src="benchmarks/largeArrayPropertyAndElements.js"></script>
+  <script src="benchmarks/selfCyclicWeakMap.js"></script>
+  <script src="benchmarks/pairCyclicWeakMap.js"></script>
+  <script src="benchmarks/textNodes.js"></script>
+  <script src="benchmarks/bigTextNodes.js"></script>
+  <script src="benchmarks/events.js"></script>
+  <script src="benchmarks/expandoEvents.js"></script>
+  <script src="benchmarks/propertyTreeSplitting.js"></script>
+
+  <script src="harness.js"></script>
+
+</head>
+
+<body onload="onload()" onunload="onunload()">
+
+<canvas id="graph" width="1080" height="400" style="padding-left:10px"></canvas>
+<canvas id="memgraph" width="1080" height="400" style="padding-left:10px"></canvas>
+<div id="memgraph-disabled" style="display: none"><i>No performance.mozMemory object available. Set dom.enable_memory_stats to True to see heap size info.</i></div>
+
+<hr>
+
+<div id='track-sizes-div'>
+  Show heap size graph: <input id='track-sizes' type='checkbox' onclick="trackHeapSizes(this.checked)">
+</div>
+
+<div>
+    <input type="button" id="stop" value="Pause" onclick="stopstart()"></input>
+</div>
+
+<div>
+    Duration: <input type="text" id="test-duration" size="3" value="8" onchange="duration_changed()"></input>s
+    <input type="button" id="test-one" value="Run Test" onclick="run_one_test()"></input>
+    <input type="button" id="test-all" value="Run All Tests" onclick="run_all_tests()"></input>
+</div>
+
+<div>
+    Currently running test load:
+    <select id="test-selection" required onchange="test_changed()"></select>
+</div>
+
+<div>
+    &nbsp;&nbsp;&nbsp;&nbsp;Time remaining: <span id="test-progress">(not running)</span>
+</div
+
+<div>
+    &nbsp;&nbsp;&nbsp;&nbsp;60 fps: <span id="pct60">n/a</span>
+    &nbsp;&nbsp;&nbsp;&nbsp;45 fps: <span id="pct45">n/a</span>
+    &nbsp;&nbsp;&nbsp;&nbsp;30 fps: <span id="pct30">n/a</span>
+</div
+
+<div>
+    &nbsp;&nbsp;&nbsp;&nbsp;Garbage items per frame:
+    <input type="text" id="garbage-per-frame" size="5" value="8K"
+           onchange="garbage_per_frame_changed()"></input>
+</div>
+<div>
+    &nbsp;&nbsp;&nbsp;&nbsp;Garbage piles:
+    <input type="text" id="garbage-total" size="5" value="8M"
+           onchange="garbage_total_changed()"></input>
+</div>
+
+<div id="results-Area">
+    Test Results:
+    <div id="results-display" style="padding-left: 10px; border: 1px solid black;"></div>
+</div>
+
+</body>
+</html>
