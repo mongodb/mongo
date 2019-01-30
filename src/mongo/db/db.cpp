@@ -77,7 +77,6 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/initialize_server_security_state.h"
 #include "mongo/db/initialize_snmp.h"
@@ -532,8 +531,6 @@ ExitCode _initAndListen(int listenPort) {
         startMongoDFTDC();
 
         startFreeMonitoring(serviceContext);
-
-        restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.

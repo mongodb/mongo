@@ -996,7 +996,6 @@ env.Library(
     source=[
         "index_builder.cpp",
         "index_legacy.cpp",
-        "index_rebuilder.cpp",
     ],
     LIBDEPS=[
         'db_raii',
