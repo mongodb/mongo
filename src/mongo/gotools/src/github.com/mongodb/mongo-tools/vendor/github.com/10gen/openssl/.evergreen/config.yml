@@ -210,17 +210,6 @@ buildvariants:
 #     SUSE Buildvariants              #
 #######################################
 
-- name: suse11
-  display_name: SUSE 11 (Go 1.8)
-  run_on:
-  - suse11-test
-  expansions:
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
-    build_tags: "openssl_pre_1.0"
-  tasks:
-  - name: build
-  - name: test
-
 - name: suse12
   display_name: SUSE 12 (Go 1.8)
   run_on:

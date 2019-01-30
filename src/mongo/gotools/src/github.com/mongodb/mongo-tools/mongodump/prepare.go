@@ -135,10 +135,10 @@ func (f *stdoutFile) Close() error {
 	return nil
 }
 
-// isReservedSystemNamespace returns true when a namespace (database +
+// shouldSkipSystemNamespace returns true when a namespace (database +
 // collection name) match certain reserved system namespaces that must
 // not be dumped.
-func (dump *MongoDump) isReservedSystemNamespace(dbName, collName string) bool {
+func shouldSkipSystemNamespace(dbName, collName string) bool {
 	// ignore <db>.system.* except for admin; ignore other specific
 	// collections in config and admin databases used for 3.6 features.
 	switch dbName {
@@ -151,6 +151,9 @@ func (dump *MongoDump) isReservedSystemNamespace(dbName, collName string) bool {
 			return true
 		}
 	default:
+		if collName == "system.js" {
+			return false
+		}
 		if strings.HasPrefix(collName, "system.") {
 			return true
 		}
@@ -383,7 +386,7 @@ func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 			}
 			collInfo.Name = collName
 		}
-		if dump.isReservedSystemNamespace(dbName, collInfo.Name) {
+		if shouldSkipSystemNamespace(dbName, collInfo.Name) {
 			log.Logvf(log.DebugHigh, "will not dump system collection '%s.%s'", dbName, collInfo.Name)
 			continue
 		}

@@ -335,6 +335,26 @@ func (imp *MongoImport) ImportDocuments() (uint64, error) {
 	return imp.importDocuments(inputReader)
 }
 
+func (imp *MongoImport) getTargetConnection() (connURL string, err error) {
+	connURL = util.DefaultHost
+	if imp.ToolOptions.Host != "" {
+		connURL = imp.ToolOptions.Host
+	} else if imp.ToolOptions.URI.ConnectionString != "" {
+		connURL = strings.Join(imp.ToolOptions.URI.GetConnectionAddrs(), ",")
+		if connURL == "" {
+			return connURL, fmt.Errorf("error parsing connection string from URI")
+		}
+		if imp.ToolOptions.URI.ParsedConnString().ReplicaSet != "" {
+			connURL = imp.ToolOptions.URI.ParsedConnString().ReplicaSet +
+				"/" + connURL
+		}
+	}
+	if imp.ToolOptions.Port != "" {
+		connURL = connURL + ":" + imp.ToolOptions.Port
+	}
+	return connURL, nil
+}
+
 // importDocuments is a helper to ImportDocuments and does all the ingestion
 // work by taking data from the inputReader source and writing it to the
 // appropriate namespace
@@ -345,13 +365,11 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 	}
 	defer session.Close()
 
-	connURL := imp.ToolOptions.Host
-	if connURL == "" {
-		connURL = util.DefaultHost
+	connURL, err := imp.getTargetConnection()
+	if err != nil {
+		return 0, err
 	}
-	if imp.ToolOptions.Port != "" {
-		connURL = connURL + ":" + imp.ToolOptions.Port
-	}
+
 	log.Logvf(log.Always, "connected to: %v", connURL)
 
 	log.Logvf(log.Info, "ns: %v.%v",

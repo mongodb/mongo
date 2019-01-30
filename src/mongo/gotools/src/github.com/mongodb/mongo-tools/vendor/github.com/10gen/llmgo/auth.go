@@ -241,14 +241,12 @@ func (socket *MongoSocket) loginClassic(cred Credential) error {
 	// Note that this only works properly because this function is
 	// synchronous, which means the nonce won't get reset while we're
 	// using it and any other login requests will block waiting for a
-	// new nonce provided in the defer call below.
 	// new nonce.
 	socket.resetNonce()
 	nonce, err := socket.getNonce()
 	if err != nil {
 		return err
 	}
-	defer socket.resetNonce()
 
 	psum := md5.New()
 	psum.Write([]byte(cred.Username + ":mongo:" + cred.Password))

@@ -1,7 +1,8 @@
 package openssl
 
 import (
-	"errors"
+	"fmt"
+	"runtime"
 	"unsafe"
 )
 
@@ -19,11 +20,13 @@ extern int _setupSystemCA(SSL_CTX* context, char * err, size_t err_len);
 import "C"
 
 func (c *Ctx) SetupSystemCA() error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	err_buf := make([]byte, 1024, 1024)
 	cstr := (*C.char)(unsafe.Pointer(&err_buf[0]))
 	r := C._setupSystemCA(c.ctx, cstr, 1024)
 	if r == 1 {
 		return nil
 	}
-	return errors.New(string(err_buf))
+	return fmt.Errorf("%s: %v", string(err_buf), errorFromErrorQueue())
 }
