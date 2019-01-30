@@ -91,10 +91,6 @@ public:
             static_cast<ClockSourceMock*>(_opCtx->getServiceContext()->getPreciseClockSource());
     }
 
-    virtual ~CursorManagerTest() {
-        useCursorManager()->invalidateAll(_opCtx.get(), true, "end of test");
-    }
-
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor() {
         return makeFakePlanExecutor(_opCtx.get());
     }
@@ -128,7 +124,7 @@ public:
     }
 
     CursorManager* useCursorManager() {
-        return CursorManager::getGlobalCursorManager();
+        return &_cursorManager;
     }
 
 protected:
@@ -137,6 +133,7 @@ protected:
 
 private:
     ClockSourceMock* _clock;
+    CursorManager _cursorManager;
 };
 
 class CursorManagerTestCustomOpCtx : public CursorManagerTest {
@@ -161,101 +158,6 @@ TEST_F(CursorManagerTest, GlobalCursorManagerShouldReportOwnershipOfCursorsItCre
              ClientCursorParams::LockPolicy::kLocksInternally});
         ASSERT_TRUE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
     }
-}
-
-/**
- * Tests that invalidating a cursor without dropping the collection while the cursor is not in use
- * will keep the cursor registered. After being invalidated, pinning the cursor should take
- * ownership of the cursor and calling getNext() on its PlanExecutor should return an error
- * including the error message.
- */
-TEST_F(CursorManagerTest, InvalidateCursor) {
-    CursorManager* cursorManager = useCursorManager();
-    auto cursorPin = cursorManager->registerCursor(
-        _opCtx.get(),
-        {makeFakePlanExecutor(),
-         kTestNss,
-         {},
-         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
-
-    auto cursorId = cursorPin.getCursor()->cursorid();
-    cursorPin.release();
-
-    ASSERT_EQUALS(1U, cursorManager->numCursors());
-    auto invalidateReason = "Invalidate Test";
-    const bool collectionGoingAway = false;
-    cursorManager->invalidateAll(_opCtx.get(), collectionGoingAway, invalidateReason);
-    // Since the collection is not going away, the cursor should remain open, but be killed.
-    ASSERT_EQUALS(1U, cursorManager->numCursors());
-
-    // Pinning a killed cursor should result in an error and clean up the cursor.
-    ASSERT_EQ(ErrorCodes::QueryPlanKilled,
-              cursorManager->pinCursor(_opCtx.get(), cursorId).getStatus());
-    ASSERT_EQUALS(0U, cursorManager->numCursors());
-}
-
-/**
- * Tests that invalidating a cursor and dropping the collection while the cursor is not in use will
- * not keep the cursor registered.
- */
-TEST_F(CursorManagerTest, InvalidateCursorWithDrop) {
-    CursorManager* cursorManager = useCursorManager();
-
-    auto cursorPin = cursorManager->registerCursor(
-        _opCtx.get(),
-        {makeFakePlanExecutor(),
-         kTestNss,
-         {},
-         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
-
-    auto cursorId = cursorPin.getCursor()->cursorid();
-    cursorPin.release();
-
-    ASSERT_EQUALS(1U, cursorManager->numCursors());
-    auto invalidateReason = "Invalidate Test";
-    const bool collectionGoingAway = true;
-    cursorManager->invalidateAll(_opCtx.get(), collectionGoingAway, invalidateReason);
-    // Since the collection is going away, the cursor should not remain open.
-    ASSERT_EQ(ErrorCodes::CursorNotFound,
-              cursorManager->pinCursor(_opCtx.get(), cursorId).getStatus());
-    ASSERT_EQUALS(0U, cursorManager->numCursors());
-}
-
-/**
- * Tests that invalidating a cursor while it is in use will deregister it from the cursor manager,
- * transferring ownership to the pinned cursor.
- */
-TEST_F(CursorManagerTest, InvalidatePinnedCursor) {
-    CursorManager* cursorManager = useCursorManager();
-
-    auto cursorPin = cursorManager->registerCursor(
-        _opCtx.get(),
-        {makeFakePlanExecutor(),
-         kTestNss,
-         {},
-         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
-    auto cursorFreer = makeGuard([&] { cursorPin.deleteUnderlying(); });
-
-    // If the cursor is pinned, it sticks around, even after invalidation.
-    ASSERT_EQUALS(1U, cursorManager->numCursors());
-    const std::string invalidateReason("InvalidatePinned Test");
-    cursorManager->invalidateAll(_opCtx.get(), false, invalidateReason);
-    ASSERT_EQUALS(0U, cursorManager->numCursors());
-
-    // The invalidation should have killed the plan executor.
-    BSONObj objOut;
-    ASSERT_EQUALS(PlanExecutor::DEAD, cursorPin.getCursor()->getExecutor()->getNext(&objOut, NULL));
-    ASSERT(WorkingSetCommon::isValidStatusMemberObject(objOut));
-    const Status status = WorkingSetCommon::getMemberObjectStatus(objOut);
-    ASSERT(status.reason().find(invalidateReason) != std::string::npos);
-
-    ASSERT_EQUALS(0U, cursorManager->numCursors());
 }
 
 /**
@@ -374,13 +276,46 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
 }
 
 /**
+ * A cursor can be left in the CursorManager in a killed state when a pinned cursor is interrupted
+ * with an unusual error code (a code other than ErrorCodes::Interrupted or
+ * ErrorCodes::CursorKilled). Verify that such cursors get deregistered and deleted on an attempt to
+ * pin.
+ */
+TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
+    CursorManager* cursorManager = useCursorManager();
+
+    auto cursorPin = cursorManager->registerCursor(
+        _opCtx.get(),
+        {makeFakePlanExecutor(),
+         NamespaceString{"test.collection"},
+         {},
+         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+         BSONObj(),
+         ClientCursorParams::LockPolicy::kLocksInternally});
+    auto cursorId = cursorPin->cursorid();
+
+    // A cursor will stay alive, but be marked as killed, if it is interrupted with a code other
+    // than ErrorCodes::Interrupted or ErrorCodes::CursorKilled and then unpinned.
+    _opCtx->markKilled(ErrorCodes::InternalError);
+    cursorPin.release();
+
+    // The cursor should still be present in the manager.
+    ASSERT_EQ(1UL, cursorManager->numCursors());
+
+    // Pinning the cursor should fail with the same error code that interrupted the OpCtx. The
+    // cursor should no longer be present in the manager.
+    ASSERT_EQ(cursorManager->pinCursor(_opCtx.get(), cursorId).getStatus(),
+              ErrorCodes::InternalError);
+    ASSERT_EQ(0UL, cursorManager->numCursors());
+}
+
+/**
  * Test that client cursors which have been marked as killed time out and get deleted.
  */
 TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
     CursorManager* cursorManager = useCursorManager();
     auto clock = useClock();
 
-    // Make a cursor from the plan executor, and immediately kill it.
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
@@ -389,44 +324,19 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
          repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
          BSONObj(),
          ClientCursorParams::LockPolicy::kLocksInternally});
+
+    // A cursor will stay alive, but be marked as killed, if it is interrupted with a code other
+    // than ErrorCodes::Interrupted or ErrorCodes::CursorKilled and then unpinned.
+    _opCtx->markKilled(ErrorCodes::InternalError);
     cursorPin.release();
-    const bool collectionGoingAway = false;
-    cursorManager->invalidateAll(
-        _opCtx.get(), collectionGoingAway, "KilledCursorsShouldTimeoutTest");
 
-    // Advance the clock to simulate time passing.
+    // The cursor should still be present in the manager.
+    ASSERT_EQ(1UL, cursorManager->numCursors());
+
+    // Advance the clock to simulate time passing, and verify that the cursor times out.
     clock->advance(getDefaultCursorTimeoutMillis());
-
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
-}
-
-/**
- * Test that client cursors which have been marked as killed but are still pinned *do not* time out.
- */
-TEST_F(CursorManagerTest, InactiveKilledCursorsThatAreStillPinnedShouldNotTimeout) {
-    CursorManager* cursorManager = useCursorManager();
-    auto clock = useClock();
-
-    // Make a cursor from the plan executor, and immediately kill it.
-    auto cursorPin = cursorManager->registerCursor(
-        _opCtx.get(),
-        {makeFakePlanExecutor(),
-         NamespaceString{"test.collection"},
-         {},
-         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-         BSONObj(),
-         ClientCursorParams::LockPolicy::kLocksInternally});
-    auto cursorFreer = makeGuard([&] { cursorPin.deleteUnderlying(); });
-    const bool collectionGoingAway = false;
-    cursorManager->invalidateAll(
-        _opCtx.get(), collectionGoingAway, "KilledCursorsShouldTimeoutTest");
-
-    // Advance the clock to simulate time passing.
-    clock->advance(getDefaultCursorTimeoutMillis());
-
-    // The pin is still in scope, so it should not time out.
-    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
 }
 
 /**

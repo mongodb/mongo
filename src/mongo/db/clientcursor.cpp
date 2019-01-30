@@ -157,8 +157,10 @@ GenericCursor ClientCursor::toGenericCursor() const {
 // Pin methods
 //
 
-ClientCursorPin::ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor)
-    : _opCtx(opCtx), _cursor(cursor) {
+ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
+                                 ClientCursor* cursor,
+                                 CursorManager* cursorManager)
+    : _opCtx(opCtx), _cursor(cursor), _cursorManager(cursorManager) {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(!_cursor->_disposed);
@@ -171,7 +173,7 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor)
 }
 
 ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
-    : _opCtx(other._opCtx), _cursor(other._cursor) {
+    : _opCtx(other._opCtx), _cursor(other._cursor), _cursorManager(other._cursorManager) {
     // The pinned cursor is being transferred to us from another pin. The 'other' pin must have a
     // pinned cursor.
     invariant(other._cursor);
@@ -180,6 +182,7 @@ ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
     // Be sure to set the 'other' pin's cursor to null in order to transfer ownership to ourself.
     other._cursor = nullptr;
     other._opCtx = nullptr;
+    other._cursorManager = nullptr;
 }
 
 ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
@@ -202,6 +205,9 @@ ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
     _opCtx = other._opCtx;
     other._opCtx = nullptr;
 
+    _cursorManager = other._cursorManager;
+    other._cursorManager = nullptr;
+
     return *this;
 }
 
@@ -214,11 +220,11 @@ void ClientCursorPin::release() {
         return;
 
     invariant(_cursor->_operationUsingCursor);
+    invariant(_cursorManager);
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
     // manager must acquire the appropriate mutex in order to safely perform the unpin operation.
-    CursorManager::getGlobalCursorManager()->unpin(
-        _opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
+    _cursorManager->unpin(_opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
     cursorStatsOpenPinned.decrement();
 
     _cursor = nullptr;
@@ -227,6 +233,7 @@ void ClientCursorPin::release() {
 void ClientCursorPin::deleteUnderlying() {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
+    invariant(_cursorManager);
     // Note the following subtleties of this method's implementation:
     // - We must unpin the cursor (by clearing the '_operationUsingCursor' field) before
     //   destruction, since it is an error to delete a pinned cursor.
@@ -236,7 +243,7 @@ void ClientCursorPin::deleteUnderlying() {
     //   access '_cursor', meaning that it is safe for us to write to '_operationUsingCursor'
     //   without holding the CursorManager mutex.
 
-    CursorManager::getGlobalCursorManager()->deregisterCursor(_cursor);
+    _cursorManager->deregisterCursor(_cursor);
 
     // Make sure the cursor is disposed and unpinned before being destroyed.
     _cursor->dispose(_opCtx);

@@ -44,6 +44,7 @@
 namespace mongo {
 
 class Collection;
+class CursorManager;
 class RecoveryUnit;
 
 /**
@@ -481,10 +482,11 @@ public:
 private:
     friend class CursorManager;
 
-    ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor);
+    ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor, CursorManager* cursorManager);
 
     OperationContext* _opCtx = nullptr;
     ClientCursor* _cursor = nullptr;
+    CursorManager* _cursorManager = nullptr;
 };
 
 void startClientCursorMonitor();

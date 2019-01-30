@@ -308,53 +308,14 @@ CursorManager::CursorManager()
       _cursorMap(stdx::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
 
 CursorManager::~CursorManager() {
-    // All cursors should have been deleted already.
-    invariant(_cursorMap->empty());
-
-    if (!isGlobalManager()) {
-        globalCursorIdCache->deregisterCursorManager(_collectionCacheRuntimeId, _nss);
-    }
-}
-
-void CursorManager::invalidateAll(OperationContext* opCtx,
-                                  bool collectionGoingAway,
-                                  const std::string& reason) {
-    dassert(isGlobalManager() || opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-    fassert(28819, !BackgroundOperation::inProgForNs(_nss));
-
-    // Mark all cursors as killed, but keep around those we can in order to provide a useful error
-    // message to the user when they attempt to use it next time.
-    std::vector<std::unique_ptr<ClientCursor, ClientCursor::Deleter>> toDisposeWithoutMutex;
-    {
-        auto allCurrentPartitions = _cursorMap->lockAllPartitions();
-        for (auto&& partition : allCurrentPartitions) {
-            for (auto it = partition.begin(); it != partition.end();) {
-                auto* cursor = it->second;
-                cursor->markAsKilled({ErrorCodes::QueryPlanKilled, reason});
-
-                // If there's an operation actively using the cursor, then that operation is now
-                // responsible for cleaning it up.  Otherwise we can immediately dispose of it.
-                if (cursor->_operationUsingCursor) {
-                    partition.erase(it++);
-                    continue;
-                }
-
-                if (!collectionGoingAway) {
-                    // We keep around unpinned cursors so that future attempts to use the cursor
-                    // will result in a useful error message.
-                    ++it;
-                } else {
-                    toDisposeWithoutMutex.emplace_back(cursor);
-                    partition.erase(it++);
-                }
-            }
+    auto allPartitions = _cursorMap->lockAllPartitions();
+    for (auto&& partition : allPartitions) {
+        for (auto&& cursor : partition) {
+            // Callers must ensure that no cursors are in use.
+            invariant(!cursor.second->_operationUsingCursor);
+            cursor.second->dispose(nullptr);
+            delete cursor.second;
         }
-    }
-
-    // Dispose of the cursors we can now delete. This might involve lock acquisitions for safe
-    // cleanup, so avoid doing it while holding mutexes.
-    for (auto&& cursor : toDisposeWithoutMutex) {
-        cursor->dispose(opCtx);
     }
 }
 
@@ -431,7 +392,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
         }
     }
 
-    return ClientCursorPin(opCtx, cursor);
+    return ClientCursorPin(opCtx, cursor, this);
 }
 
 void CursorManager::unpin(OperationContext* opCtx,
@@ -576,7 +537,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
     auto partition = _cursorMap->lockOnePartition(cursorId);
     ClientCursor* unownedCursor = clientCursor.release();
     partition->emplace(cursorId, unownedCursor);
-    return ClientCursorPin(opCtx, unownedCursor);
+    return ClientCursorPin(opCtx, unownedCursor, this);
 }
 
 void CursorManager::deregisterCursor(ClientCursor* cursor) {

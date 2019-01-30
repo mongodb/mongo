@@ -137,16 +137,11 @@ public:
 
     CursorManager();
 
-    ~CursorManager();
-
     /**
-     * This method is deprecated. Do not add new call sites.
-     *
-     * TODO SERVER-38288: Delete this method.
+     * Destroys the cursor manager, deleting all managed cursors. Illegal to call if any managed
+     * cursor is pinned.
      */
-    void invalidateAll(OperationContext* opCtx,
-                       bool collectionGoingAway,
-                       const std::string& reason);
+    ~CursorManager();
 
     /**
      * Destroys cursors that have been inactive for too long.

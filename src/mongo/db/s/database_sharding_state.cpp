@@ -51,9 +51,6 @@ DatabaseShardingState::DatabaseShardingState() = default;
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase();
-    // TODO (SERVER-33313): call CursorManager::invalidateAll() on all collections in this database
-    // with 'fromMovePrimary=true' and a predicate to only invalidate the cursor if the opCtx on its
-    // PlanExecutor has a client dbVersion.
 }
 
 void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx) {
