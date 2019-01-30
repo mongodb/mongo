@@ -258,9 +258,6 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_ForMapReduce_WithInitialSp
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
-        // TODO: can we mock the ShardRegistry to return these?
-        set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
-
         ThreadClient tc("Test", getServiceContext());
         auto opCtx = cc().makeOperationContext();
         ShardingCatalogManager::get(operationContext())
