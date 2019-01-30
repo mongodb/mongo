@@ -5653,6 +5653,18 @@ tasks:
       resmoke_args: --suites=parallel --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
+- name: parallel_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: parallel
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
+      resmoke_jobs_max: 1
+
 - <<: *task_template
   name: parallel_compatibility
   depends_on:
@@ -6313,6 +6325,17 @@ tasks:
     vars:
       resmoke_args: --suites=logical_session_cache_sharding_default_refresh_jscore_passthrough --storageEngine=wiredTiger
 
+- name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: logical_session_cache_sharding_default_refresh_jscore_passthrough
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
+
 - <<: *task_template
   name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
   depends_on:
@@ -6322,6 +6345,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_sharding_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
+
+- name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
 
 - <<: *task_template
   name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
@@ -6354,6 +6388,17 @@ tasks:
     vars:
       resmoke_args: --suites=logical_session_cache_sharding_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
 
+- name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
+
 - <<: *task_template
   name: logical_session_cache_standalone_default_refresh_jscore_passthrough
   depends_on:
@@ -6364,6 +6409,17 @@ tasks:
     vars:
       resmoke_args: --suites=logical_session_cache_standalone_default_refresh_jscore_passthrough --storageEngine=wiredTiger
 
+- name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: logical_session_cache_standalone_default_refresh_jscore_passthrough
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
+
 - <<: *task_template
   name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
   depends_on:
@@ -6373,6 +6429,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_standalone_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
+
+- name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
 
 - <<: *task_template
   name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
@@ -6404,6 +6471,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=logical_session_cache_standalone_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
+
+- name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
+      depends_on: jsCore
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
 
 - <<: *task_template
   name: retryable_writes_jscore_stepdown_passthrough
@@ -7384,6 +7462,10 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off
     test_flags: --repeat=10 --shuffle
+    resmoke_repeat_suites: 10
+    # TODO: There are currently 2 ways of repeating suites, one for regular suites and one for
+    # generated suites. Once everything is converted to generated suites, we should remove the
+    # '--repeat=10' from the test_flags. This will be done in SERVER-38817.
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: true
@@ -7399,19 +7481,19 @@ buildvariants:
   - name: integration_tests_sharded
   - name: jsCore
   - name: jsCore_txns
-  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_default_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
-  - name: parallel
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
+  - name: parallel_gen
   - name: concurrency
   - name: concurrency_replication
     distros:
