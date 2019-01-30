@@ -157,7 +157,7 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(const UUID& buildUUID,
 
 Status IndexBuildsCoordinatorMongod::setCommitQuorum(const NamespaceString& nss,
                                                      const std::vector<StringData>& indexNames,
-                                                     const WriteConcernOptions& newCommitQuorum) {
+                                                     const CommitQuorumOptions& newCommitQuorum) {
     // TODO: not yet implemented.
     return Status::OK();
 }

@@ -35,6 +35,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/collection_index_builds_tracker.h"
 #include "mongo/db/database_index_builds_tracker.h"
@@ -207,7 +208,7 @@ public:
      */
     virtual Status setCommitQuorum(const NamespaceString& nss,
                                    const std::vector<StringData>& indexNames,
-                                   const WriteConcernOptions& newCommitQuorum) = 0;
+                                   const CommitQuorumOptions& newCommitQuorum) = 0;
 
     /**
      * TODO: This is not yet implemented.

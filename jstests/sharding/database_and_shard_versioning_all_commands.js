@@ -397,7 +397,7 @@
             command: {
                 setIndexCommitQuorum: collName,
                 indexNames: ["index"],
-                commitQuorum: {w: "majority"}
+                commitQuorum: {commitQuorum: "majority"}
             },
             cleanUp: function(mongosConn) {
                 assert(mongosConn.getDB(dbName).getCollection(collName).drop());

@@ -300,6 +300,7 @@ env.Library(
         env.Idlc('set_index_commit_quorum.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
@@ -352,6 +353,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_control',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/commands',
