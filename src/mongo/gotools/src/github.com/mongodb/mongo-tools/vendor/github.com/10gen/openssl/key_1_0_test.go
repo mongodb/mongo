@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +build !openssl_pre_1.0
+
 package openssl
 
 import (
 	"bytes"
-	"crypto/rsa"
+	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
@@ -25,17 +27,21 @@ import (
 	"testing"
 )
 
-func TestMarshal(t *testing.T) {
-	key, err := LoadPrivateKeyFromPEM(keyBytes)
+func TestMarshalEC(t *testing.T) {
+	if !HasECDH() {
+		t.Skip("ECDH not available")
+	}
+
+	key, err := LoadPrivateKeyFromPEM(prime256v1KeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cert, err := LoadCertificateFromPEM(certBytes)
+	cert, err := LoadCertificateFromPEM(prime256v1CertBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	privateBlock, _ := pem_pkg.Decode(keyBytes)
+	privateBlock, _ := pem_pkg.Decode(prime256v1KeyBytes)
 	key, err = LoadPrivateKeyFromDER(privateBlock.Bytes)
 	if err != nil {
 		t.Fatal(err)
@@ -45,9 +51,9 @@ func TestMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(pem, certBytes) {
+	if !bytes.Equal(pem, prime256v1CertBytes) {
 		ioutil.WriteFile("generated", pem, 0644)
-		ioutil.WriteFile("hardcoded", certBytes, 0644)
+		ioutil.WriteFile("hardcoded", prime256v1CertBytes, 0644)
 		t.Fatal("invalid cert pem bytes")
 	}
 
@@ -55,16 +61,16 @@ func TestMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(pem, keyBytes) {
+	if !bytes.Equal(pem, prime256v1KeyBytes) {
 		ioutil.WriteFile("generated", pem, 0644)
-		ioutil.WriteFile("hardcoded", keyBytes, 0644)
+		ioutil.WriteFile("hardcoded", prime256v1KeyBytes, 0644)
 		t.Fatal("invalid private key pem bytes")
 	}
-	tls_cert, err := tls.X509KeyPair(certBytes, keyBytes)
+	tls_cert, err := tls.X509KeyPair(prime256v1CertBytes, prime256v1KeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tls_key, ok := tls_cert.PrivateKey.(*rsa.PrivateKey)
+	tls_key, ok := tls_cert.PrivateKey.(*ecdsa.PrivateKey)
 	if !ok {
 		t.Fatal("FASDFASDF")
 	}
@@ -74,7 +80,10 @@ func TestMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tls_der := x509.MarshalPKCS1PrivateKey(tls_key)
+	tls_der, err := x509.MarshalECPrivateKey(tls_key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Equal(der, tls_der) {
 		t.Fatalf("invalid private key der bytes: %s\n v.s. %s\n",
 			hex.Dump(der), hex.Dump(tls_der))
@@ -136,41 +145,5 @@ func TestMarshal(t *testing.T) {
 		ioutil.WriteFile("generated", []byte(hex.Dump(new_der_from_pem)), 0644)
 		ioutil.WriteFile("hardcoded", []byte(hex.Dump(tls_der)), 0644)
 		t.Fatal("invalid public key der bytes")
-	}
-}
-
-func TestGenerate(t *testing.T) {
-	key, err := GenerateRSAKey(2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = key.MarshalPKIXPublicKeyPEM()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = key.MarshalPKCS1PrivateKeyPEM()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = GenerateRSAKeyWithExponent(1024, 65537)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSign(t *testing.T) {
-	key, _ := GenerateRSAKey(1024)
-	data := []byte("the quick brown fox jumps over the lazy dog")
-	_, err := key.SignPKCS1v15(SHA1_Method, data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = key.SignPKCS1v15(SHA256_Method, data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = key.SignPKCS1v15(SHA512_Method, data)
-	if err != nil {
-		t.Fatal(err)
 	}
 }

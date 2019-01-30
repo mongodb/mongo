@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Space Monkey, Inc.
+// Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,30 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build cgo
-
 package openssl
 
-/*
-#include <openssl/crypto.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#include <openssl/conf.h>
-
-static long SSL_set_options_not_a_macro(SSL* ssl, long options) {
-   return SSL_set_options(ssl, options);
-}
-
-static long SSL_get_options_not_a_macro(SSL* ssl) {
-   return SSL_get_options(ssl);
-}
-
-static long SSL_clear_options_not_a_macro(SSL* ssl, long options) {
-   return SSL_clear_options(ssl, options);
-}
-
-extern int verify_ssl_cb(int ok, X509_STORE_CTX* store);
-*/
+// #include "shim.h"
 import "C"
 
 import (
@@ -53,7 +32,7 @@ const (
 )
 
 var (
-	ssl_idx = C.SSL_get_ex_new_index(0, nil, nil, nil, nil)
+	ssl_idx = C.X_SSL_new_index()
 )
 
 //export get_ssl_idx
@@ -66,8 +45,8 @@ type SSL struct {
 	verify_cb VerifyCallback
 }
 
-//export verify_ssl_cb_thunk
-func verify_ssl_cb_thunk(p unsafe.Pointer, ok C.int, ctx *C.X509_STORE_CTX) C.int {
+//export go_ssl_verify_cb_thunk
+func go_ssl_verify_cb_thunk(p unsafe.Pointer, ok C.int, ctx *C.X509_STORE_CTX) C.int {
 	defer func() {
 		if err := recover(); err != nil {
 			logger.Critf("openssl: verify callback panic'd: %v", err)
@@ -96,19 +75,19 @@ func (s *SSL) GetServername() string {
 // GetOptions returns SSL options. See
 // https://www.openssl.org/docs/ssl/SSL_CTX_set_options.html
 func (s *SSL) GetOptions() Options {
-	return Options(C.SSL_get_options_not_a_macro(s.ssl))
+	return Options(C.X_SSL_get_options(s.ssl))
 }
 
 // SetOptions sets SSL options. See
 // https://www.openssl.org/docs/ssl/SSL_CTX_set_options.html
 func (s *SSL) SetOptions(options Options) Options {
-	return Options(C.SSL_set_options_not_a_macro(s.ssl, C.long(options)))
+	return Options(C.X_SSL_set_options(s.ssl, C.long(options)))
 }
 
 // ClearOptions clear SSL options. See
 // https://www.openssl.org/docs/ssl/SSL_CTX_set_options.html
 func (s *SSL) ClearOptions(options Options) Options {
-	return Options(C.SSL_clear_options_not_a_macro(s.ssl, C.long(options)))
+	return Options(C.X_SSL_clear_options(s.ssl, C.long(options)))
 }
 
 // SetVerify controls peer verification settings. See
@@ -116,7 +95,7 @@ func (s *SSL) ClearOptions(options Options) Options {
 func (s *SSL) SetVerify(options VerifyOptions, verify_cb VerifyCallback) {
 	s.verify_cb = verify_cb
 	if verify_cb != nil {
-		C.SSL_set_verify(s.ssl, C.int(options), (*[0]byte)(C.verify_ssl_cb))
+		C.SSL_set_verify(s.ssl, C.int(options), (*[0]byte)(C.X_SSL_verify_cb))
 	} else {
 		C.SSL_set_verify(s.ssl, C.int(options), nil)
 	}
@@ -131,7 +110,7 @@ func (s *SSL) SetVerifyMode(options VerifyOptions) {
 // SetVerifyCallback controls peer verification setting. See
 // http://www.openssl.org/docs/ssl/SSL_CTX_set_verify.html
 func (s *SSL) SetVerifyCallback(verify_cb VerifyCallback) {
-	s.SetVerify(s.VerifyMode(), s.verify_cb)
+	s.SetVerify(s.VerifyMode(), verify_cb)
 }
 
 // GetVerifyCallback returns callback function. See

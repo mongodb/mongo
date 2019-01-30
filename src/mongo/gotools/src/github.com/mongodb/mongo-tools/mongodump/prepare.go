@@ -338,8 +338,8 @@ func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 
 	collInfo := &db.CollectionInfo{}
 	for colsIter.Next(collInfo) {
-		// ignore <db>.system.* except for admin
-		if dbName != "admin" && strings.HasPrefix(collInfo.Name, "system.") {
+		// ignore <db>.system.* except for admin and <db>.system.js
+		if dbName != "admin" && collInfo.Name != "system.js" && strings.HasPrefix(collInfo.Name, "system.") {
 			log.Logvf(log.DebugHigh, "will not dump system collection '%s.%s'", dbName, collInfo.Name)
 			continue
 		}

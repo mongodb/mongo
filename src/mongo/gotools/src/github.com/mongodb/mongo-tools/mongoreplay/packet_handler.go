@@ -55,7 +55,7 @@ func (p *PacketHandler) Handle(streamHandler StreamHandler, numToHandle int) err
 	count := int64(0)
 	start := time.Now()
 	if p.Verbose && numToHandle > 0 {
-		userInfoLogger.Logvf(Always, "Processing", numToHandle, "packets")
+		userInfoLogger.Logvf(Always, "Processing %v %v", numToHandle, "packets")
 	}
 	source := gopacket.NewPacketSource(p.pcap, p.pcap.LinkType())
 	streamPool := NewStreamPool(streamHandler)

@@ -12,12 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +build !openssl_pre_1.0
+
 package openssl
 
-import "fmt"
+import (
+	"bytes"
+	"testing"
+)
 
-// We can implemant SNI rfc6066 (http://tools.ietf.org/html/rfc6066) on the server side using foolowing callback.
-// You should implement context storage (tlsCtxStorage) by your self.
-func ExampleSetTLSExtServernameCallback() {
-	fmt.Println("Hello")
+func TestECDH(t *testing.T) {
+	t.Parallel()
+	if !HasECDH() {
+		t.Skip("ECDH not available")
+	}
+
+	myKey, err := GenerateECKey(Prime256v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peerKey, err := GenerateECKey(Prime256v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mySecret, err := DeriveSharedSecret(myKey, peerKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	theirSecret, err := DeriveSharedSecret(peerKey, myKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if bytes.Compare(mySecret, theirSecret) != 0 {
+		t.Fatal("shared secrets are different")
+	}
 }

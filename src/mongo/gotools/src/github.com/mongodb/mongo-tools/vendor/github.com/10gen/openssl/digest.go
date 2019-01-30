@@ -1,4 +1,4 @@
-// Copyright (C) 2015 Space Monkey, Inc.
+// Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build cgo
-
 package openssl
 
-// #include <openssl/evp.h>
+// #include "shim.h"
 import "C"
 
 import (
@@ -34,7 +32,7 @@ type Digest struct {
 func GetDigestByName(name string) (*Digest, error) {
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
-	p := C.EVP_get_digestbyname(cname)
+	p := C.X_EVP_get_digestbyname(cname)
 	if p == nil {
 		return nil, fmt.Errorf("Digest %v not found", name)
 	}

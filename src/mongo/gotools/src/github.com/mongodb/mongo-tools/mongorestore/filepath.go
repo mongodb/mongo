@@ -354,7 +354,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 				// Server versions >= 3.0.3 disallow user inserts to system.profile so
 				// it would likely fail anyway.
 				if collection == "system.profile" {
-					log.Logvf(log.DebugLow, "skipping restore of system.profile collection", db)
+					log.Logvf(log.DebugLow, "skipping restore of system.profile collection in %v", db)
 					skip = true
 				}
 				// skip restoring the indexes collection if we are using metadata

@@ -5,6 +5,8 @@ import (
 
 	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
 func TestSkipCollection(t *testing.T) {
@@ -49,4 +51,48 @@ func TestSkipCollection(t *testing.T) {
 		})
 	})
 
+}
+
+var (
+	testSystemDB = "sysjstestdb"
+)
+
+func setUpTestSystemJS() error {
+	session, err := getBareSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	collectionName := "system.js"
+
+	coll := session.DB(testSystemDB).C(collectionName)
+
+	err = coll.Insert(bson.M{"_id": "echoFunction", "value": "function(x) { return x; }"})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func TestCreateIntentsForDatabase(t *testing.T) {
+	testtype.VerifyTestType(t, testtype.IntegrationTestType)
+
+	Convey("With a MongoDump instance create an intent for system.js", t, func() {
+		err := setUpTestSystemJS()
+		So(err, ShouldBeNil)
+
+		md := simpleMongoDumpInstance()
+		md.InputOptions.Query = ""
+
+		md.ToolOptions.Namespace.Collection = "system.js"
+		err = md.Init()
+		So(err, ShouldBeNil)
+
+		err = md.CreateIntentsForDatabase(testSystemDB)
+		So(err, ShouldBeNil)
+		So(len(md.manager.Intents()), ShouldEqual, 1)
+
+	})
 }
