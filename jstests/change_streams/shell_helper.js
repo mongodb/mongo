@@ -13,9 +13,13 @@
     function checkNextChange(cursor, expected) {
         assert.soon(() => cursor.hasNext());
         const nextObj = cursor.next();
+        const originalObj = Object.assign({}, nextObj);
+
         delete nextObj._id;
         delete nextObj.clusterTime;
         assert.docEq(nextObj, expected);
+
+        return originalObj;
     }
 
     function testCommandIsCalled(testFunc, checkFunc) {
@@ -71,14 +75,22 @@
     assert.docEq(change, expected);
 
     jsTestLog("Testing watch() with pipeline");
-    changeStreamCursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}]);
+    changeStreamCursor =
+        coll.watch([{$project: {_id: 0, clusterTime: 1, docId: "$documentKey._id"}}]);
 
     // Store the cluster time of the insert as the timestamp to start from.
     const resumeTime =
         assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{_id: 1, x: 1}]}))
             .operationTime;
+    jsTestLog("Insert of document with _id 1 got operationTime " + tojson(resumeTime));
 
-    checkNextChange(changeStreamCursor, {docId: 1});
+    const changeForInsert = checkNextChange(changeStreamCursor, {docId: 1});
+    jsTestLog("Change stream event for document with _id 1 reports clusterTime " +
+              tojson(changeForInsert.clusterTime));
+
+    // We expect the clusterTime returned by the change stream event and the operationTime returned
+    // by the insert to be the same.
+    assert.eq(changeForInsert.clusterTime, resumeTime);
 
     jsTestLog("Testing watch() with pipeline and resumeAfter");
     changeStreamCursor =
