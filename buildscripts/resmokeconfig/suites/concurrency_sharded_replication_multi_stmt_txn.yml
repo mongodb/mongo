@@ -30,6 +30,7 @@ selector:
   # namespaces collide across mongos processes'
   - jstests/concurrency/fsm_workloads/map_reduce_drop.js
   - jstests/concurrency/fsm_workloads/map_reduce_inline.js
+  - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
   - jstests/concurrency/fsm_workloads/map_reduce_merge.js
   - jstests/concurrency/fsm_workloads/map_reduce_merge_nonatomic.js
   - jstests/concurrency/fsm_workloads/map_reduce_reduce.js

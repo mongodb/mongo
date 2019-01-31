@@ -307,13 +307,6 @@ public:
 
     void finalReduce(OperationContext* opCtx, CurOp* op);
 
-    // ------- cleanup/data positioning ----------
-
-    /**
-     * Clean up the temporary and incremental collections
-     */
-    void dropTempCollections();
-
     /**
        @return number objects in collection
      */
