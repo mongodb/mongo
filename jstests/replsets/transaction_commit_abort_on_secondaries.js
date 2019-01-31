@@ -1,5 +1,6 @@
 /**
- * Test that commitTransaction and abortTransaction commands work on replica set secondaries.
+ * Test that commitTransaction and abortTransaction commands are not allowed to be issued against
+ * replica set secondaries.
  *
  * @tags: [uses_transactions]
  */
@@ -22,7 +23,7 @@
 
     // Do an initial write so we have something to find.
     const initialDoc = {_id: 0};
-    assert.writeOK(primary.getDB(dbName)[collName].insert(initialDoc));
+    assert.commandWorked(primary.getDB(dbName)[collName].insert(initialDoc));
     rst.awaitLastOpCommitted();
 
     // Initiate a session on the secondary.
@@ -40,22 +41,25 @@
     // Read a document.
     assert.eq(initialDoc, sessionDb[collName].findOne({}));
 
-    jsTestLog("Make sure we can commit the transaction on the secondary.");
-    session.commitTransaction();
+    jsTestLog("Make sure we are not allowed to commit the transaction on the secondary.");
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NotMaster);
 
     /**
      * Test abortTransaction.
      */
 
-    jsTestLog("Start a read-only transaction on the secondary.");
+    jsTestLog("Start a different read-only transaction on the secondary.");
     session.startTransaction({readConcern: {level: "snapshot"}});
 
     // Read a document.
     assert.eq(initialDoc, sessionDb[collName].findOne({}));
 
-    jsTestLog("Make sure we can abort the transaction on the secondary.");
-    assert.commandWorked(session.abortTransaction_forTesting());
+    jsTestLog("Make sure we are not allowed to abort the transaction on the secondary.");
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NotMaster);
 
     session.endSession();
-    rst.stopSet();
+
+    // Terminate the secondary so we can end the test.
+    rst.stop(1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+    rst.stopSet(undefined, false, {skipValidation: true});
 }());

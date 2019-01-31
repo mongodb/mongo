@@ -73,25 +73,5 @@
     // 'clusterTime'.
     testDB0.coll0.find().readPref('secondary').itcount();
 
-    // Attempt a snapshot read at 'clusterTime' on shard 0. Test that it performs a noop write to
-    // advance its lastApplied optime past 'clusterTime'. The snapshot read itself may fail if the
-    // noop write advances the node's majority commit point past 'clusterTime' and it releases that
-    // snapshot.  Test reading from the secondary.
-    const shard0Session =
-        st.rs0.getSecondary().getDB("test0").getMongo().startSession({causalConsistency: false});
-    shard0Session.startTransaction({
-        readConcern: {level: "snapshot", atClusterTime: clusterTime},
-    });
-    res = shard0Session.getDatabase("test0").runCommand({find: "coll0"});
-    if (res.ok === 0) {
-        assert.commandFailedWithCode(res, ErrorCodes.SnapshotTooOld);
-        assert.commandFailedWithCode(shard0Session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
-    } else {
-        shard0Session.commitTransaction();
-    }
-    const shard0SecondaryOpTime = getLastOpTime(st.rs0.getSecondary()).ts;
-    assert.gte(shard0SecondaryOpTime, clusterTime);
-
     st.stop();
 }());

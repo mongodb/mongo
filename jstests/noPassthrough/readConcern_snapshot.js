@@ -84,14 +84,6 @@
                                  ErrorCodes.NoSuchTransaction);
     session.endSession();
 
-    // readConcern 'snapshot' is allowed on a replica set secondary.
-    rst.awaitLastOpCommitted();
-    session = rst.getSecondary().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    sessionDb = session.getDatabase(dbName);
-    session.startTransaction({readConcern: {level: "snapshot"}});
-    assert.commandWorked(sessionDb.runCommand({find: collName}));
-    session.commitTransaction();
-
     pingRes = assert.commandWorked(rst.getSecondary().adminCommand({ping: 1}));
     assert(pingRes.hasOwnProperty("$clusterTime"), tojson(pingRes));
     assert(pingRes.$clusterTime.hasOwnProperty("clusterTime"), tojson(pingRes));
