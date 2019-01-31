@@ -1018,7 +1018,16 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
         auto times = replLogApplyOps(
             opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink, prepare, prepareOplogSlot);
 
-        auto txnState = prepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted;
+        auto txnState = [prepare]() -> boost::optional<DurableTxnStateEnum> {
+            if (serverGlobalParams.featureCompatibility.getVersion() <
+                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) {
+                invariant(!prepare);
+                return boost::none;
+            }
+
+            return prepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted;
+        }();
+
         onWriteOpCompleted(
             opCtx, cmdNss, {stmtId}, times.writeOpTime, times.wallClockTime, txnState);
         return times;

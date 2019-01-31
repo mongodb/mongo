@@ -907,12 +907,16 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     // Commands must be processed one at a time. The only exception to this is applyOps because
     // applyOps oplog entries are effectively containers for CRUD operations. Therefore, it is safe
     // to batch applyOps commands with CRUD operations when reading from the oplog buffer.
+    //
     // Oplog entries on 'system.views' should also be processed one at a time. View catalog
     // immediately reflects changes for each oplog entry so we can see inconsistent view catalog if
     // multiple oplog entries on 'system.views' are being applied out of the original order.
+    //
+    // Process updates to 'admin.system.version' individually as well so the secondary's FCV when
+    // processing each operation matches the primary's when committing that operation.
     if ((entry.isCommand() &&
          (entry.getCommandType() != OplogEntry::CommandType::kApplyOps || entry.shouldPrepare())) ||
-        entry.getNss().isSystemDotViews()) {
+        entry.getNss().isSystemDotViews() || entry.getNss().isServerConfigurationCollection()) {
         if (ops->getCount() == 1) {
             // apply commands one-at-a-time
             _consume(opCtx, oplogBuffer);

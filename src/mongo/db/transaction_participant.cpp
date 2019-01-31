@@ -155,6 +155,15 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
         return result;
     }
 
+    // State is a new field in FCV 4.2 that indicates if a transaction committed, so check it in FCV
+    // 4.2 and upgrading to 4.2. Check when downgrading as well so sessions refreshed at the start
+    // of downgrade enter the correct state.
+    if ((serverGlobalParams.featureCompatibility.getVersion() >=
+         ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40) &&
+        result.lastTxnRecord->getState() == DurableTxnStateEnum::kCommitted) {
+        result.transactionCommitted = true;
+    }
+
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
     while (it.hasNext()) {
         try {
@@ -181,11 +190,14 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                            entry.getOpTime());
             }
 
-            // Either an applyOps oplog entry without a prepare flag or the state being kCommitted
-            // marks the commit of a transaction.
-            if ((entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
-                 !entry.shouldPrepare()) ||
-                (result.lastTxnRecord->getState() == DurableTxnStateEnum::kCommitted)) {
+            // State is a new field in FCV 4.2, so look for an applyOps oplog entry without a
+            // prepare flag to mark a committed transaction in FCV 4.0 or downgrading to 4.0. Check
+            // when upgrading as well so sessions refreshed at the beginning of upgrade enter the
+            // correct state.
+            if ((serverGlobalParams.featureCompatibility.getVersion() <=
+                 ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) &&
+                (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
+                 !entry.shouldPrepare())) {
                 result.transactionCommitted = true;
             }
         } catch (const DBException& ex) {

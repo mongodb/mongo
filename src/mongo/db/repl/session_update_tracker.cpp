@@ -35,6 +35,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/util/assert_util.h"
@@ -68,20 +69,25 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
         newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
 
-        switch (entry.getCommandType()) {
-            case repl::OplogEntry::CommandType::kApplyOps:
-                newTxnRecord.setState(entry.shouldPrepare() ? DurableTxnStateEnum::kPrepared
-                                                            : DurableTxnStateEnum::kCommitted);
-                break;
-            case repl::OplogEntry::CommandType::kCommitTransaction:
-                newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
-                break;
-            case repl::OplogEntry::CommandType::kAbortTransaction:
-                newTxnRecord.setState(DurableTxnStateEnum::kAborted);
-                break;
-            default:
-                break;
+        // "state" is a new field in 4.2.
+        if (serverGlobalParams.featureCompatibility.getVersion() >=
+            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) {
+            switch (entry.getCommandType()) {
+                case repl::OplogEntry::CommandType::kApplyOps:
+                    newTxnRecord.setState(entry.shouldPrepare() ? DurableTxnStateEnum::kPrepared
+                                                                : DurableTxnStateEnum::kCommitted);
+                    break;
+                case repl::OplogEntry::CommandType::kCommitTransaction:
+                    newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+                    break;
+                case repl::OplogEntry::CommandType::kAbortTransaction:
+                    newTxnRecord.setState(DurableTxnStateEnum::kAborted);
+                    break;
+                default:
+                    break;
+            }
         }
+
         return newTxnRecord.toBSON();
     }();
 
