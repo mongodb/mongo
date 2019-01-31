@@ -524,7 +524,7 @@ class MongoDBJavaScriptStack(gdb.Command):
                 if gdb.parse_and_eval(
                         'mongo::mozjs::kCurrentScope && mongo::mozjs::kCurrentScope->_inOp'):
                     gdb.execute('thread', from_tty=False, to_string=False)
-                    gdb.execute('printf "%s\n", ' +
+                    gdb.execute('printf "%s\\n", ' +
                                 'mongo::mozjs::kCurrentScope->buildStackString().c_str()',
                                 from_tty=False, to_string=False)
             except gdb.error as err:
