@@ -74,7 +74,7 @@ public:
     Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) override;
     Status setCommitQuorum(const NamespaceString& nss,
                            const std::vector<StringData>& indexNames,
-                           const CommitQuorumOptions& newCommitQuorum) override;
+                           const WriteConcernOptions& newCommitQuorum) override;
 
 private:
     void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept override;
