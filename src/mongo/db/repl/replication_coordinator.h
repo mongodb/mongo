@@ -46,7 +46,6 @@ namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
-class CommitQuorumOptions;
 class IndexDescriptor;
 class NamespaceString;
 class OperationContext;
@@ -250,26 +249,6 @@ public:
      */
     virtual Status checkIfWriteConcernCanBeSatisfied(
         const WriteConcernOptions& writeConcern) const = 0;
-
-    /**
-     * Checks if the 'commitQuorum' can be satisfied by all the members in the replica set; if it
-     * cannot be satisfied, then the 'UnsatisfiableCommitQuorum' error code is returned.
-     *
-     * Returns the 'NoReplicationEnabled' error code if this is called without replication enabled.
-     */
-    virtual Status checkIfCommitQuorumCanBeSatisfied(
-        const CommitQuorumOptions& commitQuorum) const = 0;
-
-    /**
-     * Checks if the 'commitQuorum' has been satisfied by the 'commitReadyMembers', if it has been
-     * satisfied, return true.
-     *
-     * Prior to checking if the 'commitQuorum' is satisfied by 'commitReadyMembers', it calls
-     * 'checkIfCommitQuorumCanBeSatisfied()' with all the replica set members.
-     */
-    virtual StatusWith<bool> checkIfCommitQuorumIsSatisfied(
-        const CommitQuorumOptions& commitQuorum,
-        const std::vector<HostAndPort>& commitReadyMembers) const = 0;
 
     /**
      * Returns Status::OK() if it is valid for this node to serve reads on the given collection

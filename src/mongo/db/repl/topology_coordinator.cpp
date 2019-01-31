@@ -41,7 +41,6 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/operation_context.h"
@@ -2790,66 +2789,6 @@ TopologyCoordinator::latestKnownOpTimeSinceHeartbeatRestartPerMember() const {
         opTimesPerMember[memberId] = member.getHeartbeatAppliedOpTime();
     }
     return opTimesPerMember;
-}
-
-bool TopologyCoordinator::checkIfCommitQuorumCanBeSatisfied(
-    const CommitQuorumOptions& commitQuorum, const std::vector<MemberConfig>& members) const {
-    if (!commitQuorum.mode.empty() && commitQuorum.mode != CommitQuorumOptions::kMajority) {
-        StatusWith<ReplSetTagPattern> tagPatternStatus =
-            _rsConfig.findCustomWriteMode(commitQuorum.mode);
-        if (!tagPatternStatus.isOK()) {
-            return false;
-        }
-
-        ReplSetTagMatch matcher(tagPatternStatus.getValue());
-        for (auto&& member : members) {
-            for (MemberConfig::TagIterator it = member.tagsBegin(); it != member.tagsEnd(); ++it) {
-                if (matcher.update(*it)) {
-                    return true;
-                }
-            }
-        }
-
-        // Even if all the nodes in the set had a given write it still would not satisfy this
-        // commit quorum.
-        return false;
-    } else {
-        int nodesRemaining = 0;
-        if (!commitQuorum.mode.empty()) {
-            invariant(commitQuorum.mode == CommitQuorumOptions::kMajority);
-            nodesRemaining = _rsConfig.getWriteMajority();
-        } else {
-            nodesRemaining = commitQuorum.numNodes;
-        }
-
-        for (auto&& member : members) {
-            if (!member.isArbiter()) {  // Only count data-bearing nodes
-                --nodesRemaining;
-                if (nodesRemaining <= 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-}
-
-bool TopologyCoordinator::checkIfCommitQuorumIsSatisfied(
-    const CommitQuorumOptions& commitQuorum,
-    const std::vector<HostAndPort>& commitReadyMembers) const {
-    std::vector<MemberConfig> commitReadyMemberConfigs;
-    for (auto& commitReadyMember : commitReadyMembers) {
-        const MemberConfig* memberConfig = _rsConfig.findMemberByHostAndPort(commitReadyMember);
-
-        invariant(memberConfig);
-        commitReadyMemberConfigs.push_back(*memberConfig);
-    }
-
-    // Calling this with commit ready members only is the same as checking if the commit quorum is
-    // satisfied. Because the 'commitQuorum' is based on the participation of all the replica set
-    // members, and if the 'commitQuorum' can be satisfied with all the commit ready members, then
-    // the commit quorum is satisfied in this replica set configuration.
-    return checkIfCommitQuorumCanBeSatisfied(commitQuorum, commitReadyMemberConfigs);
 }
 
 }  // namespace repl

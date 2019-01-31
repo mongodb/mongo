@@ -380,17 +380,6 @@ Status ReplicationCoordinatorMock::checkIfWriteConcernCanBeSatisfied(
     return Status::OK();
 }
 
-Status ReplicationCoordinatorMock::checkIfCommitQuorumCanBeSatisfied(
-    const CommitQuorumOptions& commitQuorum) const {
-    return Status::OK();
-}
-
-StatusWith<bool> ReplicationCoordinatorMock::checkIfCommitQuorumIsSatisfied(
-    const CommitQuorumOptions& commitQuorum,
-    const std::vector<HostAndPort>& commitReadyMembers) const {
-    return true;
-}
-
 WriteConcernOptions ReplicationCoordinatorMock::getGetLastErrorDefault() {
     return WriteConcernOptions();
 }

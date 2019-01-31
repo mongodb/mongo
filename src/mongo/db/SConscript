@@ -931,9 +931,6 @@ env.Library(
         "index_builds_coordinator_interface",
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
     ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
-    ],
 )
 
 env.Library(

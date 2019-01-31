@@ -790,9 +790,6 @@ env.Library('topology_coordinator',
                 'repl_settings',
                 'rslog',
                 'repl_coordinator_interface',
-            ],
-            LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
             ])
 
 env.CppUnitTest('repl_set_heartbeat_response_test',
