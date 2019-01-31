@@ -259,7 +259,12 @@ public:
 
     static void appendGlobalStats(BSONObjBuilder& b);
 
+    ClockSource* getClockSource() const {
+        return _clockSource;
+    }
+
 private:
+    class WiredTigerSessionSweeper;
     class WiredTigerJournalFlusher;
     class WiredTigerCheckpointThread;
 
@@ -299,6 +304,8 @@ private:
     bool _durable;
     bool _ephemeral;
     bool _readOnly;
+
+    std::unique_ptr<WiredTigerSessionSweeper> _sessionSweeper;
     std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
     std::unique_ptr<WiredTigerCheckpointThread> _checkpointThread;
 
