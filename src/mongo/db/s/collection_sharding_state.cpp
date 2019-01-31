@@ -35,7 +35,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/collection_sharding_runtime_lock.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/s/stale_exception.h"
@@ -136,8 +135,7 @@ ChunkVersion getOperationReceivedVersion(OperationContext* opCtx, const Namespac
 
 }  // namespace
 
-CollectionShardingState::CollectionShardingState(NamespaceString nss)
-    : _stateChangeMutex(nss.toString()), _nss(std::move(nss)) {}
+CollectionShardingState::CollectionShardingState(NamespaceString nss) : _nss(std::move(nss)) {}
 
 CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
@@ -209,13 +207,9 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     const auto wantedShardVersion =
         metadata->isSharded() ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
-    auto criticalSectionSignal = [&] {
-        auto csrLock = CollectionShardingRuntimeLock::lock(opCtx, this);
-        return _critSec.getSignal(opCtx->lockState()->isWriteLocked()
-                                      ? ShardingMigrationCriticalSection::kWrite
-                                      : ShardingMigrationCriticalSection::kRead);
-    }();
-
+    auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
+                                                        ? ShardingMigrationCriticalSection::kWrite
+                                                        : ShardingMigrationCriticalSection::kRead);
     if (criticalSectionSignal) {
         // Set migration critical section on operation sharding state: operation will wait for the
         // migration to finish before returning failure and retrying.
@@ -264,21 +258,18 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     MONGO_UNREACHABLE;
 }
 
-void CollectionShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
-                                                               CollectionShardingRuntimeLock&) {
+void CollectionShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
-void CollectionShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx,
-                                                              CollectionShardingRuntimeLock&) {
+void CollectionShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
     _critSec.enterCriticalSectionCommitPhase();
 }
 
-void CollectionShardingState::exitCriticalSection(OperationContext* opCtx,
-                                                  CollectionShardingRuntimeLock&) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+void CollectionShardingState::exitCriticalSection(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
     _critSec.exitCriticalSection();
 }
 

@@ -33,7 +33,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/collection_sharding_runtime_lock.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/platform/atomic_word.h"
@@ -155,6 +154,10 @@ private:
     friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         OperationContext*, NamespaceString const&, OID const&, int, CollectionRangeDeleter*);
 
+    // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects
+    // held within.
+    Lock::ResourceMutex _stateChangeMutex;
+
     // Namespace this state belongs to.
     const NamespaceString _nss;
 
@@ -163,6 +166,42 @@ private:
 
     boost::optional<ScopedCollectionMetadata> _getMetadata(
         const boost::optional<mongo::LogicalTime>& atClusterTime) override;
+};
+
+/**
+ * RAII-style class that locks the CollectionShardingRuntime using the CollectionShardingRuntime's
+ * ResourceMutex. The lock will be created and acquired on construction. The lock will be dismissed
+ * upon destruction of the CollectionShardingRuntimeLock object.
+ */
+class CollectionShardingRuntimeLock {
+
+public:
+    using CSRLock = stdx::variant<Lock::SharedLock, Lock::ExclusiveLock>;
+
+    /**
+     * Locks the sharding runtime state for the specified collection with the
+     * CollectionShardingRuntime object's ResourceMutex in MODE_IS. When the object goes out of
+     * scope, the ResourceMutex will be unlocked.
+     */
+    static CollectionShardingRuntimeLock lock(OperationContext* opCtx,
+                                              CollectionShardingRuntime* csr);
+
+    /**
+     * Follows the same functionality as the CollectionShardingRuntimeLock lock method, except
+     * that lockExclusive takes the ResourceMutex in MODE_X.
+     */
+    static CollectionShardingRuntimeLock lockExclusive(OperationContext* opCtx,
+                                                       CollectionShardingRuntime* csr);
+
+private:
+    CollectionShardingRuntimeLock(OperationContext* opCtx,
+                                  CollectionShardingRuntime* csr,
+                                  LockMode lockMode);
+
+    // The lock created and locked upon construction of a CollectionShardingRuntimeLock object.
+    // It locks the ResourceMutex taken from the CollectionShardingRuntime class, passed in on
+    // construction.
+    CSRLock _lock;
 };
 
 /**

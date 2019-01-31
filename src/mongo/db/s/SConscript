@@ -13,7 +13,6 @@ env.Library(
     source=[
         'collection_metadata.cpp',
         'collection_sharding_state.cpp',
-        'collection_sharding_runtime_lock.cpp',
         'database_sharding_state.cpp',
         'operation_sharding_state.cpp',
         'sharded_connection_info.cpp',
