@@ -4,6 +4,7 @@
  */
 load('jstests/replsets/rslib.js');
 load('jstests/libs/parallelTester.js');
+load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
 
 (function() {
 
@@ -22,41 +23,12 @@ load('jstests/libs/parallelTester.js');
 
     const primary = rst.getPrimary();
     const primaryDB = primary.getDB(dbName);
-    const primaryAdminDB = primary.getDB("admin");
+    const primaryAdmin = primary.getDB("admin");
     const primaryColl = primaryDB[collName];
+    const collNss = primaryColl.getFullName();
 
     TestData.dbName = dbName;
     TestData.collName = collName;
-
-    var waitForOpToReachFailPoint = (failPointMsg) => {
-        // Wait until we know the failpoint "failPointMsg" has been
-        // reached for the namespace specified in primaryColl.
-        assert.soon(
-            () => {
-                const res =
-                    primaryAdminDB
-                        .aggregate([
-                            {$currentOp: {}},
-                            {
-                              $match: {
-                                  $and: [{ns: primaryColl.getFullName()}, {"msg": failPointMsg}]
-                              }
-                            }
-                        ])
-                        .toArray();
-                if (res.length === 1) {
-                    return true;
-                }
-                return false;
-            },
-            () => {
-                return "Failed to find operation in $currentOp output: " +
-                    tojson(primaryAdminDB
-                               .aggregate(
-                                   [{$currentOp: {}}, {$match: {ns: primaryColl.getFullName()}}])
-                               .toArray());
-            });
-    };
 
     jsTestLog("1. Do a document write");
     assert.writeOK(
@@ -85,7 +57,7 @@ load('jstests/libs/parallelTester.js');
     }, primary.port);
 
     // Wait for getmore cmd to reach the fail point.
-    waitForOpToReachFailPoint("waitAfterPinningCursorBeforeGetMoreBatch");
+    waitForCurOpByFailPoint(primaryAdmin, collNss, "waitAfterPinningCursorBeforeGetMoreBatch");
 
     jsTestLog("2. Start blocking find cmd before step down");
     const joinFindThread = startParallelShell(() => {
@@ -100,7 +72,7 @@ load('jstests/libs/parallelTester.js');
     }, primary.port);
 
     // Wait for find cmd to reach the fail point.
-    waitForOpToReachFailPoint("waitInFindBeforeMakingBatch");
+    waitForCurOpByFailPoint(primaryAdmin, collNss, "waitInFindBeforeMakingBatch");
 
     jsTestLog("3. Make primary step down");
     const joinStepDownThread = startParallelShell(() => {
@@ -111,9 +83,9 @@ load('jstests/libs/parallelTester.js');
     checkLog.contains(primary, "Starting to kill user operations");
 
     jsTestLog("4. Disable fail points");
-    assert.commandWorked(primaryAdminDB.runCommand(
-        {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
-    assert.commandWorked(primaryAdminDB.runCommand(
+    assert.commandWorked(
+        primaryAdmin.runCommand({configureFailPoint: "waitInFindBeforeMakingBatch", mode: "off"}));
+    assert.commandWorked(primaryAdmin.runCommand(
         {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "off"}));
 
     // Wait for threads to join.

@@ -64,6 +64,7 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
 
         const bool shouldCheckForInterrupt =
             checkForInterrupt || data["shouldCheckForInterrupt"].booleanSafe();
+        const bool shouldContinueOnInterrupt = data["shouldContinueOnInterrupt"].booleanSafe();
         while (MONGO_FAIL_POINT((*failPoint))) {
             sleepFor(Milliseconds(10));
             if (whileWaiting) {
@@ -72,7 +73,13 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
 
             // Check for interrupt so that an operation can be killed while waiting for the
             // failpoint to be disabled, if the failpoint is configured to be interruptible.
-            if (shouldCheckForInterrupt) {
+            //
+            // For shouldContinueOnInterrupt, an interrupt merely allows the code to continue past
+            // the failpoint; it is up to the code under test to actually check for interrupt.
+            if (shouldContinueOnInterrupt) {
+                if (!opCtx->checkForInterruptNoAssert().isOK())
+                    break;
+            } else if (shouldCheckForInterrupt) {
                 opCtx->checkForInterrupt();
             }
         }
