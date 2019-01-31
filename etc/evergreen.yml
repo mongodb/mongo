@@ -261,6 +261,7 @@ variables:
   - func: "set up credentials"
   - func: "fetch and build OpenSSL"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+  - func: "install pip requirements"
   - func: "generate compile expansions"
   teardown_group:
   - func: "scons cache pruning"
@@ -369,6 +370,7 @@ variables:
     - func: "set task expansion macros"
     - func: "git get project"
     - func: "get buildnumber"
+    - func: "install pip requirements"
     - func: "generate compile expansions"
   teardown_group:
     - func: "scons cache pruning"
@@ -1493,7 +1495,7 @@ functions:
           fi
 
           echo "Shared Cache with setting: ${scons_cache_scope}"
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
 
         # Legacy Expansion generation
         else
@@ -1501,7 +1503,7 @@ functions:
           # Proceed with regular expansions generated
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
         fi
 
   "apply compile expansions" :
@@ -3845,6 +3847,7 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "install pip requirements"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
     - command: s3.get
@@ -3928,6 +3931,7 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "install pip requirements"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
     - command: s3.get
@@ -4016,6 +4020,7 @@ tasks:
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
+    - func: "install pip requirements"
     - func: "generate compile expansions"
     - func: "apply compile expansions"
 
@@ -4439,6 +4444,7 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+    - func: "install pip requirements"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
     - func: "apply compile expansions"
@@ -7713,6 +7719,7 @@ task_groups:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "install pip requirements"
     - func: "generate compile expansions"
   teardown_group:
     - func: "scons cache pruning"
