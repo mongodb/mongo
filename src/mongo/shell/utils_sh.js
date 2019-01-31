@@ -452,8 +452,10 @@ sh.getRecentFailedRounds = function(configDB) {
         balErrs.forEach(function(r) {
             if (r.details.errorOccured) {
                 result.count += 1;
-                result.lastErr = r.details.errmsg;
-                result.lastTime = r.time;
+                if (result.count == 1) {
+                    result.lastErr = r.details.errmsg;
+                    result.lastTime = r.time;
+                }
             }
         });
     }
