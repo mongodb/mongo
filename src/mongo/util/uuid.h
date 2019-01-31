@@ -66,12 +66,14 @@ class UUID {
     friend class ShardsvrShardCollectionResponse;
     friend class DatabaseVersion;
     friend class DbCheckOplogCollection;
+    friend class EncryptionPlaceholder;
     friend class idl::import::One_UUID;
     friend class IndexBuildEntry;
     friend class LogicalSessionId;
     friend class LogicalSessionToClient;
     friend class LogicalSessionIdToClient;
     friend class LogicalSessionFromClient;
+    friend class ResolvedKeyId;
     friend class repl::OplogEntryBase;
     friend class repl::ReplOperation;
     friend class ResumeTokenInternal;
@@ -130,6 +132,11 @@ public:
      * Appends to builder as BinData(4, "...") element with the given name.
      */
     void appendToBuilder(BSONObjBuilder* builder, StringData name) const;
+
+    /**
+     * Appends to array builder as BinData(4, "...").
+     */
+    void appendToArrayBuilder(BSONArrayBuilder* builder) const;
 
     /**
      * Returns a BSON object of the form { uuid: BinData(4, "...") }.

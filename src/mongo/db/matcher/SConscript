@@ -51,6 +51,7 @@ env.Library(
         'matcher.cpp',
         'matcher_type_set.cpp',
         'rewrite_expr.cpp',
+        'schema/encrypt_schema_types.cpp',
         'schema/expression_internal_schema_all_elem_match_from_index.cpp',
         'schema/expression_internal_schema_allowed_properties.cpp',
         'schema/expression_internal_schema_cond.cpp',
@@ -66,6 +67,7 @@ env.Library(
         'schema/expression_internal_schema_xor.cpp',
         'schema/json_pointer.cpp',
         'schema/json_schema_parser.cpp',
+        env.Idlc('schema/encrypt_schema.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -77,8 +79,19 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/pipeline/expression',
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         'path',
+    ],
+)
+
+env.CppUnitTest(
+    target='encrypt_schema_types_test',
+    source=[
+        'schema/encrypt_schema_types_test.cpp'
+    ],
+    LIBDEPS=[
+        'expressions',
     ],
 )
 
@@ -190,5 +203,3 @@ env.CppUnitTest(
         'expressions',
     ],
 )
-
-

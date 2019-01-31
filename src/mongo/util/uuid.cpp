@@ -124,6 +124,10 @@ void UUID::appendToBuilder(BSONObjBuilder* builder, StringData name) const {
     builder->appendBinData(name, sizeof(UUIDStorage), BinDataType::newUUID, &_uuid);
 }
 
+void UUID::appendToArrayBuilder(BSONArrayBuilder* builder) const {
+    builder->appendBinData(sizeof(UUIDStorage), BinDataType::newUUID, &_uuid);
+}
+
 BSONObj UUID::toBSON() const {
     BSONObjBuilder builder;
     appendToBuilder(&builder, "uuid");
