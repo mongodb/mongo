@@ -11,6 +11,9 @@
     const sourceColl = mongosDB["source"];
     const targetColl = mongosDB["target"];
 
+    assert.commandWorked(st.s.getDB("admin").runCommand({enableSharding: mongosDB.getName()}));
+    st.ensurePrimaryShard(mongosDB.getName(), st.shard1.name);
+
     function setAggHang(mode) {
         assert.commandWorked(st.shard0.adminCommand(
             {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
@@ -18,15 +21,23 @@
             {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
     }
 
-    function removeShard(shardName) {
-        var res = st.s.adminCommand({removeShard: shardName});
+    function removeShard(shard) {
+        var res = st.s.adminCommand({removeShard: shard.shardName});
         assert.commandWorked(res);
         assert.eq('started', res.state);
         assert.soon(function() {
-            res = st.s.adminCommand({removeShard: shardName});
+            res = st.s.adminCommand({removeShard: shard.shardName});
             assert.commandWorked(res);
             return ('completed' === res.state);
-        }, "removeShard never completed for shard " + shardName);
+        }, "removeShard never completed for shard " + shard.shardName);
+
+        // Drop the test database on the removed shard so it does not interfere with addShard later.
+        assert.commandWorked(shard.getDB(mongosDB.getName()).dropDatabase());
+
+        // SERVER-39665 is the follow up ticket to fully investigate whether the following commands
+        // are needed or not.
+        st.configRS.awaitLastOpCommitted();
+        assert.commandWorked(st.s.adminCommand({flushRouterConfig: 1}));
     }
 
     function addShard(shard) {
@@ -67,7 +78,7 @@
             () => tojson(mongosDB.currentOp().inprog));
 
         if (dropShard) {
-            removeShard(st.shard0.shardName);
+            removeShard(st.shard0);
         } else {
             addShard(st.rs0.getURL());
         }
@@ -97,6 +108,7 @@
     runOutWithMode("insertDocuments", targetColl, true);
     runOutWithMode("insertDocuments", targetColl, false);
     runOutWithMode("replaceDocuments", targetColl, true);
+    runOutWithMode("replaceDocuments", targetColl, false);
 
     st.stop();
 })();
