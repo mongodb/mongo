@@ -350,12 +350,12 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: genny_workloads
+- name: insert_remove
   priority: 5
   commands:
     - func: "prepare environment"
       vars:
-        test: "genny_workloads"
+        test: "insert_remove"
         authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
@@ -804,7 +804,7 @@ buildvariants:
     - name: snapshot_reads
     - name: linkbench
     - name: tpcc
-    - name: genny_workloads
+    - name: insert_remove
     - name: big_update
 
 - name: linux-standalone
@@ -826,7 +826,7 @@ buildvariants:
   tasks: &standalonetasks
     - name: industry_benchmarks
     - name: crud_workloads
-    - name: genny_workloads
+    - name: insert_remove
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -878,7 +878,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks
     - name: crud_workloads
-    - name: genny_workloads
+    - name: insert_remove
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -944,7 +944,7 @@ buildvariants:
     - name: industry_benchmarks
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
-    - name: genny_workloads
+    - name: insert_remove
     - name: service_architecture_workloads
     - name: mixed_workloads
     - name: misc_workloads
