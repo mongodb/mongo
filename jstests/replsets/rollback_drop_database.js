@@ -41,8 +41,13 @@
 
     // Ensure that we've hit the failpoint before moving on.
     checkLog.contains(rollbackNode, "dropDatabase - fail point dropDatabaseHangBeforeLog enabled");
-    assert.eq(false,
-              syncSourceNode.getDB(oldDbName).getCollectionNames().includes("beforeRollback"));
+
+    // Wait for the secondary to finish dropping the collection (the last replicated entry).
+    // We use the default 10-minute timeout for this.
+    assert.soon(function() {
+        let res = syncSourceNode.getDB(oldDbName).getCollectionNames().includes("beforeRollback");
+        return !res;
+    }, "Sync source did not finish dropping collection beforeRollback", 10 * 60 * 1000);
 
     rollbackTest.transitionToRollbackOperations();
 
