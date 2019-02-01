@@ -472,8 +472,12 @@ void PipelineD::prepareGenericCursorSource(Collection* collection,
         }
     }
 
+    // If this is a change stream pipeline, make sure that we tell DSCursor to track the oplog time.
+    const bool trackOplogTS =
+        (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage());
+
     addCursorSource(pipeline,
-                    DocumentSourceCursor::create(collection, std::move(exec), expCtx),
+                    DocumentSourceCursor::create(collection, std::move(exec), expCtx, trackOplogTS),
                     deps,
                     queryObj,
                     sortObj,
