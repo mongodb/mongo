@@ -34,9 +34,9 @@
 #include "mongo/db/index_builds_coordinator_mongod.h"
 
 #include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -163,40 +163,6 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(const NamespaceString& nss,
                                                      const CommitQuorumOptions& newCommitQuorum) {
     // TODO: not yet implemented.
     return Status::OK();
-}
-
-void IndexBuildsCoordinatorMongod::_runIndexBuild(OperationContext* opCtx,
-                                                  const UUID& buildUUID) noexcept {
-    auto replState = [&] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        auto it = _allIndexBuilds.find(buildUUID);
-        invariant(it != _allIndexBuilds.end());
-        return it->second;
-    }();
-
-    {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        while (_sleepForTest) {
-            lk.unlock();
-            sleepmillis(100);
-            lk.lock();
-        }
-    }
-
-    // TODO: create scoped object to create the index builder, then destroy the builder, set the
-    // promises and unregister the build.
-
-    // TODO: implement.
-
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    _unregisterIndexBuild(lk, opCtx, replState);
-
-    // TODO(SERVER-37643): Fill in index catalog stats.
-    ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-    replState->sharedPromise.emplaceValue(indexCatalogStats);
-
-    return;
 }
 
 Status IndexBuildsCoordinatorMongod::_finishScanningPhase() {

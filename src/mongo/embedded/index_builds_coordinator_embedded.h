@@ -75,9 +75,6 @@ public:
     Status setCommitQuorum(const NamespaceString& nss,
                            const std::vector<StringData>& indexNames,
                            const CommitQuorumOptions& newCommitQuorum) override;
-
-private:
-    void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept override;
 };
 
 }  // namespace mongo

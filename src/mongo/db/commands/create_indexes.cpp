@@ -50,6 +50,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -65,10 +66,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
 
 namespace {
 

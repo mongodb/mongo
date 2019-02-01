@@ -116,8 +116,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, CannotBuildIndexWithSameIndexName) {
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
-    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+    ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
 }
 
 // Incrementally registering index builds and checking both that the registration was successful and
@@ -187,20 +187,22 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
 
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
-    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+    ASSERT_GTE(indexCatalogStats.numIndexesBefore, 1);
+    ASSERT_GT(indexCatalogStats.numIndexesAfter, 1);
+    ASSERT_LTE(indexCatalogStats.numIndexesAfter, 5);
 
     indexCatalogStats = unittest::assertGet(testFoo2Future.getNoThrow());
-    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+    ASSERT_GTE(indexCatalogStats.numIndexesBefore, 1);
+    ASSERT_GT(indexCatalogStats.numIndexesAfter, 1);
+    ASSERT_LTE(indexCatalogStats.numIndexesAfter, 5);
 
     indexCatalogStats = unittest::assertGet(testBarFuture.getNoThrow());
-    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+    ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
 
     indexCatalogStats = unittest::assertGet(othertestFooFuture.getNoThrow());
-    ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-    ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+    ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
+    ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
 
     _indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testFooUUID);
     _indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testBarUUID);
@@ -245,11 +247,11 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
         _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
 
         auto indexCatalogStats = unittest::assertGet(testBarFuture.getNoThrow());
-        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+        ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
         indexCatalogStats = unittest::assertGet(othertestFooFuture.getNoThrow());
-        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+        ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
     }
 
     {
@@ -257,8 +259,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
         auto testFooFuture = assertGet(_indexBuildsCoord->startIndexBuild(
             operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"a", "b"}), UUID::gen()));
         auto indexCatalogStats = unittest::assertGet(testFooFuture.getNoThrow());
-        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+        ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
     }
 
     {
@@ -293,8 +295,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
         _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
 
         auto indexCatalogStats = unittest::assertGet(othertestFooFuture.getNoThrow());
-        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+        ASSERT_EQ(3, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(5, indexCatalogStats.numIndexesAfter);
     }
 
     {
@@ -302,8 +304,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
         auto testFooFuture = assertGet(_indexBuildsCoord->startIndexBuild(
             operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"c", "d"}), UUID::gen()));
         auto indexCatalogStats = unittest::assertGet(testFooFuture.getNoThrow());
-        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+        ASSERT_EQ(3, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(5, indexCatalogStats.numIndexesAfter);
     }
 
     {
@@ -335,8 +337,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
         auto testFooFuture = assertGet(_indexBuildsCoord->startIndexBuild(
             operationContext(), _testFooUUID, makeSpecs(_testFooNss, {"e", "f"}), UUID::gen()));
         auto indexCatalogStats = unittest::assertGet(testFooFuture.getNoThrow());
-        ASSERT_EQ(0, indexCatalogStats.numIndexesBefore);
-        ASSERT_EQ(0, indexCatalogStats.numIndexesAfter);
+        ASSERT_EQ(5, indexCatalogStats.numIndexesBefore);
+        ASSERT_EQ(7, indexCatalogStats.numIndexesAfter);
     }
 }
 

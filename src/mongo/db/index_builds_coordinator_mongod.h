@@ -107,11 +107,6 @@ private:
     /**
      * TODO: not yet implemented.
      */
-    void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept override;
-
-    /**
-     * TODO: not yet implemented.
-     */
     Status _finishScanningPhase();
 
     /**

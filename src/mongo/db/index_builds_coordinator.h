@@ -44,6 +44,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
@@ -306,9 +307,9 @@ protected:
                                std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
 
     /**
-     * TODO: not yet implemented.
+     * Runs the index build on the caller thread.
      */
-    virtual void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept = 0;
+    virtual void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept;
 
     // Protects the below state.
     mutable stdx::mutex _mutex;
@@ -404,5 +405,11 @@ private:
     IndexBuildsCoordinator* _indexBuildsCoordinatorPtr;
     UUID _collectionUUID;
 };
+
+// These fail points are used to control index build progress. Declared here to be shared
+// temporarily between createIndexes command and IndexBuildsCoordinator.
+MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildFirstDrain);
+MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildSecondDrain);
+MONGO_FAIL_POINT_DECLARE(hangAfterIndexBuildDumpsInsertsFromBulk);
 
 }  // namespace mongo

@@ -933,6 +933,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
+        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
 
@@ -947,6 +948,14 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         '$BUILD_DIR/mongo/db/catalog_raii',
         "$BUILD_DIR/mongo/db/catalog/index_builds_manager",
+    ],
+    LIBDEPS_PRIVATE=[
+        'db_raii',
+        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
 
