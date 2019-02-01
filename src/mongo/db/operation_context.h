@@ -312,6 +312,11 @@ public:
     }
 
     /**
+     * Returns the error code used when this operation's time limit is reached.
+     */
+    ErrorCodes::Error getTimeoutError() const;
+
+    /**
      * Returns the number of milliseconds remaining for this operation's time limit or
      * Milliseconds::max() if the operation has no time limit.
      */

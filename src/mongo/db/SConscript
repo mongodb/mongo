@@ -932,6 +932,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
     ],
     LIBDEPS_PRIVATE=[
+        'curop',
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],

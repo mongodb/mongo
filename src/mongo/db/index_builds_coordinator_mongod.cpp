@@ -34,6 +34,7 @@
 #include "mongo/db/index_builds_coordinator_mongod.h"
 
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
@@ -106,8 +107,29 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         return status;
     }
 
-    status = _threadPool.schedule([ this, buildUUID ]() noexcept {
+    // Task in thread pool should retain the caller's deadline.
+    auto deadline = opCtx->getDeadline();
+    auto timeoutError = opCtx->getTimeoutError();
+
+    // Task in thread pool should have similar CurOp representation to the caller so that it can be
+    // identified as a createIndexes operation.
+    BSONObj opDesc;
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        auto curOp = CurOp::get(opCtx);
+        opDesc = curOp->opDescription().getOwned();
+    }
+
+    status = _threadPool.schedule([ this, buildUUID, deadline, timeoutError, opDesc ]() noexcept {
         auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        opCtx->setDeadlineByDate(deadline, timeoutError);
+
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            auto curOp = CurOp::get(opCtx.get());
+            curOp->setOpDescription_inlock(opDesc);
+        }
 
         // Sets up and runs the index build. Sets result and cleans up index build.
         _runIndexBuild(opCtx.get(), buildUUID);

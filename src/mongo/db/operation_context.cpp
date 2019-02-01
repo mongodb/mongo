@@ -155,6 +155,10 @@ bool OperationContext::hasDeadlineExpired() const {
     return now >= getDeadline();
 }
 
+ErrorCodes::Error OperationContext::getTimeoutError() const {
+    return _timeoutError;
+}
+
 Milliseconds OperationContext::getRemainingMaxTimeMillis() const {
     if (!hasDeadline()) {
         return Milliseconds::max();
