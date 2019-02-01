@@ -4,8 +4,11 @@
 //   # This test attempts to perform queries and introspect the server's plan cache entries. The
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.
+//   # If the balancer is on and chunks are moved, the plan cache can have entries with isActive:
+//   # false when the test assumes they are true because the query has already been run many times.
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
+//   assumes_balancer_off,
 // ]
 
 (function() {
