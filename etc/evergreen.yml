@@ -9456,7 +9456,10 @@ buildvariants:
     python3: '/cygdrive/c/python/python36/python.exe'
     ext: zip
     use_scons_cache: true
-    test_flags: --serviceExecutor=adaptive
+    test_flags: |- # Use the ServiceExecutorAdaptive with a reasonable number of starting threads
+        --serviceExecutor=adaptive \
+        --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
+        --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
     tooltags: "ssl sasl"
     build_mongoreplay: false
   tasks:
@@ -13775,7 +13778,10 @@ buildvariants:
     tooltags: "ssl"
     build_mongoreplay: false
     hang_analyzer_dump_core: false
-    test_flags: --serviceExecutor=adaptive
+    test_flags: |- # Use the ServiceExecutorAdaptive with a reasonable number of starting threads
+        --serviceExecutor=adaptive \
+        --mongodSetParameters="adaptiveServiceExecutorReservedThreads: 8" \
+        --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
     scons_cache_scope: shared
   display_tasks:
   - *dbtest
