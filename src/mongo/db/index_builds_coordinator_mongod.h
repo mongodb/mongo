@@ -69,7 +69,7 @@ public:
      *
      * Returns an error status if there are any errors setting up the index build.
      */
-    StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> buildIndex(
+    StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,

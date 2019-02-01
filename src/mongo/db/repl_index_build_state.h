@@ -55,10 +55,12 @@ namespace mongo {
 struct ReplIndexBuildState {
     ReplIndexBuildState(const UUID& indexBuildUUID,
                         const UUID& collUUID,
+                        const std::string& dbName,
                         const std::vector<std::string> names,
                         const std::vector<BSONObj>& specs)
         : buildUUID(indexBuildUUID),
           collectionUUID(collUUID),
+          dbName(dbName),
           indexNames(names),
           indexSpecs(specs) {
         // Verify that the given index names and index specs match.
@@ -75,6 +77,10 @@ struct ReplIndexBuildState {
     // Identifies the collection for which the index is being built. Collections can be renamed, so
     // the collection UUID is used to maintain correct association.
     const UUID collectionUUID;
+
+    // Identifies the database containing the index being built. Unlike collections, databases
+    // cannot be renamed.
+    const std::string dbName;
 
     // The names of the indexes being built.
     const std::vector<std::string> indexNames;

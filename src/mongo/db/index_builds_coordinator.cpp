@@ -287,20 +287,13 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    NamespaceString nss =
-        UUIDCatalog::get(opCtx).lookupNSSByUUID(replIndexBuildState->collectionUUID);
-    if (!nss.isValid()) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      "The collection has been dropped since the index build began.");
-    }
-
     auto itns = _disallowedCollections.find(replIndexBuildState->collectionUUID);
-    auto itdb = _disallowedDbs.find(nss.db());
+    auto itdb = _disallowedDbs.find(replIndexBuildState->dbName);
     if (itns != _disallowedCollections.end() || itdb != _disallowedDbs.end()) {
         return Status(ErrorCodes::CannotCreateIndex,
-                      str::stream() << "Collection '" << nss.toString()
-                                    << "' is in the process of being dropped. New index builds are "
-                                       "not currently allowed.");
+                      str::stream() << "Collection ( " << replIndexBuildState->collectionUUID
+                                    << " ) is in the process of being dropped. New index builds "
+                                       "are not currently allowed.");
     }
 
     // Check whether any indexes are already being built with the same index name(s). (Duplicate
@@ -311,17 +304,21 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
             if (collIndexBuildsIt->second->hasIndexBuildState(lk, name)) {
                 return Status(ErrorCodes::IndexKeySpecsConflict,
                               str::stream() << "There's already an index with name '" << name
-                                            << "' being built on the collection");
+                                            << "' being built on the collection: "
+                                            << " ( "
+                                            << replIndexBuildState->collectionUUID
+                                            << " )");
             }
         }
     }
 
     // Register the index build.
 
-    auto dbIndexBuilds = _databaseIndexBuilds[nss.db()];
+    auto dbIndexBuilds = _databaseIndexBuilds[replIndexBuildState->dbName];
     if (!dbIndexBuilds) {
-        _databaseIndexBuilds[nss.db()] = std::make_shared<DatabaseIndexBuildsTracker>();
-        dbIndexBuilds = _databaseIndexBuilds[nss.db()];
+        _databaseIndexBuilds[replIndexBuildState->dbName] =
+            std::make_shared<DatabaseIndexBuildsTracker>();
+        dbIndexBuilds = _databaseIndexBuilds[replIndexBuildState->dbName];
     }
     dbIndexBuilds->addIndexBuild(lk, replIndexBuildState);
 
@@ -338,15 +335,11 @@ void IndexBuildsCoordinator::_unregisterIndexBuild(
     WithLock lk,
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
-    NamespaceString nss =
-        UUIDCatalog::get(opCtx).lookupNSSByUUID(replIndexBuildState->collectionUUID);
-    invariant(!nss.isEmpty());
-
-    auto dbIndexBuilds = _databaseIndexBuilds[nss.db()];
+    auto dbIndexBuilds = _databaseIndexBuilds[replIndexBuildState->dbName];
     invariant(dbIndexBuilds);
     dbIndexBuilds->removeIndexBuild(lk, replIndexBuildState->buildUUID);
     if (dbIndexBuilds->getNumberOfIndexBuilds(lk) == 0) {
-        _databaseIndexBuilds.erase(nss.db());
+        _databaseIndexBuilds.erase(replIndexBuildState->dbName);
     }
 
     auto collIndexBuildsIt = _collectionIndexBuilds.find(replIndexBuildState->collectionUUID);

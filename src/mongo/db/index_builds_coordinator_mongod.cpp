@@ -33,6 +33,7 @@
 
 #include "mongo/db/index_builds_coordinator_mongod.h"
 
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -79,10 +80,10 @@ void IndexBuildsCoordinatorMongod::shutdown() {
 }
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
-IndexBuildsCoordinatorMongod::buildIndex(OperationContext* opCtx,
-                                         CollectionUUID collectionUUID,
-                                         const std::vector<BSONObj>& specs,
-                                         const UUID& buildUUID) {
+IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
+                                              CollectionUUID collectionUUID,
+                                              const std::vector<BSONObj>& specs,
+                                              const UUID& buildUUID) {
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
         std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
@@ -95,8 +96,10 @@ IndexBuildsCoordinatorMongod::buildIndex(OperationContext* opCtx,
         indexNames.push_back(name);
     }
 
+    auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(collectionUUID);
+    auto dbName = nss.db().toString();
     auto replIndexBuildState =
-        std::make_shared<ReplIndexBuildState>(buildUUID, collectionUUID, indexNames, specs);
+        std::make_shared<ReplIndexBuildState>(buildUUID, collectionUUID, dbName, indexNames, specs);
 
     Status status = _registerIndexBuild(opCtx, replIndexBuildState);
     if (!status.isOK()) {

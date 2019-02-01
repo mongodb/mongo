@@ -49,7 +49,6 @@ IndexBuildsManager::~IndexBuildsManager() {
 
 Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            Collection* collection,
-                                           const NamespaceString& nss,
                                            const std::vector<BSONObj>& specs,
                                            const UUID& buildUUID) {
     _registerIndexBuild(opCtx, collection, buildUUID);
@@ -76,7 +75,16 @@ Status IndexBuildsManager::startBuildingIndex(const UUID& buildUUID) {
     return Status::OK();
 }
 
-Status IndexBuildsManager::finishbBuildingPhase(const UUID& buildUUID) {
+Status IndexBuildsManager::drainBackgroundWrites(const UUID& buildUUID) {
+    auto multiIndexBlockPtr = _getBuilder(buildUUID);
+    // TODO: verify that the index builder is in the expected state.
+
+    // TODO: Not yet implemented.
+
+    return Status::OK();
+}
+
+Status IndexBuildsManager::finishBuildingPhase(const UUID& buildUUID) {
     auto multiIndexBlockPtr = _getBuilder(buildUUID);
     // TODO: verify that the index builder is in the expected state.
 
@@ -86,15 +94,6 @@ Status IndexBuildsManager::finishbBuildingPhase(const UUID& buildUUID) {
 }
 
 Status IndexBuildsManager::checkIndexConstraintViolations(const UUID& buildUUID) {
-    auto multiIndexBlockPtr = _getBuilder(buildUUID);
-    // TODO: verify that the index builder is in the expected state.
-
-    // TODO: Not yet implemented.
-
-    return Status::OK();
-}
-
-Status IndexBuildsManager::finishConstraintPhase(const UUID& buildUUID) {
     auto multiIndexBlockPtr = _getBuilder(buildUUID);
     // TODO: verify that the index builder is in the expected state.
 
@@ -141,6 +140,11 @@ bool IndexBuildsManager::interruptIndexBuild(const UUID& buildUUID, const std::s
 void IndexBuildsManager::tearDownIndexBuild(const UUID& buildUUID) {
     // TODO verify that the index builder is in a finished state before allowing its destruction.
     _unregisterIndexBuild(buildUUID);
+}
+
+bool IndexBuildsManager::isBackgroundBuilding(const UUID& buildUUID) {
+    auto builder = _getBuilder(buildUUID);
+    return builder->isBackgroundBuilding();
 }
 
 void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {

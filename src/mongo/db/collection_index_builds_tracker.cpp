@@ -49,7 +49,10 @@ void CollectionIndexBuildsTracker::addIndexBuild(
     invariant(replIndexBuildState->indexNames.size());
     for (auto& indexName : replIndexBuildState->indexNames) {
         // Ensure that a new entry is added.
-        invariant(_buildStateByIndexName.emplace(indexName, replIndexBuildState).second);
+        invariant(_buildStateByIndexName.emplace(indexName, replIndexBuildState).second,
+                  str::stream() << "index build state for " << indexName
+                                << " already exists. Collection: "
+                                << replIndexBuildState->collectionUUID);
     }
 }
 

@@ -56,7 +56,7 @@ public:
      */
     void shutdown() override;
 
-    StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> buildIndex(
+    StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,

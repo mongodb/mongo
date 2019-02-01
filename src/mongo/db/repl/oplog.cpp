@@ -287,7 +287,7 @@ Status startIndexBuild(OperationContext* opCtx,
         return statusWithIndexes.getStatus();
     }
     return IndexBuildsCoordinator::get(opCtx)
-        ->buildIndex(opCtx, collUUID, statusWithIndexes.getValue(), indexBuildUUID)
+        ->startIndexBuild(opCtx, collUUID, statusWithIndexes.getValue(), indexBuildUUID)
         .getStatus();
 }
 
