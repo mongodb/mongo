@@ -92,7 +92,7 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
         return {std::move(value)};
     }
 
-    if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+    if (PlanExecutor::FAILURE == state) {
         error() << "Plan executor error during findAndModify: " << PlanExecutor::statestr(state)
                 << ", stats: " << redact(Explain::getWinningPlanStats(exec));
 

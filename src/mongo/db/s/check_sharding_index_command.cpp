@@ -202,7 +202,7 @@ public:
             }
         }
 
-        if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+        if (PlanExecutor::FAILURE == state) {
             uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(currKey).withContext(
                 "Executor error while checking sharding index"));
         }

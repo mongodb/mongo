@@ -763,11 +763,10 @@ void dropCollection(OperationContext* opCtx,
         }
 
         // If we exited the above for loop with any other execState than IS_EOF, this means that
-        // a FAILURE or DEAD state was returned. If a DEAD state occurred, the collection or
-        // database that we are attempting to save may no longer be valid. If a FAILURE state
-        // was returned, either an unrecoverable error was thrown by exec, or we attempted to
-        // retrieve data that could not be provided by the PlanExecutor. In both of these cases
-        // it is necessary for a full resync of the server.
+        // a FAILURE state was returned. If a FAILURE state was returned, either an unrecoverable
+        // error was thrown by exec, or we attempted to retrieve data that could not be provided
+        // by the PlanExecutor. In both of these cases it is necessary for a full resync of the
+        // server.
 
         if (execState != PlanExecutor::IS_EOF) {
             if (execState == PlanExecutor::FAILURE &&

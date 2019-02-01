@@ -702,7 +702,6 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 case PlanExecutor::IS_EOF:
                     return Result(docs);
                 case PlanExecutor::FAILURE:
-                case PlanExecutor::DEAD:
                     return WorkingSetCommon::getMemberObjectStatus(out);
                 default:
                     MONGO_UNREACHABLE;

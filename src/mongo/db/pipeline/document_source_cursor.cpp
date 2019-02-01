@@ -139,7 +139,7 @@ void DocumentSourceCursor::loadBatch() {
         // must hold a collection lock to destroy '_exec', but we can only assume that our locks are
         // still held if '_exec' did not end in an error. If '_exec' encountered an error during a
         // yield, the locks might be yielded.
-        if (state != PlanExecutor::DEAD && state != PlanExecutor::FAILURE) {
+        if (state != PlanExecutor::FAILURE) {
             cleanupExecutor();
         }
     }
@@ -148,7 +148,6 @@ void DocumentSourceCursor::loadBatch() {
         case PlanExecutor::ADVANCED:
         case PlanExecutor::IS_EOF:
             return;  // We've reached our limit or exhausted the cursor.
-        case PlanExecutor::DEAD:
         case PlanExecutor::FAILURE: {
             _execStatus = WorkingSetCommon::getMemberObjectStatus(resultObj).withContext(
                 "Error in $cursor stage");

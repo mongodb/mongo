@@ -133,9 +133,9 @@ private:
 
     /**
      * Yields locks and waits for inserts to the collection. Returns ADVANCED if there has been an
-     * insertion and there may be new results. Returns DEAD if the PlanExecutor was killed during a
-     * yield. This method is only to be used for tailable and awaitData cursors, so rather than
-     * returning DEAD if the operation has exceeded its time limit, we return IS_EOF to preserve
+     * insertion and there may be new results. Returns FAILURE if the PlanExecutor was killed during
+     * a yield. This method is only to be used for tailable and awaitData cursors, so rather than
+     * returning FAILURE if the operation has exceeded its time limit, we return IS_EOF to preserve
      * this PlanExecutor for future use.
      *
      * If an error is encountered and 'errorObj' is provided, it is populated with an object

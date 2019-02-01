@@ -1563,7 +1563,7 @@ public:
                         break;
                 }
 
-                if (PlanExecutor::DEAD == execState || PlanExecutor::FAILURE == execState) {
+                if (PlanExecutor::FAILURE == execState) {
                     uasserted(ErrorCodes::OperationFailed,
                               str::stream() << "Executor error during mapReduce command: "
                                             << WorkingSetCommon::toStatusString(o));

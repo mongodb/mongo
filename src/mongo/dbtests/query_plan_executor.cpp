@@ -247,7 +247,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
     auto exec = makeCollScanExec(coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT);
 
     BSONObj resultObj;
-    ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(PlanExecutor::FAILURE, exec->getNext(&resultObj, nullptr));
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, WorkingSetCommon::getMemberObjectStatus(resultObj));
 }
 
@@ -265,7 +265,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwa
                                  TailableModeEnum::kTailableAndAwaitData);
 
     BSONObj resultObj;
-    ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(PlanExecutor::FAILURE, exec->getNext(&resultObj, nullptr));
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, WorkingSetCommon::getMemberObjectStatus(resultObj));
 }
 
@@ -281,7 +281,7 @@ TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailabl
         coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, TailableModeEnum::kTailable);
 
     BSONObj resultObj;
-    ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(PlanExecutor::FAILURE, exec->getNext(&resultObj, nullptr));
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, WorkingSetCommon::getMemberObjectStatus(resultObj));
 }
 
@@ -296,7 +296,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
     auto exec = makeCollScanExec(coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED);
 
     BSONObj resultObj;
-    ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(PlanExecutor::FAILURE, exec->getNext(&resultObj, nullptr));
     ASSERT_EQ(ErrorCodes::QueryPlanKilled, WorkingSetCommon::getMemberObjectStatus(resultObj));
 }
 

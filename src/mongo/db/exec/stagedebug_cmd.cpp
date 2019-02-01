@@ -207,10 +207,9 @@ public:
 
         resultBuilder.done();
 
-        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-            error() << "Plan executor error during StageDebug command: "
-                    << PlanExecutor::statestr(state)
-                    << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
+        if (PlanExecutor::FAILURE == state) {
+            error() << "Plan executor error during StageDebug command: FAILURE, stats: "
+                    << redact(Explain::getWinningPlanStats(exec.get()));
 
             uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
                 "Executor error during StageDebug command"));

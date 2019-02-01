@@ -379,16 +379,17 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
                 return false;
             }
         } else if (PlanStage::NEED_TIME != state) {
-            // FAILURE or DEAD.  Do we want to just tank that plan and try the rest?  We
-            // probably want to fail globally as this shouldn't happen anyway.
+            // On FAILURE, mark this candidate as failed, but keep executing the other
+            // candidates. The MultiPlanStage as a whole only fails when every candidate
+            // plan fails.
 
             candidate.failed = true;
             ++_failureCount;
 
             // Propagate most recent seen failure to parent.
-            if (PlanStage::FAILURE == state) {
-                _statusMemberId = id;
-            }
+            invariant(state == PlanStage::FAILURE);
+            _statusMemberId = id;
+
 
             if (_failureCount == _candidates.size()) {
                 _failure = true;

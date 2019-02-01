@@ -372,7 +372,7 @@ public:
             }
 
             // Throw an assertion if query execution fails for any reason.
-            if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+            if (PlanExecutor::FAILURE == state) {
                 firstBatch.abandon();
                 LOG(1) << "Plan executor error during find command: "
                        << PlanExecutor::statestr(state)

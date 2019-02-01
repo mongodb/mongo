@@ -199,12 +199,7 @@ void mongo::cloneCollectionAsCapped(OperationContext* opCtx,
                 break;
             }
             default:
-                // Unreachable as:
-                // 1) We require a read lock (at a minimum) on the "from" collection
-                //    and won't yield, preventing collection drop and PlanExecutor::DEAD
-                // 2) PlanExecutor::FAILURE is only returned on PlanStage::FAILURE. The
-                //    CollectionScan PlanStage does not have a FAILURE scenario.
-                // 3) All other PlanExecutor states are handled above
+                // A collection scan plan which does not yield should never fail.
                 MONGO_UNREACHABLE;
         }
 

@@ -496,7 +496,7 @@ public:
             }
         }
 
-        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+        if (PlanExecutor::FAILURE == state) {
             warning() << "Internal error while reading " << ns;
             uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
                 "Executor error while reading during dataSize command"));

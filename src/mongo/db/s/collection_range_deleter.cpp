@@ -420,11 +420,10 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
             break;
         }
 
-        if (state == PlanExecutor::FAILURE || state == PlanExecutor::DEAD) {
+        if (state == PlanExecutor::FAILURE) {
             warning() << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
-                      << redact(min) << " to " << redact(max) << " in " << nss << ": "
-                      << redact(WorkingSetCommon::toStatusString(deletedObj))
-                      << ", stats: " << Explain::getWinningPlanStats(exec.get());
+                      << redact(min) << " to " << redact(max) << " in " << nss
+                      << ": FAILURE, stats: " << Explain::getWinningPlanStats(exec.get());
             break;
         }
 

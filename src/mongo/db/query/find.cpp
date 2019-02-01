@@ -84,7 +84,7 @@ bool shouldSaveCursor(OperationContext* opCtx,
                       const Collection* collection,
                       PlanExecutor::ExecState finalState,
                       PlanExecutor* exec) {
-    if (PlanExecutor::FAILURE == finalState || PlanExecutor::DEAD == finalState) {
+    if (PlanExecutor::FAILURE == finalState) {
         return false;
     }
 
@@ -109,7 +109,7 @@ bool shouldSaveCursor(OperationContext* opCtx,
 bool shouldSaveCursorGetMore(PlanExecutor::ExecState finalState,
                              PlanExecutor* exec,
                              bool isTailable) {
-    if (PlanExecutor::FAILURE == finalState || PlanExecutor::DEAD == finalState) {
+    if (PlanExecutor::FAILURE == finalState) {
         return false;
     }
 
@@ -199,11 +199,10 @@ void generateBatch(int ntoreturn,
 
     // Propagate any errors to the caller.
     switch (*state) {
-        // Log an error message and then perform the same cleanup as DEAD.
-        case PlanExecutor::FAILURE:
+        // Log an error message and then perform the cleanup.
+        case PlanExecutor::FAILURE: {
             error() << "getMore executor error, stats: "
                     << redact(Explain::getWinningPlanStats(exec));
-        case PlanExecutor::DEAD: {
             // We should always have a valid status object by this point.
             auto status = WorkingSetCommon::getMemberObjectStatus(obj);
             invariant(!status.isOK());
@@ -646,7 +645,7 @@ std::string runQuery(OperationContext* opCtx,
     }
 
     // Caller expects exceptions thrown in certain cases.
-    if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+    if (PlanExecutor::FAILURE == state) {
         error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
                 << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
         uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(obj),

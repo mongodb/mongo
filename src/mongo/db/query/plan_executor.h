@@ -78,20 +78,9 @@ public:
         // We're EOF.  We won't return any more results (edge case exception: capped+tailable).
         IS_EOF,
 
-        // The plan executor died, usually due to a concurrent catalog event such as a collection
-        // drop.
-        //
-        // If the underlying PlanStage has any information on the error, it will be available in
-        // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
-        // details from the output BSON object.
-        //
-        // The PlanExecutor is no longer capable of executing. The caller may extract stats from the
-        // underlying plan stages, but should not attempt to do anything else with the executor
-        // other than dispose() and destroy it.
-        DEAD,
-
         // getNext() was asked for data it cannot provide, or the underlying PlanStage had an
-        // unrecoverable error.
+        // unrecoverable error, or the executor died, usually due to a concurrent catalog event
+        // such as a collection drop.
         //
         // If the underlying PlanStage has any information on the error, it will be available in
         // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
@@ -110,7 +99,7 @@ public:
     enum YieldPolicy {
         // Any call to getNext() may yield. In particular, the executor may die on any call to
         // getNext() due to a required index or collection becoming invalid during yield. If this
-        // occurs, getNext() will produce an error during yield recovery and will return DEAD.
+        // occurs, getNext() will produce an error during yield recovery and will return FAILURE.
         // Additionally, this will handle all WriteConflictExceptions that occur while processing
         // the query.
         YIELD_AUTO,
@@ -142,12 +131,12 @@ public:
         INTERRUPT_ONLY,
 
         // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
-        // yield, returning DEAD with an error object encoding a ErrorCodes::ExceededTimeLimit
+        // yield, returning FAILURE with an error object encoding a ErrorCodes::ExceededTimeLimit
         // message.
         ALWAYS_TIME_OUT,
 
         // Used for testing, this yield policy will cause the PlanExecutor to be marked as killed on
-        // the first yield, returning DEAD with an error object encoding a
+        // the first yield, returning FAILURE with an error object encoding a
         // ErrorCodes::QueryPlanKilled message.
         ALWAYS_MARK_KILLED,
     };
@@ -393,7 +382,8 @@ public:
 
     /**
      * Notifies a PlanExecutor that it should die. Callers must specify the reason for why this
-     * executor is being killed. Subsequent calls to getNext() will return DEAD, and fill 'objOut'
+     * executor is being killed. Subsequent calls to getNext() will return FAILURE, and fill
+     * 'objOut'
      * with an error reflecting 'killStatus'. If this method is called multiple times, only the
      * first 'killStatus' will be retained. It is an error to call this method with Status::OK.
      */

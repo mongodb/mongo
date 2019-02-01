@@ -293,8 +293,6 @@ string PlanExecutor::statestr(ExecState s) {
         return "ADVANCED";
     } else if (PlanExecutor::IS_EOF == s) {
         return "IS_EOF";
-    } else if (PlanExecutor::DEAD == s) {
-        return "DEAD";
     } else {
         verify(PlanExecutor::FAILURE == s);
         return "FAILURE";
@@ -493,7 +491,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierDa
         *errorObj = Snapshotted<BSONObj>(SnapshotId(),
                                          WorkingSetCommon::buildMemberStatusObject(yieldResult));
     }
-    return DEAD;
+    return FAILURE;
 }
 
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* objOut,
@@ -513,7 +511,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             *objOut = Snapshotted<BSONObj>(SnapshotId(),
                                            WorkingSetCommon::buildMemberStatusObject(_killStatus));
         }
-        return PlanExecutor::DEAD;
+        return PlanExecutor::FAILURE;
     }
 
     if (!_stash.empty()) {
@@ -547,7 +545,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
                     *objOut = Snapshotted<BSONObj>(
                         SnapshotId(), WorkingSetCommon::buildMemberStatusObject(yieldStatus));
                 }
-                return PlanExecutor::DEAD;
+                return PlanExecutor::FAILURE;
             }
         }
 
@@ -670,7 +668,7 @@ Status PlanExecutorImpl::executePlan() {
         state = this->getNext(&obj, NULL);
     }
 
-    if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
+    if (PlanExecutor::FAILURE == state) {
         if (isMarkedAsKilled()) {
             return _killStatus;
         }

@@ -132,7 +132,7 @@ public:
     /**
      * Gets the next result from 'stage'.
      *
-     * Fails if the stage fails or returns DEAD, if the returned working
+     * Fails if the stage fails or returns FAILURE, if the returned working
      * set member is not fetched, or if there are no more results.
      */
     BSONObj getNext(PlanStage* stage, WorkingSet* ws) {
