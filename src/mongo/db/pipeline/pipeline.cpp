@@ -613,6 +613,10 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFront() {
     return targetStage;
 }
 
+DocumentSource* Pipeline::peekFront() const {
+    return _sources.empty() ? nullptr : _sources.front().get();
+}
+
 boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithName(StringData targetStageName) {
     return popFrontWithNameAndCriteria(targetStageName, nullptr);
 }

@@ -55,10 +55,14 @@ DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
 
     if (_currentBatch.empty()) {
         loadBatch();
-
-        if (_currentBatch.empty())
-            return GetNextResult::makeEOF();
     }
+
+    // If we are tracking the oplog timestamp, update our cached latest optime.
+    if (_trackOplogTS && _exec)
+        _updateOplogTimestamp();
+
+    if (_currentBatch.empty())
+        return GetNextResult::makeEOF();
 
     Document out = std::move(_currentBatch.front());
     _currentBatch.pop_front();
@@ -104,10 +108,7 @@ void DocumentSourceCursor::loadBatch() {
 
                 // As long as we're waiting for inserts, we shouldn't do any batching at this level
                 // we need the whole pipeline to see each document to see if we should stop waiting.
-                // Furthermore, if we need to return the latest oplog time (in the tailable and
-                // awaitData case), batching will result in a wrong time.
-                if (pExpCtx->isTailableAwaitData() ||
-                    awaitDataState(pExpCtx->opCtx).shouldWaitForInserts ||
+                if (awaitDataState(pExpCtx->opCtx).shouldWaitForInserts ||
                     memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
                     // End this batch and prepare PlanExecutor for yielding.
                     _exec->saveState();
@@ -144,6 +145,19 @@ void DocumentSourceCursor::loadBatch() {
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+void DocumentSourceCursor::_updateOplogTimestamp() {
+    // If we are about to return a result, set our oplog timestamp to the optime of that result.
+    if (!_currentBatch.empty()) {
+        const auto& ts = _currentBatch.front().getField(repl::OpTime::kTimestampFieldName);
+        invariant(ts.getType() == BSONType::bsonTimestamp);
+        _latestOplogTimestamp = ts.getTimestamp();
+        return;
+    }
+
+    // If we have no more results to return, advance to the latest oplog timestamp.
+    _latestOplogTimestamp = _exec->getLatestOplogTimestamp();
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceCursor::doOptimizeAt(
@@ -299,11 +313,13 @@ DocumentSourceCursor::~DocumentSourceCursor() {
 DocumentSourceCursor::DocumentSourceCursor(
     Collection* collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const intrusive_ptr<ExpressionContext>& pCtx)
+    const intrusive_ptr<ExpressionContext>& pCtx,
+    bool trackOplogTimestamp)
     : DocumentSource(pCtx),
       _docsAddedToBatches(0),
       _exec(std::move(exec)),
-      _outputSorts(_exec->getOutputSorts()) {
+      _outputSorts(_exec->getOutputSorts()),
+      _trackOplogTS(trackOplogTimestamp) {
 
     _planSummary = Explain::getPlanSummary(_exec.get());
     recordPlanSummaryStats();
@@ -322,9 +338,10 @@ DocumentSourceCursor::DocumentSourceCursor(
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     Collection* collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    bool trackOplogTimestamp) {
     intrusive_ptr<DocumentSourceCursor> source(
-        new DocumentSourceCursor(collection, std::move(exec), pExpCtx));
+        new DocumentSourceCursor(collection, std::move(exec), pExpCtx, trackOplogTimestamp));
     return source;
 }
 }

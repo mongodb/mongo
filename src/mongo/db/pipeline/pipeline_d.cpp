@@ -520,9 +520,13 @@ void PipelineD::addCursorSource(Collection* collection,
     // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved.
     exec->saveState();
 
+    // If this is a change stream pipeline, make sure that we tell DSCursor to track the oplog time.
+    const bool trackOplogTS =
+        (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage());
+
     // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
     intrusive_ptr<DocumentSourceCursor> pSource =
-        DocumentSourceCursor::create(collection, std::move(exec), expCtx);
+        DocumentSourceCursor::create(collection, std::move(exec), expCtx, trackOplogTS);
 
     // Add the cursor to the pipeline first so that it's correctly disposed of as part of the
     // pipeline if an exception is thrown during this method.

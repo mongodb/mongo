@@ -270,6 +270,11 @@ public:
     boost::intrusive_ptr<DocumentSource> popFront();
 
     /**
+     * Returns a pointer to the first stage of the pipeline, or a nullptr if the pipeline is empty.
+     */
+    DocumentSource* peekFront() const;
+
+    /**
      * Removes and returns the last stage of the pipeline. Returns nullptr if the pipeline is empty.
      */
     boost::intrusive_ptr<DocumentSource> popBack();
