@@ -62,6 +62,9 @@ namespace write_ops {
 // used if the protocol changes to avoid the 16MB limit on reply size.
 constexpr size_t kMaxWriteBatchSize = 100'000;
 
+// Limit the size that we write without yielding to 16MB / 64 (max expected number of indexes)
+constexpr size_t insertVectorMaxBytes = 256 * 1024;
+
 /**
  * Retrieves the statement id for the write at the specified position in the write batch entries
  * array.

@@ -34,7 +34,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/query_knobs.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
 

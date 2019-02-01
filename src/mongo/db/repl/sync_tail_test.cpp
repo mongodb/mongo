@@ -50,6 +50,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -759,7 +760,7 @@ TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchSizeWhenGroupingInsertOperations) 
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
     // Create a sequence of insert ops that are too large to fit in one group.
-    int maxBatchSize = insertVectorMaxBytes;
+    int maxBatchSize = write_ops::insertVectorMaxBytes;
     int opsPerBatch = 3;
     int opSize = maxBatchSize / opsPerBatch - 500;  // Leave some room for other oplog fields.
 
@@ -807,7 +808,7 @@ TEST_F(SyncTailTest, MultiSyncApplyAppliesOpIndividuallyWhenOpIndividuallyExceed
     NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
-    int maxBatchSize = insertVectorMaxBytes;
+    int maxBatchSize = write_ops::insertVectorMaxBytes;
     // Create an insert op that exceeds the maximum batch size by itself.
     auto insertOpLarge = makeSizedInsertOp(nss, maxBatchSize, seconds++);
     auto insertOpSmall = makeSizedInsertOp(nss, 100, seconds++);

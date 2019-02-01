@@ -42,7 +42,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/db/query/query_knobs.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/unittest/ensure_fcv.h"

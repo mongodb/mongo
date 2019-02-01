@@ -34,7 +34,7 @@
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
-#include "mongo/db/query/query_knobs.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

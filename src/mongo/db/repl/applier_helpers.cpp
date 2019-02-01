@@ -38,7 +38,7 @@
 #include <iterator>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/query_knobs.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/assert_util.h"
@@ -50,7 +50,7 @@ namespace repl {
 namespace {
 
 // Must not create too large an object.
-const auto kInsertGroupMaxBatchSize = insertVectorMaxBytes;
+const auto kInsertGroupMaxBatchSize = write_ops::insertVectorMaxBytes;
 
 // Limit number of ops in a single group.
 constexpr auto kInsertGroupMaxBatchCount = 64;
@@ -99,7 +99,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     std::vector<BSONObj> toInsert;
 
     // Make sure to include the first op in the batch size.
-    auto batchSize = entry.getObject().objsize();
+    size_t batchSize = entry.getObject().objsize();
     auto batchCount = OperationPtrs::size_type(1);
     auto batchNamespace = entry.getNss();
 

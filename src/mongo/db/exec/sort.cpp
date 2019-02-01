@@ -41,7 +41,7 @@
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/query_knobs.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"

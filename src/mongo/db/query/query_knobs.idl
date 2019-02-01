@@ -1,0 +1,307 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/platform/atomic_proxy.h"
+    - "mongo/platform/atomic_word.h"
+
+server_parameters:
+
+  #
+  # multi-plan ranking
+  #
+  internalQueryPlanEvaluationWorks:
+    description: "Max number of times we call work() on plans before comparing them, for small collections."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlanEvaluationWorks"
+    cpp_vartype: AtomicWord<int>
+    default: 10000
+    validator: 
+      gt: 0
+
+  internalQueryPlanEvaluationCollFraction:
+    description: "For large collections, the number times we work() candidate plans is taken as this fraction of the collection size."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlanEvaluationCollFraction"
+    cpp_vartype: AtomicDouble
+    default: 0.3
+    validator: 
+      gte: 0.0
+      lte: 1.0
+
+  internalQueryPlanEvaluationMaxResults:
+    description: "Stop working plans once a plan returns this many results."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlanEvaluationMaxResults"
+    cpp_vartype: AtomicWord<int>
+    default: 101
+    validator: 
+      gte: 0
+  
+  internalQueryForceIntersectionPlans:
+    description: "Do we give a big ranking bonus to intersection plans?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryForceIntersectionPlans"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+  
+  internalQueryPlannerEnableIndexIntersection:
+    description: "Do we have ixisect on at all?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlannerEnableIndexIntersection"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
+  internalQueryPlannerEnableHashIntersection:
+    description: "Do we use hash-based intersection for rooted $and queries?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlannerEnableHashIntersection"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+      
+  #
+  # Plan cache
+  #
+  internalQueryCacheSize:
+    description: "How many entries in the cache?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCacheSize"
+    cpp_vartype: AtomicWord<int>
+    default: 5000
+    validator: 
+      gte: 0
+
+  internalQueryCacheFeedbacksStored:
+    description: "How many feedback entries do we collect before possibly evicting from the cache based on bad performance?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCacheFeedbacksStored"
+    cpp_vartype: AtomicWord<int>
+    default: 20
+    validator: 
+      gte: 0
+
+  internalQueryCacheEvictionRatio:
+    description: "How many times more works must we perform in order to justify plan cache eviction and replanning?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCacheEvictionRatio"
+    cpp_vartype: AtomicDouble
+    default: 10.0
+    validator: 
+      gte: 0.0
+
+  internalQueryCacheWorksGrowthCoefficient:
+    description: "How quickly the the 'works' value in an inactive cache entry will grow. It grows exponentially. The value of this server parameter is the base."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCacheWorksGrowthCoefficient"
+    cpp_vartype: AtomicDouble
+    default: 2.0
+    validator: 
+      gt: 1.0
+  
+  internalQueryCacheDisableInactiveEntries:
+    description: "Whether or not cache entries can be marked as 'inactive'."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCacheDisableInactiveEntries"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalQueryCacheListPlansNewOutput:
+    description: "Whether or not planCacheListPlans uses the new output format."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCacheListPlansNewOutput"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  #
+  # Planning and enumeration
+  #
+  internalQueryPlannerMaxIndexedSolutions:
+    description: "How many indexed solutions will QueryPlanner::plan output?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlannerMaxIndexedSolutions"
+    cpp_vartype: AtomicWord<int>
+    default: 64
+    validator: 
+      gte: 0
+
+  internalQueryEnumerationMaxOrSolutions:
+    description: "How many solutions will the enumerator consider at each OR?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryEnumerationMaxOrSolutions"
+    cpp_vartype: AtomicWord<int>
+    default: 10
+    validator: 
+      gte: 0
+
+  internalQueryEnumerationMaxIntersectPerAnd:
+    description: "How many intersections will the enumerator consider at each AND?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryEnumerationMaxIntersectPerAnd"
+    cpp_vartype: AtomicWord<int>
+    default: 3
+    validator: 
+      gte: 0
+
+  internalQueryPlanOrChildrenIndependently:
+    description: "Do we want to plan each child of the OR independently?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlanOrChildrenIndependently"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
+  internalQueryMaxScansToExplode:
+    description: "How many index scans are we willing to produce in order to obtain a sort order during explodeForSort?"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxScansToExplode"
+    cpp_vartype: AtomicWord<int>
+    default: 200
+    validator: 
+      gte: 0
+
+  internalQueryPlannerGenerateCoveredWholeIndexScans:
+    description: "Allow the planner to generate covered whole index scans, rather than falling back to a COLLSCAN."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlannerGenerateCoveredWholeIndexScans"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalQueryIgnoreUnknownJSONSchemaKeywords:
+    description: "Ignore unknown JSON Schema keywords."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryIgnoreUnknownJSONSchemaKeywords"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  #
+  # Query execution
+  #
+  internalQueryExecMaxBlockingSortBytes:
+    description: "internal query execute maximum blocking sort in bytes."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryExecMaxBlockingSortBytes"
+    cpp_vartype: AtomicWord<int>
+    default: 
+      expr: 32 * 1024 * 1024
+    validator: 
+      gte: 0
+
+  internalQueryExecYieldIterations:
+    description: "Yield after this many \"should yield?\" checks."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryExecYieldIterations"
+    cpp_vartype: AtomicWord<int>
+    default: 128
+
+  internalQueryExecYieldPeriodMS:
+    description: "Yield if it's been at least this many milliseconds since we last yielded."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryExecYieldPeriodMS"
+    cpp_vartype: AtomicWord<int>
+    default: 10
+    validator: 
+      gte: 0
+
+  internalQueryFacetBufferSizeBytes:
+    description: "The number of bytes to buffer at once during a $facet stage."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryFacetBufferSizeBytes"
+    cpp_vartype: AtomicWord<int>
+    default: 
+      expr: 100 * 1024 * 1024
+    validator: 
+      gt: 0
+
+  internalDocumentSourceSortMaxBlockingSortBytes:
+    description: "The maximum size of the dataset that we are prepared to sort in-memory."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalDocumentSourceSortMaxBlockingSortBytes"
+    cpp_vartype: AtomicWord<long long>
+    default: 
+      expr: 100 * 1024 * 1024
+    validator: 
+      gt: 0
+
+  internalLookupStageIntermediateDocumentMaxSizeBytes:
+    description: "Maximum size of the result set that we cache from the foreign collection during a $lookup."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalLookupStageIntermediateDocumentMaxSizeBytes"
+    cpp_vartype: AtomicWord<long long>
+    default: 
+      expr: 100 * 1024 * 1024
+    validator: 
+      gte: { expr: BSONObjMaxInternalSize}
+
+  internalDocumentSourceGroupMaxMemoryBytes:
+    description: "Maximum size of the data that the $group aggregation stage will cache in-memory before spilling to disk."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalDocumentSourceGroupMaxMemoryBytes"
+    cpp_vartype: AtomicWord<long long>
+    default: 
+      expr: 100 * 1024 * 1024
+    validator: 
+      gt: 0
+
+  internalInsertMaxBatchSize:
+    description: "Maximum number of documents that we will insert in a single batch."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalInsertMaxBatchSize"
+    cpp_vartype: AtomicWord<int>
+    default: 
+      expr: internalQueryExecYieldIterations.load() / 2
+      is_constexpr: false
+    validator: 
+      gt: 0
+
+  internalDocumentSourceCursorBatchSizeBytes:
+    description: "Maximum amount of data that DocumentSourceCursor will cache from the underlying PlanExecutor before pipeline processing."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalDocumentSourceCursorBatchSizeBytes"
+    cpp_vartype: AtomicWord<int>
+    default: 
+      expr: 4 * 1024 * 1024
+    validator: 
+      gte: 0
+
+  internalDocumentSourceLookupCacheSizeBytes:
+    description: "Maximum amount of non-correlated foreign-collection data that the $lookup stage will cache before abandoning the cache and executing the full pipeline on each iteration."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalDocumentSourceLookupCacheSizeBytes"
+    cpp_vartype: AtomicWord<int>
+    default: 
+      expr: 100 * 1024 * 1024
+    validator: 
+      gte: 0
+
+  internalQueryProhibitBlockingMergeOnMongoS:
+    description: "If true, blocking stages such as $group or non-merging $sort will be prohibited from running on mongoS."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryProhibitBlockingMergeOnMongoS"
+    cpp_vartype: AtomicWord<bool>
+    default: false

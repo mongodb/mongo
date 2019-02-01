@@ -36,7 +36,7 @@
 
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/query/query_knobs.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
