@@ -48,6 +48,40 @@ public:
     // Explicitly unsupported type name constants.
     static constexpr StringData kSchemaTypeInteger = "integer"_sd;
 
+    // Standard JSON Schema keyword constants.
+    static constexpr StringData kSchemaAdditionalItemsKeyword = "additionalItems"_sd;
+    static constexpr StringData kSchemaAdditionalPropertiesKeyword = "additionalProperties"_sd;
+    static constexpr StringData kSchemaAllOfKeyword = "allOf"_sd;
+    static constexpr StringData kSchemaAnyOfKeyword = "anyOf"_sd;
+    static constexpr StringData kSchemaDependenciesKeyword = "dependencies"_sd;
+    static constexpr StringData kSchemaDescriptionKeyword = "description"_sd;
+    static constexpr StringData kSchemaEnumKeyword = "enum"_sd;
+    static constexpr StringData kSchemaExclusiveMaximumKeyword = "exclusiveMaximum"_sd;
+    static constexpr StringData kSchemaExclusiveMinimumKeyword = "exclusiveMinimum"_sd;
+    static constexpr StringData kSchemaItemsKeyword = "items"_sd;
+    static constexpr StringData kSchemaMaxItemsKeyword = "maxItems"_sd;
+    static constexpr StringData kSchemaMaxLengthKeyword = "maxLength"_sd;
+    static constexpr StringData kSchemaMaxPropertiesKeyword = "maxProperties"_sd;
+    static constexpr StringData kSchemaMaximumKeyword = "maximum"_sd;
+    static constexpr StringData kSchemaMinItemsKeyword = "minItems"_sd;
+    static constexpr StringData kSchemaMinLengthKeyword = "minLength"_sd;
+    static constexpr StringData kSchemaMinPropertiesKeyword = "minProperties"_sd;
+    static constexpr StringData kSchemaMinimumKeyword = "minimum"_sd;
+    static constexpr StringData kSchemaMultipleOfKeyword = "multipleOf"_sd;
+    static constexpr StringData kSchemaNotKeyword = "not"_sd;
+    static constexpr StringData kSchemaOneOfKeyword = "oneOf"_sd;
+    static constexpr StringData kSchemaPatternKeyword = "pattern"_sd;
+    static constexpr StringData kSchemaPatternPropertiesKeyword = "patternProperties"_sd;
+    static constexpr StringData kSchemaPropertiesKeyword = "properties"_sd;
+    static constexpr StringData kSchemaRequiredKeyword = "required"_sd;
+    static constexpr StringData kSchemaTitleKeyword = "title"_sd;
+    static constexpr StringData kSchemaTypeKeyword = "type"_sd;
+    static constexpr StringData kSchemaUniqueItemsKeyword = "uniqueItems"_sd;
+
+    // MongoDB-specific (non-standard) JSON Schema keyword constants.
+    static constexpr StringData kSchemaBsonTypeKeyword = "bsonType"_sd;
+    static constexpr StringData kSchemaEncryptKeyword = "encrypt"_sd;
+
     /**
      * Converts a JSON schema, represented as BSON, into a semantically equivalent match expression
      * tree. Returns a non-OK status if the schema is invalid or cannot be parsed.

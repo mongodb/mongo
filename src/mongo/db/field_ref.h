@@ -178,6 +178,10 @@ public:
         return numParts() == 0;
     }
 
+    StringData operator[](int index) const {
+        return getPart(index);
+    }
+
 private:
     // Dotted fields are most often not longer than four parts. We use a mixed structure
     // here that will not require any extra memory allocation when that is the case. And
