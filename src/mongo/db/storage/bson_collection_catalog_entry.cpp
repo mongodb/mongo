@@ -305,7 +305,7 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
             sub.append("backgroundSecondary", indexes[i].isBackgroundSecondaryBuild);
 
             sub.append("runTwoPhaseBuild", indexes[i].runTwoPhaseBuild);
-            sub.append("versionOfBuild", indexes[i].versionOfBuild);
+            sub.append("versionOfBuild", static_cast<long long>(indexes[i].versionOfBuild));
             if (indexes[i].buildPhase) {
                 sub.append("buildPhase", *indexes[i].buildPhase);
             }
