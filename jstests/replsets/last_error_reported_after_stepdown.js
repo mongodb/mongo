@@ -33,13 +33,16 @@
 
     // Note that "operation" should always be on primaryDataConn, so the stepdown doesn't clear
     // the last error.
-    function runStepDownTest({description, operation, errorCode, nDocs}) {
+    function runStepDownTest({description, logMsg, operation, errorCode, nDocs}) {
         jsTestLog(`Trying ${description} on the primary, then stepping down`);
+        // We need to make sure the command is complete before stepping down.
+        assert.commandWorked(
+            primaryAdmin.adminCommand({setParameter: 1, logComponentVerbosity: {command: 1}}));
         operation();
         // Wait for the operation to complete.
-        assert.soon(
-            () => primaryAdmin.aggregate([{'$currentOp': {}}, {'$match': {ns: coll.getName()}}])
-                      .itcount() == 0);
+        checkLog.contains(primary, logMsg + ' appName: "MongoDB Shell"');
+        assert.commandWorked(
+            primaryAdmin.adminCommand({setParameter: 1, logComponentVerbosity: {command: 0}}));
         assert.commandWorked(primaryAdmin.adminCommand({replSetStepDown: 60, force: true}));
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);
         var lastError = assert.commandWorked(primaryDb.runCommand({getLastError: 1}));
@@ -62,29 +65,43 @@
     }
 
     // Tests which should have no errors.
-    runStepDownTest({description: "insert", operation: () => coll.insert({_id: 0})});
+    runStepDownTest({
+        description: "insert",
+        logMsg: "insert " + coll.getFullName(),
+        operation: () => coll.insert({_id: 0})
+    });
     runStepDownTest({
         description: "update",
+        logMsg: "update ",
         operation: () => coll.update({_id: 'updateme'}, {'$inc': {x: 1}}),
         nDocs: 1
     });
-    runStepDownTest(
-        {description: "remove", operation: () => coll.remove({_id: 'deleteme'}), nDocs: 1});
+    runStepDownTest({
+        description: "remove",
+        logMsg: "remove ",
+        operation: () => coll.remove({_id: 'deleteme'}),
+        nDocs: 1
+    });
 
     // Tests which should have errors.
+    // We repeat log messages from tests above, so clear the log first.
+    assert.commandWorked(primaryAdmin.adminCommand({clearLog: 'global'}));
     runStepDownTest({
         description: "insert with error",
+        logMsg: "insert " + coll.getFullName(),
         operation: () => coll.insert({_id: 0}),
         errorCode: ErrorCodes.DuplicateKey
     });
     runStepDownTest({
         description: "update with error",
+        logMsg: "update ",
         operation: () => coll.update({_id: 'updateme'}, {'$inc': {nullfield: 1}}),
         errorCode: ErrorCodes.TypeMismatch,
         nDocs: 0
     });
     runStepDownTest({
         description: "remove with error",
+        logMsg: "remove ",
         operation: () => coll.remove({'$nonsense': {x: 1}}),
         errorCode: ErrorCodes.BadValue,
         nDocs: 0
