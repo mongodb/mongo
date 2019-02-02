@@ -809,32 +809,16 @@ functions:
       script: |
         set -o errexit
         set -o verbose
-        # removes files from the (local) or shared scons cache when it's over a
+        # removes files from the local scons cache when it's over a
         # threshold, to the $prune_ratio percentage. Ideally override
         # these default values in the distro config in evergreen.
 
         ${activate_virtualenv}
-        prune_scons_cache="$python buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}"
-        if [ "${scons_cache_scope}" = "shared" ]; then
-            if [ "${shared_scons_pruning}" = "true" ] && [ "${is_patch}" != "true" ]; then
-              echo "shared_scons_pruning is set to true, checking last prune time"
-              if $python buildscripts/prune_check.py; then
-                echo "Pruning shared cache"
-                $prune_scons_cache
-                if [ $? -eq 0 ]; then
-                  echo "Prune successful.  Resetting last_prune timestamp"
-                  $python buildscripts/prune_check.py -w
-                fi
-              else
-                echo "We are less than the 'shared_scons_pruning' num seconds threshold, pruning will be skipped"
-              fi
-            else
-              echo "Shared cache enabled but 'shared_scons_pruning' is not enabled for this variant or we are running a patch build, pruning will be skipped"
-            fi
-        else
-            echo "Legacy local shared cache prune"
+        if [ "${scons_cache_scope}" != "shared" ]; then
+          echo "Local cache prune"
             if [ -d "${scons_cache_path}" ]; then
-              $prune_scons_cache
+              echo "Pruning local cache: ${scons_cache_path}"
+              $python buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
             fi
         fi
 
@@ -7526,7 +7510,6 @@ buildvariants:
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     scons_cache_scope: shared
-    shared_scons_pruning: true
     tooltags: ""
     build_mongoreplay: true
     target_resmoke_time: 15
@@ -7698,7 +7681,6 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
@@ -8596,7 +8578,6 @@ buildvariants:
     packager_distro: amazon
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     tooltags: "ssl"
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v2/bin/virtualenv
@@ -8776,7 +8757,6 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
@@ -10632,7 +10612,6 @@ buildvariants:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
     compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     scons_cache_scope: shared
-    shared_scons_pruning: true
     tooltags: ""
     build_mongoreplay: true
   tasks:
@@ -10769,7 +10748,6 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
@@ -11658,7 +11636,6 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
@@ -11808,7 +11785,6 @@ buildvariants:
     packager_distro: debian81
     repo_edition: org
     scons_cache_scope: shared
-    shared_scons_pruning: true
     tooltags: "ssl"
     build_mongoreplay: true
   display_tasks:
@@ -11964,7 +11940,6 @@ buildvariants:
     repo_edition: org
     tooltags: "ssl"
     scons_cache_scope: shared
-    shared_scons_pruning: true
     build_mongoreplay: true
   display_tasks:
   - *dbtest
