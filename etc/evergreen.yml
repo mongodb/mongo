@@ -863,49 +863,58 @@ functions:
     command: shell.exec
     type: system
     params:
+      shell: bash
       working_dir: src
       script: |
         set -o errexit
         set -o verbose
         # removes files from the shared scons cache.
 
-        set +o errexit
-        mount | grep "\/efs" > /dev/null
-        if [ $? -eq 0 ]; then
-          echo "Shared cache is already mounted"
-        else
-          echo "Shared cache - mounting file system"
-          sudo mount /efs
-        fi
-        set -o errexit
+        # Only prune on master branch
+        if [[ "${project}" == "mongodb-mongo-master" ]]; then
 
-        dirs=$(ls -l /efs | grep -v total | awk '{print $NF}')
 
-        echo "Pruning shared SCons directories"
-
-        for dir in $dirs; do
-          echo "Pruning /efs/$dir/scons-cache"
-
-          if [ -e /efs/$dir/info/distro_name ]; then
-            distro=$(cat /efs/$dir/info/distro_name)
+          set +o errexit
+          mount | grep "\/efs" > /dev/null
+          if [ $? -eq 0 ]; then
+            echo "Shared cache is already mounted"
+          else
+            echo "Shared cache - mounting file system"
+            sudo mount /efs
           fi
+          set -o errexit
 
-          # Set cache sizes by distro
-          case $distro in
-               ubuntu1604|ubuntu1804|rhel62|rhel70)
-                    cache_size=300
-                    ;;
-               *)
-                    # default
-                    cache_size=200
-                    ;;
-          esac
+          dirs=$(ls -l /efs | grep -v total | awk '{print $NF}')
 
-          sudo python buildscripts/scons_cache_prune.py --cache-dir /efs/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
-          echo ""
-        done
+          echo "Pruning shared SCons directories"
 
-        sudo umount /efs || true
+          for dir in $dirs; do
+            echo "Pruning /efs/$dir/scons-cache"
+
+            if [ -e /efs/$dir/info/distro_name ]; then
+              distro=$(cat /efs/$dir/info/distro_name)
+            fi
+
+            # Set cache sizes by distro
+            case $distro in
+                 ubuntu1604|ubuntu1804|rhel62|rhel70)
+                      cache_size=600
+                      ;;
+                 *)
+                      # default
+                      cache_size=400
+                      ;;
+            esac
+
+            sudo python buildscripts/scons_cache_prune.py --cache-dir /efs/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+            echo ""
+          done
+
+          sudo umount /efs || true
+
+        else
+          echo "Not on master, shared SCons cache pruning skipped"
+        fi
 
   "scons cache pruning" :
     command: shell.exec
