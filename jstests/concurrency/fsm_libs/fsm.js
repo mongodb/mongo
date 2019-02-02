@@ -64,8 +64,8 @@ var fsm = (function() {
                 } catch (e) {
                     // Retry state functions that threw OperationNotSupportedInTransaction or
                     // InvalidOptions errors outside of a transaction. Rethrow any other error.
-                    if (e.code !== ErrorCodes.OperationNotSupportedInTransaction &&
-                        e.code !== ErrorCodes.InvalidOptions) {
+                    // e.isNotSupported added by check_for_operation_not_supported_in_transaction.js
+                    if (!e.isNotSupported) {
                         throw e;
                     }
 

@@ -7,6 +7,7 @@
 (function() {
     'use strict';
 
+    load("jstests/libs/error_code_utils.js");
     load("jstests/libs/override_methods/read_and_write_concern_helpers.js");
     load('jstests/libs/override_methods/override_helpers.js');
     load("jstests/libs/retryable_writes_util.js");
@@ -288,17 +289,7 @@
             // retry the command. If the collection did exist, we'll return the original
             // response because it failed for a different reason. Tests that expect collections
             // to not exist will have to be skipped.
-            var unsupported = false;
-            if (res.code === ErrorCodes.OperationNotSupportedInTransaction) {
-                unsupported = true;
-            } else if (res.writeErrors) {
-                const code = res.writeErrors.slice(-1)[0].code;
-                if (code === ErrorCodes.OperationNotSupportedInTransaction) {
-                    unsupported = true;
-                }
-            }
-
-            if (unsupported) {
+            if (includesErrorCode(res, ErrorCodes.OperationNotSupportedInTransaction)) {
                 const createCmdRes = runCommandOriginal.call(conn,
                                                              dbName,
                                                              {

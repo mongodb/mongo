@@ -8,17 +8,29 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/error_code_utils.js");
     load("jstests/libs/override_methods/override_helpers.js");
 
     function runCommandCheckForOperationNotSupportedInTransaction(
         conn, dbName, commandName, commandObj, func, makeFuncArgs) {
         let res = func.apply(conn, makeFuncArgs(commandObj));
-        if (!res.ok && ((res.code === ErrorCodes.OperationNotSupportedInTransaction) ||
-                        (res.code === ErrorCodes.InvalidOptions) ||
-                        (res.hasOwnProperty('errorLabels') &&
-                         res.errorLabels.includes('TransientTransactionError') &&
-                         res.code !== ErrorCodes.NoSuchTransaction))) {
-            assert.commandWorked(res);
+        const isTransient =
+            (res.errorLabels && res.errorLabels.includes('TransientTransactionError') &&
+             !includesErrorCode(res, ErrorCodes.NoSuchTransaction));
+
+        const isNotSupported =
+            (includesErrorCode(res, ErrorCodes.OperationNotSupportedInTransaction) ||
+             includesErrorCode(res, ErrorCodes.InvalidOptions));
+
+        if (isTransient || isNotSupported) {
+            // Generate an exception, store some info for fsm.js to inspect, and rethrow.
+            try {
+                assert.commandWorked(res);
+            } catch (ex) {
+                ex.isTransient = isTransient;
+                ex.isNotSupported = isNotSupported;
+                throw ex;
+            }
         }
 
         return res;
