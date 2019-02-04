@@ -287,7 +287,7 @@ public:
                 auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
                 auto opCtx = uniqueOpCtx.get();
 
-                AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+                AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
 
                 auto requestOpMsg =
                     OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, abortRequestObj)

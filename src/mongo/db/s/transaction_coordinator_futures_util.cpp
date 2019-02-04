@@ -96,7 +96,8 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                                                                                   opCtx) {
             // Note: This internal authorization is tied to the lifetime of 'opCtx', which is
             // destroyed by 'scheduleWork' immediately after this lambda ends.
-            AuthorizationSession::get(Client::getCurrent())->grantInternalAuthorization();
+            AuthorizationSession::get(Client::getCurrent())
+                ->grantInternalAuthorization(Client::getCurrent());
 
             if (MONGO_FAIL_POINT(hangWhileTargetingLocalHost)) {
                 LOG(0) << "Hit hangWhileTargetingLocalHost failpoint";

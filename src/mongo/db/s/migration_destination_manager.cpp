@@ -698,7 +698,7 @@ void MigrationDestinationManager::_migrateThread() {
 
 
     if (AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled()) {
-        AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+        AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx.get());
     }
 
     try {

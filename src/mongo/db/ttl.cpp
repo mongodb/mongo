@@ -82,7 +82,7 @@ public:
 
     virtual void run() {
         ThreadClient tc(name(), getGlobalServiceContext());
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
+        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
         while (!globalInShutdownDeprecated()) {
             {

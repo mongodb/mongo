@@ -228,7 +228,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 
-    authzSession->logoutDatabase("test");
+    authzSession->logoutDatabase(_opCtx.get(), "test");
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
     ASSERT_TRUE(
@@ -236,7 +236,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::collMod));
 
-    authzSession->logoutDatabase("admin");
+    authzSession->logoutDatabase(_opCtx.get(), "admin");
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
     ASSERT_FALSE(

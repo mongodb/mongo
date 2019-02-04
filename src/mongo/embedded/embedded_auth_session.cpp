@@ -97,11 +97,15 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void grantInternalAuthorization() override {
+    void grantInternalAuthorization(Client* client) override {
         // Always okay to do something, on embedded.
     }
 
-    void logoutDatabase(const StringData) override {
+    void grantInternalAuthorization(OperationContext* opCtx) override {
+        // Always okay to do something, on embedded.
+    }
+
+    void logoutDatabase(OperationContext* opCtx, const StringData) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
@@ -237,7 +241,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    bool isCoauthorizedWithClient(Client*) override {
+    bool isCoauthorizedWithClient(Client*, WithLock opClientLock) override {
         return true;
     }
 
