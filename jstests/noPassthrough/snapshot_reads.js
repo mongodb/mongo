@@ -29,7 +29,13 @@
                     tojson(cmdResult));
     }
 
-    function runTest({useCausalConsistency, establishCursorCmd}) {
+    function runTest({useCausalConsistency, establishCursorCmd, readConcern}) {
+        let cmdName = Object.getOwnPropertyNames(establishCursorCmd)[0];
+
+        jsTestLog(`Test establishCursorCmd: ${cmdName},
+     useCausalConsistency: ${useCausalConsistency},
+     readConcern: ${tojson(readConcern)}`);
+
         primaryDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 
         const session =
@@ -42,7 +48,7 @@
         }
         assert.commandWorked(bulk.execute({w: "majority"}));
 
-        session.startTransaction({readConcern: {level: "snapshot"}});
+        session.startTransaction({readConcern: readConcern});
 
         // Establish a snapshot batchSize:0 cursor.
         let res = assert.commandWorked(sessionDb.runCommand(establishCursorCmd));
@@ -80,7 +86,7 @@
         assert.eq(5, cursor.nextBatch.length, tojson(res));
 
         // Perform a second snapshot read under a new transaction.
-        session.startTransaction({readConcern: {level: "snapshot"}});
+        session.startTransaction({readConcern: readConcern});
         res = assert.commandWorked(
             sessionDb.runCommand({find: collName, sort: {_id: 1}, batchSize: 20}));
         session.commitTransaction();
@@ -96,15 +102,30 @@
         session.endSession();
     }
 
-    // Test snapshot reads using find.
+    // Test transaction reads using find or aggregate. Inserts outside
+    // transaction aren't visible, even after they are majority-committed.
+    // (This is a requirement for readConcern snapshot, but it is merely an
+    // implementation detail for majority or for the default, local. At some
+    // point, it would be desirable to have a transaction with readConcern
+    // local or majority see writes from other sessions. However, our current
+    // implementation of ensuring any data we read does not get rolled back
+    // relies on the fact that we read from a single WT snapshot, since we
+    // choose the timestamp to wait on in the first command of the
+    // transaction.)
     let findCmd = {find: collName, sort: {_id: 1}, batchSize: 0};
-    runTest({useCausalConsistency: false, establishCursorCmd: findCmd});
-    runTest({useCausalConsistency: true, establishCursorCmd: findCmd});
-
-    // Test snapshot reads using aggregate.
     let aggCmd = {aggregate: collName, pipeline: [{$sort: {_id: 1}}], cursor: {batchSize: 0}};
-    runTest({useCausalConsistency: false, establishCursorCmd: aggCmd});
-    runTest({useCausalConsistency: true, establishCursorCmd: aggCmd});
+
+    for (let establishCursorCmd of[findCmd, aggCmd]) {
+        for (let useCausalConsistency of[false, true]) {
+            for (let readConcern of[{level: "snapshot"}, {level: "majority"}, null]) {
+                runTest({
+                    establishCursorCmd: establishCursorCmd,
+                    useCausalConsistency: useCausalConsistency,
+                    readConcern: readConcern
+                });
+            }
+        }
+    }
 
     rst.stopSet();
 })();
