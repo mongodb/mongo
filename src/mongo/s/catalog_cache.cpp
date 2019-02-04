@@ -543,7 +543,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
                                               std::shared_ptr<CollectionRoutingInfoEntry> collEntry,
                                               NamespaceString const& nss,
                                               int refreshAttempt) {
-    const auto existingRoutingInfo = std::move(collEntry->routingInfo);
+    const auto existingRoutingInfo = collEntry->routingInfo;
 
     // If we have an existing chunk manager, the refresh is considered "incremental", regardless of
     // how many chunks are in the differential
@@ -662,6 +662,10 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         stdx::lock_guard<stdx::mutex> lg(_mutex);
         onRefreshFailed(lg, status);
     }
+
+    // The routing info for this collection shouldn't change, as other threads may try to use the
+    // CatalogCache while we are waiting for the refresh to complete.
+    invariant(collEntry->routingInfo.get() == existingRoutingInfo.get());
 }
 
 void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
