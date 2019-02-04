@@ -133,6 +133,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         let config = replSet.getReplSetConfig();
         config.members[2].priority = 0;
+        config.settings = {chainingAllowed: false};
         replSet.initiate(config);
 
         assert.eq(replSet.nodes.length,
