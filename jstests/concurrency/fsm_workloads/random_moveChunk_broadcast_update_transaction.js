@@ -74,8 +74,9 @@ var $config = extendWorkload($config, function($config, $super) {
         const docs = db[collName].find({tid: this.tid}).toArray();
         docs.forEach(doc => {
             const expectedCounter = this.expectedCounters[doc._id];
-            assertWhenOwnColl.eq(
-                expectedCounter, doc.counter, 'unexpected counter value, doc: ' + tojson(doc));
+            assertWhenOwnColl.eq(expectedCounter, doc.counter, () => {
+                return 'unexpected counter value, doc: ' + tojson(doc);
+            });
         });
     };
 

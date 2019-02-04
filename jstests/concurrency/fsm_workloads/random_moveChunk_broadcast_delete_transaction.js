@@ -112,23 +112,24 @@ var $config = extendWorkload($config, function($config, $super) {
      */
     $config.states.verifyDocuments = function verifyDocuments(db, collName, connCache) {
         const docs = db[collName].find({tid: this.tid}).toArray();
-        assertWhenOwnColl.eq(this.expectedDocuments.length,
-                             docs.length,
-                             'unexpected number of documents, docs: ' + tojson(docs));
+        assertWhenOwnColl.eq(this.expectedDocuments.length, docs.length, () => {
+            return 'unexpected number of documents, docs: ' + tojson(docs) + ', expected docs: ' +
+                tojson(this.expectedDocuments);
+        });
 
         // Verify only the documents we haven't tried to delete were found.
         const expectedDocIds = new Set(this.expectedDocuments.map(doc => doc._id));
         docs.forEach(doc => {
-            assertWhenOwnColl(expectedDocIds.has(doc._id),
-                              'expected document to be deleted, doc: ' + tojson(doc));
+            assertWhenOwnColl(expectedDocIds.has(doc._id), () => {
+                return 'expected document to be deleted, doc: ' + tojson(doc);
+            });
             expectedDocIds.delete(doc._id);
         });
 
         // All expected document ids should have been found in the collection.
-        assertWhenOwnColl.eq(
-            0,
-            expectedDocIds.size,
-            'did not find all expected documents, _ids not found: ' + tojson(expectedDocIds));
+        assertWhenOwnColl.eq(0, expectedDocIds.size, () => {
+            return 'did not find all expected documents, _ids not found: ' + tojson(expectedDocIds);
+        });
     };
 
     /**
