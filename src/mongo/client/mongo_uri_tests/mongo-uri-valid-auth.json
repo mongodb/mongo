@@ -267,7 +267,7 @@
                 "password": "secret",
                 "username": "user@EXAMPLE.COM"
             },
-            "description": "Escaped username (GSSAPI)",
+            "description": "Escaped username (GSSAPI) - SERVER NOTE: This test case has been doctored to return authmechanismproperties flattened, because that's all we support",
             "hosts": [
                 {
                     "host": "localhost",
@@ -277,10 +277,7 @@
             ],
             "options": {
                 "authmechanism": "GSSAPI",
-                "authmechanismproperties": {
-                    "CANONICALIZE_HOST_NAME": true,
-                    "SERVICE_NAME": "other"
-                }
+                "authmechanismproperties": "SERVICE_NAME:other,CANONICALIZE_HOST_NAME:true"
             },
             "uri": "mongodb://user%40EXAMPLE.COM:secret@localhost/?authMechanismProperties=SERVICE_NAME:other,CANONICALIZE_HOST_NAME:true&authMechanism=GSSAPI",
             "valid": true,

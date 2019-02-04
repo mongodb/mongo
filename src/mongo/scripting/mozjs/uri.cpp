@@ -83,7 +83,7 @@ void URIInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     BSONObjBuilder optsBuilder;
     for (const auto& kvpair : parsed.getOptions()) {
-        optsBuilder.append(kvpair.first, kvpair.second);
+        optsBuilder.append(kvpair.first.original(), kvpair.second);
     }
 
     JS::RootedObject thisv(cx);

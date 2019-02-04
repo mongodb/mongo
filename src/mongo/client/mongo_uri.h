@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <boost/algorithm/string.hpp>
 #include <map>
 #include <sstream>
 #include <string>
@@ -103,12 +104,37 @@ StatusWith<std::string> uriDecode(StringData str);
  */
 class MongoURI {
 public:
+    class CaseInsensitiveString {
+    public:
+        CaseInsensitiveString(std::string str)
+            : _original(std::move(str)), _lowercase(boost::algorithm::to_lower_copy(_original)) {}
+
+        CaseInsensitiveString(StringData sd) : CaseInsensitiveString(std::string(sd)) {}
+        CaseInsensitiveString(const char* str) : CaseInsensitiveString(std::string(str)) {}
+
+        friend bool operator<(const CaseInsensitiveString& lhs, const CaseInsensitiveString& rhs) {
+            return lhs._lowercase < rhs._lowercase;
+        }
+
+        friend bool operator==(const CaseInsensitiveString& lhs, const CaseInsensitiveString& rhs) {
+            return lhs._lowercase == rhs._lowercase;
+        }
+
+        const std::string& original() const noexcept {
+            return _original;
+        }
+
+    private:
+        std::string _original;
+        std::string _lowercase;
+    };
+
     // Note that, because this map is used for DNS TXT record injection on options, there is a
     // requirement on its behavior for `insert`: insert must not replace or update existing values
     // -- this gives the desired behavior that user-specified values override TXT record specified
     // values.  `std::map` and `std::unordered_map` satisfy this requirement.  Make sure that
     // whichever map type is used provides that guarantee.
-    using OptionsMap = std::map<std::string, std::string>;
+    using OptionsMap = std::map<CaseInsensitiveString, std::string>;
 
     static StatusWith<MongoURI> parse(const std::string& url);
 
