@@ -97,6 +97,7 @@
         assert.commandWorked(
             testDB.adminCommand({configureFailPoint: "hangDuringDropCollection", mode: "off"}));
         awaitDrop();
+        rst.awaitReplication();
     }
 
     runNoSuchTransactionTests({commitTransaction: 1}, "commitTransaction");
