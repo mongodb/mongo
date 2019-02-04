@@ -190,15 +190,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * be replicated to all nodes and should not be rolled back.
      */
     this.transitionToSteadyStateOperations = function() {
-
-        // Ensure the secondary is connected. It may already have been connected from a previous
-        // stage.
-        log(`Ensuring the secondary ${curSecondary.host} is connected to the other nodes`);
-        curSecondary.reconnect([curPrimary, tiebreakerNode]);
-
-        // Ensure that the tiebreaker node is connected to the primary.
-        curPrimary.reconnect([tiebreakerNode]);
-
         // If we shut down the primary before the secondary begins rolling back against it, then
         // the secondary may get elected and not actually roll back. In that case we do not check
         // the RBID and just await replication.
@@ -223,6 +214,11 @@ function RollbackTest(name = "RollbackTest", replSet) {
             log(`Skipping RBID check on ${curSecondary.host} because shutdowns ` +
                 `may prevent a rollback here.`);
         }
+
+        // Ensure that the tiebreaker node is connected to the other nodes. We must do this after
+        // we are sure that rollback has completed on the rollback node.
+        tiebreakerNode.reconnect([curPrimary, curSecondary]);
+        restartServerReplication(tiebreakerNode);
 
         rst.awaitSecondaryNodes();
         rst.awaitReplication();
@@ -330,8 +326,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
         curPrimary = newPrimary;
 
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
-
-        restartServerReplication(tiebreakerNode);
 
         // The current primary, which is the old secondary, will later become the sync source.
         return curPrimary;
