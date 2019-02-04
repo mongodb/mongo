@@ -95,6 +95,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterReservingPrepareTimestamp);
 
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingPrepareStartTime);
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeReleasingTransactionOplogHole);
+
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
 // The command names that are allowed in a prepared transaction.
@@ -517,7 +519,8 @@ void TransactionParticipant::_setSpeculativeTransactionReadTimestamp(WithLock,
     _transactionMetricsObserver.onChooseReadTimestamp(timestamp);
 }
 
-TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx) {
+TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx)
+    : _opCtx(opCtx) {
     // Stash the transaction on the OperationContext on the stack. At the end of this function it
     // will be unstashed onto the OperationContext.
     TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
@@ -560,6 +563,13 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
 }
 
 TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
+    if (MONGO_FAIL_POINT(hangBeforeReleasingTransactionOplogHole)) {
+        log()
+            << "transaction - hangBeforeReleasingTransactionOplogHole fail point enabled. Blocking "
+               "until fail point is disabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeReleasingTransactionOplogHole);
+    }
+
     // If the constructor did not complete, we do not attempt to abort the units of work.
     if (_recoveryUnit) {
         // We should be at WUOW nesting level 1, only the top level WUOW for the oplog reservation
@@ -568,6 +578,13 @@ TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
         _locker->endWriteUnitOfWork();
         invariant(!_locker->inAWriteUnitOfWork());
     }
+
+    // After releasing the oplog hole, the "all committed timestamp" can advance past
+    // this oplog hole, if there are no other open holes. Check if we can advance the stable
+    // timestamp any further since a majority write may be waiting on the stable timestamp to
+    // advance beyond this oplog hole to acknowledge the write to the user.
+    auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
+    replCoord->attemptToAdvanceStableTimestamp();
 }
 
 TransactionParticipant::TxnResources::TxnResources(OperationContext* opCtx, StashStyle stashStyle) {
@@ -1206,12 +1223,6 @@ void TransactionParticipant::_finishCommitTransaction(WithLock lk, OperationCont
             CurOp::get(opCtx)->debug().additiveMetrics,
             CurOp::get(opCtx)->debug().storageStats);
     }
-
-    // After writing down the commit oplog entry and adding a finishOpTime to
-    // ServerTransactionsMetrics, recalculate the stable optime to ensure we correctly advance
-    // the stable timestamp.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    replCoord->recalculateStableOpTime();
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.

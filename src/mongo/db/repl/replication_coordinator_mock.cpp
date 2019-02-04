@@ -505,7 +505,7 @@ bool ReplicationCoordinatorMock::setContainsArbiter() const {
     return false;
 }
 
-void ReplicationCoordinatorMock::recalculateStableOpTime() {
+void ReplicationCoordinatorMock::attemptToAdvanceStableTimestamp() {
     return;
 }
 

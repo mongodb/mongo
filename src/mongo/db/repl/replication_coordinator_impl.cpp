@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -3272,7 +3271,7 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime(WithLock lk) {
     _wakeReadyWaiters_inlock();
 }
 
-boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime(
+boost::optional<OpTime> ReplicationCoordinatorImpl::_chooseStableOpTimeFromCandidates(
     WithLock lk, const std::set<OpTime>& candidates, OpTime maximumStableOpTime) {
 
     // No optime candidates.
@@ -3362,10 +3361,10 @@ void ReplicationCoordinatorImpl::_cleanupStableOpTimeCandidates(std::set<OpTime>
     candidates->erase(candidates->begin(), deletePoint);
 }
 
-boost::optional<OpTime> ReplicationCoordinatorImpl::calculateStableOpTime_forTest(
+boost::optional<OpTime> ReplicationCoordinatorImpl::chooseStableOpTimeFromCandidates_forTest(
     const std::set<OpTime>& candidates, const OpTime& maximumStableOpTime) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _calculateStableOpTime(lk, candidates, maximumStableOpTime);
+    return _chooseStableOpTimeFromCandidates(lk, candidates, maximumStableOpTime);
 }
 void ReplicationCoordinatorImpl::cleanupStableOpTimeCandidates_forTest(std::set<OpTime>* candidates,
                                                                        OpTime stableOpTime) {
@@ -3377,14 +3376,9 @@ std::set<OpTime> ReplicationCoordinatorImpl::getStableOpTimeCandidates_forTest()
     return _stableOpTimeCandidates;
 }
 
-boost::optional<OpTime> ReplicationCoordinatorImpl::recalculateStableOpTime_forTest() {
+void ReplicationCoordinatorImpl::attemptToAdvanceStableTimestamp() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    return _recalculateStableOpTime(lk);
-}
-
-void ReplicationCoordinatorImpl::recalculateStableOpTime() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _recalculateStableOpTime(lk);
+    _setStableTimestampForStorage(lk);
 }
 
 boost::optional<OpTime> ReplicationCoordinatorImpl::_recalculateStableOpTime(WithLock lk) {
@@ -3399,8 +3393,9 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_recalculateStableOpTime(Wit
     // abort timestamps are <= the commit point. If so, remove them from our oldest non-majority
     // committed optimes set because we know that the commit/abort oplog entries are majority
     // committed.
-    // We must remove these optimes before calling _calculateStableOpTime because we want the stable
-    // timestamp to advance up to the commit point if all transactions are committed or aborted.
+    // We must remove these optimes before calling _chooseStableOpTimeFromCandidates
+    // because we want the stable timestamp to advance up to the commit point if all transactions
+    // are committed or aborted.
     auto txnMetrics = ServerTransactionsMetrics::get(getGlobalServiceContext());
     txnMetrics->removeOpTimesLessThanOrEqToCommittedOpTime(commitPoint);
 
@@ -3411,7 +3406,8 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_recalculateStableOpTime(Wit
         : _topCoord->getMyLastAppliedOpTime();
 
     // Compute the current stable optime.
-    auto stableOpTime = _calculateStableOpTime(lk, _stableOpTimeCandidates, maximumStableOpTime);
+    auto stableOpTime =
+        _chooseStableOpTimeFromCandidates(lk, _stableOpTimeCandidates, maximumStableOpTime);
     if (stableOpTime) {
         // Check that the selected stable optime does not exceed our maximum.
         invariant(stableOpTime->getTimestamp() <= maximumStableOpTime.getTimestamp());

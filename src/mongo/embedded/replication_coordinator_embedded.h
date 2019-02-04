@@ -239,7 +239,7 @@ public:
 
     bool setContainsArbiter() const override;
 
-    void recalculateStableOpTime() override;
+    void attemptToAdvanceStableTimestamp() override;
 
 private:
     // Back pointer to the ServiceContext that has started the instance.

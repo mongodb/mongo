@@ -587,6 +587,7 @@ private:
         }
 
     private:
+        OperationContext* _opCtx;
         std::unique_ptr<Locker> _locker;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         OplogSlot _oplogSlot;

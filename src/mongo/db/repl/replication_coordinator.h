@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -835,10 +834,10 @@ public:
     virtual bool setContainsArbiter() const = 0;
 
     /**
-     * Getter that exposes _recalculateStableOpTime to the Transaction Participant so we can
-     * recalculate the stable timestamp when needed.
+     * Instructs the ReplicationCoordinator to recalculate the stable timestamp and advance it for
+     * storage if needed.
      */
-    virtual void recalculateStableOpTime() = 0;
+    virtual void attemptToAdvanceStableTimestamp() = 0;
 
 
 protected:

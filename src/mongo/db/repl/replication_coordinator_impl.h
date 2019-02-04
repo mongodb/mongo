@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -312,22 +311,7 @@ public:
 
     virtual bool setContainsArbiter() const override;
 
-    /**
-     * Getter that exposes _recalculateStableOpTime to the Transaction Participant so we can
-     * recalculate the stable timestamp when we add a finishOpTime to ServerTransactionsMetrics.
-     * This is necessary in the case that the commit point advances to include a prepared
-     * transaction's commit/abort oplog entry before the metrics are updated.
-     *
-     * When we advance the commit point, we calculate and set the stable timestamp for storage.
-     * But, since we did not update ServerTransactionsMetrics in time, the replication
-     * coordinator will not know to advance the stable optime. If no new operation triggers a
-     * new calculation, anything waiting for a new committed snapshot will hang.
-
-     * To prevent that, we explicitly recalculate the stable timestamp by calling
-     * _recalculateStableOpTime when we add a finishOpTime to ServerTransactionsMetrics in the
-     * Transaction Participant.
-     */
-    virtual void recalculateStableOpTime() override;
+    virtual void attemptToAdvanceStableTimestamp() override;
 
     // ================== Test support API ===================
 
@@ -380,11 +364,10 @@ public:
     /**
      * Simple test wrappers that expose private methods.
      */
-    boost::optional<OpTime> calculateStableOpTime_forTest(const std::set<OpTime>& candidates,
-                                                          const OpTime& maximumStableOpTime);
+    boost::optional<OpTime> chooseStableOpTimeFromCandidates_forTest(
+        const std::set<OpTime>& candidates, const OpTime& maximumStableOpTime);
     void cleanupStableOpTimeCandidates_forTest(std::set<OpTime>* candidates, OpTime stableOpTime);
     std::set<OpTime> getStableOpTimeCandidates_forTest();
-    boost::optional<OpTime> recalculateStableOpTime_forTest();
 
     /**
      * Non-blocking version of updateTerm.
@@ -1110,11 +1093,13 @@ private:
     /**
      * Calculates the 'stable' replication optime given a set of optime candidates and a maximum
      * stable optime. The stable optime is the greatest optime in 'candidates' that is also less
-     * than or equal to 'maximumStableOpTime'.
+     * than or equal to 'maximumStableOpTime' and other criteria.
+     *
+     * Returns boost::none if there is no satisfactory candidate.
      */
-    boost::optional<OpTime> _calculateStableOpTime(WithLock lk,
-                                                   const std::set<OpTime>& candidates,
-                                                   OpTime maximumStableOpTime);
+    boost::optional<OpTime> _chooseStableOpTimeFromCandidates(WithLock lk,
+                                                              const std::set<OpTime>& candidates,
+                                                              OpTime maximumStableOpTime);
 
     /**
      * Removes any optimes from the optime set 'candidates' that are less than
@@ -1123,9 +1108,9 @@ private:
     void _cleanupStableOpTimeCandidates(std::set<OpTime>* candidates, OpTime stableOpTime);
 
     /**
-     * Calculates and sets the value of the 'stable' replication optime for the storage engine.
-     * See ReplicationCoordinatorImpl::_calculateStableOpTime for a definition of 'stable', in
-     * this context.
+     * Calculates and sets the value of the 'stable' replication optime for the storage engine.  See
+     * ReplicationCoordinatorImpl::_chooseStableOpTimeFromCandidates for a definition of 'stable',
+     * in this context.
      */
     void _setStableTimestampForStorage(WithLock lk);
 

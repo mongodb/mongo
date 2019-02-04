@@ -451,7 +451,7 @@ bool ReplicationCoordinatorEmbedded::setContainsArbiter() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::recalculateStableOpTime() {
+void ReplicationCoordinatorEmbedded::attemptToAdvanceStableTimestamp() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
