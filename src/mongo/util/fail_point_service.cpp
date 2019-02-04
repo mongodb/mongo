@@ -45,7 +45,9 @@ MONGO_FAIL_POINT_DEFINE(dummy);  // used by tests in jstests/fail_point
 
 unique_ptr<FailPointRegistry> _fpRegistry(nullptr);
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(FailPointRegistry, MONGO_NO_PREREQUISITES)
+MONGO_INITIALIZER_GENERAL(FailPointRegistry,
+                          MONGO_NO_PREREQUISITES,
+                          ("BeginGeneralStartupOptionRegistration"))
 (InitializerContext* context) {
     _fpRegistry.reset(new FailPointRegistry());
     return Status::OK();
