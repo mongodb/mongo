@@ -1446,7 +1446,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostB
 
 DEATH_TEST_F(AsyncResultsMergerTest,
              SortedTailableCursorInvariantsIfRemoteHasOplogTimestampButNoPostBatchResumeToken,
-             "Invariant failure !response.getLastOplogTimestamp()") {
+             "Fatal Assertion 51062") {
     AsyncResultsMergerParams params;
     params.setNss(kTestNss);
     UUID uuid = UUID::gen();

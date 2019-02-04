@@ -532,12 +532,13 @@ void AsyncResultsMerger::_updateRemoteMetadata(WithLock,
     } else {
         // If we don't have a postBatchResumeToken, then we should never have an oplog timestamp.
         // TODO SERVER-38539: remove this validation when $internalLatestOplogTimestamp is removed.
-        invariant(!response.getLastOplogTimestamp(),
-                  str::stream() << "Host " << remote.shardHostAndPort
-                                << " returned a cursor which has an oplog timestamp but does not "
-                                   "have a postBatchResumeToken, suggesting that one or more shards"
-                                   " are running an older version of MongoDB. This configuration "
-                                   "is not supported.");
+        if (response.getLastOplogTimestamp()) {
+            severe() << "Host " << remote.shardHostAndPort
+                     << " returned a cursor which has an oplog timestamp but does not have a "
+                        "postBatchResumeToken, suggesting that one or more shards are running an "
+                        "older version of MongoDB. This configuration is not supported.";
+            fassertFailedNoTrace(51062);
+        }
     }
 }
 
