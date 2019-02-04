@@ -297,8 +297,19 @@ __schema_open_index(WT_SESSION_IMPL *session,
 	for (i = 0; ret == 0; i++, ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, &uri));
 		name = uri;
-		if (!WT_PREFIX_SKIP(name, tmp->data))
+
+		if (!WT_PREFIX_SKIP(name, tmp->data)) {
+			/*
+			 * We reached the end of index list, remove the rest of
+			 * in memory indices, they no longer exist.
+			 */
+			while (i < table->nindices) {
+				WT_TRET(__wt_schema_destroy_index(session,
+				    &table->indices[table->nindices - 1]));
+				table->indices[--table->nindices] = NULL;
+			}
 			break;
+		}
 
 		/* Is this the index we are looking for? */
 		match = idxname == NULL || WT_STRING_MATCH(name, idxname, len);
@@ -315,7 +326,8 @@ __schema_open_index(WT_SESSION_IMPL *session,
 		while (table->indices[i] != NULL &&
 		    (cmp = strcmp(uri, table->indices[i]->name)) > 0) {
 			/* Index no longer exists, remove it. */
-			__wt_free(session, table->indices[i]);
+			WT_ERR(__wt_schema_destroy_index(session,
+			    &table->indices[i]));
 			memmove(&table->indices[i], &table->indices[i + 1],
 			    (table->nindices - i) * sizeof(WT_INDEX *));
 			table->indices[--table->nindices] = NULL;

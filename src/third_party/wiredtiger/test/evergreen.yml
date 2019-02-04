@@ -32,15 +32,16 @@ functions:
         if [ "Windows_NT" = "$OS" ]; then
           scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic ${smp_command|}
         else
-          ./build_posix/reconf
-          ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+          cd build_posix
+          sh ./reconf
+          ${configure_env_vars|} ../configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
           ${make_command|make} ${smp_command|} 2>&1
     
           # On macOS, change the binary location with install_name_tool since DYLD_LIBRARY_PATH
           # appears not to work for dynamic modules loaded by python. For wt, the libtool generated
           # script has the wrong path for running on test machines.
           if [ "$(uname -s)" == "Darwin" ]; then
-            WT_VERSION=$(m4 build_posix/aclocal/version.m4)
+            WT_VERSION=$(m4 aclocal/version.m4)
             install_name_tool -change /usr/local/lib/libwiredtiger-$WT_VERSION.dylib $(pwd)/.libs/libwiredtiger-$WT_VERSION.dylib lang/python/_wiredtiger*.so
             install_name_tool -change /usr/local/lib/libwiredtiger-$WT_VERSION.dylib $(pwd)/.libs/libwiredtiger-$WT_VERSION.dylib .libs/wt
           fi
@@ -52,12 +53,14 @@ pre:
       script: |
         rm -rf "wiredtiger"
 post:
-  - command: archive.targz_pack
+  - command: shell.exec
     params:
-      target: "wiredtiger.tgz"
-      source_dir: "wiredtiger"
-      include:
-        - "./**"
+      script: |
+        set -o errexit
+        set -o verbose
+        cd wiredtiger
+        tar cvfz ../wiredtiger.tgz .
+        cd ..
   - command: s3.put
     params:
       aws_secret: ${aws_secret}
@@ -67,7 +70,7 @@ post:
       permissions: public-read
       content_type: application/tar
       display_name: Artifacts
-      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_id}.tgz
   - command: shell.exec
     params:
       script: |
@@ -83,6 +86,28 @@ tasks:
         params:
           directory: wiredtiger
       - func: "compile wiredtiger"
+      - command: archive.targz_pack
+        params:
+          target: "wiredtiger.tgz"
+          source_dir: "wiredtiger"
+          include:
+            - "./**"
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          local_file: wiredtiger.tgz
+          bucket: build_external
+          permissions: public-read
+          content_type: application/tar
+          display_name: Artifacts_compile
+          remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${build_id}.tgz
+      # Remove the artifacts here so the later post commands won't perform duplicated archiving.
+      - command: shell.exec
+        params:
+          script: |
+            rm -rf "wiredtiger"
+            rm -rf "wiredtiger.tgz"
 
   - name: make-check-test
     depends_on:
@@ -92,7 +117,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -109,7 +134,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -124,7 +149,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -139,7 +164,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -154,7 +179,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -169,7 +194,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -184,7 +209,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -199,7 +224,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -214,7 +239,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -229,7 +254,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -244,7 +269,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -259,7 +284,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -274,7 +299,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -289,7 +314,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -304,7 +329,7 @@ tasks:
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -322,12 +347,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/random_abort/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../../../test/csuite/random_abort/smoke.sh 2>&1
 
   - name: csuite-random-directio-test
     depends_on:
@@ -336,12 +361,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/random_directio/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../../../test/csuite/random_directio/smoke.sh 2>&1
 
   - name: csuite-schema-abort-test
     depends_on:
@@ -350,12 +375,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/schema_abort/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../../../test/csuite/schema_abort/smoke.sh 2>&1
 
   - name: csuite-timestamp-abort-test
     depends_on:
@@ -364,12 +389,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} $(pwd)/timestamp_abort/smoke.sh 2>&1
+            ${test_env_vars|} $(pwd)/../../../test/csuite/timestamp_abort/smoke.sh 2>&1
 
   - name: csuite-scope-test
     depends_on:
@@ -378,7 +403,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -392,7 +417,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -406,7 +431,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -420,7 +445,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -434,7 +459,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -448,7 +473,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -462,7 +487,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -476,7 +501,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -490,7 +515,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -504,7 +529,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -518,7 +543,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -532,7 +557,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -546,7 +571,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -560,7 +585,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -574,7 +599,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -588,7 +613,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -602,7 +627,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -616,7 +641,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -630,7 +655,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -644,7 +669,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -658,7 +683,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -672,7 +697,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -686,7 +711,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -700,7 +725,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -714,7 +739,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -728,7 +753,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/test/csuite"
+          working_dir: "wiredtiger/build_posix/test/csuite"
           script: |
             set -o errexit
             set -o verbose
@@ -746,7 +771,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
@@ -756,7 +781,7 @@ tasks:
             # Avoid /usr/bin/python, at least on macOS: with System Integrity
             # Protection enabled, it ignores DYLD_LIBRARY_PATH and hence
             # doesn't find the WiredTiger library in the local tree.
-            ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py -v 2 ${smp_command|} 2>&1
 
   # Break out Python unit tests into multiple buckets/tasks based on test name and runtime
   # The test/suite/run.py script can work out test names by casting each command argument
@@ -772,13 +797,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            cd .libs
-            ${python_test_env_vars|} python ../test/suite/run.py [ab] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py [ab] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket01
     depends_on:
@@ -787,13 +811,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            cd .libs
-            ${python_test_env_vars|} python ../test/suite/run.py [c] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py [c] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket02
     depends_on:
@@ -802,13 +825,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            cd .libs
-            ${python_test_env_vars|} python ../test/suite/run.py [defg] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py [defg] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket03
     depends_on:
@@ -817,13 +839,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            cd .libs
-            ${python_test_env_vars|} python ../test/suite/run.py [hijk] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py [hijk] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket04
     depends_on:
@@ -832,13 +853,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            cd .libs
-            ${python_test_env_vars|} python ../test/suite/run.py [lmnopq] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py [lmnopq] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket05
     depends_on:
@@ -847,13 +867,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            cd .libs
-            ${python_test_env_vars|} python ../test/suite/run.py [rs] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py [rs] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket06
     depends_on:
@@ -862,13 +881,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            cd .libs
-            ${python_test_env_vars|} python ../test/suite/run.py [t] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py [t] -v 2 ${smp_command|} 2>&1
 
   - name: unit-test-bucket07
     depends_on:
@@ -877,13 +895,12 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger"
+          working_dir: "wiredtiger/build_posix"
           script: |
             set -o errexit
             set -o verbose
 
-            cd .libs
-            ${python_test_env_vars|} python ../test/suite/run.py [uvwxyz] -v 2 ${smp_command|} 2>&1
+            ${test_env_vars|} python ../test/suite/run.py [uvwxyz] -v 2 ${smp_command|} 2>&1
 
   # End of Python unit test tasks
 
@@ -915,7 +932,7 @@ tasks:
             if [ "Windows_NT" = "$OS" ]; then
               cmd.exe /c t_fops.exe
             else
-              ./test/fops/t
+              build_posix/test/fops/t
             fi
 
   - name: format
@@ -956,8 +973,6 @@ buildvariants:
   expansions:
     # It's ugly, but we need the absolute path here, not the relative
     test_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
-    # Python (unit) test is executed under the .libs directory, where wiredtiger shared library files locate
-    python_test_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH LD_LIBRARY_PATH=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ PATH=/opt/mongodbtoolchain/v2/bin:$PATH
   tasks:

@@ -182,12 +182,14 @@ class suite_subprocess:
         wterrname = errfilename or "wt.err"
         with open(wterrname, "w") as wterr:
             with open(wtoutname, "w") as wtout:
-                # Prefer running the actual 'wt' executable rather than the
+                # Prefer running the actual 'wt' binary rather than the
                 # 'wt' script created by libtool. On OS/X with System Integrity
                 # Protection enabled, running a shell script strips
-                # environment variables needed to run 'wt'.
-                if sys.platform == "darwin":
-                    wtexe = os.path.join(wt_builddir, ".libs", "wt")
+                # environment variables needed to run 'wt'. There are
+                # also test environments that work better with the binary.
+                libs_wt = os.path.join(wt_builddir, ".libs", "wt")
+                if os.path.isfile(libs_wt):
+                    wtexe = libs_wt
                 else:
                     wtexe = os.path.join(wt_builddir, "wt")
                 procargs = [ wtexe ]

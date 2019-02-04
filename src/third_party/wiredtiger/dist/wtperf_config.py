@@ -1,5 +1,6 @@
-# Output a doxgen version of the wtperf configuration options.
-import string, sys
+''' Output a doxgen version of the wtperf configuration options. '''
+from __future__ import print_function
+import sys
 
 for line in sys.stdin:
     if not line.startswith('OPTION '):
@@ -21,5 +22,5 @@ for line in sys.stdin:
         d = '"' + v[2] + '"'
     else:
         d = v[2]
-    print '@par ' + v[0] + ' (' + v[3] + ', default=' + d + ')'
-    print v[1]
+    print('@par ' + v[0] + ' (' + v[3] + ', default=' + d + ')')
+    print(v[1])
