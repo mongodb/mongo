@@ -124,9 +124,10 @@ repl::OplogEntry makeSentinelOplogEntry(OperationSessionInfo sessionInfo, Date_t
 SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* opCtx,
                                                              NamespaceString ns)
     : _ns(std::move(ns)), _rollbackIdAtInit(repl::ReplicationProcess::get(opCtx)->getRollbackID()) {
+    // Exclude entries for transaction.
+    Query query(BSON(SessionTxnRecord::kStateFieldName << BSON("$exists" << false)));
     // Sort is not needed for correctness. This is just for making it easier to write deterministic
     // tests.
-    Query query;
     query.sort(BSON("_id" << 1));
 
     DBDirectClient client(opCtx);

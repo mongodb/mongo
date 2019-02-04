@@ -651,5 +651,47 @@ TEST_F(SessionCatalogMigrationSourceTest, ShouldAssertWhenRollbackDetected) {
     ASSERT_TRUE(migrationSource.hasMoreOplog());
 }
 
+TEST_F(SessionCatalogMigrationSourceTest, TransactionEntriesShouldBeIgnored) {
+    auto insertOplog = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 30),                      // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        0,                                    // statement id
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+
+    SessionTxnRecord retryableWriteRecord;
+    retryableWriteRecord.setSessionId(makeLogicalSessionIdForTest());
+    retryableWriteRecord.setTxnNum(1);
+    retryableWriteRecord.setLastWriteOpTime(insertOplog.getOpTime());
+    retryableWriteRecord.setLastWriteDate(*insertOplog.getWallClockTime());
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                  retryableWriteRecord.toBSON());
+
+    SessionTxnRecord txnRecord;
+    txnRecord.setSessionId(makeLogicalSessionIdForTest());
+    txnRecord.setTxnNum(20);
+    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(12, 34), 5));
+    txnRecord.setLastWriteDate(Date_t::now());
+    txnRecord.setState(DurableTxnStateEnum::kCommitted);
+
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), txnRecord.toBSON());
+
+    insertOplogEntry(insertOplog);
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs);
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+    auto nextOplogResult = migrationSource.getLastFetchedOplog();
+    ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+    // Cannot compare directly because of SERVER-31356
+    ASSERT_BSONOBJ_EQ(insertOplog.toBSON(), nextOplogResult.oplog->toBSON());
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+}
+
 }  // namespace
 }  // namespace mongo
