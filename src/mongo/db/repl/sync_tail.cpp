@@ -340,7 +340,7 @@ std::unique_ptr<ThreadPool> SyncTail::makeWriterPool(int threadCount) {
         // Only do this once per thread
         if (!Client::getCurrent()) {
             Client::initThreadIfNotAlready();
-            AuthorizationSession::get(cc())->grantInternalAuthorization();
+            AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
         }
     };
     auto pool = stdx::make_unique<ThreadPool>(options);

@@ -138,7 +138,7 @@ void IndexBuilder::run() {
         unreplicatedWrites.emplace(opCtx.get());
     }
 
-    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx.get());
 
     {
         stdx::lock_guard<Client> lk(*(opCtx->getClient()));

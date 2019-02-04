@@ -156,7 +156,7 @@ auto makeThreadPool(const std::string& poolName) {
     threadPoolOptions.poolName = poolName;
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
+        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
     };
     return stdx::make_unique<ThreadPool>(threadPoolOptions);
 }

@@ -51,6 +51,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/util/assert_util.h"
@@ -172,6 +173,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 
     // Calling add() on the UserSet may return a user that was replaced because it was from the
     // same database.
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     userHolder.reset(_authenticatedUsers.add(userHolder.release()));
 
     // If there are any users and roles in the impersonation data, clear it out.
@@ -201,7 +203,8 @@ User* AuthorizationSessionImpl::getSingleUser() {
     return lookupUser(userName);
 }
 
-void AuthorizationSessionImpl::logoutDatabase(const std::string& dbname) {
+void AuthorizationSessionImpl::logoutDatabase(OperationContext* opCtx, StringData dbname) {
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     User* removedUser = _authenticatedUsers.removeByDBName(dbname);
     if (removedUser) {
         getAuthorizationManager().releaseUser(removedUser);
@@ -229,9 +232,18 @@ std::string AuthorizationSessionImpl::getAuthenticatedUserNamesToken() {
     return ret;
 }
 
-void AuthorizationSessionImpl::grantInternalAuthorization() {
+void AuthorizationSessionImpl::grantInternalAuthorization(Client* client) {
+    stdx::lock_guard<Client> lk(*client);
     _authenticatedUsers.add(internalSecurity.user);
     _buildAuthenticatedRolesVector();
+}
+
+/**
+ * Overloaded function - takes in the opCtx of the current AuthSession
+ * and calls the function above.
+ */
+void AuthorizationSessionImpl::grantInternalAuthorization(OperationContext* opCtx) {
+    grantInternalAuthorization(opCtx->getClient());
 }
 
 PrivilegeVector AuthorizationSessionImpl::getDefaultPrivileges() {
@@ -819,14 +831,17 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     UserSet::iterator it = _authenticatedUsers.begin();
     while (it != _authenticatedUsers.end()) {
         User* user = *it;
-
         if (!user->isValid()) {
             // Make a good faith effort to acquire an up-to-date user object, since the one
             // we've cached is marked "out-of-date."
             UserName name = user->getName();
             User* updatedUser;
-
             Status status = authMan.acquireUser(opCtx, name, &updatedUser);
+
+            // Take out a lock on the client here to ensure that no one reads while
+            // _authenticatedUsers is being modified.
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+
             switch (status.code()) {
                 case ErrorCodes::OK: {
 
@@ -1015,7 +1030,7 @@ void AuthorizationSessionImpl::setImpersonatedUserData(std::vector<UserName> use
     _impersonationFlag = true;
 }
 
-bool AuthorizationSessionImpl::isCoauthorizedWithClient(Client* opClient) {
+bool AuthorizationSessionImpl::isCoauthorizedWithClient(Client* opClient, WithLock opClientLock) {
     auto getUserNames = [](AuthorizationSession* authSession) {
         if (authSession->isImpersonating()) {
             return authSession->getImpersonatedUserNames();
@@ -1043,6 +1058,7 @@ bool AuthorizationSessionImpl::isCoauthorizedWith(UserNameIterator userNameIter)
     if (!getAuthorizationManager().isAuthEnabled()) {
         return true;
     }
+
     if (!userNameIter.more() && !isAuthenticated()) {
         return true;
     }

@@ -58,7 +58,7 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(OperationContext* opCtx,
         // If auth is disabled, ignore the allUsers parameter.
         if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
             userMode == CurrentOpUserMode::kExcludeOthers &&
-            !ctxAuth->isCoauthorizedWithClient(client)) {
+            !ctxAuth->isCoauthorizedWithClient(client, lk)) {
             continue;
         }
 

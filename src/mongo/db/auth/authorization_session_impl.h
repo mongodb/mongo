@@ -97,9 +97,11 @@ public:
 
     std::string getAuthenticatedUserNamesToken() override;
 
-    void logoutDatabase(const std::string& dbname) override;
+    void logoutDatabase(OperationContext* opCtx, StringData dbname) override;
 
-    void grantInternalAuthorization() override;
+    void grantInternalAuthorization(Client* client) override;
+
+    void grantInternalAuthorization(OperationContext* opCtx) override;
 
     PrivilegeVector getDefaultPrivileges() override;
 
@@ -190,7 +192,7 @@ public:
 
     void clearImpersonatedUserData() override;
 
-    bool isCoauthorizedWithClient(Client* opClient) override;
+    bool isCoauthorizedWithClient(Client* opClient, WithLock opClientLock) override;
 
     bool isCoauthorizedWith(UserNameIterator userNameIter) override;
 
