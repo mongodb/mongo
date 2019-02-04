@@ -13,13 +13,8 @@
     }
 
     function stepDownPrimary(replTest) {
-        let exception = assert.throws(function() {
-            let res = assert.commandWorked(
-                replTest.getPrimary().adminCommand({replSetStepDown: 10, force: true}));
-            print("replSetStepDown did not throw exception but returned: " + tojson(res));
-        });
-        assert(isNetworkError(exception),
-               "replSetStepDown did not disconnect client; failed with " + tojson(exception));
+        assert.commandWorked(
+            replTest.getPrimary().adminCommand({replSetStepDown: 10, force: true}));
     }
 
     const replTest = new ReplSetTest({nodes: 3});

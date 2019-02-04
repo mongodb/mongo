@@ -81,9 +81,8 @@
     // replSetStepDown.
     //
     function replSetStepDown(replSetTest) {
-        assert.throws(function() {
-            replSetTest.getPrimary().adminCommand({replSetStepDown: 60, force: true});
-        });
+        assert.commandWorked(
+            replSetTest.getPrimary().adminCommand({replSetStepDown: 60, force: true}));
     }
     testStepdown(replSetStepDown);
 

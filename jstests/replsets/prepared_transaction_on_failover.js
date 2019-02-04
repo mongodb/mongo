@@ -81,9 +81,7 @@
 
     function stepDownViaCommand() {
         jsTestLog("Stepping down primary via command");
-        assert.throws(function() {
-            replTest.getPrimary().adminCommand({replSetStepDown: 10});
-        });
+        assert.commandWorked(replTest.getPrimary().adminCommand({replSetStepDown: 10}));
     }
     testTransactionsWithFailover(stepDownViaCommand);
 

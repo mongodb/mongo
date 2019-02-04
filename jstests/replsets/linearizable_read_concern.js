@@ -122,11 +122,8 @@ load('jstests/libs/write_concern_util.js');
     });
     assert.eq(primary, replTest.getPrimary(), "Primary unexpectedly changed mid test.");
     jsTestLog("Making Primary step down");
-    var stepDownException = assert.throws(function() {
-        var result = primary.adminCommand(
-            {"replSetStepDown": 100, secondaryCatchUpPeriodSecs: 0, "force": true});
-        print('replSetStepDown did not throw exception but returned: ' + tojson(result));
-    });
+    assert.commandWorked(primary.adminCommand(
+        {"replSetStepDown": 100, secondaryCatchUpPeriodSecs: 0, "force": true}));
     parallelShell();
     replTest.stopSet();
 }());

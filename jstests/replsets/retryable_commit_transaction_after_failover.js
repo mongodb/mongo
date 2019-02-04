@@ -58,11 +58,14 @@
     }));
 
     jsTest.log("Step up the secondary");
+    const oldPrimary = rst.getPrimary();
     const oldSecondary = rst.getSecondary();
     rst.stepUp(oldSecondary);
     // Wait until the other node becomes primary.
     assert.eq(oldSecondary, rst.getPrimary());
     // Reconnect the connection to the new primary.
+    sessionDb.getMongo()._markNodeAsFailed(
+        oldPrimary.host, ErrorCodes.NotMaster, "Notice that primary is not master");
     reconnect(sessionDb);
 
     jsTest.log("commitTransaction command is retryable after failover");

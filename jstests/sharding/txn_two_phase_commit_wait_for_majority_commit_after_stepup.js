@@ -104,14 +104,11 @@
     stopServerReplication([coordPrimary, coordSecondary]);
 
     // Induce the coordinator primary to step down.
-    const stepDownResult = assert.throws(function() {
-        // The amount of time the node has to wait before becoming primary again.
-        const stepDownSecs = 1;
-        coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true});
-    });
-    assert(isNetworkError(stepDownResult),
-           'Expected exception from stepping down coordinator primary ' + coordPrimary.host + ': ' +
-               tojson(stepDownResult));
+
+    // The amount of time the node has to wait before becoming primary again.
+    const stepDownSecs = 1;
+    assert.commandWorked(coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
+
     assert.commandWorked(coordPrimary.adminCommand({
         configureFailPoint: "hangBeforeWritingDecision",
         mode: "off",

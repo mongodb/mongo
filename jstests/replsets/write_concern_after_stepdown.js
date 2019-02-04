@@ -88,17 +88,8 @@
     nodes[2].acceptConnectionsFrom(nodes[0]);
 
     // Allow the old primary to finish stepping down so that shutdown can finish.
-    var res = null;
-    try {
-        res = nodes[0].adminCommand({configureFailPoint: 'blockHeartbeatStepdown', mode: 'off'});
-    } catch (e) {
-        // Expected - once we disable the fail point the stepdown will proceed and it's racy whether
-        // the stepdown closes all connections before or after the configureFailPoint command
-        // returns
-    }
-    if (res) {
-        assert.commandWorked(res);
-    }
+    assert.commandWorked(
+        nodes[0].adminCommand({configureFailPoint: 'blockHeartbeatStepdown', mode: 'off'}));
 
     joinMajorityWriter();
 

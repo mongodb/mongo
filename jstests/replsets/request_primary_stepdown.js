@@ -23,12 +23,8 @@
     clearRawMongoProgramOutput();
 
     // Primary should step down long enough for election to occur on secondary.
-    var stepDownException = assert.throws(function() {
-        var result = primary.adminCommand({replSetStepDown: 70, secondaryCatchUpPeriodSecs: 60});
-        print('replSetStepDown did not throw exception but returned: ' + tojson(result));
-    });
-    assert(isNetworkError(stepDownException),
-           'replSetStepDown did not disconnect client; failed with ' + tojson(stepDownException));
+    assert.commandWorked(
+        primary.adminCommand({replSetStepDown: 70, secondaryCatchUpPeriodSecs: 60}));
 
     // Wait for node 1 to be promoted to primary after node 0 stepped down.
     replSet.waitForState(replSet.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);

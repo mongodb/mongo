@@ -69,9 +69,7 @@ let ContinuousStepdown;
 
             try {
                 // The config primary may unexpectedly step down during startup if under heavy
-                // load and too slowly processing heartbeats. When it steps down, it closes all of
-                // its connections. ReplSetTest will therefore retry discovery of the replica set's
-                // config.
+                // load and too slowly processing heartbeats.
                 const replSet = new ReplSetTest(seedNode);
 
                 let primary = replSet.getPrimary();
@@ -79,15 +77,8 @@ let ContinuousStepdown;
                 while (stopCounter.getCount() > 0) {
                     print("*** Stepping down " + primary);
 
-                    assert.throws(function() {
-                        let result = primary.adminCommand(
-                            {replSetStepDown: options.stepdownDurationSecs, force: true});
-                        print("replSetStepDown command did not throw and returned: " +
-                              tojson(result));
-
-                        // The call to replSetStepDown should never succeed.
-                        assert.commandWorked(result);
-                    });
+                    assert.commandWorked(primary.adminCommand(
+                        {replSetStepDown: options.stepdownDurationSecs, force: true}));
 
                     // Wait for primary to get elected and allow the test to make some progress
                     // before attempting another stepdown.

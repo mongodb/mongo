@@ -98,8 +98,6 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions
 MONGO_FAIL_POINT_DEFINE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
 MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 
-MONGO_EXPORT_SERVER_PARAMETER(closeConnectionsOnStepdown, bool, true);
-
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
@@ -1770,7 +1768,7 @@ void ReplicationCoordinatorImpl::_killUserOperationsOnStepDown(
         if (toKill && toKill->getOpID() != stepDownOpCtx->getOpID()) {
             const GlobalLockAcquisitionTracker& globalLockTracker =
                 GlobalLockAcquisitionTracker::get(toKill);
-            if (closeConnectionsOnStepdown.load() || globalLockTracker.getGlobalWriteLocked() ||
+            if (globalLockTracker.getGlobalWriteLocked() ||
                 globalLockTracker.getGlobalSharedLockTaken()) {
                 serviceCtx->killOperation(lk, toKill, ErrorCodes::InterruptedDueToStepDown);
             }
@@ -2810,9 +2808,6 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             _externalState->closeConnections();
         /* FALLTHROUGH */
         case kActionSteppedDown:
-            if (closeConnectionsOnStepdown.load()) {
-                _externalState->closeConnections();
-            }
             _externalState->shardingOnStepDownHook();
             _externalState->stopNoopWriter();
             break;

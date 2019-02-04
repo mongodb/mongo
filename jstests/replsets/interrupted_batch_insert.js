@@ -57,11 +57,10 @@
             return {idx: i};
         });
         var coll = new Mongo(host).getCollection(collName);
-        assert.throws(
-            () => coll.insert(docsToInsert,
-                              {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
-            [],
-            "network error");
+        assert.commandFailedWithCode(
+            coll.insert(docsToInsert,
+                        {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
+            ErrorCodes.InterruptedDueToStepDown);
     }, primary.host, collName, 10 * batchSize);
     worker.start();
 

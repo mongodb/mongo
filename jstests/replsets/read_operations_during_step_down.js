@@ -14,10 +14,7 @@ load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
     const dbName = "test";
     const collName = "coll";
 
-    var rst = new ReplSetTest({
-        name: testName,
-        nodes: [{setParameter: {closeConnectionsOnStepdown: false}}, {rsConfig: {priority: 0}}]
-    });
+    var rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}]});
     rst.startSet();
     rst.initiate();
 

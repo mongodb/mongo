@@ -6,8 +6,7 @@
 
     load("jstests/libs/curop_helpers.js");
 
-    const rst = new ReplSetTest(
-        {nodes: [{setParameter: {closeConnectionsOnStepdown: false}}, {rsConfig: {priority: 0}}]});
+    const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
     rst.startSet();
     rst.initiate();
 

@@ -67,15 +67,9 @@ try {
         'Step down ' + master + ' expected error: ' +
         tojson(assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown: 10}))));
 
-    // The server will disconnect the client on a successful forced stepdown so we use the
-    // presence of an exception to confirm the forced stepdown result.
     jsTestLog('Do stepdown of primary ' + master + ' that should work');
-    var exceptionFromForcedStepDown = assert.throws(function() {
-        master.getDB("admin").runCommand(
-            {replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true});
-    });
-    jsTestLog('Forced stepdown ' + master + ' expected failure: ' +
-              tojson(exceptionFromForcedStepDown));
+    assert.commandWorked(
+        master.adminCommand({replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true}));
 
     jsTestLog('Checking isMaster on ' + master);
     var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster: 1}));

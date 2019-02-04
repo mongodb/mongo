@@ -28,9 +28,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.neq(Timestamp(0, 0), shardVersionBeforeStepdown);
 
     // Stepdown the primary of the shard and ensure that that cursor can still be read
-    assert.throws(function() {
-        assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 60, force: 1}));
-    });
+    assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 60, force: 1}));
 
     var getMoreCursor =
         assert.commandWorked(db.runCommand({getMore: findCursor.id, collection: 'TestColl'}))

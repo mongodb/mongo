@@ -16,29 +16,26 @@
     load("jstests/libs/override_methods/auto_retry_on_network_error.js");
     load("jstests/replsets/rslib.js");
 
-    function stepDownPrimary(rst) {
-        // Since we expect the mongo shell's connection to get severed as a result of running the
-        // "replSetStepDown" command, we temporarily disable the retry on network error behavior.
-        TestData.skipRetryOnNetworkError = true;
-        try {
-            const primary = rst.getPrimary();
-            const error = assert.throws(function() {
-                const res = primary.adminCommand({replSetStepDown: 1, force: true});
-                print("replSetStepDown did not throw exception but returned: " + tojson(res));
-            });
-            assert(isNetworkError(error),
-                   "replSetStepDown did not disconnect client; failed with " + tojson(error));
+    function getThreadName(db) {
+        let myUri = db.adminCommand({whatsmyuri: 1}).you;
+        return db.getSiblingDB("admin")
+            .aggregate([{$currentOp: {localOps: true}}, {$match: {client: myUri}}])
+            .toArray()[0]
+            .desc;
+    }
 
-            // We use the reconnect() function to run a command against the former primary that
-            // acquires the global lock to ensure that it has finished stepping down and has
-            // therefore closed all of its client connections. This ensures commands sent on other
-            // connections to the former primary trigger a network error rather than potentially
-            // returning a "not master" error while the server is in the midst of closing client
-            // connections.
-            reconnect(primary);
-        } finally {
-            TestData.skipRetryOnNetworkError = false;
-        }
+    function failNextCommand(db, command) {
+        let threadName = getThreadName(db);
+
+        assert.commandWorked(db.adminCommand({
+            configureFailPoint: "failCommand",
+            mode: {times: 1},
+            data: {
+                closeConnection: true,
+                failCommands: [command],
+                threadName: threadName,
+            }
+        }));
     }
 
     const rst = new ReplSetTest({nodes: 1});
@@ -55,22 +52,22 @@
     // allow automatic re-targeting of the primary on NotMaster errors.
     const db = new Mongo(rst.getURL()).startSession({retryWrites: true}).getDatabase(dbName);
 
-    // Commands with no stepdowns should work as normal.
+    // Commands with no disconnections should work as normal.
     assert.commandWorked(db.runCommand({ping: 1}));
     assert.commandWorked(db.runCommandWithMetadata({ping: 1}, {}).commandReply);
 
     // Read commands are automatically retried on network errors.
-    stepDownPrimary(rst);
+    failNextCommand(db, "find");
     assert.commandWorked(db.runCommand({find: collName}));
 
-    stepDownPrimary(rst);
+    failNextCommand(db, "find");
     assert.commandWorked(db.runCommandWithMetadata({find: collName}, {}).commandReply);
 
     // Retryable write commands that can be retried succeed.
-    stepDownPrimary(rst);
+    failNextCommand(db, "insert");
     assert.writeOK(db[collName].insert({x: 1}));
 
-    stepDownPrimary(rst);
+    failNextCommand(db, "insert");
     assert.commandWorked(db.runCommandWithMetadata({
                                insert: collName,
                                documents: [{x: 2}, {x: 3}],
@@ -82,7 +79,7 @@
 
     // Retryable write commands that cannot be retried (i.e. no transaction number, no session id,
     // or are unordered) throw.
-    stepDownPrimary(rst);
+    failNextCommand(db, "insert");
     assert.throws(function() {
         db.runCommand({insert: collName, documents: [{x: 1}, {x: 2}], ordered: false});
     });
@@ -91,7 +88,7 @@
     // the primary, so the connection to it can be closed.
     assert.commandWorked(db.runCommandWithMetadata({ping: 1}, {}).commandReply);
 
-    stepDownPrimary(rst);
+    failNextCommand(db, "insert");
     assert.throws(function() {
         db.runCommandWithMetadata({insert: collName, documents: [{x: 1}, {x: 2}], ordered: false},
                                   {});
@@ -100,13 +97,13 @@
     // getMore commands can't be retried because we won't know whether the cursor was advanced or
     // not.
     let cursorId = assert.commandWorked(db.runCommand({find: collName, batchSize: 0})).cursor.id;
-    stepDownPrimary(rst);
+    failNextCommand(db, "getMore");
     assert.throws(function() {
         db.runCommand({getMore: cursorId, collection: collName});
     });
 
     cursorId = assert.commandWorked(db.runCommand({find: collName, batchSize: 0})).cursor.id;
-    stepDownPrimary(rst);
+    failNextCommand(db, "getMore");
     assert.throws(function() {
         db.runCommandWithMetadata({getMore: cursorId, collection: collName}, {});
     });

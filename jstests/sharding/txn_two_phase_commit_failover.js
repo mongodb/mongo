@@ -174,12 +174,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                              failpointData.numTimesShouldBeHit);
 
             // Induce the coordinator primary to step down.
-            const stepDownResult = assert.throws(function() {
-                coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true});
-            });
-            assert(isNetworkError(stepDownResult),
-                   'Expected exception from stepping down coordinator primary ' +
-                       coordPrimary.host + ': ' + tojson(stepDownResult));
+            assert.commandWorked(
+                coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
             assert.commandWorked(coordPrimary.adminCommand({
                 configureFailPoint: failpointData.failpoint,
                 mode: "off",

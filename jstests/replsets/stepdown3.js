@@ -32,26 +32,17 @@
 
     // step down the primary asyncronously
     print("stepdown");
-    var command = "sleep(4000); tojson(db.adminCommand( { replSetStepDown : 60, force : 1 } ));";
+    var command =
+        "sleep(4000); assert.commandWorked(db.adminCommand( { replSetStepDown : 60, force : 1 } ));";
     var awaitShell = startParallelShell(command, master.port);
 
-    print("getlasterror; should assert or return an error, depending on timing");
-    var gleFunction = function() {
-        var result =
-            master.getDB("test").runCommand({getLastError: 1, w: 2, wtimeout: 10 * 60 * 1000});
-        if (result.errmsg === "not master" || result.code == ErrorCodes.NotMaster ||
-            result.code == ErrorCodes.InterruptedDueToStepDown) {
-            throw new Error("satisfy assert.throws()");
-        }
-        print("failed to throw exception; GLE returned: ");
-        printjson(result);
-    };
-    var result = assert.throws(gleFunction);
+    print("getlasterror; should return an error");
+    let result = master.getDB("test").runCommand({getLastError: 1, w: 2, wtimeout: 10 * 60 * 1000});
+    assert(ErrorCodes.isNotMasterError(result.code));
     print("result of gle:");
     printjson(result);
 
-    var exitCode = awaitShell({checkExitSuccess: false});
-    assert.neq(0, exitCode, "expected replSetStepDown to close the shell's connection");
+    awaitShell();
 
     // unlock and shut down
     printjson(locked.getDB("admin").fsyncUnlock());

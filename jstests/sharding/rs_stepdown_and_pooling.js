@@ -52,17 +52,8 @@
         jsTest.log("Stepdown primary and then step back up...");
 
         var stepDown = function(node, timeSecs) {
-            var result = null;
-            try {
-                result = node.getDB("admin").runCommand({replSetStepDown: timeSecs, force: true});
-                // Should not get here
-            } catch (e) {
-                printjson(e);
-            }
-
-            if (result != null)
-                printjson(result);
-            assert.eq(null, result);
+            assert.commandWorked(
+                node.getDB("admin").runCommand({replSetStepDown: timeSecs, force: true}));
         };
 
         stepDown(primary, 0);

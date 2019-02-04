@@ -27,12 +27,7 @@
 
     // Primary should step down long enough for election to occur on secondary.
     var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
-    var stepDownException = assert.throws(function() {
-        var result = primary.adminCommand({replSetStepDown: replSet.kDefaultTimeoutMS / 1000});
-        print('replSetStepDown did not throw exception but returned: ' + tojson(result));
-    });
-    assert(isNetworkError(stepDownException),
-           'replSetStepDown did not disconnect client; failed with ' + tojson(stepDownException));
+    assert.commandWorked(primary.adminCommand({replSetStepDown: replSet.kDefaultTimeoutMS / 1000}));
 
     // Step down primary and wait for node 1 to be promoted to primary.
     replSet.waitForState(replSet.nodes[1], ReplSetTest.State.PRIMARY);

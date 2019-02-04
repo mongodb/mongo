@@ -34,9 +34,7 @@
     function stepUp(node) {
         var primary = rst.getPrimary();
         if (primary != node) {
-            assert.throws(function() {
-                primary.adminCommand({replSetStepDown: 60 * 5});
-            });
+            assert.commandWorked(primary.adminCommand({replSetStepDown: 60 * 5}));
         }
         waitForPrimary(node);
     }

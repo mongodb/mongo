@@ -72,9 +72,7 @@
                 assertNodeHasLastVote(node, term, primary);
             });
         }
-        assert.throws(function() {
-            primary.adminCommand({replSetStepDown: 60 * 10, force: true});
-        });
+        assert.commandWorked(primary.adminCommand({replSetStepDown: 60 * 10, force: true}));
 
         // Make sure a new primary has been established.
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);

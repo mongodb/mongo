@@ -74,11 +74,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // Make one of the primaries step down.
         const oldPrimary = st.rs0.getPrimary();
 
-        const stepDownError = assert.throws(function() {
-            oldPrimary.adminCommand({replSetStepDown: 300, force: true});
-        });
-        assert(isNetworkError(stepDownError),
-               "replSetStepDown did not disconnect client; failed with " + tojson(stepDownError));
+        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: 300, force: true}));
 
         st.rs0.awaitNodesAgreeOnPrimary();
         const newPrimary = st.rs0.getPrimary();

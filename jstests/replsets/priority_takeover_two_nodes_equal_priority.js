@@ -38,10 +38,8 @@ load('jstests/replsets/rslib.js');
         );
 
     jsTestLog("Stepping down the current primary.");
-    assert.throws(function() {
-        assert.commandWorked(
-            primary.adminCommand({replSetStepDown: 10 * 60, secondaryCatchUpPeriodSecs: 10 * 60}));
-    });
+    assert.commandWorked(
+        primary.adminCommand({replSetStepDown: 10 * 60, secondaryCatchUpPeriodSecs: 10 * 60}));
 
     // Make sure the primary has stepped down.
     assert.neq(primary, replTest.getPrimary());

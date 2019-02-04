@@ -44,9 +44,7 @@
         assert.docEq(firstChange.fullDocument, {_id: 0});
 
         // Make the primary step down
-        assert.throws(function() {
-            primaryDB.adminCommand({replSetStepDown: 30});
-        });
+        assert.commandWorked(primaryDB.adminCommand({replSetStepDown: 30}));
 
         // Now wait for another primary to be elected.
         const newPrimary = rst.getPrimary();

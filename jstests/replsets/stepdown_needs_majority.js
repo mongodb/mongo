@@ -24,15 +24,14 @@
 
     function assertStepDownFailsWithExceededTimeLimit(node) {
         assert.commandFailedWithCode(
-            node.getDB("admin").runCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 5}),
+            node.adminCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 5}),
             ErrorCodes.ExceededTimeLimit,
             "step down did not fail with 'ExceededTimeLimit'");
     }
 
     function assertStepDownSucceeds(node) {
-        assert.throws(function() {
-            node.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60});
-        });
+        assert.commandWorked(
+            node.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
     }
 
     function nodeIdStr(repltest, node) {

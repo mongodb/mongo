@@ -33,14 +33,9 @@
     const[secondary1, secondary2] = rst.getSecondaries();
 
     function stepDownPrimary(rst) {
-        const awaitShell = startParallelShell(function() {
-            const error = assert.throws(function() {
-                const res = db.adminCommand({replSetStepDown: 60, force: true});
-                print("replSetStepDown did not throw exception but returned: " + tojson(res));
-            });
-            assert(isNetworkError(error),
-                   "replSetStepDown did not disconnect client; failed with " + tojson(error));
-        }, directConn.port);
+        const awaitShell = startParallelShell(
+            () => assert.commandWorked(db.adminCommand({replSetStepDown: 60, force: true})),
+            directConn.port);
 
         // We wait for the primary to transition to the SECONDARY state to ensure we're waiting
         // until after the parallel shell has started the replSetStepDown command and the server is

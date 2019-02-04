@@ -7,11 +7,8 @@
     load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
 
     const name = "change_stream_speculative_majority";
-    const replTest = new ReplSetTest({
-        name: name,
-        nodes: [{setParameter: {closeConnectionsOnStepdown: false}}, {}],
-        nodeOptions: {enableMajorityReadConcern: 'false'}
-    });
+    const replTest = new ReplSetTest(
+        {name: name, nodes: [{}, {}], nodeOptions: {enableMajorityReadConcern: 'false'}});
     replTest.startSet();
     replTest.initiate();
 

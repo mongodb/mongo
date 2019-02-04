@@ -36,7 +36,8 @@
     assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
 
     var stepDownCmd = function() {
-        db.getSiblingDB('admin').runCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60});
+        assert.commandWorked(
+            db.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
     };
     var stepDowner = startParallelShell(stepDownCmd, primary.port);
 
@@ -67,8 +68,7 @@
 
     jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
     replSet.waitForState(primary, ReplSetTest.State.SECONDARY);
-    var exitCode = stepDowner({checkExitSuccess: false});
-    assert.neq(0, exitCode, "expected replSetStepDown to close the shell's connection");
+    var exitCode = stepDowner();
 
     jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");
     replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
