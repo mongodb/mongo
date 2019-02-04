@@ -60,121 +60,15 @@
 
 namespace mongo {
 
-using std::vector;
-
 constexpr int CursorManager::kNumPartitions;
 
-namespace {
-
-class GlobalCursorIdCache {
-public:
-    GlobalCursorIdCache();
-    ~GlobalCursorIdCache();
-
-    /**
-     * works globally
-     */
-    bool killCursor(OperationContext* opCtx, CursorId id, bool checkAuth);
-
-    void appendStats(BSONObjBuilder& builder);
-
-    std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
-
-    int64_t nextSeed();
-
-private:
-    // '_mutex' must not be held when acquiring a CursorManager mutex to avoid deadlock.
-    SimpleMutex _mutex;
-
-    using CursorIdToNssMap = stdx::unordered_map<CursorId, NamespaceString>;
-    using IdToNssMap = stdx::unordered_map<unsigned, NamespaceString>;
-
-    IdToNssMap _idToNss;
-    unsigned _nextId;
-
-    std::unique_ptr<SecureRandom> _secureRandom;
-};
-
-// Note that "globalCursorIdCache" must be declared before "globalCursorManager", as the latter
-// calls into the former during destruction.
-std::unique_ptr<GlobalCursorIdCache> globalCursorIdCache;
 std::unique_ptr<CursorManager> globalCursorManager;
 
-MONGO_INITIALIZER(GlobalCursorIdCache)(InitializerContext* context) {
-    globalCursorIdCache.reset(new GlobalCursorIdCache());
-    return Status::OK();
-}
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(GlobalCursorManager, ("GlobalCursorIdCache"))
+MONGO_INITIALIZER(GlobalCursorManager)
 (InitializerContext* context) {
-    globalCursorManager.reset(new CursorManager());
+    globalCursorManager = std::make_unique<CursorManager>();
     return Status::OK();
 }
-
-GlobalCursorIdCache::GlobalCursorIdCache() : _nextId(0), _secureRandom() {}
-
-GlobalCursorIdCache::~GlobalCursorIdCache() {}
-
-int64_t GlobalCursorIdCache::nextSeed() {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-    if (!_secureRandom)
-        _secureRandom = SecureRandom::create();
-    return _secureRandom->nextInt64();
-}
-
-bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool checkAuth) {
-    // Figure out what the namespace of this cursor is.
-    NamespaceString nss;
-    {
-        auto pin = globalCursorManager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
-        if (!pin.isOK()) {
-            // Either the cursor doesn't exist, or it was killed during the last time it was being
-            // used, and was cleaned up after this call. Either way, we cannot kill it.
-            return false;
-        }
-        nss = pin.getValue().getCursor()->nss();
-    }
-    invariant(nss.isValid());
-
-    boost::optional<AutoStatsTracker> statsTracker;
-    if (!nss.isCollectionlessCursorNamespace()) {
-        const boost::optional<int> dbProfilingLevel = boost::none;
-        statsTracker.emplace(opCtx,
-                             nss,
-                             Top::LockType::NotLocked,
-                             AutoStatsTracker::LogMode::kUpdateTopAndCurop,
-                             dbProfilingLevel);
-    }
-
-    // Check if we are authorized to kill this cursor.
-    if (checkAuth) {
-        auto ccPin = globalCursorManager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
-        if (!ccPin.isOK()) {
-            audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, ccPin.getStatus().code());
-            return false;
-        }
-
-        AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
-        auto cursorOwner = ccPin.getValue().getCursor()->getAuthenticatedUsers();
-        auto authStatus = as->checkAuthForKillCursors(nss, cursorOwner);
-        if (!authStatus.isOK()) {
-            audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, authStatus.code());
-            return false;
-        }
-    }
-
-    Status killStatus = globalCursorManager->killCursor(opCtx, id, checkAuth);
-    massert(28697,
-            killStatus.reason(),
-            killStatus.code() == ErrorCodes::OK || killStatus.code() == ErrorCodes::CursorNotFound);
-    return killStatus.isOK();
-}
-
-std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t now) {
-    return globalCursorManager->timeoutCursors(opCtx, now);
-}
-
-}  // namespace
 
 CursorManager* CursorManager::getGlobalCursorManager() {
     return globalCursorManager.get();
@@ -193,32 +87,8 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
                           bySessionCursorKiller.getCursorsKilled());
 }
 
-std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* opCtx, Date_t now) {
-    return globalCursorIdCache->timeoutCursors(opCtx, now);
-}
-
-int CursorManager::killCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* _ids) {
-    ConstDataCursor ids(_ids);
-    int numDeleted = 0;
-    for (int i = 0; i < n; i++) {
-        if (killCursorGlobalIfAuthorized(opCtx, ids.readAndAdvance<LittleEndian<int64_t>>()))
-            numDeleted++;
-        if (globalInShutdownDeprecated())
-            break;
-    }
-    return numDeleted;
-}
-bool CursorManager::killCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id) {
-    return globalCursorIdCache->killCursor(opCtx, id, true);
-}
-bool CursorManager::killCursorGlobal(OperationContext* opCtx, CursorId id) {
-    return globalCursorIdCache->killCursor(opCtx, id, false);
-}
-
-// --------------------------
-
 CursorManager::CursorManager()
-    : _random(stdx::make_unique<PseudoRandom>(globalCursorIdCache->nextSeed())),
+    : _random(stdx::make_unique<PseudoRandom>(SecureRandom::create()->nextInt64())),
       _cursorMap(stdx::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
 
 CursorManager::~CursorManager() {

@@ -66,6 +66,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/run_op_kill_cursors.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -996,7 +997,7 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
 
     const char* cursorArray = dbmessage.getArray(n);
 
-    int found = CursorManager::killCursorGlobalIfAuthorized(opCtx, n, cursorArray);
+    int found = runOpKillCursors(opCtx, static_cast<size_t>(n), cursorArray);
 
     if (shouldLog(logger::LogSeverity::Debug(1)) || found != n) {
         LOG(found == n ? 1 : 0) << "killcursors: found " << found << " of " << n;
@@ -1099,12 +1100,15 @@ DbResponse receivedGetMore(OperationContext* opCtx,
             // Make sure that killCursorGlobal does not throw an exception if it is interrupted.
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-            // If a cursor with id 'cursorid' was authorized, it may have been advanced
-            // before an exception terminated processGetMore.  Erase the ClientCursor
-            // because it may now be out of sync with the client's iteration state.
-            // SERVER-7952
-            // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-            CursorManager::killCursorGlobal(opCtx, cursorid);
+            // If an error was thrown prior to auth checks, then the cursor should remain alive in
+            // order to prevent an unauthorized user from resulting in the death of a cursor. In
+            // other error cases, the cursor is dead and should be cleaned up.
+            //
+            // If killing the cursor fails, ignore the error and don't try again. The cursor should
+            // be reaped by the client cursor timeout thread.
+            CursorManager::getGlobalCursorManager()
+                ->killCursor(opCtx, cursorid, false /* shouldAudit */)
+                .ignore();
         }
 
         BSONObjBuilder err;

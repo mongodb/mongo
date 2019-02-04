@@ -1175,6 +1175,7 @@ env.Library(
         'query/plan_yield_policy.cpp',
         'query/query_yield.cpp',
         'query/stage_builder.cpp',
+        'run_op_kill_cursors.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

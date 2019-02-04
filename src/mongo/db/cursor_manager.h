@@ -73,21 +73,6 @@ public:
      */
     static CursorManager* getGlobalCursorManager();
 
-    static int killCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
-
-    static bool killCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id);
-
-    static bool killCursorGlobal(OperationContext* opCtx, CursorId id);
-
-    /**
-     * Deletes inactive cursors from the global cursor manager. Returns the number of cursors that
-     * were timed out.
-     *
-     * TODO SERVER-37454: This method can become non-static now that there are no per-collection
-     * cursor managers.
-     */
-    static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, Date_t now);
-
     CursorManager();
 
     /**
