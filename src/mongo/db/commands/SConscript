@@ -255,6 +255,7 @@ env.Library(
         "sleep_command.cpp",
         "validate.cpp",
         "write_commands/write_commands.cpp",
+        env.Idlc('enable_coordinator_for_create_indexes_command.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
