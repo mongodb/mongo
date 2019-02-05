@@ -975,8 +975,10 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          //     ]
          // }
 
-         // TODO (SERVER-38701): this must do nothing for applyOps. Pivot can be made on 'mode' to
-         // identify applyOps requests and take no action.
+         if (OplogApplication::Mode::kApplyOpsCmd == mode) {
+             return {ErrorCodes::CommandNotSupported,
+                     "The startIndexBuild operation is not supported in applyOps mode"};
+         }
 
          const NamespaceString nss(parseUUIDorNs(opCtx, ns, ui, cmd));
 
@@ -1028,8 +1030,10 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          //     ]
          // }
 
-         // TODO this must work for applyOps, which doesn't provide collection or build UUIDs. Pivot
-         // can be made on 'mode' to identify applyOps requests. (SERVER-38701).
+         if (OplogApplication::Mode::kApplyOpsCmd == mode) {
+             return {ErrorCodes::CommandNotSupported,
+                     "The commitIndexBuild operation is not supported in applyOps mode"};
+         }
 
          // Ensure the collection name is specified
          BSONElement first = cmd.firstElement();
@@ -1083,6 +1087,11 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          //         }
          //     ]
          // }
+
+         if (OplogApplication::Mode::kApplyOpsCmd == mode) {
+             return {ErrorCodes::CommandNotSupported,
+                     "The abortIndexBuild operation is not supported in applyOps mode"};
+         }
 
          // Ensure that the first element is the 'abortIndexBuild' field.
          BSONElement first = cmd.firstElement();
