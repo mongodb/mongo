@@ -160,12 +160,31 @@ void MultiIndexBlock::ignoreUniqueConstraint() {
     _ignoreUnique = true;
 }
 
-StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const BSONObj& spec) {
-    const auto indexes = std::vector<BSONObj>(1, spec);
-    return init(indexes);
+MultiIndexBlock::OnInitFn MultiIndexBlock::kNoopOnInitFn = [] {};
+
+MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(OperationContext* opCtx,
+                                                                        const Collection* coll) {
+    return [ opCtx, ns = coll->ns() ]() {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
+            replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
+            // Only primaries must timestamp this write. Secondaries run this from within a
+            // `TimestampBlock`. Primaries performing an index build via `applyOps` may have a
+            // wrapping commit timestamp that will be used instead.
+            opCtx->getServiceContext()->getOpObserver()->onOpMessage(
+                opCtx,
+                BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
+        }
+    };
 }
 
-StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const BSONObj& spec, OnInitFn onInit) {
+    const auto indexes = std::vector<BSONObj>(1, spec);
+    return init(indexes, onInit);
+}
+
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs,
+                                                       OnInitFn onInit) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -290,15 +309,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj
     if (isBackgroundBuilding())
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
-    auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-    if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
-        replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
-        // Only primaries must timestamp this write. Secondaries run this from within a
-        // `TimestampBlock`. Primaries performing an index build via `applyOps` may have a
-        // wrapping commit timestamp that will be used instead.
-        _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
-            _opCtx, BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
-    }
+    onInit();
 
     wunit.commit();
 
@@ -637,11 +648,10 @@ void MultiIndexBlock::abortWithoutCleanup() {
     _needToCleanup = false;
 }
 
-Status MultiIndexBlock::commit() {
-    return commit({});
-}
+MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {};
+MultiIndexBlock::OnCommitFn MultiIndexBlock::kNoopOnCommitFn = []() {};
 
-Status MultiIndexBlock::commit(stdx::function<void(const BSONObj& spec)> onCreateFn) {
+Status MultiIndexBlock::commit(OnCreateEachFn onCreateEach, OnCommitFn onCommit) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
                 str::stream() << "Index build aborted: " << _abortReason
@@ -661,9 +671,7 @@ Status MultiIndexBlock::commit(stdx::function<void(const BSONObj& spec)> onCreat
     MultikeyPathTracker::get(_opCtx).stopTrackingMultikeyPathInfo();
 
     for (size_t i = 0; i < _indexes.size(); i++) {
-        if (onCreateFn) {
-            onCreateFn(_indexes[i].block->getSpec());
-        }
+        onCreateEach(_indexes[i].block->getSpec());
 
         // Do this before calling success(), which unsets the interceptor pointer on the index
         // catalog entry.
@@ -694,6 +702,8 @@ Status MultiIndexBlock::commit(stdx::function<void(const BSONObj& spec)> onCreat
             }
         }
     }
+
+    onCommit();
 
     // The state of this index build is set to Committed only when the WUOW commits.
     // It is possible for abort() to be called after the check at the beginning of this function and

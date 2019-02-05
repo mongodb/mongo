@@ -102,7 +102,8 @@ public:
         OperationContext* opCtx,
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
-        const UUID& buildUUID) = 0;
+        const UUID& buildUUID,
+        IndexBuildProtocol protocol) = 0;
 
     /**
      * TODO: not yet implemented.

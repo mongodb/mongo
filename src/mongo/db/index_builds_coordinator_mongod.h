@@ -73,7 +73,8 @@ public:
         OperationContext* opCtx,
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
-        const UUID& buildUUID) override;
+        const UUID& buildUUID,
+        IndexBuildProtocol protocol) override;
 
     /**
      * TODO: not yet implemented.

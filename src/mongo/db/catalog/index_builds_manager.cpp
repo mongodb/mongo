@@ -74,7 +74,8 @@ IndexBuildsManager::~IndexBuildsManager() {
 Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            Collection* collection,
                                            const std::vector<BSONObj>& specs,
-                                           const UUID& buildUUID) {
+                                           const UUID& buildUUID,
+                                           OnInitFn onInit) {
     _registerIndexBuild(opCtx, collection, buildUUID);
 
     const auto& nss = collection->ns();
@@ -85,10 +86,10 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
 
     auto builder = _getBuilder(buildUUID);
 
-    auto initResult = writeConflictRetry(opCtx,
-                                         "IndexBuildsManager::setUpIndexBuild",
-                                         nss.ns(),
-                                         [builder, &specs] { return builder->init(specs); });
+    auto initResult = writeConflictRetry(
+        opCtx, "IndexBuildsManager::setUpIndexBuild", nss.ns(), [opCtx, builder, &onInit, &specs] {
+            return builder->init(specs, onInit);
+        });
 
     if (!initResult.isOK()) {
         return initResult.getStatus();
@@ -138,22 +139,23 @@ Status IndexBuildsManager::checkIndexConstraintViolations(const UUID& buildUUID)
 Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const UUID& buildUUID,
-                                            OnCommitFn onCommitFn) {
+                                            MultiIndexBlock::OnCreateEachFn onCreateEachFn,
+                                            MultiIndexBlock::OnCommitFn onCommitFn) {
     auto builder = _getBuilder(buildUUID);
 
-    return writeConflictRetry(
-        opCtx, "IndexBuildsManager::commitIndexBuild", nss.ns(), [builder, opCtx, &onCommitFn] {
-            WriteUnitOfWork wunit(opCtx);
+    return writeConflictRetry(opCtx,
+                              "IndexBuildsManager::commitIndexBuild",
+                              nss.ns(),
+                              [builder, opCtx, &onCreateEachFn, &onCommitFn] {
+                                  WriteUnitOfWork wunit(opCtx);
+                                  auto status = builder->commit(onCreateEachFn, onCommitFn);
+                                  if (!status.isOK()) {
+                                      return status;
+                                  }
 
-            auto status = builder->commit(onCommitFn);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            wunit.commit();
-
-            return Status::OK();
-        });
+                                  wunit.commit();
+                                  return Status::OK();
+                              });
 }
 
 bool IndexBuildsManager::abortIndexBuild(const UUID& buildUUID, const std::string& reason) {

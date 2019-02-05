@@ -409,11 +409,13 @@ void Cloner::copyIndexes(OperationContext* opCtx,
         return;
     }
 
-    auto indexInfoObjs = uassertStatusOK(indexer.init(prunedIndexesToBuild));
+    auto indexInfoObjs =
+        uassertStatusOK(indexer.init(prunedIndexesToBuild, MultiIndexBlock::kNoopOnInitFn));
     uassertStatusOK(indexer.insertAllDocumentsInCollection());
 
     WriteUnitOfWork wunit(opCtx);
-    uassertStatusOK(indexer.commit());
+    uassertStatusOK(
+        indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
     if (opCtx->writesAreReplicated()) {
         for (auto&& infoObj : indexInfoObjs) {
             getGlobalServiceContext()->getOpObserver()->onCreateIndex(

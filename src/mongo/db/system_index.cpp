@@ -123,8 +123,8 @@ SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> generateSystemIndexForE
 
         UUID buildUUID = UUID::gen();
         IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-        auto indexBuildFuture = uassertStatusOK(
-            indexBuildsCoord->startIndexBuild(opCtx, collectionUUID, {indexSpec}, buildUUID));
+        auto indexBuildFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
+            opCtx, collectionUUID, {indexSpec}, buildUUID, IndexBuildProtocol::kSinglePhase));
         return indexBuildFuture;
     } catch (const DBException& e) {
         severe() << "Failed to regenerate index for " << ns << ". Exception: " << e.what();

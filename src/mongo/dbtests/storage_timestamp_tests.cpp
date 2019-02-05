@@ -240,8 +240,10 @@ public:
         MultiIndexBlock indexer(_opCtx, coll);
         BSONObj indexInfoObj;
         {
-            auto swIndexInfoObj = indexer.init({BSON(
-                "v" << 2 << "name" << indexName << "ns" << coll->ns().ns() << "key" << indexKey)});
+            auto swIndexInfoObj = indexer.init(
+                {BSON("v" << 2 << "name" << indexName << "ns" << coll->ns().ns() << "key"
+                          << indexKey)},
+                MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -251,11 +253,14 @@ public:
         {
             WriteUnitOfWork wuow(_opCtx);
             // Timestamping index completion. Primaries write an oplog entry.
-            ASSERT_OK(indexer.commit());
-            // The op observer is not called from the index builder, but rather the
-            // `createIndexes` command.
-            _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                _opCtx, coll->ns(), *(coll->uuid()), indexInfoObj, false);
+            ASSERT_OK(indexer.commit(
+                [&](const BSONObj& indexSpec) {
+                    _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                        _opCtx, coll->ns(), *(coll->uuid()), indexSpec, false);
+                },
+                MultiIndexBlock::kNoopOnCommitFn));
+            // The timestamping repsponsibility is placed on the caller rather than the
+            // MultiIndexBlock.
             wuow.commit();
         }
     }
@@ -1811,12 +1816,14 @@ public:
                 unreplicated.emplace(_opCtx);
             }
 
-            auto swIndexInfoObj = indexer.init({BSON("v" << 2 << "unique" << true << "name"
-                                                         << "a_1"
-                                                         << "ns"
-                                                         << nss.ns()
-                                                         << "key"
-                                                         << BSON("a" << 1))});
+            auto swIndexInfoObj = indexer.init(
+                {BSON("v" << 2 << "unique" << true << "name"
+                          << "a_1"
+                          << "ns"
+                          << nss.ns()
+                          << "key"
+                          << BSON("a" << 1))},
+                MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, autoColl.getCollection()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -1830,18 +1837,20 @@ public:
         {
             WriteUnitOfWork wuow(_opCtx);
             // All callers of `MultiIndexBlock::commit` are responsible for timestamping index
-            // completion.  Primaries write an oplog entry. Secondaries explicitly set a
+            // completion  Primaries write an oplog entry. Secondaries explicitly set a
             // timestamp.
-            ASSERT_OK(indexer.commit());
-            if (SimulatePrimary) {
-                // The op observer is not called from the index builder, but rather the
-                // `createIndexes` command.
-                _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    _opCtx, nss, *(autoColl.getCollection()->uuid()), indexInfoObj, false);
-            } else {
-                ASSERT_OK(
-                    _opCtx->recoveryUnit()->setTimestamp(_clock->getClusterTime().asTimestamp()));
-            }
+            ASSERT_OK(indexer.commit(
+                [&](const BSONObj& indexSpec) {
+                    if (SimulatePrimary) {
+                        // The timestamping responsibility for each index is placed on the caller.
+                        _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                            _opCtx, nss, *(autoColl.getCollection()->uuid()), indexSpec, false);
+                    } else {
+                        ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(
+                            _clock->getClusterTime().asTimestamp()));
+                    }
+                },
+                MultiIndexBlock::kNoopOnCommitFn));
             wuow.commit();
         }
 
@@ -1910,12 +1919,14 @@ public:
                 unreplicated.emplace(_opCtx);
             }
 
-            auto swIndexInfoObj = indexer.init({BSON("v" << 2 << "unique" << true << "name"
-                                                         << "a_1"
-                                                         << "ns"
-                                                         << nss.ns()
-                                                         << "key"
-                                                         << BSON("a" << 1))});
+            auto swIndexInfoObj = indexer.init(
+                {BSON("v" << 2 << "unique" << true << "name"
+                          << "a_1"
+                          << "ns"
+                          << nss.ns()
+                          << "key"
+                          << BSON("a" << 1))},
+                MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, autoColl.getCollection()));
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -2000,7 +2011,18 @@ public:
 
         {
             WriteUnitOfWork wuow(_opCtx);
-            ASSERT_OK(indexer.commit());
+            ASSERT_OK(indexer.commit(
+                [&](const BSONObj& indexSpec) {
+                    if (SimulatePrimary) {
+                        // The timestamping responsibility for each index is placed on the caller.
+                        _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                            _opCtx, nss, *(autoColl.getCollection()->uuid()), indexSpec, false);
+                    } else {
+                        ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(
+                            _clock->getClusterTime().asTimestamp()));
+                    }
+                },
+                MultiIndexBlock::kNoopOnCommitFn));
             wuow.commit();
         }
     }

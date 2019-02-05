@@ -105,7 +105,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         wunit.commit();
     }
     MultiIndexBlock indexer(opCtx, coll);
-    Status status = indexer.init(spec).getStatus();
+    Status status = indexer.init(spec, MultiIndexBlock::kNoopOnInitFn).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }
@@ -121,7 +121,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         return status;
     }
     WriteUnitOfWork wunit(opCtx);
-    ASSERT_OK(indexer.commit());
+    ASSERT_OK(
+        indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
     wunit.commit();
     return Status::OK();
 }

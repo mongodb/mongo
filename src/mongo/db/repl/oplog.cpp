@@ -260,42 +260,50 @@ void setOplogCollectionName(ServiceContext* service) {
 /**
  * Parse the given BSON array of BSON into a vector of BSON.
  */
-StatusWith<std::vector<BSONObj>> parseBSONArrayIntoVector(const BSONElement& bsonArrayElem) {
+StatusWith<std::vector<BSONObj>> parseBSONSpecsIntoVector(const BSONElement& bsonArrayElem,
+                                                          const NamespaceString& nss) {
     invariant(bsonArrayElem.type() == Array);
     std::vector<BSONObj> vec;
-    for (auto& bsonElem : bsonArrayElem.Obj()) {
+    for (auto& bsonElem : bsonArrayElem.Array()) {
         if (bsonElem.type() != BSONType::Object) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "The elements of '" << bsonArrayElem.fieldName()
                                   << "' array must be objects, but found "
                                   << typeName(bsonElem.type())};
         }
-        BSONObjBuilder builder;
-        builder.append(bsonElem);
+        BSONObjBuilder builder(bsonElem.Obj());
+        builder.append("ns", nss.toString());
         vec.emplace_back(builder.obj());
     }
     return vec;
 }
 
 Status startIndexBuild(OperationContext* opCtx,
+                       const NamespaceString& nss,
                        const UUID& collUUID,
                        const UUID& indexBuildUUID,
                        const BSONElement& indexesElem,
                        OplogApplication::Mode mode) {
-    auto statusWithIndexes = parseBSONArrayIntoVector(indexesElem);
+    auto statusWithIndexes = parseBSONSpecsIntoVector(indexesElem, nss);
     if (!statusWithIndexes.isOK()) {
         return statusWithIndexes.getStatus();
     }
     return IndexBuildsCoordinator::get(opCtx)
-        ->startIndexBuild(opCtx, collUUID, statusWithIndexes.getValue(), indexBuildUUID)
+        ->startIndexBuild(opCtx,
+                          collUUID,
+                          statusWithIndexes.getValue(),
+                          indexBuildUUID,
+                          /* This oplog entry is only replicated for two-phase index builds */
+                          IndexBuildProtocol::kTwoPhase)
         .getStatus();
 }
 
 Status commitIndexBuild(OperationContext* opCtx,
+                        const NamespaceString& nss,
                         const UUID& indexBuildUUID,
                         const BSONElement& indexesElem,
                         OplogApplication::Mode mode) {
-    auto statusWithIndexes = parseBSONArrayIntoVector(indexesElem);
+    auto statusWithIndexes = parseBSONSpecsIntoVector(indexesElem, nss);
     if (!statusWithIndexes.isOK()) {
         return statusWithIndexes.getStatus();
     }
@@ -986,20 +994,20 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'startIndexBuild' oplog entry, missing required field "
                  "'indexBuildUUID'.",
-                 buildUUIDElem.eoo());
+                 !buildUUIDElem.eoo());
          UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
 
          auto indexesElem = cmd.getField("indexes");
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'startIndexBuild' oplog entry, missing required field 'indexes'.",
-                 indexesElem.eoo());
+                 !indexesElem.eoo());
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'startIndexBuild' oplog entry, field 'indexes' must be an array.",
                  indexesElem.type() == Array);
 
          auto collUUID = uassertStatusOK(UUID::parse(ui));
 
-         return startIndexBuild(opCtx, collUUID, indexBuildUUID, indexesElem, mode);
+         return startIndexBuild(opCtx, nss, collUUID, indexBuildUUID, indexesElem, mode);
      }}},
     {"commitIndexBuild",
      {[](OperationContext* opCtx,
@@ -1042,22 +1050,24 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
                  "commitIndexBuild value must be a string",
                  first.type() == mongo::String);
 
+         const NamespaceString nss(parseUUIDorNs(opCtx, ns, ui, cmd));
+
          auto buildUUIDElem = cmd.getField("indexBuildUUID");
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'commitIndexBuild' oplog entry, missing required field "
                  "'indexBuildUUID'.",
-                 buildUUIDElem.eoo());
+                 !buildUUIDElem.eoo());
          UUID indexBuildUUID = uassertStatusOK(UUID::parse(buildUUIDElem));
 
          auto indexesElem = cmd.getField("indexes");
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'commitIndexBuild' oplog entry, missing required field 'indexes'.",
-                 indexesElem.eoo());
+                 !indexesElem.eoo());
          uassert(ErrorCodes::BadValue,
                  "Error parsing 'commitIndexBuild' oplog entry, field 'indexes' must be an array.",
                  indexesElem.type() == Array);
 
-         return commitIndexBuild(opCtx, indexBuildUUID, indexesElem, mode);
+         return commitIndexBuild(opCtx, nss, indexBuildUUID, indexesElem, mode);
      }}},
     {"abortIndexBuild",
      {[](OperationContext* opCtx,

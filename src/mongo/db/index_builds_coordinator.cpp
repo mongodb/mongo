@@ -436,13 +436,6 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         // not allow locks or re-locks to be interrupted.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
-        if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
-            uasserted(ErrorCodes::NotMaster,
-                      str::stream() << "Not primary while creating indexes in " << nss.ns() << " ("
-                                    << collectionUUID
-                                    << ")");
-        }
-
         auto collection = uuidCatalog.lookupCollectionByUUID(collectionUUID);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection not found for index build: " << buildUUID << ": "
@@ -480,8 +473,20 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         }
 
         mustTearDown = true;
-        uassertStatusOK(
-            _indexBuildsManager.setUpIndexBuild(opCtx, collection, specsToBuild, buildUUID));
+
+        MultiIndexBlock::OnInitFn onInitFn;
+        // Two-phase index builds write a different oplog entry than the default behavior which
+        // writes a no-op just to generate an optime.
+        if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+            onInitFn = [&] {
+                opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
+                    opCtx, nss, collectionUUID, buildUUID, specsToBuild, false /* fromMigrate */);
+            };
+        } else {
+            onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection);
+        }
+        uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
+            opCtx, collection, specsToBuild, buildUUID, onInitFn));
 
         // If we're a background index, replace exclusive db lock with an intent lock, so that
         // other readers and writers can proceed during this phase.
@@ -564,12 +569,25 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         // Index constraint checking phase.
         uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(buildUUID));
 
+        auto onCommitFn = MultiIndexBlock::kNoopOnCommitFn;
+        auto onCreateEachFn = MultiIndexBlock::kNoopOnCreateEachFn;
+        if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+            // Two-phase index builds write one oplog entry for all indexes that are completed.
+            onCommitFn = [&] {
+                opCtx->getServiceContext()->getOpObserver()->onCommitIndexBuild(
+                    opCtx, nss, collectionUUID, buildUUID, specsToBuild, false /* fromMigrate */);
+            };
+        } else {
+            // Single-phase index builds write an oplog entry per index being built.
+            onCreateEachFn = [opCtx, &nss, &collectionUUID](const BSONObj& spec) {
+                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                    opCtx, nss, collectionUUID, spec, false);
+            };
+        }
+
         // Commit index build.
-        auto onCommitFn = [opCtx, &nss, &collectionUUID](const BSONObj& spec) {
-            opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                opCtx, nss, collectionUUID, spec, false);
-        };
-        uassertStatusOK(_indexBuildsManager.commitIndexBuild(opCtx, nss, buildUUID, onCommitFn));
+        uassertStatusOK(_indexBuildsManager.commitIndexBuild(
+            opCtx, nss, buildUUID, onCreateEachFn, onCommitFn));
 
         indexCatalogStats.numIndexesAfter = getNumIndexesTotal(opCtx, collection);
         log() << "Index builds manager completed successfully: " << buildUUID << ": " << nss
@@ -628,7 +646,6 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
     } else {
         replState->sharedPromise.setError(status);
     }
-
     return;
 }
 

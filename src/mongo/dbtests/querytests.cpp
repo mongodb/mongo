@@ -103,7 +103,7 @@ protected:
         MultiIndexBlock indexer(&_opCtx, _collection);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            uassertStatusOK(indexer.init(specObj));
+            uassertStatusOK(indexer.init(specObj, MultiIndexBlock::kNoopOnInitFn));
             wunit.commit();
         }
         uassertStatusOK(indexer.insertAllDocumentsInCollection());
@@ -111,7 +111,8 @@ protected:
         uassertStatusOK(indexer.checkConstraints());
         {
             WriteUnitOfWork wunit(&_opCtx);
-            uassertStatusOK(indexer.commit());
+            uassertStatusOK(indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn,
+                                           MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
         }
     }

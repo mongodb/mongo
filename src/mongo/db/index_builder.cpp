@@ -224,10 +224,13 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     }
 
     Status status = Status::OK();
+
     {
         TimestampBlock tsBlock(opCtx, _initIndexTs);
-        status = writeConflictRetry(
-            opCtx, "Init index build", ns.ns(), [&] { return indexer.init(_index).getStatus(); });
+        status = writeConflictRetry(opCtx, "Init index build", ns.ns(), [&] {
+            return indexer.init(_index, MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, coll))
+                .getStatus();
+        });
     }
 
     if (status == ErrorCodes::IndexAlreadyExists ||
@@ -309,10 +312,12 @@ Status IndexBuilder::_build(OperationContext* opCtx,
 
     status = writeConflictRetry(opCtx, "Commit index build", ns.ns(), [opCtx, coll, &indexer, &ns] {
         WriteUnitOfWork wunit(opCtx);
-        auto status = indexer.commit([opCtx, coll, &ns](const BSONObj& indexSpec) {
-            opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                opCtx, ns, *(coll->uuid()), indexSpec, false);
-        });
+        auto status = indexer.commit(
+            [opCtx, coll, &ns](const BSONObj& indexSpec) {
+                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                    opCtx, ns, *(coll->uuid()), indexSpec, false);
+            },
+            MultiIndexBlock::kNoopOnCommitFn);
         if (!status.isOK()) {
             return status;
         }

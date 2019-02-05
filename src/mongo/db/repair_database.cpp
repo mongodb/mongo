@@ -151,7 +151,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
         collection = databaseHolder->makeCollection(opCtx, ns, uuid, cce, rs, dbce);
 
         indexer = std::make_unique<MultiIndexBlock>(opCtx, collection.get());
-        Status status = indexer->init(indexSpecs).getStatus();
+        Status status = indexer->init(indexSpecs, MultiIndexBlock::kNoopOnInitFn).getStatus();
         if (!status.isOK()) {
             // The WUOW will handle cleanup, so the indexer shouldn't do its own.
             indexer->abortWithoutCleanup();
@@ -220,7 +220,8 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
 
     {
         WriteUnitOfWork wunit(opCtx);
-        status = indexer->commit();
+        status =
+            indexer->commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn);
         if (!status.isOK()) {
             return status;
         }

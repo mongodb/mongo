@@ -84,7 +84,8 @@ StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                                               CollectionUUID collectionUUID,
                                               const std::vector<BSONObj>& specs,
-                                              const UUID& buildUUID) {
+                                              const UUID& buildUUID,
+                                              IndexBuildProtocol protocol) {
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
         std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
@@ -99,8 +100,8 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
     auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(collectionUUID);
     auto dbName = nss.db().toString();
-    auto replIndexBuildState =
-        std::make_shared<ReplIndexBuildState>(buildUUID, collectionUUID, dbName, indexNames, specs);
+    auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
+        buildUUID, collectionUUID, dbName, indexNames, specs, protocol);
 
     Status status = _registerIndexBuild(opCtx, replIndexBuildState);
     if (!status.isOK()) {
@@ -119,9 +120,23 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         return replIndexBuildState->sharedPromise.getFuture();
     }
 
+    // Copy over all necessary OperationContext state.
+
     // Task in thread pool should retain the caller's deadline.
-    auto deadline = opCtx->getDeadline();
-    auto timeoutError = opCtx->getTimeoutError();
+    const auto deadline = opCtx->getDeadline();
+    const auto timeoutError = opCtx->getTimeoutError();
+
+    // TODO: SERVER-39484 Because both 'writesAreReplicated' and
+    // 'shouldNotConflictWithSecondaryBatchApplication' depend on the current replication state,
+    // just passing the state here is not resilient to member state changes like stepup/stepdown.
+
+    // If the calling thread is replicating oplog writes (primary), this state should be passed to
+    // the builder.
+    const bool writesAreReplicated = opCtx->writesAreReplicated();
+    // Index builds on secondaries can't hold the PBWM lock because it would conflict with
+    // replication.
+    const bool shouldNotConflictWithSecondaryBatchApplication =
+        !opCtx->lockState()->shouldConflictWithSecondaryBatchApplication();
 
     // Task in thread pool should have similar CurOp representation to the caller so that it can be
     // identified as a createIndexes operation.
@@ -132,10 +147,29 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         opDesc = curOp->opDescription().getOwned();
     }
 
-    status = _threadPool.schedule([ this, buildUUID, deadline, timeoutError, opDesc ]() noexcept {
+    status = _threadPool.schedule([
+        this,
+        buildUUID,
+        deadline,
+        timeoutError,
+        writesAreReplicated,
+        shouldNotConflictWithSecondaryBatchApplication,
+        opDesc
+    ]() noexcept {
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         opCtx->setDeadlineByDate(deadline, timeoutError);
+
+        boost::optional<repl::UnreplicatedWritesBlock> unreplicatedWrites;
+        if (!writesAreReplicated) {
+            unreplicatedWrites.emplace(opCtx.get());
+        }
+
+        // If the calling thread should not take the PBWM lock, neither should this thread.
+        boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> shouldNotConflictBlock;
+        if (shouldNotConflictWithSecondaryBatchApplication) {
+            shouldNotConflictBlock.emplace(opCtx->lockState());
+        }
 
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());

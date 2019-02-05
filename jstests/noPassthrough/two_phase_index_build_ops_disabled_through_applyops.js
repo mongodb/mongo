@@ -2,32 +2,41 @@
  * Ensures that oplog entries specific to two-phase index builds are not allow when run through
  * applyOps.
  *
- * @tags: [requires_non_retryable_commands, requires_replication]
+ * @tags: [requires_replication]
  */
 
 (function() {
 
-    load("jstests/libs/fixture_helpers.js");  // for FixtureHelpers
-    if (FixtureHelpers.isMongos(db)) {
-        print("skipping because applyOps commands not accepted on mongos");
-        return;
-    }
+    const replSet = new ReplSetTest({
+        nodes: [
+            {},
+            {
+              // Disallow elections on secondary.
+              rsConfig: {
+                  priority: 0,
+                  votes: 0,
+              },
+            },
+        ]
+    });
 
-    const coll = db.twoPhaseIndexOps;
-    coll.drop();
+    replSet.startSet();
+    replSet.initiate();
 
-    const cmdNs = db.getName() + ".$cmd";
+    const testDB = replSet.getPrimary().getDB('test');
+    const coll = testDB.twoPhaseIndexBuild;
+    const cmdNs = testDB.getName() + ".$cmd";
 
     coll.insert({a: 1});
 
-    assert.commandFailedWithCode(db.adminCommand({
+    assert.commandFailedWithCode(testDB.adminCommand({
         applyOps: [
             {op: "c", ns: cmdNs, o: {startIndexBuild: coll.getName(), key: {a: 1}, name: 'a_1'}}
         ]
     }),
                                  [ErrorCodes.CommandNotSupported, ErrorCodes.FailedToParse]);
 
-    assert.commandFailedWithCode(db.adminCommand({
+    assert.commandFailedWithCode(testDB.adminCommand({
         applyOps: [{
             op: "c",
             ns: cmdNs,
@@ -36,10 +45,12 @@
     }),
                                  [ErrorCodes.CommandNotSupported, ErrorCodes.FailedToParse]);
 
-    assert.commandFailedWithCode(db.adminCommand({
+    assert.commandFailedWithCode(testDB.adminCommand({
         applyOps: [
             {op: "c", ns: cmdNs, o: {abortIndexBuild: coll.getName(), key: {a: 1}, name: 'a_1'}}
         ]
     }),
                                  [ErrorCodes.CommandNotSupported, ErrorCodes.FailedToParse]);
+
+    replSet.stopSet();
 })();

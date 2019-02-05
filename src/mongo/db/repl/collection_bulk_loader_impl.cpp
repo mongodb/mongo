@@ -86,7 +86,8 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
             auto specs = indexCatalog->removeExistingIndexes(_opCtx.get(), secondaryIndexSpecs);
             if (specs.size()) {
                 _secondaryIndexesBlock->ignoreUniqueConstraint();
-                auto status = _secondaryIndexesBlock->init(specs).getStatus();
+                auto status =
+                    _secondaryIndexesBlock->init(specs, MultiIndexBlock::kNoopOnInitFn).getStatus();
                 if (!status.isOK()) {
                     return status;
                 }
@@ -94,7 +95,8 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                 _secondaryIndexesBlock.reset();
             }
             if (!_idIndexSpec.isEmpty()) {
-                auto status = _idIndexBlock->init(_idIndexSpec).getStatus();
+                auto status =
+                    _idIndexBlock->init(_idIndexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus();
                 if (!status.isOK()) {
                     return status;
                 }
@@ -176,7 +178,8 @@ Status CollectionBulkLoaderImpl::commit() {
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    auto status = _secondaryIndexesBlock->commit();
+                    auto status = _secondaryIndexesBlock->commit(
+                        MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -202,7 +205,8 @@ Status CollectionBulkLoaderImpl::commit() {
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    auto status = _idIndexBlock->commit();
+                    auto status = _idIndexBlock->commit(MultiIndexBlock::kNoopOnCreateEachFn,
+                                                        MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
                         return status;
                     }

@@ -60,7 +60,8 @@ public:
         OperationContext* opCtx,
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
-        const UUID& buildUUID) override;
+        const UUID& buildUUID,
+        IndexBuildProtocol protocol) override;
 
     /**
      * None of the following functions should ever be called on an embedded server node.

@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern_options.h"
@@ -57,12 +58,14 @@ struct ReplIndexBuildState {
                         const UUID& collUUID,
                         const std::string& dbName,
                         const std::vector<std::string> names,
-                        const std::vector<BSONObj>& specs)
+                        const std::vector<BSONObj>& specs,
+                        IndexBuildProtocol protocol)
         : buildUUID(indexBuildUUID),
           collectionUUID(collUUID),
           dbName(dbName),
           indexNames(names),
-          indexSpecs(specs) {
+          indexSpecs(specs),
+          protocol(protocol) {
         // Verify that the given index names and index specs match.
         invariant(names.size() == specs.size());
         for (auto& spec : specs) {
@@ -91,7 +94,7 @@ struct ReplIndexBuildState {
 
     // Whether to do a two phase index build or a single phase index build like in v4.0. The FCV
     // at the start of the index build will determine this setting.
-    bool twoPhaseIndexBuild = false;
+    IndexBuildProtocol protocol;
 
     // Protects the state below.
     mutable stdx::mutex mutex;

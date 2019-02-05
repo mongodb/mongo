@@ -204,7 +204,7 @@ public:
 
             indexer = std::make_unique<MultiIndexBlock>(opCtx, collection);
 
-            swIndexesToRebuild = indexer->init(all);
+            swIndexesToRebuild = indexer->init(all, MultiIndexBlock::kNoopOnInitFn);
             uassertStatusOK(swIndexesToRebuild.getStatus());
             wunit.commit();
         }
@@ -214,7 +214,8 @@ public:
 
         {
             WriteUnitOfWork wunit(opCtx);
-            uassertStatusOK(indexer->commit());
+            uassertStatusOK(indexer->commit(MultiIndexBlock::kNoopOnCreateEachFn,
+                                            MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
         }
 
