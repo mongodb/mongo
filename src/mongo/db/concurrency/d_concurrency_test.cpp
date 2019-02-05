@@ -1336,6 +1336,31 @@ TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
 }
 
+TEST_F(DConcurrencyTestFixture,
+       GlobalLockTimeoutDueToTicketOutageShouldThrowIfMaxLockTimeoutIsEffective) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+
+    UseGlobalThrottling throttle(opCtx, 0);
+
+    boost::optional<Lock::GlobalLock> globalLock;
+    opCtx->lockState()->setMaxLockTimeout(Milliseconds(100));
+    ASSERT_THROWS_CODE(
+        globalLock.emplace(opCtx, MODE_IX), AssertionException, ErrorCodes::LockTimeout);
+}
+
+TEST_F(DConcurrencyTestFixture,
+       GlobalLockTimeoutDueToTicketOutageShouldFailSilentlyIfDeadlineIsEffective) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+
+    UseGlobalThrottling throttle(opCtx, 0);
+
+    Lock::GlobalLock globalLock(
+        opCtx, MODE_IX, Date_t::now() + Milliseconds(100), Lock::InterruptBehavior::kThrow);
+    ASSERT(!globalLock.isLocked());
+}
+
 TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextThrowsEvenWhenUncontested) {
     auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
     auto opCtx = clients[0].second.get();
