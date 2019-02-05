@@ -98,7 +98,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         _shouldNotConflictWithSecondaryBatchApplicationBlock.emplace(opCtx->lockState());
     }
-    const auto collectionLockMode = getLockModeForQuery(opCtx);
+    const auto collectionLockMode = getLockModeForQuery(opCtx, nsOrUUID.nss());
     _autoColl.emplace(opCtx, nsOrUUID, collectionLockMode, viewMode, deadline);
 
     // If the read source is explicitly set to kNoTimestamp, we read the most up to date data and do
@@ -330,12 +330,15 @@ OldClientContext::~OldClientContext() {
                 currentOp->getReadWriteType());
 }
 
-LockMode getLockModeForQuery(OperationContext* opCtx) {
+LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<NamespaceString>& nss) {
     invariant(opCtx);
 
     // Use IX locks for autocommit:false multi-statement transactions; otherwise, use IS locks.
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
+        uassert(51071,
+                "Cannot query system.views within a transaction",
+                !nss || !nss->isSystemDotViews());
         return MODE_IX;
     }
     return MODE_IS;

@@ -79,6 +79,9 @@ selector:
   # Windows debug builds than other builds.
   - jstests/core/insert1.js
 
+  # Reads from system.views.
+  - jstests/core/views/views_drop.js
+
   ##
   ## Some aggregation stages don't support snapshot readconcern.
   ##

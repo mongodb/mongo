@@ -59,6 +59,9 @@ selector:
   # Test is only for stand alone mongod.
   - jstests/core/read_after_optime.js
 
+  # Reads from system.views.
+  - jstests/core/views/views_drop.js
+
   ##
   ## Limitations with the way the runner file injects transactions.
   ##

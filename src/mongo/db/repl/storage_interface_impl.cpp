@@ -91,6 +91,9 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 const auto kIdIndexName = "_id_"_sd;
 
+LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
+    return nss.isSystemDotViews() ? MODE_X : mode;
+}
 }  // namespace
 
 StorageInterfaceImpl::StorageInterfaceImpl()
@@ -219,7 +222,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
 
         // Get locks and create the collection.
         AutoGetOrCreateDb db(opCtx.get(), nss.db(), MODE_X);
-        AutoGetCollection coll(opCtx.get(), nss, MODE_IX);
+        AutoGetCollection coll(opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
 
         if (coll.getCollection()) {
             return Status(ErrorCodes::NamespaceExists,
@@ -232,7 +235,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
             wunit.commit();
         }
 
-        autoColl = stdx::make_unique<AutoGetCollection>(opCtx.get(), nss, MODE_IX);
+        autoColl = stdx::make_unique<AutoGetCollection>(
+            opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
 
         // Build empty capped indexes.  Capped indexes cannot be built by the MultiIndexBlock
         // because the cap might delete documents off the back while we are inserting them into

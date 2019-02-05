@@ -9,6 +9,7 @@
     const testDB = session.getDatabase("no_writes_system_collections_in_txn");
     assert.commandWorked(testDB.dropDatabase());
     const systemColl = testDB.getCollection("system.js");
+    const systemDotViews = testDB.getCollection("system.views");
 
     // Ensure that a collection exists with at least one document.
     assert.commandWorked(systemColl.insert({name: 0}, {writeConcern: {w: "majority"}}));
@@ -27,6 +28,12 @@
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(systemColl.insert({name: "new"}), 50791);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
+
+    session.startTransaction({readConcern: {level: "snapshot"}});
+    assert.commandFailedWithCode(
+        systemDotViews.insert({_id: "new.view", viewOn: "bar", pipeline: []}), 50791);
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 

@@ -216,7 +216,7 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
 
     {
         auto opCtx = pExpCtx->opCtx;
-        auto lockMode = getLockModeForQuery(opCtx);
+        auto lockMode = getLockModeForQuery(opCtx, _exec->nss());
         AutoGetDb dbLock(opCtx, _exec->nss().db(), lockMode);
         Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), lockMode);
         auto collection =

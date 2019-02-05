@@ -268,6 +268,10 @@ Status finishAndLogApply(ClockSource* clockSource,
     return finalStatus;
 }
 
+LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
+    return nss.isSystemDotViews() ? MODE_X : mode;
+}
+
 }  // namespace
 
 // static
@@ -331,7 +335,8 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         return finishApply(writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
             // Need to throw instead of returning a status for it to be properly ignored.
             try {
-                AutoGetCollection autoColl(opCtx, getNsOrUUID(nss, op), MODE_IX);
+                AutoGetCollection autoColl(
+                    opCtx, getNsOrUUID(nss, op), fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
                 auto db = autoColl.getDb();
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream() << "missing database (" << nss.db() << ")",

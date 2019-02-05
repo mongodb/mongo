@@ -302,6 +302,10 @@ SingleWriteResult createIndex(OperationContext* opCtx,
     return result;
 }
 
+LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
+    return nss.isSystemDotViews() ? MODE_X : mode;
+}
+
 void insertDocuments(OperationContext* opCtx,
                      Collection* collection,
                      std::vector<InsertStatement>::iterator begin,
@@ -373,7 +377,10 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
             }
 
-            collection.emplace(opCtx, wholeOp.getNamespace(), MODE_IX);
+            collection.emplace(
+                opCtx,
+                wholeOp.getNamespace(),
+                fixLockModeForSystemDotViewsChanges(wholeOp.getNamespace(), MODE_IX));
             if (collection->getCollection())
                 break;
 
@@ -605,7 +612,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         collection.emplace(opCtx,
                            ns,
                            MODE_IX,  // DB is always IX, even if collection is X.
-                           MODE_IX);
+                           fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
         if (collection->getCollection() || !updateRequest.isUpsert())
             break;
 
@@ -845,7 +852,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     AutoGetCollection collection(opCtx,
                                  ns,
                                  MODE_IX,  // DB is always IX, even if collection is X.
-                                 MODE_IX);
+                                 fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
     if (collection.getDb()) {
         curOp.raiseDbProfileLevel(collection.getDb()->getProfilingLevel());
     }

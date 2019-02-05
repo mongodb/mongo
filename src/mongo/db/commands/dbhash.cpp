@@ -121,7 +121,7 @@ public:
         if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
             // However, if we are inside a multi-statement transaction, then we only need to lock
             // the database in intent mode to ensure that none of the collections get dropped.
-            lockMode = getLockModeForQuery(opCtx);
+            lockMode = getLockModeForQuery(opCtx, boost::none);
         }
         AutoGetDb autoDb(opCtx, ns, lockMode);
         Database* db = autoDb.getDb();
@@ -227,8 +227,9 @@ private:
             // reading from the consistent snapshot doesn't overlap with any catalog operations on
             // the collection.
             invariant(
-                opCtx->lockState()->isDbLockedForMode(db->name(), getLockModeForQuery(opCtx)));
-            collLock.emplace(opCtx->lockState(), fullCollectionName, getLockModeForQuery(opCtx));
+                opCtx->lockState()->isDbLockedForMode(db->name(), getLockModeForQuery(opCtx, ns)));
+            collLock.emplace(
+                opCtx->lockState(), fullCollectionName, getLockModeForQuery(opCtx, ns));
 
             auto minSnapshot = collection->getMinimumVisibleSnapshot();
             auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();

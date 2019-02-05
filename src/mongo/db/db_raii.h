@@ -215,7 +215,8 @@ private:
 /**
  * Returns a MODE_IX LockMode if a read is performed under readConcern level snapshot, or a MODE_IS
  * lock otherwise. MODE_IX acquisition will allow a read to participate in two-phase locking.
+ * Throws an exception if 'system.views' is being queried within a transaction.
  */
-LockMode getLockModeForQuery(OperationContext* opCtx);
+LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<NamespaceString>& nss);
 
 }  // namespace mongo
