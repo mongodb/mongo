@@ -475,7 +475,6 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
         // opened.
         case ReadSource::kNoOverlap:
         case ReadSource::kLastApplied:
-        case ReadSource::kLastAppliedSnapshot:
         case ReadSource::kAllCommittedSnapshot:
             break;
     }
@@ -492,7 +491,6 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
             }
             return boost::none;
         case ReadSource::kNoOverlap:
-        case ReadSource::kLastAppliedSnapshot:
         case ReadSource::kAllCommittedSnapshot:
             invariant(!_readAtTimestamp.isNull());
             return _readAtTimestamp;
@@ -553,16 +551,6 @@ void WiredTigerRecoveryUnit::_txnOpen() {
         case ReadSource::kAllCommittedSnapshot: {
             if (_readAtTimestamp.isNull()) {
                 _readAtTimestamp = _beginTransactionAtAllCommittedTimestamp(session);
-                break;
-            }
-            // Intentionally continue to the next case to read at the _readAtTimestamp.
-        }
-        case ReadSource::kLastAppliedSnapshot: {
-            // Only ever read the last applied timestamp once, and continue reusing it for
-            // subsequent transactions.
-            if (_readAtTimestamp.isNull()) {
-                _readAtTimestamp = _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(
-                    session, _ignorePrepared);
                 break;
             }
             // Intentionally continue to the next case to read at the _readAtTimestamp.

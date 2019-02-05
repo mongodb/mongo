@@ -63,13 +63,13 @@ extern AtomicWord<int> transactionLifetimeLimitSeconds;
  * concern level specified as 'snapshot', we will use 'kAllCommitted' which ensures a snapshot
  * with no 'holes'; that is, it is a state of the system that could be reconstructed from
  * the oplog.  For transactions with read concern level specified as 'local' or 'majority',
- * we will use 'kLastApplied' which gives us the most recent snapshot.  This snapshot may
+ * we will use 'kNoTimestamp' which gives us the most recent snapshot.  This snapshot may
  * reflect oplog 'holes' from writes earlier than the last applied write which have not yet
- * completed.  Using 'kLastApplied' ensures that transactions with mode 'local' are always able to
+ * completed.  Using 'kNoTimestamp' ensures that transactions with mode 'local' are always able to
  * read writes from earlier transactions with mode 'local' on the same connection.
  */
 enum class SpeculativeTransactionOpTime {
-    kLastApplied,
+    kNoTimestamp,
     kAllCommitted,
 };
 

@@ -505,17 +505,23 @@ void TransactionParticipant::Participant::_setSpeculativeTransactionOpTime(
     OperationContext* opCtx, SpeculativeTransactionOpTime opTimeChoice) {
     repl::ReplicationCoordinator* replCoord =
         repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-    opCtx->recoveryUnit()->setTimestampReadSource(
-        opTimeChoice == SpeculativeTransactionOpTime::kAllCommitted
-            ? RecoveryUnit::ReadSource::kAllCommittedSnapshot
-            : RecoveryUnit::ReadSource::kLastAppliedSnapshot);
+
+    boost::optional<Timestamp> readTimestamp;
+
+    if (opTimeChoice == SpeculativeTransactionOpTime::kAllCommitted) {
+        opCtx->recoveryUnit()->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kAllCommittedSnapshot);
+        readTimestamp = repl::StorageInterface::get(opCtx)->getPointInTimeReadTimestamp(opCtx);
+        // Transactions do not survive term changes, so combining "getTerm" here with the
+        // recovery unit timestamp does not cause races.
+        p().speculativeTransactionReadOpTime = {*readTimestamp, replCoord->getTerm()};
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        o(lk).transactionMetricsObserver.onChooseReadTimestamp(*readTimestamp);
+    } else {
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    }
+
     opCtx->recoveryUnit()->preallocateSnapshot();
-    auto readTimestamp = repl::StorageInterface::get(opCtx)->getPointInTimeReadTimestamp(opCtx);
-    // Transactions do not survive term changes, so combining "getTerm" here with the
-    // recovery unit timestamp does not cause races.
-    p().speculativeTransactionReadOpTime = {readTimestamp, replCoord->getTerm()};
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-    o(lk).transactionMetricsObserver.onChooseReadTimestamp(readTimestamp);
 }
 
 void TransactionParticipant::Participant::_setSpeculativeTransactionReadTimestamp(
@@ -840,7 +846,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
                                              readConcernArgs.getOriginalLevel() ==
                                                      repl::ReadConcernLevel::kSnapshotReadConcern
                                                  ? SpeculativeTransactionOpTime::kAllCommitted
-                                                 : SpeculativeTransactionOpTime::kLastApplied);
+                                                 : SpeculativeTransactionOpTime::kNoTimestamp);
         }
     } else {
         opCtx->recoveryUnit()->preallocateSnapshot();

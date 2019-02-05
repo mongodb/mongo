@@ -190,8 +190,6 @@ public:
      * a point in time. Any point in time returned will reflect one of the following:
      *  - when using ReadSource::kProvided, the timestamp provided.
      *  - when using ReadSource::kNoOverlap, the timestamp chosen by the storage engine.
-     *  - when using ReadSource::kLastAppliedSnapshot, the timestamp chosen using the storage
-     * engine's last applied timestamp.
      *  - when using ReadSource::kAllCommittedSnapshot, the timestamp chosen using the storage
      * engine's all-committed timestamp.
      *  - when using ReadSource::kLastApplied, the timestamp chosen using the storage engine's last
@@ -319,11 +317,6 @@ public:
          * timestamp.
          */
         kLastApplied,
-        /**
-         * Read from the last applied timestamp. New transactions will always read from the same
-         * timestamp and never advance.
-         */
-        kLastAppliedSnapshot,
         /**
          * Read from the all-committed timestamp. New transactions will always read from the same
          * timestamp and never advance.
