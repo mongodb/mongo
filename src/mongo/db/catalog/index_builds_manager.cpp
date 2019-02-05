@@ -79,7 +79,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            const UUID& buildUUID,
                                            OnInitFn onInit,
                                            bool forRecovery) {
-    _registerIndexBuild(opCtx, collection, buildUUID);
+    _registerIndexBuild(buildUUID);
 
     const auto& nss = collection->ns();
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X),
@@ -89,10 +89,12 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
 
     auto builder = _getBuilder(buildUUID);
 
-    auto initResult = writeConflictRetry(
-        opCtx, "IndexBuildsManager::setUpIndexBuild", nss.ns(), [opCtx, builder, &onInit, &specs] {
-            return builder->init(specs, onInit);
-        });
+    auto initResult = writeConflictRetry(opCtx,
+                                         "IndexBuildsManager::setUpIndexBuild",
+                                         nss.ns(),
+                                         [opCtx, collection, builder, &onInit, &specs] {
+                                             return builder->init(opCtx, collection, specs, onInit);
+                                         });
 
     if (!initResult.isOK()) {
         return initResult.getStatus();
@@ -117,10 +119,12 @@ StatusWith<IndexBuildRecoveryState> IndexBuildsManager::recoverIndexBuild(
     return IndexBuildRecoveryState::Building;
 }
 
-Status IndexBuildsManager::startBuildingIndex(const UUID& buildUUID) {
+Status IndexBuildsManager::startBuildingIndex(OperationContext* opCtx,
+                                              Collection* collection,
+                                              const UUID& buildUUID) {
     auto builder = _getBuilder(buildUUID);
 
-    return builder->insertAllDocumentsInCollection();
+    return builder->insertAllDocumentsInCollection(opCtx, collection);
 }
 
 StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingIndexForRecovery(
@@ -161,7 +165,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                 } else {
                     numRecords++;
                     dataSize += data.size();
-                    auto insertStatus = builder->insert(data.releaseToBson(), id);
+                    auto insertStatus = builder->insert(opCtx, data.releaseToBson(), id);
                     if (!insertStatus.isOK()) {
                         return insertStatus;
                     }
@@ -183,17 +187,17 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
         }
     }
 
-    Status status = builder->dumpInsertsFromBulk();
+    Status status = builder->dumpInsertsFromBulk(opCtx);
     if (!status.isOK()) {
         return status;
     }
     return std::make_pair(numRecords, dataSize);
 }
 
-Status IndexBuildsManager::drainBackgroundWrites(const UUID& buildUUID) {
+Status IndexBuildsManager::drainBackgroundWrites(OperationContext* opCtx, const UUID& buildUUID) {
     auto builder = _getBuilder(buildUUID);
 
-    return builder->drainBackgroundWrites();
+    return builder->drainBackgroundWrites(opCtx);
 }
 
 Status IndexBuildsManager::finishBuildingPhase(const UUID& buildUUID) {
@@ -205,13 +209,15 @@ Status IndexBuildsManager::finishBuildingPhase(const UUID& buildUUID) {
     return Status::OK();
 }
 
-Status IndexBuildsManager::checkIndexConstraintViolations(const UUID& buildUUID) {
+Status IndexBuildsManager::checkIndexConstraintViolations(OperationContext* opCtx,
+                                                          const UUID& buildUUID) {
     auto builder = _getBuilder(buildUUID);
 
-    return builder->checkConstraints();
+    return builder->checkConstraints(opCtx);
 }
 
 Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
+                                            Collection* collection,
                                             const NamespaceString& nss,
                                             const UUID& buildUUID,
                                             MultiIndexBlock::OnCreateEachFn onCreateEachFn,
@@ -221,9 +227,10 @@ Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
     return writeConflictRetry(opCtx,
                               "IndexBuildsManager::commitIndexBuild",
                               nss.ns(),
-                              [builder, opCtx, &onCreateEachFn, &onCommitFn] {
+                              [builder, opCtx, collection, &onCreateEachFn, &onCommitFn] {
                                   WriteUnitOfWork wunit(opCtx);
-                                  auto status = builder->commit(onCreateEachFn, onCommitFn);
+                                  auto status = builder->commit(
+                                      opCtx, collection, onCreateEachFn, onCommitFn);
                                   if (!status.isOK()) {
                                       return status;
                                   }
@@ -256,8 +263,12 @@ bool IndexBuildsManager::interruptIndexBuild(const UUID& buildUUID, const std::s
     return true;
 }
 
-void IndexBuildsManager::tearDownIndexBuild(const UUID& buildUUID) {
+void IndexBuildsManager::tearDownIndexBuild(OperationContext* opCtx,
+                                            Collection* collection,
+                                            const UUID& buildUUID) {
     // TODO verify that the index builder is in a finished state before allowing its destruction.
+    auto builder = _getBuilder(buildUUID);
+    builder->cleanUpAfterBuild(opCtx, collection);
     _unregisterIndexBuild(buildUUID);
 }
 
@@ -270,12 +281,10 @@ void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {
     invariant(_builders.empty());
 }
 
-void IndexBuildsManager::_registerIndexBuild(OperationContext* opCtx,
-                                             Collection* collection,
-                                             UUID buildUUID) {
+void IndexBuildsManager::_registerIndexBuild(UUID buildUUID) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    std::shared_ptr<MultiIndexBlock> mib = std::make_shared<MultiIndexBlock>(opCtx, collection);
+    std::shared_ptr<MultiIndexBlock> mib = std::make_shared<MultiIndexBlock>();
     invariant(_builders.insert(std::make_pair(buildUUID, mib)).second);
 }
 

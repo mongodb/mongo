@@ -162,7 +162,10 @@ Status IndexBuilder::_buildAndHandleErrors(OperationContext* opCtx,
     // Collections should not be implicitly created by the index builder.
     fassert(40409, coll);
 
-    MultiIndexBlock indexer(opCtx, coll);
+    MultiIndexBlock indexer;
+
+    // The 'indexer' can throw, so ensure build cleanup occurs.
+    ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, coll); });
 
     auto status = _build(opCtx, buildInBackground, coll, indexer, dbLock);
     // Background index builds are not allowed to return errors because they run in a background
@@ -227,7 +230,9 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     {
         TimestampBlock tsBlock(opCtx, _initIndexTs);
         status = writeConflictRetry(opCtx, "Init index build", ns.ns(), [&] {
-            return indexer.init(_index, MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, coll))
+            return indexer
+                .init(
+                    opCtx, coll, _index, MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, coll))
                 .getStatus();
         });
     }
@@ -260,7 +265,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     {
         Lock::CollectionLock collLock(opCtx->lockState(), ns.ns(), MODE_IX);
         // WriteConflict exceptions and statuses are not expected to escape this method.
-        status = indexer.insertAllDocumentsInCollection();
+        status = indexer.insertAllDocumentsInCollection(opCtx, coll);
     }
     if (!status.isOK()) {
         return status;
@@ -273,7 +278,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
 
             // Read at a point in time so that the drain, which will timestamp writes at
             // lastApplied, can never commit writes earlier than its read timestamp.
-            status = indexer.drainBackgroundWrites(RecoveryUnit::ReadSource::kNoOverlap);
+            status = indexer.drainBackgroundWrites(opCtx, RecoveryUnit::ReadSource::kNoOverlap);
         }
         if (!status.isOK()) {
             return status;
@@ -282,7 +287,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
         // Perform the second drain while stopping inserts into the collection.
         {
             Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
-            status = indexer.drainBackgroundWrites();
+            status = indexer.drainBackgroundWrites(opCtx);
         }
         if (!status.isOK()) {
             return status;
@@ -295,14 +300,14 @@ Status IndexBuilder::_build(OperationContext* opCtx,
 
         // Perform the third and final drain after releasing a shared lock and reacquiring an
         // exclusive lock on the database.
-        status = indexer.drainBackgroundWrites();
+        status = indexer.drainBackgroundWrites(opCtx);
         if (!status.isOK()) {
             return status;
         }
 
         // Only perform constraint checking when enforced (on primaries).
         if (_indexConstraints == IndexConstraints::kEnforce) {
-            status = indexer.checkConstraints();
+            status = indexer.checkConstraints(opCtx);
             if (!status.isOK()) {
                 return status;
             }
@@ -311,12 +316,13 @@ Status IndexBuilder::_build(OperationContext* opCtx,
 
     status = writeConflictRetry(opCtx, "Commit index build", ns.ns(), [opCtx, coll, &indexer, &ns] {
         WriteUnitOfWork wunit(opCtx);
-        auto status = indexer.commit(
-            [opCtx, coll, &ns](const BSONObj& indexSpec) {
-                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, ns, *(coll->uuid()), indexSpec, false);
-            },
-            MultiIndexBlock::kNoopOnCommitFn);
+        auto status = indexer.commit(opCtx,
+                                     coll,
+                                     [opCtx, coll, &ns](const BSONObj& indexSpec) {
+                                         opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                                             opCtx, ns, *(coll->uuid()), indexSpec, false);
+                                     },
+                                     MultiIndexBlock::kNoopOnCommitFn);
         if (!status.isOK()) {
             return status;
         }
@@ -346,4 +352,5 @@ Status IndexBuilder::_build(OperationContext* opCtx,
 } catch (const DBException& e) {
     return e.toStatus();
 }
-}
+
+}  // namespace mongo

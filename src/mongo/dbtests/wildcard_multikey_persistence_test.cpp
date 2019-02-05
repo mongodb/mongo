@@ -193,15 +193,17 @@ protected:
         AutoGetCollection autoColl(opCtx(), nss, MODE_X);
         auto coll = autoColl.getCollection();
 
-        MultiIndexBlock indexer(opCtx(), coll);
+        MultiIndexBlock indexer;
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx(), coll); });
 
         // Initialize the index builder and add all documents currently in the collection.
-        ASSERT_OK(indexer.init(indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus());
-        ASSERT_OK(indexer.insertAllDocumentsInCollection());
+        ASSERT_OK(
+            indexer.init(opCtx(), coll, indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus());
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx(), coll));
 
         WriteUnitOfWork wunit(opCtx());
-        ASSERT_OK(
-            indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+        ASSERT_OK(indexer.commit(
+            opCtx(), coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
     }
 

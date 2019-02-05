@@ -283,7 +283,7 @@ public:
     }
 
     OptionalCollectionUUID uuid() const {
-        return UUID::gen();
+        return _uuid;
     }
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) {
@@ -291,6 +291,7 @@ public:
     }
 
 private:
+    OptionalCollectionUUID _uuid = UUID::gen();
     NamespaceString _ns;
     std::unique_ptr<IndexCatalog> _indexCatalog;
 };

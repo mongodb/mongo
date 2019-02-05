@@ -236,10 +236,14 @@ public:
     void createIndex(Collection* coll, std::string indexName, const BSONObj& indexKey) {
 
         // Build an index.
-        MultiIndexBlock indexer(_opCtx, coll);
+        MultiIndexBlock indexer;
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(_opCtx, coll); });
+
         BSONObj indexInfoObj;
         {
             auto swIndexInfoObj = indexer.init(
+                _opCtx,
+                coll,
                 {BSON("v" << 2 << "name" << indexName << "ns" << coll->ns().ns() << "key"
                           << indexKey)},
                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, coll));
@@ -247,17 +251,19 @@ public:
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
 
-        ASSERT_OK(indexer.insertAllDocumentsInCollection());
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll));
 
         {
             WriteUnitOfWork wuow(_opCtx);
             // Timestamping index completion. Primaries write an oplog entry.
-            ASSERT_OK(indexer.commit(
-                [&](const BSONObj& indexSpec) {
-                    _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                        _opCtx, coll->ns(), *(coll->uuid()), indexSpec, false);
-                },
-                MultiIndexBlock::kNoopOnCommitFn));
+            ASSERT_OK(
+                indexer.commit(_opCtx,
+                               coll,
+                               [&](const BSONObj& indexSpec) {
+                                   _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                                       _opCtx, coll->ns(), *(coll->uuid()), indexSpec, false);
+                               },
+                               MultiIndexBlock::kNoopOnCommitFn));
             // The timestamping repsponsibility is placed on the caller rather than the
             // MultiIndexBlock.
             wuow.commit();
@@ -1799,7 +1805,8 @@ public:
         std::vector<std::string> origIdents = kvCatalog->getAllIdents(_opCtx);
 
         // Build an index on `{a: 1}`. This index will be multikey.
-        MultiIndexBlock indexer(_opCtx, autoColl.getCollection());
+        MultiIndexBlock indexer;
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(_opCtx, autoColl.getCollection()); });
         const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
         BSONObj indexInfoObj;
         {
@@ -1816,6 +1823,8 @@ public:
             }
 
             auto swIndexInfoObj = indexer.init(
+                _opCtx,
+                autoColl.getCollection(),
                 {BSON("v" << 2 << "unique" << true << "name"
                           << "a_1"
                           << "ns"
@@ -1831,7 +1840,7 @@ public:
 
         // Inserting all the documents has the side-effect of setting internal state on the index
         // builder that the index is multikey.
-        ASSERT_OK(indexer.insertAllDocumentsInCollection());
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, autoColl.getCollection()));
 
         {
             WriteUnitOfWork wuow(_opCtx);
@@ -1839,6 +1848,8 @@ public:
             // completion  Primaries write an oplog entry. Secondaries explicitly set a
             // timestamp.
             ASSERT_OK(indexer.commit(
+                _opCtx,
+                autoColl.getCollection(),
                 [&](const BSONObj& indexSpec) {
                     if (SimulatePrimary) {
                         // The timestamping responsibility for each index is placed on the caller.
@@ -1902,7 +1913,8 @@ public:
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
 
         // Build an index on `{a: 1}`.
-        MultiIndexBlock indexer(_opCtx, autoColl.getCollection());
+        MultiIndexBlock indexer;
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(_opCtx, autoColl.getCollection()); });
         const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
         BSONObj indexInfoObj;
         {
@@ -1919,6 +1931,8 @@ public:
             }
 
             auto swIndexInfoObj = indexer.init(
+                _opCtx,
+                autoColl.getCollection(),
                 {BSON("v" << 2 << "unique" << true << "name"
                           << "a_1"
                           << "ns"
@@ -1953,7 +1967,7 @@ public:
                       .getTimestamp(),
                   firstInsert.asTimestamp());
 
-        ASSERT_OK(indexer.drainBackgroundWrites());
+        ASSERT_OK(indexer.drainBackgroundWrites(_opCtx));
 
         auto indexCatalog = autoColl.getCollection()->getIndexCatalog();
         const IndexCatalogEntry* buildingIndex = indexCatalog->getEntry(
@@ -1994,7 +2008,7 @@ public:
         const LogicalTime afterSecondInsert = _clock->reserveTicks(1);
         setReplCoordAppliedOpTime(repl::OpTime(afterSecondInsert.asTimestamp(), presentTerm));
 
-        ASSERT_OK(indexer.drainBackgroundWrites());
+        ASSERT_OK(indexer.drainBackgroundWrites(_opCtx));
 
         {
             // At time of the second insert, there are un-drained writes.
@@ -2011,6 +2025,8 @@ public:
         {
             WriteUnitOfWork wuow(_opCtx);
             ASSERT_OK(indexer.commit(
+                _opCtx,
+                autoColl.getCollection(),
                 [&](const BSONObj& indexSpec) {
                     if (SimulatePrimary) {
                         // The timestamping responsibility for each index is placed on the caller.

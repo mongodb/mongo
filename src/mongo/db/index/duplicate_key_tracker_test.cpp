@@ -148,13 +148,14 @@ TEST_F(DuplicateKeyTrackerTest, IndexBuild) {
         AutoGetCollection autoColl(opCtx(), collNs, MODE_X);
         auto coll = autoColl.getCollection();
 
-        MultiIndexBlock indexer(opCtx(), coll);
+        MultiIndexBlock indexer;
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx(), coll); });
         // Don't use the bulk builder, which does not insert directly into the IAM for the index.
         indexer.allowBackgroundBuilding();
         // Allow duplicates.
         indexer.ignoreUniqueConstraint();
 
-        ASSERT_OK(indexer.init(spec).getStatus());
+        ASSERT_OK(indexer.init(opCtx(), coll, spec).getStatus());
 
         IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName(
             opCtx(), indexName, true /* includeUnfinished */);
@@ -174,20 +175,22 @@ TEST_F(DuplicateKeyTrackerTest, IndexBuild) {
         std::vector<BSONObj> dupsInserted;
 
         // The insert of the first document should return no duplicates.
-        ASSERT_OK(indexer.insert(record1->data.releaseToBson(), record1->id, &dupsInserted));
+        ASSERT_OK(indexer.insert(
+            opCtx(), coll, record1->data.releaseToBson(), record1->id, &dupsInserted));
         ASSERT_EQ(0u, dupsInserted.size());
 
         // The insert of the second document should return that a duplicate key was inserted.
         record2 = cursor->next();
         ASSERT(record2);
-        ASSERT_OK(indexer.insert(record2->data.releaseToBson(), record2->id, &dupsInserted));
+        ASSERT_OK(indexer.insert(
+            opCtx(), coll, record2->data.releaseToBson(), record2->id, &dupsInserted));
         ASSERT_EQ(1u, dupsInserted.size());
 
         // Record that duplicates were inserted.
         AutoGetCollection tempColl(opCtx(), tracker->nss(), MODE_IX);
         ASSERT_OK(tracker->recordDuplicates(opCtx(), tempColl.getCollection(), dupsInserted));
 
-        ASSERT_OK(indexer.commit());
+        ASSERT_OK(indexer.commit(opCtx(), coll));
         wunit.commit();
     }
 
@@ -259,11 +262,12 @@ TEST_F(DuplicateKeyTrackerTest, BulkIndexBuild) {
         AutoGetCollection autoColl(opCtx(), collNs, MODE_X);
         auto coll = autoColl.getCollection();
 
-        MultiIndexBlock indexer(opCtx(), coll);
+        MultiIndexBlock indexer;
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx(), coll); });
         // Allow duplicates.
         indexer.ignoreUniqueConstraint();
 
-        ASSERT_OK(indexer.init(spec).getStatus());
+        ASSERT_OK(indexer.init(opCtx(), coll, spec).getStatus());
 
         IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName(
             opCtx(), indexName, true /* includeUnfinished */);
@@ -281,15 +285,17 @@ TEST_F(DuplicateKeyTrackerTest, BulkIndexBuild) {
 
         // Neither of these inserts will recognize duplicates because the bulk inserter does not
         // detect them until dumpInsertsFromBulk() is called.
-        ASSERT_OK(indexer.insert(record1->data.releaseToBson(), record1->id, &dupsInserted));
+        ASSERT_OK(indexer.insert(
+            opCtx(), coll, record1->data.releaseToBson(), record1->id, &dupsInserted));
         ASSERT_EQ(0u, dupsInserted.size());
 
         record2 = cursor->next();
         ASSERT(record2);
-        ASSERT_OK(indexer.insert(record2->data.releaseToBson(), record2->id, &dupsInserted));
+        ASSERT_OK(indexer.insert(
+            opCtx(), coll, record2->data.releaseToBson(), record2->id, &dupsInserted));
         ASSERT_EQ(0u, dupsInserted.size());
 
-        ASSERT_OK(indexer.dumpInsertsFromBulk(&dupsInserted));
+        ASSERT_OK(indexer.dumpInsertsFromBulk(opCtx(), coll, &dupsInserted));
         ASSERT_EQ(1u, dupsInserted.size());
 
         // Record that duplicates were inserted.
@@ -298,7 +304,7 @@ TEST_F(DuplicateKeyTrackerTest, BulkIndexBuild) {
         AutoGetCollection tempColl(opCtx(), tracker->nss(), MODE_IX);
         ASSERT_OK(tracker->recordDuplicates(opCtx(), tempColl.getCollection(), dupsInserted));
 
-        ASSERT_OK(indexer.commit());
+        ASSERT_OK(indexer.commit(opCtx(), coll));
         wunit.commit();
     }
 

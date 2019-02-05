@@ -189,27 +189,31 @@ public:
 
         result.appendNumber("nIndexesWas", all.size());
 
-        std::unique_ptr<MultiIndexBlock> indexer;
+        std::unique_ptr<MultiIndexBlock> indexer = std::make_unique<MultiIndexBlock>();
         StatusWith<std::vector<BSONObj>> swIndexesToRebuild(ErrorCodes::UnknownError,
                                                             "Uninitialized");
+
+        // The 'indexer' can throw, so ensure build cleanup occurs.
+        ON_BLOCK_EXIT([&] { indexer->cleanUpAfterBuild(opCtx, collection); });
 
         {
             WriteUnitOfWork wunit(opCtx);
             collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
-            indexer = std::make_unique<MultiIndexBlock>(opCtx, collection);
-
-            swIndexesToRebuild = indexer->init(all, MultiIndexBlock::kNoopOnInitFn);
+            swIndexesToRebuild =
+                indexer->init(opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn);
             uassertStatusOK(swIndexesToRebuild.getStatus());
             wunit.commit();
         }
 
-        auto status = indexer->insertAllDocumentsInCollection();
+        auto status = indexer->insertAllDocumentsInCollection(opCtx, collection);
         uassertStatusOK(status);
 
         {
             WriteUnitOfWork wunit(opCtx);
-            uassertStatusOK(indexer->commit(MultiIndexBlock::kNoopOnCreateEachFn,
+            uassertStatusOK(indexer->commit(opCtx,
+                                            collection,
+                                            MultiIndexBlock::kNoopOnCreateEachFn,
                                             MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
         }

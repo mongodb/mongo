@@ -73,12 +73,17 @@ protected:
 
     bool buildIndexInterrupted(const BSONObj& key) {
         try {
-            MultiIndexBlock indexer(&_opCtx, collection());
+            MultiIndexBlock indexer;
 
-            uassertStatusOK(indexer.init(key, MultiIndexBlock::kNoopOnInitFn));
-            uassertStatusOK(indexer.insertAllDocumentsInCollection());
+            ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, collection()); });
+
+            uassertStatusOK(
+                indexer.init(&_opCtx, collection(), key, MultiIndexBlock::kNoopOnInitFn));
+            uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, collection()));
             WriteUnitOfWork wunit(&_opCtx);
-            ASSERT_OK(indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn,
+            ASSERT_OK(indexer.commit(&_opCtx,
+                                     collection(),
+                                     MultiIndexBlock::kNoopOnCreateEachFn,
                                      MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
         } catch (const DBException& e) {
@@ -125,7 +130,7 @@ public:
             wunit.commit();
         }
 
-        MultiIndexBlock indexer(&_opCtx, coll);
+        MultiIndexBlock indexer;
         indexer.ignoreUniqueConstraint();
 
         const BSONObj spec = BSON("name"
@@ -141,12 +146,14 @@ public:
                                   << "background"
                                   << background);
 
-        ASSERT_OK(indexer.init(spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
-        ASSERT_OK(indexer.insertAllDocumentsInCollection());
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, coll); });
+
+        ASSERT_OK(indexer.init(&_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(&_opCtx, coll));
 
         WriteUnitOfWork wunit(&_opCtx);
-        ASSERT_OK(
-            indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+        ASSERT_OK(indexer.commit(
+            &_opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
     }
 };
@@ -178,8 +185,7 @@ public:
             wunit.commit();
         }
 
-        MultiIndexBlock indexer(&_opCtx, coll);
-        // indexer.ignoreUniqueConstraint(); // not calling this
+        MultiIndexBlock indexer;
 
         const BSONObj spec = BSON("name"
                                   << "a"
@@ -194,15 +200,18 @@ public:
                                   << "background"
                                   << background);
 
-        ASSERT_OK(indexer.init(spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, coll); });
+
+        ASSERT_OK(indexer.init(&_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
+
         auto desc =
             coll->getIndexCatalog()->findIndexByName(&_opCtx, "a", true /* includeUnfinished */);
         ASSERT(desc);
 
         // Hybrid index builds check duplicates explicitly.
-        ASSERT_OK(indexer.insertAllDocumentsInCollection());
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(&_opCtx, coll));
 
-        auto status = indexer.checkConstraints();
+        auto status = indexer.checkConstraints(&_opCtx);
         ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
     }
 };
@@ -288,21 +297,25 @@ public:
 };
 
 Status IndexBuildBase::createIndex(const std::string& dbname, const BSONObj& indexSpec) {
-    MultiIndexBlock indexer(&_opCtx, collection());
-    Status status = indexer.init(indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus();
+    MultiIndexBlock indexer;
+    ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, collection()); });
+    Status status =
+        indexer.init(&_opCtx, collection(), indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.insertAllDocumentsInCollection();
+    status = indexer.insertAllDocumentsInCollection(&_opCtx, collection());
     if (!status.isOK()) {
         return status;
     }
     WriteUnitOfWork wunit(&_opCtx);
-    ASSERT_OK(
-        indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+    ASSERT_OK(indexer.commit(&_opCtx,
+                             collection(),
+                             MultiIndexBlock::kNoopOnCreateEachFn,
+                             MultiIndexBlock::kNoopOnCommitFn));
     wunit.commit();
     return Status::OK();
 }

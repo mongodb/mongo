@@ -78,13 +78,14 @@ void MultiIndexBlockTest::setUp() {
         std::make_unique<CollectionMock>(nss, std::make_unique<IndexCatalogNoop>());
     _collection = std::move(collectionMock);
 
-    _indexer = std::make_unique<MultiIndexBlock>(_opCtx.get(), _collection.get());
+    _indexer = std::make_unique<MultiIndexBlock>();
 }
 
 void MultiIndexBlockTest::tearDown() {
     auto service = getServiceContext();
     repl::ReplicationCoordinator::set(service, {});
 
+    _indexer->cleanUpAfterBuild(getOpCtx(), getCollection());
     _indexer = {};
 
     _collection = {};
@@ -110,17 +111,19 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
     auto indexer = getIndexer();
     ASSERT_EQUALS(MultiIndexBlock::State::kUninitialized, indexer->getState_forTest());
 
-    auto specs =
-        unittest::assertGet(indexer->init(std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        getOpCtx(), getCollection(), std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_EQUALS(MultiIndexBlock::State::kRunning, indexer->getState_forTest());
 
-    ASSERT_OK(indexer->dumpInsertsFromBulk());
+    ASSERT_OK(indexer->dumpInsertsFromBulk(getOpCtx()));
 
     ASSERT_FALSE(indexer->isCommitted());
     {
         WriteUnitOfWork wunit(getOpCtx());
-        ASSERT_OK(indexer->commit(MultiIndexBlock::kNoopOnCreateEachFn,
+        ASSERT_OK(indexer->commit(getOpCtx(),
+                                  getCollection(),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
                                   MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
     }
@@ -132,18 +135,20 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
     auto indexer = getIndexer();
     ASSERT_EQUALS(MultiIndexBlock::State::kUninitialized, indexer->getState_forTest());
 
-    auto specs =
-        unittest::assertGet(indexer->init(std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        getOpCtx(), getCollection(), std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_EQUALS(MultiIndexBlock::State::kRunning, indexer->getState_forTest());
 
-    ASSERT_OK(indexer->insert({}, {}));
-    ASSERT_OK(indexer->dumpInsertsFromBulk());
+    ASSERT_OK(indexer->insert(getOpCtx(), {}, {}));
+    ASSERT_OK(indexer->dumpInsertsFromBulk(getOpCtx()));
 
     ASSERT_FALSE(indexer->isCommitted());
     {
         WriteUnitOfWork wunit(getOpCtx());
-        ASSERT_OK(indexer->commit(MultiIndexBlock::kNoopOnCreateEachFn,
+        ASSERT_OK(indexer->commit(getOpCtx(),
+                                  getCollection(),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
                                   MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
     }
@@ -156,10 +161,10 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
 
 TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     auto indexer = getIndexer();
-    auto specs =
-        unittest::assertGet(indexer->init(std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        getOpCtx(), getCollection(), std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
-    ASSERT_OK(indexer->insert({}, {}));
+    ASSERT_OK(indexer->insert(getOpCtx(), {}, {}));
     indexer->abortWithoutCleanup();
     ASSERT_EQUALS(MultiIndexBlock::State::kAborted, indexer->getState_forTest());
 
@@ -175,7 +180,10 @@ TEST_F(MultiIndexBlockTest, InitFailsAfterAbort) {
 
     ASSERT_EQUALS(
         ErrorCodes::IndexBuildAborted,
-        indexer->init(std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn).getStatus());
+        indexer
+            ->init(
+                getOpCtx(), getCollection(), std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn)
+            .getStatus());
     ASSERT_EQUALS(MultiIndexBlock::State::kAborted, indexer->getState_forTest());
 
     ASSERT_FALSE(indexer->isCommitted());
@@ -185,8 +193,8 @@ TEST_F(MultiIndexBlockTest, InsertingSingleDocumentFailsAfterAbort) {
     auto indexer = getIndexer();
     ASSERT_EQUALS(MultiIndexBlock::State::kUninitialized, indexer->getState_forTest());
 
-    auto specs =
-        unittest::assertGet(indexer->init(std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        getOpCtx(), getCollection(), std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_EQUALS(MultiIndexBlock::State::kRunning, indexer->getState_forTest());
 
@@ -194,7 +202,7 @@ TEST_F(MultiIndexBlockTest, InsertingSingleDocumentFailsAfterAbort) {
     ASSERT_EQUALS(MultiIndexBlock::State::kAborted, indexer->getState_forTest());
 
     ASSERT_EQUALS(ErrorCodes::IndexBuildAborted,
-                  indexer->insert(BSON("_id" << 123 << "a" << 456), {}));
+                  indexer->insert(getOpCtx(), BSON("_id" << 123 << "a" << 456), {}));
     ASSERT_EQUALS(MultiIndexBlock::State::kAborted, indexer->getState_forTest());
 
     ASSERT_FALSE(indexer->isCommitted());
@@ -204,18 +212,18 @@ TEST_F(MultiIndexBlockTest, DumpInsertsFromBulkFailsAfterAbort) {
     auto indexer = getIndexer();
     ASSERT_EQUALS(MultiIndexBlock::State::kUninitialized, indexer->getState_forTest());
 
-    auto specs =
-        unittest::assertGet(indexer->init(std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        getOpCtx(), getCollection(), std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_EQUALS(MultiIndexBlock::State::kRunning, indexer->getState_forTest());
 
-    ASSERT_OK(indexer->insert(BSON("_id" << 123 << "a" << 456), {}));
+    ASSERT_OK(indexer->insert(getOpCtx(), BSON("_id" << 123 << "a" << 456), {}));
     ASSERT_EQUALS(MultiIndexBlock::State::kRunning, indexer->getState_forTest());
 
     indexer->abort("test"_sd);
     ASSERT_EQUALS(MultiIndexBlock::State::kAborted, indexer->getState_forTest());
 
-    ASSERT_EQUALS(ErrorCodes::IndexBuildAborted, indexer->dumpInsertsFromBulk());
+    ASSERT_EQUALS(ErrorCodes::IndexBuildAborted, indexer->dumpInsertsFromBulk(getOpCtx()));
     ASSERT_EQUALS(MultiIndexBlock::State::kAborted, indexer->getState_forTest());
 
     ASSERT_FALSE(indexer->isCommitted());
@@ -225,22 +233,24 @@ TEST_F(MultiIndexBlockTest, CommitFailsAfterAbort) {
     auto indexer = getIndexer();
     ASSERT_EQUALS(MultiIndexBlock::State::kUninitialized, indexer->getState_forTest());
 
-    auto specs =
-        unittest::assertGet(indexer->init(std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        getOpCtx(), getCollection(), std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_EQUALS(MultiIndexBlock::State::kRunning, indexer->getState_forTest());
 
-    ASSERT_OK(indexer->insert(BSON("_id" << 123 << "a" << 456), {}));
+    ASSERT_OK(indexer->insert(getOpCtx(), BSON("_id" << 123 << "a" << 456), {}));
     ASSERT_EQUALS(MultiIndexBlock::State::kRunning, indexer->getState_forTest());
 
-    ASSERT_OK(indexer->dumpInsertsFromBulk());
+    ASSERT_OK(indexer->dumpInsertsFromBulk(getOpCtx()));
 
     indexer->abort("test"_sd);
     ASSERT_EQUALS(MultiIndexBlock::State::kAborted, indexer->getState_forTest());
 
-    ASSERT_EQUALS(
-        ErrorCodes::IndexBuildAborted,
-        indexer->commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+    ASSERT_EQUALS(ErrorCodes::IndexBuildAborted,
+                  indexer->commit(getOpCtx(),
+                                  getCollection(),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
     ASSERT_EQUALS(MultiIndexBlock::State::kAborted, indexer->getState_forTest());
 
     ASSERT_FALSE(indexer->isCommitted());

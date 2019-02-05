@@ -87,7 +87,9 @@ public:
      *
      * TODO: Not yet implemented.
      */
-    Status startBuildingIndex(const UUID& buildUUID);
+    Status startBuildingIndex(OperationContext* opCtx,
+                              Collection* collection,
+                              const UUID& buildUUID);
 
     /**
      * Iterates through every record in the collection to index it while also removing documents
@@ -102,7 +104,7 @@ public:
      * Document inserts observed during the scanning/insertion phase of an index build are not
      * added but are instead stored in a temporary buffer until this function is invoked.
      */
-    Status drainBackgroundWrites(const UUID& buildUUID);
+    Status drainBackgroundWrites(OperationContext* opCtx, const UUID& buildUUID);
 
     /**
      * Persists information in the index catalog entry to reflect the successful completion of the
@@ -117,7 +119,7 @@ public:
      *
      * TODO: Not yet implemented.
      */
-    Status checkIndexConstraintViolations(const UUID& buildUUID);
+    Status checkIndexConstraintViolations(OperationContext* opCtx, const UUID& buildUUID);
 
     /**
      * Persists information in the index catalog entry that the index is ready for use, as well as
@@ -126,6 +128,7 @@ public:
     using OnCreateEachFn = MultiIndexBlock::OnCreateEachFn;
     using OnCommitFn = MultiIndexBlock::OnCommitFn;
     Status commitIndexBuild(OperationContext* opCtx,
+                            Collection* collection,
                             const NamespaceString& nss,
                             const UUID& buildUUID,
                             OnCreateEachFn onCreateEachFn,
@@ -156,7 +159,7 @@ public:
     /**
      * Cleans up the index build state and unregisters it from the manager.
      */
-    void tearDownIndexBuild(const UUID& buildUUID);
+    void tearDownIndexBuild(OperationContext* opCtx, Collection* collection, const UUID& buildUUID);
 
     /**
      * Returns true if the index build supports background writes while building an index. This is
@@ -173,7 +176,7 @@ private:
     /**
      * Creates and registers a new builder in the _builders map, mapped by the provided buildUUID.
      */
-    void _registerIndexBuild(OperationContext* opCtx, Collection* collection, UUID buildUUID);
+    void _registerIndexBuild(UUID buildUUID);
 
     /**
      * Unregisters the builder associcated with the given buildUUID from the _builders map.

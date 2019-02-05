@@ -310,8 +310,8 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     spec = statusWithSpec.getValue();
 
     // now going to touch disk
-    IndexBuildBlock indexBuildBlock(opCtx, _collection, this, spec, IndexBuildMethod::kForeground);
-    status = indexBuildBlock.init();
+    IndexBuildBlock indexBuildBlock(this, _collection->ns(), spec, IndexBuildMethod::kForeground);
+    status = indexBuildBlock.init(opCtx, _collection);
     if (!status.isOK())
         return status;
 
@@ -325,7 +325,7 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     status = entry->accessMethod()->initializeAsEmpty(opCtx);
     if (!status.isOK())
         return status;
-    indexBuildBlock.success();
+    indexBuildBlock.success(opCtx, _collection);
 
     // sanity check
     invariant(_collection->getCatalogEntry()->isIndexReady(opCtx, descriptor->indexName()));
@@ -1388,7 +1388,7 @@ Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) {
 
 std::unique_ptr<IndexCatalog::IndexBuildBlockInterface> IndexCatalogImpl::createIndexBuildBlock(
     OperationContext* opCtx, const BSONObj& spec, IndexBuildMethod method) {
-    return std::make_unique<IndexBuildBlock>(opCtx, _collection, this, spec, method);
+    return std::make_unique<IndexBuildBlock>(this, _collection->ns(), spec, method);
 }
 
 std::string::size_type IndexCatalogImpl::getLongestIndexNameLength(OperationContext* opCtx) const {

@@ -395,26 +395,29 @@ void Cloner::copyIndexes(OperationContext* opCtx,
         });
     }
 
-    // TODO pass the MultiIndexBlock when inserting into the collection rather than building the
-    // indexes after the fact. This depends on holding a lock on the collection the whole time
-    // from creation to completion without yielding to ensure the index and the collection
-    // matches. It also wouldn't work on non-empty collections so we would need both
-    // implementations anyway as long as that is supported.
-    MultiIndexBlock indexer(opCtx, collection);
-
     auto indexCatalog = collection->getIndexCatalog();
     auto prunedIndexesToBuild = indexCatalog->removeExistingIndexes(opCtx, indexesToBuild);
     if (prunedIndexesToBuild.empty()) {
         return;
     }
 
-    auto indexInfoObjs =
-        uassertStatusOK(indexer.init(prunedIndexesToBuild, MultiIndexBlock::kNoopOnInitFn));
-    uassertStatusOK(indexer.insertAllDocumentsInCollection());
+    // TODO pass the MultiIndexBlock when inserting into the collection rather than building the
+    // indexes after the fact. This depends on holding a lock on the collection the whole time
+    // from creation to completion without yielding to ensure the index and the collection
+    // matches. It also wouldn't work on non-empty collections so we would need both
+    // implementations anyway as long as that is supported.
+    MultiIndexBlock indexer;
+
+    // The code below throws, so ensure build cleanup occurs.
+    ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, collection); });
+
+    auto indexInfoObjs = uassertStatusOK(
+        indexer.init(opCtx, collection, prunedIndexesToBuild, MultiIndexBlock::kNoopOnInitFn));
+    uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
 
     WriteUnitOfWork wunit(opCtx);
-    uassertStatusOK(
-        indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+    uassertStatusOK(indexer.commit(
+        opCtx, collection, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
     if (opCtx->writesAreReplicated()) {
         for (auto&& infoObj : indexInfoObjs) {
             getGlobalServiceContext()->getOpObserver()->onCreateIndex(

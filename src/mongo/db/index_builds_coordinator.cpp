@@ -588,7 +588,7 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
     }
 
     invariant(opCtx->lockState()->isDbLockedForMode(replState->dbName, MODE_X));
-    _indexBuildsManager.tearDownIndexBuild(replState->buildUUID);
+    _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
 
     log() << "Index build completed successfully: " << replState->buildUUID << ": " << nss << " ( "
           << replState->collectionUUID
@@ -647,7 +647,8 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     // background.
     {
         Lock::CollectionLock colLock(opCtx->lockState(), nss.ns(), MODE_IX);
-        uassertStatusOK(_indexBuildsManager.startBuildingIndex(replState->buildUUID));
+        uassertStatusOK(
+            _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
@@ -660,7 +661,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), nss.ns(), MODE_IS);
 
-        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(replState->buildUUID));
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(opCtx, replState->buildUUID));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
@@ -673,7 +674,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), nss.ns(), MODE_S);
 
-        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(replState->buildUUID));
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(opCtx, replState->buildUUID));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
@@ -715,10 +716,11 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
 
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.
-    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(replState->buildUUID));
+    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(opCtx, replState->buildUUID));
 
     // Index constraint checking phase.
-    uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(replState->buildUUID));
+    uassertStatusOK(
+        _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
 
     auto collectionUUID = replState->collectionUUID;
     auto onCommitFn = MultiIndexBlock::kNoopOnCommitFn;
@@ -744,7 +746,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
 
     // Commit index build.
     uassertStatusOK(_indexBuildsManager.commitIndexBuild(
-        opCtx, nss, replState->buildUUID, onCreateEachFn, onCommitFn));
+        opCtx, collection, nss, replState->buildUUID, onCreateEachFn, onCommitFn));
 
     return;
 }
@@ -782,6 +784,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
 
         // Commit the index build.
         uassertStatusOK(_indexBuildsManager.commitIndexBuild(opCtx,
+                                                             collection,
                                                              nss,
                                                              buildUUID,
                                                              MultiIndexBlock::kNoopOnCreateEachFn,
@@ -804,7 +807,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     if (status.isOK()) {
         // A successful index build means that all the requested indexes are now part of the
         // catalog.
-        _indexBuildsManager.tearDownIndexBuild(buildUUID);
+        _indexBuildsManager.tearDownIndexBuild(opCtx, collection, buildUUID);
     } else {
         // An index build failure during recovery is fatal.
         logFailure(status, nss, replState);

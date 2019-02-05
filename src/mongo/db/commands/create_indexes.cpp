@@ -288,7 +288,7 @@ bool runCreateIndexes(OperationContext* opCtx,
                          AutoStatsTracker::LogMode::kUpdateTopAndCurop,
                          dbProfilingLevel);
 
-    MultiIndexBlock indexer(opCtx, collection);
+    MultiIndexBlock indexer;
 
     const size_t origSpecsSize = specs.size();
     specs = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, std::move(specs));
@@ -311,10 +311,19 @@ bool runCreateIndexes(OperationContext* opCtx,
         }
     }
 
+    // The 'indexer' can throw, so ensure the build cleanup occurs.
+    ON_BLOCK_EXIT([&] {
+        invariant(opCtx->lockState()->isDbLockedForMode(dbname, MODE_X));
+        indexer.cleanUpAfterBuild(opCtx, collection);
+    });
+
     std::vector<BSONObj> indexInfoObjs =
         writeConflictRetry(opCtx, kCommandName, ns.ns(), [opCtx, collection, &indexer, &specs] {
-            return uassertStatusOK(indexer.init(
-                specs, MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection)));
+            return uassertStatusOK(
+                indexer.init(opCtx,
+                             collection,
+                             specs,
+                             MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection)));
         });
 
     // If we're a background index, replace exclusive db lock with an intent lock, so that
@@ -343,7 +352,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // background.
     {
         Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IX);
-        uassertStatusOK(indexer.insertAllDocumentsInCollection());
+        uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
@@ -358,7 +367,7 @@ bool runCreateIndexes(OperationContext* opCtx,
 
         // Read at a point in time so that the drain, which will timestamp writes at lastApplied,
         // can never commit writes earlier than its read timestamp.
-        uassertStatusOK(indexer.drainBackgroundWrites(RecoveryUnit::ReadSource::kNoOverlap));
+        uassertStatusOK(indexer.drainBackgroundWrites(opCtx, RecoveryUnit::ReadSource::kNoOverlap));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
@@ -371,7 +380,7 @@ bool runCreateIndexes(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_S);
 
-        uassertStatusOK(indexer.drainBackgroundWrites());
+        uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
@@ -399,20 +408,22 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.
-    uassertStatusOK(indexer.drainBackgroundWrites());
+    uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
 
     // This is required before completion.
-    uassertStatusOK(indexer.checkConstraints());
+    uassertStatusOK(indexer.checkConstraints(opCtx));
 
     writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
 
-        uassertStatusOK(indexer.commit(
-            [opCtx, &ns, collection](const BSONObj& spec) {
-                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, ns, *(collection->uuid()), spec, false);
-            },
-            MultiIndexBlock::kNoopOnCommitFn));
+        uassertStatusOK(
+            indexer.commit(opCtx,
+                           collection,
+                           [opCtx, &ns, collection](const BSONObj& spec) {
+                               opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                                   opCtx, ns, *(collection->uuid()), spec, false);
+                           },
+                           MultiIndexBlock::kNoopOnCommitFn));
 
         wunit.commit();
     });

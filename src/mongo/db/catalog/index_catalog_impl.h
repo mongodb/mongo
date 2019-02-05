@@ -244,9 +244,8 @@ public:
         MONGO_DISALLOW_COPYING(IndexBuildBlock);
 
     public:
-        IndexBuildBlock(OperationContext* opCtx,
-                        Collection* collection,
-                        IndexCatalogImpl* catalog,
+        IndexBuildBlock(IndexCatalogImpl* catalog,
+                        const NamespaceString& nss,
                         const BSONObj& spec,
                         IndexBuildMethod method);
 
@@ -255,19 +254,19 @@ public:
         /**
          * Must be called from within a `WriteUnitOfWork`
          */
-        Status init();
+        Status init(OperationContext* opCtx, Collection* collection);
 
         /**
          * Must be called from within a `WriteUnitOfWork`
          */
-        void success();
+        void success(OperationContext* opCtx, Collection* collection);
 
         /**
          * index build failed, clean up meta data
          *
          * Must be called from within a `WriteUnitOfWork`
          */
-        void fail();
+        void fail(OperationContext* opCtx, const Collection* collection);
 
         IndexCatalogEntry* getEntry() {
             return _entry;
@@ -282,7 +281,6 @@ public:
         }
 
     private:
-        Collection* const _collection;
         IndexCatalogImpl* const _catalog;
         const std::string _ns;
 
@@ -294,7 +292,6 @@ public:
 
         IndexCatalogEntry* _entry;
 
-        OperationContext* _opCtx;
         std::unique_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
     };
 

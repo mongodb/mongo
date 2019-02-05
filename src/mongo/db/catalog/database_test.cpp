@@ -311,12 +311,12 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             indexCatalog->createIndexBuildBlock(opCtx, indexInfoObj, IndexBuildMethod::kHybrid);
         {
             WriteUnitOfWork wuow(opCtx);
-            ASSERT_OK(indexBuildBlock->init());
+            ASSERT_OK(indexBuildBlock->init(opCtx, collection));
             wuow.commit();
         }
-        ON_BLOCK_EXIT([&indexBuildBlock, opCtx] {
+        ON_BLOCK_EXIT([&indexBuildBlock, opCtx, collection] {
             WriteUnitOfWork wuow(opCtx);
-            indexBuildBlock->success();
+            indexBuildBlock->success(opCtx, collection);
             wuow.commit();
         });
 

@@ -59,14 +59,14 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient&
     : _client{std::move(client)},
       _opCtx{std::move(opCtx)},
       _autoColl{std::move(autoColl)},
+      _collection{_autoColl->getCollection()},
       _nss{_autoColl->getCollection()->ns()},
-      _idIndexBlock(std::make_unique<MultiIndexBlock>(_opCtx.get(), _autoColl->getCollection())),
-      _secondaryIndexesBlock(
-          std::make_unique<MultiIndexBlock>(_opCtx.get(), _autoColl->getCollection())),
+      _idIndexBlock(std::make_unique<MultiIndexBlock>()),
+      _secondaryIndexesBlock(std::make_unique<MultiIndexBlock>()),
       _idIndexSpec(idIndexSpec.getOwned()) {
 
     invariant(_opCtx);
-    invariant(_autoColl->getCollection());
+    invariant(_collection);
 }
 
 CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
@@ -86,7 +86,9 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
             if (specs.size()) {
                 _secondaryIndexesBlock->ignoreUniqueConstraint();
                 auto status =
-                    _secondaryIndexesBlock->init(specs, MultiIndexBlock::kNoopOnInitFn).getStatus();
+                    _secondaryIndexesBlock
+                        ->init(_opCtx.get(), _collection, specs, MultiIndexBlock::kNoopOnInitFn)
+                        .getStatus();
                 if (!status.isOK()) {
                     return status;
                 }
@@ -95,7 +97,10 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
             }
             if (!_idIndexSpec.isEmpty()) {
                 auto status =
-                    _idIndexBlock->init(_idIndexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus();
+                    _idIndexBlock
+                        ->init(
+                            _opCtx.get(), _collection, _idIndexSpec, MultiIndexBlock::kNoopOnInitFn)
+                        .getStatus();
                 if (!status.isOK()) {
                     return status;
                 }
@@ -164,7 +169,7 @@ Status CollectionBulkLoaderImpl::commit() {
         // deleted.
         if (_secondaryIndexesBlock) {
             std::set<RecordId> secDups;
-            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(&secDups);
+            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(_opCtx.get(), &secDups);
             if (!status.isOK()) {
                 return status;
             }
@@ -177,8 +182,11 @@ Status CollectionBulkLoaderImpl::commit() {
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    auto status = _secondaryIndexesBlock->commit(
-                        MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn);
+                    auto status =
+                        _secondaryIndexesBlock->commit(_opCtx.get(),
+                                                       _collection,
+                                                       MultiIndexBlock::kNoopOnCreateEachFn,
+                                                       MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -194,7 +202,7 @@ Status CollectionBulkLoaderImpl::commit() {
             // Gather RecordIds for uninserted duplicate keys to delete.
             std::set<RecordId> dups;
             // Do not do inside a WriteUnitOfWork (required by dumpInsertsFromBulk).
-            auto status = _idIndexBlock->dumpInsertsFromBulk(&dups);
+            auto status = _idIndexBlock->dumpInsertsFromBulk(_opCtx.get(), &dups);
             if (!status.isOK()) {
                 return status;
             }
@@ -204,7 +212,9 @@ Status CollectionBulkLoaderImpl::commit() {
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    auto status = _idIndexBlock->commit(MultiIndexBlock::kNoopOnCreateEachFn,
+                    auto status = _idIndexBlock->commit(_opCtx.get(),
+                                                        _collection,
+                                                        MultiIndexBlock::kNoopOnCreateEachFn,
                                                         MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
                         return status;
@@ -242,11 +252,15 @@ Status CollectionBulkLoaderImpl::commit() {
 
 void CollectionBulkLoaderImpl::_releaseResources() {
     invariant(&cc() == _opCtx->getClient());
-    if (_secondaryIndexesBlock)
+    if (_secondaryIndexesBlock) {
+        _secondaryIndexesBlock->cleanUpAfterBuild(_opCtx.get(), _collection);
         _secondaryIndexesBlock.reset();
+    }
 
-    if (_idIndexBlock)
+    if (_idIndexBlock) {
+        _idIndexBlock->cleanUpAfterBuild(_opCtx.get(), _collection);
         _idIndexBlock.reset();
+    }
 
     // release locks.
     _autoColl.reset();
@@ -270,14 +284,14 @@ Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(const F& task
 Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
                                                            const RecordId& loc) {
     if (_idIndexBlock) {
-        auto status = _idIndexBlock->insert(doc, loc);
+        auto status = _idIndexBlock->insert(_opCtx.get(), doc, loc);
         if (!status.isOK()) {
             return status.withContext("failed to add document to _id index");
         }
     }
 
     if (_secondaryIndexesBlock) {
-        auto status = _secondaryIndexesBlock->insert(doc, loc);
+        auto status = _secondaryIndexesBlock->insert(_opCtx.get(), doc, loc);
         if (!status.isOK()) {
             return status.withContext("failed to add document to secondary indexes");
         }

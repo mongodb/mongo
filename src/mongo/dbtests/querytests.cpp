@@ -99,18 +99,22 @@ protected:
         builder.append("ns", ns());
         auto specObj = builder.obj();
 
-        MultiIndexBlock indexer(&_opCtx, _collection);
+        MultiIndexBlock indexer;
+        ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(&_opCtx, _collection); });
         {
             WriteUnitOfWork wunit(&_opCtx);
-            uassertStatusOK(indexer.init(specObj, MultiIndexBlock::kNoopOnInitFn));
+            uassertStatusOK(
+                indexer.init(&_opCtx, _collection, specObj, MultiIndexBlock::kNoopOnInitFn));
             wunit.commit();
         }
-        uassertStatusOK(indexer.insertAllDocumentsInCollection());
-        uassertStatusOK(indexer.drainBackgroundWrites());
-        uassertStatusOK(indexer.checkConstraints());
+        uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, _collection));
+        uassertStatusOK(indexer.drainBackgroundWrites(&_opCtx));
+        uassertStatusOK(indexer.checkConstraints(&_opCtx));
         {
             WriteUnitOfWork wunit(&_opCtx);
-            uassertStatusOK(indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn,
+            uassertStatusOK(indexer.commit(&_opCtx,
+                                           _collection,
+                                           MultiIndexBlock::kNoopOnCreateEachFn,
                                            MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
         }

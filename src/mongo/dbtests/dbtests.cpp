@@ -104,25 +104,26 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         invariant(coll);
         wunit.commit();
     }
-    MultiIndexBlock indexer(opCtx, coll);
-    Status status = indexer.init(spec, MultiIndexBlock::kNoopOnInitFn).getStatus();
+    MultiIndexBlock indexer;
+    ON_BLOCK_EXIT([&] { indexer.cleanUpAfterBuild(opCtx, coll); });
+    Status status = indexer.init(opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.insertAllDocumentsInCollection();
+    status = indexer.insertAllDocumentsInCollection(opCtx, coll);
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.checkConstraints();
+    status = indexer.checkConstraints(opCtx);
     if (!status.isOK()) {
         return status;
     }
     WriteUnitOfWork wunit(opCtx);
-    ASSERT_OK(
-        indexer.commit(MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+    ASSERT_OK(indexer.commit(
+        opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
     wunit.commit();
     return Status::OK();
 }
