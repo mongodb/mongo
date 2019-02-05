@@ -42,18 +42,16 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/multi_index_block.h"
-#include "mongo/db/client.h"
 #include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/enable_coordinator_for_create_indexes_command_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -61,17 +59,21 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 namespace {
 
-const StringData kIndexesFieldName = "indexes"_sd;
-const StringData kCommandName = "createIndexes"_sd;
-const StringData kTwoPhaseCommandName = "twoPhaseCreateIndexes"_sd;
+constexpr auto kIndexesFieldName = "indexes"_sd;
+constexpr auto kCommandName = "createIndexes"_sd;
+constexpr auto kTwoPhaseCommandName = "twoPhaseCreateIndexes"_sd;
+constexpr auto kCreateCollectionAutomaticallyFieldName = "createdCollectionAutomatically"_sd;
+constexpr auto kNumIndexesBeforeFieldName = "numIndexesBefore"_sd;
+constexpr auto kNumIndexesAfterFieldName = "numIndexesAfter"_sd;
+constexpr auto kNoteFieldName = "note"_sd;
 
 /**
  * Parses the index specifications from 'cmdObj', validates them, and returns equivalent index
@@ -417,6 +419,183 @@ bool runCreateIndexes(OperationContext* opCtx,
     return true;
 }
 
+bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
+                                     const std::string& dbname,
+                                     const BSONObj& cmdObj,
+                                     std::string& errmsg,
+                                     BSONObjBuilder& result,
+                                     bool runTwoPhaseBuild) {
+    const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+    uassertStatusOK(userAllowedWriteNS(ns));
+
+    // Disallow users from creating new indexes on config.transactions since the sessions code
+    // was optimized to not update indexes
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "not allowed to create index on " << ns.ns(),
+            ns != NamespaceString::kSessionTransactionsTableNamespace);
+
+    auto specs = uassertStatusOK(
+        parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
+
+    // Preliminary checks before handing control over to IndexBuildsCoordinator:
+    // 1) We are in a replication mode that allows for index creation.
+    // 2) Check sharding state.
+    // 3) Create the collection to hold the index(es) if necessary.
+    OptionalCollectionUUID collectionUUID;
+    {
+        // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
+        Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
+        if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
+            uasserted(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while creating indexes in " << ns.ns());
+        }
+
+        // Before potentially taking an exclusive database lock, check if all indexes already exist
+        // while holding an intent lock. Only continue if new indexes need to be built and the
+        // database should be re-locked in exclusive mode.
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        auto db = autoColl.getDb();
+        auto collection = autoColl.getCollection();
+        if (collection) {
+            invariant(db, str::stream() << "Database missing for index build: " << ns);
+            auto& dss = DatabaseShardingState::get(db);
+            auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+            dss.checkDbVersion(opCtx, dssLock);
+            collectionUUID = collection->uuid();
+            result.appendBool(kCreateCollectionAutomaticallyFieldName, false);
+            auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
+            // Return from command invocation early if we  are not adding any new indexes.
+            if (specsCopy.size() == 0) {
+                auto numIndexes = collection->getIndexCatalog()->numIndexesTotal(opCtx);
+                result.append(kNumIndexesBeforeFieldName, numIndexes);
+                result.append(kNumIndexesAfterFieldName, numIndexes);
+                result.append(kNoteFieldName, "all indexes already exist");
+                return true;
+            }
+        } else {
+            // Relocking temporarily releases the Database lock while holding a Global IX lock. This
+            // prevents the replication state from changing, but requires abandoning the current
+            // snapshot in case indexes change during the period of time where no database lock is
+            // held.
+            opCtx->recoveryUnit()->abandonSnapshot();
+            dbLock.relockWithMode(MODE_X);
+
+            // Allow the strong lock acquisition above to be interrupted, but from this point
+            // forward do not allow locks or re-locks to be interrupted.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+            auto databaseHolder = DatabaseHolder::get(opCtx);
+            db = databaseHolder->getDb(opCtx, ns.db());
+            if (!db) {
+                db = databaseHolder->openDb(opCtx, ns.db());
+            }
+            auto& dss = DatabaseShardingState::get(db);
+            auto dssLock = DatabaseShardingState::DSSLock::lock(opCtx, &dss);
+            dss.checkDbVersion(opCtx, dssLock);
+
+            // We would not reach this point if we were able to check existing indexes on the
+            // collection.
+            invariant(!collection);
+            if (db->getViewCatalog()->lookup(opCtx, ns.ns())) {
+                errmsg = str::stream() << "Cannot create indexes on a view: " << ns.ns();
+                uasserted(ErrorCodes::CommandNotSupportedOnView, errmsg);
+            }
+
+            uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));
+
+            collectionUUID = UUID::gen();
+            CollectionOptions options;
+            options.uuid = collectionUUID;
+            writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                collection = db->createCollection(opCtx, ns.ns(), options);
+                invariant(collection,
+                          str::stream() << "Failed to create collection " << ns.ns()
+                                        << " during index creation: "
+                                        << redact(cmdObj));
+                wunit.commit();
+            });
+            result.appendBool(kCreateCollectionAutomaticallyFieldName, true);
+        }
+    }
+
+    // Use AutoStatsTracker to update Top.
+    boost::optional<AutoStatsTracker> statsTracker;
+    const boost::optional<int> dbProfilingLevel = boost::none;
+    statsTracker.emplace(opCtx,
+                         ns,
+                         Top::LockType::WriteLocked,
+                         AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                         dbProfilingLevel);
+
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    auto buildUUID = UUID::gen();
+    log() << "Registering index build: " << buildUUID;
+    ReplIndexBuildState::IndexCatalogStats stats;
+    try {
+        auto buildIndexFuture = uassertStatusOK(
+            indexBuildsCoord->startIndexBuild(opCtx, *collectionUUID, specs, buildUUID));
+
+        auto deadline = opCtx->getDeadline();
+        // Date_t::max() means no deadline.
+        if (deadline == Date_t::max()) {
+            log() << "Waiting for index build to complete: " << buildUUID;
+        } else {
+            log() << "Waiting for index build to complete: " << buildUUID
+                  << " (deadline: " << deadline << ")";
+        }
+
+        // Throws on error.
+        try {
+            stats = buildIndexFuture.get(opCtx);
+        } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruptionEx) {
+            // It is unclear whether the interruption originated from the current opCtx instance
+            // for the createIndexes command or that the IndexBuildsCoordinator task was interrupted
+            // independently of this command invocation. We'll defensively abort the index build
+            // with the assumption that if the index build was already in the midst of tearing down,
+            // this be a no-op.
+            log() << "Index build interrupted: " << buildUUID << ": aborting index build.";
+            auto abortIndexFuture = indexBuildsCoord->abortIndexBuildByBuildUUID(
+                buildUUID,
+                str::stream() << "Index build interrupted: " << buildUUID << ": "
+                              << interruptionEx.toString());
+            log() << "Index build aborted: " << buildUUID << ": "
+                  << abortIndexFuture.getNoThrow(opCtx);
+            throw;
+        }
+
+        log() << "Index build completed: " << buildUUID;
+    } catch (DBException& ex) {
+        // If the collection is dropped after the initial checks in this function (before the
+        // AutoStatsTracker is created), the IndexBuildsCoordinator (either startIndexBuild() or
+        // the the task running the index build) may return NamespaceNotFound. This is not
+        // considered an error and the command should return success.
+        if (ErrorCodes::NamespaceNotFound == ex.code()) {
+            log() << "Index build failed: " << buildUUID << ": collection dropped: " << ns;
+            return true;
+        }
+
+        // All other errors should be forwarded to the caller with index build information included.
+        log() << "Index build failed: " << buildUUID << ": " << ex.toStatus();
+        ex.addContext(str::stream() << "Index build failed: " << buildUUID << ": Collection " << ns
+                                    << " ( "
+                                    << *collectionUUID
+                                    << " )");
+        throw;
+    }
+
+
+    result.append(kNumIndexesBeforeFieldName, stats.numIndexesBefore);
+    result.append(kNumIndexesAfterFieldName, stats.numIndexesAfter);
+    if (stats.numIndexesAfter == stats.numIndexesBefore) {
+        result.append(kNoteFieldName, "all indexes already exist");
+    } else if (stats.numIndexesAfter < stats.numIndexesBefore + int(specs.size())) {
+        result.append(kNoteFieldName, "index already exists");
+    }
+
+    return true;
+}
+
 /**
  * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
  */
@@ -448,6 +627,10 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
+        if (enableIndexBuildsCoordinatorForCreateIndexesCommand) {
+            return runCreateIndexesWithCoordinator(
+                opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
+        }
         return runCreateIndexes(opCtx, dbname, cmdObj, errmsg, result, false /*two phase build*/);
     }
 
@@ -489,7 +672,8 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        return runCreateIndexes(opCtx, dbname, cmdObj, errmsg, result, true /*two phase build*/);
+        return runCreateIndexesWithCoordinator(
+            opCtx, dbname, cmdObj, errmsg, result, true /*two phase build*/);
     }
 
 } cmdTwoPhaseCreateIndex;
