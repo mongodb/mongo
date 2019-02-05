@@ -93,7 +93,7 @@ class TransactionCoordinatorDriver {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorDriver);
 
 public:
-    TransactionCoordinatorDriver(ServiceContext* service);
+    TransactionCoordinatorDriver(ServiceContext* serviceContext);
     ~TransactionCoordinatorDriver();
 
     /**
@@ -232,6 +232,8 @@ public:
     Future<void> sendDecisionToParticipantShard(const ShardId& shardId, const BSONObj& commandObj);
 
 private:
+    ServiceContext* _serviceContext;
+
     std::unique_ptr<txn::AsyncWorkScheduler> _scheduler;
 
     // TODO (SERVER-38522): Remove once AsyncWorkScheduler is used for cancellation

@@ -1,6 +1,47 @@
 const kSnapshotErrors =
     [ErrorCodes.SnapshotTooOld, ErrorCodes.SnapshotUnavailable, ErrorCodes.StaleChunkHistory];
 
+// List of failpoints in the coordinator's two-phase commit code. The associated data describes how
+// many times each failpoint would be hit assuming a 3-participant transaction where one of the
+// participants is co-located with the coordinator:
+// - numTimesShouldBeHit: N means the failpoint should be hit N times during that phase; for
+//   example, if there are two remote participants, the hangWhileTargetingRemoteHost failpoint would
+//   be hit two times in the prepare phase.
+// - skip: N means turn on the failpoint after the failpoint has been hit N times; it's used to turn
+//   on the remote and local targeting failpoints for the prepare and decision phase separately.
+function getCoordinatorFailpoints() {
+    const coordinatorFailpointDataArr = [
+        {failpoint: "hangBeforeWritingParticipantList", numTimesShouldBeHit: 1},
+        {
+          // Test targeting remote nodes for prepare
+          failpoint: "hangWhileTargetingRemoteHost",
+          numTimesShouldBeHit: 2 /* once per remote participant */
+        },
+        {
+          // Test targeting local node for prepare
+          failpoint: "hangWhileTargetingLocalHost",
+          numTimesShouldBeHit: 1
+        },
+        {failpoint: "hangBeforeWritingDecision", numTimesShouldBeHit: 1},
+        {
+          // Test targeting remote nodes for decision
+          failpoint: "hangWhileTargetingRemoteHost",
+          numTimesShouldBeHit: 2, /* once per remote participant */
+          skip: 2                 /* to skip when the failpoint is hit for prepare */
+        },
+        {
+          // Test targeting local node for decision
+          failpoint: "hangWhileTargetingLocalHost",
+          numTimesShouldBeHit: 1,
+          skip: 1 /* to skip when the failpoint is hit for prepare */
+        },
+        {failpoint: "hangBeforeDeletingCoordinatorDoc", numTimesShouldBeHit: 1},
+    ];
+
+    // Return a deep copy of the array, so that the caller is free to modify its contents.
+    return coordinatorFailpointDataArr.map(failpoint => Object.assign({}, failpoint));
+}
+
 function setFailCommandOnShards(st, mode, commands, code, numShards) {
     for (let i = 0; i < numShards; i++) {
         const shardConn = st["rs" + i].getPrimary();

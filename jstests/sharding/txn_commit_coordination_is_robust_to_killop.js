@@ -161,22 +161,7 @@
         st.s.getDB(dbName).getCollection(collName).drop();
     };
 
-    const failpointDataArr = [
-        {failpoint: "hangBeforeWritingParticipantList", numTimesShouldBeHit: 1},
-        {failpoint: "hangBeforeWritingDecision", numTimesShouldBeHit: 1},
-        {failpoint: "hangBeforeDeletingCoordinatorDoc", numTimesShouldBeHit: 1},
-        {
-          // Test targeting for prepare
-          failpoint: "hangWhileTargetingRemoteHost",
-          numTimesShouldBeHit: 2 /* once per ~remote~ participant */
-        },
-        {
-          // Test targeting for decision (skip the first two times the failpoint is hit)
-          failpoint: "hangWhileTargetingRemoteHost",
-          numTimesShouldBeHit: 2, /* once per ~remote~ participant */
-          skip: 2
-        },
-    ];
+    const failpointDataArr = getCoordinatorFailpoints();
 
     // Test abort path.
 

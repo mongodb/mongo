@@ -91,6 +91,176 @@ TEST(TransactionCoordinatorFuturesUtilTest, CollectReturnsCombinedResultWithSeve
     ASSERT_EQ(resultFuture.get(), std::accumulate(futureValues.begin(), futureValues.end(), 0));
 }
 
+TEST(TransactionCoordinatorFuturesUtilTest,
+     CollectStopsApplyingCombinerAfterCombinerReturnsShouldStopIterationYes) {
+    std::vector<Future<int>> futures;
+    std::vector<Promise<int>> promises;
+    for (int i = 0; i < 5; ++i) {
+        auto pf = makePromiseFuture<int>();
+        futures.push_back(std::move(pf.future));
+        promises.push_back(std::move(pf.promise));
+    }
+
+    auto resultFuture = txn::collect(std::move(futures), 0, [](int& result, const int& next) {
+        result += next;
+        if (result >= 2) {
+            return txn::ShouldStopIteration::kYes;
+        }
+        return txn::ShouldStopIteration::kNo;
+    });
+
+    for (size_t i = 0; i < promises.size(); ++i) {
+        promises[i].emplaceValue(1);
+    }
+
+    // Result should be capped at 2.
+    ASSERT_EQ(resultFuture.get(), 2);
+}
+
+
+TEST(TransactionCoordinatorFuturesUtilTest,
+     CollectReturnsErrorIfFirstResponseIsErrorRestAreSuccess) {
+    std::vector<Future<int>> futures;
+    std::vector<Promise<int>> promises;
+    for (int i = 0; i < 5; ++i) {
+        auto pf = makePromiseFuture<int>();
+        futures.push_back(std::move(pf.future));
+        promises.push_back(std::move(pf.promise));
+    }
+
+    auto resultFuture = txn::collect(std::move(futures), 0, [](int& result, const int& next) {
+        result += next;
+        return txn::ShouldStopIteration::kNo;
+    });
+
+    Status errorStatus{ErrorCodes::InternalError, "dummy error"};
+    promises[0].setError(errorStatus);
+
+    ASSERT(!resultFuture.isReady());
+
+    for (size_t i = 1; i < promises.size(); ++i) {
+        promises[i].emplaceValue(1);
+    }
+
+    ASSERT_THROWS_CODE(resultFuture.get(), AssertionException, errorStatus.code());
+}
+
+TEST(TransactionCoordinatorFuturesUtilTest,
+     CollectReturnsErrorIfLastResponseIsErrorRestAreSuccess) {
+    std::vector<Future<int>> futures;
+    std::vector<Promise<int>> promises;
+    for (int i = 0; i < 5; ++i) {
+        auto pf = makePromiseFuture<int>();
+        futures.push_back(std::move(pf.future));
+        promises.push_back(std::move(pf.promise));
+    }
+
+    auto resultFuture = txn::collect(std::move(futures), 0, [](int& result, const int& next) {
+        result += next;
+        return txn::ShouldStopIteration::kNo;
+    });
+
+    for (size_t i = 0; i < promises.size() - 1; ++i) {
+        promises[i].emplaceValue(1);
+    }
+
+    Status errorStatus{ErrorCodes::InternalError, "dummy error"};
+    promises[promises.size() - 1].setError(errorStatus);
+
+    ASSERT_THROWS_CODE(resultFuture.get(), AssertionException, errorStatus.code());
+}
+
+TEST(TransactionCoordinatorFuturesUtilTest,
+     CollectReturnsErrorIfReceivesErrorResponseWhileStopIterationIsNo) {
+    std::vector<Future<int>> futures;
+    std::vector<Promise<int>> promises;
+    for (int i = 0; i < 5; ++i) {
+        auto pf = makePromiseFuture<int>();
+        futures.push_back(std::move(pf.future));
+        promises.push_back(std::move(pf.promise));
+    }
+
+    auto resultFuture = txn::collect(std::move(futures), 0, [](int& result, const int& next) {
+        result += next;
+        if (result >= 2) {
+            return txn::ShouldStopIteration::kYes;
+        }
+        return txn::ShouldStopIteration::kNo;
+    });
+
+    promises[0].emplaceValue(1);
+
+    Status errorStatus{ErrorCodes::InternalError, "dummy error"};
+    promises[1].setError(errorStatus);
+    ASSERT(!resultFuture.isReady());
+
+    promises[2].emplaceValue(1);
+    promises[3].emplaceValue(1);
+    promises[4].emplaceValue(1);
+
+    ASSERT_THROWS_CODE(resultFuture.get(), AssertionException, errorStatus.code());
+}
+
+TEST(TransactionCoordinatorFuturesUtilTest,
+     CollectReturnsResultIfReceivesErrorResponseWhileStopIterationIsYes) {
+    std::vector<Future<int>> futures;
+    std::vector<Promise<int>> promises;
+    for (int i = 0; i < 5; ++i) {
+        auto pf = makePromiseFuture<int>();
+        futures.push_back(std::move(pf.future));
+        promises.push_back(std::move(pf.promise));
+    }
+
+    auto resultFuture = txn::collect(std::move(futures), 0, [](int& result, const int& next) {
+        result += next;
+        if (result >= 2) {
+            return txn::ShouldStopIteration::kYes;
+        }
+        return txn::ShouldStopIteration::kNo;
+    });
+
+    promises[0].emplaceValue(1);
+    promises[1].emplaceValue(1);
+    promises[2].emplaceValue(1);
+
+    Status errorStatus{ErrorCodes::InternalError, "dummy error"};
+    promises[3].setError(errorStatus);
+    ASSERT(!resultFuture.isReady());
+
+    promises[4].emplaceValue(1);
+
+    // Result should be capped at 2.
+    ASSERT_EQ(resultFuture.get(), 2);
+}
+
+TEST(TransactionCoordinatorFuturesUtilTest,
+     CollectReturnsFirstErrorIfFirstResponseIsErrorLaterResponseIsDifferentError) {
+    std::vector<Future<int>> futures;
+    std::vector<Promise<int>> promises;
+    for (int i = 0; i < 5; ++i) {
+        auto pf = makePromiseFuture<int>();
+        futures.push_back(std::move(pf.future));
+        promises.push_back(std::move(pf.promise));
+    }
+
+    auto resultFuture = txn::collect(std::move(futures), 0, [](int& result, const int& next) {
+        return txn::ShouldStopIteration::kNo;
+    });
+
+    Status errorStatus1{ErrorCodes::InternalError, "dummy error"};
+    promises[0].setError(errorStatus1);
+    ASSERT(!resultFuture.isReady());
+
+    Status errorStatus2{ErrorCodes::NotMaster, "dummy error"};
+    promises[1].setError(errorStatus2);
+    ASSERT(!resultFuture.isReady());
+
+    promises[2].emplaceValue(1);
+    promises[3].emplaceValue(1);
+    promises[4].emplaceValue(1);
+
+    ASSERT_THROWS_CODE(resultFuture.get(), AssertionException, errorStatus1.code());
+}
 
 class AsyncWorkSchedulerTest : public ShardServerTestFixture {
 protected:

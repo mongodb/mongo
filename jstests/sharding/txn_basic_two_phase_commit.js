@@ -175,7 +175,7 @@
         }
 
         if (simulateNetworkFailures) {
-            startSimulatingNetworkFailures([participant1, participant2, coordinator]);
+            startSimulatingNetworkFailures([participant1, participant2]);
         }
 
         // Turn on failpoints so that the coordinator hangs after each write it does, so that the
@@ -222,7 +222,7 @@
         });
 
         if (simulateNetworkFailures) {
-            stopSimulatingNetworkFailures([participant1, participant2, coordinator]);
+            stopSimulatingNetworkFailures([participant1, participant2]);
         }
 
         // Check that the transaction committed or aborted as expected.

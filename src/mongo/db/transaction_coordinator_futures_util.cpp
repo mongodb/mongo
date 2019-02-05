@@ -47,6 +47,7 @@ namespace txn {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangWhileTargetingRemoteHost);
+MONGO_FAIL_POINT_DEFINE(hangWhileTargetingLocalHost);
 
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
@@ -91,36 +92,38 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
         // rather than going through the host targeting below. This ensures that the state changes
         // for the participant and coordinator occur sequentially on a single branch of replica set
         // history. See SERVER-38142 for details.
-        return scheduleWork([ this, shardId, commandObj = commandObj.getOwned() ](OperationContext *
-                                                                                  opCtx) {
-            // NOTE: This internal authorization is tied to the lifetime of client, which will be
-            // destroyed by 'scheduleWork' immediately after this lambda ends.
-            AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+        return scheduleWork(
+            [ this, shardId, commandObj = commandObj.getOwned() ](OperationContext * opCtx) {
+                // Note: This internal authorization is tied to the lifetime of 'opCtx', which is
+                // destroyed by 'scheduleWork' immediately after this lambda ends.
+                AuthorizationSession::get(Client::getCurrent())->grantInternalAuthorization();
 
-            LOG(3) << "Coordinator going to send command " << commandObj << " to shard " << shardId;
+                if (MONGO_FAIL_POINT(hangWhileTargetingLocalHost)) {
+                    LOG(0) << "Hit hangWhileTargetingLocalHost failpoint";
+                }
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingLocalHost);
 
-            const auto service = opCtx->getServiceContext();
-            auto start = _executor->now();
+                const auto service = opCtx->getServiceContext();
+                auto start = _executor->now();
 
-            auto requestOpMsg =
-                OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, commandObj).serialize();
-            const auto replyOpMsg = OpMsg::parseOwned(
-                service->getServiceEntryPoint()->handleRequest(opCtx, requestOpMsg).response);
+                auto requestOpMsg =
+                    OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, commandObj).serialize();
+                const auto replyOpMsg = OpMsg::parseOwned(
+                    service->getServiceEntryPoint()->handleRequest(opCtx, requestOpMsg).response);
 
-            // Document sequences are not yet being used for responses.
-            invariant(replyOpMsg.sequences.empty());
+                // Document sequences are not yet being used for responses.
+                invariant(replyOpMsg.sequences.empty());
 
-            // 'ResponseStatus' is the response format of a remote request sent over the network, so
-            // we simulate that format manually here, since we sent the request over the loopback.
-            return ResponseStatus{replyOpMsg.body.getOwned(), _executor->now() - start};
-        });
+                // 'ResponseStatus' is the response format of a remote request sent over the network
+                // so we simulate that format manually here, since we sent the request over the
+                // loopback.
+                return ResponseStatus{replyOpMsg.body.getOwned(), _executor->now() - start};
+            });
     }
 
     return _targetHostAsync(shardId, readPref)
         .then([ this, shardId, commandObj = commandObj.getOwned(), readPref ](
             HostAndPort shardHostAndPort) mutable {
-            LOG(3) << "Coordinator sending command " << commandObj << " to shard " << shardId;
-
             executor::RemoteCommandRequest request(shardHostAndPort,
                                                    NamespaceString::kAdminDb.toString(),
                                                    commandObj,
@@ -139,8 +142,6 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                     shardId = std::move(shardId),
                     promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))
                 ](const RemoteCommandCallbackArgs& args) mutable noexcept {
-                    LOG(3) << "Coordinator shard got response " << args.response.data << " for "
-                           << commandObj << " to " << shardId;
                     auto status = args.response.status;
                     // Only consider actual failures to send the command as errors.
                     if (status.isOK()) {
@@ -166,10 +167,6 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                     stdx::lock_guard<stdx::mutex> lg(_mutex);
                     _activeHandles.erase(it);
                 });
-        })
-        .tapError([ shardId, commandObj = commandObj.getOwned() ](Status s) {
-            LOG(3) << "Coordinator shard failed to target command " << commandObj << " to shard "
-                   << shardId << causedBy(s);
         });
 }
 

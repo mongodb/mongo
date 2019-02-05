@@ -183,10 +183,11 @@ enum class ShouldStopIteration { kYes, kNo };
 
 /**
  * Helper function that allows you to asynchronously aggregate the results of a vector of Futures.
- * It's essentially an async foldLeft, with the ability to decide to stop processing results before
- * they have all come back. The combiner function specifies how to take an incoming result (the
- * second parameter) and combine it to create the final ('global') result (the first parameter). The
- * inital value for the 'global result' is specified by initValue.
+ * It's essentially an async foldLeft.
+ *
+ * The combiner function specifies how to take an incoming result (the second parameter) and combine
+ * it to create the final ('global') result (the first parameter). The inital value for the 'global
+ * result' is specified by initValue.
  *
  * Example from the unit tests:
  *
@@ -242,8 +243,13 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
         // Protects all state in the SharedBlock.
         stdx::mutex mutex;
 
-        // Whether or not collect has finished collecting responses.
-        bool done{false};
+        // If any response returns an error, the promise will be set with that error rather than the
+        // global result.
+        Status status{Status::OK()};
+
+        // If the combiner returns kYes after processing any response, the combiner will not be
+        // applied to any further responses.
+        ShouldStopIteration shouldStopIteration{ShouldStopIteration::kNo};
 
         /*****************************************************
          * The below have initial values based on user input.*
@@ -271,43 +277,35 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
     // SharedBlock upon completion of the input future.
     for (auto&& localFut : futures) {
         std::move(localFut)
-            // If the input future is successful, increment the number of resolved futures and apply
-            // the combiner to the new input.
             .then([sharedBlock](IndividualResult res) {
                 stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
-                if (!sharedBlock->done) {
-                    sharedBlock->numOutstandingResponses--;
-
-                    // Process responses until the combiner function returns false or all inputs
-                    // have been resolved.
-                    bool shouldStopProcessingResponses =
-                        sharedBlock->combiner(sharedBlock->globalResult, std::move(res)) ==
-                        ShouldStopIteration::kYes;
-
-                    if (sharedBlock->numOutstandingResponses == 0 ||
-                        shouldStopProcessingResponses) {
-                        sharedBlock->done = true;
-                        // Unlock before emplacing the result in case any continuations do expensive
-                        // work.
-                        lk.unlock();
-                        sharedBlock->resultPromise.emplaceValue(sharedBlock->globalResult);
-                    }
+                if (sharedBlock->shouldStopIteration == ShouldStopIteration::kNo &&
+                    sharedBlock->status.isOK()) {
+                    sharedBlock->shouldStopIteration =
+                        sharedBlock->combiner(sharedBlock->globalResult, std::move(res));
                 }
             })
-            // If the input future completes with an error, also set an error on the output promise
-            // and stop processing responses.
             .onError([sharedBlock](Status s) {
                 stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
-                if (!sharedBlock->done) {
-                    sharedBlock->done = true;
+                if (sharedBlock->shouldStopIteration == ShouldStopIteration::kNo &&
+                    sharedBlock->status.isOK()) {
+                    sharedBlock->status = s;
+                }
+            })
+            .getAsync([sharedBlock](Status s) {
+                stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
+                sharedBlock->numOutstandingResponses--;
+                if (sharedBlock->numOutstandingResponses == 0) {
                     // Unlock before emplacing the result in case any continuations do expensive
                     // work.
                     lk.unlock();
-                    sharedBlock->resultPromise.setError(s);
+                    if (sharedBlock->status.isOK()) {
+                        sharedBlock->resultPromise.emplaceValue(sharedBlock->globalResult);
+                    } else {
+                        sharedBlock->resultPromise.setError(sharedBlock->status);
+                    }
                 }
-            })
-            // Asynchronously execute the above call chain rather than wait for a response.
-            .getAsync([](Status s) {});
+            });
     }
 
     return std::move(resultPromiseAndFuture.future);

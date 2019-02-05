@@ -40,6 +40,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction_coordinator.h"
 #include "mongo/db/transaction_coordinator_document_gen.h"
 #include "mongo/db/transaction_coordinator_futures_util.h"
@@ -110,10 +111,47 @@ std::string buildParticipantListString(const std::vector<ShardId>& participantLi
     return ss.str();
 }
 
+bool checkIsLocalShard(ServiceContext* serviceContext, const ShardId& shardId) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return shardId == ShardRegistry::kConfigServerShardId;
+    }
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        return shardId == ShardingState::get(serviceContext)->shardId();
+    }
+    MONGO_UNREACHABLE;  // Only sharded systems should use the two-phase commit path.
+}
+
+bool shouldRetryCommandAgainstShard(const ShardId& shardId,
+                                    bool isLocalShard,
+                                    const BSONObj& commandObj,
+                                    const Status responseStatus) {
+    bool shouldRetry = true;
+
+    if (isLocalShard && ErrorCodes::isNotMasterError(responseStatus.code())) {
+        // For the local shard, stop retrying if the response indicates the node is stepping down or
+        // has stepped down.
+        // Note: It is vital that the error reported by the local shard originated from the local
+        // shard (i.e., the local shard did not do any RPCs), otherwise this node will stop
+        // coordinating the commit, and no other node will step up to take its place.
+        shouldRetry = false;
+    }
+
+    // Otherwise, retry on errors until the prepare phase times out.
+    if (responseStatus.isOK()) {
+        shouldRetry = false;
+    }
+
+    LOG(3) << "Coordinator " << (shouldRetry ? "retrying " : "not retrying ") << commandObj
+           << " against " << (isLocalShard ? "local " : "") << "shard " << shardId
+           << " because got response status " << responseStatus;
+    return shouldRetry;
+}
+
 }  // namespace
 
-TransactionCoordinatorDriver::TransactionCoordinatorDriver(ServiceContext* service)
-    : _scheduler(std::make_unique<txn::AsyncWorkScheduler>(service)) {}
+TransactionCoordinatorDriver::TransactionCoordinatorDriver(ServiceContext* serviceContext)
+    : _serviceContext(serviceContext),
+      _scheduler(std::make_unique<txn::AsyncWorkScheduler>(serviceContext)) {}
 
 TransactionCoordinatorDriver::~TransactionCoordinatorDriver() = default;
 
@@ -263,35 +301,23 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
 
             switch (*next.vote) {
                 case PrepareVote::kAbort:
-                    if (result.decision == CommitDecision::kAbort) {
-                        LOG(3) << "Ignoring vote to abort from shard " << next.participantShardId
-                               << " because a vote to abort has already been received";
-                        break;
-                    }
                     result.decision = CommitDecision::kAbort;
                     result.maxPrepareTimestamp = boost::none;
                     cancel();
-                    break;
+                    return txn::ShouldStopIteration::kYes;
                 case PrepareVote::kCommit:
-                    if (result.decision == CommitDecision::kAbort) {
-                        LOG(3) << "Ignoring vote to commit from shard " << next.participantShardId
-                               << " because a vote to abort has already been received";
-                        break;
-                    }
-
                     result.decision = CommitDecision::kCommit;
                     result.maxPrepareTimestamp = (result.maxPrepareTimestamp)
                         ? std::max(result.maxPrepareTimestamp, next.prepareTimestamp)
                         : next.prepareTimestamp;
-                    break;
+                    return txn::ShouldStopIteration::kNo;
                 case PrepareVote::kCanceled:
                     // PrepareVote is just an alias for CommitDecision, so we need to include this
                     // branch as part of the switch statement, but CommitDecision::kCanceled will
                     // never be a valid response to prepare so this path is unreachable.
                     MONGO_UNREACHABLE;
             }
-
-            return txn::ShouldStopIteration::kNo;
+            MONGO_UNREACHABLE;
         });
 }
 
@@ -417,8 +443,9 @@ Future<void> TransactionCoordinatorDriver::persistDecision(
         *_scheduler,
         boost::none /* no need for a backoff */,
         [](const Status& s) {
-            // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
-            // want to retry on other interruption errors, like InterruptedDueToStepDown.
+            // 'Interrupted' is the error code delivered for killOp sent by a user.
+            // Note, we do not want to retry on other interruption errors, like
+            // InterruptedDueToStepDown.
             return s.code() == ErrorCodes::Interrupted;
         },
         [this, lsid, txnNumber, participantList, commitTimestamp] {
@@ -536,9 +563,9 @@ Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSes
     return txn::doWhile(*_scheduler,
                         boost::none /* no need for a backoff */,
                         [](const Status& s) {
-                            // 'Interrupted' is the error code delivered for killOp sent by a
-                            // user. Note, we do not want to retry on other interruption errors,
-                            // like InterruptedDueToStepDown.
+                            // 'Interrupted' is the error code delivered for killOp sent by a user.
+                            // Note, we do not want to retry on other interruption errors, like
+                            // InterruptedDueToStepDown.
                             return s.code() == ErrorCodes::Interrupted;
                         },
                         [this, lsid, txnNumber] {
@@ -571,16 +598,18 @@ std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAl
 
 Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
     const ShardId& shardId, const BSONObj& commandObj) {
+    const bool isLocalShard = checkIsLocalShard(_serviceContext, shardId);
     return txn::doWhile(
         *_scheduler,
         kExponentialBackoff,
-        [](StatusWith<PrepareResponse> swPrepareResponse) {
-            // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
-            // want to retry on other interruption errors, like InterruptedDueToStepDown.
-            return swPrepareResponse.getStatus().code() == ErrorCodes::Interrupted ||
-                isRetryableError(swPrepareResponse.getStatus().code());
+        [ isLocalShard, shardId, commandObj = commandObj.getOwned() ](
+            StatusWith<PrepareResponse> swPrepareResponse) {
+            return shouldRetryCommandAgainstShard(
+                shardId, isLocalShard, commandObj, swPrepareResponse.getStatus());
         },
-        [ this, shardId, commandObj = commandObj.getOwned() ] {
+        [ this, shardId, isLocalShard, commandObj = commandObj.getOwned() ] {
+            LOG(3) << "Coordinator going to send command " << commandObj << " to "
+                   << (isLocalShard ? " local " : "") << " shard " << shardId;
             return _scheduler->scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
                     auto status = getStatusFromCommandResult(response.data);
@@ -621,7 +650,8 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
                     uassertStatusOK(status);
                     MONGO_UNREACHABLE;
                 })
-                .onError<ErrorCodes::ShardNotFound>([shardId](const Status& s) {
+                .onError<ErrorCodes::ShardNotFound>([shardId, isLocalShard](const Status& s) {
+                    invariant(!isLocalShard);
                     // ShardNotFound may indicate that the participant shard has been removed (it
                     // could also mean the participant shard was recently added and this node
                     // refreshed its ShardRegistry from a stale config secondary).
@@ -638,11 +668,6 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
                         return PrepareResponse{shardId, boost::none, boost::none};
                     }
 
-                    if (!(isRetryableError(status.code()) ||
-                          status.code() == ErrorCodes::Interrupted)) {
-                        return PrepareResponse{shardId, CommitDecision::kAbort, boost::none};
-                    }
-
                     uassertStatusOK(status);
                     MONGO_UNREACHABLE;
                 });
@@ -651,15 +676,16 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
 
 Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
     const ShardId& shardId, const BSONObj& commandObj) {
+    const bool isLocalShard = checkIsLocalShard(_serviceContext, shardId);
     return txn::doWhile(
         *_scheduler,
         kExponentialBackoff,
-        [](const Status& s) {
-            // 'Interrupted' is the error code delivered for killOp sent by a user. Note, we do not
-            // want to retry on other interruption errors, like InterruptedDueToStepDown.
-            return s.code() == ErrorCodes::Interrupted || isRetryableError(s.code());
+        [ isLocalShard, shardId, commandObj = commandObj.getOwned() ](const Status& s) {
+            return shouldRetryCommandAgainstShard(shardId, isLocalShard, commandObj, s);
         },
-        [ this, shardId, commandObj = commandObj.getOwned() ] {
+        [ this, isLocalShard, shardId, commandObj = commandObj.getOwned() ] {
+            LOG(3) << "Coordinator going to send command " << commandObj << " to "
+                   << (isLocalShard ? " local " : "") << " shard " << shardId;
             return _scheduler->scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
                     auto status = getStatusFromCommandResult(response.data);
@@ -681,11 +707,12 @@ Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
 
                     return status;
                 })
-                .onError<ErrorCodes::ShardNotFound>([](const Status& s) {
+                .onError<ErrorCodes::ShardNotFound>([isLocalShard](const Status& s) {
+                    invariant(!isLocalShard);
                     // TODO (SERVER-38918): Unlike for prepare, there is no pessimistic way to
                     // handle ShardNotFound. It's not safe to treat ShardNotFound as an ack, because
                     // this node may have refreshed its ShardRegistry from a stale config secondary.
-                    MONGO_UNREACHABLE;
+                    fassert(51068, false);
                 });
         });
 }
