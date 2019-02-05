@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/collection_index_builds_tracker.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_index_builds_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl_index_build_state.h"
@@ -311,6 +312,39 @@ protected:
      * Runs the index build on the caller thread.
      */
     virtual void _runIndexBuild(OperationContext* opCtx, const UUID& buildUUID) noexcept;
+
+    /**
+     * Modularizes the _indexBuildsManager calls part of _runIndexBuild. Throws on error.
+     */
+    void _buildIndex(OperationContext* opCtx,
+                     Collection* collection,
+                     const NamespaceString& nss,
+                     std::shared_ptr<ReplIndexBuildState> replState,
+                     const std::vector<BSONObj>& filteredSpecs,
+                     Lock::DBLock* dbLock);
+    /**
+     * Returns total number of indexes in collection, including unfinished/in-progress indexes.
+     *
+     * Helper function that is used in sub-classes. Used to set statistics on index build results.
+     *
+     * Expects a lock to be held by the caller, so that 'collection' is safe to use.
+     */
+    int _getNumIndexesTotal(OperationContext* opCtx, Collection* collection);
+
+    /**
+     * Adds collation defaults to 'indexSpecs', as well as filtering out existing indexes (ready or
+     * building) and checking uniqueness constraints are compatible with sharding.
+     *
+     * Helper function that is used in sub-classes. Produces final specs that the Coordinator will
+     * register and use for the build, if the result is non-empty.
+     *
+     * This function throws on error. Expects a DB X lock to be held by the caller.
+     */
+    std::vector<BSONObj> _addDefaultsAndFilterExistingIndexes(
+        OperationContext* opCtx,
+        Collection* collection,
+        const NamespaceString& nss,
+        const std::vector<BSONObj>& indexSpecs);
 
     // Protects the below state.
     mutable stdx::mutex _mutex;

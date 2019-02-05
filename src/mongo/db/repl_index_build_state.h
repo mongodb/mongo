@@ -107,12 +107,16 @@ struct ReplIndexBuildState {
     // to commit the index(es).
     std::vector<HostAndPort> commitReadyMembers;
 
-    // Communicates the final outcome of the index build to any callers waiting upon the associated
-    // SharedSemiFuture(s).
     using IndexCatalogStats = struct {
         int numIndexesBefore = 0;
         int numIndexesAfter = 0;
     };
+
+    // Tracks the index build stats that are returned to the caller upon success.
+    IndexCatalogStats stats;
+
+    // Communicates the final outcome of the index build to any callers waiting upon the associated
+    // SharedSemiFuture(s).
     SharedPromise<IndexCatalogStats> sharedPromise;
 
     // There is a period of time where the index build is registered on the coordinator, but an
