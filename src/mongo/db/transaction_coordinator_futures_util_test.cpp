@@ -333,9 +333,6 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsRemoteCommandsWhichAreBlockedWa
     auto future2 = async.scheduleRemoteCommand(
         kShardIds[2], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
 
-    // Wait till at least one of the two commands above gets scheduled
-    network()->waitForWork();
-
     ASSERT(!future1.isReady());
     ASSERT(!future2.isReady());
 
