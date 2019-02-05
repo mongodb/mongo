@@ -818,6 +818,7 @@ env.Library(
         'catalog/index_key_validate',
         'catalog/multi_index_block',
         'concurrency/write_conflict_exception',
+        'index_builds_coordinator_interface',
     ],
 )
 

@@ -47,10 +47,13 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
 #include "mongo/util/log.h"
 
 using namespace std::chrono_literals;
@@ -96,17 +99,11 @@ MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     return Status::OK();
 }
 
-void generateSystemIndexForExistingCollection(OperationContext* opCtx,
-                                              Collection* collection,
-                                              const NamespaceString& ns,
-                                              const IndexSpec& spec) {
-    // Do not try and generate any system indexes in read only mode.
-    if (storageGlobalParams.readOnly) {
-        warning() << "Running in queryable backup mode. Unable to create authorization index on "
-                  << ns;
-        return;
-    }
-
+SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> generateSystemIndexForExistingCollection(
+    OperationContext* opCtx,
+    UUID collectionUUID,
+    const NamespaceString& ns,
+    const IndexSpec& spec) {
     // Do not try to generate any system indexes on a secondary.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     uassert(ErrorCodes::NotMaster,
@@ -124,26 +121,11 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
         log() << "No authorization index detected on " << ns
               << " collection. Attempting to recover by creating an index with spec: " << indexSpec;
 
-        MultiIndexBlock indexer(opCtx, collection);
-
-        writeConflictRetry(opCtx, "authorization index regeneration", ns.ns(), [&] {
-            fassert(40453, indexer.init(indexSpec));
-        });
-
-        fassert(40454, indexer.insertAllDocumentsInCollection());
-
-        writeConflictRetry(opCtx, "authorization index regeneration", ns.ns(), [&] {
-            WriteUnitOfWork wunit(opCtx);
-
-            fassert(51015, indexer.commit([opCtx, &ns, collection](const BSONObj& spec) {
-                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, ns, *(collection->uuid()), spec, false /* fromMigrate */);
-            }));
-
-            wunit.commit();
-        });
-
-        log() << "Authorization index construction on " << ns << " is complete";
+        UUID buildUUID = UUID::gen();
+        IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+        auto indexBuildFuture = uassertStatusOK(
+            indexBuildsCoord->startIndexBuild(opCtx, collectionUUID, {indexSpec}, buildUUID));
+        return indexBuildFuture;
     } catch (const DBException& e) {
         severe() << "Failed to regenerate index for " << ns << ". Exception: " << e.what();
         throw;
@@ -153,8 +135,17 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
 }  // namespace
 
 Status verifySystemIndexes(OperationContext* opCtx) {
+    // Do not try and generate any system indexes in read only mode.
+    if (storageGlobalParams.readOnly) {
+        warning() << "Running in queryable backup mode. Unable to create authorization indexes";
+        return Status::OK();
+    }
+
     const NamespaceString& systemUsers = AuthorizationManager::usersCollectionNamespace;
     const NamespaceString& systemRoles = AuthorizationManager::rolesCollectionNamespace;
+
+    boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> systemUsersFuture;
+    boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> systemRolesFuture;
 
     // Create indexes for collections on the admin db
     {
@@ -184,8 +175,8 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemUsersKeyPattern, false, &indexes);
             if (indexes.empty()) {
                 try {
-                    generateSystemIndexForExistingCollection(
-                        opCtx, collection, systemUsers, v3SystemUsersIndexSpec);
+                    systemUsersFuture = generateSystemIndexForExistingCollection(
+                        opCtx, collection->uuid().get(), systemUsers, v3SystemUsersIndexSpec);
                 } catch (...) {
                     return exceptionToStatus();
                 }
@@ -202,13 +193,32 @@ Status verifySystemIndexes(OperationContext* opCtx) {
             indexCatalog->findIndexesByKeyPattern(opCtx, v3SystemRolesKeyPattern, false, &indexes);
             if (indexes.empty()) {
                 try {
-                    generateSystemIndexForExistingCollection(
-                        opCtx, collection, systemRoles, v3SystemRolesIndexSpec);
+                    systemRolesFuture = generateSystemIndexForExistingCollection(
+                        opCtx, collection->uuid().get(), systemRoles, v3SystemRolesIndexSpec);
                 } catch (...) {
                     return exceptionToStatus();
                 }
             }
         }
+    }
+
+    Status systemUsersStatus = Status::OK();
+    Status systemRolesStatus = Status::OK();
+
+    if (systemUsersFuture) {
+        systemUsersStatus = systemUsersFuture->waitNoThrow(opCtx);
+    }
+
+    if (systemRolesFuture) {
+        systemRolesStatus = systemRolesFuture->waitNoThrow(opCtx);
+    }
+
+    if (!systemUsersStatus.isOK()) {
+        return systemUsersStatus;
+    }
+
+    if (!systemRolesStatus.isOK()) {
+        return systemRolesStatus;
     }
 
     return Status::OK();
