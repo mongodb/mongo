@@ -313,15 +313,14 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
     if (clientState != kInactive)
         return;
 
-    auto acquireTicketResult = _acquireTicket(opCtx, _modeForTicket, Date_t::max());
+    auto deadline = _maxLockTimeout ? Date_t::now() + *_maxLockTimeout : Date_t::max();
+    auto acquireTicketResult = _acquireTicket(opCtx, _modeForTicket, deadline);
     uassert(ErrorCodes::LockTimeout,
             str::stream() << "Unable to acquire ticket with mode '" << _modeForTicket
                           << "' within a max lock request timeout of '"
-                          << _maxLockTimeout.get()
+                          << *_maxLockTimeout
                           << "' milliseconds.",
-            acquireTicketResult == LOCK_OK || !_maxLockTimeout);
-    // If no deadline is specified we should always get a ticket.
-    invariant(acquireTicketResult == LOCK_OK);
+            acquireTicketResult == LOCK_OK || _uninterruptibleLocksRequested);
 }
 
 LockResult LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
@@ -329,10 +328,6 @@ LockResult LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Da
     auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
     if (holder) {
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
-
-        if (_maxLockTimeout && !_uninterruptibleLocksRequested) {
-            deadline = std::min(deadline, Date_t::now() + _maxLockTimeout.get());
-        }
 
         // If the ticket wait is interrupted, restore the state of the client.
         auto restoreStateOnErrorGuard = makeGuard([&] { _clientState.store(kInactive); });
@@ -352,7 +347,19 @@ LockResult LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Da
 LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) {
     dassert(isLocked() == (_modeForTicket != MODE_NONE));
     if (_modeForTicket == MODE_NONE) {
-        auto acquireTicketResult = _acquireTicket(opCtx, mode, deadline);
+        auto lockTimeoutDate =
+            _maxLockTimeout ? Date_t::now() + _maxLockTimeout.get() : Date_t::max();
+        auto useLockTimeout = lockTimeoutDate < deadline;
+        auto acquireTicketResult =
+            _acquireTicket(opCtx, mode, useLockTimeout ? lockTimeoutDate : deadline);
+        if (useLockTimeout) {
+            uassert(ErrorCodes::LockTimeout,
+                    str::stream() << "Unable to acquire ticket with mode '" << _modeForTicket
+                                  << "' within a max lock request timeout of '"
+                                  << *_maxLockTimeout
+                                  << "' milliseconds.",
+                    acquireTicketResult == LOCK_OK || _uninterruptibleLocksRequested);
+        }
         if (acquireTicketResult != LOCK_OK) {
             return acquireTicketResult;
         }

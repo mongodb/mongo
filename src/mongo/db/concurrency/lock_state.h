@@ -292,8 +292,10 @@ private:
     void _releaseTicket();
 
     /**
-     * Acquires a ticket for the Locker under 'mode'. Returns LOCK_TIMEOUT if it cannot acquire a
-     * ticket within 'deadline'.
+     * Acquires a ticket for the Locker under 'mode'.
+     * Returns LOCK_OK      if a ticket is successfully acquired.
+     *         LOCK_TIMEOUT if it cannot acquire a ticket within 'deadline'.
+     * It may throw an exception when it is interrupted.
      */
     LockResult _acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline);
 
