@@ -212,11 +212,11 @@ BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile) {
     auto inputFd = ::open(inputFile.c_str(), O_RDONLY);
 #endif
 
-    const auto guard = makeGuard([&] { ::close(inputFd); });
-
     uassert(ErrorCodes::FileNotOpen,
             str::stream() << "Specified file does not exist (" << inputFile << ")",
             inputFd > 0);
+
+    const auto guard = makeGuard([&] { ::close(inputFd); });
 
     auto buf = SharedBuffer::allocate(MaxMessageSizeBytes);
     while (auto packet = readPacket(buf.get(), inputFd)) {

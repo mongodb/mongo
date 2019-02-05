@@ -6,6 +6,10 @@
     const recordingFilePath = MongoRunner.toRealDir(recordingDir + "/" + recordingFile);
     const replayFilePath = MongoRunner.toRealDir(recordingDir + "/replay.txt");
 
+    assert.throws(function() {
+        convertTrafficRecordingToBSON("notarealfileatall");
+    });
+
     // Create the recording directory if it does not already exist
     mkdir(recordingDir);
 
