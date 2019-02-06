@@ -11,6 +11,8 @@ selector:
   - jstests/core/capped_update.js
   # JSON Schema is not available in featureCompatibilityVersion 3.4
   - jstests/core/json_schema/*.js
+  # Uses $lookup pipeline syntax, which is not available in featureCompatibilityVersion 3.4
+  - jstests/core/views/views_collation.js
   exclude_with_any_tags:
   - requires_fcv36
 

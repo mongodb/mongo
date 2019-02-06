@@ -161,6 +161,16 @@
     const lookupSimpleView = {
         $lookup: {from: "simpleView", localField: "x", foreignField: "x", as: "result"}
     };
+    const nestedLookupSimpleView = {
+        $lookup: {
+            from: "simpleCollection",
+            pipeline: [{
+                $lookup:
+                    {from: "simpleView", localField: "x", foreignField: "x", as: "inner_result"}
+            }],
+            as: "result"
+        }
+    };
     const graphLookupSimpleView = {
         $graphLookup: {
             from: "simpleView",
@@ -176,6 +186,8 @@
     assert.commandWorked(viewsDB.runCommand(
         {aggregate: "simpleCollection", pipeline: [lookupSimpleView], cursor: {}}));
     assert.commandWorked(viewsDB.runCommand(
+        {aggregate: "simpleCollection", pipeline: [nestedLookupSimpleView], cursor: {}}));
+    assert.commandWorked(viewsDB.runCommand(
         {aggregate: "simpleCollection", pipeline: [graphLookupSimpleView], cursor: {}}));
 
     // You can lookup into a view with the simple collation if the operation has a matching
@@ -183,6 +195,12 @@
     assert.commandWorked(viewsDB.runCommand({
         aggregate: "ukCollection",
         pipeline: [lookupSimpleView],
+        cursor: {},
+        collation: {locale: "simple"}
+    }));
+    assert.commandWorked(viewsDB.runCommand({
+        aggregate: "ukCollection",
+        pipeline: [nestedLookupSimpleView],
         cursor: {},
         collation: {locale: "simple"}
     }));
@@ -204,6 +222,13 @@
                                  ErrorCodes.OptionNotSupportedOnView);
     assert.commandFailedWithCode(viewsDB.runCommand({
         aggregate: "simpleCollection",
+        pipeline: [nestedLookupSimpleView],
+        cursor: {},
+        collation: {locale: "en"}
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        aggregate: "simpleCollection",
         pipeline: [graphLookupSimpleView],
         cursor: {},
         collation: {locale: "zh"}
@@ -213,6 +238,18 @@
     const lookupFilView = {
         $lookup: {from: "filView", localField: "x", foreignField: "x", as: "result"}
     };
+    function makeNestedLookupFilView(sourceCollName) {
+        return {
+            $lookup: {
+                from: sourceCollName,
+                pipeline: [{
+                    $lookup:
+                        {from: "filView", localField: "x", foreignField: "x", as: "inner_result"}
+                }],
+                as: "result"
+            }
+        };
+    }
     const graphLookupFilView = {
         $graphLookup: {
             from: "filView",
@@ -227,6 +264,11 @@
     // collation matches the collation of the view.
     assert.commandWorked(
         viewsDB.runCommand({aggregate: "filCollection", pipeline: [lookupFilView], cursor: {}}));
+    assert.commandWorked(viewsDB.runCommand({
+        aggregate: "filCollection",
+        pipeline: [makeNestedLookupFilView("filCollection")],
+        cursor: {}
+    }));
     assert.commandWorked(viewsDB.runCommand(
         {aggregate: "filCollection", pipeline: [graphLookupFilView], cursor: {}}));
 
@@ -235,6 +277,12 @@
     assert.commandWorked(viewsDB.runCommand({
         aggregate: "ukCollection",
         pipeline: [lookupFilView],
+        cursor: {},
+        collation: {locale: "fil"}
+    }));
+    assert.commandWorked(viewsDB.runCommand({
+        aggregate: "ukCollection",
+        pipeline: [makeNestedLookupFilView("ukCollection")],
         cursor: {},
         collation: {locale: "fil"}
     }));
@@ -250,6 +298,12 @@
     assert.commandFailedWithCode(
         viewsDB.runCommand({aggregate: "simpleCollection", cursor: {}, pipeline: [lookupFilView]}),
         ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        aggregate: "simpleCollection",
+        cursor: {},
+        pipeline: [makeNestedLookupFilView("simpleCollation")]
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
     assert.commandFailedWithCode(
         viewsDB.runCommand(
             {aggregate: "simpleCollection", cursor: {}, pipeline: [graphLookupFilView]}),
@@ -260,6 +314,13 @@
     assert.commandFailedWithCode(viewsDB.runCommand({
         aggregate: "filCollection",
         pipeline: [lookupFilView],
+        cursor: {},
+        collation: {locale: "zh"}
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        aggregate: "filCollection",
+        pipeline: [makeNestedLookupFilView("filCollection")],
         cursor: {},
         collation: {locale: "zh"}
     }),
@@ -321,6 +382,13 @@
         create: "zhView",
         viewOn: "simpleCollection",
         pipeline: [lookupFilView],
+        collation: {locale: "zh"}
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+    assert.commandFailedWithCode(viewsDB.runCommand({
+        create: "zhView",
+        viewOn: "simpleCollection",
+        pipeline: [makeNestedLookupFilView("zhView")],
         collation: {locale: "zh"}
     }),
                                  ErrorCodes.OptionNotSupportedOnView);
