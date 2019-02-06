@@ -268,7 +268,7 @@ public:
     */
     void commitPreparedTransaction(OperationContext* opCtx,
                                    Timestamp commitTimestamp,
-                                   std::optional<repl::OpTime> commitOplogEntryOpTime);
+                                   boost::optional<repl::OpTime> commitOplogEntryOpTime);
 
     /**
      * Aborts the transaction outside the transaction, releasing transaction resources.

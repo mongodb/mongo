@@ -1092,7 +1092,7 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
 void TransactionParticipant::commitPreparedTransaction(
     OperationContext* opCtx,
     Timestamp commitTimestamp,
-    std::optional<repl::OpTime> commitOplogEntryOpTime) {
+    boost::optional<repl::OpTime> commitOplogEntryOpTime) {
     // Re-acquire the RSTL to prevent state transitions while committing the transaction. When the
     // transaction was prepared, we dropped the RSTL. We do not need to reacquire the PBWM because
     // if we're not the primary we will uassert anyways.
@@ -1173,8 +1173,7 @@ void TransactionParticipant::commitPreparedTransaction(
         // If commitOplogEntryOpTime is a nullopt, then we grab the OpTime from the commitOplogSlot
         // which will only be set if we are primary. Otherwise, the commitOplogEntryOpTime must have
         // been passed in during secondary oplog application.
-        _finishOpTime =
-            (commitOplogEntryOpTime) ? commitOplogEntryOpTime.value() : commitOplogSlot.opTime;
+        _finishOpTime = commitOplogEntryOpTime.value_or(commitOplogSlot.opTime);
 
         _finishCommitTransaction(lk, opCtx);
     } catch (...) {
