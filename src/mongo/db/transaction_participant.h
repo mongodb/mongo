@@ -261,9 +261,14 @@ public:
     * Commits the transaction, including committing the write unit of work and updating
     * transaction state.
     *
+    * On a secondary, the "commitOplogEntryOpTime" will be the OpTime of the commitTransaction oplog
+    * entry.
+    *
     * Throws an exception if the transaction is not prepared or if the 'commitTimestamp' is null.
     */
-    void commitPreparedTransaction(OperationContext* opCtx, Timestamp commitTimestamp);
+    void commitPreparedTransaction(OperationContext* opCtx,
+                                   Timestamp commitTimestamp,
+                                   std::optional<repl::OpTime> commitOplogEntryOpTime);
 
     /**
      * Aborts the transaction outside the transaction, releasing transaction resources.

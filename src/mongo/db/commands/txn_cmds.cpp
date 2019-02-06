@@ -111,7 +111,7 @@ public:
         auto optionalCommitTimestamp = cmd.getCommitTimestamp();
         if (optionalCommitTimestamp) {
             // commitPreparedTransaction will throw if the transaction is not prepared.
-            txnParticipant->commitPreparedTransaction(opCtx, optionalCommitTimestamp.get());
+            txnParticipant->commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
         } else {
             // commitUnpreparedTransaction will throw if the transaction is prepared.
             txnParticipant->commitUnpreparedTransaction(opCtx);

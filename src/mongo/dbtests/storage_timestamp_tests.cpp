@@ -2619,7 +2619,7 @@ public:
         }
         txnParticipant->unstashTransactionResources(_opCtx, "commitTransaction");
 
-        txnParticipant->commitPreparedTransaction(_opCtx, commitTimestamp);
+        txnParticipant->commitPreparedTransaction(_opCtx, commitTimestamp, {});
 
         txnParticipant->stashTransactionResources(_opCtx);
         {

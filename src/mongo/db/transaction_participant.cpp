@@ -1089,8 +1089,10 @@ void TransactionParticipant::commitUnpreparedTransaction(OperationContext* opCtx
     _finishCommitTransaction(lk, opCtx);
 }
 
-void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
-                                                       Timestamp commitTimestamp) {
+void TransactionParticipant::commitPreparedTransaction(
+    OperationContext* opCtx,
+    Timestamp commitTimestamp,
+    std::optional<repl::OpTime> commitOplogEntryOpTime) {
     // Re-acquire the RSTL to prevent state transitions while committing the transaction. When the
     // transaction was prepared, we dropped the RSTL. We do not need to reacquire the PBWM because
     // if we're not the primary we will uassert anyways.
@@ -1128,6 +1130,7 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
         // writes that are causally related to the transaction commit enter the oplog at a
         // timestamp earlier than the commit oplog entry.
         if (opCtx->writesAreReplicated()) {
+            invariant(!commitOplogEntryOpTime);
             oplogSlotReserver.emplace(opCtx);
             commitOplogSlot = oplogSlotReserver->getReservedOplogSlot();
             invariant(commitOplogSlot.opTime.getTimestamp() >= commitTimestamp,
@@ -1136,6 +1139,10 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
                                     << commitTimestamp.toBSON()
                                     << ", commit oplog entry optime: "
                                     << commitOplogSlot.opTime.toBSON());
+        } else {
+            // We always expect a non-null commitOplogEntryOpTime to be passed in on secondaries
+            // in order to set the finishOpTime.
+            invariant(commitOplogEntryOpTime);
         }
 
         // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
@@ -1163,7 +1170,11 @@ void TransactionParticipant::commitPreparedTransaction(OperationContext* opCtx,
         // If we are committing a prepared transaction, then we must have already recorded this
         // transaction's oldest oplog entry optime.
         invariant(_oldestOplogEntryOpTime);
-        _finishOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        // If commitOplogEntryOpTime is a nullopt, then we grab the OpTime from the commitOplogSlot
+        // which will only be set if we are primary. Otherwise, the commitOplogEntryOpTime must have
+        // been passed in during secondary oplog application.
+        _finishOpTime =
+            (commitOplogEntryOpTime) ? commitOplogEntryOpTime.value() : commitOplogSlot.opTime;
 
         _finishCommitTransaction(lk, opCtx);
     } catch (...) {
