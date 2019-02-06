@@ -135,6 +135,11 @@ public:
 
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {
         collections->push_back(_fromNs);
+        if (_parsedIntrospectionPipeline) {
+            for (auto&& stage : _parsedIntrospectionPipeline->getSources()) {
+                stage->addInvolvedCollections(collections);
+            }
+        }
     }
 
     void detachFromOperationContext() final;
