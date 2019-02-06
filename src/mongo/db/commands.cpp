@@ -500,21 +500,27 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
 }
 
 void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
+    bool closeConnection, hasErrorCode;
+    long long errorCode;
+
     MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
+        closeConnection = data.hasField("closeConnection") &&
+            bsonExtractBooleanField(data, "closeConnection", &closeConnection).isOK() &&
+            closeConnection;
+        hasErrorCode = data.hasField("errorCode") &&
+            bsonExtractIntegerField(data, "errorCode", &errorCode).isOK();
+
         return shouldActivateFailCommandFailPoint(data, commandName, opCtx->getClient()) &&
-            (data.hasField("closeConnection") || data.hasField("errorCode"));
+            (closeConnection || hasErrorCode);
     }) {
-        bool closeConnection;
-        if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection).isOK() &&
-            closeConnection) {
+        if (closeConnection) {
             opCtx->getClient()->session()->end();
             log() << "Failing command '" << commandName
                   << "' via 'failCommand' failpoint. Action: closing connection.";
             uasserted(50985, "Failing command due to 'failCommand' failpoint");
         }
 
-        long long errorCode;
-        if (bsonExtractIntegerField(data.getData(), "errorCode", &errorCode).isOK()) {
+        if (hasErrorCode) {
             log() << "Failing command '" << commandName
                   << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
                   << ".";

@@ -264,4 +264,26 @@
     assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
     assert.commandWorked(testDB.runCommand({insert: "c", documents: [{}]}));  // Works again.
     assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
+
+    // Test that specifying both writeConcernError and closeConnection : false will not make
+    // `times` decrement twice per operation
+    assert.commandWorked(adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 2},
+        data: {
+            failCommands: ["insert"],
+            closeConnection: false,
+            writeConcernError: {code: 12345, errmsg: "hello"},
+            threadName: threadName,
+        }
+    }));
+
+    var res = testDB.runCommand({insert: "test", documents: [{a: "something"}]});
+    assert.commandWorkedIgnoringWriteConcernErrors(res);
+    assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
+    res = testDB.runCommand({insert: "test", documents: [{a: "something else"}]});
+    assert.commandWorkedIgnoringWriteConcernErrors(res);
+    assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
+    assert.commandWorked(testDB.runCommand({insert: "test", documents: [{b: "or_other"}]}));
+
 }());
