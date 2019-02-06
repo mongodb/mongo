@@ -305,3 +305,10 @@ server_parameters:
     cpp_varname: "internalQueryProhibitBlockingMergeOnMongoS"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  internalQueryAllowShardedLookup:
+    description: "If true, activates the incomplete sharded $lookup feature."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryAllowShardedLookup"
+    cpp_vartype: AtomicWord<bool>
+    default: false

@@ -203,6 +203,13 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
         ? HostTypeRequirement::kNone
         : HostTypeRequirement::kPrimaryShard;
 
+    const bool foreignShardedAllowed =
+        getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
+    if (!foreignShardedAllowed) {
+        // Always run on the primary shard.
+        hostRequirement = HostTypeRequirement::kPrimaryShard;
+    }
+
     StageConstraints constraints(StreamType::kStreaming,
                                  PositionRequirement::kNone,
                                  hostRequirement,

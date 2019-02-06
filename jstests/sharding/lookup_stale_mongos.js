@@ -5,11 +5,17 @@
 (function() {
     "use strict";
 
+    load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+    load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+
     const testName = "lookup_stale_mongos";
     const st = new ShardingTest({
         shards: 2,
         mongos: 2,
     });
+    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(st.s0).concat([st.s1.host]),
+                           "internalQueryAllowShardedLookup",
+                           true);
 
     const mongos0DB = st.s0.getDB(testName);
     assert.commandWorked(mongos0DB.dropDatabase());

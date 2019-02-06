@@ -9,7 +9,9 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/utils.js");  // for arrayEq
+    load("jstests/aggregation/extras/utils.js");                     // for arrayEq
+    load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+    load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
     function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collation) {
         // Test that the $lookup stage respects the inherited collation.
@@ -379,6 +381,9 @@
     }
 
     const st = new ShardingTest({shards: 2, config: 1});
+    setParameterOnAllHosts(
+        DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", true);
+
     const testName = "collation_lookup";
     const caseInsensitive = {collation: {locale: "en_US", strength: 2}};
 

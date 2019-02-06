@@ -3,11 +3,16 @@
 (function() {
     "use strict";
 
-    load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-    load("jstests/libs/fixture_helpers.js");      // For isSharded.
+    load("jstests/aggregation/extras/utils.js");                     // For assertErrorCode.
+    load("jstests/libs/fixture_helpers.js");                         // For isSharded.
+    load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+    load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
     const st = new ShardingTest({shards: 2, config: 1, mongos: 1});
     const testName = "lookup_sharded";
+
+    const nodeList = DiscoverTopology.findNonConfigNodes(st.s);
+    setParameterOnAllHosts(nodeList, "internalQueryAllowShardedLookup", true);
 
     const mongosDB = st.s0.getDB(testName);
     assert.commandWorked(mongosDB.dropDatabase());
@@ -613,6 +618,53 @@
     ]);
 
     assert.eq([{a: 0, same: [{_id: 0, b: 0}]}], outColl.find({}, {_id: 0}).toArray());
+
+    // Disable the server parameter. Be sure that an attempt to run a $lookup on a sharded
+    // collection fails.
+    setParameterOnAllHosts(nodeList, "internalQueryAllowShardedLookup", false);
+
+    // Re shard the foreign collection on _id.
+    st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
+
+    let err = assert.throws(() => sourceColl
+                                      .aggregate([{
+                                          $lookup: {
+                                              localField: "a",
+                                              foreignField: "b",
+                                              from: fromColl.getName(),
+                                              as: "same"
+                                          }
+                                      }])
+                                      .itcount());
+    assert.eq(err.code, 28769);
+    err = assert.throws(() => sourceColl
+                                  .aggregate([{
+                                                $lookup: {
+                                                    localField: "a",
+                                                    foreignField: "b",
+                                                    from: fromColl.getName(),
+                                                    as: "same"
+                                                }
+                                             }],
+                                             {allowDiskUse: true})
+                                  .itcount());
+    assert.eq(err.code, 28769);
+    err = assert.throws(() => sourceColl
+                                  .aggregate(
+                                      [
+                                        {$_internalSplitPipeline: {mergeType: "anyShard"}},
+                                        {
+                                          $lookup: {
+                                              localField: "a",
+                                              foreignField: "b",
+                                              from: fromColl.getName(),
+                                              as: "same"
+                                          }
+                                        }
+                                      ],
+                                      {allowDiskUse: true})
+                                  .itcount());
+    assert.eq(err.code, 28769);
 
     st.stop();
 }());

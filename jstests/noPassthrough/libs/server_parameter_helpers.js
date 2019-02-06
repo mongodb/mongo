@@ -25,6 +25,13 @@ function setParameter(conn, field, value) {
     return conn.adminCommand(cmd);
 }
 
+function setParameterOnAllHosts(hostList, field, value) {
+    for (let host of hostList) {
+        const conn = new Mongo(host);
+        assert.commandWorked(setParameter(conn, field, value));
+    }
+}
+
 /**
  * Helper for validation testing of server parameters with numeric values.
  *

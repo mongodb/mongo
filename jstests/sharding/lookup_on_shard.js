@@ -1,6 +1,13 @@
 // Test that a pipeline with a $lookup stage on a sharded foreign collection may be run on a mongod.
 (function() {
+
+    load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+    load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+
     const sharded = new ShardingTest({mongos: 1, shards: 2});
+
+    setParameterOnAllHosts(
+        DiscoverTopology.findNonConfigNodes(sharded.s), "internalQueryAllowShardedLookup", true);
 
     assert.commandWorked(sharded.s.adminCommand({enableSharding: "test"}));
     sharded.ensurePrimaryShard('test', sharded.shard0.shardName);

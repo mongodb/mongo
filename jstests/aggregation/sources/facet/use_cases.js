@@ -4,6 +4,10 @@
  */
 (function() {
     "use strict";
+
+    load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+    load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+
     const dbName = "test";
     const collName = jsTest.name();
     const testNs = dbName + "." + collName;
@@ -125,6 +129,9 @@
         st.admin.runCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));
 
     // Test $lookup inside a $facet stage on a sharded collection.
+    // Enable sharded $lookup.
+    setParameterOnAllHosts(
+        DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", true);
     assert.commandWorked(unshardedColl.runCommand({
         aggregate: unshardedColl.getName(),
         pipeline: [{
@@ -141,6 +148,9 @@
         }],
         cursor: {}
     }));
+    // Disable sharded $lookup.
+    setParameterOnAllHosts(
+        DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", false);
 
     // Then run the assertions against a sharded collection.
     assert.commandWorked(st.admin.runCommand({enableSharding: dbName}));

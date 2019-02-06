@@ -16,6 +16,8 @@
 (function() {
     load("jstests/libs/profiler.js");         // For profilerHas*OrThrow helper functions.
     load('jstests/libs/geo_near_random.js');  // For GeoNearRandomTest.
+    load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+    load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
     const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 
@@ -287,6 +289,10 @@
             expectedCount: 400
         });
 
+        // Allow sharded $lookup.
+        setParameterOnAllHosts(
+            DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", true);
+
         // Test that $lookup is merged on the primary shard when the foreign collection is
         // unsharded.
         assertMergeOnMongoD({
@@ -325,6 +331,10 @@
             allowDiskUse: allowDiskUse,
             expectedCount: 400
         });
+
+        // Disable sharded $lookup.
+        setParameterOnAllHosts(
+            DiscoverTopology.findNonConfigNodes(st.s), "internalQueryAllowShardedLookup", false);
     }
 
     /**

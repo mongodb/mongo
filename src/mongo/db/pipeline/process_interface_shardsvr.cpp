@@ -45,6 +45,7 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction_participant.h"
@@ -187,8 +188,14 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
     }();
 
     if (isSharded) {
-        // For a sharded collection we may have to establish cursors on a remote host.
-        return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, pipeline.release());
+        const bool foreignShardedAllowed =
+            getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
+        if (foreignShardedAllowed) {
+            // For a sharded collection we may have to establish cursors on a remote host.
+            return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, pipeline.release());
+        }
+
+        uasserted(51069, "Cannot run $lookup with sharded foreign collection");
     }
 
     // Perform a "local read", the same as if we weren't a shard server.

@@ -8,6 +8,9 @@
 (function() {
     "use strict";
 
+    load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
+    load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
+
     // Restarts the primary shard and ensures that it believes both collections are unsharded.
     function restartPrimaryShard(rs, localColl, foreignColl) {
         // Returns true if the shard is aware that the collection is sharded.
@@ -21,6 +24,11 @@
         rs.awaitSecondaryNodes();
         assert(!hasRoutingInfoForNs(rs.getPrimary(), localColl.getFullName()));
         assert(!hasRoutingInfoForNs(rs.getPrimary(), foreignColl.getFullName()));
+
+        // Reset the server parameter allowing sharded $lookup on each node.
+        setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(rs.getPrimary()),
+                               "internalQueryAllowShardedLookup",
+                               true);
     }
 
     const testName = "lookup_stale_mongod";
@@ -29,6 +37,11 @@
         mongos: 2,
         rs: {nodes: 1},
     });
+
+    // Set the parameter allowing sharded $lookup on all nodes.
+    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(st.s0).concat([st.s1.host]),
+                           "internalQueryAllowShardedLookup",
+                           true);
 
     const mongos0DB = st.s0.getDB(testName);
     const mongos0LocalColl = mongos0DB[testName + "_local"];
@@ -43,15 +56,20 @@
           $lookup:
               {localField: "a", foreignField: "b", from: mongos0ForeignColl.getName(), as: "same"}
         },
-        {$sort: {_id: 1}}
+        // Unwind the results of the $lookup, so we can sort by them to get a consistent ordering
+        // for the query results.
+        {$unwind: "$same"},
+        {$sort: {_id: 1, "same._id": 1}}
     ];
 
     // The results are expected to be correct if the $lookup stage is executed on the mongos which
     // is aware that the collection is sharded.
     const expectedResults = [
-        {_id: 0, a: 1, "same": [{_id: 0, b: 1}]},
-        {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
+        {_id: 0, a: 1, "same": {_id: 0, b: 1}},
+        {_id: 1, a: null, "same": {_id: 1, b: null}},
+        {_id: 1, a: null, "same": {_id: 2}},
+        {_id: 2, "same": {_id: 1, b: null}},
+        {_id: 2, "same": {_id: 2}}
     ];
 
     // Ensure that shard0 is the primary shard.
@@ -132,8 +150,11 @@
     // sent to the stale mongos.
     restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
     assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), [
-        {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
+        {_id: 1, a: null, "same": {_id: 1, b: null}},
+        {_id: 1, a: null, "same": {_id: 2}},
+
+        {_id: 2, "same": {_id: 1, b: null}},
+        {_id: 2, "same": {_id: 2}}
     ]);
 
     //
@@ -156,8 +177,10 @@
     // primary shard incorrectly believe that a collection is unsharded.
     restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
     assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), [
-        {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
+        {_id: 1, a: null, "same": {_id: 1, b: null}},
+        {_id: 1, a: null, "same": {_id: 2}},
+        {_id: 2, "same": {_id: 1, b: null}},
+        {_id: 2, "same": {_id: 2}}
     ]);
 
     st.stop();
