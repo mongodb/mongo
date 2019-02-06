@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ "$#" -lt "5" ]; then
     echo "usage:"
@@ -8,6 +8,7 @@ fi
 
 set -o verbose
 set -o errexit
+set -o pipefail
 
 ANDROID_SDK=$1
 shift
@@ -60,8 +61,18 @@ echo "Copying the test to the virtual device"
 $ANDROID_SDK/platform-tools/adb push $DIRECTORY /data
 
 echo "Running the test on the virtual device"
-$ANDROID_SDK/platform-tools/adb shell /data/$(basename $DIRECTORY)/$TEST_PATH_IN_DIRECTORY "$@"
+$ANDROID_SDK/platform-tools/adb shell /data/$(basename $DIRECTORY)/$TEST_PATH_IN_DIRECTORY "$@" | tee android_sim_test_output.txt 2>&1
 
-# Do not add additional statements after the above adb invocation without
+# On the android sim ( possibly on nomral android as well ) if a program fails its runtime link,
+# for example because of a missing library, it will have an exit code of 0. In which case the
+# android_sim_test_output.txt file will not contian the test output, but instead will contain
+# "CANNOT LINK EXECUTABLE"
+# So, once we're here in this script, the previous adb shell test command has either run
+# successfully or failed to link. If it ran with errors, this script would have returned already
+# because of the errexit.
+# We test the output file to disambiguate
+grep -q 'SUCCESS - All tests in all suites passed' android_sim_test_output.txt
+
+# Do not add additional statements after the above command invocation without
 # forwarding its exit status or you will cause failing tests to appear
 # to succeed.
