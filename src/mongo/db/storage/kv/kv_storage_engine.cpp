@@ -504,7 +504,7 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
     for (auto&& temp : internalIdentsToDrop) {
         log() << "Dropping internal ident: " << temp;
         WriteUnitOfWork wuow(opCtx);
-        fassert(51063, _engine->dropIdent(opCtx, temp));
+        fassert(51067, _engine->dropIdent(opCtx, temp));
         wuow.commit();
     }
 

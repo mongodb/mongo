@@ -637,7 +637,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
     WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared);
     auto status =
         txnOpen.setTimestamp(readTimestamp, WiredTigerBeginTxnBlock::RoundToOldest::kRound);
-    fassert(51061, status);
+    fassert(51066, status);
 
     // We might have rounded to oldest between calling getAllCommitted and setTimestamp.  We need to
     // get the actual read timestamp we used.
