@@ -446,7 +446,8 @@ private:
      */
     enum PostMemberStateUpdateAction {
         kActionNone,
-        kActionSteppedDownOrRemoved,
+        kActionSteppedDown,
+        kActionRollbackOrRemoved,
         kActionFollowerModeStateChange,
         kActionStartSingleNodeElection
     };

@@ -2700,7 +2700,8 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));
 
         serverGlobalParams.validateFeaturesAsMaster.store(false);
-        result = kActionSteppedDownOrRemoved;
+        result = (newState.removed() || newState.rollback()) ? kActionRollbackOrRemoved
+                                                             : kActionSteppedDown;
     } else {
         result = kActionFollowerModeStateChange;
     }
@@ -2805,7 +2806,10 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
         case kActionFollowerModeStateChange:
             _onFollowerModeStateChange();
             break;
-        case kActionSteppedDownOrRemoved:
+        case kActionRollbackOrRemoved:
+            _externalState->closeConnections();
+        /* FALLTHROUGH */
+        case kActionSteppedDown:
             if (closeConnectionsOnStepdown.load()) {
                 _externalState->closeConnections();
             }
