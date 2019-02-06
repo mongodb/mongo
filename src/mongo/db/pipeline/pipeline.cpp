@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_out.h"
+#include "mongo/db/pipeline/document_source_out_in_place.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
@@ -158,7 +159,9 @@ void Pipeline::validateTopLevelPipeline() const {
             uasserted(ErrorCodes::InvalidNamespace,
                       "{aggregate: 1} is not valid for an empty pipeline.");
         }
-    } else if ("$mergeCursors"_sd != _sources.front()->getSourceName()) {
+        return;
+    }
+    if ("$mergeCursors"_sd != _sources.front()->getSourceName()) {
         // The $mergeCursors stage can take {aggregate: 1} or a normal namespace. Aside from this,
         // {aggregate: 1} is only valid for collectionless sources, and vice-versa.
         const auto firstStageConstraints = _sources.front()->constraints(_splitState);
@@ -188,6 +191,21 @@ void Pipeline::validateTopLevelPipeline() const {
                         source->constraints(_splitState).isAllowedInChangeStream());
             }
         }
+    }
+    // Make sure we aren't reading and writing to the same namespace for an $out. This is
+    // allowed for mode "replaceCollection", but not for the in-place modes.
+    if (auto outStage = dynamic_cast<DocumentSourceOutInPlace*>(_sources.back().get())) {
+        const auto& outNss = outStage->getOutputNs();
+        stdx::unordered_set<NamespaceString> collectionNames;
+        // In order to gather only the involved namespaces which we are reading to, not the one we
+        // are writing from, skip the final stage as we know it is an $out stage.
+        for (auto it = _sources.begin(); it != std::prev(_sources.end()); it++) {
+            (*it)->addInvolvedCollections(&collectionNames);
+        }
+        uassert(51079,
+                "Cannot use $out to write to the same namespace being read from elsewhere in the "
+                "pipeline unless $out's mode is \"replaceCollection\"",
+                collectionNames.find(outNss) == collectionNames.end());
     }
 }
 
@@ -412,12 +430,12 @@ bool Pipeline::requiredToRunOnMongos() const {
     return false;
 }
 
-std::vector<NamespaceString> Pipeline::getInvolvedCollections() const {
-    std::vector<NamespaceString> collections;
+stdx::unordered_set<NamespaceString> Pipeline::getInvolvedCollections() const {
+    stdx::unordered_set<NamespaceString> collectionNames;
     for (auto&& source : _sources) {
-        source->addInvolvedCollections(&collections);
+        source->addInvolvedCollections(&collectionNames);
     }
-    return collections;
+    return collectionNames;
 }
 
 vector<Value> Pipeline::serialize() const {

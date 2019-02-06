@@ -298,9 +298,12 @@ public:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
 
     /**
-     * If DocumentSource uses additional collections, it adds the namespaces to the input vector.
+     * If this stage uses additional namespaces, adds them to 'collectionNames'. These namespaces
+     * should all be names of collections, not views.
      */
-    virtual void addInvolvedCollections(std::vector<NamespaceString>* collections) const {}
+    virtual void addInvolvedCollections(
+        stdx::unordered_set<NamespaceString>* collectionNames) const {}
+
 
     virtual void detachFromOperationContext() {}
 

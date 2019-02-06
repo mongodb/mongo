@@ -135,7 +135,7 @@ public:
     }
 
     // The following are overridden just to forward calls to sub-pipelines.
-    void addInvolvedCollections(std::vector<NamespaceString>* collections) const final;
+    void addInvolvedCollections(stdx::unordered_set<NamespaceString>* involvedNssSet) const final;
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;

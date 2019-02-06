@@ -295,11 +295,11 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
 Status collatorCompatibleWithPipeline(OperationContext* opCtx,
                                       Database* db,
                                       const CollatorInterface* collator,
-                                      const Pipeline* pipeline) {
-    if (!db || !pipeline) {
+                                      const LiteParsedPipeline& liteParsedPipeline) {
+    if (!db) {
         return Status::OK();
     }
-    for (auto&& potentialViewNs : pipeline->getInvolvedCollections()) {
+    for (auto&& potentialViewNs : liteParsedPipeline.getInvolvedNamespaces()) {
         if (db->getCollection(opCtx, potentialViewNs)) {
             continue;
         }
@@ -538,7 +538,7 @@ Status runAggregate(OperationContext* opCtx,
         if (!pipelineInvolvedNamespaces.empty()) {
             invariant(ctx);
             auto pipelineCollationStatus = collatorCompatibleWithPipeline(
-                opCtx, ctx->getDb(), expCtx->getCollator(), pipeline.get());
+                opCtx, ctx->getDb(), expCtx->getCollator(), liteParsedPipeline);
             if (!pipelineCollationStatus.isOK()) {
                 return pipelineCollationStatus;
             }

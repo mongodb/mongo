@@ -83,9 +83,7 @@ public:
         return DepsTracker::State::SEE_NEXT;
     };
 
-    void addInvolvedCollections(std::vector<NamespaceString>* collections) const final {
-        collections->push_back(_from);
-    }
+    void addInvolvedCollections(stdx::unordered_set<NamespaceString>* collectionNames) const final;
 
     void detachFromOperationContext() final;
 

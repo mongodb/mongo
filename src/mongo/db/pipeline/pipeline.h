@@ -233,9 +233,10 @@ public:
 
     /**
      * Returns any other collections involved in the pipeline in addition to the collection the
-     * aggregation is run on.
+     * aggregation is run on. All namespaces returned are the names of collections, after views have
+     * been resolved.
      */
-    std::vector<NamespaceString> getInvolvedCollections() const;
+    stdx::unordered_set<NamespaceString> getInvolvedCollections() const;
 
     /**
      * Serializes the pipeline into a form that can be parsed into an equivalent pipeline.

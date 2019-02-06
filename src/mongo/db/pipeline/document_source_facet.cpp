@@ -208,10 +208,11 @@ Value DocumentSourceFacet::serialize(boost::optional<ExplainOptions::Verbosity> 
     return Value(Document{{"$facet", serialized.freezeToValue()}});
 }
 
-void DocumentSourceFacet::addInvolvedCollections(vector<NamespaceString>* collections) const {
+void DocumentSourceFacet::addInvolvedCollections(
+    stdx::unordered_set<NamespaceString>* collectionNames) const {
     for (auto&& facet : _facets) {
         for (auto&& source : facet.pipeline->getSources()) {
-            source->addInvolvedCollections(collections);
+            source->addInvolvedCollections(collectionNames);
         }
     }
 }
