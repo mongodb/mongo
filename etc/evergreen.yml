@@ -314,7 +314,7 @@ variables:
   - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation_wildcard_fuzzer_gen
   - name: audit
-  - name: auth_audit
+  - name: auth_audit_gen
   - name: benchmarks_orphaned
   - name: benchmarks_sharding
   - name: buildscripts_test
@@ -334,18 +334,18 @@ variables:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_default_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
   - name: sasl
@@ -353,8 +353,8 @@ variables:
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
 
 - &stitch_support_task_group_template
   name: stitch_support_task_group_template
@@ -5206,14 +5206,6 @@ tasks:
     vars:
       resmoke_args: --suites=audit --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: auth
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=auth --storageEngine=wiredTiger
-
 - name: auth_gen
   commands:
   - func: "generate resmoke tasks"
@@ -5221,14 +5213,6 @@ tasks:
       task: auth
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 4
-
-- <<: *task_template
-  name: auth_audit
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=auth_audit --storageEngine=wiredTiger
 
 - name: auth_audit_gen
   commands:
@@ -5598,14 +5582,6 @@ tasks:
     vars:
       resmoke_args: --suites=causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: sharded_causally_consistent_jscore_txns_passthrough
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharded_causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
-
 - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   commands:
   - func: "generate resmoke tasks"
@@ -5653,16 +5629,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
-
-- <<: *task_template
-  name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=replica_sets_multi_stmt_txn_stepdown_jscore_passthrough --storageEngine=wiredTiger
 
 - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
   depends_on:
@@ -5774,14 +5740,6 @@ tasks:
       task_path_suffix: /data/multiversion
       resmoke_args: --suites=multiversion --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: noPassthrough
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=no_passthrough --storageEngine=wiredTiger
-
 - name: noPassthrough_gen
   commands:
   - func: "generate resmoke tasks"
@@ -5790,14 +5748,6 @@ tasks:
       suite: no_passthrough
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 11
-
-- <<: *task_template
-  name: noPassthroughWithMongod
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=no_passthrough_with_mongod --storageEngine=wiredTiger
 
 - name: noPassthroughWithMongod_gen
   commands:
@@ -5815,15 +5765,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=bulk_gle_passthrough --storageEngine=wiredTiger
-
-- <<: *task_template
-  name: slow1
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=slow1 --storageEngine=wiredTiger
-      resmoke_jobs_max: 1
 
 - name: slow1_gen
   commands:
@@ -5873,16 +5814,6 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_jscore_op_query_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: sharding_jscore_passthrough_wire_ops
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility --excludeWithAnyTags=requires_find_command
-
 - name: sharding_jscore_passthrough_wire_ops_gen
   depends_on:
   - name: jsCore
@@ -5905,17 +5836,6 @@ tasks:
     vars:
       resmoke_args: --suites=sharded_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: multi_shard_multi_stmt_txn_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=multi_shard_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
-      resmoke_jobs_max: 0  # No cap on number of jobs.
-
 - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -5929,16 +5849,6 @@ tasks:
       fallback_num_sub_suites: 28
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
-- <<: *task_template
-  name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough --storageEngine=wiredTiger
-
 - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -5949,16 +5859,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 4
-
-- <<: *task_template
-  name: multi_stmt_txn_jscore_passthrough_with_migration
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=multi_stmt_txn_jscore_passthrough_with_migration --storageEngine=wiredTiger
 
 - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   depends_on:
@@ -5971,17 +5871,6 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 19
-
-- <<: *task_template
-  name: parallel
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=parallel --storageEngine=wiredTiger
-      resmoke_jobs_max: 1
 
 - name: parallel_gen
   depends_on:
@@ -6105,15 +5994,6 @@ tasks:
       resmoke_args: --suites=concurrency_sharded_replication_with_balancer --excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_sharded_causal_consistency
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=concurrency_sharded_causal_consistency --storageEngine=wiredTiger
-      resmoke_jobs_max: 1
-
 - name: concurrency_sharded_causal_consistency_gen
   commands:
   - func: "generate resmoke tasks"
@@ -6121,6 +6001,7 @@ tasks:
       task: concurrency_sharded_causal_consistency
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 3
+      use_large_distro: "true"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -6214,16 +6095,6 @@ tasks:
     vars:
       resmoke_args: --suites=read_concern_linearizable_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: read_concern_majority_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=read_concern_majority_passthrough --storageEngine=wiredTiger
-
 - name: read_concern_majority_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6246,16 +6117,6 @@ tasks:
     vars:
       resmoke_args: --suites=write_concern_majority_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: secondary_reads_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=secondary_reads_passthrough --storageEngine=wiredTiger
-
 - name: secondary_reads_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6276,14 +6137,6 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: replica_sets_ese
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=replica_sets_ese --storageEngine=wiredTiger
-
 - name: replica_sets_ese_gen
   commands:
   - func: "generate resmoke tasks"
@@ -6292,14 +6145,6 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
-
-- <<: *task_template
-  name: replica_sets_auth
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=replica_sets_auth --storageEngine=wiredTiger
 
 - name: replica_sets_auth_gen
   commands:
@@ -6327,22 +6172,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 15
 
-- <<: *task_template
-  name: sharding
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding --storageEngine=wiredTiger
-
-- <<: *task_template
-  name: sharding_csrs_continuous_config_stepdown
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_continuous_config_stepdown --storageEngine=wiredTiger
-
 - name: sharding_csrs_continuous_config_stepdown_gen
   commands:
   - func: "generate resmoke tasks"
@@ -6353,14 +6182,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 22
 
-- <<: *task_template
-  name: sharding_ese
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_ese --storageEngine=wiredTiger
-
 - name: sharding_ese_gen
   commands:
   - func: "generate resmoke tasks"
@@ -6369,14 +6190,6 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 21
-
-- <<: *task_template
-  name: sharding_op_query
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
 
 - name: sharding_op_query_gen
   commands:
@@ -6388,14 +6201,6 @@ tasks:
       resmoke_args: --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       fallback_num_sub_suites: 12
 
-- <<: *task_template
-  name: sharding_auth
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_auth --storageEngine=wiredTiger
-
 - name: sharding_auth_gen
   commands:
   - func: "generate resmoke tasks"
@@ -6404,16 +6209,6 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 20
-
-- <<: *task_template
-  name: sharding_auth_audit
-  depends_on:
-  - name: sharding_auth
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharding_auth_audit --storageEngine=wiredTiger
 
 - name: sharding_auth_audit_gen
   depends_on:
@@ -6427,21 +6222,12 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 20
 
-- <<: *task_template
-  name: sharding_last_stable_mongos_and_mixed_shards
-  commands:
-  - func: "do setup"
-  - func: "do multiversion setup"
-  - func: "run tests"
-    vars:
-      task_path_suffix: /data/multiversion
-      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards
-
 - name: sharding_last_stable_mongos_and_mixed_shards_gen
   commands:
   - func: "generate resmoke tasks"
     vars:
       task: sharding_last_stable_mongos_and_mixed_shards
+      use_large_distro: "true"
       use_multiversion: /data/multiversion
       resmoke_args: ""
       fallback_num_sub_suites: 12
@@ -6456,28 +6242,6 @@ tasks:
       snmp_config_path: SNMPCONFPATH=snmpconf
       resmoke_args: --suites=snmp --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: ssl
-  commands:
-  - func: "do setup"
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        ${activate_virtualenv}
-        if [ "Windows_NT" = "$OS" ]; then
-          /cygdrive/c/python/python36/python.exe -m pip install -r etc/pip/evgtest-requirements.txt
-        else
-          python3 -m pip install -r etc/pip/evgtest-requirements.txt
-        fi
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=ssl --storageEngine=wiredTiger
-
 - name: ssl_gen
   commands:
   - func: "generate resmoke tasks"
@@ -6485,14 +6249,6 @@ tasks:
       task: ssl
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
-
-- <<: *task_template
-  name: sslSpecial
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=ssl_special --storageEngine=wiredTiger
 
 - name: sslSpecial_gen
   commands:
@@ -6545,16 +6301,6 @@ tasks:
     vars:
       resmoke_args: --suites=session_jscore_passthrough --storageEngine=wiredTiger
 
-- <<: *task_template
-  name: causally_consistent_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=causally_consistent_jscore_passthrough --storageEngine=wiredTiger
-
 - name: causally_consistent_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6565,16 +6311,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 6
-
-- <<: *task_template
-  name: causally_consistent_jscore_passthrough_auth
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=causally_consistent_jscore_passthrough_auth --storageEngine=wiredTiger
 
 - name: causally_consistent_jscore_passthrough_auth_gen
   depends_on:
@@ -6587,16 +6323,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
 
-- <<: *task_template
-  name: sharded_causally_consistent_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=sharded_causally_consistent_jscore_passthrough --storageEngine=wiredTiger
-
 - name: sharded_causally_consistent_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6607,16 +6333,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 6
-
-- <<: *task_template
-  name: retryable_writes_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=retryable_writes_jscore_passthrough --storageEngine=wiredTiger
 
 - name: retryable_writes_jscore_passthrough_gen
   depends_on:
@@ -6630,16 +6346,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 8
 
-- <<: *task_template
-  name: logical_session_cache_replication_default_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_replication_default_refresh_jscore_passthrough --storageEngine=wiredTiger
-
 - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6650,16 +6356,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
-
-- <<: *task_template
-  name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_replication_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
 
 - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
   depends_on:
@@ -6672,16 +6368,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 8
 
-- <<: *task_template
-  name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_replication_1sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-
 - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6692,16 +6378,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
-
-- <<: *task_template
-  name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_replication_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
 
 - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
   depends_on:
@@ -6714,16 +6390,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
 
-- <<: *task_template
-  name: logical_session_cache_sharding_default_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_sharding_default_refresh_jscore_passthrough --storageEngine=wiredTiger
-
 - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6734,16 +6400,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
-
-- <<: *task_template
-  name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_sharding_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
 
 - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
   depends_on:
@@ -6756,16 +6412,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
 
-- <<: *task_template
-  name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_sharding_1sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-
 - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6776,16 +6422,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 3
-
-- <<: *task_template
-  name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_sharding_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
 
 - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
   depends_on:
@@ -6798,16 +6434,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
 
-- <<: *task_template
-  name: logical_session_cache_standalone_default_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_standalone_default_refresh_jscore_passthrough --storageEngine=wiredTiger
-
 - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6818,16 +6444,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
-
-- <<: *task_template
-  name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_standalone_100ms_refresh_jscore_passthrough --storageEngine=wiredTiger
 
 - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
   depends_on:
@@ -6840,16 +6456,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
 
-- <<: *task_template
-  name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_standalone_1sec_refresh_jscore_passthrough --storageEngine=wiredTiger
-
 - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   depends_on:
   - name: jsCore
@@ -6860,16 +6466,6 @@ tasks:
       depends_on: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 3
-
-- <<: *task_template
-  name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=logical_session_cache_standalone_10sec_refresh_jscore_passthrough --storageEngine=wiredTiger
 
 - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
   depends_on:
@@ -7926,22 +7522,22 @@ buildvariants:
   - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
   - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
+  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough
+  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
   - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
+  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
+  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   - name: mongosTest
   - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
   - name: read_concern_majority_passthrough_gen
@@ -8020,7 +7616,7 @@ buildvariants:
     - rhel62-large
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_simultaneous
@@ -8039,13 +7635,13 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: serial_run
   - name: sharding_jscore_passthrough
-  - name: slow1
+  - name: slow1_gen
   - name: tool
 
 - name: linux-64-lsm
@@ -8099,7 +7695,7 @@ buildvariants:
     - ubuntu1404-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -8126,10 +7722,10 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -8144,11 +7740,11 @@ buildvariants:
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: powercycle
   - name: powercycle_fcv4.0
@@ -8157,18 +7753,18 @@ buildvariants:
   - name: powercycle_replication_smalloplog
   - name: powercycle_syncdelay
   - name: powercycle_write_concern_majority
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -8208,7 +7804,7 @@ buildvariants:
     - ubuntu1804-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -8234,10 +7830,10 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -8253,23 +7849,23 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -8323,16 +7919,16 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: replica_sets_auth
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharding_auth
+  - name: sharding_auth_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: watchdog_inmemory
   - name: watchdog_wiredtiger
   - name: package
@@ -8372,7 +7968,7 @@ buildvariants:
     - ubuntu1604-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -8414,10 +8010,10 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -8433,26 +8029,26 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: tool
   - name: package
     distros:
@@ -8491,7 +8087,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -8514,10 +8110,10 @@ buildvariants:
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -8531,23 +8127,23 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -8626,7 +8222,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -8648,10 +8244,10 @@ buildvariants:
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -8665,23 +8261,23 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -8762,7 +8358,7 @@ buildvariants:
     - ubuntu1604-power8-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
@@ -8785,10 +8381,10 @@ buildvariants:
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -8802,23 +8398,23 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -8867,8 +8463,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -8905,42 +8501,42 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
-  - name: sharding_csrs_continuous_config_stepdown
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -8983,7 +8579,7 @@ buildvariants:
     - ubuntu1804-zseries-build
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: ssl
+  - name: ssl_gen
   - name: publish_packages
     distros:
     - ubuntu1804-test
@@ -9030,8 +8626,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -9064,42 +8660,42 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
-  - name: sharding_csrs_continuous_config_stepdown
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: tool
   - name: write_concern_majority_passthrough
   - name: publish_packages
@@ -9141,8 +8737,8 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: ese
   - name: failpoints_auth
   - name: jsCore
@@ -9159,33 +8755,33 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: replica_sets_auth
-  - name: replica_sets_ese
+  - name: replica_sets_auth_gen
+  - name: replica_sets_ese_gen
   - name: replica_sets_jscore_passthrough
   - name: powercycle
   - name: sasl
-  - name: sharding_auth
-  - name: sharding_auth_audit
-  - name: sharding_ese
-  - name: slow1
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_ese_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_jscore_passthrough_wire_ops_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: package
@@ -9225,7 +8821,7 @@ buildvariants:
     - linux-64-amzn-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -9252,10 +8848,10 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -9271,27 +8867,27 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: ssl
-  - name: sslSpecial
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -9337,8 +8933,8 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: ese
   - name: failpoints_auth
   - name: jsCore
@@ -9355,32 +8951,32 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: replica_sets_auth
-  - name: replica_sets_ese
+  - name: replica_sets_auth_gen
+  - name: replica_sets_ese_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharding_auth
-  - name: sharding_auth_audit
-  - name: sharding_ese
-  - name: slow1
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_ese_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_jscore_passthrough_wire_ops_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: package
@@ -9424,7 +9020,7 @@ buildvariants:
     - amazon2-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -9451,10 +9047,10 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -9470,27 +9066,27 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: ssl
-  - name: sslSpecial
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -9524,6 +9120,7 @@ buildvariants:
     multiversion_edition: enterprise
     tooltags: ""
     build_mongoreplay: false
+    large_distro_name: windows-64-vs2017-compile
   display_tasks:
   - *dbtest
   - *unittests
@@ -9538,10 +9135,10 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: aggregation_expression_multiversion_fuzzer_gen
-  - name: auth
-  - name: causally_consistent_jscore_passthrough
-  - name: causally_consistent_jscore_passthrough_auth
-  - name: sharded_causally_consistent_jscore_passthrough
+  - name: auth_gen
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: change_streams
   - name: change_streams_mongos_passthrough
   - name: change_streams_mongos_sessions_passthrough
@@ -9564,19 +9161,19 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: multi_shard_multi_stmt_txn_jscore_passthrough
-  - name: multi_stmt_txn_jscore_passthrough_with_migration
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: rollback_fuzzer_gen
   - name: rollback_fuzzer_clean_shutdowns_gen
   - name: rollback_fuzzer_unclean_shutdowns_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
     # Some concurrency workloads require a lot of memory, so we use machines
     # with more RAM for these suites.
@@ -9610,9 +9207,7 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
     distros:
     - windows-64-vs2017-compile
-  - name: concurrency_sharded_causal_consistency
-    distros:
-    - windows-64-vs2017-compile
+  - name: concurrency_sharded_causal_consistency_gen
   - name: concurrency_sharded_causal_consistency_and_balancer
     distros:
     - windows-64-vs2017-compile
@@ -9631,9 +9226,7 @@ buildvariants:
   - name: read_concern_linearizable_passthrough
     distros:
     - windows-64-vs2017-compile
-  - name: read_concern_majority_passthrough
-    distros:
-    - windows-64-vs2017-compile
+  - name: read_concern_majority_passthrough_gen
   - name: read_only
   - name: read_only_sharded
   - name: replica_sets
@@ -9651,9 +9244,7 @@ buildvariants:
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
     distros:
     - windows-64-vs2017-compile
-  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough
-    distros:
-    - windows-64-vs2017-compile
+  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
   - name: replica_sets_kill_primary_jscore_passthrough
     distros:
     - windows-64-vs2017-compile
@@ -9663,16 +9254,12 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough
     distros:
     - windows-64-vs2017-compile
-  - name: retryable_writes_jscore_passthrough
-    distros:
-    - windows-64-vs2017-compile
+  - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
     - windows-64-vs2017-compile
   - name: session_jscore_passthrough
-  - name: sharding
-    distros:
-    - windows-64-vs2017-compile
+  - name: sharding_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -9835,7 +9422,7 @@ buildvariants:
     - windows-64-vs2017-compile
   - name: jsCore
   - name: replica_sets
-  - name: sharding
+  - name: sharding_gen
 
 - name: enterprise-windows-64-2k8-inmem
   display_name: Enterprise Windows 2008R2 (inMemory)
@@ -9862,6 +9449,7 @@ buildvariants:
     multiversion_edition: enterprise
     tooltags: "ssl sasl"
     build_mongoreplay: false
+    large_distro_name: windows-64-vs2017-compile
   display_tasks:
   - *dbtest
   - *unittests
@@ -9870,7 +9458,7 @@ buildvariants:
     distros:
     - windows-64-vs2017-compile
   - name: audit
-  - name: auth_audit
+  - name: auth_audit_gen
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
@@ -9897,26 +9485,22 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: read_concern_linearizable_passthrough
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding_auth
-    distros:
-    - windows-64-vs2017-compile
-  - name: sharding_auth_audit
-    distros:
-    - windows-64-vs2017-compile
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
 
 - name: windows-64-2k8-ssl
   display_name: Windows 2008R2
@@ -9943,6 +9527,7 @@ buildvariants:
     use_scons_cache: true
     tooltags: "ssl"
     build_mongoreplay: false
+    large_distro_name: windows-64-vs2017-compile
   display_tasks:
   - *dbtest
   - *unittests
@@ -9955,7 +9540,7 @@ buildvariants:
   - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
-  - name: auth
+  - name: auth_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -9997,15 +9582,15 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency_gen
   - name: jstestfuzz_sharded_continuous_stepdown_gen
   - name: jstestfuzz_sharded_session_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
   - name: multiversion
   - name: multiversion_auth
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: powercycle
   - name: powercycle_fcv4.0
@@ -10013,29 +9598,25 @@ buildvariants:
   - name: powercycle_replication
   - name: powercycle_syncdelay
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
   - name: replica_sets_jscore_passthrough
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-    distros:
-    - windows-64-vs2017-compile
+  - name: sharding_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_last_stable_mongos_and_mixed_shards
-    distros:
-    - windows-64-vs2017-compile
-  - name: slow1
-  - name: ssl
-  - name: sslSpecial
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: slow1_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -10107,11 +9688,11 @@ buildvariants:
   - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
-  - name: auth
+  - name: auth_gen
   - name: bulk_gle_passthrough
-  - name: causally_consistent_jscore_passthrough
-  - name: causally_consistent_jscore_passthrough_auth
-  - name: sharded_causally_consistent_jscore_passthrough
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: change_streams
   - name: change_streams_mongos_passthrough
   - name: change_streams_mongos_sessions_passthrough
@@ -10132,7 +9713,7 @@ buildvariants:
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_gen
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
@@ -10164,25 +9745,25 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: jstestfuzz_sharded_causal_consistency_gen
   - name: jstestfuzz_sharded_session_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: retryable_writes_jscore_passthrough
+  - name: retryable_writes_jscore_passthrough_gen
   - name: rollback_fuzzer_gen
   - name: rollback_fuzzer_clean_shutdowns_gen
   - name: rollback_fuzzer_unclean_shutdowns_gen
   - name: serial_run
   - name: session_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
@@ -10191,10 +9772,10 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: slow1
-  - name: ssl
-  - name: sslSpecial
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: slow1_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -10219,7 +9800,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: jsCore
@@ -10229,8 +9810,8 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: replica_sets
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -10259,7 +9840,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
   - name: audit
-  - name: auth_audit
+  - name: auth_audit_gen
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -10271,14 +9852,14 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: replica_sets_auth
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: push
     distros:
     - rhel70-small
@@ -10310,7 +9891,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
   - name: audit
-  - name: auth_audit
+  - name: auth_audit_gen
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -10322,10 +9903,10 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: sasl
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
 
 
 ###########################################
@@ -10907,14 +10488,14 @@ buildvariants:
   - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
+  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
+  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
-  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
+  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   - name: mongosTest
   - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
@@ -10923,7 +10504,7 @@ buildvariants:
   - name: multiversion
   - name: noPassthroughWithMongod_gen
   - name: noPassthrough_gen
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
     distros:
@@ -11046,8 +10627,8 @@ buildvariants:
   - name: aggregation_one_shard_sharded_collections
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: buildscripts_test
   - name: bulk_gle_passthrough
   - name: change_streams
@@ -11063,9 +10644,9 @@ buildvariants:
   - name: change_streams_whole_cluster_mongos_passthrough
   - name: change_streams_whole_cluster_secondary_reads_passthrough
   - name: change_streams_whole_cluster_sharded_collections_passthrough
-  - name: causally_consistent_jscore_passthrough
-  - name: causally_consistent_jscore_passthrough_auth
-  - name: sharded_causally_consistent_jscore_passthrough
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
@@ -11074,7 +10655,7 @@ buildvariants:
   - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication_no_txns
   - name: concurrency_sharded_replication_no_txns_with_balancer
-  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_gen
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
@@ -11119,14 +10700,14 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency_gen
   - name: jstestfuzz_sharded_continuous_stepdown_gen
   - name: jstestfuzz_sharded_session_gen
-  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_default_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
   - name: multiversion
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
     distros:
@@ -11153,13 +10734,11 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough
     distros:
     - rhel62-large
-  - name: retryable_writes_jscore_passthrough
-    distros:
-    - rhel62-large
+  - name: retryable_writes_jscore_passthrough_gen
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_jscore_txns
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding_gen
@@ -11170,26 +10749,22 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_jscore_passthrough_wire_ops_gen
   - name: sharding_last_stable_mongos_and_mixed_shards_gen
-  - name: sharding_csrs_continuous_config_stepdown
-    distros:
-    - rhel62-large
+  - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharding_op_query_gen
-  - name: slow1
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: tool
   - name: update_fuzzer_gen
   - name: update_fuzzer_replication_gen
   - name: write_concern_majority_passthrough
     distros:
     - rhel62-large
-  - name: secondary_reads_passthrough
-    distros:
-    - rhel62-large
+  - name: secondary_reads_passthrough_gen
 
 - name: enterprise-rhel-62-64-bit-required-majority-read-concern-off
   display_name: "! Enterprise RHEL 6.2 (majority read concern off)"
@@ -11253,8 +10828,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: change_streams
   - name: change_streams_mongos_passthrough
@@ -11279,7 +10854,7 @@ buildvariants:
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_gen
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
@@ -11305,63 +10880,63 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
-  - name: multi_shard_multi_stmt_txn_jscore_passthrough
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: read_only
   - name: read_only_sharded
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
-  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
   - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: retryable_writes_jscore_passthrough
+  - name: retryable_writes_jscore_passthrough_gen
   - name: sasl
   - name: session_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: sharding_op_query
-  - name: sharding_csrs_continuous_config_stepdown
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: sharding_op_query_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: update_fuzzer_gen
   - name: update_fuzzer_replication_gen
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
 
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
@@ -11395,8 +10970,8 @@ buildvariants:
     distros:
     - rhel70
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: benchmarks_orphaned
   - name: benchmarks_sharding
   - name: ese
@@ -11413,18 +10988,18 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: external_auth
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharding_auth
-  - name: sharding_auth_audit
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: package
@@ -11455,20 +11030,16 @@ buildvariants:
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
   batchtime: 1440 # 1 day
+  runs_on:
+  - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl --use-cpu-profiler MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
     has_packages: false
   tasks:
   - name: compile_all_run_unittests_TG
-    distros:
-    - rhel70
   - name: jsCore
-    distros:
-    - rhel70
-  - name: noPassthrough
-    distros:
-    - rhel70
+  - name: noPassthrough_gen
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
@@ -11486,11 +11057,11 @@ buildvariants:
     - ubuntu1604-build
   - name: jsCore
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
+  - name: sharding_gen
+  - name: sharding_auth_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
 
@@ -11524,7 +11095,7 @@ buildvariants:
     - rhel62-large
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -11549,24 +11120,24 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_default_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -11582,24 +11153,24 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: ssl
-  - name: sslSpecial
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: tool
   - name: package
     distros:
@@ -11637,7 +11208,7 @@ buildvariants:
     - rhel70
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -11660,15 +11231,15 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
     distros:
@@ -11707,20 +11278,20 @@ buildvariants:
     distros:
     - rhel70
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_auth
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: slow1_gen
   - name: serial_run
   - name: sharding_jscore_passthrough
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: ssl
-  - name: sslSpecial
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -11769,8 +11340,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -11809,47 +11380,47 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
-  - name: sharding_csrs_continuous_config_stepdown
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
   - name: publish_packages
     distros:
     - rhel70-small
@@ -11895,8 +11466,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -11933,47 +11504,47 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
-  - name: sharding_csrs_continuous_config_stepdown
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
   - name: publish_packages
     distros:
     - rhel70-small
@@ -12015,8 +11586,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -12048,47 +11619,47 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
-  - name: sharding_csrs_continuous_config_stepdown
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
   - name: publish_packages
     distros:
     - rhel62-large
@@ -12123,7 +11694,7 @@ buildvariants:
     - rhel72-zseries-build
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: ssl
+  - name: ssl_gen
   - name: publish_packages
     distros:
     - rhel70
@@ -12158,7 +11729,7 @@ buildvariants:
     - rhel67-zseries-build
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: ssl
+  - name: ssl_gen
   - name: publish_packages
     distros:
     - rhel62-large
@@ -12212,16 +11783,16 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: replica_sets_auth
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharding_auth
+  - name: sharding_auth_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: package
     distros:
     - ubuntu1604-packer
@@ -12287,16 +11858,16 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: replica_sets_auth
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharding_auth
+  - name: sharding_auth_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: watchdog_inmemory
@@ -12396,16 +11967,16 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: replica_sets_auth
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharding_auth
+  - name: sharding_auth_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: package
@@ -12452,8 +12023,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -12490,47 +12061,47 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
-  - name: sharding_csrs_continuous_config_stepdown
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
   - name: publish_packages
     distros:
     - suse12-test
@@ -12569,7 +12140,7 @@ buildvariants:
     - suse12-zseries-build
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-  - name: ssl
+  - name: ssl_gen
   - name: publish_packages
     distros:
     - suse12-test
@@ -12608,7 +12179,7 @@ buildvariants:
     - suse12-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -12634,10 +12205,10 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -12653,24 +12224,24 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -12726,16 +12297,16 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: replica_sets_auth
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharding_auth
+  - name: sharding_auth_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: package
@@ -12774,7 +12345,7 @@ buildvariants:
     - debian81-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -12800,10 +12371,10 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -12819,23 +12390,23 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: slow1_gen
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: ssl
-  - name: sslSpecial
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -12890,16 +12461,16 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: replica_sets_auth
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharding_auth
+  - name: sharding_auth_gen
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: package
@@ -12941,7 +12512,7 @@ buildvariants:
     - debian92-build
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
@@ -12967,10 +12538,10 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: mongosTest
   - name: multiversion
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
@@ -12986,27 +12557,27 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_replication
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: ssl
-  - name: sslSpecial
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
@@ -13056,6 +12627,7 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl sasl"
     build_mongoreplay: true
+    large_distro_name: rhel62-large
   display_tasks:
   - *dbtest
   - *unittests
@@ -13070,12 +12642,12 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
-  - name: causally_consistent_jscore_passthrough
-  - name: causally_consistent_jscore_passthrough_auth
-  - name: sharded_causally_consistent_jscore_passthrough
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: change_streams
   - name: change_streams_mongos_passthrough
   - name: change_streams_mongos_sessions_passthrough
@@ -13101,9 +12673,7 @@ buildvariants:
   - name: concurrency_sharded_replication_with_balancer
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
-  - name: concurrency_sharded_causal_consistency
-    distros:
-    - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: concurrency_sharded_causal_consistency_gen
   - name: concurrency_sharded_causal_consistency_and_balancer
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
@@ -13152,59 +12722,57 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: jstestfuzz_sharded_session_gen
   - name: jstestfuzz_sharded_causal_consistency_gen
-  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_default_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
-  - name: retryable_writes_jscore_passthrough
+  - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
   - name: rollback_fuzzer_gen
   - name: sasl
   - name: session_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharded_collections_jscore_passthrough
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_auth_audit
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: tool
   - name: update_fuzzer_gen
   - name: update_fuzzer_replication_gen
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
-    distros:
-    - rhel62-large
+  - name: secondary_reads_passthrough_gen
 
 - name: enterprise-rhel-62-64-bit-required-inmem
   display_name: "! Enterprise RHEL 6.2 (inMemory)"
@@ -13273,7 +12841,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
-  - name: auth
+  - name: auth_gen
   - name: concurrency
   - name: benchrun_embedded_aggregation
     distros:
@@ -13314,8 +12882,8 @@ buildvariants:
   - name: jsonSchema
   - name: jstestfuzz_gen
   - name: jstestfuzz_concurrent_gen
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: powercycle_mobile
   - name: serial_run
   - name: session_jscore_passthrough
@@ -13350,7 +12918,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
-  - name: auth
+  - name: auth_gen
   - name: concurrency
   - name: disk_mobile
   - name: failpoints
@@ -13366,8 +12934,8 @@ buildvariants:
   - name: jsonSchema
   - name: jstestfuzz_gen
   - name: jstestfuzz_concurrent_gen
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: serial_run
   - name: session_jscore_passthrough
 
@@ -13428,7 +12996,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
-  - name: auth
+  - name: auth_gen
   - name: concurrency
   - name: disk_mobile
   - name: failpoints
@@ -13444,8 +13012,8 @@ buildvariants:
   - name: jsonSchema
   - name: jstestfuzz_gen
   - name: jstestfuzz_concurrent_gen
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: serial_run
   - name: session_jscore_passthrough
 
@@ -13471,7 +13039,7 @@ buildvariants:
     - rhel62-large
   - name: aggregation
   - name: aggregation_auth
-  - name: auth
+  - name: auth_gen
   - name: concurrency
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
@@ -13508,35 +13076,33 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_gen
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: bulk_gle_passthrough
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: rollback_fuzzer_gen
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
+  - name: sharding_jscore_passthrough_wire_ops_gen
   - name: tool
   - name: update_fuzzer_gen
   - name: update_fuzzer_replication_gen
@@ -13568,8 +13134,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
@@ -13593,42 +13159,42 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_auth_audit
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: tool
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
@@ -13656,8 +13222,8 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
   - name: concurrency
     distros:
@@ -13698,42 +13264,42 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: parallel
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: replica_sets
-  - name: replica_sets_auth
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_auth
-  - name: sharding_auth_audit
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: tool
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
 
 
 ###########################################
@@ -13778,12 +13344,12 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
-  - name: causally_consistent_jscore_passthrough
-  - name: causally_consistent_jscore_passthrough_auth
-  - name: sharded_causally_consistent_jscore_passthrough
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: change_streams
   - name: change_streams_mongos_passthrough
   - name: change_streams_mongos_sessions_passthrough
@@ -13807,7 +13373,7 @@ buildvariants:
   #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
   #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
   - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_gen
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
@@ -13834,75 +13400,75 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
-  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_replication_default_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
-  - name: multi_shard_multi_stmt_txn_jscore_passthrough
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: read_only
   - name: read_only_sharded
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
-  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
   - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: retryable_writes_jscore_passthrough
+  - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
   - name: sasl
   - name: session_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
   - name: update_fuzzer_gen
   - name: update_fuzzer_replication_gen
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -13984,12 +13550,12 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
-  - name: causally_consistent_jscore_passthrough
-  - name: causally_consistent_jscore_passthrough_auth
-  - name: sharded_causally_consistent_jscore_passthrough
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: change_streams
   - name: change_streams_mongos_passthrough
   - name: change_streams_mongos_sessions_passthrough
@@ -14010,7 +13576,7 @@ buildvariants:
   - name: concurrency_replication_multi_stmt_txn_ubsan
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
-  - name: concurrency_sharded_causal_consistency
+  - name: concurrency_sharded_causal_consistency_gen
   - name: concurrency_sharded_causal_consistency_and_balancer
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
@@ -14038,66 +13604,66 @@ buildvariants:
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
-  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough
-  - name: multi_shard_multi_stmt_txn_jscore_passthrough
+  - name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: read_only
   - name: read_only_sharded
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
-  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
   - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: retryable_writes_jscore_passthrough
+  - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
   - name: sasl
   - name: session_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
   - name: stitch_support_lib_build_and_archive
   - name: tool
   - name: update_fuzzer_gen
   - name: update_fuzzer_replication_gen
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
 
 - name: ubuntu1604-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise SSL Ubuntu 16.04 DEBUG"
@@ -14162,12 +13728,12 @@ buildvariants:
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
-  - name: auth
-  - name: auth_audit
+  - name: auth_gen
+  - name: auth_audit_gen
   - name: bulk_gle_passthrough
-  - name: causally_consistent_jscore_passthrough
-  - name: causally_consistent_jscore_passthrough_auth
-  - name: sharded_causally_consistent_jscore_passthrough
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
@@ -14200,52 +13766,52 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns
   - name: causally_consistent_jscore_txns_passthrough
-  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough
-  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod
-  - name: noPassthrough
-  - name: parallel
+  - name: noPassthroughWithMongod_gen
+  - name: noPassthrough_gen
+  - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
-  - name: read_concern_majority_passthrough
+  - name: read_concern_majority_passthrough_gen
   - name: read_only
   - name: read_only_sharded
   - name: replica_sets
-  - name: replica_sets_ese
-  - name: replica_sets_auth
+  - name: replica_sets_ese_gen
+  - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: sasl
-  - name: sharded_causally_consistent_jscore_txns_passthrough
+  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharded_jscore_txns
   - name: sharded_jscore_txns_sharded_collections
-  - name: sharding
-  - name: sharding_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit
+  - name: sharding_gen
+  - name: sharding_ese_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_mongos_and_mixed_shards_gen
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharding_jscore_passthrough_wire_ops
-  - name: sharding_op_query
-  - name: slow1
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_op_query_gen
+  - name: slow1_gen
   - name: serial_run
   - name: snmp
-  - name: ssl
-  - name: sslSpecial
+  - name: ssl_gen
+  - name: sslSpecial_gen
   - name: tool
   - name: write_concern_majority_passthrough
-  - name: secondary_reads_passthrough
+  - name: secondary_reads_passthrough_gen
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
