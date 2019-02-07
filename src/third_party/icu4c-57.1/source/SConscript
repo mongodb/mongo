@@ -51,6 +51,13 @@ if env.TargetOSIs('windows'):
     # C4996: '...': was declared deprecated
     env.Append(CCFLAGS=['/wd4996'])
 
+
+# Suppress `register` keyword warnings in FreeBSD builds
+
+if env.TargetOSIs('freebsd'):
+    env.Append(CCFLAGS=['-Wno-error=register'])
+    env.Append(CCFLAGS=['-Wno-register'])
+
 i18nEnv = env.Clone()
 i18nEnv.Append(
     CPPDEFINES=[
