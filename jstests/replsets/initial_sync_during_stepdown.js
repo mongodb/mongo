@@ -61,7 +61,6 @@
 
         jsTestLog("Making primary step down");
         const joinStepDownThread = startParallelShell(() => {
-
             assert.commandWorked(db.adminCommand({"replSetStepDown": 30 * 60, "force": true}));
         }, primary.port);
 

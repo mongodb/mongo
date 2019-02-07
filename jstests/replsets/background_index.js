@@ -33,11 +33,7 @@
     rst.awaitReplication();
 
     // Step down the primary.
-    try {
-        adminDB.runCommand({replSetStepDown: 60, force: true});
-    } catch (e) {
-        // Left empty on purpose.
-    }
+    assert.commandWorked(adminDB.runCommand({replSetStepDown: 60, force: true}));
 
     // Wait for new primary.
     var newPrimary = rst.getPrimary();

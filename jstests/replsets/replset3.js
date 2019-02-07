@@ -25,12 +25,8 @@ var doTest = function(signal) {
 
     print(phase++);
 
-    // Step down master.  Note: this will close our connection!
-    try {
-        master.getDB("admin").runCommand({replSetStepDown: 0, force: 1});
-    } catch (err) {
-        print("caught: " + err + " on stepdown");
-    }
+    // Step down master.
+    assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 0, force: 1}));
 
     print(phase++);
 

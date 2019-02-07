@@ -48,14 +48,9 @@
 
         // Force step down primary.
         jsTestLog('Stepping down primary ' + primary.host + ' with {force: true}.');
-        const stepDownResult = assert.throws(function() {
-            // The amount of time the node has to wait before becoming primary again.
-            const stepDownSecs = 1;
-            primary.adminCommand({replSetStepDown: stepDownSecs, force: true});
-        });
-        let errMsg = 'Expected exception from stepping down primary ' + primary.host + ': ' +
-            tojson(stepDownResult);
-        assert(isNetworkError(stepDownResult), errMsg);
+        // The amount of time the node has to wait before becoming primary again.
+        const stepDownSecs = 1;
+        assert.commandWorked(primary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
 
         // Wait for the node that stepped down to regain PRIMARY status.
         jsTestLog('Waiting for node ' + primary.host + ' to become primary again');

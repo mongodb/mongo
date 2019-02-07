@@ -27,11 +27,8 @@ var testMoveChunkWithSession = function(
     checkRetryResultFunc(result, assert.commandWorked(testDB.runCommand(cmdObj)));
     checkDocumentsFunc(coll);
 
-    try {
-        st.rs1.getPrimary().adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 30});
-    } catch (excep) {
-        print('Expected exception due to step down: ' + tojson(excep));
-    }
+    assert.commandWorked(
+        st.rs1.getPrimary().adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 30}));
 
     st.rs1.awaitNodesAgreeOnPrimary();
     st.configRS.nodes.concat([st.s]).forEach(function awaitNode(conn) {

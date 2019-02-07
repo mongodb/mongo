@@ -67,10 +67,11 @@
 
     // Issue an explicit stepdown command to save us some of the wait.
     try {
-        rollbackNode.adminCommand({replSetStepDown: 60, force: true});
+        assert.commandWorked(rollbackNode.adminCommand({replSetStepDown: 60, force: true}));
     } catch (e) {
-        // Stepdown may fail if the node has already started stepping down. We might also
-        // get an exception when the node closes the connection. Both are acceptable.
+        // Stepdown may fail if the node has already started stepping down.
+        if (!ErrorCodes.isNotMasterError(e))
+            throw e;
         print('Caught exception from replSetStepDown: ' + e);
     }
 

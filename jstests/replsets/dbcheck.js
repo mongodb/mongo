@@ -313,12 +313,8 @@
         let nodeId = replSet.getNodeId(master);
         assert.commandWorked(db.runCommand({dbCheck: multiBatchSimpleCollName}));
 
-        // Step down the master.  This will close our connection.
-        try {
-            master.getDB("admin").runCommand({replSetStepDown: 0, force: true});
-            // (throwing an exception in the process, which we will ignore).
-        } catch (e) {
-        }
+        // Step down the master.
+        assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 0, force: true}));
 
         // Wait for the cluster to come up.
         replSet.awaitSecondaryNodes();

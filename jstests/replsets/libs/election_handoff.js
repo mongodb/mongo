@@ -50,10 +50,10 @@ var ElectionHandoffTest = (function() {
         rst.awaitNodesAgreeOnAppliedOpTime();
 
         // Step down the current primary.
-        assert.adminCommandWorkedAllowingNetworkError(primary, {
+        assert.commandWorked(primary.adminCommand({
             replSetStepDown: kStepDownPeriodSecs,
             secondaryCatchUpPeriodSecs: kStepDownPeriodSecs / 2
-        });
+        }));
 
         jsTestLog(`Checking that the secondary with id ${expectedCandidateId} is stepped up...`);
 

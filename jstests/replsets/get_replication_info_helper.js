@@ -38,10 +38,7 @@
         var secondary = replSet._slaves[i];
         secondary.getDB('admin').runCommand({replSetFreeze: 120});
     }
-    try {
-        primary.getDB('admin').runCommand({replSetStepDown: 120, force: true});
-    } catch (e) {
-    }
+    assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 120, force: true}));
 
     mongo =
         startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);

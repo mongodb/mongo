@@ -81,11 +81,7 @@ assert.eq(countIndexesFor(secondDB, /temp\d$/), 4);  // indexes (2 _id + 2 x)
 assert.eq(countCollection(secondDB, /keep\d$/), 4);
 
 // step down primary and make sure former secondary (now primary) drops collections
-try {
-    master.adminCommand({replSetStepDown: 50, force: true});
-} catch (e) {
-    // ignoring socket errors since they sometimes, but not always, fire after running that command.
-}
+assert.commandWorked(master.adminCommand({replSetStepDown: 50, force: true}));
 
 assert.soon(function() {
     return secondDB.isMaster().ismaster;

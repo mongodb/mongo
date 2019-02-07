@@ -190,11 +190,8 @@
     var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
 
     // Step-down command should abort catchup.
-    try {
-        printjson(stepUpResults.newPrimary.adminCommand({replSetStepDown: 60}));
-    } catch (e) {
-        print(e);
-    }
+    assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetStepDown: 60}));
+
     // Rename the primary.
     var steppedDownPrimary = stepUpResults.newPrimary;
     var newPrimary = rst.getPrimary();

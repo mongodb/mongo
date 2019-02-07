@@ -158,10 +158,7 @@ var CSRSUpgradeCoordinator = function() {
     this.switchToCSRSMode = function() {
         jsTest.log("Restarting " + csrs[0].name + " in csrs mode");
         delete csrs0Opts.configsvrMode;
-        try {
-            csrs[0].adminCommand({replSetStepDown: 60});
-        } catch (e) {
-        }  // Expected
+        assert.commandWorked(csrs[0].adminCommand({replSetStepDown: 60}));
         MongoRunner.stopMongod(csrs[0]);
         csrs[0] = MongoRunner.runMongod(csrs0Opts);
         var csrsStatus;

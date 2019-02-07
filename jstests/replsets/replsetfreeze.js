@@ -67,12 +67,7 @@ assert.commandFailedWithCode(
     'replSetFreeze should return error when run on primary ' + master.host);
 
 jsTestLog('3: step down primary ' + master.host);
-try {
-    master.getDB("admin").runCommand({replSetStepDown: 10, force: 1});
-} catch (e) {
-    print(e);
-}
-reconnect(master);
+assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 10, force: 1}));
 printjson(master.getDB("admin").runCommand({replSetGetStatus: 1}));
 
 jsTestLog('4: freeze stepped down primary ' + master.host + ' for 30 seconds');
@@ -95,12 +90,7 @@ assert.eq(master.host,
           'new primary should be the same node as primary that previously stepped down');
 
 jsTestLog('7: step down new master ' + master.host);
-try {
-    master.getDB("admin").runCommand({replSetStepDown: 10, force: 1});
-} catch (e) {
-    jsTestLog('step down command threw exception' + e);
-}
-reconnect(master);
+assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 10, force: 1}));
 
 jsTestLog('8: freeze stepped down primary ' + master.host + ' for 30 seconds');
 master.getDB("admin").runCommand({replSetFreeze: 30});

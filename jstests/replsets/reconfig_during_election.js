@@ -26,10 +26,10 @@
     }));
 
     // The incumbent sends replSetStepUp to the candidate for election handoff.
-    assert.adminCommandWorkedAllowingNetworkError(incumbent, {
+    assert.commandWorked(incumbent.adminCommand({
         replSetStepDown: ElectionHandoffTest.stepDownPeriodSecs,
         secondaryCatchUpPeriodSecs: ElectionHandoffTest.stepDownPeriodSecs / 2
-    });
+    }));
 
     jsTestLog("Wait for candidate to win the election");
 

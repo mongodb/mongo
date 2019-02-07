@@ -99,15 +99,9 @@
         ErrorCodes.ExceededTimeLimit,
         'replSetTest waitForDrainFinish should time out when draining is not allowed to complete');
 
-    try {
-        secondary.adminCommand({replSetStepDown: 60, force: true});
-    } catch (e) {
-        // expected
-        print("Caught stepdown exception: " + tojson(e));
-    }
+    assert.commandWorked(secondary.adminCommand({replSetStepDown: 60, force: true}));
 
     // Assert stepdown was successful.
-    reconnect(secondary);
     assert.eq(ReplSetTest.State.SECONDARY, secondary.adminCommand({replSetGetStatus: 1}).myState);
     assert(!secondary.adminCommand('ismaster').ismaster);
 

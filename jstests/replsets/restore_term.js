@@ -40,11 +40,8 @@ load("jstests/replsets/rslib.js");
     assert.eq(latestOp.t, firstSuccessfulTerm);
 
     // Step down to increase the term.
-    try {
-        var res = primary.adminCommand({replSetStepDown: 0});
-    } catch (err) {
-        print("caught: " + err + " on stepdown");
-    }
+    assert.commandWorked(primary.adminCommand({replSetStepDown: 0}));
+
     rst.awaitSecondaryNodes();
     // The secondary became the new primary now with a higher term.
     // Since there's only one secondary who may run for election, the new term is higher by 1.

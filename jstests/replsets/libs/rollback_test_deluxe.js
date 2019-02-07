@@ -427,8 +427,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
         sb.push(currentRolesToString());
 
         log(`Forcing the primary ${curPrimary.host} to step down`, true);
-        assert.adminCommandWorkedAllowingNetworkError(curPrimary,
-                                                      {replSetStepDown: 1, force: true});
+        assert.commandWorked(curPrimary.adminCommand({replSetStepDown: 1, force: true}));
         waitForState(curPrimary, ReplSetTest.State.SECONDARY);
 
         log(`Waiting for the rollback secondary ${rollbackSecondary.host} to be elected`);
