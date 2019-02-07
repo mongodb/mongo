@@ -1,0 +1,14 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - src/mongo/db/modules/*/jstests/fle/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+  hooks:
+  - class: CleanEveryN
+    n: 20

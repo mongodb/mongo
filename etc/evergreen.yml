@@ -322,6 +322,7 @@ variables:
   - name: external_auth
     distros:
     - windows-64-2016
+  - name: fle
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_decimal
@@ -6536,6 +6537,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: fle
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=fle --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: jsonSchema
   commands:
   - func: "do setup"
@@ -7907,6 +7917,7 @@ buildvariants:
     - ubuntu1804-build
   - name: audit
   - name: ese
+  - name: fle
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -8090,6 +8101,7 @@ buildvariants:
   - name: auth_gen
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -8225,6 +8237,7 @@ buildvariants:
   - name: auth_gen
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -8361,6 +8374,7 @@ buildvariants:
   - name: auth_gen
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -8481,6 +8495,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -8640,6 +8655,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -8741,6 +8757,7 @@ buildvariants:
   - name: auth_audit_gen
   - name: ese
   - name: failpoints_auth
+  - name: fle
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_auth
@@ -8937,6 +8954,7 @@ buildvariants:
   - name: auth_audit_gen
   - name: ese
   - name: failpoints_auth
+  - name: fle
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_auth
@@ -9323,6 +9341,7 @@ buildvariants:
   - name: external_auth
     distros:
     - windows-64-2016
+  - name: fle
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_decimal
@@ -9842,6 +9861,7 @@ buildvariants:
   - name: audit
   - name: auth_audit_gen
   - name: ese
+  - name: fle
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -9893,6 +9913,7 @@ buildvariants:
   - name: audit
   - name: auth_audit_gen
   - name: ese
+  - name: fle
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -10445,6 +10466,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -10663,6 +10685,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -10864,6 +10887,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -10975,6 +10999,7 @@ buildvariants:
   - name: benchmarks_orphaned
   - name: benchmarks_sharding
   - name: ese
+  - name: fle
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -11099,6 +11124,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
@@ -11358,6 +11384,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -11484,6 +11511,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -11604,6 +11632,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -11770,6 +11799,7 @@ buildvariants:
     distros:
     - ubuntu1404-build
   - name: audit
+  - name: fle
   - name: ese
   - name: jsCore
   - name: jsCore_auth
@@ -11831,6 +11861,7 @@ buildvariants:
     - ubuntu1604-build
   - name: audit
   - name: ese
+  - name: fle
   - name: jepsen_register_findAndModify
     distros:
     - ubuntu1604-build
@@ -11955,6 +11986,7 @@ buildvariants:
     - suse12-build
   - name: audit
   - name: ese
+  - name: fle
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -12041,6 +12073,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -12285,6 +12318,7 @@ buildvariants:
     - debian81-build
   - name: audit
   - name: ese
+  - name: fle
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -12449,6 +12483,7 @@ buildvariants:
     - debian92-build
   - name: audit
   - name: ese
+  - name: fle
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -13383,6 +13418,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_basics_passthrough
@@ -13586,6 +13622,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_basics_passthrough
@@ -13750,6 +13787,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: fle
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
