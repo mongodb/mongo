@@ -89,6 +89,15 @@ public:
     Status startBuildingIndex(const UUID& buildUUID);
 
     /**
+     * Iterates through every record in the collection to index it while also removing documents
+     * that are not valid BSON objects.
+     *
+     * Returns the number of records and the size of the data iterated over.
+     */
+    StatusWith<std::pair<long long, long long>> startBuildingIndexForRecovery(
+        OperationContext* opCtx, NamespaceString ns, const UUID& buildUUID);
+
+    /**
      * Document inserts observed during the scanning/insertion phase of an index build are not
      * added but are instead stored in a temporary buffer until this function is invoked.
      */
@@ -153,6 +162,17 @@ public:
      * true for the kHybrid and kBackground methods.
      */
     bool isBackgroundBuilding(const UUID& buildUUID);
+
+    /**
+     * Initializes the 'indexSpecs' with a MultiIndexBlock on 'collection', then aborts them without
+     * cleaning them up.
+     *
+     * This is to be used only during recovery mode when the index build process fails to ensure
+     * that we don't lose any indexes.
+     */
+    void initializeIndexesWithoutCleanupForRecovery(OperationContext* opCtx,
+                                                    Collection* collection,
+                                                    const std::vector<BSONObj>& indexSpecs);
 
     /**
      * Checks via invariant that the manager has no index builds presently.

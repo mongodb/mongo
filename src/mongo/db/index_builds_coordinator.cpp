@@ -156,6 +156,42 @@ IndexBuildsCoordinator::~IndexBuildsCoordinator() {
     invariant(_collectionIndexBuilds.empty());
 }
 
+StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRebuildForRecovery(
+    OperationContext* opCtx,
+    std::unique_ptr<Collection> collection,
+    const std::vector<BSONObj>& specs,
+    const UUID& buildUUID) {
+    // Index builds in recovery mode have the global write lock.
+    invariant(opCtx->lockState()->isW());
+
+    std::vector<std::string> indexNames;
+    for (auto& spec : specs) {
+        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+        if (name.empty()) {
+            return Status(
+                ErrorCodes::CannotCreateIndex,
+                str::stream() << "Cannot create an index for a spec '" << spec
+                              << "' without a non-empty string value for the 'name' field");
+        }
+        indexNames.push_back(name);
+    }
+
+    auto collectionUUID = *collection->uuid();
+    auto nss = collection->ns();
+    auto dbName = nss.db().toString();
+    // We run the index build using the single phase protocol as we already hold the global write
+    // lock.
+    auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
+        buildUUID, collectionUUID, dbName, indexNames, specs, IndexBuildProtocol::kSinglePhase);
+
+    Status status = _registerIndexBuild(opCtx, replIndexBuildState);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return _runIndexRebuildForRecovery(opCtx, collection.get(), buildUUID);
+}
+
 Future<void> IndexBuildsCoordinator::joinIndexBuilds(const NamespaceString& nss,
                                                      const std::vector<BSONObj>& indexSpecs) {
     // TODO: implement. This code is just to make it compile.
@@ -649,6 +685,137 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
         opCtx, nss, replState->buildUUID, onCreateEachFn, onCommitFn));
 
     return;
+}
+
+StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexRebuildForRecovery(
+    OperationContext* opCtx, Collection* collection, const UUID& buildUUID) noexcept {
+    // Index builds in recovery mode have the global write lock.
+    invariant(opCtx->lockState()->isW());
+
+    auto replState = [&] {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        auto it = _allIndexBuilds.find(buildUUID);
+        invariant(it != _allIndexBuilds.end());
+        return it->second;
+    }();
+
+    // We rely on 'collection' for any collection information because no databases are open during
+    // recovery.
+    auto collectionUUID = *collection->uuid();
+    NamespaceString nss = collection->ns();
+    invariant(!nss.isEmpty());
+
+    auto status = Status::OK();
+    ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
+    bool mustTearDown = false;
+    bool addIndexSpecsToCatalog = false;
+
+    long long numRecords = 0;
+    long long dataSize = 0;
+
+    try {
+        log() << "Index builds manager starting: " << buildUUID << ": " << nss << " ("
+              << collectionUUID << ")";
+
+        indexCatalogStats.numIndexesBefore = _getNumIndexesTotal(opCtx, collection);
+
+        // First, drop all the indexes that we're going to be building.
+        {
+            auto indexCatalog = collection->getIndexCatalog();
+
+            WriteUnitOfWork wuow(opCtx);
+            // Clear the index catalog of all unfinished indexes.
+            std::vector<BSONObj> unfinishedIndexes =
+                indexCatalog->getAndClearUnfinishedIndexes(opCtx);
+
+            // Drop any ready indexes if they have to be rebuilt.
+            for (const auto& indexSpec : replState->indexSpecs) {
+                std::string name = indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName);
+                const IndexDescriptor* desc =
+                    indexCatalog->findIndexByName(opCtx, name, /*includeUnfinishedIndexes=*/false);
+                if (!desc) {
+                    continue;
+                }
+
+                uassertStatusOK(indexCatalog->dropIndex(opCtx, desc));
+            }
+
+            wuow.commit();
+            addIndexSpecsToCatalog = true;
+        }
+
+        mustTearDown = true;
+
+        uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
+            opCtx, collection, replState->indexSpecs, buildUUID, MultiIndexBlock::kNoopOnInitFn));
+
+        std::tie(numRecords, dataSize) = uassertStatusOK(
+            _indexBuildsManager.startBuildingIndexForRecovery(opCtx, collection->ns(), buildUUID));
+
+        // Commit the index build.
+        uassertStatusOK(_indexBuildsManager.commitIndexBuild(opCtx,
+                                                             nss,
+                                                             buildUUID,
+                                                             MultiIndexBlock::kNoopOnCreateEachFn,
+                                                             MultiIndexBlock::kNoopOnCommitFn));
+
+        indexCatalogStats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
+
+        log() << "Index builds manager completed successfully: " << buildUUID << ": " << nss
+              << " ( " << collectionUUID
+              << " ). Index specs requested: " << replState->indexSpecs.size()
+              << ". Indexes in catalog before build: " << indexCatalogStats.numIndexesBefore
+              << ". Indexes in catalog after build: " << indexCatalogStats.numIndexesAfter;
+    } catch (const DBException& ex) {
+        status = ex.toStatus();
+        invariant(status != ErrorCodes::IndexAlreadyExists);
+        log() << "Index builds manager failed: " << buildUUID << ": " << nss << " ( "
+              << collectionUUID << " ): " << status;
+    }
+
+    // Index build is registered in manager regardless of IndexBuildsManager::setUpIndexBuild()
+    // result.
+    if (status.isOK()) {
+        // A successful index build means that all the requested indexes are now part of the
+        // catalog.
+        if (mustTearDown) {
+            _indexBuildsManager.tearDownIndexBuild(buildUUID);
+        }
+    } else if (mustTearDown) {
+        // In recovery mode, we need to add the indexes back to not lose them.
+        if (addIndexSpecsToCatalog) {
+            _indexBuildsManager.initializeIndexesWithoutCleanupForRecovery(
+                opCtx, collection, replState->indexSpecs);
+        }
+
+        // If the index build fails, there's cleanup to do.
+        try {
+            _indexBuildsManager.tearDownIndexBuild(buildUUID);
+        } catch (DBException& ex) {
+            ex.addContext(str::stream()
+                          << "Index builds manager failed to clean up partially built index: "
+                          << buildUUID
+                          << ": "
+                          << nss
+                          << " ( "
+                          << collectionUUID
+                          << " )");
+            fassertNoTrace(51076, ex.toStatus());
+        }
+    }
+
+    // 'numIndexesBefore' was before we cleared any unfinished indexes, so it must be the same
+    // as 'numIndexesAfter', since we're going to be building any unfinished indexes too.
+    invariant(indexCatalogStats.numIndexesBefore == indexCatalogStats.numIndexesAfter);
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    _unregisterIndexBuild(lk, opCtx, replState);
+
+    if (status.isOK()) {
+        return std::make_pair(numRecords, dataSize);
+    }
+    return status;
 }
 
 void IndexBuildsCoordinator::_stopIndexBuildsOnDatabase(StringData dbName) {

@@ -59,16 +59,13 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
                                                [](const std::string& indexName) { return true; });
 
 /**
- * Selectively rebuild some indexes on a collection. Indexes will be built in parallel with a
- * `MultiIndexBlock`. One example usage is when a `dropIndex` command is rolled back. The dropped
- * index must be remade.
- *
- * @param indexNameObjs is expected to be the result of a call to `getIndexNameObjs`.
+ * Rebuilds the indexes provided by the 'indexSpecs' on the given collection.
+ * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
  */
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
                                   DatabaseCatalogEntry* dbce,
                                   CollectionCatalogEntry* cce,
-                                  const IndexNameObjs& indexNameObjs);
+                                  const std::vector<BSONObj>& indexSpecs);
 
 /**
  * Repairs a database using a storage engine-specific, best-effort process.

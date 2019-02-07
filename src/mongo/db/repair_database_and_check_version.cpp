@@ -230,9 +230,10 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
         for (const auto& indexName : entry.second.first) {
             log() << "Rebuilding index. Collection: " << collNss << " Index: " << indexName;
         }
+
+        std::vector<BSONObj> indexSpecs = entry.second.second;
         fassert(40592,
-                rebuildIndexesOnCollection(
-                    opCtx, dbCatalogEntry, collCatalogEntry, std::move(entry.second)));
+                rebuildIndexesOnCollection(opCtx, dbCatalogEntry, collCatalogEntry, indexSpecs));
     }
 }
 

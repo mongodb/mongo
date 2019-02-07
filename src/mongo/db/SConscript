@@ -1092,6 +1092,7 @@ env.Library(
         'logical_clock',
     ],
     LIBDEPS_PRIVATE=[
+        'index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
