@@ -142,6 +142,7 @@ void Grid::clearForUnitTests() {
     _balancerConfig.reset();
     _executorPool.reset();
     _network = nullptr;
+    _shardingInitialized.store(false);
 
     _configOpTime = repl::OpTime();
 }

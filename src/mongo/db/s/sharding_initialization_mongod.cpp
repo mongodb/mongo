@@ -110,7 +110,7 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
         validator->stopKeyManager();
     }
 
-    Status initStatus = initializeGlobalShardingState(
+    return initializeGlobalShardingState(
         opCtx,
         configCS,
         distLockProcessId,
@@ -127,12 +127,6 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
         // We only need one task executor here because sharding task executors aren't used for user
         // queries in mongod.
         1);
-
-    if (initStatus.isOK()) {
-        Grid::get(opCtx)->setShardingInitialized();
-    }
-
-    return initStatus;
 }
 
 }  // namespace mongo

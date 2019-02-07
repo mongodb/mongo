@@ -323,6 +323,8 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
 
             _chunkSplitter->setReplicaSetMode(isStandaloneOrPrimary);
 
+            Grid::get(opCtx)->setShardingInitialized();
+
             log() << "initialized sharding components for "
                   << (isStandaloneOrPrimary ? "primary" : "secondary") << " node.";
             _setInitializationState(InitializationState::kInitialized);
