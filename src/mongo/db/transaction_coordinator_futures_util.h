@@ -243,8 +243,9 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
         // Protects all state in the SharedBlock.
         stdx::mutex mutex;
 
-        // If any response returns an error, the promise will be set with that error rather than the
-        // global result.
+        // If any response returns an error prior to a response setting shouldStopIteration to
+        // ShouldStopIteration::kYes, the promise will be set with that error rather than the global
+        // result.
         Status status{Status::OK()};
 
         // If the combiner returns kYes after processing any response, the combiner will not be
