@@ -279,7 +279,7 @@ Message getMore(OperationContext* opCtx,
     // These are set in the QueryResult msg we return.
     int resultFlags = ResultFlag_AwaitCapable;
 
-    auto cursorManager = CursorManager::getGlobalCursorManager();
+    auto cursorManager = CursorManager::get(opCtx);
     auto statusWithCursorPin = cursorManager->pinCursor(opCtx, cursorid);
     if (statusWithCursorPin == ErrorCodes::CursorNotFound) {
         return makeCursorNotFoundResponse();
@@ -717,7 +717,7 @@ std::string runQuery(OperationContext* opCtx,
 
         const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         // Allocate a new ClientCursor and register it with the cursor manager.
-        ClientCursorPin pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+        ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
             {std::move(exec),
              nss,

@@ -66,9 +66,9 @@ LogicalSessionIdSet ServiceLiaisonMongod::getActiveOpSessions() const {
     return activeSessions;
 }
 
-LogicalSessionIdSet ServiceLiaisonMongod::getOpenCursorSessions() const {
+LogicalSessionIdSet ServiceLiaisonMongod::getOpenCursorSessions(OperationContext* opCtx) const {
     LogicalSessionIdSet cursorSessions;
-    CursorManager::getGlobalCursorManager()->appendActiveSessions(&cursorSessions);
+    CursorManager::get(opCtx)->appendActiveSessions(&cursorSessions);
     return cursorSessions;
 }
 
@@ -98,7 +98,7 @@ ServiceContext* ServiceLiaisonMongod::_context() {
 
 std::pair<Status, int> ServiceLiaisonMongod::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
-    return CursorManager::getGlobalCursorManager()->killCursorsWithMatchingSessions(opCtx, matcher);
+    return CursorManager::get(opCtx)->killCursorsWithMatchingSessions(opCtx, matcher);
 }
 
 }  // namespace mongo

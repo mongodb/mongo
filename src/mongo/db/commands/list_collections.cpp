@@ -380,7 +380,7 @@ public:
             exec->detachFromOperationContext();
         }  // Drop db lock. Global cursor registration must be done without holding any locks.
 
-        auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+        auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
             {std::move(exec),
              cursorNss,

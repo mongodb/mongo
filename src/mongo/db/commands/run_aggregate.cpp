@@ -645,8 +645,7 @@ Status runAggregate(OperationContext* opCtx,
             cursorParams.setAwaitData(true);
         }
 
-        auto pin =
-            CursorManager::getGlobalCursorManager()->registerCursor(opCtx, std::move(cursorParams));
+        auto pin = CursorManager::get(opCtx)->registerCursor(opCtx, std::move(cursorParams));
         cursors.emplace_back(pin.getCursor());
         pins.emplace_back(std::move(pin));
     }

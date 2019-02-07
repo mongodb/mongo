@@ -44,7 +44,7 @@ namespace mongo {
 namespace {
 
 bool killCursorIfAuthorized(OperationContext* opCtx, CursorId id) {
-    auto cursorManager = CursorManager::getGlobalCursorManager();
+    auto cursorManager = CursorManager::get(opCtx);
 
     auto pin = cursorManager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
     if (!pin.isOK()) {

@@ -101,7 +101,7 @@ public:
         exec->saveState();
         exec->detachFromOperationContext();
 
-        auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+        auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
             {std::move(exec),
              ns,

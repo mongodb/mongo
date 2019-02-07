@@ -399,16 +399,15 @@ public:
             if (shouldSaveCursor(opCtx, collection, state, exec.get())) {
                 // Create a ClientCursor containing this plan executor and register it with the
                 // cursor manager.
-                ClientCursorPin pinnedCursor =
-                    CursorManager::getGlobalCursorManager()->registerCursor(
-                        opCtx,
-                        {std::move(exec),
-                         nss,
-                         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                         repl::ReadConcernArgs::get(opCtx),
-                         _request.body,
-                         ClientCursorParams::LockPolicy::kLockExternally,
-                         {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
+                ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
+                    opCtx,
+                    {std::move(exec),
+                     nss,
+                     AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                     repl::ReadConcernArgs::get(opCtx),
+                     _request.body,
+                     ClientCursorParams::LockPolicy::kLockExternally,
+                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
                 cursorId = pinnedCursor.getCursor()->cursorid();
 
                 invariant(!exec);

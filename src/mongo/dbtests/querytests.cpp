@@ -303,8 +303,8 @@ public:
         {
             // Check that a cursor has been registered with the global cursor manager, and has
             // already returned its first batch of results.
-            auto pinnedCursor = unittest::assertGet(
-                CursorManager::getGlobalCursorManager()->pinCursor(&_opCtx, cursorId));
+            auto pinnedCursor =
+                unittest::assertGet(CursorManager::get(&_opCtx)->pinCursor(&_opCtx, cursorId));
             ASSERT_EQUALS(std::uint64_t(2), pinnedCursor.getCursor()->nReturnedSoFar());
         }
 
@@ -367,7 +367,7 @@ public:
         _client.dropCollection("unittests.querytests.GetMoreInvalidRequest");
     }
     void run() {
-        auto startNumCursors = CursorManager::getGlobalCursorManager()->numCursors();
+        auto startNumCursors = CursorManager::get(&_opCtx)->numCursors();
 
         // Create a collection with some data.
         const char* ns = "unittests.querytests.GetMoreInvalidRequest";
@@ -394,9 +394,8 @@ public:
             AssertionException);
 
         // Check that the cursor still exists.
-        ASSERT_EQ(startNumCursors + 1, CursorManager::getGlobalCursorManager()->numCursors());
-        ASSERT_OK(
-            CursorManager::getGlobalCursorManager()->pinCursor(&_opCtx, cursorId).getStatus());
+        ASSERT_EQ(startNumCursors + 1, CursorManager::get(&_opCtx)->numCursors());
+        ASSERT_OK(CursorManager::get(&_opCtx)->pinCursor(&_opCtx, cursorId).getStatus());
 
         // Check that the cursor can be iterated until all documents are returned.
         while (cursor->more()) {
@@ -406,7 +405,7 @@ public:
         ASSERT_EQUALS(1000, count);
 
         // The cursor should no longer exist, since we exhausted it.
-        ASSERT_EQ(startNumCursors, CursorManager::getGlobalCursorManager()->numCursors());
+        ASSERT_EQ(startNumCursors, CursorManager::get(&_opCtx)->numCursors());
     }
 };
 
@@ -1280,7 +1279,7 @@ public:
     }
 
     size_t numCursorsOpen() {
-        return CursorManager::getGlobalCursorManager()->numCursors();
+        return CursorManager::get(&_opCtx)->numCursors();
     }
 
     const char* ns() {

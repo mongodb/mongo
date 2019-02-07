@@ -220,7 +220,7 @@ public:
         }  // Drop collection lock. Global cursor registration must be done without holding any
            // locks.
 
-        const auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+        const auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
             {std::move(exec),
              nss,

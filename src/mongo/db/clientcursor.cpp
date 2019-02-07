@@ -280,7 +280,7 @@ public:
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
                 auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
                 cursorStatsTimedOut.increment(
-                    CursorManager::getGlobalCursorManager()->timeoutCursors(opCtx.get(), now));
+                    CursorManager::get(opCtx.get())->timeoutCursors(opCtx.get(), now));
             }
             MONGO_IDLE_THREAD_BLOCK;
             sleepsecs(getClientCursorMonitorFrequencySecs());

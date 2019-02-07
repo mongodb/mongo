@@ -552,5 +552,29 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleSessions) {
     ASSERT(cursors2.find(cursor2) != cursors2.end());
 }
 
+/**
+ * Test that a CursorManager is registered with the global ServiceContext.
+ */
+TEST(CursorManagerTest, RegisteredWithGlobalServiceContext) {
+    CursorManager* cursorManager = CursorManager::get(getGlobalServiceContext());
+    ASSERT(cursorManager);
+}
+
+/**
+ * Test that a CursorManager is registered with a custom ServiceContext.
+ */
+TEST_F(CursorManagerTest, RegisteredWithCustomServiceContext) {
+    CursorManager* cursorManager = CursorManager::get(_queryServiceContext->getServiceContext());
+    ASSERT(cursorManager);
+}
+
+/**
+ * Test that a CursorManager is accessible via an OperationContext.
+ */
+TEST_F(CursorManagerTest, CanAccessFromOperationContext) {
+    CursorManager* cursorManager = CursorManager::get(_opCtx.get());
+    ASSERT(cursorManager);
+}
+
 }  // namespace
 }  // namespace mongo

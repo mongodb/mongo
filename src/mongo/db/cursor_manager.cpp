@@ -62,16 +62,30 @@ namespace mongo {
 
 constexpr int CursorManager::kNumPartitions;
 
-std::unique_ptr<CursorManager> globalCursorManager;
+namespace {
 
-MONGO_INITIALIZER(GlobalCursorManager)
-(InitializerContext* context) {
-    globalCursorManager = std::make_unique<CursorManager>();
-    return Status::OK();
+const auto serviceCursorManager =
+    ServiceContext::declareDecoration<std::unique_ptr<CursorManager>>();
+
+ServiceContext::ConstructorActionRegisterer cursorManagerRegisterer{
+    "CursorManagerRegisterer", [](ServiceContext* svcCtx) {
+        auto cursorManager = stdx::make_unique<CursorManager>();
+        CursorManager::set(svcCtx, std::move(cursorManager));
+    }};
+}  // namespace
+
+CursorManager* CursorManager::get(ServiceContext* svcCtx) {
+    return serviceCursorManager(svcCtx).get();
 }
 
-CursorManager* CursorManager::getGlobalCursorManager() {
-    return globalCursorManager.get();
+CursorManager* CursorManager::get(OperationContext* optCtx) {
+    return get(optCtx->getServiceContext());
+}
+
+void CursorManager::set(ServiceContext* svcCtx, std::unique_ptr<CursorManager> newCursorManager) {
+    invariant(newCursorManager);
+    auto& cursorManager = serviceCursorManager(svcCtx);
+    cursorManager = std::move(newCursorManager);
 }
 
 std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(

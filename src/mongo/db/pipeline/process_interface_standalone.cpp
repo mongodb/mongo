@@ -383,7 +383,7 @@ std::vector<FieldPath> MongoInterfaceStandalone::collectDocumentKeyFieldsActingA
 
 std::vector<GenericCursor> MongoInterfaceStandalone::getIdleCursors(
     const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
-    return CursorManager::getGlobalCursorManager()->getIdleCursors(expCtx->opCtx, userMode);
+    return CursorManager::get(expCtx->opCtx)->getIdleCursors(expCtx->opCtx, userMode);
 }
 
 boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(

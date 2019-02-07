@@ -49,7 +49,7 @@ LogicalSessionIdSet MockServiceLiaisonImpl::getActiveOpSessions() const {
     return _activeSessions;
 }
 
-LogicalSessionIdSet MockServiceLiaisonImpl::getOpenCursorSessions() const {
+LogicalSessionIdSet MockServiceLiaisonImpl::getOpenCursorSessions(OperationContext* opCtx) const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _cursorSessions;
 }

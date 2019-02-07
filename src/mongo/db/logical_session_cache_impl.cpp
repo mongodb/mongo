@@ -385,7 +385,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     KillAllSessionsByPatternSet patterns;
 
-    auto openCursorSessions = _service->getOpenCursorSessions();
+    auto openCursorSessions = _service->getOpenCursorSessions(opCtx);
     // Exclude sessions added to _activeSessions from the openCursorSession to avoid race between
     // killing cursors on the removed sessions and creating sessions.
     {

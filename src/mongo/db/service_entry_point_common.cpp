@@ -1108,7 +1108,7 @@ DbResponse receivedGetMore(OperationContext* opCtx,
             //
             // If killing the cursor fails, ignore the error and don't try again. The cursor should
             // be reaped by the client cursor timeout thread.
-            CursorManager::getGlobalCursorManager()
+            CursorManager::get(opCtx)
                 ->killCursor(opCtx, cursorid, false /* shouldAudit */)
                 .ignore();
         }

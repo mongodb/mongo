@@ -61,7 +61,7 @@ public:
 
     // Forwarding methods from the MockServiceLiaison
     LogicalSessionIdSet getActiveOpSessions() const;
-    LogicalSessionIdSet getOpenCursorSessions() const;
+    LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) const;
     Date_t now() const;
     void scheduleJob(PeriodicRunner::PeriodicJob job);
     void join();
@@ -105,8 +105,8 @@ public:
         return _impl->getActiveOpSessions();
     }
 
-    LogicalSessionIdSet getOpenCursorSessions() const override {
-        return _impl->getOpenCursorSessions();
+    LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) const override {
+        return _impl->getOpenCursorSessions(opCtx);
     }
 
     Date_t now() const override {

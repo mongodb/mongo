@@ -304,7 +304,7 @@ public:
             boost::optional<AutoGetCollectionForRead> readLock;
             boost::optional<AutoStatsTracker> statsTracker;
 
-            auto cursorManager = CursorManager::getGlobalCursorManager();
+            auto cursorManager = CursorManager::get(opCtx);
             auto cursorPin = uassertStatusOK(cursorManager->pinCursor(opCtx, _request.cursorid));
 
             if (cursorPin->lockPolicy() == ClientCursorParams::LockPolicy::kLocksInternally) {

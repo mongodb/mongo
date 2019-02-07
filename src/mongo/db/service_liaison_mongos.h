@@ -53,7 +53,7 @@ namespace mongo {
 class ServiceLiaisonMongos : public ServiceLiaison {
 public:
     LogicalSessionIdSet getActiveOpSessions() const override;
-    LogicalSessionIdSet getOpenCursorSessions() const override;
+    LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) const override;
 
     void scheduleJob(PeriodicRunner::PeriodicJob job) override;
 
