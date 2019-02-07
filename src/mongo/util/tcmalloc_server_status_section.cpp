@@ -43,62 +43,19 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/thread_idle_callback.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
-// If many clients are used, the per-thread caches become smaller and chances of
-// rebalancing of free space during critical sections increases. In such situations,
-// it is better to release memory when it is likely the thread will be blocked for
-// a long time.
-const int kManyClients = 40;
 
-MONGO_COMPILER_VARIABLE_UNUSED stdx::mutex tcmallocCleanupLock;
-
-MONGO_EXPORT_SERVER_PARAMETER(tcmallocEnableMarkThreadTemporarilyIdle, bool, false);
-
-/**
- *  Callback to allow TCMalloc to release freed memory to the central list at
- *  favorable times. Ideally would do some milder cleanup or scavenge...
- */
-void threadStateChange() {
-
-    if (!tcmallocEnableMarkThreadTemporarilyIdle.load()) {
-        return;
-    }
-
-    if (getGlobalServiceContext()->getServiceEntryPoint()->numOpenSessions() <= kManyClients)
-        return;
-
-#if MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE
-    size_t threadCacheSizeBytes = MallocExtension::instance()->GetThreadCacheSize();
-
-    static const size_t kMaxThreadCacheSizeBytes = 0x10000;
-    if (threadCacheSizeBytes < kMaxThreadCacheSizeBytes) {
-        // This number was chosen a bit magically.
-        // At 1000 threads and the current (64mb) thread local cache size, we're "full".
-        // So we may want this number to scale with the number of current clients.
-        return;
-    }
-
-    LOG(1) << "thread over memory limit, cleaning up, current: " << (threadCacheSizeBytes / 1024)
-           << "k";
-
-    // We synchronize as the tcmalloc central list uses a spinlock, and we can cause a really
-    // terrible runaway if we're not careful.
-    stdx::lock_guard<stdx::mutex> lk(tcmallocCleanupLock);
-#endif
-    MallocExtension::instance()->MarkThreadTemporarilyIdle();
-}
-
-// Register threadStateChange callback
-MONGO_INITIALIZER(TCMallocThreadIdleListener)(InitializerContext*) {
-    if (!RUNNING_ON_VALGRIND)
-        registerThreadIdleCallback(&threadStateChange);
-    return Status::OK();
-}
+MONGO_EXPORT_SERVER_PARAMETER(tcmallocEnableMarkThreadTemporarilyIdle, bool, false)
+    ->withValidator([](const bool& potentialNewValue) {
+        return Status(ErrorCodes::BadValue,
+                      "tcmallocEnableMarkThreadTemporarilyIdle has been removed. Setting this "
+                      "parameter has no effect and it will be removed in a future version of "
+                      "MongoDB.");
+    });
 
 class TCMallocServerStatusSection : public ServerStatusSection {
 public:

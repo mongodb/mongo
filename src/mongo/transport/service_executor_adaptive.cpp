@@ -40,7 +40,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_task_names.h"
-#include "mongo/transport/thread_idle_callback.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
@@ -238,11 +237,6 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
         task();
         _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
             ._totalSpentExecuting.addAndFetch(_localTimer.sinceStartTicks());
-
-        if ((flags & ServiceExecutor::kMayYieldBeforeSchedule) &&
-            (_localThreadState->markIdleCounter++ & 0xf)) {
-            markThreadIdle();
-        }
     };
 
     // Dispatching a task on the io_context will run the task immediately, and may run it
