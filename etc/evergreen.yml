@@ -1431,6 +1431,10 @@ functions:
           extra_args="$extra_args --jlink=${num_scons_link_jobs_available|}"
         fi
 
+        if [ "${scons_cache_scope|}" = "shared" ]; then
+          extra_args="$extra_args --cache-debug=scons_cache.log"
+        fi
+
         ${activate_virtualenv}
 
         python2 -m pip install -r ./etc/pip/compile-requirements.txt
@@ -3489,6 +3493,17 @@ tasks:
         # We only need to upload the source tarball from one of the build variants
         # because it should be the same everywhere, so just use rhel70/windows-64-2k8-ssl.
         build_variants: [ rhel70, windows-64-2k8-ssl ]
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/scons_cache.log
+        content_type: text/plain
+        remote_file: ${project}/${build_variant}/${revision}/cache.log
+        bucket: mciuploads
+        permissions: public-read
+        display_name: SCons cache debug log
     # For patch builds that bypass compile, we upload links to pre-existing tarballs, except for the
     # artifacts.tgz.
     - command: attach.artifacts
