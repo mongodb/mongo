@@ -1,0 +1,77 @@
+
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/s/mongos_options.h"
+  configs:
+    section: "Sharding options"
+    source: [ yaml, cli, ini ]
+
+configs:
+  "sharding.configDB":
+    description: >-
+      Connection string for communicating with config servers:
+      <config replset name>/<host1:port>,<host2:port>,[...]
+    short_name: configdb
+    arg_vartype: String
+  "replication.localPingThresholdMs":
+    description: "ping time (in ms) for a node to be considered local (default 15ms)"
+    short_name: "localThreshold"
+    cpp_varname: "serverGlobalParams.defaultLocalThresholdMillis"
+    arg_vartype: Int
+  "test":
+    description: "just run unit tests"
+    short_name: "test"
+    arg_vartype: Switch
+    source: [ cli, ini ]
+#
+# Javascript Options
+# As a general rule, js enable/disable options are ignored for mongos.
+# However, we define and hide these options so that if someone
+# were to use these args in a set of options meant for both
+# mongos and mongod runs, the mongos won't fail on an unknown argument.
+#
+# These options have no affect on how the mongos runs.
+# Setting either or both to *any* value will provoke a warning message
+# and nothing more.
+#
+  "security.javascriptEnabled":
+    section: "General options"
+    description: "Enable javascript execution"
+    arg_vartype: Bool
+    source: [ yaml ]
+    hidden: true
+  "noscripting":
+    description: "disable scripting engine"
+    short_name: "noscripting"
+    arg_vartype: Switch
+    source: [ cli, ini ]
+    hidden: true

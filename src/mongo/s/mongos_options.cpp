@@ -73,51 +73,11 @@ Status addMongosOptions(moe::OptionSection* options) {
     }
 #endif
 
-    moe::OptionSection sharding_options("Sharding options");
-
-    sharding_options.addOptionChaining("sharding.configDB",
-                                       "configdb",
-                                       moe::String,
-                                       "Connection string for communicating with config servers:\n"
-                                       "<config replset name>/<host1:port>,<host2:port>,[...]");
-
-    sharding_options.addOptionChaining(
-        "replication.localPingThresholdMs",
-        "localThreshold",
-        moe::Int,
-        "ping time (in ms) for a node to be considered local (default 15ms)");
-
-    sharding_options.addOptionChaining("test", "test", moe::Switch, "just run unit tests")
-        .setSources(moe::SourceAllLegacy);
-
-    /** Javascript Options
-     *  As a general rule, js enable/disable options are ignored for mongos.
-     *  However, we define and hide these options so that if someone
-     *  were to use these args in a set of options meant for both
-     *  mongos and mongod runs, the mongos won't fail on an unknown argument.
-     *
-     *  These options have no affect on how the mongos runs.
-     *  Setting either or both to *any* value will provoke a warning message
-     *  and nothing more.
-     */
-    sharding_options
-        .addOptionChaining("noscripting", "noscripting", moe::Switch, "disable scripting engine")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
-    general_options
-        .addOptionChaining(
-            "security.javascriptEnabled", "", moe::Bool, "Enable javascript execution")
-        .hidden()
-        .setSources(moe::SourceYAMLConfig);
-
     options->addSection(general_options).transitional_ignore();
 
 #if defined(_WIN32)
     options->addSection(windows_scm_options).transitional_ignore();
 #endif
-
-    options->addSection(sharding_options).transitional_ignore();
 
     return Status::OK();
 }
@@ -175,11 +135,6 @@ Status storeMongosOptions(const moe::Environment& params) {
         if (port <= 0 || port > 65535) {
             return Status(ErrorCodes::BadValue, "error: port number must be between 1 and 65535");
         }
-    }
-
-    if (params.count("replication.localPingThresholdMs")) {
-        serverGlobalParams.defaultLocalThresholdMillis =
-            params["replication.localPingThresholdMs"].as<int>();
     }
 
     if (params.count("noscripting") || params.count("security.javascriptEnabled")) {

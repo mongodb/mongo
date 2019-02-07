@@ -476,6 +476,7 @@ mongos = env.Program(
         's/cluster_cursor_stats.cpp',
         's/mongos_options.cpp',
         's/mongos_options_init.cpp',
+        env.Idlc('s/mongos_options.idl')[0],
         's/s_sharding_server_status.cpp',
         's/server.cpp',
         's/service_entry_point_mongos.cpp',
@@ -511,8 +512,11 @@ mongos = env.Program(
         'util/fail_point',
         'util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
         'util/ntservice',
-        'util/options_parser/options_parser_init',
         'util/version_impl',
+    ],
+    LIBDEPS_PRIVATE=[
+        'util/options_parser/options_parser_init',
+        'util/options_parser/options_parser',
     ],
     INSTALL_ALIAS=[
         'servers',
