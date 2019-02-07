@@ -331,7 +331,7 @@ public:
         now = clkSource->now();
 
         // Fire expired timers
-        for (auto iter = _timers.begin(); iter != _timers.end() && iter->first < now;) {
+        for (auto iter = _timers.begin(); iter != _timers.end() && iter->first <= now;) {
             toFulfill.push_back(std::move(iter->second.promise));
             _timersById.erase(iter->second.id);
             iter = _timers.erase(iter);
