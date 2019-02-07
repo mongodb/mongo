@@ -319,7 +319,7 @@ public:
         }
 
         // Fire expired timers
-        for (auto iter = _timers.begin(); iter != _timers.end() && iter->expiration < now;) {
+        for (auto iter = _timers.begin(); iter != _timers.end() && iter->expiration <= now;) {
             toFulfill.push_back(std::move(iter->promise));
             _timersById.erase(iter->id);
             iter = _timers.erase(iter);
