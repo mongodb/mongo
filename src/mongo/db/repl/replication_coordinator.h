@@ -214,8 +214,8 @@ public:
      * will not be able to receive writes to a database other than local (it will not be
      * treated as standalone node).
      *
-     * NOTE: This function can only be meaningfully called while the caller holds the global
-     * lock in some mode other than MODE_NONE.
+     * NOTE: This function can only be meaningfully called while the caller holds the
+     * ReplicationStateTransitionLock in some mode other than MODE_NONE.
      */
     virtual bool canAcceptWritesForDatabase(OperationContext* opCtx, StringData dbName) = 0;
 
