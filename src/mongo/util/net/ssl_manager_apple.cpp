@@ -69,6 +69,11 @@ namespace mongo {
 
 namespace {
 
+template <typename T>
+constexpr T cf_cast(::CFTypeRef val) {
+    return static_cast<T>(const_cast<void*>(val));
+}
+
 // CFAbsoluteTime and X.509 is relative to Jan 1 2001 00:00:00 GMT
 // Unix Epoch (and thereby Date_t) is relative to Jan 1, 1970 00:00:00 GMT
 static const ::CFAbsoluteTime k20010101_000000_GMT = 978307200;
@@ -522,12 +527,180 @@ StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFDictionary
             swNameStr = swCIDRValue.getValue().toString();
             if (san == kDNS) {
                 warning() << "You have an IP Address in the DNS Name field on your "
-                             "certificate. This formulation is depreceated.";
+                             "certificate. This formulation is deprecated.";
             }
         }
         ret.push_back(swNameStr.getValue());
     }
     return ret;
+}
+
+bool isCFDataEqual(::CFDataRef a, ::CFDataRef b) {
+    const auto len = ::CFDataGetLength(a);
+    if (::CFDataGetLength(b) != len) {
+        return false;
+    }
+
+    const auto* A = ::CFDataGetBytePtr(a);
+    const auto* B = ::CFDataGetBytePtr(b);
+    return 0 == memcmp(A, B, len);
+}
+
+/**
+ * Attempt to merge a security item bundle into an
+ * identity and optional cert chain.
+ *
+ * The file must have exactly one key which will be paired with
+ * the first available certificate, or exactly one identity.
+ */
+StatusWith<::CFArrayRef> bindIdentity(::CFArrayRef certs) {
+    auto count = ::CFArrayGetCount(certs);
+    if (count == 0) {
+        return certs;
+    }
+
+    // Ideal case, exactly one identity.
+    if (count == 1) {
+        auto idElem = ::CFArrayGetValueAtIndex(certs, 0);
+        if (::CFGetTypeID(idElem) == ::SecIdentityGetTypeID()) {
+            return certs;
+        }
+    }
+
+    // Optimistic case, exactly one cert-key pair.
+    if (count == 2) {
+        auto certElem = ::CFArrayGetValueAtIndex(certs, 0);
+        auto keyElem = ::CFArrayGetValueAtIndex(certs, 1);
+        if (::CFGetTypeID(certElem) == ::SecKeyGetTypeID()) {
+            std::swap(certElem, keyElem);
+        }
+        if ((::CFGetTypeID(certElem) == ::SecCertificateGetTypeID()) &&
+            (::CFGetTypeID(keyElem) == ::SecKeyGetTypeID())) {
+            CFUniquePtr<::SecIdentityRef> cfid(::SecIdentityCreate(
+                nullptr, cf_cast<::SecCertificateRef>(certElem), cf_cast<::SecKeyRef>(keyElem)));
+            if (cfid) {
+                auto id = static_cast<const void*>(cfid.get());
+                return ::CFArrayCreate(nullptr, &id, 1, &kCFTypeArrayCallBacks);
+            }
+        }
+    }
+
+    // Complex case, multiple certs.
+    // Find the key, pair it with the first cert, and bundle the remaining certs in.
+    std::vector<::SecCertificateRef> intermediateCerts;
+    ::SecIdentityRef id = nullptr;
+    ::SecCertificateRef leafCert = nullptr;
+    ::SecKeyRef key = nullptr;
+    for (::CFIndex i = 0; i < count; ++i) {
+        auto elem = ::CFArrayGetValueAtIndex(certs, i);
+        invariant(elem);
+
+        const auto elemType = ::CFGetTypeID(elem);
+        if (elemType == ::SecIdentityGetTypeID()) {
+            if (id) {
+                return {ErrorCodes::InvalidSSLConfiguration,
+                        str::stream() << "Multiple identities found in PEM file"};
+            }
+            id = cf_cast<::SecIdentityRef>(elem);
+            continue;
+        }
+
+        if (elemType == ::SecKeyGetTypeID()) {
+            if (key) {
+                return {ErrorCodes::InvalidSSLConfiguration,
+                        str::stream() << "Multiple private keys found in PEM file"};
+            }
+            key = cf_cast<::SecKeyRef>(elem);
+            continue;
+        }
+
+        if (elemType != ::SecCertificateGetTypeID()) {
+            // Ignore other types.
+            continue;
+        }
+
+        if (leafCert) {
+            intermediateCerts.push_back(cf_cast<::SecCertificateRef>(elem));
+        } else {
+            leafCert = cf_cast<::SecCertificateRef>(elem);
+        }
+    }
+
+    if (id && key) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                "Found both identity and private key in PEM file"};
+    }
+    if (key && !leafCert) {
+        return {ErrorCodes::InvalidSSLConfiguration, "Found key without certificate in PEM file"};
+    }
+
+    CFUniquePtr<::CFMutableArrayRef> ret(
+        ::CFArrayCreateMutable(nullptr, count, &kCFTypeArrayCallBacks));
+
+    if (id) {
+        ::CFArrayAppendValue(ret.get(), id);
+    }
+
+    if (key) {
+        CFUniquePtr<::SecIdentityRef> ident(::SecIdentityCreate(nullptr, leafCert, key));
+        if (!ident) {
+            return {ErrorCodes::InvalidSSLConfiguration, "Unable to create Identity from keyfile"};
+        }
+        ::CFArrayAppendValue(ret.get(), ident.get());
+    } else if (leafCert) {
+        ::CFArrayAppendValue(ret.get(), leafCert);
+    }
+
+    for (auto& cert : intermediateCerts) {
+        ::CFArrayAppendValue(ret.get(), cert);
+    }
+
+    return ret.release();
+}
+
+/**
+ * Strip a security item bundle down to just Certificates.
+ * This means ignoring SecKeyRef and splitting SecIdentityRef
+ * into just their SecCertificateRef potions.
+ */
+StatusWith<::CFArrayRef> stripKeys(::CFArrayRef certs) {
+    auto count = ::CFArrayGetCount(certs);
+
+    if (count == 0) {
+        return certs;
+    }
+
+    // Strip unpaired keys and identities.
+    CFUniquePtr<::CFMutableArrayRef> ret(
+        ::CFArrayCreateMutable(nullptr, count, &kCFTypeArrayCallBacks));
+    for (::CFIndex i = 0; i < count; ++i) {
+        auto elem = ::CFArrayGetValueAtIndex(certs, i);
+        if (!elem) {
+            continue;
+        }
+        const auto type = ::CFGetTypeID(elem);
+        if (type == ::SecCertificateGetTypeID()) {
+            // Preserve Certificates.
+            ::CFArrayAppendValue(ret.get(), elem);
+            continue;
+        }
+        if (type != ::SecIdentityGetTypeID()) {
+            continue;
+        }
+
+        // Extract public certificate from Identity.
+        ::SecCertificateRef cert = nullptr;
+        const auto status = ::SecIdentityCopyCertificate(cf_cast<::SecIdentityRef>(elem), &cert);
+        CFUniquePtr<::SecCertificateRef> cfcert(cert);
+        if (status != ::errSecSuccess) {
+            return {ErrorCodes::InternalError,
+                    str::stream() << "Unable to extract certificate from identity: "
+                                  << stringFromOSStatus(status)};
+        }
+        ::CFArrayAppendValue(ret.get(), cfcert.get());
+    }
+
+    return ret.release();
 }
 
 enum LoadPEMMode {
@@ -551,7 +724,8 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
     const auto retFail = [&keyfilepath, &passphrase](const std::string& msg = "") {
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "Unable to load PEM from '" << keyfilepath << "'"
-                                    << (passphrase.empty() ? "" : " with passphrase: ")
+                                    << (passphrase.empty() ? "" : " with passphrase")
+                                    << (msg.empty() ? "" : ": ")
                                     << msg);
     };
 
@@ -601,89 +775,22 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
                                      << stringFromOSStatus(status));
     }
 
-    auto count = ::CFArrayGetCount(cfcerts.get());
-    if ((count > 0) && (mode == kLoadPEMBindIdentities)) {
-        // Turn Certificate/Key pairs into identities.
-        CFUniquePtr<::CFMutableArrayRef> bind(
-            ::CFArrayCreateMutable(nullptr, count, &kCFTypeArrayCallBacks));
-        for (::CFIndex i = 0; i < count; ++i) {
-            auto elem = ::CFArrayGetValueAtIndex(cfcerts.get(), i);
-            invariant(elem);
-            const auto type = ::CFGetTypeID(elem);
-            if (type == ::SecIdentityGetTypeID()) {
-                // Our import had a proper identity in it, ready to go.
-                ::CFArrayAppendValue(bind.get(), elem);
-                continue;
-            }
-            if (type != ::SecCertificateGetTypeID()) {
-                continue;
-            }
-
-            // Attempt to match the certificate to a private key in the aggregate we just imported.
-            CFUniquePtr<::SecIdentityRef> cfid;
-            for (::CFIndex j = 0; j < count; ++j) {
-                auto key = ::CFArrayGetValueAtIndex(cfcerts.get(), j);
-                invariant(key);
-                if (::CFGetTypeID(key) != ::SecKeyGetTypeID()) {
-                    continue;
-                }
-                auto id =
-                    ::SecIdentityCreate(nullptr,
-                                        static_cast<::SecCertificateRef>(const_cast<void*>(elem)),
-                                        static_cast<::SecKeyRef>(const_cast<void*>(key)));
-                if (id) {
-                    cfid.reset(id);
-                    break;
-                }
-            }
-            if (cfid) {
-                ::CFArrayAppendValue(bind.get(), cfid.get());
-            } else {
-                ::CFArrayAppendValue(bind.get(), elem);
-            }
+    if (mode == kLoadPEMBindIdentities) {
+        auto swCerts = bindIdentity(cfcerts.get());
+        if (!swCerts.isOK()) {
+            return swCerts.getStatus();
         }
-        // Reencapsulate to allow the inner type to change.
-        cfcerts.reset(bind.release());
-        count = ::CFArrayGetCount(cfcerts.get());
+        cfcerts.reset(swCerts.getValue());
+    } else {
+        invariant(mode == kLoadPEMStripKeys);
+        auto swCerts = stripKeys(cfcerts.get());
+        if (!swCerts.isOK()) {
+            return swCerts.getStatus();
+        }
+        cfcerts.reset(swCerts.getValue());
     }
 
-    if ((count > 0) && (mode == kLoadPEMStripKeys)) {
-        // Strip unpaired keys and identities.
-        CFUniquePtr<::CFMutableArrayRef> strip(
-            ::CFArrayCreateMutable(nullptr, count, &kCFTypeArrayCallBacks));
-        for (::CFIndex i = 0; i < count; ++i) {
-            auto elem = ::CFArrayGetValueAtIndex(cfcerts.get(), i);
-            if (!elem) {
-                continue;
-            }
-            const auto type = ::CFGetTypeID(elem);
-            if (type == ::SecCertificateGetTypeID()) {
-                // Preserve Certificates.
-                ::CFArrayAppendValue(strip.get(), elem);
-                continue;
-            }
-            if (type != ::SecIdentityGetTypeID()) {
-                continue;
-            }
-
-            // Extract public certificate from Identity.
-            ::SecCertificateRef cert = nullptr;
-            const auto status = ::SecIdentityCopyCertificate(
-                static_cast<::SecIdentityRef>(const_cast<void*>(elem)), &cert);
-            CFUniquePtr<::SecCertificateRef> cfcert(cert);
-            if (status != ::errSecSuccess) {
-                return {ErrorCodes::InternalError,
-                        str::stream() << "Unable to extract certificate from identity: "
-                                      << stringFromOSStatus(status)};
-            }
-            ::CFArrayAppendValue(strip.get(), cfcert.get());
-        }
-        // Reencapsulate to allow the inner type to change.
-        cfcerts.reset(strip.release());
-        count = ::CFArrayGetCount(cfcerts.get());
-    }
-
-    if (count <= 0) {
+    if (::CFArrayGetCount(cfcerts.get()) <= 0) {
         return {ErrorCodes::InvalidSSLConfiguration,
                 str::stream() << "PEM file '" << keyfilepath << "' has no certificates"};
     }
@@ -750,8 +857,7 @@ StatusWith<SSLX509Name> certificateGetSubject(::CFArrayRef certs, Date_t* expire
     }
 
     ::SecCertificateRef idcert = nullptr;
-    auto status = ::SecIdentityCopyCertificate(
-        static_cast<::SecIdentityRef>(const_cast<void*>(root)), &idcert);
+    auto status = ::SecIdentityCopyCertificate(cf_cast<::SecIdentityRef>(root), &idcert);
     if (status != ::errSecSuccess) {
         return {ErrorCodes::InvalidSSLConfiguration,
                 str::stream() << "Unable to get certificate from identity: "
@@ -831,8 +937,7 @@ StatusWith<CFUniquePtr<::CFArrayRef>> copyMatchingCertificate(
     CFUniquePtr<::CFMutableArrayRef> cfresult(
         ::CFArrayCreateMutable(nullptr, 1, &::kCFTypeArrayCallBacks));
     for (::CFIndex i = 0; i < ::CFArrayGetCount(cfident.get()); ++i) {
-        auto ident = static_cast<::SecIdentityRef>(
-            const_cast<void*>(::CFArrayGetValueAtIndex(cfident.get(), i)));
+        auto ident = cf_cast<::SecIdentityRef>(::CFArrayGetValueAtIndex(cfident.get(), i));
         if (::CFGetTypeID(ident) != ::SecIdentityGetTypeID()) {
             continue;
         }
