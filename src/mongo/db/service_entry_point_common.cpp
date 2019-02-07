@@ -45,6 +45,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/dbdirectclient.h"
@@ -98,6 +99,19 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
+MONGO_FAIL_POINT_DEFINE(waitAfterReadCommandFinishesExecution);
+
+// Tracks the number of times a legacy unacknowledged write failed due to
+// not master error resulted in network disconnection.
+Counter64 notMasterLegacyUnackWrites;
+ServerStatusMetricField<Counter64> displayNotMasterLegacyUnackWrites(
+    "repl.network.notMasterLegacyUnacknowledgedWrites", &notMasterLegacyUnackWrites);
+
+// Tracks the number of times an unacknowledged write failed due to not master error
+// resulted in network disconnection.
+Counter64 notMasterUnackWrites;
+ServerStatusMetricField<Counter64> displayNotMasterUnackWrites(
+    "repl.network.notMasterUnacknowledgedWrites", &notMasterUnackWrites);
 
 namespace {
 using logger::LogComponent;
@@ -450,6 +464,16 @@ bool runCommandImpl(OperationContext* opCtx,
                 opCtx, invocation, txnParticipant, sessionOptions, replyBuilder);
         } else {
             invocation->run(opCtx, replyBuilder);
+            MONGO_FAIL_POINT_BLOCK(waitAfterReadCommandFinishesExecution, options) {
+                const BSONObj& data = options.getData();
+                auto db = data["db"].str();
+                if (db.empty() || request.getDatabase() == db) {
+                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                        &waitAfterReadCommandFinishesExecution,
+                        opCtx,
+                        "waitAfterReadCommandFinishesExecution");
+                }
+            }
         }
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
@@ -863,8 +887,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
                             const Message& message,
                             const ServiceEntryPointCommon::Hooks& behaviors) {
     auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
+    OpMsgRequest request;
     [&] {
-        OpMsgRequest request;
         try {  // Parse.
             request = rpc::opMsgRequestFromAnyProtocol(message);
         } catch (const DBException& ex) {
@@ -934,10 +958,16 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
     if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
         // Close the connection to get client to go through server selection again.
-        uassert(ErrorCodes::NotMaster,
-                "Not-master error during fire-and-forget command processing",
-                !LastError::get(opCtx->getClient()).hadNotMasterError());
-
+        if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
+            notMasterUnackWrites.increment();
+            uasserted(ErrorCodes::NotMaster,
+                      str::stream() << "Not-master error while processing '"
+                                    << request.getCommandName()
+                                    << "' operation  on '"
+                                    << request.getDatabase()
+                                    << "' database via "
+                                    << "fire-and-forget command execution.");
+        }
         return {};  // Don't reply.
     }
 
@@ -1253,9 +1283,16 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         // A NotMaster error can be set either within receivedInsert/receivedUpdate/receivedDelete
         // or within the AssertionException handler above.  Either way, we want to throw an
         // exception here, which will cause the client to be disconnected.
-        uassert(ErrorCodes::NotMaster,
-                "Not-master error during legacy fire-and-forget command processing",
-                !LastError::get(opCtx->getClient()).hadNotMasterError());
+        if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
+            notMasterLegacyUnackWrites.increment();
+            uasserted(ErrorCodes::NotMaster,
+                      str::stream() << "Not-master error while processing '"
+                                    << networkOpToString(op)
+                                    << "' operation  on '"
+                                    << nsString
+                                    << "' namespace via legacy "
+                                    << "fire-and-forget command execution.");
+        }
     }
 
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether

@@ -491,6 +491,16 @@ private:
          */
         void stopAndWaitForKillOpThread();
 
+        /*
+         * Returns _userOpsRunning value.
+         */
+        size_t getUserOpsRunning() const;
+
+        /*
+         * Increments _userOpsRunning by val.
+         */
+        void incrUserOpsRunningBy(size_t val = 1);
+
     private:
         ReplicationCoordinatorImpl* const _replCord;  // not owned.
         OperationContext* const _stepDownOpCtx;       // not owned.
@@ -502,6 +512,8 @@ private:
         stdx::condition_variable _stopKillingOps;
         // Once this is set to true, the killOpThreadFn method will terminate.
         bool _killSignaled = false;
+        // Tracks number of operations left running on step down.
+        size_t _userOpsRunning = 0;
     };
 
     // Abstract struct that holds information about clients waiting for replication.
@@ -987,9 +999,15 @@ private:
     executor::TaskExecutor::EventHandle _stepDownStart();
 
     /**
+     * Update the "repl.stepDown.userOperationsRunning" counter and log number of operations
+     * killed and left running on step down.
+     */
+    void _updateAndLogStatsOnStepDown(const KillOpContainer* koc) const;
+
+    /**
      * kill all user operations that have taken a global lock except in IS mode.
      */
-    void _killUserOperationsOnStepDown(const OperationContext* stepDownOpCtx);
+    void _killUserOperationsOnStepDown(const OperationContext* stepDownOpCtx, KillOpContainer* koc);
 
     /**
      * Completes a step-down of the current node.  Must be run with a global
