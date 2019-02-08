@@ -32,7 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator_futures_util.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/remote_command_targeter.h"

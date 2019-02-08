@@ -28,22 +28,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/transaction_coordinator_factory.h"
-#include "mongo/db/transaction_coordinator_service.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/s/transaction_coordinator_factory.h"
 
 namespace mongo {
-MONGO_REGISTER_SHIM(createTransactionCoordinator)
-(OperationContext* opCtx, TxnNumber clientTxnNumber)->void {
-    auto clientLsid = opCtx->getLogicalSessionId().get();
-    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
 
-    // If this shard has been selected as the coordinator, set up the coordinator state
-    // to be ready to receive votes.
-    TransactionCoordinatorService::get(opCtx)->createCoordinator(
-        opCtx,
-        clientLsid,
-        clientTxnNumber,
-        clockSource->now() + Seconds(transactionLifetimeLimitSeconds.load()));
-}
+MONGO_DEFINE_SHIM(createTransactionCoordinator);
+
 }  // namespace mongo

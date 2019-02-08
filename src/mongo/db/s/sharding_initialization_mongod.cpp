@@ -34,7 +34,6 @@
 
 #include "mongo/db/s/sharding_initialization_mongod.h"
 
-#include "mongo/base/status.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -53,8 +52,8 @@
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_config_optime_gossip.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/transaction_coordinator_service.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog_cache.h"

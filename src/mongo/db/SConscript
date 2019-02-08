@@ -668,29 +668,6 @@ env.Library(
 )
 
 env.Library(
-    target='transaction_coordinator',
-    source=[
-        'transaction_coordinator_catalog.cpp',
-        'transaction_coordinator_driver.cpp',
-        'transaction_coordinator_factory_mongod.cpp',
-        'transaction_coordinator_futures_util.cpp',
-        'transaction_coordinator_service.cpp',
-        'transaction_coordinator.cpp',
-        env.Idlc('transaction_coordinator_document.idl')[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'catalog_raii',
-        'rw_concern_d',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
-        '$BUILD_DIR/mongo/s/async_requests_sender',
-        '$BUILD_DIR/mongo/s/grid',
-    ]
-)
-
-env.Library(
     target='session_catalog',
     source=[
         'session_catalog.cpp',
@@ -712,7 +689,6 @@ env.Library(
         'server_transactions_metrics.cpp',
         'session_catalog_mongod.cpp',
         'single_transaction_stats.cpp',
-        'transaction_coordinator_factory.cpp',
         'transaction_history_iterator.cpp',
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
@@ -745,23 +721,6 @@ env.Library(
         'commands/server_status',
         'update/update_driver',
     ]
-)
-
-env.CppUnitTest(
-    target='transaction_coordinator_test',
-    source=[
-        'transaction_coordinator_catalog_test.cpp',
-        'transaction_coordinator_futures_util_test.cpp',
-        'transaction_coordinator_service_test.cpp',
-        'transaction_coordinator_test_fixture.cpp',
-        'transaction_coordinator_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
-        '$BUILD_DIR/mongo/s/shard_server_test_fixture',
-        'auth/authmocks',
-        'transaction_coordinator',
-    ],
 )
 
 env.CppUnitTest(

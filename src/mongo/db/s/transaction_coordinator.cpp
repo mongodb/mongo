@@ -32,11 +32,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator.h"
+#include "mongo/db/s/transaction_coordinator.h"
 
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/transaction_coordinator_document_gen.h"
-#include "mongo/db/transaction_coordinator_futures_util.h"
+#include "mongo/db/s/transaction_coordinator_document_gen.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

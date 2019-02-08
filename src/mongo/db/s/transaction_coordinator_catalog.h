@@ -34,10 +34,8 @@
 #include <map>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/transaction_coordinator.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {

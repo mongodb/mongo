@@ -32,7 +32,7 @@
 
 #include <vector>
 
-#include "mongo/db/transaction_coordinator_driver.h"
+#include "mongo/db/s/transaction_coordinator_driver.h"
 #include "mongo/logger/logstream_builder.h"
 
 namespace mongo {

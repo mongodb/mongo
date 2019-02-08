@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator_catalog.h"
+#include "mongo/db/s/transaction_coordinator_catalog.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

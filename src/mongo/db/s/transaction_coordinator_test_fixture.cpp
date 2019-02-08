@@ -32,7 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator_test_fixture.h"
+#include "mongo/db/s/transaction_coordinator_test_fixture.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands/txn_cmds_gen.h"

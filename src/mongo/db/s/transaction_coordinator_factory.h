@@ -28,8 +28,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/transaction_coordinator_factory.h"
+#pragma once
+
+#include "mongo/base/shim.h"
+#include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
-MONGO_DEFINE_SHIM(createTransactionCoordinator);
-}
+
+extern MONGO_DECLARE_SHIM((OperationContext * opCtx, TxnNumber clientTxnNumber)->void)
+    createTransactionCoordinator;
+
+}  // namespace mongo

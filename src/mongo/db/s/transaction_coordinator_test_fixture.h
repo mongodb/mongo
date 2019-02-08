@@ -34,7 +34,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/db/transaction_coordinator.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_server_test_fixture.h"
 

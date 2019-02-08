@@ -33,16 +33,15 @@
 #include <vector>
 
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/transaction_coordinator_futures_util.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/shard_id.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
+
 class TransactionCoordinatorDocument;
+
 namespace txn {
 
 /**

@@ -30,7 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/logical_session_id.h"
-        - "mongo/db/transaction_coordinator.h"
+        - "mongo/db/s/transaction_coordinator.h"
 
 imports:
     - "mongo/idl/basic_types.idl"

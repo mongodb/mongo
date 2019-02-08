@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/transaction_coordinator_catalog.h"
+#include "mongo/db/s/transaction_coordinator_catalog.h"
 
 namespace mongo {
 

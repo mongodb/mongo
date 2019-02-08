@@ -32,7 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_coordinator_driver.h"
+#include "mongo/db/s/transaction_coordinator_driver.h"
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -41,9 +41,9 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/transaction_coordinator.h"
-#include "mongo/db/transaction_coordinator_document_gen.h"
-#include "mongo/db/transaction_coordinator_futures_util.h"
+#include "mongo/db/s/transaction_coordinator.h"
+#include "mongo/db/s/transaction_coordinator_document_gen.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point_service.h"
