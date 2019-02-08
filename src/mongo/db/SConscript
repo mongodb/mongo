@@ -419,6 +419,21 @@ if env.TargetOSIs('windows'):
         ],
     )
 
+env.Library(
+    target='server_options_base',
+    source=[
+        'server_options_base.cpp',
+        env.Idlc('server_options_base.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'server_options_core',
+    ],
+)
+
 env.Clone().InjectModule("enterprise").Library(
     target="server_options_servers",
     source=[
@@ -431,6 +446,7 @@ env.Clone().InjectModule("enterprise").Library(
         # networking library has separate options
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         'server_options',
+        'server_options_base',
     ],
 )
 
@@ -502,6 +518,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'global_settings',
+        'server_options_base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ]
 )
 

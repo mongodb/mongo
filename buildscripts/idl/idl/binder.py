@@ -1075,7 +1075,7 @@ def _bind_config_option(ctxt, globals_spec, option):
 
         node.short_name = node.short_name + ',' + option.single_name
 
-    node.description = option.description
+    node.description = _bind_expression(option.description)
     node.arg_vartype = option.arg_vartype
     node.cpp_vartype = option.cpp_vartype
     node.cpp_varname = option.cpp_varname

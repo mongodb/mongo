@@ -1,0 +1,157 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/server_options.h"
+        - "mongo/db/server_options_base.h"
+    configs:
+        section: 'General options'
+        source: [ cli, ini, yaml ]
+        initializer:
+            register: addBaseServerOptionDefinitions
+
+configs:
+    # The verbosity level can be set at startup in the following ways.  Note that if multiple
+    # methods for setting the verbosity are specified simultaneously, the verbosity will be set
+    # based on the whichever option specifies the highest level
+    #
+    # Command Line Option | Resulting Verbosity
+    # _________________________________________
+    # (none)              | 0
+    # --verbose ""        | Error after Boost 1.59
+    # --verbose           | 1
+    # --verbose v         | 1
+    # --verbose vv        | 2 (etc.)
+    # -v                  | 1
+    # -vv                 | 2 (etc.)
+    #
+    # INI Config Option   | Resulting Verbosity
+    # _________________________________________
+    # verbose=            | 0
+    # verbose=v           | 1
+    # verbose=vv          | 2 (etc.)
+    # v=true              | 1
+    # vv=true             | 2 (etc.)
+    #
+    # YAML Config Option  | Resulting Verbosity
+    # _________________________________________
+    # systemLog:          |
+    #    verbosity: 5     | 5
+    # systemLog:          |
+    #   component:        |
+    #     verbosity: 5    | 5
+    # systemLog:          |
+    #   component:        |
+    #     Sharding:       |
+    #       verbosity: 5  | 5 (for Sharding only, 0 for default)
+    verbose:
+        description: 'Be more verbose (include multiple times for more verbosity e.g. -vvvvv)'
+        single_name: v
+        arg_vartype: String
+        source: [ cli, ini ]
+        implicit: v
+    # vv-vvvvvvvvvvvv defined in server_options_base.cpp
+
+    'systemLog.verbosity':
+        description: 'Set verbose level'
+        arg_vartype: Int
+        source: yaml
+
+    # systemLog.component.*.verbosity defined in server_options_base.cpp
+
+    'systemLog.quiet':
+        description: 'Quieter output'
+        short_name: quiet
+        arg_vartype: Switch
+    'net.port':
+        description:
+            expr: 'ServerGlobalParams::getPortSettingHelpText()'
+            is_constexpr: false
+        short_name: port
+        arg_vartype: Int
+    logpath:
+        # Cannot roll into systemLog.path because canonicalization also sets systemLog.destination.
+        description: 'Log file to send write to instead of stdout - has to be a file, not directory'
+        source: [ cli, ini ]
+        arg_vartype: String
+        conflicts: syslog
+        hidden: true
+    'systemLog.path':
+        description: 'Log file to send write to instead of stdout - has to be a file, not directory'
+        source: yaml
+        arg_vartype: String
+        conflicts: syslog
+    'systemLog.destination':
+        description: 'Destination of system log output.  (syslog/file)'
+        arg_vartype: String
+        source: yaml
+        hidden: true
+        validator:
+            callback: validateSystemLogDestinationSetting
+
+    syslog:
+        description: "Log to system's syslog facility instead of file or stdout"
+        arg_vartype: Switch
+        source: [ cli, ini ]
+        conflicts: 'systemLog.path'
+        condition:
+            preprocessor: '!defined(_WIN32)'
+    'systemLog.syslogFacility':
+        description: 'syslog facility used for mongodb syslog message'
+        short_name: syslogFacility
+        arg_vartype: String
+        condition:
+            preprocessor: '!defined(_WIN32)'
+
+    'systemLog.logAppend':
+        description: 'Append to logpath instead of over-writing'
+        short_name: logappend
+        arg_vartype: Switch
+    'systemLog.logRotate':
+        description: 'Set the log rotation behavior (rename|reopen)'
+        short_name: logRotate
+        arg_vartype: String
+    'systemLog.timeStampFormat':
+        description: Desired format for timestamps in log messages. One of ctime, iso8601-utc or iso8601-local
+        short_name: timeStampFormat
+        arg_vartype: String
+
+    setParameter:
+        description: 'Set a configurable parameter'
+        arg_vartype: StringMap
+        duplicate_behavior: append
+
+    # -vvvvv
+
+    'systemLog.traceAllExceptions':
+        description: 'Log stack traces for every exception'
+        short_name: traceExceptions
+        arg_vartype: Switch
+        hidden: true

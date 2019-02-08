@@ -2026,12 +2026,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         with self._condition(opt.condition):
             with self._block(section, ';'):
                 self._writer.write_line(
-                    common.template_args(
+                    common.template_format(
                         '.addOptionChaining(${name}, ${short}, moe::${argtype}, ${desc}, ${deprname}, ${deprshortname})',
-                        name=_encaps(opt.name), short=_encaps(
-                            opt.short_name), argtype=opt.arg_vartype, desc=_encaps(opt.description),
-                        deprname=_encaps_list(opt.deprecated_name), deprshortname=_encaps_list(
-                            opt.deprecated_short_name)))
+                        {
+                            'name': _encaps(opt.name),
+                            'short': _encaps(opt.short_name),
+                            'argtype': opt.arg_vartype,
+                            'desc': _get_expression(opt.description),
+                            'deprname': _encaps_list(opt.deprecated_name),
+                            'deprshortname': _encaps_list(opt.deprecated_short_name),
+                        }))
                 self._writer.write_line('.setSources(moe::%s)' % (opt.source))
                 if opt.hidden:
                     self._writer.write_line('.hidden()')

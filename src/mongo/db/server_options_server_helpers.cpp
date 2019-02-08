@@ -44,6 +44,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/logger/log_component.h"
@@ -68,7 +69,7 @@ namespace moe = ::mongo::optionenvironment;
 namespace mongo {
 
 Status addGeneralServerOptions(moe::OptionSection* options) {
-    auto baseResult = addBaseServerOptions(options);
+    auto baseResult = addBaseServerOptions(&moe::startupOptions);
     if (!baseResult.isOK()) {
         return baseResult;
     }

@@ -496,6 +496,7 @@ mongos = env.Program(
         'db/logical_time_metadata_hook',
         'db/mongodandmongos',
         'db/server_options',
+        'db/server_options_base',
         'db/startup_warnings_common',
         'db/stats/counters',
         'db/windows_options' if env.TargetOSIs('windows') else [],

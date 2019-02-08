@@ -1,5 +1,6 @@
+
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,51 +28,20 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 
 namespace mongo {
 
-namespace optionenvironment {
-class OptionSection;
-class Environment;
-}  // namespace optionenvironment
-
-namespace moe = mongo::optionenvironment;
-
 /**
-* Handle custom validation of base options that can not currently be done by using
-* Constraints in the Environment.  See the "validate" function in the Environment class for
-* more details.
-*/
-Status validateBaseOptions(const moe::Environment& params);
-
-/**
-* Canonicalize base options for the given environment.
-*
-* For example, the options "objcheck", "noobjcheck", and "net.wireObjectCheck" should all be
-* merged into "net.wireObjectCheck".
-*/
-Status canonicalizeBaseOptions(moe::Environment* params);
-
-/**
- * Sets up the global server state necessary to be able to store the server options, based on how
- * the server was started.
+ * Base server options that are available in all applications, standalone and embedded.
  *
- * For example, saves the current working directory in serverGlobalParams.cwd so that relative paths
- * in server options can be interpreted correctly.
+ * Included by addGeneralServerOptions, don't call both.
  */
-Status setupBaseOptions(const std::vector<std::string>& args);
+Status addBaseServerOptions(optionenvironment::OptionSection*);
 
-/**
-* Store the given parsed params in global server state.
-*
-* For example, sets the serverGlobalParams.quiet variable based on the systemLog.quiet config
-* parameter.
-*/
-Status storeBaseOptions(const moe::Environment& params);
+Status validateSystemLogDestinationSetting(const std::string&);
 
 }  // namespace mongo

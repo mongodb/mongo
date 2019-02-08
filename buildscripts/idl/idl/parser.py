@@ -624,7 +624,7 @@ def _parse_config_option(ctxt, spec, name, node):
             "single_name": _RuleDesc('scalar'),
             "deprecated_name": _RuleDesc('scalar_or_sequence'),
             "deprecated_short_name": _RuleDesc('scalar_or_sequence'),
-            "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "description": _RuleDesc('scalar_or_mapping', _RuleDesc.REQUIRED, _parse_expression),
             "section": _RuleDesc('scalar'),
             "arg_vartype": _RuleDesc('scalar', _RuleDesc.REQUIRED),
             "cpp_vartype": _RuleDesc('scalar'),

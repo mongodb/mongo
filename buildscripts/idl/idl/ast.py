@@ -345,7 +345,7 @@ class ConfigOption(common.SourceLocation):
         self.deprecated_name = []  # type: List[unicode]
         self.deprecated_short_name = []  # type: List[unicode]
 
-        self.description = None  # type: unicode
+        self.description = None  # type: Expression
         self.section = None  # type: unicode
         self.arg_vartype = None  # type: unicode
         self.cpp_vartype = None  # type: unicode

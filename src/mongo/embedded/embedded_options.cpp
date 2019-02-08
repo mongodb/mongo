@@ -31,7 +31,7 @@
 
 #include "mongo/embedded/embedded_options.h"
 
-#include "mongo/db/server_options.h"
+#include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/storage/storage_options.h"
 
@@ -44,9 +44,7 @@ namespace embedded {
 using std::string;
 
 Status addOptions(optionenvironment::OptionSection* options) {
-    moe::OptionSection general_options("General options");
-
-    Status ret = addBaseServerOptions(&general_options);
+    Status ret = addBaseServerOptions(options);
     if (!ret.isOK()) {
         return ret;
     }
@@ -78,10 +76,7 @@ Status addOptions(optionenvironment::OptionSection* options) {
 
 #endif
 
-    options->addSection(general_options).transitional_ignore();
-    options->addSection(storage_options).transitional_ignore();
-
-    return Status::OK();
+    return options->addSection(storage_options);
 }
 
 Status canonicalizeOptions(optionenvironment::Environment* params) {
