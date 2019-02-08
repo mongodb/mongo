@@ -248,9 +248,9 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
     // can be called immediately and recursively.
     if ((flags & kMayRecurse) &&
         (_localThreadState->recursionDepth + 1 < _config->recursionLimit())) {
-        _reactorHandle->schedule(Reactor::kDispatch, std::move(wrappedTask));
+        _reactorHandle->dispatch(std::move(wrappedTask));
     } else {
-        _reactorHandle->schedule(Reactor::kPost, std::move(wrappedTask));
+        _reactorHandle->schedule(std::move(wrappedTask));
     }
 
     _lastScheduleTimer.reset();

@@ -38,6 +38,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -153,7 +154,7 @@ private:
     const size_t _id;
 };
 
-class Reactor {
+class Reactor : public OutOfLineExecutor {
 public:
     Reactor(const Reactor&) = delete;
     Reactor& operator=(const Reactor&) = delete;
@@ -168,20 +169,8 @@ public:
     virtual void stop() = 0;
     virtual void drain() = 0;
 
-    using Task = unique_function<void()>;
-
-    enum ScheduleMode { kDispatch, kPost };
-    virtual void schedule(ScheduleMode mode, Task task) = 0;
-
-    template <typename Callback>
-    Future<FutureContinuationResult<Callback>> execute(Callback&& cb) {
-        auto pf = makePromiseFuture<FutureContinuationResult<Callback>>();
-        schedule(kPost, [ cb = std::forward<Callback>(cb), p = std::move(pf.promise) ]() mutable {
-            p.setWith(cb);
-        });
-
-        return std::move(pf.future);
-    }
+    virtual void schedule(Task task) = 0;
+    virtual void dispatch(Task task) = 0;
 
     virtual bool onReactorThread() const = 0;
 
