@@ -2627,4 +2627,91 @@ TEST_F(QueryPlannerTest, CompoundIndexBoundsNotEqualsNullReverseIndex) {
         "}}");
 }
 
+TEST_F(QueryPlannerTest, MustFetchBeforeDottedMultiKeyPathSort) {
+    addIndex(BSON("a.x" << 1), /* multikey= */ true);
+    runQuerySortProj(fromjson("{'a.x': 4}"), BSON("a.x" << 1), BSONObj());
+
+    assertNumSolutions(3U);
+    assertSolutionExists(
+        "{sort: {pattern: {'a.x': 1}, limit: 0, node: {sortKeyGen: {node: {cscan: {dir: 1}}}}}}");
+    assertSolutionExists(
+        "{sort: {"
+        "  pattern: {'a.x': 1},"
+        "  limit: 0,"
+        "  node: {"
+        "    sortKeyGen: {"
+        "      node: {"
+        "        fetch: {"
+        "          filter: {'a.x': 4},"
+        "          node: {"
+        "            ixscan: {"
+        "              filter: null, "
+        "              pattern: {'a.x': 1},"
+        "              bounds: {"
+        "                'a.x': [['MinKey', 'MaxKey', true, true]]"
+        "              },"
+        "              dir: 1"
+        "            }"
+        "          }"
+        "        }"
+        "      }"
+        "    }"
+        "  }"
+        "}}");
+    assertSolutionExists(
+        "{sort: {"
+        "  pattern: {'a.x': 1},"
+        "  limit: 0,"
+        "  node: {"
+        "    sortKeyGen: {"
+        "      node: {"
+        "        fetch: {"
+        "          filter: null,"
+        "          node: {"
+        "            ixscan: {"
+        "              filter: null, "
+        "              pattern: {'a.x': 1},"
+        "              bounds: {"
+        "                'a.x': [[4, 4, true, true]]"
+        "              },"
+        "              dir: 1"
+        "            }"
+        "          }"
+        "        }"
+        "      }"
+        "    }"
+        "  }"
+        "}}");
+
+    // Now without a query predicate.
+    runQuerySortProj(BSONObj(), BSON("a.x" << 1), BSONObj());
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {'a.x': 1}, limit: 0, node: {sortKeyGen: {node: {cscan: {dir: 1}}}}}}");
+    assertSolutionExists(
+        "{sort: {"
+        "  pattern: {'a.x': 1},"
+        "  limit: 0,"
+        "  node: {"
+        "    sortKeyGen: {"
+        "      node: {"
+        "        fetch: {"
+        "          filter: null,"
+        "          node: {"
+        "            ixscan: {"
+        "              filter: null, "
+        "              pattern: {'a.x': 1},"
+        "              bounds: {"
+        "                'a.x': [['MinKey', 'MaxKey', true, true]]"
+        "              },"
+        "              dir: 1"
+        "            }"
+        "          }"
+        "        }"
+        "      }"
+        "    }"
+        "  }"
+        "}}");
+}
 }  // namespace

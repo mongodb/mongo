@@ -15,9 +15,14 @@
      * result set, after being converted to an array, is equal to 'expected'. Also asserts that the
      * find plan uses the SORT stage and the agg plan uses the "$sort" agg stage.
      */
-    function testAggAndFindSort({filter, sort, project, expected}) {
+    function testAggAndFindSort({filter, sort, project, hint, expected}) {
         let cursor = coll.find(filter, project).sort(sort);
         assert.eq(cursor.toArray(), expected);
+        if (hint) {
+            // If there was a hint specified, make sure we get the same results with the hint.
+            cursor = coll.find(filter, project).sort(sort).hint(hint);
+            assert.eq(cursor.toArray(), expected);
+        }
         let explain = coll.find(filter, project).sort(sort).explain();
         assert(planHasStage(db, explain.queryPlanner.winningPlan, "SORT"));
 
@@ -170,4 +175,58 @@
         sort: {"a.c": 1},
         expected: [{_id: 0}, {_id: 1}, {_id: 2}]
     });
+
+    // Test that an indexed and unindexed sort return the same thing for a path "a.x" which
+    // traverses through an array.
+    coll.drop();
+    assert.commandWorked(coll.insert({_id: 0, a: [{x: 2}]}));
+    assert.commandWorked(coll.insert({_id: 1, a: [{x: 1}]}));
+    assert.commandWorked(coll.insert({_id: 2, a: [{x: 3}]}));
+    testAggAndFindSort({
+        filter: {},
+        project: {_id: 1},
+        sort: {"a.x": 1},
+        expected: [{_id: 1}, {_id: 0}, {_id: 2}]
+    });
+    assert.commandWorked(coll.createIndex({"a.x": 1}));
+    testAggAndFindSort({
+        filter: {},
+        project: {_id: 1},
+        sort: {"a.x": 1},
+        expected: [{_id: 1}, {_id: 0}, {_id: 2}]
+    });
+    testAggAndFindSort({
+        filter: {},
+        project: {_id: 1},
+        sort: {"a.x": 1},
+        hint: {"a.x": 1},
+        expected: [{_id: 1}, {_id: 0}, {_id: 2}]
+    });
+
+    // Now repeat the test with multiple entries along the path "a.x".
+    coll.drop();
+    assert.commandWorked(coll.insert({_id: 0, a: [{x: 2}, {x: 3}]}));
+    assert.commandWorked(coll.insert({_id: 1, a: [{x: 1}, {x: 4}]}));
+    assert.commandWorked(coll.insert({_id: 2, a: [{x: 3}, {x: 4}]}));
+    testAggAndFindSort({
+        filter: {},
+        project: {_id: 1},
+        sort: {"a.x": 1},
+        expected: [{_id: 1}, {_id: 0}, {_id: 2}]
+    });
+    assert.commandWorked(coll.createIndex({"a.x": 1}));
+    testAggAndFindSort({
+        filter: {},
+        project: {_id: 1},
+        sort: {"a.x": 1},
+        expected: [{_id: 1}, {_id: 0}, {_id: 2}]
+    });
+    testAggAndFindSort({
+        filter: {},
+        project: {_id: 1},
+        sort: {"a.x": 1},
+        hint: {"a.x": 1},
+        expected: [{_id: 1}, {_id: 0}, {_id: 2}]
+    });
+
 }());
