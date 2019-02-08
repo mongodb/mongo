@@ -374,13 +374,13 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledBlockingWorkInSucceeds) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(network());
-        network()->runUntil(network()->now() + Milliseconds{5});
+        network()->advanceTime(network()->now() + Milliseconds{5});
         ASSERT(!future.isReady());
     }
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(network());
-        network()->runUntil(network()->now() + Milliseconds{5});
+        network()->advanceTime(network()->now() + Milliseconds{5});
         ASSERT(future.isReady());
     }
 
@@ -501,12 +501,18 @@ TEST_F(AsyncWorkSchedulerTest, ShutdownInterruptsRemoteCommandsWhichAreBlockedWa
         kShardIds[1], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
 
     auto future2 = async.scheduleRemoteCommand(
-        kShardIds[2], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
+        kShardIds[2], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 2));
 
     ASSERT(!future1.isReady());
     ASSERT(!future2.isReady());
 
     async.shutdown({ErrorCodes::InternalError, "Test internal error"});
+
+    // Ensure that any scheduled cancellations as a result of the shutdown call above run
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Milliseconds(1));
+    }
 
     ASSERT_THROWS_CODE(future1.get(), AssertionException, ErrorCodes::InternalError);
     ASSERT_THROWS_CODE(future2.get(), AssertionException, ErrorCodes::InternalError);
@@ -643,7 +649,7 @@ TEST_F(DoWhileTest, LoopObeysBackoff) {
     // Back-off is 1 millisecond now
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(network());
-        network()->runUntil(network()->now() + Milliseconds{1});
+        network()->advanceTime(network()->now() + Milliseconds{1});
         ASSERT(!future.isReady());
         ASSERT_EQ(2, numLoops);
     }
@@ -652,14 +658,14 @@ TEST_F(DoWhileTest, LoopObeysBackoff) {
     // loop body to run
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(network());
-        network()->runUntil(network()->now() + Milliseconds{1});
+        network()->advanceTime(network()->now() + Milliseconds{1});
         ASSERT(!future.isReady());
         ASSERT_EQ(2, numLoops);
     }
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(network());
-        network()->runUntil(network()->now() + Seconds{1});
+        network()->advanceTime(network()->now() + Seconds{1});
         ASSERT(future.isReady());
         ASSERT_EQ(3, numLoops);
     }

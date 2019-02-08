@@ -154,7 +154,7 @@ void NetworkInterfaceMock::cancelCommand(const CallbackHandle& cbHandle, const B
 
 void NetworkInterfaceMock::_interruptWithResponse_inlock(
     const CallbackHandle& cbHandle,
-    const std::vector<NetworkOperationList*> queuesToCheck,
+    const std::vector<NetworkOperationList*>& queuesToCheck,
     const ResponseStatus& response) {
 
     auto matchFn = [&cbHandle](const auto& ops) { return ops.isForCallback(cbHandle); };
