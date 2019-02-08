@@ -279,6 +279,15 @@ public:
      */
     void awaitNoBgOpInProgForDb(StringData db) const;
 
+    /**
+     * Called by the replication coordinator when a replica set reconfig occurs, which could affect
+     * any index build to make their commit quorum unachievable.
+     *
+     * Checks if the commit quorum is still satisfiable for each index build, if it is no longer
+     * satisfiable, then those index builds are aborted.
+     */
+    void onReplicaSetReconfig();
+
     void sleepIndexBuilds_forTestOnly(bool sleep);
 
     void verifyNoIndexBuilds_forTestOnly();

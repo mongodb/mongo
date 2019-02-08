@@ -353,6 +353,10 @@ void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(StringData db) const {
     dbIndexBuildsIt->second->waitUntilNoIndexBuildsRemain(lk);
 }
 
+void IndexBuildsCoordinator::onReplicaSetReconfig() {
+    // TODO: not yet implemented.
+}
+
 void IndexBuildsCoordinator::sleepIndexBuilds_forTestOnly(bool sleep) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _sleepForTest = sleep;

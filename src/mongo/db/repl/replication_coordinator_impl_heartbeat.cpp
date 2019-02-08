@@ -40,6 +40,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
@@ -628,6 +629,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
+
+    // Inform the index builds coordinator of the replica set reconfig.
+    IndexBuildsCoordinator::get(opCtx.get())->onReplicaSetReconfig();
 }
 
 void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(

@@ -49,6 +49,7 @@
 #include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
@@ -2553,6 +2554,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
     _replExecutor->signalEvent(finishedEvent);
+
+    // Inform the index builds coordinator of the replica set reconfig.
+    IndexBuildsCoordinator::get(opCtx.get())->onReplicaSetReconfig();
 }
 
 Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCtx,
