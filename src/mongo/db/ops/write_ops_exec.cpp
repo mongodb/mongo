@@ -360,7 +360,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 &hangDuringBatchInsert,
                 opCtx,
                 "hangDuringBatchInsert",
-                [wholeOp]() {
+                [&wholeOp]() {
                     log()
                         << "batch insert - hangDuringBatchInsert fail point enabled for namespace "
                         << wholeOp.getNamespace() << ". Blocking "
@@ -590,7 +590,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
             &hangDuringBatchUpdate,
             opCtx,
             "hangDuringBatchUpdate",
-            [ns]() {
+            [&ns]() {
                 log() << "batch update - hangDuringBatchUpdate fail point enabled for nss " << ns
                       << ". Blocking until "
                          "fail point is disabled.";
