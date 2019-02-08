@@ -127,10 +127,8 @@
             let db = coll.getDB();
             assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));
         },
-        sessionId: pinnedCursorSession,
         runGetMoreFunc: () => {
-            assert.commandFailed(
-                db.runCommand({getMore: cursorId, collection: collName, lsid: sessionId}));
+            assert.commandFailed(db.runCommand({getMore: cursorId, collection: collName}));
         },
         failPointName: failPointName,
     });

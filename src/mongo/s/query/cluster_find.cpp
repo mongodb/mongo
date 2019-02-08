@@ -598,14 +598,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     BSONObj postBatchResumeToken;
     bool stashedResult = false;
 
-    // If the 'waitWithPinnedCursorDuringGetMoreBatch' fail point is enabled, set the 'msg'
-    // field of this operation's CurOp to signal that we've hit this point.
-    if (MONGO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitWithPinnedCursorDuringGetMoreBatch,
-                                                         opCtx,
-                                                         "waitWithPinnedCursorDuringGetMoreBatch");
-    }
-
     while (!FindCommon::enoughForGetMore(batchSize, batch.size())) {
         auto context = batch.empty()
             ? RouterExecStage::ExecContext::kGetMoreNoResultsYet
