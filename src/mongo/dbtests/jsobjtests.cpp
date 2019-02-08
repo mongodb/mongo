@@ -1853,7 +1853,7 @@ public:
             memcpy(crap, x.objdata(), x.objsize());
             BSONObj y(crap);
             ASSERT_BSONOBJ_EQ(x, y);
-            free(crap);
+            mongoFree(crap);
         }
 
         {
@@ -1869,7 +1869,7 @@ public:
                 state = 2;
                 ASSERT(strstr(e.what(), "_id: 5") != NULL);
             }
-            free(crap);
+            mongoFree(crap);
             ASSERT_EQUALS(2, state);
         }
     }

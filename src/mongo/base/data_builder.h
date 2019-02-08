@@ -54,10 +54,30 @@ class DataBuilder {
     /**
      * The dtor type used in the unique_ptr which holds the buffer
      */
-    struct FreeBuf {
-        void operator()(char* buf) {
-            std::free(buf);
+    struct BufDeleter {
+        BufDeleter() : _capacity(0) {}
+        explicit BufDeleter(size_t capacity) : _capacity(capacity) {}
+
+        BufDeleter(BufDeleter&& other) : _capacity(other._capacity) {
+            other._capacity = 0;
         }
+
+        BufDeleter& operator=(BufDeleter&& other) {
+            _capacity = other._capacity;
+            other._capacity = 0;
+            return *this;
+        }
+
+        void operator()(char* buf) const {
+            mongoFree(buf, _capacity);
+        }
+
+        size_t capacity() const {
+            return _capacity;
+        }
+
+    private:
+        size_t _capacity;
     };
 
     static const std::size_t kInitialBufferSize = 64;
@@ -79,10 +99,8 @@ public:
 
     DataBuilder& operator=(DataBuilder&& other) {
         _buf = std::move(other._buf);
-        _capacity = other._capacity;
         _unwrittenSpaceCursor = {_buf.get(), _buf.get() + other.size()};
 
-        other._capacity = 0;
         other._unwrittenSpaceCursor = {nullptr, nullptr};
 
         return *this;
@@ -151,14 +169,14 @@ public:
             return 0;
         }
 
-        return _capacity - _unwrittenSpaceCursor.length();
+        return capacity() - _unwrittenSpaceCursor.length();
     }
 
     /**
      * The total size of the buffer, including reserved but not written bytes.
      */
     std::size_t capacity() const {
-        return _capacity;
+        return _buf.get_deleter().capacity();
     }
 
     /**
@@ -166,7 +184,7 @@ public:
      * grow it.
      */
     void resize(std::size_t newSize) {
-        if (newSize == _capacity)
+        if (newSize == capacity())
             return;
 
         if (newSize == 0) {
@@ -178,12 +196,12 @@ public:
 
         auto ptr = _buf.release();
 
-        _buf.reset(static_cast<char*>(mongoRealloc(ptr, newSize)));
-
-        _capacity = newSize;
+        _buf = std::unique_ptr<char, BufDeleter>(static_cast<char*>(mongoRealloc(ptr, newSize)),
+                                                 BufDeleter(newSize));
 
         // If we downsized, truncate. If we upsized keep the old size
-        _unwrittenSpaceCursor = {_buf.get() + std::min(oldSize, _capacity), _buf.get() + _capacity};
+        _unwrittenSpaceCursor = {_buf.get() + std::min(oldSize, capacity()),
+                                 _buf.get() + capacity()};
     }
 
     /**
@@ -194,7 +212,9 @@ public:
     void reserve(std::size_t needed) {
         std::size_t oldSize = size();
 
-        std::size_t newSize = _capacity ? _capacity : kInitialBufferSize;
+        std::size_t newSize = capacity();
+        if (newSize == 0)
+            newSize = kInitialBufferSize;
 
         while ((newSize < oldSize) || (newSize - oldSize < needed)) {
             // growth factor of about 1.5
@@ -212,14 +232,14 @@ public:
      * internal data pointers.
      */
     void clear() {
-        _unwrittenSpaceCursor = {_buf.get(), _buf.get() + _capacity};
+        _unwrittenSpaceCursor = {_buf.get(), _buf.get() + capacity()};
     }
 
     /**
      * Release the buffer. After this the builder is left in the default
      * constructed state.
      */
-    std::unique_ptr<char, FreeBuf> release() {
+    std::unique_ptr<char, BufDeleter> release() {
         auto buf = std::move(_buf);
 
         *this = DataBuilder{};
@@ -252,8 +272,7 @@ private:
         }
     }
 
-    std::unique_ptr<char, FreeBuf> _buf;
-    std::size_t _capacity = 0;
+    std::unique_ptr<char, BufDeleter> _buf;
     DataRangeCursor _unwrittenSpaceCursor = {nullptr, nullptr};
 };
 

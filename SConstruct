@@ -2392,11 +2392,14 @@ def doConfigure(myenv):
     if myenv.ToolchainIs('msvc'):
         myenv.AppendUnique(CCFLAGS=['/Zc:__cplusplus', '/permissive-'])
         if get_option('cxx-std') == "17":
-            myenv.AppendUnique(CCFLAGS=['/std:c++17'])
+            myenv.AppendUnique(CCFLAGS=['/std:c++17', '/Zc:sizedDealloc'])
     else:
         if get_option('cxx-std') == "17":
             if not AddToCXXFLAGSIfSupported(myenv, '-std=c++17'):
                 myenv.ConfError('Compiler does not honor -std=c++17')
+
+            if not AddToCXXFLAGSIfSupported(myenv, '-fsized-deallocation'):
+                myenv.ConfError('Compiler does not honor -fsized-deallocation')
 
         if not AddToCFLAGSIfSupported(myenv, '-std=c11'):
             myenv.ConfError("C++14/17 mode selected for C++ files, but can't enable C11 for C files")

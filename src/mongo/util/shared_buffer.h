@@ -114,8 +114,9 @@ private:
             if (h->_refCount.subtractAndFetch(1) == 0) {
                 // We placement new'ed a Holder in takeOwnership above,
                 // so we must destroy the object here.
+                auto allocation_size = sizeof(Holder) + h->_capacity;
                 h->~Holder();
-                free(h);
+                mongoFree(h, allocation_size);
             }
         }
 

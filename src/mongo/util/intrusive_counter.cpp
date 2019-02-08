@@ -44,8 +44,7 @@ intrusive_ptr<const RCString> RCString::create(StringData s) {
                           << "MB",
             s.size() < static_cast<size_t>(BSONObjMaxUserSize));
 
-    const size_t sizeWithNUL = s.size() + 1;
-    const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
+    const size_t bytesNeeded = bytesRequiredForSize(s.size());
 
 #pragma warning(push)
 #pragma warning(disable : 4291)

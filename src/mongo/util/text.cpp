@@ -311,8 +311,8 @@ WindowsCommandLine::WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envp
 }
 
 WindowsCommandLine::~WindowsCommandLine() {
-    free(_argv);
-    free(_envp);
+    mongoFree(_argv);
+    mongoFree(_envp);
 }
 
 #endif  // #if defined(_WIN32)

@@ -61,7 +61,7 @@ inline void deallocateWrapper(void* ptr, std::size_t bytes, bool secure) {
     if (secure) {
         return deallocate(ptr, bytes);
     } else {
-        return free(ptr);
+        return mongoFree(ptr, bytes);
     }
 }
 
