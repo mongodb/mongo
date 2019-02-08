@@ -57,11 +57,20 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
     invariant(opCtx);
 
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
-    int attempts = 0;
+    int attempts = 1;
+    // If the failpoint is enabled, don't call the function, just simulate a conflict.
+    int ret =
+        MONGO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
+    if (ret != WT_PREPARE_CONFLICT)
+        return ret;
+    CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
+    wiredTigerPrepareConflictLog(attempts);
+
     while (true) {
         attempts++;
+        auto lastCount = recoveryUnit->getSessionCache()->getPrepareCommitOrAbortCount();
         // If the failpoint is enabled, don't call the function, just simulate a conflict.
-        int ret =
+        ret =
             MONGO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
 
         if (ret != WT_PREPARE_CONFLICT)
@@ -70,7 +79,8 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
         wiredTigerPrepareConflictLog(attempts);
         // Wait on the session cache to signal that a unit of work has been committed or aborted.
-        recoveryUnit->getSessionCache()->waitUntilPreparedUnitOfWorkCommitsOrAborts(opCtx);
+        recoveryUnit->getSessionCache()->waitUntilPreparedUnitOfWorkCommitsOrAborts(opCtx,
+                                                                                    lastCount);
     }
 }
 }  // namespace mongo

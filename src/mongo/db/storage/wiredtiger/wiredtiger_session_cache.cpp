@@ -233,14 +233,14 @@ WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
       _conn(engine->getConnection()),
       _clockSource(_engine->getClockSource()),
       _shuttingDown(0),
-      _lastCommitOrAbortCounter(0) {}
+      _prepareCommitOrAbortCounter(0) {}
 
 WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn, ClockSource* cs)
     : _engine(nullptr),
       _conn(conn),
       _clockSource(cs),
       _shuttingDown(0),
-      _lastCommitOrAbortCounter(0) {}
+      _prepareCommitOrAbortCounter(0) {}
 
 WiredTigerSessionCache::~WiredTigerSessionCache() {
     shuttingDown();
@@ -340,21 +340,20 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
     _journalListener->onDurable(token);
 }
 
-void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx) {
+void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx,
+                                                                        std::uint64_t lastCount) {
     invariant(opCtx);
     stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
-
-    auto lastCounter = _lastCommitOrAbortCounter;
-    opCtx->waitForConditionOrInterrupt(_prepareCommittedOrAbortedCond, lk, [&] {
-        return lastCounter != _lastCommitOrAbortCounter;
-    });
+    if (lastCount == _prepareCommitOrAbortCounter.loadRelaxed()) {
+        opCtx->waitForConditionOrInterrupt(_prepareCommittedOrAbortedCond, lk, [&] {
+            return _prepareCommitOrAbortCounter.loadRelaxed() > lastCount;
+        });
+    }
 }
 
 void WiredTigerSessionCache::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
-    {
-        stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
-        _lastCommitOrAbortCounter++;
-    }
+    stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
+    _prepareCommitOrAbortCounter.fetchAndAdd(1);
     _prepareCommittedOrAbortedCond.notify_all();
 }
 
