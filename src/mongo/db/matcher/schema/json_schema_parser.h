@@ -87,6 +87,13 @@ public:
      * tree. Returns a non-OK status if the schema is invalid or cannot be parsed.
      */
     static StatusWithMatchExpression parse(BSONObj schema, bool ignoreUnknownKeywords = false);
+
+    /**
+     * Builds a set of type aliases from the given type element using 'aliasMap'. Returns a non-OK
+     * status if 'typeElt' is invalid or does not contain an entry in the 'aliasMap'.
+     */
+    static StatusWith<MatcherTypeSet> parseTypeSet(BSONElement typeElt,
+                                                   const StringMap<BSONType>& aliasMap);
 };
 
 }  // namespace mongo

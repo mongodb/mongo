@@ -146,46 +146,8 @@ StatusWith<std::unique_ptr<InternalSchemaTypeExpression>> parseType(
     StringData keywordName,
     BSONElement typeElt,
     const StringMap<BSONType>& aliasMap) {
-    if (typeElt.type() != BSONType::String && typeElt.type() != BSONType::Array) {
-        return {Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "$jsonSchema keyword '" << keywordName
-                                     << "' must be either a string or an array of strings")};
-    }
 
-    std::set<StringData> aliases;
-    if (typeElt.type() == BSONType::String) {
-        if (typeElt.valueStringData() == JSONSchemaParser::kSchemaTypeInteger) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << "$jsonSchema type '" << JSONSchemaParser::kSchemaTypeInteger
-                                  << "' is not currently supported."};
-        }
-        aliases.insert(typeElt.valueStringData());
-    } else {
-        for (auto&& typeArrayEntry : typeElt.embeddedObject()) {
-            if (typeArrayEntry.type() != BSONType::String) {
-                return {Status(ErrorCodes::TypeMismatch,
-                               str::stream() << "$jsonSchema keyword '" << keywordName
-                                             << "' array elements must be strings")};
-            }
-
-            if (typeArrayEntry.valueStringData() == JSONSchemaParser::kSchemaTypeInteger) {
-                return {ErrorCodes::FailedToParse,
-                        str::stream() << "$jsonSchema type '"
-                                      << JSONSchemaParser::kSchemaTypeInteger
-                                      << "' is not currently supported."};
-            }
-
-            auto insertionResult = aliases.insert(typeArrayEntry.valueStringData());
-            if (!insertionResult.second) {
-                return {Status(ErrorCodes::FailedToParse,
-                               str::stream() << "$jsonSchema keyword '" << keywordName
-                                             << "' has duplicate value: "
-                                             << typeArrayEntry.valueStringData())};
-            }
-        }
-    }
-
-    auto typeSet = MatcherTypeSet::fromStringAliases(std::move(aliases), aliasMap);
+    auto typeSet = JSONSchemaParser::parseTypeSet(typeElt, aliasMap);
     if (!typeSet.isOK()) {
         return typeSet.getStatus();
     }
@@ -1527,6 +1489,52 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
     return {std::move(andExpr)};
 }
 }  // namespace
+
+StatusWith<MatcherTypeSet> JSONSchemaParser::parseTypeSet(BSONElement typeElt,
+                                                          const StringMap<BSONType>& aliasMap) {
+    if (typeElt.type() != BSONType::String && typeElt.type() != BSONType::Array) {
+        return {Status(ErrorCodes::TypeMismatch,
+                       str::stream() << "$jsonSchema keyword '" << typeElt.fieldNameStringData()
+                                     << "' must be either a string or an array of strings")};
+    }
+
+    std::set<StringData> aliases;
+    if (typeElt.type() == BSONType::String) {
+        if (typeElt.valueStringData() == JSONSchemaParser::kSchemaTypeInteger) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "$jsonSchema type '" << JSONSchemaParser::kSchemaTypeInteger
+                                  << "' is not currently supported."};
+        }
+        aliases.insert(typeElt.valueStringData());
+    } else {
+        for (auto&& typeArrayEntry : typeElt.embeddedObject()) {
+            if (typeArrayEntry.type() != BSONType::String) {
+                return {Status(ErrorCodes::TypeMismatch,
+                               str::stream() << "$jsonSchema keyword '"
+                                             << typeElt.fieldNameStringData()
+                                             << "' array elements must be strings")};
+            }
+
+            if (typeArrayEntry.valueStringData() == JSONSchemaParser::kSchemaTypeInteger) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << "$jsonSchema type '"
+                                      << JSONSchemaParser::kSchemaTypeInteger
+                                      << "' is not currently supported."};
+            }
+
+            auto insertionResult = aliases.insert(typeArrayEntry.valueStringData());
+            if (!insertionResult.second) {
+                return {Status(ErrorCodes::FailedToParse,
+                               str::stream() << "$jsonSchema keyword '"
+                                             << typeElt.fieldNameStringData()
+                                             << "' has duplicate value: "
+                                             << typeArrayEntry.valueStringData())};
+            }
+        }
+    }
+
+    return MatcherTypeSet::fromStringAliases(std::move(aliases), aliasMap);
+}
 
 StatusWithMatchExpression JSONSchemaParser::parse(BSONObj schema, bool ignoreUnknownKeywords) {
     LOG(5) << "Parsing JSON Schema: " << schema.jsonString();
