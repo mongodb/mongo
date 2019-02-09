@@ -782,7 +782,7 @@ public:
      *
      * Returns a DERToken which consists of the (tag, length, value) tuple.
      */
-    static StatusWith<DERToken> parse(ConstDataRange cdr, size_t* outLength);
+    static StatusWith<DERToken> parse(ConstDataRange cdr, uint64_t* outLength);
 
 private:
     DERType _type{DERType::EndOfContent};
@@ -799,7 +799,7 @@ struct DataType::Handler<DERToken> {
                        size_t length,
                        size_t* advanced,
                        std::ptrdiff_t debug_offset) {
-        size_t outLength;
+        uint64_t outLength;
 
         auto swPair = DERToken::parse(ConstDataRange(ptr, length), &outLength);
 
@@ -844,7 +844,7 @@ StatusWith<std::string> readDERString(ConstDataRangeCursor& cdc) {
 }
 
 
-StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
+StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, uint64_t* outLength) {
     const size_t kTagLength = 1;
     const size_t kTagLengthAndInitialLengthByteLength = kTagLength + 1;
 
