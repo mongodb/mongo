@@ -100,10 +100,6 @@ struct ReplIndexBuildState {
     // allowed to commit.
     WriteConcernOptions commitQuorum;
 
-    // Whether or not the primary replica set member has signaled that it is okay to go ahead and
-    // verify index constraint violations have gone away.
-    bool prepareIndexBuild = false;
-
     // Tracks the members of the replica set that have finished building the index(es) and are ready
     // to commit the index(es).
     std::vector<HostAndPort> commitReadyMembers;

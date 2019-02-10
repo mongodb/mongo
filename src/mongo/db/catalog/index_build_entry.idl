@@ -62,14 +62,6 @@ structs:
                 type: array<string>
                 description: "An array of index names associated with this particular cross replica
                               set index build."
-            prepareIndexBuild:
-                optional: false
-                type: bool
-                default: false
-                description: "Indicates that the primary has entered the commit phase, and 
-                              secondaries are allowed to proceed with the index constraint 
-                              violations resolution phase when ready and then send 
-                              voteCommitIndexBuild."
             commitReadyMembers:
                 optional: true
                 type: array<HostAndPort>
