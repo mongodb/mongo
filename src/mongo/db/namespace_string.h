@@ -99,6 +99,9 @@ public:
     // Namespace for replica set configuration settings.
     static const NamespaceString kSystemReplSetNamespace;
 
+    // Namespace for index build entries.
+    static const NamespaceString kIndexBuildEntryNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

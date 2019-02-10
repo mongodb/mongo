@@ -75,6 +75,8 @@ const NamespaceString NamespaceString::kSystemKeysNamespace(NamespaceString::kAd
 const NamespaceString NamespaceString::kRsOplogNamespace(NamespaceString::kLocalDb, "oplog.rs");
 const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::kLocalDb,
                                                                "system.replset");
+const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString::kConfigDb,
+                                                                 "system.indexBuilds");
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;

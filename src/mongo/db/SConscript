@@ -986,6 +986,38 @@ env.CppUnitTest(
     ]
 )
 
+
+env.Library(
+    target='index_build_entry_helpers',
+    source=[
+        "index_build_entry_helpers.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "catalog_raii",
+        "dbhelpers",
+        "namespace_string",
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
+        "$BUILD_DIR/mongo/db/catalog/index_build_entry_idl",
+        "$BUILD_DIR/mongo/db/storage/write_unit_of_work",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/util/net/network",
+    ],
+)
+
+env.CppUnitTest(
+    target='index_build_entry_helpers_test',
+    source=[
+        'index_build_entry_helpers_test.cpp',
+    ],
+    LIBDEPS=[
+        'index_build_entry_helpers',
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
 env.Library(
     target="cloner",
     source=[
