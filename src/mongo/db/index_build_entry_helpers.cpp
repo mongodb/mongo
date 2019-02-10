@@ -196,7 +196,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
         IDLParserErrorContext ctx("IndexBuildsEntry Parser");
         IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
         return indexBuildEntry;
-    } catch (const DBException& ex) {
+    } catch (...) {
         mongoutils::str::stream ss;
         ss << "Invalid BSON found for matching document with indexBuildUUID: " << indexBuildUUID;
         return Status(ErrorCodes::InvalidBSON, ss);
@@ -249,7 +249,7 @@ StatusWith<std::vector<IndexBuildEntry>> getIndexBuildEntries(OperationContext* 
             IDLParserErrorContext ctx("IndexBuildsEntry Parser");
             IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
             indexBuildEntries.push_back(indexBuildEntry);
-        } catch (const DBException& ex) {
+        } catch (...) {
             mongoutils::str::stream ss;
             ss << "Invalid BSON found for RecordId " << loc << " in collection "
                << collection->ns();
