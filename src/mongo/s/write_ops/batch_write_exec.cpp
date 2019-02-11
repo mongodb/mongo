@@ -305,6 +305,12 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                         // This forces the chunk manager to reload so we can attach the correct
                         // version on retry and make sure we route to the correct shard.
                         targeter.noteCouldNotTarget();
+
+                        // It is also possible that information about which shard is the primary
+                        // for this collection collection is stale, so refresh the database as
+                        // well.
+                        Grid::get(opCtx)->catalogCache()->invalidateDatabaseEntry(
+                            targeter.getNS().db());
                     }
 
                     // Remember that we successfully wrote to this shard
