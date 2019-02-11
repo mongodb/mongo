@@ -7846,7 +7846,7 @@ buildvariants:
   run_on:
   - rhel62-small
   batchtime: 1440 # 1 day
-  expansions:
+  expansions: &linux-64-required-duroff-expansions
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux-duroff
@@ -7895,6 +7895,25 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: slow1_gen
   - name: tool
+
+- name: linux-64-required-duroff
+  display_name: "! Linux (No Journal)"
+  run_on:
+  - rhel62-small
+  expansions:
+    <<: *linux-64-required-duroff-expansions
+    burn_in_tests_build_variant: linux-64-duroff
+  tasks:
+  # This build variants exists specifically to test that newly added or modified JavaScript tests
+  # are correctly tagged with "requires_journaling" prior to the changes being pushed. It uses the
+  # task list from the linux-64-duroff build variant to determine the resmoke.py YAML suite
+  # configurations to run the tests under. Do not add more tasks to this list.
+  - name: compile_TG
+    requires:
+    - name: burn_in_tests
+    distros:
+    - rhel62-large
+  - name: burn_in_tests
 
 - name: linux-64-lsm
   stepback: false
