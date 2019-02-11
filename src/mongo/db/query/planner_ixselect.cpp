@@ -55,6 +55,21 @@ namespace {
 
 namespace wcp = ::mongo::wildcard_planning;
 
+bool isNotEqualsArrayOrNotInArray(const MatchExpression* me) {
+    const auto type = me->matchType();
+    if (type == MatchExpression::EQ) {
+        return static_cast<const ComparisonMatchExpression*>(me)->getData().type() ==
+            BSONType::Array;
+    } else if (type == MatchExpression::MATCH_IN) {
+        const auto& equalities = static_cast<const InMatchExpression*>(me)->getEqualities();
+        return std::any_of(equalities.begin(), equalities.end(), [](BSONElement elt) {
+            return elt.type() == BSONType::Array;
+        });
+    }
+
+    return false;
+}
+
 std::size_t numPathComponents(StringData path) {
     return FieldRef{path}.numParts();
 }
@@ -391,7 +406,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             }
 
             const auto* child = node->getChild(0);
-            MatchExpression::MatchType childtype = child->matchType();
+            const MatchExpression::MatchType childtype = child->matchType();
             const bool isNotEqualsNull =
                 (childtype == MatchExpression::EQ &&
                  static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
@@ -415,6 +430,12 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             if (MatchExpression::REGEX == childtype || MatchExpression::MOD == childtype ||
                 MatchExpression::TYPE_OPERATOR == childtype ||
                 MatchExpression::ELEM_MATCH_VALUE == childtype) {
+                return false;
+            }
+
+            // Can't index negations of {$eq: <Array>} or {$in: [<Array>, ...]}. Note that we could
+            // use the index in principle, though we would need to generate special bounds.
+            if (isNotEqualsArrayOrNotInArray(child)) {
                 return false;
             }
 
