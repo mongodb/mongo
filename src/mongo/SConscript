@@ -543,17 +543,20 @@ def installBinary( e, name ):
             name,
             debug_sym_cmd
         )
+        e.NoCache(debug_sym)
         e.Install("#/", debug_sym)
         e.Alias('debugsymbols', debug_sym)
         distDebugSymbols.append(debug_sym)
 
     if env.TargetOSIs('linux', 'solaris') and (not has_option("nostrip")):
+        stripped_name = 'stripped/%s' % name
         strip_cmd = e.Command(
-            'stripped/%s' % name,
+            stripped_name,
             [name, debug_sym],
             '${OBJCOPY} --strip-debug --add-gnu-debuglink ${SOURCES[1]} ${SOURCES[0]} $TARGET'
         )
-        distBinaries.append('stripped/%s' % name)
+        e.NoCache(stripped_name)
+        distBinaries.append(stripped_name)
     else:
         distBinaries.append(name)
 
@@ -661,7 +664,7 @@ if env.TargetOSIs('posix'):
 # "dist" target is valid only when --use-new-tools is specified
 # Attempts to build release artifacts without tools must fail
 if has_option("use-new-tools"):
-    env.Command(
+    server_archive = env.Command(
         target='#/${SERVER_ARCHIVE}',
         source=['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] + distBinaries,
         action=' '.join(
@@ -682,7 +685,8 @@ if has_option("use-new-tools"):
         BUILD_DIR=env.Dir('$BUILD_DIR').path
     )
 
-    env.Alias("dist", source='#/${SERVER_ARCHIVE}')
+    env.Alias("dist", server_archive)
+    env.NoCache(server_archive)
 else:
     def failDist(env, target, source):
         env.FatalError("ERROR: 'dist' target only valid with --use-new-tools.")
@@ -704,6 +708,7 @@ debug_symbols_dist = env.Command(
 )
 
 env.Alias('dist-debugsymbols', debug_symbols_dist)
+env.NoCache(debug_symbols_dist)
 
 #final alias
 env.Alias( "install", "$INSTALL_DIR" )

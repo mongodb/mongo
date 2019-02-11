@@ -146,6 +146,7 @@ pre_msi_cmd = env.Command(pre_msi,
             '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null -sice:ICE82 -sice:ICE03'
             ' -ext "$WIXUIEXT" -ext "$WIXUTILEXT"'
             ' ${SOURCES}')
+env.NoCache(pre_msi_cmd)
 
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongo.exe')
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongod.exe')
@@ -161,5 +162,6 @@ env.Command(msi,
             pre_msi,
             r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}')
 env.AlwaysBuild(msi)
+env.NoCache(msi)
 
 env.Alias( "msi" , msi )
