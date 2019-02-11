@@ -849,8 +849,13 @@ public:
     }
 
     void rollback() final {
-        _collection->infoCache()->addedIndex(_opCtx, _entry->descriptor());
+        auto indexDescriptor = _entry->descriptor();
         _entries->add(std::move(_entry));
+
+        // Refresh the CollectionInfoCache's knowledge of what indices are present. This must be
+        // done after re-adding our IndexCatalogEntry to the '_entries' list, since 'addedIndex()'
+        // refreshes its knowledge by iterating the list of indices currently in the catalog.
+        _collection->infoCache()->addedIndex(_opCtx, indexDescriptor);
     }
 
 private:
