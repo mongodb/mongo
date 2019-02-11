@@ -367,9 +367,9 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
         // to a specific event; we thus only need to check (1), similar to 'startAtOperationTime'.
         startFrom = tokenData.clusterTime;
         if (expCtx->needsMerge || ResumeToken::isHighWaterMarkToken(tokenData)) {
-            resumeStage = DocumentSourceShardCheckResumability::create(expCtx, *startFrom);
+            resumeStage = DocumentSourceShardCheckResumability::create(expCtx, tokenData);
         } else {
-            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
+            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, tokenData);
         }
     }
 
