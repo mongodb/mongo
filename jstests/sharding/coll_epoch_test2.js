@@ -17,7 +17,8 @@ var config = st.s.getDB("config");
 var admin = st.s.getDB("admin");
 var coll = st.s.getCollection("foo.bar");
 
-insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true});
+assert.commandWorked(
+    insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
 
 var shards = [st.shard0, st.shard1];
 
@@ -27,27 +28,25 @@ var shards = [st.shard0, st.shard1];
 
 jsTest.log("Enabling sharding for the first time...");
 
-admin.runCommand({enableSharding: coll.getDB() + ""});
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
 st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
-admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
+assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 assert.writeOK(coll.insert({hello: "world"}));
 
 jsTest.log("Sharding collection across multiple shards...");
 
-var getOtherShard = function(shardId) {
-    for (shard in shards) {
-        if (shard.shardName != shardId)
-            return shard.shardName;
-    }
-};
+let res = admin.runCommand({split: coll + "", middle: {_id: 0}});
+assert.commandWorked(res);
+printjson(res);
 
-printjson(admin.runCommand({split: coll + "", middle: {_id: 0}}));
-printjson(admin.runCommand({
+res = admin.runCommand({
     moveChunk: coll + "",
     find: {_id: 0},
-    to: getOtherShard(config.databases.findOne({_id: coll.getDB() + ""}).primary)
-}));
+    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name
+});
+assert.commandWorked(res);
+printjson(res);
 
 st.printShardingStatus();
 
@@ -58,7 +57,9 @@ st.printShardingStatus();
 jsTest.log("Loading this status in all mongoses...");
 
 for (var i = 0; i < st._mongos.length; i++) {
-    printjson(st._mongos[i].getDB("admin").runCommand({flushRouterConfig: 1}));
+    res = st._mongos[i].getDB("admin").runCommand({flushRouterConfig: 1});
+    assert.commandWorked(res);
+    printjson(res);
     assert.neq(null, st._mongos[i].getCollection(coll + "").findOne());
 }
 
@@ -78,21 +79,26 @@ assert(droppedCollDoc.lastmodEpoch != null);
 assert(droppedCollDoc.lastmodEpoch.equals(new ObjectId("000000000000000000000000")),
        "epoch not zero: " + droppedCollDoc.lastmodEpoch);
 
-admin.runCommand({enableSharding: coll.getDB() + ""});
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
 st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
-admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
+assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++)
     bulk.insert({_id: i});
 assert.writeOK(bulk.execute());
 
-printjson(admin.runCommand({split: coll + "", middle: {_id: 200}}));
-printjson(admin.runCommand({
+res = admin.runCommand({split: coll + "", middle: {_id: 200}});
+assert.commandWorked(res);
+printjson(res);
+
+res = admin.runCommand({
     moveChunk: coll + "",
     find: {_id: 200},
-    to: getOtherShard(config.databases.findOne({_id: coll.getDB() + ""}).primary)
-}));
+    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name
+});
+assert.commandWorked(res);
+printjson(res);
 
 //
 // Make sure all operations on mongoses aren't tricked by the change
