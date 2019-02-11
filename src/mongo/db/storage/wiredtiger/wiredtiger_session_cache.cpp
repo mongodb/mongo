@@ -235,10 +235,15 @@ WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
     : _engine(engine),
       _conn(engine->getConnection()),
       _clockSource(_engine->getClockSource()),
-      _shuttingDown(0) {}
+      _shuttingDown(0),
+      _lastCommitOrAbortCounter(0) {}
 
 WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn, ClockSource* cs)
-    : _engine(NULL), _conn(conn), _clockSource(cs), _shuttingDown(0) {}
+    : _engine(nullptr),
+      _conn(conn),
+      _clockSource(cs),
+      _shuttingDown(0),
+      _lastCommitOrAbortCounter(0) {}
 
 WiredTigerSessionCache::~WiredTigerSessionCache() {
     shuttingDown();
