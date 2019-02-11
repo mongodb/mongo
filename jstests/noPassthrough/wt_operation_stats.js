@@ -77,7 +77,8 @@
         }
 
         checkLogStats();
-        let profileObj = getLatestProfilerEntry(testDB);
+        // Look for the storage statistics in the profiled output of the find command.
+        let profileObj = getLatestProfilerEntry(testDB, {op: "query", ns: "wt_op_stat.foo"});
         checkSystemProfileStats(profileObj, "bytesRead");
 
         MongoRunner.stopMongod(conn);
