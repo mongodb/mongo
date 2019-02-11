@@ -129,10 +129,6 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"voteAbortTransaction", 1},
                                         {"voteCommitTransaction", 1}};
 
-// The command names that are allowed in a multi-document transaction only when test commands are
-// enabled.
-const StringMap<int> txnCmdForTestingWhitelist = {{"dbHash", 1}};
-
 
 // The commands that can be run on the 'admin' database in multi-document transactions.
 const StringMap<int> txnAdminCommands = {{"abortTransaction", 1},
@@ -451,9 +447,7 @@ Status CommandHelpers::canUseTransactions(StringData dbName, StringData cmdName)
                 "http://dochub.mongodb.org/core/transaction-count for a recommended alternative."};
     }
 
-    if (txnCmdWhitelist.find(cmdName) == txnCmdWhitelist.cend() &&
-        !(getTestCommandsEnabled() &&
-          txnCmdForTestingWhitelist.find(cmdName) != txnCmdForTestingWhitelist.cend())) {
+    if (txnCmdWhitelist.find(cmdName) == txnCmdWhitelist.cend()) {
         return {ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction."};
     }

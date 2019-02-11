@@ -37,6 +37,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
@@ -262,10 +264,74 @@ public:
                         !txnParticipant->inActiveOrKilledMultiDocumentTransaction() ||
                         !qr->isReadOnce());
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "The '$_internalReadAtClusterTime' option is only supported when testing"
+                    " commands are enabled",
+                    !qr->getReadAtClusterTime() || getTestCommandsEnabled());
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "The '$_internalReadAtClusterTime' option is only supported when replication is"
+                    " enabled",
+                    !qr->getReadAtClusterTime() || replCoord->isReplEnabled());
+
+            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            uassert(ErrorCodes::InvalidOptions,
+                    "The '$_internalReadAtClusterTime' option is only supported by storage engines"
+                    " that support document-level concurrency",
+                    !qr->getReadAtClusterTime() || storageEngine->supportsDocLocking());
+
             // Validate term before acquiring locks, if provided.
             if (auto term = qr->getReplicationTerm()) {
                 // Note: updateTerm returns ok if term stayed the same.
                 uassertStatusOK(replCoord->updateTerm(opCtx, *term));
+            }
+
+            // We call RecoveryUnit::setTimestampReadSource() before acquiring a lock on the
+            // collection via AutoGetCollectionForRead in order to ensure the comparison to the
+            // collection's minimum visible snapshot is accurate.
+            if (auto targetClusterTime = qr->getReadAtClusterTime()) {
+                // We aren't holding the global lock in intent mode, so it is possible after
+                // comparing 'targetClusterTime' to 'lastAppliedOpTime' for the last applied opTime
+                // to go backwards or for the term to change due to replication rollback. This isn't
+                // an actual concern because the testing infrastructure won't use the
+                // $_internalReadAtClusterTime option in any test suite where rollback is expected
+                // to occur.
+                auto lastAppliedOpTime = replCoord->getMyLastAppliedOpTime();
+
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "$_internalReadAtClusterTime value must not be greater"
+                                         " than the last applied opTime. Requested clusterTime: "
+                                      << targetClusterTime->toString()
+                                      << "; last applied opTime: "
+                                      << lastAppliedOpTime.toString(),
+                        lastAppliedOpTime.getTimestamp() >= targetClusterTime);
+
+                // We aren't holding the global lock in intent mode, so it is possible for the
+                // global storage engine to have been destructed already as a result of the server
+                // shutting down. This isn't an actual concern because the testing infrastructure
+                // won't use the $_internalReadAtClusterTime option in any test suite where clean
+                // shutdown is expected to occur concurrently with tests running.
+                auto allCommittedTime = storageEngine->getAllCommittedTimestamp();
+                invariant(!allCommittedTime.isNull());
+
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "$_internalReadAtClusterTime value must not be greater"
+                                         " than the all-committed timestamp. Requested"
+                                         " clusterTime: "
+                                      << targetClusterTime->toString()
+                                      << "; all-committed timestamp: "
+                                      << allCommittedTime.toString(),
+                        allCommittedTime >= targetClusterTime);
+
+                // The $_internalReadAtClusterTime option causes any storage-layer cursors created
+                // during plan execution to read from a consistent snapshot of data at the supplied
+                // clusterTime, even across yields.
+                opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                              targetClusterTime);
+
+                // The $_internalReadAtClusterTime option also causes any storage-layer cursors
+                // created during plan execution to block on prepared transactions.
+                opCtx->recoveryUnit()->setIgnorePrepared(false);
             }
 
             // Acquire locks. If the query is on a view, we release our locks and convert the query

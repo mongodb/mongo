@@ -3,15 +3,17 @@
  *
  * Unlike run_check_repl_dbhash.js, this version of the hook doesn't require that all operations
  * have finished replicating, nor does it require that the test has finished running. The dbHash
- * command is run inside of a transaction specifying atClusterTime in order for an identical
- * snapshot to be used by all members of the replica set.
+ * command reads at a particular clusterTime in order for an identical snapshot to be used by all
+ * members of the replica set.
  *
- * The find and getMore commands used to generate the collection diff run as part of the same
- * transaction as the dbHash command. This ensures the diagnostics for a dbhash mismatch aren't
- * subjected to changes from any operations in flight.
+ * The find and getMore commands used to generate the collection diff read at the same clusterTime
+ * as the dbHash command. While this ensures the diagnostics for a dbhash mismatch aren't subjected
+ * to changes from any operations in flight, it is possible for the collection or an index on the
+ * collection to be dropped due to no locks being held.
  *
- * If a transient transaction error occurs, then the dbhash check is retried until it succeeds, or
- * until it fails with a non-transient error.
+ * If a transient error occurs, then the dbhash check is retried until it succeeds, or until it
+ * fails with a non-transient error. The most common case of a transient error is attempting to read
+ * from a collection after a catalog operation has been performed on the collection or database.
  */
 'use strict';
 
@@ -26,7 +28,7 @@
     let debugInfo = [];
 
     // We turn off printing the JavaScript stacktrace in doassert() to avoid generating an
-    // overwhelming amount of log messages when handling transient transaction errors.
+    // overwhelming amount of log messages when handling transient errors.
     TestData = TestData || {};
     TestData.traceExceptions = false;
 
@@ -69,13 +71,8 @@
     const kForeverSeconds = 1e9;
     const dbNames = new Set();
 
-    // We enable the "WTPreserveSnapshotHistoryIndefinitely" failpoint and extend the
-    // "transactionLifetimeLimitSeconds" server parameter to ensure that
-    //
-    //   (1) the same snapshot will be available to read at on the primary and secondaries, and
-    //
-    //   (2) the potentally long-running transaction isn't killed while we are part-way through
-    //       verifying data consistency.
+    // We enable the "WTPreserveSnapshotHistoryIndefinitely" failpoint to ensure that the same
+    // snapshot will be available to read at on the primary and secondaries.
     for (let session of sessions) {
         const db = session.getDatabase('admin');
 
@@ -96,19 +93,6 @@
                 mode: 'off',
             }));
         });
-
-        const res = assert.commandWorked(db.runCommand({
-            setParameter: 1,
-            transactionLifetimeLimitSeconds: kForeverSeconds,
-        }));
-
-        const transactionLifetimeLimitSecondsOriginal = res.was;
-        resetFns.push(() => {
-            assert.commandWorked(db.runCommand({
-                setParameter: 1,
-                transactionLifetimeLimitSeconds: transactionLifetimeLimitSecondsOriginal,
-            }));
-        });
     }
 
     for (let session of sessions) {
@@ -124,8 +108,8 @@
         });
     }
 
-    // Transactions cannot be run on the following databases. (The "local" database is also not
-    // replicated.)
+    // Transactions cannot be run on the following databases so we don't attempt to read at a
+    // clusterTime on them either. (The "local" database is also not replicated.)
     dbNames.delete('admin');
     dbNames.delete('config');
     dbNames.delete('local');
@@ -133,9 +117,8 @@
     const results = [];
 
     // The waitForSecondaries() function waits for all secondaries to have applied up to
-    // 'clusterTime' locally. This ensures that a later atClusterTime read inside a transaction
-    // doesn't stall as a result of a pending global X lock (e.g. from a dropDatabase command) on
-    // the primary preventing getMores on the oplog from receiving a response.
+    // 'clusterTime' locally. This ensures that a later $_internalReadAtClusterTime read doesn't
+    // fail as a result of the secondary's clusterTime being behind 'clusterTime'.
     const waitForSecondaries = (clusterTime, signedClusterTime) => {
         debugInfo.push({"waitForSecondaries": clusterTime, "signedClusterTime": signedClusterTime});
         for (let i = 1; i < sessions.length; ++i) {
@@ -198,9 +181,10 @@
     // isn't multi-versioned. Unlike with ReplSetTest#checkReplicatedDataHashes(), it is possible
     // for a collection catalog operation (e.g. a drop or rename) to have been applied on the
     // primary but not yet applied on the secondary.
-    const checkCollectionHashesForDB = (dbName) => {
+    const checkCollectionHashesForDB = (dbName, clusterTime) => {
         const result = [];
-        const hashes = rst.getHashesUsingSessions(sessions, dbName);
+        const hashes =
+            rst.getHashesUsingSessions(sessions, dbName, {readAtClusterTime: clusterTime});
         const hashesByUUID = hashes.map((response, i) => {
             const info = {};
 
@@ -281,9 +265,7 @@
             // ReplSetTest#getCollectionDiffUsingSessions() upon detecting a dbHash mismatch. It is
             // presumed to still useful to know that a bug exists even if we cannot get more
             // diagnostics for it.
-            if ((e.hasOwnProperty('errorLabels') &&
-                 e.errorLabels.includes('TransientTransactionError')) ||
-                e.code === ErrorCodes.Interrupted) {
+            if (e.code === ErrorCodes.Interrupted || e.code === ErrorCodes.SnapshotUnavailable) {
                 hasTransientError = true;
                 return true;
             }
@@ -310,23 +292,15 @@
                 debugInfo.push({
                     "node": session.getClient(),
                     "session": session,
-                    "startTransaction": clusterTime
+                    "readAtClusterTime": clusterTime
                 });
-                session.startTransaction(
-                    {readConcern: {level: 'snapshot', atClusterTime: clusterTime}});
             }
 
             hasTransientError = false;
 
             try {
-                result = checkCollectionHashesForDB(dbName);
+                result = checkCollectionHashesForDB(dbName, clusterTime);
             } catch (e) {
-                // We abort each of the transactions started on the nodes if one of them returns an
-                // error while running the dbHash check.
-                for (let session of sessions) {
-                    session.abortTransaction_forTesting();
-                }
-
                 if (isTransientError(e)) {
                     debugInfo.push({"transientError": e});
                     continue;
@@ -334,21 +308,6 @@
 
                 jsTestLog(debugInfo);
                 throw e;
-            }
-
-            // We then attempt to commit each of the transactions started on the nodes to confirm
-            // the data we read was actually majority-committed. If one of them returns an error,
-            // then we still try to commit the transactions started on subsequent nodes in order to
-            // clear their transaction state.
-            for (let session of sessions) {
-                try {
-                    session.commitTransaction();
-                } catch (e) {
-                    if (!isTransientError(e)) {
-                        jsTestLog(debugInfo);
-                        throw e;
-                    }
-                }
             }
         } while (hasTransientError);
 

@@ -43,10 +43,14 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
@@ -68,13 +72,6 @@ public:
 
     ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
-    }
-
-    bool supportsReadConcern(const std::string& dbName,
-                             const BSONObj& cmdObj,
-                             repl::ReadConcernLevel level) const override {
-        return level == repl::ReadConcernLevel::kLocalReadConcern ||
-            level == repl::ReadConcernLevel::kSnapshotReadConcern;
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -114,14 +111,80 @@ public:
                 str::stream() << "Invalid db name: " << ns,
                 NamespaceString::validDBName(ns, NamespaceString::DollarInDbNameBehavior::Allow));
 
+        if (auto elem = cmdObj["$_internalReadAtClusterTime"]) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "The '$_internalReadAtClusterTime' option is only supported when testing"
+                    " commands are enabled",
+                    getTestCommandsEnabled());
+
+            auto* replCoord = repl::ReplicationCoordinator::get(opCtx);
+            uassert(ErrorCodes::InvalidOptions,
+                    "The '$_internalReadAtClusterTime' option is only supported when replication is"
+                    " enabled",
+                    replCoord->isReplEnabled());
+
+            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            uassert(ErrorCodes::InvalidOptions,
+                    "The '$_internalReadAtClusterTime' option is only supported by storage engines"
+                    " that support document-level concurrency",
+                    storageEngine->supportsDocLocking());
+
+            uassert(ErrorCodes::TypeMismatch,
+                    "The '$_internalReadAtClusterTime' option must be a Timestamp",
+                    elem.type() == BSONType::bsonTimestamp);
+
+            auto targetClusterTime = elem.timestamp();
+
+            // We aren't holding the global lock in intent mode, so it is possible after comparing
+            // 'targetClusterTime' to 'lastAppliedOpTime' for the last applied opTime to go
+            // backwards or for the term to change due to replication rollback. This isn't an actual
+            // concern because the testing infrastructure won't use the $_internalReadAtClusterTime
+            // option in any test suite where rollback is expected to occur.
+            auto lastAppliedOpTime = replCoord->getMyLastAppliedOpTime();
+
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "$_internalReadAtClusterTime value must not be greater"
+                                     " than the last applied opTime. Requested clusterTime: "
+                                  << targetClusterTime.toString()
+                                  << "; last applied opTime: "
+                                  << lastAppliedOpTime.toString(),
+                    lastAppliedOpTime.getTimestamp() >= targetClusterTime);
+
+            // We aren't holding the global lock in intent mode, so it is possible for the global
+            // storage engine to have been destructed already as a result of the server shutting
+            // down. This isn't an actual concern because the testing infrastructure won't use the
+            // $_internalReadAtClusterTime option in any test suite where clean shutdown is expected
+            // to occur concurrently with tests running.
+            auto allCommittedTime = storageEngine->getAllCommittedTimestamp();
+            invariant(!allCommittedTime.isNull());
+
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "$_internalReadAtClusterTime value must not be greater"
+                                     " than the all-committed timestamp. Requested clusterTime: "
+                                  << targetClusterTime.toString()
+                                  << "; all-committed timestamp: "
+                                  << allCommittedTime.toString(),
+                    allCommittedTime >= targetClusterTime);
+
+            // The $_internalReadAtClusterTime option causes any storage-layer cursors created
+            // during plan execution to read from a consistent snapshot of data at the supplied
+            // clusterTime, even across yields.
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                          targetClusterTime);
+
+            // The $_internalReadAtClusterTime option also causes any storage-layer cursors created
+            // during plan execution to block on prepared transactions.
+            opCtx->recoveryUnit()->setIgnorePrepared(false);
+        }
+
         // We lock the entire database in S-mode in order to ensure that the contents will not
         // change for the snapshot.
         auto lockMode = LockMode::MODE_S;
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
-            // However, if we are inside a multi-statement transaction, then we only need to lock
-            // the database in intent mode to ensure that none of the collections get dropped.
-            lockMode = getLockModeForQuery(opCtx, boost::none);
+        if (opCtx->recoveryUnit()->getTimestampReadSource() ==
+            RecoveryUnit::ReadSource::kProvided) {
+            // However, if we are performing a read at a timestamp, then we only need to lock the
+            // database in intent mode to ensure that none of the collections get dropped.
+            lockMode = LockMode::MODE_IS;
         }
         AutoGetDb autoDb(opCtx, ns, lockMode);
         Database* db = autoDb.getDb();
@@ -220,16 +283,14 @@ private:
             return "";
 
         boost::optional<Lock::CollectionLock> collLock;
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
-            // When inside a multi-statement transaction, we are only holding the database lock in
+        if (opCtx->recoveryUnit()->getTimestampReadSource() ==
+            RecoveryUnit::ReadSource::kProvided) {
+            // When performing a read at a timestamp, we are only holding the database lock in
             // intent mode. We need to also acquire the collection lock in intent mode to ensure
             // reading from the consistent snapshot doesn't overlap with any catalog operations on
             // the collection.
-            invariant(
-                opCtx->lockState()->isDbLockedForMode(db->name(), getLockModeForQuery(opCtx, ns)));
-            collLock.emplace(
-                opCtx->lockState(), fullCollectionName, getLockModeForQuery(opCtx, ns));
+            invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IS));
+            collLock.emplace(opCtx->lockState(), fullCollectionName, MODE_IS);
 
             auto minSnapshot = collection->getMinimumVisibleSnapshot();
             auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();

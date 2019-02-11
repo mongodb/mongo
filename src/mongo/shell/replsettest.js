@@ -1494,11 +1494,16 @@ var ReplSetTest = function(opts) {
 
     this.getHashesUsingSessions = function(sessions, dbName, {
         filterCapped: filterCapped = true,
-        filterMapReduce: filterMapReduce = true,
+        filterMapReduce: filterMapReduce = true, readAtClusterTime,
     } = {}) {
         return sessions.map(session => {
+            const commandObj = {dbHash: 1};
+            if (readAtClusterTime !== undefined) {
+                commandObj.$_internalReadAtClusterTime = readAtClusterTime;
+            }
+
             const db = session.getDatabase(dbName);
-            const res = assert.commandWorked(db.runCommand({dbHash: 1}));
+            const res = assert.commandWorked(db.runCommand(commandObj));
 
             // The "capped" field in the dbHash command response is new as of MongoDB 4.0.
             const cappedCollections = new Set(filterCapped ? res.capped : []);
@@ -1528,7 +1533,7 @@ var ReplSetTest = function(opts) {
     };
 
     this.getCollectionDiffUsingSessions = function(
-        primarySession, secondarySession, dbName, collNameOrUUID) {
+        primarySession, secondarySession, dbName, collNameOrUUID, readAtClusterTime) {
         function PeekableCursor(cursor) {
             let _stashedDoc;
 
@@ -1557,11 +1562,16 @@ var ReplSetTest = function(opts) {
         const primaryDB = primarySession.getDatabase(dbName);
         const secondaryDB = secondarySession.getDatabase(dbName);
 
-        const primaryCursor = new PeekableCursor(new DBCommandCursor(
-            primaryDB, primaryDB.runCommand({find: collNameOrUUID, sort: {_id: 1}})));
+        const commandObj = {find: collNameOrUUID, sort: {_id: 1}};
+        if (readAtClusterTime !== undefined) {
+            commandObj.$_internalReadAtClusterTime = readAtClusterTime;
+        }
 
-        const secondaryCursor = new PeekableCursor(new DBCommandCursor(
-            secondaryDB, secondaryDB.runCommand({find: collNameOrUUID, sort: {_id: 1}})));
+        const primaryCursor =
+            new PeekableCursor(new DBCommandCursor(primaryDB, primaryDB.runCommand(commandObj)));
+
+        const secondaryCursor = new PeekableCursor(
+            new DBCommandCursor(secondaryDB, secondaryDB.runCommand(commandObj)));
 
         while (primaryCursor.hasNext() && secondaryCursor.hasNext()) {
             const primaryDoc = primaryCursor.peekNext();

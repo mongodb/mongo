@@ -307,6 +307,32 @@ public:
             auto cursorManager = CursorManager::get(opCtx);
             auto cursorPin = uassertStatusOK(cursorManager->pinCursor(opCtx, _request.cursorid));
 
+            {
+                // We call RecoveryUnit::setTimestampReadSource() before acquiring a lock on the
+                // collection via AutoGetCollectionForRead in order to ensure the comparison to the
+                // collection's minimum visible snapshot is accurate.
+                PlanExecutor* exec = cursorPin->getExecutor();
+                const auto* cq = exec->getCanonicalQuery();
+
+                if (auto clusterTime =
+                        (cq ? cq->getQueryRequest().getReadAtClusterTime() : boost::none)) {
+                    // We don't compare 'clusterTime' to the last applied opTime or to the
+                    // all-committed timestamp because the testing infrastructure won't use the
+                    // $_internalReadAtClusterTime option in any test suite where rollback is
+                    // expected to occur.
+
+                    // The $_internalReadAtClusterTime option causes any storage-layer cursors
+                    // created during plan execution to read from a consistent snapshot of data at
+                    // the supplied clusterTime, even across yields.
+                    opCtx->recoveryUnit()->setTimestampReadSource(
+                        RecoveryUnit::ReadSource::kProvided, clusterTime);
+
+                    // The $_internalReadAtClusterTime option also causes any storage-layer cursors
+                    // created during plan execution to block on prepared transactions.
+                    opCtx->recoveryUnit()->setIgnorePrepared(false);
+                }
+            }
+
             if (cursorPin->lockPolicy() == ClientCursorParams::LockPolicy::kLocksInternally) {
                 if (!_request.nss.isCollectionlessCursorNamespace()) {
                     const boost::optional<int> dbProfilingLevel = boost::none;
