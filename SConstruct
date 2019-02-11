@@ -1174,27 +1174,6 @@ if has_option("cache"):
         env.FatalError("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
     env.CacheDir(str(env.Dir(cacheDir)))
 
-    if get_option("cache") == "nolinked":
-        def noCacheEmitter(target, source, env):
-            for t in target:
-                env.NoCache(t)
-            return target, source
-
-        def addNoCacheEmitter(builder):
-            origEmitter = builder.emitter
-            if SCons.Util.is_Dict(origEmitter):
-                for k,v in origEmitter:
-                    origEmitter[k] = SCons.Builder.ListEmitter([v, noCacheEmitter])
-            elif SCons.Util.is_List(origEmitter):
-                emitter.append(noCacheEmitter)
-            else:
-                builder.emitter = SCons.Builder.ListEmitter([origEmitter, noCacheEmitter])
-
-        addNoCacheEmitter(env['BUILDERS']['Program'])
-        addNoCacheEmitter(env['BUILDERS']['StaticLibrary'])
-        addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
-        addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
-
 # Normalize the link model. If it is auto, then for now both developer and release builds
 # use the "static" mode. Somday later, we probably want to make the developer build default
 # dynamic, but that will require the hygienic builds project.
@@ -3309,6 +3288,34 @@ try:
 # methods that are cross-platform.
 except NotImplementedError:
     pass
+
+# Keep this late in the game so that we can investigate attributes set by all the tools that have run.
+if has_option("cache"):
+    if get_option("cache") == "nolinked":
+        def noCacheEmitter(target, source, env):
+            for t in target:
+                try:
+                    if getattr(t.attributes, 'thin_archive', False):
+                        continue
+                except(AttributeError):
+                    pass
+                env.NoCache(t)
+            return target, source
+
+        def addNoCacheEmitter(builder):
+            origEmitter = builder.emitter
+            if SCons.Util.is_Dict(origEmitter):
+                for k,v in origEmitter:
+                    origEmitter[k] = SCons.Builder.ListEmitter([v, noCacheEmitter])
+            elif SCons.Util.is_List(origEmitter):
+                origEmitter.append(noCacheEmitter)
+            else:
+                builder.emitter = SCons.Builder.ListEmitter([origEmitter, noCacheEmitter])
+
+        addNoCacheEmitter(env['BUILDERS']['Program'])
+        addNoCacheEmitter(env['BUILDERS']['StaticLibrary'])
+        addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
+        addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
 
 env.SConscript(
     dirs=[
