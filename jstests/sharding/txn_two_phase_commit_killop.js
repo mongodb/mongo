@@ -98,8 +98,7 @@
         // Turn on failpoint to make the coordinator hang at a the specified point.
         assert.commandWorked(coordinator.adminCommand({
             configureFailPoint: failpointData.failpoint,
-            mode: "alwaysOn",
-            skip: (failpointData.skip ? failpointData.skip : 0),
+            mode: {skip: (failpointData.skip ? failpointData.skip : 0)},
         }));
 
         // Run commitTransaction through a parallel shell.

@@ -158,8 +158,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
             assert.commandWorked(coordPrimary.adminCommand({
                 configureFailPoint: failpointData.failpoint,
-                mode: "alwaysOn",
-                skip: (failpointData.skip ? failpointData.skip : 0),
+                mode: {skip: (failpointData.skip ? failpointData.skip : 0)},
             }));
 
             // Run commitTransaction through a parallel shell.
@@ -269,6 +268,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     failpointDataArr.forEach(function(failpointData) {
         if (failpointData.failpoint == "hangWhileTargetingRemoteHost") {
             failpointData.numTimesShouldBeHit++;
+            if (failpointData.skip) {
+                failpointData.skip++;
+            }
         }
     });
 

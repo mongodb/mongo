@@ -165,8 +165,8 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
     if (MONGO_FAIL_POINT(hangBeforeWritingParticipantList)) {
         LOG(0) << "Hit hangBeforeWritingParticipantList failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingParticipantList);
     }
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingParticipantList);
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
@@ -233,9 +233,9 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
     if (MONGO_FAIL_POINT(hangBeforeWaitingForParticipantListWriteConcern)) {
         LOG(0) << "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+            opCtx, hangBeforeWaitingForParticipantListWriteConcern);
     }
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
-        opCtx, hangBeforeWaitingForParticipantListWriteConcern);
 
     WriteConcernResult unusedWCResult;
     uassertStatusOK(
@@ -332,8 +332,8 @@ void persistDecisionBlocking(OperationContext* opCtx,
 
     if (MONGO_FAIL_POINT(hangBeforeWritingDecision)) {
         LOG(0) << "Hit hangBeforeWritingDecision failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingDecision);
     }
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingDecision);
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
@@ -421,9 +421,9 @@ void persistDecisionBlocking(OperationContext* opCtx,
 
     if (MONGO_FAIL_POINT(hangBeforeWaitingForDecisionWriteConcern)) {
         LOG(0) << "Hit hangBeforeWaitingForDecisionWriteConcern failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                        hangBeforeWaitingForDecisionWriteConcern);
     }
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
-                                                    hangBeforeWaitingForDecisionWriteConcern);
 
     WriteConcernResult unusedWCResult;
     uassertStatusOK(
@@ -501,8 +501,8 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
     if (MONGO_FAIL_POINT(hangBeforeDeletingCoordinatorDoc)) {
         LOG(0) << "Hit hangBeforeDeletingCoordinatorDoc failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDeletingCoordinatorDoc);
     }
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDeletingCoordinatorDoc);
 
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);

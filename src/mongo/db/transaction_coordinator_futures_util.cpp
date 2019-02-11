@@ -92,33 +92,33 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
         // rather than going through the host targeting below. This ensures that the state changes
         // for the participant and coordinator occur sequentially on a single branch of replica set
         // history. See SERVER-38142 for details.
-        return scheduleWork(
-            [ this, shardId, commandObj = commandObj.getOwned() ](OperationContext * opCtx) {
-                // Note: This internal authorization is tied to the lifetime of 'opCtx', which is
-                // destroyed by 'scheduleWork' immediately after this lambda ends.
-                AuthorizationSession::get(Client::getCurrent())->grantInternalAuthorization();
+        return scheduleWork([ this, shardId, commandObj = commandObj.getOwned() ](OperationContext *
+                                                                                  opCtx) {
+            // Note: This internal authorization is tied to the lifetime of 'opCtx', which is
+            // destroyed by 'scheduleWork' immediately after this lambda ends.
+            AuthorizationSession::get(Client::getCurrent())->grantInternalAuthorization();
 
-                if (MONGO_FAIL_POINT(hangWhileTargetingLocalHost)) {
-                    LOG(0) << "Hit hangWhileTargetingLocalHost failpoint";
-                }
+            if (MONGO_FAIL_POINT(hangWhileTargetingLocalHost)) {
+                LOG(0) << "Hit hangWhileTargetingLocalHost failpoint";
                 MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingLocalHost);
+            }
 
-                const auto service = opCtx->getServiceContext();
-                auto start = _executor->now();
+            const auto service = opCtx->getServiceContext();
+            auto start = _executor->now();
 
-                auto requestOpMsg =
-                    OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, commandObj).serialize();
-                const auto replyOpMsg = OpMsg::parseOwned(
-                    service->getServiceEntryPoint()->handleRequest(opCtx, requestOpMsg).response);
+            auto requestOpMsg =
+                OpMsgRequest::fromDBAndBody(NamespaceString::kAdminDb, commandObj).serialize();
+            const auto replyOpMsg = OpMsg::parseOwned(
+                service->getServiceEntryPoint()->handleRequest(opCtx, requestOpMsg).response);
 
-                // Document sequences are not yet being used for responses.
-                invariant(replyOpMsg.sequences.empty());
+            // Document sequences are not yet being used for responses.
+            invariant(replyOpMsg.sequences.empty());
 
-                // 'ResponseStatus' is the response format of a remote request sent over the network
-                // so we simulate that format manually here, since we sent the request over the
-                // loopback.
-                return ResponseStatus{replyOpMsg.body.getOwned(), _executor->now() - start};
-            });
+            // 'ResponseStatus' is the response format of a remote request sent over the network
+            // so we simulate that format manually here, since we sent the request over the
+            // loopback.
+            return ResponseStatus{replyOpMsg.body.getOwned(), _executor->now() - start};
+        });
     }
 
     return _targetHostAsync(shardId, readPref)
@@ -214,8 +214,8 @@ Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,
 
         if (MONGO_FAIL_POINT(hangWhileTargetingRemoteHost)) {
             LOG(0) << "Hit hangWhileTargetingRemoteHost failpoint";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingRemoteHost);
         }
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingRemoteHost);
 
         // TODO (SERVER-35678): Return a SemiFuture<HostAndPort> rather than using a blocking call
         return shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx);
