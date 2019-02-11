@@ -113,7 +113,7 @@ function MongoBridge(options) {
      * Terminates the mongobridge process.
      */
     this.stop = function stop() {
-        _stopMongoProgram(this.port);
+        return _stopMongoProgram(this.port);
     };
 
     // Throws an error if 'obj' is not a MongoBridge instance.

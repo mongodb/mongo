@@ -2311,7 +2311,9 @@ var ReplSetTest = function(opts) {
 
         print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
 
-        if (_useBridge) {
+        if (_useBridge && (restart === undefined || !restart)) {
+            // We leave the mongobridge process running when the mongod process is restarted so we
+            // don't need to start a new one.
             var bridgeOptions = Object.merge(_bridgeOptions, options.bridgeOptions || {});
             bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: this.host,
@@ -2395,7 +2397,7 @@ var ReplSetTest = function(opts) {
             signal = undefined;
         }
 
-        this.stop(n, signal, options);
+        this.stop(n, signal, options, {forRestart: true});
 
         var started = this.start(n, options, true, wait);
 
@@ -2421,11 +2423,18 @@ var ReplSetTest = function(opts) {
     /**
      * Stops a particular node or nodes, specified by conn or id
      *
+     * If _useBridge=true, then the mongobridge process(es) corresponding to the node(s) are also
+     * terminated unless forRestart=true. The mongobridge process(es) are left running across
+     * restarts to ensure their configuration remains intact.
+     *
      * @param {number|Mongo} n the index or connection object of the replica set member to stop.
      * @param {number} signal the signal number to use for killing
      * @param {Object} opts @see MongoRunner.stopMongod
+     * @param {Object} [extraOptions={}]
+     * @param {boolean} [extraOptions.forRestart=false] indicates whether stop() is being called
+     * with the intent to call start() with restart=true for the same node(s) n.
      */
-    this.stop = function(n, signal, opts) {
+    this.stop = function(n, signal, opts, {forRestart: forRestart = false} = {}) {
         // Flatten array of nodes to stop
         if (n.length) {
             var nodes = n;
@@ -2453,8 +2462,13 @@ var ReplSetTest = function(opts) {
         print('ReplSetTest stop *** Mongod in port ' + conn.port + ' shutdown with code (' + ret +
               ') ***');
 
-        if (_useBridge) {
-            this.nodes[n].stop();
+        if (_useBridge && !forRestart) {
+            // We leave the mongobridge process running when the mongod process is being restarted.
+            const bridge = this.nodes[n];
+            print('ReplSetTest stop *** Shutting down mongobridge on port ' + bridge.port + ' ***');
+            const exitCode = bridge.stop();  // calls MongoBridge#stop()
+            print('ReplSetTest stop *** mongobridge on port ' + bridge.port +
+                  ' exited with code (' + exitCode + ') ***');
         }
 
         return ret;
