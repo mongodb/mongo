@@ -3509,7 +3509,7 @@ tasks:
         aws_secret: ${aws_secret}
         local_file: src/scons_cache.log
         content_type: text/plain
-        remote_file: ${project}/${build_variant}/${revision}/cache.log
+        remote_file: ${project}/${build_variant}/${revision}/scons-cache-${build_id}-${execution}.log
         bucket: mciuploads
         permissions: public-read
         display_name: SCons cache debug log
