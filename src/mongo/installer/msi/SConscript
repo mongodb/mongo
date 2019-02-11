@@ -159,6 +159,7 @@ pre_msi_cmd = env.Command(pre_msi,
             ' -ext "$WIXUIEXT"'
             ' -ext "$WIXUTILEXT"'
             ' ${SOURCES}')
+env.NoCache(pre_msi_cmd)
 
 # Generated Dependencies
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongo.exe')
@@ -179,5 +180,6 @@ env.Command(msi,
             pre_msi,
             r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}')
 env.AlwaysBuild(msi)
+env.NoCache(msi)
 
 env.Alias( "msi" , msi )
