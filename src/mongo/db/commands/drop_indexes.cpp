@@ -50,7 +50,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/logical_clock.h"
@@ -122,7 +121,6 @@ public:
                    const BSONObj& jsobj,
                    string& errmsg,
                    BSONObjBuilder& result) {
-        DBDirectClient db(opCtx);
 
         const NamespaceString toReIndexNss =
             CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
