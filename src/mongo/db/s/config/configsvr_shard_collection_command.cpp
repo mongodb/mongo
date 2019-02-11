@@ -895,14 +895,16 @@ public:
         // Make sure the cached metadata for the collection knows that we are now sharded
         catalogCache->invalidateShardedCollection(nss);
 
-        // Free the distlocks to allow the splits and migrations below to proceed.
+        // Free the collection distlock to allow the splits and migrations below to proceed. These
+        // operations do not take the database distlocks.
         collDistLock.reset();
-        dbDistLock.reset();
-        backwardsCompatibleDbDistLock.reset();
 
         // Step 7. Migrate initial chunks to distribute them across shards.
         migrateAndFurtherSplitInitialChunks(
             opCtx, nss, numShards, shardIds, isEmpty, shardKeyPattern, allSplits);
+
+        dbDistLock.reset();
+        backwardsCompatibleDbDistLock.reset();
 
         return true;
     }
