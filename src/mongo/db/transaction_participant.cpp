@@ -316,7 +316,7 @@ TransactionParticipant::Participant::Participant(OperationContext* opCtx)
 TransactionParticipant::Participant::Participant(const SessionToKill& session)
     : Observer(&getTransactionParticipant(session.get())) {}
 
-void TransactionParticipant::performNoopWriteForNoSuchTransaction(OperationContext* opCtx) {
+void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringData msg) {
     repl::ReplicationCoordinator* replCoord =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
 
@@ -335,15 +335,12 @@ void TransactionParticipant::performNoopWriteForNoSuchTransaction(OperationConte
                 "Not primary when performing noop write for NoSuchTransaction error",
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
 
-        writeConflictRetry(
-            opCtx, "performNoopWriteForNoSuchTransaction", "local.rs.oplog", [&opCtx] {
-                WriteUnitOfWork wuow(opCtx);
-                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
-                    opCtx,
-                    BSON("msg"
-                         << "NoSuchTransaction"));
-                wuow.commit();
-            });
+        writeConflictRetry(opCtx, "performNoopWrite", "local.rs.oplog", [&opCtx, &msg] {
+            WriteUnitOfWork wuow(opCtx);
+            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                opCtx, BSON("msg" << msg));
+            wuow.commit();
+        });
     }
 }
 
@@ -1053,9 +1050,13 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
                             << "this transaction is not prepared. But, it is currently "
                             << p().oldestOplogEntryOpTime->toString());
 
+    auto txnOps = retrieveCompletedTransactionOperations(opCtx);
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
-    opObserver->onUnpreparedTransactionCommit(opCtx, retrieveCompletedTransactionOperations(opCtx));
+    opObserver->onUnpreparedTransactionCommit(opCtx, txnOps);
+
+    auto wc = opCtx->getWriteConcern();
+    auto needsNoopWrite = txnOps.empty() && !opCtx->getWriteConcern().usedDefault;
     clearOperationsInMemory(opCtx);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1069,6 +1070,12 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     _commitStorageTransaction(opCtx);
     invariant(o().txnState.isCommittingWithoutPrepare(),
               str::stream() << "Current State: " << o().txnState);
+
+    if (needsNoopWrite) {
+        performNoopWrite(
+            opCtx, str::stream() << "read-only transaction with writeConcern " << wc.toBSON());
+    }
+
     _finishCommitTransaction(opCtx);
 }
 

@@ -787,15 +787,10 @@ public:
     }
 
     /**
-     * When the server returns a NoSuchTransaction error for a command, it performs a noop write if
-     * there is a writeConcern on the command. The TransientTransactionError label is only appended
-     * to a NoSuchTransaction response for 'commitTransaction' and 'coordinateCommitTransaction' if
-     * there is no writeConcern error. This ensures that if 'commitTransaction' or
-     * 'coordinateCommitTransaction' is run with w:majority, then the TransientTransactionError
-     * label is only returned if the transaction is not committed on any valid branch of history,
-     * so the driver or application can safely retry the entire transaction.
+     * Append a no-op to the oplog, for cases where we haven't written in this unit of work but
+     * want to await a write concern.
      */
-    static void performNoopWriteForNoSuchTransaction(OperationContext* opCtx);
+    static void performNoopWrite(OperationContext* opCtx, StringData msg);
 
     TransactionParticipant() = default;
     ~TransactionParticipant() = default;

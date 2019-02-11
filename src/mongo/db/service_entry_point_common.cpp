@@ -510,9 +510,10 @@ bool runCommandImpl(OperationContext* opCtx,
                 invocation->run(opCtx, replyBuilder);
             }
         } catch (const DBException& ex) {
+            // Do no-op write before returning NoSuchTransaction if command has writeConcern.
             if (ex.toStatus().code() == ErrorCodes::NoSuchTransaction &&
                 !opCtx->getWriteConcern().usedDefault) {
-                TransactionParticipant::performNoopWriteForNoSuchTransaction(opCtx);
+                TransactionParticipant::performNoopWrite(opCtx, "NoSuchTransaction");
             }
             waitForWriteConcern(*extraFieldsBuilder);
             throw;
