@@ -1403,6 +1403,10 @@ if link_model.startswith("dynamic"):
     # If that condition is met, then the graph will be acyclic.
 
     if env.TargetOSIs('darwin'):
+        if link_model.startswith('dynamic'):
+            print("WARNING: Building MongoDB server with dynamic linking " +
+                  "on macOS is not supported. Static linking is recommended.")
+
         if link_model == "dynamic-strict":
             # Darwin is strict by default
             pass
@@ -2026,7 +2030,7 @@ def doConfigure(myenv):
         #endif
 
         #if defined(__apple_build_version__)
-        #if __apple_build_version__ < 10001145
+        #if __apple_build_version__ < 10001044
         #error %s or newer is required to build MongoDB
         #endif
         #elif (__clang_major__ < 7) || (__clang_major__ == 7 && __clang_minor__ < 0)
