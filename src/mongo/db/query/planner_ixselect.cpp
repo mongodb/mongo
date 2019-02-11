@@ -71,6 +71,23 @@ bool elemMatchValueCompatible(const BSONElement& elt,
     return true;
 }
 
+// Can't index negations of {$eq: <Array>} or {$in: [<Array>, ...]}. Note that we could
+// use the index in principle, though we would need to generate special bounds.
+bool isNotEqualsArrayOrNotInArray(const MatchExpression* me) {
+    const auto type = me->matchType();
+    if (type == MatchExpression::EQ) {
+        return static_cast<const ComparisonMatchExpression*>(me)->getData().type() ==
+            BSONType::Array;
+    } else if (type == MatchExpression::MATCH_IN) {
+        const auto& equalities = static_cast<const InMatchExpression*>(me)->getEqualities();
+        return std::any_of(equalities.begin(), equalities.end(), [](BSONElement elt) {
+            return elt.type() == BSONType::Array;
+        });
+    }
+
+    return false;
+}
+
 }  // namespace
 
 static double fieldWithDefault(const BSONObj& infoObj, const string& name, double def) {
@@ -270,10 +287,17 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
             }
 
             // Can't index negations of MOD, REGEX, TYPE_OPERATOR, or ELEM_MATCH_VALUE.
-            MatchExpression::MatchType childtype = node->getChild(0)->matchType();
+            const auto* child = node->getChild(0);
+            MatchExpression::MatchType childtype = child->matchType();
             if (MatchExpression::REGEX == childtype || MatchExpression::MOD == childtype ||
                 MatchExpression::TYPE_OPERATOR == childtype ||
                 MatchExpression::ELEM_MATCH_VALUE == childtype) {
+                return false;
+            }
+
+            // Can't index negations of {$eq: <Array>} or {$in: [<Array>, ...]}. Note that we could
+            // use the index in principle, though we would need to generate special bounds.
+            if (isNotEqualsArrayOrNotInArray(child)) {
                 return false;
             }
 

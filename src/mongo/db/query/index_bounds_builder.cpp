@@ -374,6 +374,10 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         translate(child, elt, index, oilOut, tightnessOut);
         oilOut->complement();
 
+        // TODO SERVER-27646: We cannot assume this invariant is true unless we build exact bounds
+        // for $ne: null queries.
+        // invariant(*tightnessOut == IndexBoundsBuilder::EXACT);
+
         // If the index is multikey, it doesn't matter what the tightness of the child is, we must
         // return INEXACT_FETCH. Consider a multikey index on 'a' with document {a: [1, 2, 3]} and
         // query {a: {$ne: 3}}.  If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then we

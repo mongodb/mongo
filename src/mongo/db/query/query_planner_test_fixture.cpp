@@ -459,6 +459,11 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
     FAIL(ss);
 }
 
+void QueryPlannerTest::assertHasOnlyCollscan() const {
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
 std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(
     const BSONObj& obj, const CollatorInterface* collator) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

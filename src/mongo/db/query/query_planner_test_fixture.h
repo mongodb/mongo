@@ -194,6 +194,11 @@ protected:
     void assertHasOneSolutionOf(const std::vector<std::string>& solnStrs) const;
 
     /**
+     * Check that the only solution available is an ascending collection scan.
+     */
+    void assertHasOnlyCollscan() const;
+
+    /**
      * Helper function to parse a MatchExpression.
      */
     static std::unique_ptr<MatchExpression> parseMatchExpression(

@@ -2844,6 +2844,71 @@ TEST_F(QueryPlannerTest, NegationElemMatchObject2) {
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
+// Negated $eq: <Array> won't use the index.
+TEST_F(QueryPlannerTest, NegationEqArray) {
+    addIndex(BSON("i" << 1));
+    runQuery(fromjson("{i: {$not: {$eq: [1, 2]}}}"));
+
+    assertHasOnlyCollscan();
+}
+
+// If we negate a $in and any of the members of the $in equalities
+// is an array, we don't use the index.
+TEST_F(QueryPlannerTest, NegationInArray) {
+    addIndex(BSON("i" << 1));
+    runQuery(fromjson("{i: {$not: {$in: [1, [1, 2]]}}}"));
+
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, ElemMatchValueNegationEqArray) {
+    addIndex(BSON("i" << 1));
+    runQuery(fromjson("{i: {$elemMatch: {$not: {$eq: [1]}}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, ElemMatchValueNegationInArray) {
+    addIndex(BSON("i" << 1));
+    runQuery(fromjson("{i: {$elemMatch: {$not: {$in: [[1]]}}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, NegatedElemMatchValueEqArray) {
+    addIndex(BSON("i" << 1));
+    runQuery(fromjson("{i: {$not: {$elemMatch: {$eq: [1]}}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, NegatedElemMatchValueInArray) {
+    addIndex(BSON("i" << 1));
+    runQuery(fromjson("{i: {$not: {$elemMatch: {$in: [[1]]}}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, ElemMatchObjectNegationEqArray) {
+    addIndex(BSON("i.j" << 1));
+    runQuery(fromjson("{i: {$elemMatch: {j: {$ne: [1]}}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, ElemMatchObjectNegationInArray) {
+    addIndex(BSON("i.j" << 1));
+    runQuery(fromjson("{i: {$elemMatch: {j: {$not: {$in: [[1]]}}}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, NegatedElemMatchObjectEqArray) {
+    addIndex(BSON("i.j" << 1));
+    runQuery(fromjson("{i: {$not: {$elemMatch: {j: [1]}}}}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, NegatedElemMatchObjectInArray) {
+    addIndex(BSON("i.j" << 1));
+    runQuery(fromjson("{i: {$not: {$elemMatch: {j: {$in: [[1]]}}}}}"));
+    assertHasOnlyCollscan();
+}
+
 // If there is a negation that can't use the index,
 // ANDed with a predicate that can use the index, then
 // we can still use the index for the latter predicate.
