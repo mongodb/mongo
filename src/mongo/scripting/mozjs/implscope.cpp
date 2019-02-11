@@ -199,14 +199,10 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     auto status = [&scope]() -> Status {
         stdx::lock_guard<stdx::mutex> lk(scope->_mutex);
 
-        if (scope->_inOp > 0 && scope->_opCtx) {
-            scope->_killStatus = scope->_opCtx->checkForInterruptNoAssert();
-        }
-
         return scope->_killStatus;
     }();
 
-    if (status.isOK() && scope->_hasOutOfMemoryException) {
+    if (scope->_hasOutOfMemoryException) {
         status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
     }
 
@@ -785,17 +781,6 @@ void MozJSImplScope::gc() {
 
 void MozJSImplScope::sleep(Milliseconds ms) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    if (_opCtx) {
-        try {
-            _opCtx->waitForConditionOrInterruptFor(_sleepCondition, lk, ms);
-        } catch (const DBException& ex) {
-            _killStatus = ex.toStatus();
-            uasserted(ErrorCodes::JSUncatchableError, "sleep was interrupted by kill");
-        }
-
-        return;
-    }
 
     uassert(ErrorCodes::JSUncatchableError,
             "sleep was interrupted by kill",
