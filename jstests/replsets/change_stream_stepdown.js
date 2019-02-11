@@ -1,14 +1,16 @@
 /**
  * Test that a change stream on the primary node survives stepdown.
+ *
+ * Change streams are only supported on WiredTiger.
+ * @tags: [requires_wiredtiger]
  */
 (function() {
     "use strict";
 
     load("jstests/libs/write_concern_util.js");  // for [stop|restart]ServerReplication.
 
-    const name = "change_stream_speculative_majority";
-    const replTest = new ReplSetTest(
-        {name: name, nodes: [{}, {}], nodeOptions: {enableMajorityReadConcern: 'false'}});
+    const name = "change_stream_stepdown";
+    const replTest = new ReplSetTest({name: name, nodes: [{}, {}]});
     replTest.startSet();
     replTest.initiate();
 
