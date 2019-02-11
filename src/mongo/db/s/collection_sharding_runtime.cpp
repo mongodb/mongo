@@ -78,7 +78,6 @@ CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* sc,
                                                      NamespaceString nss,
                                                      executor::TaskExecutor* rangeDeleterExecutor)
     : CollectionShardingState(nss),
-      _stateChangeMutex(nss.toString()),
       _nss(std::move(nss)),
       _metadataManager(std::make_shared<MetadataManager>(sc, _nss, rangeDeleterExecutor)) {
     if (isNamespaceAlwaysUnsharded(_nss)) {
@@ -193,13 +192,19 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, Na
                                AutoGetCollection::ViewMode::kViewsForbidden,
                                opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
-    CollectionShardingState::get(opCtx, _nss)->enterCriticalSectionCatchUpPhase(_opCtx);
+    auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
+    auto csrLock = CollectionShardingState::CSRLock::lockExclusive(_opCtx, csr);
+
+    csr->enterCriticalSectionCatchUpPhase(_opCtx, csrLock);
 }
 
 CollectionCriticalSection::~CollectionCriticalSection() {
     UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_X);
-    CollectionShardingState::get(_opCtx, _nss)->exitCriticalSection(_opCtx);
+    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, MODE_IX);
+    auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+
+    csr->exitCriticalSection(_opCtx, csrLock);
 }
 
 void CollectionCriticalSection::enterCommitPhase() {
@@ -210,7 +215,10 @@ void CollectionCriticalSection::enterCommitPhase() {
                                AutoGetCollection::ViewMode::kViewsForbidden,
                                _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
-    CollectionShardingState::get(_opCtx, _nss)->enterCriticalSectionCommitPhase(_opCtx);
+    auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+
+    csr->enterCriticalSectionCommitPhase(_opCtx, csrLock);
 }
 
 }  // namespace mongo

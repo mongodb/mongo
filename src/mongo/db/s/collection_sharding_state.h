@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
+#include "mongo/db/s/sharding_state_lock.h"
 
 namespace mongo {
 
@@ -55,6 +56,8 @@ class CollectionShardingState {
     MONGO_DISALLOW_COPYING(CollectionShardingState);
 
 public:
+    using CSRLock = ShardingStateLock<CollectionShardingState>;
+
     virtual ~CollectionShardingState() = default;
 
     /**
@@ -103,12 +106,24 @@ public:
     void checkShardVersionOrThrow(OperationContext* opCtx);
 
     /**
-     * Methods to control the collection's critical section. Must be called with the collection X
-     * lock held.
+     * Methods to control the collection's critical section. Methods listed below must be called
+     * with both the collection lock and CollectionShardingRuntimeLock held in exclusive mode.
+     *
+     * In these methods, the CollectionShardingRuntimeLock ensures concurrent access to the
+     * critical section.
      */
-    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx);
-    void enterCriticalSectionCommitPhase(OperationContext* opCtx);
-    void exitCriticalSection(OperationContext* opCtx);
+    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx, CSRLock&);
+    void enterCriticalSectionCommitPhase(OperationContext* opCtx, CSRLock&);
+
+
+    /**
+     * Method to control the collection's critical secion. Method listed below must be called with
+     * the collection lock in IX mode and the CollectionShardingRuntimeLock in exclusive mode.
+     *
+     * In this method, the CollectionShardingRuntimeLock ensures concurrent access to the
+     * critical section.
+     */
+    void exitCriticalSection(OperationContext* opCtx, CSRLock&);
 
     /**
      * If the collection is currently in a critical section, returns the critical section signal to
@@ -122,6 +137,12 @@ protected:
     CollectionShardingState(NamespaceString nss);
 
 private:
+    friend CSRLock;
+
+    // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects
+    // held within. Use only the CollectionShardingRuntimeLock to lock this mutex.
+    Lock::ResourceMutex _stateChangeMutex;
+
     // Namespace this state belongs to.
     const NamespaceString _nss;
 

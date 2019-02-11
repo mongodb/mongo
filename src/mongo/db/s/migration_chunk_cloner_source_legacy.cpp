@@ -151,9 +151,13 @@ public:
                 sessionSource->notifyNewWriteOpTime(_opTime);
             }
         }
+
+        _cloner->_decrementOutstandingCommitHandlers();
     }
 
-    void rollback() override {}
+    void rollback() override {
+        _cloner->_decrementOutstandingCommitHandlers();
+    }
 
 private:
     MigrationChunkClonerSourceLegacy* const _cloner;
@@ -376,6 +380,10 @@ void MigrationChunkClonerSourceLegacy::onInsertOp(OperationContext* opCtx,
         return;
     }
 
+    if (!_successfullyAddedOperationToOutstandingCommitHandlers()) {
+        return;
+    }
+
     if (opCtx->getTxnNumber()) {
         opCtx->recoveryUnit()->registerChange(
             new LogOpForShardingHandler(this, idElement.wrap(), 'i', opTime, {}));
@@ -402,6 +410,10 @@ void MigrationChunkClonerSourceLegacy::onUpdateOp(OperationContext* opCtx,
         return;
     }
 
+    if (!_successfullyAddedOperationToOutstandingCommitHandlers()) {
+        return;
+    }
+
     if (opCtx->getTxnNumber()) {
         opCtx->recoveryUnit()->registerChange(
             new LogOpForShardingHandler(this, idElement.wrap(), 'u', opTime, prePostImageOpTime));
@@ -424,12 +436,52 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
         return;
     }
 
+    if (!_successfullyAddedOperationToOutstandingCommitHandlers()) {
+        return;
+    }
+
     if (opCtx->getTxnNumber()) {
         opCtx->recoveryUnit()->registerChange(
             new LogOpForShardingHandler(this, idElement.wrap(), 'd', opTime, preImageOpTime));
     } else {
         opCtx->recoveryUnit()->registerChange(
             new LogOpForShardingHandler(this, idElement.wrap(), 'd', {}, {}));
+    }
+}
+
+bool MigrationChunkClonerSourceLegacy::_successfullyAddedOperationToOutstandingCommitHandlers() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (!_acceptingIncomingCommitHandlers) {
+        return false;
+    }
+
+    _incrementOutstandingCommitHandlers(lk);
+    return true;
+}
+
+void MigrationChunkClonerSourceLegacy::_drainAllOutstandingCommitHandlers(
+    stdx::unique_lock<stdx::mutex>& lk) {
+    invariant(_state == kDone);
+    _acceptingIncomingCommitHandlers = false;
+
+    if (_outstandingCommitHandlers == 0) {
+        return;
+    }
+
+    _allCommitHandlersDrained.wait(lk);
+}
+
+
+void MigrationChunkClonerSourceLegacy::_incrementOutstandingCommitHandlers(WithLock) {
+    invariant(_acceptingIncomingCommitHandlers);
+    ++_outstandingCommitHandlers;
+}
+
+void MigrationChunkClonerSourceLegacy::_decrementOutstandingCommitHandlers() {
+    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    --_outstandingCommitHandlers;
+    if (_outstandingCommitHandlers == 0) {
+        _allCommitHandlersDrained.notify_all();
     }
 }
 
@@ -500,8 +552,11 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
 }
 
 void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> sl(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _state = kDone;
+
+    _drainAllOutstandingCommitHandlers(lk);
+
     _reload.clear();
     _deleted.clear();
 }

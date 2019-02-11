@@ -448,7 +448,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         // this node can accept writes for this collection as a proxy for it being primary.
         if (!status.isOK()) {
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
+            AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_IX);
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
                 CollectionShardingRuntime::get(opCtx, getNss())->clearFilteringMetadata();
                 uassertStatusOK(status.withContext(
@@ -484,7 +484,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     if (!refreshStatus.isOK()) {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_IX);
 
         CollectionShardingRuntime::get(opCtx, getNss())->clearFilteringMetadata();
 
@@ -683,18 +683,19 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     auto cloneDriver = [&]() {
         // Unregister from the collection's sharding state and exit the migration critical section.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
-        auto* const css = CollectionShardingRuntime::get(opCtx, getNss());
+        AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_IX);
+        auto* const csr = CollectionShardingRuntime::get(opCtx, getNss());
+        auto csrLock = CollectionShardingState::CSRLock::lockExclusive(opCtx, csr);
 
         // In the kCreated state there should be no state to clean up, but we can verify this
         // just to be safe.
         if (_state == kCreated) {
             // Verify that we did not set the MSM on the CSR.
-            invariant(!msmForCsr(css));
+            invariant(!msmForCsr(csr));
             // Verify that the clone driver was not initialized.
             invariant(!_cloneDriver);
         } else {
-            auto oldMsmOnCsr = std::exchange(msmForCsr(css), nullptr);
+            auto oldMsmOnCsr = std::exchange(msmForCsr(csr), nullptr);
             invariant(this == oldMsmOnCsr);
         }
         _critSec.reset();

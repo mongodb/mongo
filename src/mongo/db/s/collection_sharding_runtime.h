@@ -34,7 +34,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
-#include "mongo/db/s/sharding_state_lock.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/decorable.h"
@@ -52,8 +51,6 @@ class CollectionShardingRuntime final : public CollectionShardingState,
     MONGO_DISALLOW_COPYING(CollectionShardingRuntime);
 
 public:
-    using CSRLock = ShardingStateLock<CollectionShardingRuntime>;
-
     CollectionShardingRuntime(ServiceContext* sc,
                               NamespaceString nss,
                               executor::TaskExecutor* rangeDeleterExecutor);
@@ -149,14 +146,8 @@ public:
     }
 
 private:
-    friend CSRLock;
-
     friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         OperationContext*, NamespaceString const&, OID const&, int, CollectionRangeDeleter*);
-
-    // Object-wide ResourceMutex to protect changes to the CollectionShardingRuntime or objects
-    // held within.
-    Lock::ResourceMutex _stateChangeMutex;
 
     // Namespace this state belongs to.
     const NamespaceString _nss;

@@ -1201,7 +1201,7 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx, ChunkR
     }
 
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    AutoGetCollection autoColl(opCtx, _nss, MODE_IX, MODE_X);
+    AutoGetCollection autoColl(opCtx, _nss, MODE_IX, MODE_IX);
     auto* const css = CollectionShardingRuntime::get(opCtx, _nss);
     const auto optMetadata = css->getCurrentMetadataIfKnown();
 
