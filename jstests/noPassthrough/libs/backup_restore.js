@@ -355,12 +355,16 @@ var BackupRestoreTest = function(options) {
             filter: {'name': {$nin: ['admin', 'config', 'local', '$external']}}
         });
         assert.commandWorked(result);
+
+        // We use the implicitly_retry_on_database_drop_pending.js override file to
+        // handle the retry logic for DatabaseDropPending error responses.
+        load("jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js");
+
         const databases = result.databases.map(dbs => dbs.name);
-        databases.forEach(dbName => assert.soonNoExcept(function() {
-            let result = primary.getDB(dbName).afterClientKills.insert(
-                {'a': 1}, {writeConcern: {w: 'majority'}});
-            return (result.nInserted === 1);
-        }, 'failed to insert to test collection', 10 * 60 * 1000));
+        databases.forEach(dbName => {
+            assert.commandWorked(primary.getDB(dbName).afterClientKills.insert(
+                {'a': 1}, {writeConcern: {w: 'majority'}}));
+        });
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
         jsTestLog('CRUD and FSM clients stopped. Waiting for hidden node ' + hiddenHost +
