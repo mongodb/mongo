@@ -47,7 +47,6 @@ namespace mozjs {
  * traces, and instanceOf Error.
  */
 struct MongoStatusInfo : public BaseInfo {
-    static void construct(JSContext* cx, JS::CallArgs args);
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
@@ -60,6 +59,7 @@ struct MongoStatusInfo : public BaseInfo {
     static const char* const className;
     static const char* const inheritFrom;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+    static const InstallType installType = InstallType::Private;
 
     static Status toStatus(JSContext* cx, JS::HandleObject object);
     static Status toStatus(JSContext* cx, JS::HandleValue value);
