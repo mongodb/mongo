@@ -41,9 +41,7 @@ namespace mongo {
 
 /**
  * A container for TransactionCoordinator objects, indexed by logical session id and transaction
- * number. It allows holding several coordinator objects per session. It also knows how to recreate
- * itself from the config.txnCommitDecisions collection, which will be done on transition to
- * primary (whether from startup or ordinary step up).
+ * number. It allows holding several coordinator objects per session.
  */
 class TransactionCoordinatorCatalog {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorCatalog);
@@ -53,6 +51,16 @@ public:
     ~TransactionCoordinatorCatalog();
 
     /**
+     * Marks that recovery of the catalog has completed and that operations can be run on it.
+     */
+    void exitStepUp(Status status);
+
+    /**
+     * Cancels any outstanding idle transaction coordinators so that they will get unregistered.
+     */
+    void onStepDown();
+
+    /**
      * Inserts a coordinator into the catalog.
      *
      * Note: Inserting a duplicate coordinator for the given session id and transaction number
@@ -60,7 +68,7 @@ public:
      * does not take place.
      */
     void insert(OperationContext* opCtx,
-                LogicalSessionId lsid,
+                const LogicalSessionId& lsid,
                 TxnNumber txnNumber,
                 std::shared_ptr<TransactionCoordinator> coordinator,
                 bool forStepUp = false);
@@ -70,7 +78,7 @@ public:
      * does not exist, return nullptr.
      */
     std::shared_ptr<TransactionCoordinator> get(OperationContext* opCtx,
-                                                LogicalSessionId lsid,
+                                                const LogicalSessionId& lsid,
                                                 TxnNumber txnNumber);
 
     /**
@@ -78,21 +86,7 @@ public:
      * exists. If it does not exist, return boost::none.
      */
     boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
-    getLatestOnSession(OperationContext* opCtx, LogicalSessionId lsid);
-
-    /**
-     * Removes the coordinator with the given session id and transaction number from the catalog, if
-     * one exists, and if this the last coordinator in the catalog, signals that there are no active
-     * coordinators.
-     *
-     * Note: The coordinator must be in a state suitable for removal (i.e. committed or aborted).
-     */
-    void remove(LogicalSessionId lsid, TxnNumber txnNumber);
-
-    /**
-     * Marks no stepup in progress and signals that no stepup is in progress.
-     */
-    void exitStepUp(Status status);
+    getLatestOnSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
      * Blocking method, which waits for all coordinators registered on the catalog to complete
@@ -119,6 +113,22 @@ private:
     void _waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
 
     /**
+     * Removes the coordinator with the given session id and transaction number from the catalog, if
+     * one exists, and if this the last coordinator in the catalog, signals that there are no active
+     * coordinators.
+     *
+     * Note: The coordinator must be in a state suitable for removal (i.e. committed or aborted).
+     */
+    void _remove(const LogicalSessionId& lsid, TxnNumber txnNumber);
+
+    /**
+     * Goes through the '_coordinatorsToCleanup' list and deletes entries from it. As a side-effect
+     * also unlocks the passed-in lock, so no other synchronized members of the class should be
+     * accessed after it is called.
+     */
+    void _cleanupCompletedCoordinators(stdx::unique_lock<stdx::mutex>& ul);
+
+    /**
      * Constructs a string representation of all the coordinators registered on the catalog.
      */
     std::string _toString(WithLock wl) const;
@@ -135,23 +145,26 @@ private:
     // commit coordination and would normally be expunged from memory.
     LogicalSessionIdMap<TransactionCoordinatorMap> _coordinatorsBySessionDefunct;
 
+    // Set of coordinators which have completed, but have not yet been destroyed.
+    std::list<std::shared_ptr<TransactionCoordinator>> _coordinatorsToCleanup;
+
     // Stores the result of the coordinator catalog's recovery attempt (the status passed to
     // exitStepUp). This is what the values mean:
     //
     // stepUpCompletionStatus = none - brand new created object (exitStepUp has not been called
-    // yet). All calls will block.
+    //   yet). All calls will block.
     // stepUpCompletionStatus = OK - recovery completed successfully, transactions can be
-    // coordinated
+    //   coordinated
     // stepUpCompletionStatus = error - recovery completed with an error, transactions cannot be
-    // coordinated (all methods will fail with this error)
+    //   coordinated (all methods will fail with this error)
     boost::optional<Status> _stepUpCompletionStatus;
 
     // Signaled when recovery of the catalog completes (when _stepUpCompletionStatus transitions
     // from none to either OK or error)
-    stdx::condition_variable _stepUpCompleteCv;
+    stdx::condition_variable _stepUpCompleteCV;
 
     // Notified when the last coordinator is removed from the catalog.
-    stdx::condition_variable _noActiveCoordinatorsCv;
+    stdx::condition_variable _noActiveCoordinatorsCV;
 };
 
 }  // namespace mongo

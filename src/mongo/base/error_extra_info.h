@@ -81,8 +81,11 @@ public:
     }
 
     /**
-     * Fails fatally if any error codes that should have parsers registered don't. Call this during
-     * startup of any shipping executable to prevent failures at runtime.
+     * Fails fatally if any error codes that should have parsers registered don't. An invariant in
+     * this function indicates that there isn't a MONGO_INIT_REGISTER_ERROR_EXTRA_INFO declaration
+     * for some error code, which requires an extra info.
+     *
+     * Call this during startup of any shipping executable to prevent failures at runtime.
      */
     static void invariantHaveAllParsers();
 

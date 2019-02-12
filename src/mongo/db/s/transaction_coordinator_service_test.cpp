@@ -65,9 +65,7 @@ const StatusWith<BSONObj> kPrepareOkButWriteConcernError =
               << kDummyWriteConcernError);
 
 class TransactionCoordinatorServiceTestFixture : public TransactionCoordinatorTestFixture {
-public:
-    // Prepare responses
-
+protected:
     void assertPrepareSentAndRespondWithSuccess() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kPrepareOk,
@@ -145,9 +143,6 @@ public:
         ASSERT_FALSE(network()->hasReadyRequests());
     }
 
-    // TODO (SERVER-38382): Put all these helpers in one separate file and share with
-    // transaction_coordinator_test.
-
     /**
      * Goes through the steps to commit a transaction through the coordinator service  for a given
      * lsid and txnNumber. Useful when not explictly testing the commit protocol.
@@ -183,9 +178,8 @@ public:
         auto commitDecisionFuture =
             *coordinatorService.coordinateCommit(operationContext(), lsid, txnNumber, shardIdSet);
 
-        for (size_t i = 0; i < shardIdSet.size(); ++i) {
-            assertPrepareSentAndRespondWithNoSuchTransaction();
-        }
+        // It is sufficient to abort just one of the participants
+        assertPrepareSentAndRespondWithNoSuchTransaction();
 
         for (size_t i = 0; i < shardIdSet.size(); ++i) {
             assertAbortSentAndRespondWithSuccess();
@@ -390,11 +384,11 @@ TEST_F(TransactionCoordinatorServiceTest,
         operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
+    advanceClockAndExecuteScheduledTasks();  // Make sure the cancellation callback is delivered
 
     auto commitDecisionFuture2 = *coordinatorService->coordinateCommit(
         operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
-    assertPrepareSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
 
@@ -433,11 +427,11 @@ TEST_F(TransactionCoordinatorServiceTest, RecoverCommitJoinsOngoingCoordinationT
         operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
+    advanceClockAndExecuteScheduledTasks();  // Make sure the cancellation callback is delivered
 
     auto commitDecisionFuture2 =
         *coordinatorService->recoverCommit(operationContext(), _lsid, _txnNumber);
 
-    assertPrepareSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
 
@@ -478,7 +472,6 @@ TEST_F(TransactionCoordinatorServiceTest,
     // Cancel previous coordinator by creating a new coordinator at a higher txn number.
     coordinatorService->createCoordinator(
         operationContext(), _lsid, _txnNumber + 1, kCommitDeadline);
-
 
     ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
               static_cast<int>(txn::CommitDecision::kCanceled));
@@ -661,8 +654,8 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
         operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     // Simulate a participant voting to abort.
-    assertPrepareSentAndRespondWithNoSuchTransaction();
-    assertPrepareSentAndRespondWithSuccess();
+    onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
+                [&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; }});
 
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
@@ -678,8 +671,6 @@ TEST_F(TransactionCoordinatorServiceTestSingleTxn,
         operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     ASSERT_FALSE(commitDecisionFuture.isReady());
-    // To prevent invariant failure in TransactionCoordinator that all futures have been completed.
-    abortTransaction(*coordinatorService(), _lsid, _txnNumber, kTwoShardIdSet, kTwoShardIdList[0]);
 }
 
 TEST_F(TransactionCoordinatorServiceTestSingleTxn,

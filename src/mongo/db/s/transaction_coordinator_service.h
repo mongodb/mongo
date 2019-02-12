@@ -106,6 +106,9 @@ private:
     struct CatalogAndScheduler {
         CatalogAndScheduler(ServiceContext* service) : scheduler(service) {}
 
+        void onStepDown();
+        void join();
+
         txn::AsyncWorkScheduler scheduler;
         TransactionCoordinatorCatalog catalog;
 

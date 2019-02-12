@@ -63,8 +63,12 @@ protected:
     void createCoordinatorInCatalog(OperationContext* opCtx,
                                     LogicalSessionId lsid,
                                     TxnNumber txnNumber) {
-        auto newCoordinator =
-            std::make_shared<TransactionCoordinator>(getServiceContext(), lsid, txnNumber);
+        auto newCoordinator = std::make_shared<TransactionCoordinator>(
+            getServiceContext(),
+            lsid,
+            txnNumber,
+            std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+            boost::none);
 
         _coordinatorCatalog->insert(opCtx, lsid, txnNumber, newCoordinator);
         _coordinatorsForTest.push_back(newCoordinator);

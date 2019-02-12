@@ -21,9 +21,6 @@
     let participant1 = st.shard1;
     let participant2 = st.shard2;
 
-    let expectedParticipantList =
-        [participant1.shardName, participant2.shardName, coordinator.shardName];
-
     let lsid = {id: UUID()};
     let txnNumber = 0;
 
@@ -113,6 +110,7 @@
 
         waitForFailpoint("Hit " + failpointData.failpoint + " failpoint",
                          failpointData.numTimesShouldBeHit);
+
         jsTest.log("Going to find coordinator opCtx ids");
         let coordinatorOps =
             coordinator.getDB("admin")
@@ -162,12 +160,15 @@
 
     const failpointDataArr = getCoordinatorFailpoints();
 
-    // Test abort path.
+    // TODO(SERVER-39754): The abort path is unreliable, because depending on the stage at which the
+    // transaction is aborted, the failpoints might be hit more than the specified number of times.
+    //
+    // // Test abort path.
 
-    failpointDataArr.forEach(function(failpointData) {
-        testCommitProtocol(false /* shouldCommit */, failpointData);
-        clearRawMongoProgramOutput();
-    });
+    // failpointDataArr.forEach(function(failpointData) {
+    //     testCommitProtocol(false /* shouldCommit */, failpointData);
+    //     clearRawMongoProgramOutput();
+    // });
 
     // Test commit path.
 

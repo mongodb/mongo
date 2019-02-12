@@ -191,15 +191,6 @@ public:
     Future<void> deleteCoordinatorDoc(const LogicalSessionId& lsid, TxnNumber txnNumber);
 
     /**
-     * Non-blocking method, which interrupts any executing asynchronous tasks and prevents new ones
-     * from getting scheduled. Any futures returned by the driver must still be waited on before the
-     * object is disposed of.
-     *
-     * TODO (SERVER-38522): Implement using real cancellation through the AsyncWorkScheduler
-     */
-    void cancel();
-
-    /**
      * Reads and returns all documents in config.transaction_coordinators.
      */
     static std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(
@@ -210,32 +201,37 @@ public:
     //
 
     /**
-     * Sends prepare to a given shard, retrying until a response is received from the participant or
-     * until the coordinator is no longer in a preparing state due to having already received a vote
-     * to abort from another participant.
+     * Sends prepare to the given shard and returns a future, which will be set with the vote.
      *
-     * Returns a future containing the participant's response.
+     * This method will retry until it receives a non-retryable response from the remote node or
+     * until the scheduler under which it is running is shut down. Because of this it can return
+     * only the following error code(s):
+     *   - TransactionCoordinatorSteppingDown
+     *   - ShardNotFound
      */
-    Future<txn::PrepareResponse> sendPrepareToShard(const ShardId& shardId,
+    Future<txn::PrepareResponse> sendPrepareToShard(txn::AsyncWorkScheduler& scheduler,
+                                                    const ShardId& shardId,
                                                     const BSONObj& prepareCommandObj);
 
     /**
-     * Sends a command corresponding to a commit decision (i.e. commitTransaction or
-     * abortTransaction) to the given shard ID and retries on any retryable error until the command
-     * succeeds or receives a response that may be interpreted as a vote to abort (e.g.
-     * NoSuchTransaction).
+     * Sends a command corresponding to a commit decision (i.e. commitTransaction or*
+     * abortTransaction) to the given shard and returns a future, which will be set with the result.
      *
      * Used for sendCommit and sendAbort.
+     *
+     * This method will retry until it receives a response from the remote node which can be
+     * interpreted as vote abort (e.g. NoSuchTransaction), or until the scheduler under which it is
+     * running is shut down. Because of this it can return only the following error code(s):
+     *   - TransactionCoordinatorSteppingDown
      */
-    Future<void> sendDecisionToParticipantShard(const ShardId& shardId, const BSONObj& commandObj);
+    Future<void> sendDecisionToParticipantShard(txn::AsyncWorkScheduler& scheduler,
+                                                const ShardId& shardId,
+                                                const BSONObj& commandObj);
 
 private:
     ServiceContext* _serviceContext;
 
     std::unique_ptr<txn::AsyncWorkScheduler> _scheduler;
-
-    // TODO (SERVER-38522): Remove once AsyncWorkScheduler is used for cancellation
-    AtomicWord<bool> _cancelled{false};
 };
 
 }  // namespace mongo

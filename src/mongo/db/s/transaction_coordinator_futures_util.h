@@ -93,6 +93,9 @@ public:
                         auto scopedGuard = makeGuard([&] {
                             ul.lock();
                             _activeOpContexts.erase(uniqueOpCtxIter);
+                            // There is no need to call _notifyAllTasksComplete here, because we
+                            // will still have an outstanding _activeHandles entry, so the scheduler
+                            // is never completed at this point
                         });
 
                         return task(uniqueOpCtxIter->get());
@@ -108,6 +111,7 @@ public:
                 [ this, it = std::move(it) ](StatusOrStatusWith<ReturnType> s) {
                     stdx::lock_guard<stdx::mutex> lg(_mutex);
                     _activeHandles.erase(it);
+                    _notifyAllTasksComplete(lg);
                 });
         } catch (const DBException& ex) {
             taskCompletionPromise->setError(ex.toStatus());
@@ -151,6 +155,13 @@ private:
     Future<HostAndPort> _targetHostAsync(const ShardId& shardId,
                                          const ReadPreferenceSetting& readPref);
 
+    /**
+     * Invoked every time a registered op context, handle or child scheduler is getting
+     * unregistered. Used to notify the 'all lists empty' condition variable when there is no more
+     * activity on a scheduler which has been shut down.
+     */
+    void _notifyAllTasksComplete(WithLock);
+
     // Service context under which this executor runs
     ServiceContext* const _serviceContext;
 
@@ -177,6 +188,10 @@ private:
 
     // Any outstanding child schedulers created though 'makeChildScheduler'
     ChildIteratorsList _childSchedulers;
+
+    // Notified when the the scheduler is shut down and the last active handle, operation context or
+    // child scheduler has been unregistered.
+    stdx::condition_variable _allListsEmptyCV;
 };
 
 enum class ShouldStopIteration { kYes, kNo };

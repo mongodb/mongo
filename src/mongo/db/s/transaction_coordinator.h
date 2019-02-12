@@ -43,9 +43,20 @@ class TransactionCoordinator {
     MONGO_DISALLOW_COPYING(TransactionCoordinator);
 
 public:
+    /**
+     * Instantiates a new TransactioncCoordinator for the specified lsid + txnNumber pair and gives
+     * it a 'scheduler' to use for any asynchronous tasks it spawns.
+     *
+     * If the 'coordinateCommitDeadline' parameter is specified, a timed task will be scheduled to
+     * cause the coordinator to be put in a cancelled state, if runCommit is not eventually
+     * received.
+     */
     TransactionCoordinator(ServiceContext* serviceContext,
                            const LogicalSessionId& lsid,
-                           TxnNumber txnNumber);
+                           TxnNumber txnNumber,
+                           std::unique_ptr<txn::AsyncWorkScheduler> scheduler,
+                           boost::optional<Date_t> coordinateCommitDeadline);
+
     ~TransactionCoordinator();
 
     /**
@@ -94,19 +105,24 @@ public:
 
     /**
      * The first time this is called, it asynchronously begins the two-phase commit process for the
-     * transaction that this coordinator is responsible for, and returns a future that will be
-     * resolved when a commit or abort decision has been made and persisted.
+     * transaction that this coordinator is responsible for.
      *
-     * Subsequent calls will not re-run the commit process, but instead return a future that will be
-     * resolved when the original commit process that was kicked off comes to a decision. If the
-     * original commit process has completed, returns a ready future containing the final decision.
+     * Subsequent calls will not re-run the commit process.
      */
-    SharedSemiFuture<txn::CommitDecision> runCommit(const std::vector<ShardId>& participantShards);
+    void runCommit(std::vector<ShardId> participantShards);
 
     /**
      * To be used to continue coordinating a transaction on step up.
      */
     void continueCommit(const TransactionCoordinatorDocument& doc);
+
+    /**
+     * Gets a Future that will contain the decision that the coordinator reaches. Note that this
+     * will never be signaled unless runCommit has been called.
+     *
+     * TODO (SERVER-37364): Remove this when it is no longer needed by the coordinator service.
+     */
+    SharedSemiFuture<txn::CommitDecision> getDecision();
 
     /**
      * Returns a future that will be signaled when the transaction has completely finished
@@ -118,23 +134,22 @@ public:
     Future<void> onCompletion();
 
     /**
-     * Gets a Future that will contain the decision that the coordinator reaches. Note that this
-     * will never be signaled unless runCommit has been called.
-     *
-     * TODO (SERVER-37364): Remove this when it is no longer needed by the coordinator service.
-     */
-    SharedSemiFuture<txn::CommitDecision> getDecision();
-
-    /**
      * If runCommit has not yet been called, this will transition this coordinator object to
      * the 'done' state, effectively making it impossible for two-phase commit to be run for this
      * coordinator.
      *
-     * Called when a transaction with a higher transaction number is received on this session.
+     * Called when a transaction with a higher transaction number is received on this session or
+     * when the transaction coordinator service is shutting down.
      */
     void cancelIfCommitNotYetStarted();
 
 private:
+    /**
+     * Called when the timeout task scheduled by the constructor is no longer necessary (i.e.
+     * coordinateCommit was received or the coordinator was cancelled intentionally).
+     */
+    void _cancelTimeoutWaitForCommitTask();
+
     /**
      * Expects the participant list to already be majority-committed.
      *
@@ -181,13 +196,22 @@ private:
     // Shortcut to the service context under which this coordinator runs
     ServiceContext* const _serviceContext;
 
-    // Context object used to perform and track the state of asynchronous operations on behalf of
-    // this coordinator.
-    TransactionCoordinatorDriver _driver;
-
     // The lsid + transaction number that this coordinator is coordinating
     const LogicalSessionId _lsid;
     const TxnNumber _txnNumber;
+
+    // Scheduler to use for all asynchronous activity which needs to be performed by this
+    // coordinator
+    std::unique_ptr<txn::AsyncWorkScheduler> _scheduler;
+
+    // If not nullptr, references the scheduler containing a task which willl trigger
+    // 'cancelIfCommitNotYetStarted' if runCommit has not been invoked. If nullptr, then this
+    // coordinator was not created with an expiration task.
+    std::unique_ptr<txn::AsyncWorkScheduler> _deadlineScheduler;
+
+    // Context object used to perform and track the state of asynchronous operations on behalf of
+    // this coordinator.
+    TransactionCoordinatorDriver _driver;
 
     // Protects the state below
     mutable stdx::mutex _mutex;
@@ -199,7 +223,7 @@ private:
     // abort). This is only known once all responses to prepare have been received from all
     // participants, and the collective decision has been majority persisted to
     // config.transactionCommitDecisions.
-    SharedPromise<txn::CommitDecision> _finalDecisionPromise;
+    SharedPromise<txn::CommitDecision> _decisionPromise;
 
     // A list of all promises corresponding to futures that were returned to callers of
     // onCompletion.
@@ -208,30 +232,10 @@ private:
     std::vector<Promise<void>> _completionPromises;
 };
 
-inline logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
-                                            const TransactionCoordinator::CoordinatorState& state) {
-    using State = TransactionCoordinator::CoordinatorState;
-    // clang-format off
-    switch (state) {
-        case State::kInit:  stream.stream() << "kInit"; break;
-        case State::kPreparing:   stream.stream() << "kPreparing"; break;
-        case State::kAborting: stream.stream() << "kAborting"; break;
-        case State::kCommitting: stream.stream() << "kCommitting"; break;
-        case State::kDone: stream.stream() << "kDone"; break;
-    };
-    // clang-format on
-    return stream;
-}
+logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
+                                     const TransactionCoordinator::CoordinatorState& state);
 
-inline logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
-                                            const txn::CommitDecision& decision) {
-    // clang-format off
-    switch (decision) {
-        case txn::CommitDecision::kCommit:     stream.stream() << "kCommit"; break;
-        case txn::CommitDecision::kAbort:      stream.stream() << "kAbort"; break;
-        case txn::CommitDecision::kCanceled:   stream.stream() << "kCanceled"; break;
-    };
-    // clang-format on
-    return stream;
-}
+logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
+                                     const txn::CommitDecision& decision);
+
 }  // namespace mongo

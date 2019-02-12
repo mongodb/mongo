@@ -140,6 +140,11 @@ bool shouldRetryCommandAgainstShard(const ShardId& shardId,
         shouldRetry = false;
     }
 
+    if (responseStatus == ErrorCodes::TransactionCoordinatorSteppingDown ||
+        responseStatus == ErrorCodes::TransactionCoordinatorReachedAbortDecision) {
+        shouldRetry = false;
+    }
+
     LOG(3) << "Coordinator " << (shouldRetry ? "retrying " : "not retrying ") << commandObj
            << " against " << (isLocalShard ? "local " : "") << "shard " << shardId
            << " because got response status " << responseStatus;
@@ -279,8 +284,10 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
 
     // Send prepare to all participants asynchronously and collect their future responses in a
     // vector of responses.
+    auto prepareScheduler = _scheduler->makeChildScheduler();
+
     for (const auto& participant : participantShards) {
-        responses.push_back(sendPrepareToShard(participant, prepareObj));
+        responses.push_back(sendPrepareToShard(*prepareScheduler, participant, prepareObj));
     }
 
     // Asynchronously aggregate all prepare responses to find the decision and max prepare timestamp
@@ -291,7 +298,8 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
         // Initial value
         txn::PrepareVoteConsensus{boost::none, boost::none},
         // Aggregates an incoming response (next) with the existing aggregate value (result)
-        [this](txn::PrepareVoteConsensus& result, const PrepareResponse& next) {
+        [prepareScheduler = std::move(prepareScheduler)](txn::PrepareVoteConsensus & result,
+                                                         const PrepareResponse& next) {
             if (!next.vote) {
                 LOG(3) << "Transaction coordinator did not receive a response from shard "
                        << next.participantShardId;
@@ -302,7 +310,9 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
                 case PrepareVote::kAbort:
                     result.decision = CommitDecision::kAbort;
                     result.maxPrepareTimestamp = boost::none;
-                    cancel();
+                    prepareScheduler->shutdown(
+                        {ErrorCodes::TransactionCoordinatorReachedAbortDecision,
+                         "Received at least one vote abort"});
                     return txn::ShouldStopIteration::kYes;
                 case PrepareVote::kCommit:
                     result.decision = CommitDecision::kCommit;
@@ -469,7 +479,7 @@ Future<void> TransactionCoordinatorDriver::sendCommit(const std::vector<ShardId>
 
     std::vector<Future<void>> responses;
     for (const auto& participant : participantShards) {
-        responses.push_back(sendDecisionToParticipantShard(participant, commitObj));
+        responses.push_back(sendDecisionToParticipantShard(*_scheduler, participant, commitObj));
     }
     return txn::whenAll(responses);
 }
@@ -486,7 +496,7 @@ Future<void> TransactionCoordinatorDriver::sendAbort(const std::vector<ShardId>&
 
     std::vector<Future<void>> responses;
     for (const auto& participant : participantShards) {
-        responses.push_back(sendDecisionToParticipantShard(participant, abortObj));
+        responses.push_back(sendDecisionToParticipantShard(*_scheduler, participant, abortObj));
     }
     return txn::whenAll(responses);
 }
@@ -595,20 +605,22 @@ std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAl
 }
 
 Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
-    const ShardId& shardId, const BSONObj& commandObj) {
+    txn::AsyncWorkScheduler& scheduler, const ShardId& shardId, const BSONObj& commandObj) {
     const bool isLocalShard = checkIsLocalShard(_serviceContext, shardId);
-    return txn::doWhile(
-        *_scheduler,
+
+    auto f = txn::doWhile(
+        scheduler,
         kExponentialBackoff,
-        [ isLocalShard, shardId, commandObj = commandObj.getOwned() ](
+        [ shardId, isLocalShard, commandObj = commandObj.getOwned() ](
             StatusWith<PrepareResponse> swPrepareResponse) {
             return shouldRetryCommandAgainstShard(
                 shardId, isLocalShard, commandObj, swPrepareResponse.getStatus());
         },
-        [ this, shardId, isLocalShard, commandObj = commandObj.getOwned() ] {
+        [&scheduler, shardId, isLocalShard, commandObj = commandObj.getOwned() ] {
             LOG(3) << "Coordinator going to send command " << commandObj << " to "
                    << (isLocalShard ? " local " : "") << " shard " << shardId;
-            return _scheduler->scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
+
+            return scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
                     auto status = getStatusFromCommandResult(response.data);
                     auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
@@ -641,6 +653,7 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
 
                     LOG(3) << "Coordinator shard received " << status << " from shard " << shardId
                            << " for " << commandObj;
+
                     if (ErrorCodes::isVoteAbortError(status.code())) {
                         return PrepareResponse{shardId, PrepareVote::kAbort, boost::none};
                     }
@@ -648,7 +661,7 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
                     uassertStatusOK(status);
                     MONGO_UNREACHABLE;
                 })
-                .onError<ErrorCodes::ShardNotFound>([shardId, isLocalShard](const Status& s) {
+                .onError<ErrorCodes::ShardNotFound>([shardId, isLocalShard](const Status&) {
                     invariant(!isLocalShard);
                     // ShardNotFound may indicate that the participant shard has been removed (it
                     // could also mean the participant shard was recently added and this node
@@ -659,32 +672,31 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
                     // must then send abort.
                     return Future<PrepareResponse>::makeReady(
                         {shardId, CommitDecision::kAbort, boost::none});
-                })
-                .onError([this, shardId](const Status& status) {
-                    if (_cancelled.loadRelaxed()) {
-                        LOG(3) << "Prepare stopped retrying due to retrying being cancelled";
-                        return PrepareResponse{shardId, boost::none, boost::none};
-                    }
-
-                    uassertStatusOK(status);
-                    MONGO_UNREACHABLE;
                 });
+        });
+
+    return std::move(f).onError<ErrorCodes::TransactionCoordinatorReachedAbortDecision>(
+        [shardId](const Status&) {
+            LOG(3) << "Prepare stopped retrying due to retrying being cancelled";
+            return PrepareResponse{shardId, boost::none, boost::none};
         });
 }
 
 Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
-    const ShardId& shardId, const BSONObj& commandObj) {
+    txn::AsyncWorkScheduler& scheduler, const ShardId& shardId, const BSONObj& commandObj) {
     const bool isLocalShard = checkIsLocalShard(_serviceContext, shardId);
+
     return txn::doWhile(
-        *_scheduler,
+        scheduler,
         kExponentialBackoff,
-        [ isLocalShard, shardId, commandObj = commandObj.getOwned() ](const Status& s) {
+        [ shardId, isLocalShard, commandObj = commandObj.getOwned() ](const Status& s) {
             return shouldRetryCommandAgainstShard(shardId, isLocalShard, commandObj, s);
         },
-        [ this, isLocalShard, shardId, commandObj = commandObj.getOwned() ] {
+        [&scheduler, shardId, isLocalShard, commandObj = commandObj.getOwned() ] {
             LOG(3) << "Coordinator going to send command " << commandObj << " to "
                    << (isLocalShard ? " local " : "") << " shard " << shardId;
-            return _scheduler->scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
+
+            return scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
                     auto status = getStatusFromCommandResult(response.data);
                     auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
@@ -713,10 +725,6 @@ Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
                     fassert(51068, false);
                 });
         });
-}
-
-void TransactionCoordinatorDriver::cancel() {
-    _cancelled.store(true);
 }
 
 }  // namespace mongo

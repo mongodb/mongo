@@ -48,15 +48,49 @@ TransactionCoordinatorCatalog::~TransactionCoordinatorCatalog() {
     join();
 }
 
+void TransactionCoordinatorCatalog::exitStepUp(Status status) {
+    if (status.isOK()) {
+        LOG(0) << "Incoming coordinateCommit requests are now enabled";
+    } else {
+        warning() << "Coordinator recovery failed and coordinateCommit requests will not be allowed"
+                  << causedBy(status);
+    }
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(!_stepUpCompletionStatus);
+    _stepUpCompletionStatus = std::move(status);
+    _stepUpCompleteCV.notify_all();
+}
+
+void TransactionCoordinatorCatalog::onStepDown() {
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
+
+    std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
+    for (auto && [ sessionId, coordinatorsForSession ] : _coordinatorsBySession) {
+        for (auto && [ txnNumber, coordinator ] : coordinatorsForSession) {
+            coordinatorsToCancel.emplace_back(coordinator);
+        }
+    }
+
+    ul.unlock();
+
+    for (auto&& coordinator : coordinatorsToCancel) {
+        coordinator->cancelIfCommitNotYetStarted();
+    }
+
+    ul.lock();
+    _cleanupCompletedCoordinators(ul);
+}
+
 void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
-                                           LogicalSessionId lsid,
+                                           const LogicalSessionId& lsid,
                                            TxnNumber txnNumber,
                                            std::shared_ptr<TransactionCoordinator> coordinator,
                                            bool forStepUp) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(ul); });
     if (!forStepUp) {
-        _waitForStepUpToComplete(lk, opCtx);
+        _waitForStepUpToComplete(ul, opCtx);
     }
 
     auto& coordinatorsBySession = _coordinatorsBySession[lsid];
@@ -70,18 +104,19 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
 
     // Schedule callback to remove coordinator from catalog when it either commits or aborts.
     coordinator->onCompletion().getAsync(
-        [this, lsid, txnNumber](Status) { remove(lsid, txnNumber); });
+        [this, lsid, txnNumber](Status) { _remove(lsid, txnNumber); });
 
     LOG(3) << "Inserting coordinator for transaction " << txnNumber << " on session "
            << lsid.toBSON() << " into in-memory catalog";
+
     coordinatorsBySession[txnNumber] = std::move(coordinator);
 }
 
-std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(OperationContext* opCtx,
-                                                                           LogicalSessionId lsid,
-                                                                           TxnNumber txnNumber) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _waitForStepUpToComplete(lk, opCtx);
+std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
+    OperationContext* opCtx, const LogicalSessionId& lsid, TxnNumber txnNumber) {
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(ul); });
+    _waitForStepUpToComplete(ul, opCtx);
 
     std::shared_ptr<TransactionCoordinator> coordinatorToReturn;
 
@@ -112,9 +147,11 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(Opera
 }
 
 boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
-TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx, LogicalSessionId lsid) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _waitForStepUpToComplete(lk, opCtx);
+TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
+                                                  const LogicalSessionId& lsid) {
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
+    auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(ul); });
+    _waitForStepUpToComplete(ul, opCtx);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -132,7 +169,7 @@ TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx, Logic
     return std::make_pair(lastCoordinatorOnSession->first, lastCoordinatorOnSession->second);
 }
 
-void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnNumber) {
+void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNumber txnNumber) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     LOG(3) << "Removing coordinator for transaction " << txnNumber << " on session "
@@ -163,6 +200,11 @@ void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnN
                 }
             }
 
+            // Since the '_remove' method executes on the AWS of the coordinator which is being
+            // removed, we cannot destroy it inline. Because of this, put it on a cleanup list so
+            // that subsequent catalog operations will perform the cleanup.
+            _coordinatorsToCleanup.emplace_back(coordinatorForTxnIter->second);
+
             coordinatorsForSession.erase(coordinatorForTxnIter);
             if (coordinatorsForSession.empty()) {
                 _coordinatorsBySession.erase(coordinatorsForSessionIter);
@@ -172,28 +214,14 @@ void TransactionCoordinatorCatalog::remove(LogicalSessionId lsid, TxnNumber txnN
 
     if (_coordinatorsBySession.empty()) {
         LOG(3) << "Signaling last active coordinator removed";
-        _noActiveCoordinatorsCv.notify_all();
+        _noActiveCoordinatorsCV.notify_all();
     }
-}
-
-void TransactionCoordinatorCatalog::exitStepUp(Status status) {
-    if (status.isOK()) {
-        LOG(0) << "Incoming coordinateCommit requests are now enabled";
-    } else {
-        warning() << "Coordinator recovery failed and coordinateCommit requests will not be allowed"
-                  << causedBy(status);
-    }
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(!_stepUpCompletionStatus);
-    _stepUpCompletionStatus = std::move(status);
-    _stepUpCompleteCv.notify_all();
 }
 
 void TransactionCoordinatorCatalog::join() {
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
-    while (!_noActiveCoordinatorsCv.wait_for(
+    while (!_noActiveCoordinatorsCV.wait_for(
         ul, stdx::chrono::seconds{5}, [this] { return _coordinatorsBySession.empty(); })) {
         LOG(0) << "After 5 seconds of wait there are still " << _coordinatorsBySession.size()
                << " sessions left with active coordinators which have not yet completed";
@@ -210,23 +238,28 @@ void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<s
                                                              OperationContext* opCtx) {
     invariant(lk.owns_lock());
     opCtx->waitForConditionOrInterrupt(
-        _stepUpCompleteCv, lk, [this]() { return bool(_stepUpCompletionStatus); });
+        _stepUpCompleteCV, lk, [this]() { return bool(_stepUpCompletionStatus); });
 
     uassertStatusOK(*_stepUpCompletionStatus);
+}
+
+void TransactionCoordinatorCatalog::_cleanupCompletedCoordinators(
+    stdx::unique_lock<stdx::mutex>& ul) {
+    invariant(ul.owns_lock());
+    auto coordinatorsToCleanup = std::move(_coordinatorsToCleanup);
+
+    // Ensure the destructors run outside of the lock in order to minimize the time this methods
+    // spends in a critical section
+    ul.unlock();
 }
 
 std::string TransactionCoordinatorCatalog::_toString(WithLock wl) const {
     StringBuilder ss;
     ss << "[";
-    for (auto coordinatorsForSession = _coordinatorsBySession.begin();
-         coordinatorsForSession != _coordinatorsBySession.end();
-         ++coordinatorsForSession) {
-        ss << "\n";
-        ss << coordinatorsForSession->first.toBSON() << ": ";
-        for (auto coordinatorForTxnNumber = coordinatorsForSession->second.begin();
-             coordinatorForTxnNumber != coordinatorsForSession->second.end();
-             ++coordinatorForTxnNumber) {
-            ss << coordinatorForTxnNumber->first << " ";
+    for (const auto& coordinatorsForSession : _coordinatorsBySession) {
+        ss << "\n" << coordinatorsForSession.first.toBSON() << ": ";
+        for (const auto& coordinator : coordinatorsForSession.second) {
+            ss << coordinator.first << ",";
         }
     }
     ss << "]";
