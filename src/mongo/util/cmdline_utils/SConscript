@@ -14,6 +14,3 @@ env.Library(
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ])
 
-env.CppUnitTest('censor_cmdline_test',
-                'censor_cmdline_test.cpp',
-                LIBDEPS=['cmdline_utils', '$BUILD_DIR/mongo/unittest/unittest'])

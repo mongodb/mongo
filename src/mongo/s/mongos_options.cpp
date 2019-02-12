@@ -63,22 +63,7 @@ Status addMongosOptions(moe::OptionSection* options) {
         return ret;
     }
 
-#if defined(_WIN32)
-    moe::OptionSection windows_scm_options("Windows Service Control Manager options");
-
-    ret = addWindowsServerOptions(&windows_scm_options);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
-
-    options->addSection(general_options).transitional_ignore();
-
-#if defined(_WIN32)
-    options->addSection(windows_scm_options).transitional_ignore();
-#endif
-
-    return Status::OK();
+    return options->addSection(general_options);
 }
 
 void printMongosHelp(const moe::OptionSection& options) {

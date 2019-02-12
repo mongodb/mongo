@@ -46,13 +46,8 @@ struct InsensitiveCompare {
     }
 };
 
-std::set<std::string, InsensitiveCompare> gRedactedDottedNames = {
-    // Legacy redacted names pending conversion.
-    "processManagement.windowsService.servicePassword",
-};
-std::set<std::string, InsensitiveCompare> gRedactedSingleNames = {
-    "servicePassword",
-};
+std::set<std::string, InsensitiveCompare> gRedactedDottedNames;
+std::set<std::string, InsensitiveCompare> gRedactedSingleNames;
 std::set<char> gRedactedCharacterNames;
 
 bool gGatherOptionsDone = false;

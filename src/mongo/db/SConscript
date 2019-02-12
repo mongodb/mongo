@@ -408,6 +408,17 @@ env.Library(
     ],
 )
 
+if env.TargetOSIs('windows'):
+    env.Library(
+        target='windows_options',
+        source=[
+            env.Idlc('windows_options.idl')[0],
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        ],
+    )
+
 env.Clone().InjectModule("enterprise").Library(
     target="server_options_servers",
     source=[
