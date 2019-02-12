@@ -811,53 +811,54 @@ functions:
         # If the android toolchain has not been setup the android sdk will not
         # be available and we should not build the android version of mongodb
         # embedded.
-        if [ "${setup_android_toolchain|}" = "true" ]; then
-            export ANDROID_HOME=$(pwd)/android_sdk
+        if [ "${setup_android_toolchain|}" != "true" ]; then
+            echo "Android toolchain has not been setup, skipping \"build java embedded sdk\""
+            exit 0
+        fi
 
-            cd src/src/mongo/embedded/mongo_embedded/java
-
-            # TODO: Clean this up later where we can remove duplication
-            if [ ${package_type|embedded-android} = "embedded-jar" ]; then
-                tar zxvf ../../../../../../embedded-sdk-java-linux-x86-64.tgz
-                mkdir -p jniLibs/linux-x86-64
-                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/linux-x86-64
-                rm -rf ./mongo-embedded-sdk-${version}
-
-                tar zxvf ../../../../../../embedded-sdk-java-darwin.tgz
-                mkdir -p jniLibs/darwin
-                cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.dylib jniLibs/darwin
-                rm -rf ./mongo-embedded-sdk-${version}
-
-                ./gradlew clean :embedded-jar:build :embedded-jar:publishMavenPublicationToLocalRepository
-
-                # Is this a release?
-                if [ "${is_release|false}" = "true" ]; then
-                    echo "Releases disabled on master."
-                    #source ./artifactory_mobile_creds.sh
-                    #./gradlew --info :embedded-jar:artifactoryPublish
-                fi
+        export ANDROID_HOME=$(pwd)/android_sdk
+        MINOR_VER=$(echo "${version}" | awk -F. '{print $(NF-1)}')
+        if [ $(($MINOR_VER % 2)) != 0 ]; then
+            EMBEDDED_RELEASE_VERSION="${version}-SNAPSHOT"
+        else
+            EMBEDDED_RELEASE_VERSION="${version}"
+        fi
 
 
-                mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/java
-                cp -r embedded-jar/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/java
-            else
-                for arch in arm64-v8a armeabi-v7a x86_64 ; do
-                    tar zxvf ../../../../../../embedded-sdk-android-$arch.tgz
-                    mkdir -p jniLibs/$arch
-                    cp ./mongo-embedded-sdk-${version}/lib/libmongo_embedded.so jniLibs/$arch
-                    rm -rf ./mongo-embedded-sdk-${version}
-                done
+        cd src/src/mongo/embedded/mongo_embedded/java
 
-                ./gradlew clean :embedded-android:build
-                # Is this a release?
-                if [ "${is_release|false}" = "true" ]; then
-                    echo "Releases disabled on master."
-                    #./gradlew :embedded-android:uploadArchives closeAndReleaseRepository
-                fi
+        # TODO: Clean this up later where we can remove duplication
+        if [ ${package_type|embedded-android} = "embedded-jar" ]; then
+            tar zxvf ../../../../../../embedded-sdk-java-linux-x86-64.tgz
+            mkdir -p jniLibs/linux-x86-64
+            cp ./mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/lib/libmongo_embedded.so jniLibs/linux-x86-64
+            rm -rf ./mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION
 
-                mkdir -p ../../../../../build/mongo-embedded-sdk-${version}/android
-                cp -r embedded-android/build/repo/* ../../../../../build/mongo-embedded-sdk-${version}/android
+            tar zxvf ../../../../../../embedded-sdk-java-darwin.tgz
+            mkdir -p jniLibs/darwin
+            cp ./mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/lib/libmongo_embedded.dylib jniLibs/darwin
+            rm -rf ./mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION
+
+            ./gradlew clean :embedded-jar:build :embedded-jar:publishMavenPublicationToLocalRepository
+
+            mkdir -p ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/java
+            cp -r embedded-jar/build/repo/* ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/java
+        else
+            for arch in arm64-v8a armeabi-v7a x86_64 ; do
+                tar zxvf ../../../../../../embedded-sdk-android-$arch.tgz
+                mkdir -p jniLibs/$arch
+                cp ./mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/lib/libmongo_embedded.so jniLibs/$arch
+                rm -rf ./mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION
+            done
+
+            ./gradlew clean :embedded-android:build
+            # Is this a release?
+            if [ "${is_release|false}" = "true" ]; then
+                ./gradlew :embedded-android:uploadArchives closeAndReleaseRepository
             fi
+
+            mkdir -p ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/android
+            cp -r embedded-android/build/repo/* ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/android
         fi
 
   "shared scons cache pruning" :

@@ -40,6 +40,11 @@ def getGitVersion() {
             outputAsString = os.toString().substring(1).trim()
         }
 
+        def minorVer = outputAsString.tokenize('.')[1].toInteger()
+        if ((minorVer % 2) != 0) {
+            return outputAsString + "-SNAPSHOT"
+        }
+
         return outputAsString
     }
 }
