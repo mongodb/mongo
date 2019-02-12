@@ -1934,7 +1934,7 @@ TEST_F(StepDownTest,
     ASSERT_THROWS_CODE(
         getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000)),
         AssertionException,
-        ErrorCodes::ExceededTimeLimit);
+        ErrorCodes::LockTimeout);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     ASSERT_TRUE(locker->isRSTLExclusive());

@@ -50,7 +50,7 @@ struct PartitionedLockHead;
  * This matrix answers the question, "Is a lock request with mode 'Requested Mode' compatible with
  * an existing lock held in mode 'Granted Mode'?"
  *
- * | Requested Mode | Granted Mode |         |          |        |          |
+ * | Requested Mode |                      Granted Mode                     |
  * |----------------|:------------:|:-------:|:--------:|:------:|:--------:|
  * |                |  MODE_NONE   | MODE_IS |  MODE_IX | MODE_S |  MODE_X  |
  * | MODE_IS        |      +       |    +    |     +    |    +   |          |

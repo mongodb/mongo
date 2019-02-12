@@ -82,11 +82,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual LockResult lockGlobal(OperationContext* opCtx, LockMode mode) {
+    virtual void lockGlobal(OperationContext* opCtx, LockMode mode) {
         MONGO_UNREACHABLE;
     }
 
-    virtual LockResult lockGlobal(LockMode mode) {
+    virtual void lockGlobal(LockMode mode) {
         MONGO_UNREACHABLE;
     }
 
@@ -98,11 +98,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline) {
+    virtual void lockGlobalComplete(OperationContext* opCtx, Date_t deadline) {
         MONGO_UNREACHABLE;
     }
 
-    virtual LockResult lockGlobalComplete(Date_t deadline) {
+    virtual void lockGlobalComplete(Date_t deadline) {
         MONGO_UNREACHABLE;
     }
 
@@ -122,7 +122,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline) {
+    virtual void lockRSTLComplete(OperationContext* opCtx, Date_t deadline) {
         MONGO_UNREACHABLE;
     }
 
@@ -130,16 +130,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual LockResult lock(OperationContext* opCtx,
-                            ResourceId resId,
-                            LockMode mode,
-                            Date_t deadline) {
-        return LockResult::LOCK_OK;
-    }
+    virtual void lock(OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline) {}
 
-    virtual LockResult lock(ResourceId resId, LockMode mode, Date_t deadline) {
-        return LockResult::LOCK_OK;
-    }
+    virtual void lock(ResourceId resId, LockMode mode, Date_t deadline) {}
 
     virtual void downgrade(ResourceId resId, LockMode newMode) {
         MONGO_UNREACHABLE;

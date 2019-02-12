@@ -981,10 +981,8 @@ void shutdownTask() {
     LockerImpl* globalLocker = new LockerImpl();
     LockResult result = globalLocker->lockGlobalBegin(MODE_X, Date_t::max());
     if (result == LOCK_WAITING) {
-        result = globalLocker->lockGlobalComplete(Date_t::max());
+        globalLocker->lockGlobalComplete(Date_t::max());
     }
-
-    invariant(LOCK_OK == result);
 
     // Global storage engine may not be started in all cases before we exit
     if (serviceContext->getStorageEngine()) {

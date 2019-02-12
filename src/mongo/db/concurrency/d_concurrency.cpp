@@ -173,26 +173,23 @@ void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
         if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
             _pbwm.lock(MODE_IS);
         }
-
-        _result = _opCtx->lockState()->lock(
-            _opCtx, resourceIdReplicationStateTransitionLock, MODE_IX, deadline);
-        if (_result != LOCK_OK) {
+        auto unlockPBWM = makeGuard([this] {
             if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
                 _pbwm.unlock();
             }
-            return;
-        }
+        });
 
-        // At this point the RSTL is locked and must be unlocked if acquiring the GlobalLock fails.
-        // We only want to unlock the RSTL if we were interrupted acquiring the GlobalLock and not
-        // if we were interrupted acquiring the RSTL itself. If we were interrupted acquiring the
-        // RSTL then the RSTL will not be locked and we do not want to attempt to unlock it.
-        try {
-            _result = _opCtx->lockState()->lockGlobalBegin(_opCtx, lockMode, deadline);
-        } catch (...) {
-            _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
-            throw;
-        }
+        _opCtx->lockState()->lock(
+            _opCtx, resourceIdReplicationStateTransitionLock, MODE_IX, deadline);
+
+        auto unlockRSTL = makeGuard(
+            [this] { _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock); });
+
+        _result = LOCK_INVALID;
+        _result = _opCtx->lockState()->lockGlobalBegin(_opCtx, lockMode, deadline);
+
+        unlockRSTL.dismiss();
+        unlockPBWM.dismiss();
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         // The kLeaveUnlocked behavior suppresses this exception.
         if (_interruptBehavior == InterruptBehavior::kThrow)
@@ -203,18 +200,15 @@ void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
 void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {
     try {
         if (_result == LOCK_WAITING) {
-            _result = _opCtx->lockState()->lockGlobalComplete(_opCtx, deadline);
-        }
-
-        if (_result != LOCK_OK) {
-            _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
-
-            if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-                _pbwm.unlock();
-            }
+            _result = LOCK_INVALID;
+            _opCtx->lockState()->lockGlobalComplete(_opCtx, deadline);
+            _result = LOCK_OK;
         }
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
+        if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
+            _pbwm.unlock();
+        }
         // The kLeaveUnlocked behavior suppresses this exception.
         if (_interruptBehavior == InterruptBehavior::kThrow)
             throw;
@@ -239,19 +233,14 @@ Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Date
           opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, deadline, InterruptBehavior::kThrow) {
     massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
 
-    if (!_globalLock.isLocked()) {
-        invariant(deadline != Date_t::max() || _opCtx->lockState()->hasMaxLockTimeout());
-        return;
-    }
-
     // The check for the admin db is to ensure direct writes to auth collections
     // are serialized (see SERVER-16092).
     if ((_id == resourceIdAdminDB) && !isSharedLockMode(_mode)) {
         _mode = MODE_X;
     }
 
-    _result = _opCtx->lockState()->lock(_opCtx, _id, _mode, deadline);
-    invariant(_result == LOCK_OK || _result == LOCK_TIMEOUT);
+    _opCtx->lockState()->lock(_opCtx, _id, _mode, deadline);
+    _result = LOCK_OK;
 }
 
 Lock::DBLock::DBLock(DBLock&& otherLock)
@@ -280,7 +269,8 @@ void Lock::DBLock::relockWithMode(LockMode newMode) {
     _opCtx->lockState()->unlock(_id);
     _mode = newMode;
 
-    invariant(LOCK_OK == _opCtx->lockState()->lock(_opCtx, _id, _mode));
+    _opCtx->lockState()->lock(_opCtx, _id, _mode);
+    _result = LOCK_OK;
 }
 
 
@@ -298,8 +288,8 @@ Lock::CollectionLock::CollectionLock(Locker* lockState,
         actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
     }
 
-    _result = _lockState->lock(_id, actualLockMode, deadline);
-    invariant(_result == LOCK_OK || _result == LOCK_TIMEOUT);
+    _lockState->lock(_id, actualLockMode, deadline);
+    _result = LOCK_OK;
 }
 
 Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)
@@ -343,8 +333,8 @@ Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
 
 void Lock::ResourceLock::lock(LockMode mode) {
     invariant(_result == LOCK_INVALID);
-    _result = _locker->lock(_rid, mode);
-    invariant(_result == LOCK_OK);
+    _locker->lock(_rid, mode);
+    _result = LOCK_OK;
 }
 
 void Lock::ResourceLock::unlock() {

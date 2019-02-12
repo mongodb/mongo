@@ -57,7 +57,7 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
     // Use GlobalLock instead of DBLock to allow return when the lock is not available. It may
     // happen when the primary steps down and a shared global lock is acquired.
     Lock::GlobalLock lock(
-        opCtx, MODE_IX, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kThrow);
+        opCtx, MODE_IX, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kLeaveUnlocked);
 
     if (!lock.isLocked()) {
         LOG(1) << "Global lock is not available skipping noopWrite";

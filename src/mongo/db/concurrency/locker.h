@@ -152,19 +152,23 @@ public:
      * @param mode Mode in which the global lock should be acquired. Also indicates the intent
      *              of the operation.
      *
-     * @return LOCK_OK, if the global lock was acquired within the specified time bound. Otherwise,
-     *              the failure code and no lock will be acquired.
+     * It may throw an exception if it is interrupted.
      */
-    virtual LockResult lockGlobal(OperationContext* opCtx, LockMode mode) = 0;
-    virtual LockResult lockGlobal(LockMode mode) = 0;
+    virtual void lockGlobal(OperationContext* opCtx, LockMode mode) = 0;
+    virtual void lockGlobal(LockMode mode) = 0;
 
     /**
      * Requests the global lock to be acquired in the specified mode.
      *
      * See the comments for lockBegin/Complete for more information on the semantics. The deadline
      * indicates the absolute time point when this lock acquisition will time out, if not yet
-     * granted. The lockGlobalBegin method has a deadline for use with the TicketHolder, if there
-     *  is one.
+     * granted. The lockGlobalBegin method has a deadline for use with the TicketHolder, if there is
+     * one.
+     *
+     * Returns LOCK_OK if the global lock is successfully acquired,
+     *      or LOCK_WAITING if the global lock is currently held by someone else.
+     *
+     * The ticket acquisition phase can be interrupted or time out, thus throwing an exception.
      */
     virtual LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) = 0;
     virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) = 0;
@@ -172,9 +176,11 @@ public:
     /**
      * Calling lockGlobalComplete without an OperationContext does not allow the lock acquisition
      * to be interrupted.
+     *
+     * It may throw an exception if it is interrupted.
      */
-    virtual LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline) = 0;
-    virtual LockResult lockGlobalComplete(Date_t deadline) = 0;
+    virtual void lockGlobalComplete(OperationContext* opCtx, Date_t deadline) = 0;
+    virtual void lockGlobalComplete(Date_t deadline) = 0;
 
     /**
      * Decrements the reference count on the global lock.  If the reference count on the
@@ -200,8 +206,10 @@ public:
     /**
      * Waits for the completion of acquiring the RSTL in mode X. This should only be called inside
      * ReplicationStateTransitionLockGuard.
+     *
+     * It may throw an exception if it is interrupted.
      */
-    virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline) = 0;
+    virtual void lockRSTLComplete(OperationContext* opCtx, Date_t deadline) = 0;
 
     /**
      * Unlocks the RSTL when the transaction becomes prepared. This is used to bypass two-phase
@@ -235,28 +243,29 @@ public:
      * corresponding call to unlock.
      *
      * If setLockTimeoutMillis has been called, then a lock request with a Date_t::max() deadline
-     * may throw a LockTimeout error. See setMaxLockTimeout() above for details.
+     * may throw a LockTimeout exception. See setMaxLockTimeout() above for details.
      *
      * @param opCtx If provided, will be used to interrupt a LOCK_WAITING state.
      * @param resId Id of the resource to be locked.
      * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
-     * @param deadline How long to wait for the lock to be granted, before
-     *              returning LOCK_TIMEOUT. This parameter defaults to an infinite deadline.
-     *              If Milliseconds(0) is passed, the request will return immediately, if
-     *              the request could not be granted right away.
+     * @param deadline How long to wait for the lock to be granted.
+     *                 This parameter defaults to an infinite deadline.
+     *                 If Milliseconds(0) is passed, the function will return immediately if the
+     *                 request could be granted right away, or throws a LockTimeout exception
+     *                 otherwise.
      *
-     * @return All LockResults except for LOCK_WAITING, because it blocks.
+     * It may throw an exception if it is interrupted.
      */
-    virtual LockResult lock(OperationContext* opCtx,
-                            ResourceId resId,
-                            LockMode mode,
-                            Date_t deadline = Date_t::max()) = 0;
+    virtual void lock(OperationContext* opCtx,
+                      ResourceId resId,
+                      LockMode mode,
+                      Date_t deadline = Date_t::max()) = 0;
 
     /**
      * Calling lock without an OperationContext does not allow LOCK_WAITING states to be
      * interrupted.
      */
-    virtual LockResult lock(ResourceId resId, LockMode mode, Date_t deadline = Date_t::max()) = 0;
+    virtual void lock(ResourceId resId, LockMode mode, Date_t deadline = Date_t::max()) = 0;
 
     /**
      * Downgrades the specified resource's lock mode without changing the reference count.
@@ -474,9 +483,8 @@ protected:
 
     /**
      * The number of callers that are guarding from lock interruptions.
-     * When 0, all lock acquisitions are interruptible. When positive, no lock acquisitions
-     * are interruptible. This is only true for database and global locks. Collection locks are
-     * never interruptible.
+     * When 0, all lock acquisitions are interruptible. When positive, no lock acquisitions are
+     * interruptible or can time out.
      */
     int _uninterruptibleLocksRequested = 0;
 

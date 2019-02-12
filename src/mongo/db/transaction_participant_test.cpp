@@ -711,9 +711,7 @@ TEST_F(TxnParticipantTest, StepDownAfterPrepareDoesNotBlock) {
     // Test that we can acquire the RSTL in mode X, and then immediately release it so the test can
     // complete successfully.
     auto func = [&](OperationContext* opCtx) {
-        ASSERT_EQ(
-            LOCK_OK,
-            opCtx->lockState()->lock(opCtx, resourceIdReplicationStateTransitionLock, MODE_X));
+        opCtx->lockState()->lock(opCtx, resourceIdReplicationStateTransitionLock, MODE_X);
         opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
     };
     runFunctionFromDifferentOpCtx(func);
@@ -734,9 +732,7 @@ TEST_F(TxnParticipantTest, StepDownAfterPrepareDoesNotBlockThenCommit) {
     // Test that we can acquire the RSTL in mode X, and then immediately release it so the test can
     // complete successfully.
     auto func = [&](OperationContext* opCtx) {
-        ASSERT_EQ(
-            LOCK_OK,
-            opCtx->lockState()->lock(opCtx, resourceIdReplicationStateTransitionLock, MODE_X));
+        opCtx->lockState()->lock(opCtx, resourceIdReplicationStateTransitionLock, MODE_X);
         opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
     };
     runFunctionFromDifferentOpCtx(func);

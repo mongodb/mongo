@@ -64,11 +64,10 @@ void ReplicationStateTransitionLockGuard::waitForLockUntil(mongo::Date_t deadlin
         return;
     }
 
+    _result = LOCK_INVALID;
     // Wait for the completion of the lock request for the RSTL in mode X.
-    _result = _opCtx->lockState()->lockRSTLComplete(_opCtx, deadline);
-    uassert(ErrorCodes::ExceededTimeLimit,
-            "Could not acquire the RSTL before the deadline",
-            _opCtx->lockState()->isRSTLExclusive());
+    _opCtx->lockState()->lockRSTLComplete(_opCtx, deadline);
+    _result = LOCK_OK;
 }
 
 void ReplicationStateTransitionLockGuard::release() {

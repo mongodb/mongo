@@ -53,7 +53,6 @@ void uassertLockTimeout(std::string resourceName, LockMode lockMode, bool isLock
 
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
     : _dbLock(opCtx, dbName, mode, deadline), _db([&] {
-          uassertLockTimeout(str::stream() << "database " << dbName, mode, _dbLock.isLocked());
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
@@ -76,9 +75,6 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
               deadline),
       _resolvedNss(resolveNamespaceStringOrUUID(opCtx, nsOrUUID)) {
     _collLock.emplace(opCtx->lockState(), _resolvedNss.ns(), modeColl, deadline);
-    uassertLockTimeout(
-        str::stream() << "collection " << nsOrUUID.toString(), modeColl, _collLock->isLocked());
-
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
         const BSONObj& data = customWait.getData();

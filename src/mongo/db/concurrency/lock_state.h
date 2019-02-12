@@ -128,8 +128,8 @@ public:
         _maxLockTimeout = boost::none;
     }
 
-    virtual LockResult lockGlobal(OperationContext* opCtx, LockMode mode);
-    virtual LockResult lockGlobal(LockMode mode) {
+    virtual void lockGlobal(OperationContext* opCtx, LockMode mode);
+    virtual void lockGlobal(LockMode mode) {
         return lockGlobal(nullptr, mode);
     }
     virtual LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) {
@@ -138,15 +138,15 @@ public:
     virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) {
         return _lockGlobalBegin(nullptr, mode, deadline);
     }
-    virtual LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline);
-    virtual LockResult lockGlobalComplete(Date_t deadline) {
-        return lockGlobalComplete(nullptr, deadline);
+    virtual void lockGlobalComplete(OperationContext* opCtx, Date_t deadline);
+    virtual void lockGlobalComplete(Date_t deadline) {
+        lockGlobalComplete(nullptr, deadline);
     }
 
     virtual bool unlockGlobal();
 
     virtual LockResult lockRSTLBegin(OperationContext* opCtx);
-    virtual LockResult lockRSTLComplete(OperationContext* opCtx, Date_t deadline);
+    virtual void lockRSTLComplete(OperationContext* opCtx, Date_t deadline);
 
     virtual bool unlockRSTLforPrepare();
 
@@ -163,13 +163,13 @@ public:
      * the lock acquisition. A lock operation would otherwise wait until a timeout or the lock is
      * granted.
      */
-    virtual LockResult lock(OperationContext* opCtx,
-                            ResourceId resId,
-                            LockMode mode,
-                            Date_t deadline = Date_t::max());
+    virtual void lock(OperationContext* opCtx,
+                      ResourceId resId,
+                      LockMode mode,
+                      Date_t deadline = Date_t::max());
 
-    virtual LockResult lock(ResourceId resId, LockMode mode, Date_t deadline = Date_t::max()) {
-        return lock(nullptr, resId, mode, deadline);
+    virtual void lock(ResourceId resId, LockMode mode, Date_t deadline = Date_t::max()) {
+        lock(nullptr, resId, mode, deadline);
     }
 
     virtual void downgrade(ResourceId resId, LockMode newMode);
@@ -239,14 +239,13 @@ public:
      * @param mode Mode which was passed to an earlier lockBegin call. Must match.
      * @param deadline The absolute time point when this lock acquisition will time out, if not yet
      * granted.
+     *
+     * Throws an exception if it is interrupted.
      */
-    LockResult lockComplete(OperationContext* opCtx,
-                            ResourceId resId,
-                            LockMode mode,
-                            Date_t deadline);
+    void lockComplete(OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline);
 
-    LockResult lockComplete(ResourceId resId, LockMode mode, Date_t deadline) {
-        return lockComplete(nullptr, resId, mode, deadline);
+    void lockComplete(ResourceId resId, LockMode mode, Date_t deadline) {
+        lockComplete(nullptr, resId, mode, deadline);
     }
 
     /**
@@ -261,7 +260,12 @@ private:
     typedef FastMapNoAlloc<ResourceId, LockRequest> LockRequestsMap;
 
     /**
-     * Like lockGlobalBegin, but accepts a deadline for acquiring a ticket.
+     * Acquires the ticket within the deadline (or _maxLockTimeout) and tries to grab the lock.
+     *
+     * Returns LOCK_OK if successfully acquired the global lock,
+     *      or LOCK_WAITING if the global lock is currently held by someone else.
+     *
+     * The ticket acquisition can be interrupted (by killOp/timeout), thus throwing an exception.
      */
     LockResult _lockGlobalBegin(OperationContext* opCtx, LockMode, Date_t deadline);
 
@@ -293,11 +297,11 @@ private:
 
     /**
      * Acquires a ticket for the Locker under 'mode'.
-     * Returns LOCK_OK      if a ticket is successfully acquired.
-     *         LOCK_TIMEOUT if it cannot acquire a ticket within 'deadline'.
+     * Returns true   if a ticket is successfully acquired.
+     *         false  if it cannot acquire a ticket within 'deadline'.
      * It may throw an exception when it is interrupted.
      */
-    LockResult _acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline);
+    bool _acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline);
 
     // Used to disambiguate different lockers
     const LockerId _id;
@@ -340,7 +344,7 @@ private:
     // If this is set, dictates the max number of milliseconds that we will wait for lock
     // acquisition. Effectively resets lock acquisition deadlines to time out sooner. If set to 0,
     // for example, lock attempts will time out immediately if the lock is not immediately
-    // available.
+    // available. Note this will be ineffective if uninterruptible lock guard is set.
     boost::optional<Milliseconds> _maxLockTimeout;
 
     //////////////////////////////////////////////////////////////////////////////////////////
