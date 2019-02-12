@@ -295,10 +295,13 @@ protected:
         return ss.str();
     }
 
-    auto checkUpsert(const char* expr, const char* match) {
-        stitch_support_v1_matcher* matcher =
-            stitch_support_v1_matcher_create(lib, toBSONForAPI(match).first, nullptr, nullptr);
-        ASSERT(matcher);
+    auto checkUpsert(const char* expr, const char* match = nullptr) {
+        stitch_support_v1_matcher* matcher = nullptr;
+        if (match) {
+            matcher =
+                stitch_support_v1_matcher_create(lib, toBSONForAPI(match).first, nullptr, nullptr);
+            ASSERT(matcher);
+        }
         ON_BLOCK_EXIT([matcher] { stitch_support_v1_matcher_destroy(matcher); });
 
         stitch_support_v1_update* update = stitch_support_v1_update_create(
@@ -395,7 +398,7 @@ TEST_F(StitchSupportTest, CheckMatchWorksWithCollation) {
     ASSERT_TRUE(checkMatch("{a: 'word'}", {"{a: 'WORD', b: 'other'}"}, collator));
 }
 
-TEST_F(StitchSupportTest, CheckProjectionWorkDefaults) {
+TEST_F(StitchSupportTest, CheckProjectionWorksWithDefaults) {
     auto results =
         checkProjection("{a: 1}", {"{_id: 1, a: 100, b: 200}", "{_id: 1, a: 200, b: 300}"});
     ASSERT_EQ("{ \"_id\" : 1, \"a\" : 100 }", results[0]);
@@ -537,6 +540,22 @@ TEST_F(StitchSupportTest, TestUpsert) {
     ASSERT_EQ("{ \"a\" : 2 }", checkUpsert("{$set: {a: 2}}", "{a: 1}"));
     ASSERT_EQ("{ \"_id\" : 1, \"a\" : 1 }", checkUpsert("{$setOnInsert: {a: 1}}", "{_id: 1}"));
     ASSERT_EQ("{ \"_id\" : 1, \"b\" : 1 }", checkUpsert("{$inc: {b: 1}}", "{_id: 1, a: {$gt: 2}}"));
+    // Document replace overrides matcher.
+    ASSERT_EQ("{}", checkUpsert("{}", "{a: 1}"));
+}
+
+TEST_F(StitchSupportTest, TestUpsertWithoutMatcher) {
+    ASSERT_EQ("{ \"a\" : 1 }", checkUpsert("{a: 1}"));
+    ASSERT_EQ("{ \"a\" : [ { \"b\" : 2 }, false ] }", checkUpsert("{a: [{b: 2}, false]}"));
+    ASSERT_EQ("{}", checkUpsert("{}"));
+}
+
+TEST_F(StitchSupportTest, TestUpsertEmptyMatcher) {
+    ASSERT_EQ("{ \"a\" : 1 }", checkUpsert("{$set: {a: 1}}", "{}"));
+    ASSERT_EQ("{ \"a\" : 1 }", checkUpsert("{$setOnInsert: {a: 1}}", "{}"));
+    ASSERT_EQ("{ \"b\" : 1 }", checkUpsert("{$inc: {b: 1}}", "{}"));
+    ASSERT_EQ("{ \"a\" : 1 }", checkUpsert("{a: 1}", "{}"));
+    ASSERT_EQ("{ \"a\" : [ { \"b\" : 2 }, false ] }", checkUpsert("{a: [{b: 2}, false]}", "{}"));
 }
 
 TEST_F(StitchSupportTest, TestUpsertProducesProperStatus) {

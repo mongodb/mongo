@@ -457,6 +457,9 @@ typedef struct stitch_support_v1_update stitch_support_v1_update;
  * This function will fail if either 'updateBSON' or 'arrayFiltersBSON fails to parse, returning
  * NULL and populating 'status' with information about the error.
  *
+ * A 'matcher' argument can be provided which is required if the positional '$' operator appears
+ * inside the 'update' and optional and unused otherwise.
+ *
  * The caller can optionally provide a collator, which is used when evaluating arrayFilters match
  * expressions. The 'collator' parameter must match the collator in 'matcher'. A mismatch will raise
  * an invariant violation if 'matcher' is non-NULL. Multiple matcher, projection, and update objects
@@ -509,13 +512,20 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
 
 /**
  * Return the document that would result from an {upsert: true} update operation that must perform
- * an upsert. The resulting document is based on the match predicate in the associated matcher and
- * on the update document. There is no "input document," like in stitch_support_v1_apply(), because
- * upserts occur when no input document is found by the match predicate.
+ * an upsert. There is no "input document," like in stitch_support_v1_apply(), because upserts occur
+ * when no input document is found by the match predicate.
  *
- * This operation requires an update object that has an associated matcher. Returns a pointer to the
- * output buffer on success or, on error, returns NULL and populates the 'status' object. The caller
- * is responsible for destroying the result buffer with stitch_support_v1_bson_free().
+ * In the case of an update consisting of operators, the resulting document is based on the match
+ * predicate in the associated matcher and on the update document. This case expects an update
+ * object that has an associated matcher but will synthesize an empty matcher if none was given.
+ *
+ * In the case of an update consisting of a full document, the resulting document will be a copy of
+ * the given document. This is consistent with the server behavior for updates without operators. In
+ * this case a matcher is not required and if present, is ignored.
+ *
+ * This operation returns a pointer to the output buffer on success or, on error, returns NULL and
+ * populates the 'status' object. The caller is responsible for destroying the result buffer with
+ * stitch_support_v1_bson_free().
  *
  * Note that, although a database upsert operations guarantees that the inserted document will have
  * an '_id' field, this function does not populate an '_id' field if one is not in the match or
