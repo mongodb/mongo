@@ -61,4 +61,23 @@
     assert.throws(function() {
         t.find({key: {$regex: 'abcd\0xyz'}}).explain();
     });
+
+    //
+    // Confirm $options and mode specified in $regex are not allowed to be specified together.
+    //
+    t.drop();
+    assert.commandWorked(t.insert({x: ["abc"]}));
+
+    let regexFirst = assert.throws(() => t.find({x: {$regex: /ab/i, $options: 's'}}).itcount());
+    assert.commandFailedWithCode(regexFirst, 51075);
+
+    let optsFirst = assert.throws(() => t.find({x: {$options: 's', $regex: /ab/i}}).itcount());
+    assert.commandFailedWithCode(optsFirst, 51074);
+
+    t.drop();
+    assert.commandWorked(t.save({x: ["abc"]}));
+
+    assert.eq(1, t.count({x: {$regex: /ABC/i}}));
+    assert.eq(1, t.count({x: {$regex: /ABC/, $options: 'i'}}));
+    assert.eq(1, t.count({x: {$options: 'i', $regex: /ABC/}}));
 })();

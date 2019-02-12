@@ -327,6 +327,67 @@ TEST(MatchExpressionParserTest, WhereParsesSuccessfullyWhenAllowed) {
                   .getStatus());
 }
 
+TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithoutOptions) {
+    auto query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "")));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+}
+
+TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithOptionsInline) {
+    auto query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "i")));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+}
+
+TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithoutOptionsInlineAndEmptyOptionsStr) {
+    auto query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                           << ""));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+}
+
+TEST(MatchExpressionParserTest, RegexDoesNotParseSuccessfullyWithOptionsInlineAndEmptyOptionsStr) {
+    auto query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "i") << "$options"
+                                           << ""));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+}
+
+TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithOptionsNotInline) {
+    auto query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                           << "i"));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+}
+
+TEST(MatchExpressionParserTest, RegexDoesNotParseSuccessfullyWithMultipleOptions) {
+    auto query = BSON("a" << BSON("$options"
+                                  << "s"
+                                  << "$regex"
+                                  << BSONRegEx("/myRegex/", "i")));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+}
+
+TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithOptionsFirst) {
+    auto query = BSON("a" << BSON("$options"
+                                  << "s"
+                                  << "$regex"
+                                  << BSONRegEx("/myRegex/", "")));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+}
+
+TEST(MatchExpressionParserTest, RegexParsesSuccessfullyWithOptionsFirstEmptyOptions) {
+    auto query = BSON("a" << BSON("$options"
+                                  << ""
+                                  << "$regex"
+                                  << BSONRegEx("/myRegex/", "")));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ASSERT_OK(MatchExpressionParser::parse(query, expCtx).getStatus());
+}
+
+
 TEST(MatchExpressionParserTest, NearSphereFailsToParseWhenDisallowed) {
     auto query = fromjson("{a: {$nearSphere: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
