@@ -808,7 +808,16 @@ def _bind_globals(parsed_spec):
         configs = parsed_spec.globals.configs
         if configs:
             ast_global.configs = ast.ConfigGlobal(configs.file_name, configs.line, configs.column)
-            ast_global.configs.initializer_name = configs.initializer_name
+
+            if configs.initializer:
+                init = configs.initializer
+
+                ast_global.configs.initializer = ast.GlobalInitializer(
+                    init.file_name, init.line, init.column)
+                # Parser rule makes it impossible to have both name and register/store.
+                ast_global.configs.initializer.name = init.name
+                ast_global.configs.initializer.register = init.register
+                ast_global.configs.initializer.store = init.store
 
     else:
         ast_global = ast.Global("<implicit>", 0, 0)

@@ -305,6 +305,20 @@ class ServerParameter(common.SourceLocation):
         super(ServerParameter, self).__init__(file_name, line, column)
 
 
+class GlobalInitializer(common.SourceLocation):
+    """Initializer details for custom registration/storage."""
+
+    def __init__(self, file_name, line, column):
+        # type: (unicode, int, int) -> None
+        """Construct a GlobalInitializer."""
+
+        self.name = None  # type: unicode
+        self.register = None  # type: unicode
+        self.store = None  # type: unicode
+
+        super(GlobalInitializer, self).__init__(file_name, line, column)
+
+
 class ConfigGlobal(common.SourceLocation):
     """IDL ConfigOption Globals."""
 
@@ -313,7 +327,7 @@ class ConfigGlobal(common.SourceLocation):
         """Construct a ConfigGlobal."""
 
         # Other config globals are consumed in bind phase.
-        self.initializer_name = None  # type: unicode
+        self.initializer = None  # type: GlobalInitializer
 
         super(ConfigGlobal, self).__init__(file_name, line, column)
 

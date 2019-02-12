@@ -159,6 +159,23 @@ def _parse_mapping(
         func(ctxt, spec, first_name, second_node)
 
 
+def _parse_initializer(ctxt, node):
+    # type: (errors.ParserContext, Union[yaml.nodes.ScalarNode, yaml.nodes.MappingNode]) -> syntax.GlobalInitializer
+    """Parse a global initializer."""
+    init = syntax.GlobalInitializer(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+
+    if node.id == 'scalar':
+        init.name = node.value
+        return init
+
+    _generic_parser(ctxt, node, "initializer", init, {
+        "register": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+        "store": _RuleDesc('scalar'),
+    })
+
+    return init
+
+
 def _parse_config_global(ctxt, node):
     # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.ConfigGlobal
     """Parse global settings for config options."""
@@ -168,7 +185,7 @@ def _parse_config_global(ctxt, node):
         ctxt, node, "configs", config, {
             "section": _RuleDesc("scalar"),
             "source": _RuleDesc("scalar_or_sequence"),
-            "initializer_name": _RuleDesc("scalar"),
+            "initializer": _RuleDesc("scalar_or_mapping", mapping_parser_func=_parse_initializer),
         })
 
     return config

@@ -841,6 +841,24 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if idents:
             self.write_empty_line()
 
+    def _gen_config_function_declaration(self, spec):
+        # type: (ast.IDLAST) -> None
+        """Generate function declarations for config initializers."""
+
+        initializer = spec.globals.configs and spec.globals.configs.initializer
+        if not initializer:
+            return
+
+        if initializer.register:
+            self._writer.write_line('Status %s(optionenvironment::OptionSection*);' %
+                                    (initializer.register))
+        if initializer.store:
+            self._writer.write_line('Status %s(const optionenvironment::Environment&);' %
+                                    (initializer.store))
+
+        if initializer.register or initializer.store:
+            self.write_empty_line()
+
     def gen_server_parameter_class(self, scp):
         # type: (ast.ServerParameter) -> None
         """Generate a C++ class definition for a ServerParameter."""
@@ -916,6 +934,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         if spec.configs:
             header_list.append('mongo/util/options_parser/option_description.h')
+            config_init = spec.globals.configs and spec.globals.configs.initializer
+            if config_init and (config_init.register or config_init.store):
+                header_list.append('mongo/util/options_parser/option_section.h')
+                header_list.append('mongo/util/options_parser/environment.h')
 
         if spec.server_parameters:
             header_list.append('mongo/idl/server_parameter.h')
@@ -1014,9 +1036,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self._gen_extern_declaration(scp.cpp_vartype, scp.cpp_varname, scp.condition)
                 self.gen_server_parameter_class(scp)
 
-            for opt in spec.configs:
-                self._gen_exported_constexpr(opt.name, 'Default', opt.default, opt.condition)
-                self._gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname, opt.condition)
+            if spec.configs:
+                for opt in spec.configs:
+                    self._gen_exported_constexpr(opt.name, 'Default', opt.default, opt.condition)
+                    self._gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname, opt.condition)
+                self._gen_config_function_declaration(spec)
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):
@@ -2053,6 +2077,48 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
+    def _gen_config_options_register(self, root_opts, sections):
+        self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
+        self.write_empty_line()
+
+        for opt in root_opts:
+            self.gen_config_option(opt, 'options')
+
+        for section_name, section_opts in sections.iteritems():
+            with self._block('{', '}'):
+                self._writer.write_line('moe::OptionSection section(%s);' % (_encaps(section_name)))
+                self.write_empty_line()
+
+                for opt in section_opts:
+                    self.gen_config_option(opt, 'section')
+
+                self._writer.write_line('auto status = options.addSection(section);')
+                with self._block('if (!status.isOK()) {', '}'):
+                    self._writer.write_line('return status;')
+            self.write_empty_line()
+
+        self._writer.write_line('return Status::OK();')
+
+    def _gen_config_options_store(self, configs):
+        # Setup initializer for storing configured options in their variables.
+        self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
+        self.write_empty_line()
+
+        for opt in configs:
+            if opt.cpp_varname is None:
+                continue
+
+            vartype = ("moe::OptionTypeMap<moe::%s>::type" %
+                       (opt.arg_vartype)) if opt.cpp_vartype is None else opt.cpp_vartype
+            with self._condition(opt.condition):
+                with self._block('if (params.count(%s)) {' % (_encaps(opt.name)), '}'):
+                    self._writer.write_line('%s = params[%s].as<%s>();' % (opt.cpp_varname,
+                                                                           _encaps(opt.name),
+                                                                           vartype))
+            self.write_empty_line()
+
+        self._writer.write_line('return Status::OK();')
+
     def gen_config_options(self, spec, header_file_name):
         # type: (ast.IDLAST, unicode) -> None
         """Generate Config Option instances."""
@@ -2082,68 +2148,43 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             else:
                 root_opts.append(opt)
 
-        with self.gen_namespace_block(''):
-            # Group together options by section
-            if spec.globals.configs and spec.globals.configs.initializer_name:
-                blockname = spec.globals.configs.initializer_name
-            else:
-                blockname = 'idl_' + hashlib.sha1(header_file_name).hexdigest()
+        initializer = spec.globals.configs and spec.globals.configs.initializer
 
-            with self._block('MONGO_MODULE_STARTUP_OPTIONS_REGISTER(%s)(InitializerContext*) {' %
-                             (blockname), '}'):
-                self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
-                self.write_empty_line()
+        # pylint: disable=consider-using-ternary
+        blockname = (initializer
+                     and initializer.name) or ('idl_' + hashlib.sha1(header_file_name).hexdigest())
 
-                for opt in root_opts:
-                    self.gen_config_option(opt, 'moe::startupOptions')
-
-                for section_name, section_opts in sections.iteritems():
-                    with self._block('{', '}'):
-                        self._writer.write_line('moe::OptionSection section(%s);' %
-                                                (_encaps(section_name)))
-                        self.write_empty_line()
-
-                        for opt in section_opts:
-                            self.gen_config_option(opt, 'section')
-
-                        self._writer.write_line(
-                            'auto status = moe::startupOptions.addSection(section);')
-                        with self._block('if (!status.isOK()) {', '}'):
-                            self._writer.write_line('return status;')
-                    self.write_empty_line()
-
-                self._writer.write_line('return Status::OK();')
-            self.write_empty_line()
-
-            if has_storage_targets:
-                # Setup initializer for storing configured options in their variables.
-                with self._block('MONGO_STARTUP_OPTIONS_STORE(%s)(InitializerContext*) {' %
-                                 (blockname), '}'):
-                    self._writer.write_line('namespace moe = ::mongo::optionenvironment;')
-                    # If all options are guarded by non-passing #ifdefs, then params will be unused.
-                    self._writer.write_line(
-                        'MONGO_COMPILER_VARIABLE_UNUSED const auto& params = moe::startupOptionsParsed;'
-                    )
-                    self.write_empty_line()
-
-                    for opt in spec.configs:
-                        if opt.cpp_varname is None:
-                            continue
-
-                        vartype = ("moe::OptionTypeMap<moe::%s>::type" % (
-                            opt.arg_vartype)) if opt.cpp_vartype is None else opt.cpp_vartype
-                        with self._condition(opt.condition):
-                            with self._block('if (params.count(%s)) {' % (_encaps(opt.name)), '}'):
-                                self._writer.write_line('%s = params[%s].as<%s>();' %
-                                                        (opt.cpp_varname, _encaps(opt.name),
-                                                         vartype))
-                        self.write_empty_line()
-
-                    self._writer.write_line('return Status::OK();')
-
-                self.write_empty_line()
+        if initializer and initializer.register:
+            with self._block('Status %s(optionenvironment::OptionSection* options_ptr) {' %
+                             initializer.register, '}'):
+                self._writer.write_line('auto& options = *options_ptr;')
+                self._gen_config_options_register(root_opts, sections)
+        else:
+            with self.gen_namespace_block(''):
+                with self._block(
+                        'MONGO_MODULE_STARTUP_OPTIONS_REGISTER(%s)(InitializerContext*) {' %
+                    (blockname), '}'):
+                    self._writer.write_line('auto& options = optionenvironment::startupOptions;')
+                    self._gen_config_options_register(root_opts, sections)
 
         self.write_empty_line()
+
+        if has_storage_targets:
+            if initializer and initializer.store:
+                with self._block('Status %s(const optionenvironment::Environment& params) {' %
+                                 initializer.store, '}'):
+                    self._gen_config_options_store(spec.configs)
+            else:
+                with self.gen_namespace_block(''):
+                    with self._block('MONGO_STARTUP_OPTIONS_STORE(%s)(InitializerContext*) {' %
+                                     (blockname), '}'):
+                        # If all options are guarded by non-passing #ifdefs, then params will be unused.
+                        self._writer.write_line(
+                            'MONGO_COMPILER_VARIABLE_UNUSED const auto& params = optionenvironment::startupOptionsParsed;'
+                        )
+                        self._gen_config_options_store(spec.configs)
+
+            self.write_empty_line()
 
     def generate(self, spec, header_file_name):
         # type: (ast.IDLAST, unicode) -> None

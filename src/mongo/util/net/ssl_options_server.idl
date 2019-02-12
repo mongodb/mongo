@@ -35,7 +35,7 @@ global:
     section: "TLS Options"
     source: [ yaml, cli, ini ]
     # Name these initializers so they can be invoked from ssl_options_test.cpp
-    initializer_name: SSLServerOptionsIDL
+    initializer: SSLServerOptionsIDL
 
 imports:
   - "mongo/idl/basic_types.idl"

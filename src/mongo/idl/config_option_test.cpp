@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/idl/config_option_no_init_test_gen.h"
 #include "mongo/idl/config_option_test_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cmdline_utils/censor_cmdline_test.h"
@@ -612,6 +613,22 @@ TEST(ConfigOption, Opt17) {
     ASSERT_OK(parseArgv({"mongod", "--testConfigOpt17", std::to_string(kTestConfigOpt17Minimum)},
                         &okParse));
     ASSERT_OPTION_SET<std::int32_t>(okParse, "test.config.opt17", kTestConfigOpt17Minimum);
+}
+
+TEST(ConfigOptionNoInit, Opt1) {
+    moe::OptionSection options("Options");
+    ASSERT_OK(addIDLTestConfigs(&options));
+
+    const std::vector<std::string> argv({
+        "mongod", "--testConfigNoInitOpt1", "Hello",
+    });
+    moe::Environment parsed;
+    ASSERT_OK(moe::OptionsParser().run(options, argv, {}, &parsed));
+    ASSERT_OK(parsed.validate());
+    ASSERT_OK(storeIDLTestConfigs(parsed));
+
+    ASSERT_OPTION_SET<std::string>(parsed, "test.config.noInit.opt1", "Hello");
+    ASSERT_EQ(gTestConfigNoInitOpt1, "Hello");
 }
 
 }  // namespace

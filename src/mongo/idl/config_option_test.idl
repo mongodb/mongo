@@ -32,7 +32,7 @@ global:
   - "mongo/idl/server_parameter_with_storage_test.h"
   - "mongo/idl/config_option_test.h"
   configs:
-    initializer_name: TestConfigs
+    initializer: TestConfigs
 
 configs:
   "test.config.opt1":
