@@ -85,6 +85,10 @@ MONGO_EXPORT_SERVER_PARAMETER(transactionLifetimeLimitSeconds, std::int32_t, 60)
         return Status::OK();
     });
 
+// The useMultipleOplogEntryFormatForTransactions is for gating the new oplog format for
+// transactions, to allow transactions > 16MB, while in development.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useMultipleOplogEntryFormatForTransactions, bool, false);
+
 namespace {
 
 // Failpoint which will pause an operation just after allocating a point-in-time storage engine
@@ -1010,7 +1014,8 @@ void TransactionParticipant::addTransactionOperation(OperationContext* opCtx,
                           << BSONObjMaxInternalSize
                           << ". Actual size is "
                           << _transactionOperationBytes,
-            _transactionOperationBytes <= BSONObjMaxInternalSize);
+            !useMultipleOplogEntryFormatForTransactions &&
+                _transactionOperationBytes <= BSONObjMaxInternalSize);
 }
 
 std::vector<repl::ReplOperation>& TransactionParticipant::retrieveCompletedTransactionOperations(

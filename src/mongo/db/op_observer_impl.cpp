@@ -65,6 +65,10 @@
 
 namespace mongo {
 using repl::OplogEntry;
+
+// This is a startup server parameter defined in transaction_participant.cpp.
+extern bool useMultipleOplogEntryFormatForTransactions;
+
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
