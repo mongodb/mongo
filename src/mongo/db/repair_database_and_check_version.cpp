@@ -33,6 +33,8 @@
 
 #include "repair_database_and_check_version.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -131,23 +133,53 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
 }
 
 /**
- * Checks that all replicated collections in the given list of 'dbNames' have UUIDs. Returns a
- * MustDowngrade error status if any do not.
+ * Returns true if the collection associated with the given CollectionCatalogEntry has an index on
+ * the _id field
+ */
+bool checkIdIndexExists(OperationContext* opCtx, const CollectionCatalogEntry* catalogEntry) {
+    auto indexCount = catalogEntry->getTotalIndexCount(opCtx);
+    auto indexNames = std::vector<std::string>(indexCount);
+    catalogEntry->getAllIndexes(opCtx, &indexNames);
+
+    for (auto name : indexNames) {
+        if (name == "_id_") {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Checks that all replicated collections in the given list of 'dbNames' have UUIDs and an index on
+ * the _id field. Returns a MustDowngrade error status if any do not satisfy these requirements.
  *
  * Additionally assigns UUIDs to any non-replicated collections that are missing UUIDs.
  */
 Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                                      const std::vector<std::string>& dbNames) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto downgradeError = Status{ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
+
     for (const auto& dbName : dbNames) {
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db);
-        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
-            Collection* coll = *collectionIt;
 
+        for (Collection* coll : *db) {
             // We expect all collections to have UUIDs in MongoDB 4.2
             if (!coll->uuid()) {
-                return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
+                return downgradeError;
+            }
+
+            // All collections created since MongoDB 4.0 have _id indexes.
+            auto requiresIndex = coll->requiresIdIndex() && coll->ns().isReplicated();
+            auto catalogEntry = coll->getCatalogEntry();
+            auto collOptions = catalogEntry->getCollectionOptions(opCtx);
+            auto hasAutoIndexIdField = collOptions.autoIndexId == CollectionOptions::YES;
+
+            // If the autoIndexId field is not YES, the index may have been created later.
+            // Check the list of indexes to confirm index does not exist before returning an error.
+            if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, catalogEntry)) {
+                return downgradeError;
             }
         }
     }
