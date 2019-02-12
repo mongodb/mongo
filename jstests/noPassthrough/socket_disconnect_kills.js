@@ -23,8 +23,8 @@
     // Returns false if the op was gone from current op
     function check(client, pre, post) {
         const interval = 200;
-        const timeout = 2000;
-        const socketTimeout = 1000;
+        const timeout = 10000;
+        const socketTimeout = 5000;
 
         const host = client.host;
 
