@@ -38,7 +38,7 @@ import re
 import string
 import sys
 import textwrap
-import uuid
+import hashlib
 from typing import cast, Dict, List, Mapping, Tuple, Union
 
 from . import ast
@@ -1955,8 +1955,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     unused='MONGO_COMPILER_VARIABLE_UNUSED', alias_var='scp_%d_%d' %
                     (param_no, alias_no), name=_encaps(alias), param_var='scp_%d' % (param_no)))
 
-    def gen_server_parameters(self, params):
-        # type: (List[ast.ServerParameter]) -> None
+    def gen_server_parameters(self, params, header_file_name):
+        # type: (List[ast.ServerParameter], unicode) -> None
         """Generate IDLServerParameter instances."""
 
         for param in params:
@@ -1971,7 +1971,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line('%s %s%s;' % (param.cpp_vartype, param.cpp_varname,
                                                           init))
 
-        blockname = 'idl_' + uuid.uuid4().hex
+        blockname = 'idl_' + hashlib.sha1(header_file_name).hexdigest()
         with self._block('MONGO_SERVER_PARAMETER_REGISTER(%s)(InitializerContext*) {' % (blockname),
                          '}'):
             # ServerParameter instances.
@@ -2053,8 +2053,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-    def gen_config_options(self, spec):
-        # type: (ast.IDLAST) -> None
+    def gen_config_options(self, spec, header_file_name):
+        # type: (ast.IDLAST, unicode) -> None
         """Generate Config Option instances."""
 
         # pylint: disable=too-many-branches,too-many-statements
@@ -2087,7 +2087,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if spec.globals.configs and spec.globals.configs.initializer_name:
                 blockname = spec.globals.configs.initializer_name
             else:
-                blockname = 'idl_' + uuid.uuid4().hex
+                blockname = 'idl_' + hashlib.sha1(header_file_name).hexdigest()
 
             with self._block('MONGO_MODULE_STARTUP_OPTIONS_REGISTER(%s)(InitializerContext*) {' %
                              (blockname), '}'):
@@ -2236,9 +2236,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
             if spec.server_parameters:
-                self.gen_server_parameters(spec.server_parameters)
+                self.gen_server_parameters(spec.server_parameters, header_file_name)
             if spec.configs:
-                self.gen_config_options(spec)
+                self.gen_config_options(spec, header_file_name)
 
 
 def generate_header_str(spec):
