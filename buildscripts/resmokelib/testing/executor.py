@@ -9,6 +9,7 @@ from . import fixtures
 from . import hook_test_archival as archival
 from . import hooks as _hooks
 from . import job as _job
+from . import queue_element
 from . import report as _report
 from . import testcases
 from .. import config as _config
@@ -178,8 +179,10 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             user_interrupted = True
         else:
             # Only wait for all the Job instances if not interrupted by the user.
+            self.logger.debug("Waiting for threads to complete")
             for thr in threads:
                 thr.join()
+            self.logger.debug("Threads are completed!")
 
         reports = [job.report for job in self._jobs]
         combined_report = _report.TestReport.combine(*reports)
@@ -252,15 +255,16 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         """
 
         # Put all the test cases in a queue.
-        queue = _queue.Queue()
-        for _ in range(self._suite.options.num_repeat_tests):
-            for test_name in self._suite.tests:
-                test_case = testcases.make_test_case(self._suite.test_kind, self.test_queue_logger,
-                                                     test_name, **self.test_config)
-                queue.put(test_case)
+        if self._suite.options.time_repeat_tests_secs:
+            queue_method = queue_element.QueueElemRepeatTime
+        else:
+            queue_method = queue_element.QueueElemRepeatNum
 
-        # Add sentinel value for each job to indicate when there are no more items to process.
-        for _ in xrange(len(self._jobs)):
-            queue.put(None)
+        queue = _queue.Queue()
+
+        for test_name in self._suite.tests:
+            test_case = testcases.make_test_case(self._suite.test_kind, self.test_queue_logger,
+                                                 test_name, **self.test_config)
+            queue.put(queue_method(test_case, self.test_config, self._suite.options))
 
         return queue

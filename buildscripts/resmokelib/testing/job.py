@@ -3,7 +3,10 @@
 from __future__ import absolute_import
 
 import sys
+import time
 
+from . import queue_element
+from . import testcases
 from .. import config
 from .. import errors
 from ..testing.fixtures import interface as _fixtures
@@ -107,18 +110,47 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         for hook in self.hooks:
             hook.before_suite(self.report)
 
-        while not interrupt_flag.is_set():
-            test = queue.get_nowait()
+        while not queue.empty() and not interrupt_flag.is_set():
+            queue_elem = queue.get_nowait()
+            test_time_start = time.time()
             try:
-                if test is None:
-                    # Sentinel value received, so exit.
-                    break
+                test = queue_elem.testcase
                 self._execute_test(test)
             finally:
+                queue_elem.job_completed(time.time() - test_time_start)
                 queue.task_done()
+
+            self._requeue_test(queue, queue_elem, interrupt_flag)
 
         for hook in self.hooks:
             hook.after_suite(self.report)
+
+    def _log_requeue_test(self, queue_elem):
+        """Log the requeue of a test."""
+
+        if self.suite_options.time_repeat_tests_secs:
+            progress = "{} of ({}/{}/{:2.2f} min/max/time)".format(
+                queue_elem.repeat_num + 1, self.suite_options.num_repeat_tests_min,
+                self.suite_options.num_repeat_tests_max, self.suite_options.time_repeat_tests_secs)
+        else:
+            progress = "{} of {}".format(queue_elem.repeat_num + 1,
+                                         self.suite_options.num_repeat_tests)
+        self.logger.info(("Requeueing test %s %s, cumulative time elapsed %0.2f"),
+                         queue_elem.testcase.test_name, progress, queue_elem.repeat_time_elapsed)
+
+    def _requeue_test(self, queue, queue_elem, interrupt_flag):
+        """Requeue a test if it needs to be repeated."""
+
+        if not queue_elem.should_requeue():
+            return
+
+        queue_elem.testcase = testcases.make_test_case(
+            queue_elem.testcase.REGISTERED_NAME, queue_elem.testcase.logger,
+            queue_elem.testcase.test_name, **queue_elem.test_config)
+
+        if not interrupt_flag.is_set():
+            self._log_requeue_test(queue_elem)
+            queue.put(queue_elem)
 
     def _execute_test(self, test):
         """Call the before/after test hooks and execute 'test'."""

@@ -306,8 +306,13 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         # cannot be said to have succeeded.
         num_failed = report.num_failed + report.num_interrupted
         num_run = report.num_succeeded + report.num_errored + num_failed
-        num_tests = len(self.tests) * self.options.num_repeat_tests
-        num_skipped = num_tests + report.num_dynamic - num_run
+        # The number of skipped tests is only known if self.options.time_repeat_tests_secs
+        # is not specified.
+        if self.options.time_repeat_tests_secs:
+            num_skipped = 0
+        else:
+            num_tests = len(self.tests) * self.options.num_repeat_tests
+            num_skipped = num_tests + report.num_dynamic - num_run
 
         if report.num_succeeded == num_run and num_skipped == 0:
             sb.append("All %d test(s) passed in %0.2f seconds." % (num_run, time_taken))

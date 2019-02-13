@@ -70,6 +70,9 @@ DEFAULTS = {
     "perf_report_file": None,
     "repeat_suites": 1,
     "repeat_tests": 1,
+    "repeat_tests_max": None,
+    "repeat_tests_min": None,
+    "repeat_tests_secs": None,
     "report_failure_status": "fail",
     "report_file": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
@@ -119,6 +122,9 @@ _SuiteOptions = collections.namedtuple("_SuiteOptions", [
     "num_jobs",
     "num_repeat_suites",
     "num_repeat_tests",
+    "num_repeat_tests_max",
+    "num_repeat_tests_min",
+    "time_repeat_tests_secs",
     "report_failure_status",
 ])
 
@@ -182,6 +188,9 @@ class SuiteOptions(_SuiteOptions):
                 JOBS,
                 REPEAT_SUITES,
                 REPEAT_TESTS,
+                REPEAT_TESTS_MAX,
+                REPEAT_TESTS_MIN,
+                REPEAT_TESTS_SECS,
                 REPORT_FAILURE_STATUS,
             ]))
 
@@ -319,6 +328,17 @@ REPEAT_SUITES = None
 
 # If set, then each test is repeated the specified number of times inside the suites.
 REPEAT_TESTS = None
+
+# If set and REPEAT_TESTS_SECS is set, then each test is repeated up to specified number of
+# times inside the suites.
+REPEAT_TESTS_MAX = None
+
+# If set and REPEAT_TESTS_SECS is set, then each test is repeated at least specified number of
+# times inside the suites.
+REPEAT_TESTS_MIN = None
+
+# If set, then each test is repeated the specified time (seconds) inside the suites.
+REPEAT_TESTS_SECS = None
 
 # Controls if the test failure status should be reported as failed or be silently ignored.
 REPORT_FAILURE_STATUS = None

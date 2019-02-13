@@ -164,6 +164,23 @@ def _make_parser():  # pylint: disable=too-many-statements
                       " defined in the suite configuration as well as tests defined on the command"
                       " line.")
 
+    parser.add_option("--repeatTestsMax", type="int", dest="repeat_tests_max", metavar="N",
+                      help="Repeats the tests inside each suite no more than N time when"
+                      " --repeatTestsSecs is specified. This applies to tests defined in the suite"
+                      " configuration as well as tests defined on the command line.")
+
+    parser.add_option("--repeatTestsMin", type="int", dest="repeat_tests_min", metavar="N",
+                      help="Repeats the tests inside each suite at least N times when"
+                      " --repeatTestsSecs is specified. This applies to tests defined in the suite"
+                      " configuration as well as tests defined on the command line.")
+
+    parser.add_option("--repeatTestsSecs", type="float", dest="repeat_tests_secs",
+                      metavar="SECONDS",
+                      help="Repeats the tests inside each suite this amount of time. Note that"
+                      " this option is mutually exclusive with --repeatTests. This applies to"
+                      " tests defined in the suite configuration as well as tests defined on the"
+                      " command line.")
+
     parser.add_option("--reportFailureStatus", type="choice", action="store",
                       dest="report_failure_status", choices=("fail",
                                                              "silentfail"), metavar="STATUS",
@@ -337,6 +354,7 @@ def parse_command_line():
 
     _validate_options(parser, options, args)
     _update_config_vars(options)
+    _validate_config(parser)
 
     return ResmokeConfig(list_suites=options.list_suites, find_suites=options.find_suites,
                          dry_run=options.dry_run, suite_files=options.suite_files.split(","),
@@ -355,13 +373,30 @@ def _validate_options(parser, options, args):
                          options.executor_file, " ".join(args)))
 
 
+def _validate_config(parser):
+    """Do validation on the config settings."""
+
+    if _config.REPEAT_TESTS_MAX:
+        if not _config.REPEAT_TESTS_SECS:
+            parser.error("Must specify --repeatTestsSecs with --repeatTestsMax")
+
+        if _config.REPEAT_TESTS_MIN > _config.REPEAT_TESTS_MAX:
+            parser.error("--repeatTestsSecsMin > --repeatTestsMax")
+
+    if _config.REPEAT_TESTS_MIN and not _config.REPEAT_TESTS_SECS:
+        parser.error("Must specify --repeatTestsSecs with --repeatTestsMin")
+
+    if _config.REPEAT_TESTS > 1 and _config.REPEAT_TESTS_SECS:
+        parser.error("Cannot specify --repeatTests and --repeatTestsSecs")
+
+
 def validate_benchmark_options():
     """Error out early if any options are incompatible with benchmark test suites.
 
     :return: None
     """
 
-    if _config.REPEAT_SUITES > 1 or _config.REPEAT_TESTS > 1:
+    if _config.REPEAT_SUITES > 1 or _config.REPEAT_TESTS > 1 or _config.REPEAT_TESTS_SECS:
         raise optparse.OptionValueError(
             "--repeatSuites/--repeatTests cannot be used with benchmark tests. "
             "Please use --benchmarkMinTimeSecs to increase the runtime of a single benchmark "
@@ -419,6 +454,9 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT_SUITES = config.pop("repeat_suites")
     _config.REPEAT_TESTS = config.pop("repeat_tests")
+    _config.REPEAT_TESTS_MAX = config.pop("repeat_tests_max")
+    _config.REPEAT_TESTS_MIN = config.pop("repeat_tests_min")
+    _config.REPEAT_TESTS_SECS = config.pop("repeat_tests_secs")
     _config.REPORT_FAILURE_STATUS = config.pop("report_failure_status")
     _config.REPORT_FILE = config.pop("report_file")
     _config.SERVICE_EXECUTOR = config.pop("service_executor")
