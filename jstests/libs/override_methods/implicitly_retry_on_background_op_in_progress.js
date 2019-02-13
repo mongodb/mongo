@@ -28,8 +28,8 @@
         "renameCollection": [ErrorCodes.NamespaceNotFound],
     };
 
-    const kTimeout = 5 * 60 * 1000;
-    const kInterval = 1000;
+    const kTimeout = 10 * 60 * 1000;
+    const kInterval = 200;
 
     // Make it easier to understand whether or not returns from the assert.soon are being retried.
     const kNoRetry = true;
