@@ -334,6 +334,10 @@ static CONFIG c[] = {
 	  "maximum time to run in minutes",
 	  C_IGNORE, 0, 0, UINT_MAX, &g.c_timer, NULL },
 
+	{ "timing_stress_aggressive_sweep",
+	  "stress aggressive sweep",				/* 2% */
+	  C_BOOL, 2, 0, 0, &g.c_timing_stress_aggressive_sweep, NULL },
+
 	{ "timing_stress_checkpoint",
 	  "stress checkpoints",					/* 2% */
 	  C_BOOL, 2, 0, 0, &g.c_timing_stress_checkpoint, NULL },

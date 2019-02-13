@@ -165,7 +165,7 @@ __stat_page_col_var(
 			++deleted_cnt;
 		} else {
 			orig_deleted = false;
-			__wt_cell_unpack(page, cell, unpack);
+			__wt_cell_unpack(session, page, cell, unpack);
 			if (unpack->type == WT_CELL_DEL)
 				orig_deleted = true;
 			else {
@@ -244,7 +244,8 @@ __stat_page_row_int(
 	 * a reference to the original cell.
 	 */
 	if (page->dsk != NULL)
-		WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, false) {
+		WT_CELL_FOREACH_BEGIN(
+		    session, btree, page->dsk, unpack, false) {
 			if (__wt_cell_type(unpack.cell) == WT_CELL_KEY_OVFL)
 				++ovfl_cnt;
 		} WT_CELL_FOREACH_END;
@@ -293,7 +294,8 @@ __stat_page_row_leaf(
 		    upd->type != WT_UPDATE_TOMBSTONE))
 			++entry_cnt;
 		if (upd == NULL) {
-			__wt_row_leaf_value_cell(page, rip, NULL, &unpack);
+			__wt_row_leaf_value_cell(
+			    session, page, rip, NULL, &unpack);
 			if (unpack.type == WT_CELL_VALUE_OVFL)
 				++ovfl_cnt;
 		}
@@ -316,7 +318,8 @@ __stat_page_row_leaf(
 	 */
 	if (page->dsk != NULL) {
 		key = false;
-		WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, false) {
+		WT_CELL_FOREACH_BEGIN(
+		    session, btree, page->dsk, unpack, false) {
 			switch (__wt_cell_type(unpack.cell)) {
 			case WT_CELL_KEY_OVFL:
 				++ovfl_cnt;

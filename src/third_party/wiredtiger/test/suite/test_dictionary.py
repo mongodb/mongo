@@ -38,8 +38,8 @@ import wiredtiger, wttest
 class test_dictionary(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
     scenarios = make_scenarios([
-        ('row', dict(key_format='S', value_format='S')),
-        ('var', dict(key_format='r', value_format='S')),
+        ('row', dict(key_format='S')),
+        ('var', dict(key_format='r')),
     ])
 
     # Smoke test dictionary compression.
@@ -48,8 +48,10 @@ class test_dictionary(wttest.WiredTigerTestCase):
         uri = 'file:test_dictionary'    # This is a btree layer test.
 
         # Create the object, open the cursor, insert some records with identical values. Use
-        # alternating values, otherwise column-store will RLE compress them into a single item.
-        self.session.create(uri, 'dictionary=100,value_format=S,key_format=' + self.key_format)
+        # a reasonably large page size so most of the items fit on a page. Use alternating
+        # values, otherwise column-store will RLE compress them into a single item.
+        config='leaf_page_max=64K,dictionary=100,value_format=S,key_format='
+        self.session.create(uri, config + self.key_format)
         cursor = self.session.open_cursor(uri, None)
         i = 0
         while i < nentries:

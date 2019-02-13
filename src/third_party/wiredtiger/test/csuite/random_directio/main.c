@@ -904,12 +904,11 @@ check_db(uint32_t nth, uint32_t datasize, bool directio, uint32_t flags)
 	printf("starting full scan at %" PRIu64 "\n", id);
 	gen_kv(keybuf, kvsize, id, 0, large_arr[0], true);
 	cursor->set_key(cursor, keybuf);
-	testutil_check(cursor->search(cursor));
 	th = 0;
 
 	/* Keep bitmap of "active" threads. */
 	threadmap = (0x1U << nth) - 1;
-	for (ret = 0; ret != WT_NOTFOUND && threadmap != 0;
+	for (ret = cursor->search(cursor); ret != WT_NOTFOUND && threadmap != 0;
 	     ret = cursor->next(cursor)) {
 		testutil_check(ret);
 		testutil_check(cursor->get_key(cursor, &gotkey));

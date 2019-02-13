@@ -235,6 +235,8 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 
 	/* Optionally stress operations. */
 	CONFIG_APPEND(p, ",timing_stress_for_test=[");
+	if (g.c_timing_stress_aggressive_sweep)
+		CONFIG_APPEND(p, ",aggressive_sweep");
 	if (g.c_timing_stress_checkpoint)
 		CONFIG_APPEND(p, ",checkpoint_slow");
 	if (g.c_timing_stress_lookaside_sweep)

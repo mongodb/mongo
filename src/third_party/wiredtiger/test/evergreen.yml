@@ -965,6 +965,18 @@ tasks:
             ulimit -c unlimited 
             largescale/run-million-collection-test.sh .
 
+  - name: compatibility-test-for-mongodb-releases
+    commands:
+      - func: "fetch source"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/evergreen/compatibility_test_for_mongodb_releases.sh
+
+
 buildvariants:
 - name: ubuntu1404
   display_name: Ubuntu 14.04
@@ -972,9 +984,10 @@ buildvariants:
   - ubuntu1404-test
   expansions:
     # It's ugly, but we need the absolute path here, not the relative
-    test_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
     - name: compile
     - name: lang-python-test
@@ -1037,9 +1050,17 @@ buildvariants:
   run_on:
   - rhel62-large
   expansions:
-    configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
+    configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++
   tasks:
     - name: million-collection-test
+
+- name: compatibility-tests
+  display_name: Compatibility tests
+  batchtime: 10080 # 7 days
+  run_on:
+  - ubuntu1404-test
+  tasks:
+    - name: compatibility-test-for-mongodb-releases
 
 - name: windows-64
   display_name: Windows 64-bit
@@ -1058,9 +1079,9 @@ buildvariants:
   - macos-1012
   expansions:
     smp_command: -j $(sysctl -n hw.logicalcpu)
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
-    make_command: PATH=/opt/mongodbtoolchain/v2/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
-    test_env_vars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
+    test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs
   tasks:
     - name: compile
     - name: make-check-test

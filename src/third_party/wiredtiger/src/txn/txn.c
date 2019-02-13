@@ -643,7 +643,7 @@ __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 			 * Check timestamps are used in order.
 			 */
 			op_zero_ts = !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT);
-			upd_zero_ts = upd->timestamp == WT_TS_NONE;
+			upd_zero_ts = upd->start_ts == WT_TS_NONE;
 			if (op_zero_ts != upd_zero_ts)
 				WT_RET_MSG(session, EINVAL,
 				    "per-key timestamps used inconsistently");
@@ -655,14 +655,14 @@ __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 			if (op_zero_ts)
 				continue;
 
-			op_timestamp = op->u.op_upd->timestamp;
+			op_timestamp = op->u.op_upd->start_ts;
 			/*
 			 * Only if the update structure doesn't have a timestamp
 			 * then use the one in the transaction structure.
 			 */
 			if (op_timestamp == WT_TS_NONE)
 				op_timestamp = txn->commit_timestamp;
-			if (op_timestamp < upd->timestamp)
+			if (op_timestamp < upd->start_ts)
 				WT_RET_MSG(session, EINVAL,
 				    "out of order timestamps");
 		}
@@ -1016,7 +1016,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 			}
 
 			/* Set prepare timestamp. */
-			upd->timestamp = ts;
+			upd->start_ts = ts;
 
 			WT_PUBLISH(upd->prepare_state, WT_PREPARE_INPROGRESS);
 			op->u.op_upd = NULL;

@@ -12,8 +12,6 @@ struct __rec_chunk;		typedef struct __rec_chunk WT_CHUNK;
 struct __rec_dictionary;	typedef struct __rec_dictionary WT_DICTIONARY;
 struct __rec_kv;		typedef struct __rec_kv WT_KV;
 
-#define	WT_TS_FIXME	37		/* Fake timestamp */
-
 /*
  * Reconciliation is the process of taking an in-memory page, walking each entry
  * in the page, building a backing disk image in a temporary buffer representing
@@ -272,6 +270,16 @@ typedef struct {
 	 */
 	WT_CURSOR_BTREE update_modify_cbt;
 } WT_RECONCILE;
+
+typedef struct {
+	WT_UPDATE *upd;			/* Update to write (or NULL) */
+
+	uint64_t txnid;			/* Transaction ID, timestamps */
+	wt_timestamp_t start_ts, stop_ts;
+
+	bool upd_saved;			/* Updates saved to list */
+
+} WT_UPDATE_SELECT;
 
 #define	WT_CROSSING_MIN_BND(r, next_len)				\
 	((r)->cur_ptr->min_offset == 0 &&				\
@@ -1157,8 +1165,8 @@ __rec_append_orig_value(WT_SESSION_IMPL *session,
 	 */
 	if (upd->type == WT_UPDATE_BIRTHMARK) {
 		append->txnid = upd->txnid;
-		append->timestamp = upd->timestamp;
-		append->durable_timestamp = upd->durable_timestamp;
+		append->start_ts = upd->start_ts;
+		append->durable_ts = upd->durable_ts;
 		append->next = upd->next;
 	}
 
@@ -1176,14 +1184,13 @@ err:	__wt_scr_free(session, &tmp);
 }
 
 /*
- * __rec_txn_read --
+ * __rec_upd_select --
  *	Return the update in a list that should be written (or NULL if none can
  *	be written).
  */
 static int
-__rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-    WT_INSERT *ins, void *ripcip, WT_CELL_UNPACK *vpack,
-    bool *upd_savedp, WT_UPDATE **updp)
+__rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
+    void *ripcip, WT_CELL_UNPACK *vpack, WT_UPDATE_SELECT *upd_select)
 {
 	WT_PAGE *page;
 	WT_UPDATE *first_ts_upd, *first_txn_upd, *first_upd, *upd;
@@ -1192,9 +1199,12 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	uint64_t max_txn, txnid;
 	bool all_visible, prepared, skipped_birthmark, uncommitted;
 
-	if (upd_savedp != NULL)
-		*upd_savedp = false;
-	*updp = NULL;
+	/*
+	 * The "saved updates" return value is used independently of returning
+	 * an update we can write, both must be initialized.
+	 */
+	upd_select->upd = NULL;
+	upd_select->upd_saved = false;
 
 	page = r->page;
 	first_ts_upd = first_txn_upd = NULL;
@@ -1252,7 +1262,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			       continue;
 
 			/* Consider a non durable update as uncommitted. */
-			if (upd->timestamp != WT_TS_NONE &&
+			if (upd->start_ts != WT_TS_NONE &&
 			    !__wt_txn_upd_durable(session, upd)) {
 				uncommitted = r->update_uncommitted = true;
 				continue;
@@ -1261,7 +1271,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		}
 
 		/* Track the first update with non-zero timestamp. */
-		if (first_ts_upd == NULL && upd->timestamp != WT_TS_NONE)
+		if (first_ts_upd == NULL && upd->start_ts != WT_TS_NONE)
 			first_ts_upd = upd;
 
 		/*
@@ -1282,8 +1292,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * (but we save enough information that checkpoint can fix
 		 * things up if we choose an update that is too new).
 		 */
-		if (*updp == NULL && r->las_skew_newest)
-			*updp = upd;
+		if (upd_select->upd == NULL && r->las_skew_newest)
+			upd_select->upd = upd;
 
 		/* Consider non durable updates as uncommitted. */
 		if ((F_ISSET(r, WT_REC_VISIBLE_ALL) ?
@@ -1302,7 +1312,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			 * discard an uncommitted update.
 			 */
 			if (F_ISSET(r, WT_REC_UPDATE_RESTORE) &&
-			    *updp != NULL && (uncommitted || prepared)) {
+			    upd_select->upd != NULL &&
+			    (uncommitted || prepared)) {
 				r->leave_dirty = true;
 				return (__wt_set_return(session, EBUSY));
 			}
@@ -1318,16 +1329,25 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * (set to the first uncommitted transaction). Lookaside with
 		 * stable timestamp always takes the first stable update.
 		 */
-		if (*updp == NULL)
-			*updp = upd;
+		if (upd_select->upd == NULL)
+			upd_select->upd = upd;
 	}
 
 	/* Keep track of the selected update. */
-	upd = *updp;
+	upd = upd_select->upd;
 
 	/* Reconciliation should never see an aborted or reserved update. */
 	WT_ASSERT(session, upd == NULL ||
 	    (upd->txnid != WT_TXN_ABORTED && upd->type != WT_UPDATE_RESERVE));
+
+	/*
+	 * The checkpoint transaction is special.  Make sure we never write
+	 * metadata updates from a checkpoint in a concurrent session.
+	 */
+	WT_ASSERT(session, !WT_IS_METADATA(session->dhandle) ||
+	    upd == NULL || upd->txnid == WT_TXN_NONE ||
+	    upd->txnid != S2C(session)->txn_global.checkpoint_state.id ||
+	    WT_SESSION_IS_CHECKPOINT(session));
 
 	/* If all of the updates were aborted, quit. */
 	if (first_txn_upd == NULL) {
@@ -1340,13 +1360,29 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		r->update_used = true;
 
 	/*
-	 * The checkpoint transaction is special.  Make sure we never write
-	 * metadata updates from a checkpoint in a concurrent session.
+	 * The start timestamp is determined by the commit timestamp when the
+	 * key is first inserted (or last updated). The end timestamp is set
+	 * when a key/value pair becomes invalid, either because of a remove
+	 * or a modify/update operation on the same key.
 	 */
-	WT_ASSERT(session, !WT_IS_METADATA(session->dhandle) ||
-	    upd == NULL || upd->txnid == WT_TXN_NONE ||
-	    upd->txnid != S2C(session)->txn_global.checkpoint_state.id ||
-	    WT_SESSION_IS_CHECKPOINT(session));
+	if (upd != NULL) {
+		upd_select->txnid = upd->txnid;
+
+		/*
+		 * TIMESTAMP-FIXME
+		 * This is waiting on the WT_UPDATE structure's start/stop
+		 * timestamp work. For now, if we don't have a timestamp,
+		 * just pretend it's durable, otherwise pretend the start
+		 * and stop timestamps are the same.
+		 *
+		 */
+		if (upd_select->upd->start_ts == WT_TS_NONE) {
+			upd_select->start_ts = WT_TS_NONE;
+			upd_select->stop_ts = WT_TS_MAX;
+		} else
+			upd_select->start_ts =
+			    upd_select->stop_ts = upd_select->upd->start_ts;
+	}
 
 	/*
 	 * Track the most recent transaction in the page.  We store this in the
@@ -1358,8 +1394,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		r->max_txn = max_txn;
 
 	/* Update the maximum timestamp. */
-	if (first_ts_upd != NULL && r->max_timestamp < first_ts_upd->timestamp)
-		r->max_timestamp = first_ts_upd->timestamp;
+	if (first_ts_upd != NULL && r->max_timestamp < first_ts_upd->start_ts)
+		r->max_timestamp = first_ts_upd->start_ts;
 
 	/*
 	 * If the update we chose was a birthmark, or we are doing
@@ -1369,7 +1405,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (upd != NULL &&
 	    (upd->type == WT_UPDATE_BIRTHMARK ||
 	    (F_ISSET(r, WT_REC_UPDATE_RESTORE) && skipped_birthmark)))
-		*updp = NULL;
+		upd_select->upd = NULL;
 
 	/*
 	 * Check if all updates on the page are visible.  If not, it must stay
@@ -1379,7 +1415,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * order), so we track the maximum transaction ID and the newest update
 	 * with a timestamp (if any).
 	 */
-	timestamp = first_ts_upd == NULL ? 0 : first_ts_upd->timestamp;
+	timestamp = first_ts_upd == NULL ? 0 : first_ts_upd->start_ts;
 	all_visible = upd == first_txn_upd && !(uncommitted || prepared) &&
 	    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 	    __wt_txn_visible_all(session, max_txn, timestamp) :
@@ -1427,9 +1463,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * The order of the updates on the list matters, we can't move only the
 	 * unresolved updates, move the entire update list.
 	 */
-	WT_RET(__rec_update_save(session, r, ins, ripcip, *updp, upd_memsize));
-	if (upd_savedp != NULL)
-		*upd_savedp = true;
+	WT_RET(__rec_update_save(
+	    session, r, ins, ripcip, upd_select->upd, upd_memsize));
+	upd_select->upd_saved = true;
 
 	/*
 	 * Track the first off-page update when saving history in the lookaside
@@ -1441,18 +1477,18 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if (WT_TXNID_LT(r->unstable_txn, first_upd->txnid))
 			r->unstable_txn = first_upd->txnid;
 		if (first_ts_upd != NULL &&
-		    r->unstable_timestamp < first_ts_upd->timestamp)
-			r->unstable_timestamp = first_ts_upd->timestamp;
+		    r->unstable_timestamp < first_ts_upd->start_ts)
+			r->unstable_timestamp = first_ts_upd->start_ts;
 	} else if (F_ISSET(r, WT_REC_LOOKASIDE)) {
-		for (upd = first_upd; upd != *updp; upd = upd->next) {
+		for (upd = first_upd; upd != upd_select->upd; upd = upd->next) {
 			if (upd->txnid == WT_TXN_ABORTED)
 				continue;
 
 			if (upd->txnid != WT_TXN_NONE &&
 			    WT_TXNID_LT(upd->txnid, r->unstable_txn))
 				r->unstable_txn = upd->txnid;
-			if (upd->timestamp < r->unstable_timestamp)
-				r->unstable_timestamp = upd->timestamp;
+			if (upd->start_ts < r->unstable_timestamp)
+				r->unstable_timestamp = upd->start_ts;
 		}
 	}
 
@@ -1461,7 +1497,9 @@ check_original_value:
 	 * Paranoia: check that we didn't choose an update that has since been
 	 * rolled back.
 	 */
-	WT_ASSERT(session, *updp == NULL || (*updp)->txnid != WT_TXN_ABORTED);
+	WT_ASSERT(session,
+	    upd_select->upd == NULL ||
+	    upd_select->upd->txnid != WT_TXN_ABORTED);
 
 	/*
 	 * Returning an update means the original on-page value might be lost,
@@ -1474,7 +1512,8 @@ check_original_value:
 	 * - or any reconciliation of a backing overflow record that will be
 	 *   physically removed once it's no longer needed.
 	 */
-	if (*updp != NULL && (!WT_UPDATE_DATA_VALUE(*updp) ||
+	if (upd_select->upd != NULL &&
+	    (!WT_UPDATE_DATA_VALUE(upd_select->upd) ||
 	    F_ISSET(r, WT_REC_LOOKASIDE) || (vpack != NULL &&
 	    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
 		WT_RET(
@@ -1937,7 +1976,7 @@ __rec_dict_replace(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		offset = (uint64_t)WT_PTRDIFF(r->first_free,
 		    (uint8_t *)r->cur_ptr->image.mem + dp->offset);
 		val->len = val->cell_len = __wt_cell_pack_copy(
-		    &val->cell, start_ts, stop_ts, rle, offset);
+		    session, &val->cell, start_ts, stop_ts, rle, offset);
 		val->buf.data = NULL;
 		val->buf.size = 0;
 	}
@@ -3600,7 +3639,7 @@ __wt_bulk_insert_var(
 	val = &r->v;
 	if (deleted) {
 		val->cell_len = __wt_cell_pack_del(
-		    &val->cell, WT_TS_NONE, WT_TS_MAX, cbulk->rle);
+		    session, &val->cell, WT_TS_NONE, WT_TS_MAX, cbulk->rle);
 		val->buf.data = NULL;
 		val->buf.size = 0;
 		val->len = val->cell_len;
@@ -3729,7 +3768,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 		if (addr == NULL && __wt_off_page(page, ref->addr))
 			addr = ref->addr;
 		if (addr == NULL) {
-			__wt_cell_unpack(page, ref->addr, vpack);
+			__wt_cell_unpack(session, page, ref->addr, vpack);
 			val->buf.data = ref->addr;
 			val->buf.size = __wt_cell_total_len(vpack);
 			val->cell_len = 0;
@@ -3813,6 +3852,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 	WT_INSERT *ins;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
+	WT_UPDATE_SELECT upd_select;
 	uint64_t recno;
 	uint32_t entry, nrecs;
 
@@ -3828,7 +3868,9 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
-		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, NULL, &upd));
+		WT_RET(__rec_upd_select(
+		    session, r, ins, NULL, NULL, &upd_select));
+		upd = upd_select.upd;
 		if (upd != NULL)
 			__bit_setv(r->first_free,
 			    WT_INSERT_RECNO(ins) - pageref->ref_recno,
@@ -3872,8 +3914,9 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 				break;
 			upd = NULL;
 		} else {
-			WT_RET(__rec_txn_read(
-			    session, r, ins, NULL, NULL, NULL, &upd));
+			WT_RET(__rec_upd_select(
+			    session, r, ins, NULL, NULL, &upd_select));
+			upd = upd_select.upd;
 			recno = WT_INSERT_RECNO(ins);
 		}
 		for (;;) {
@@ -4004,15 +4047,14 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
  */
 static int
 __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-    WT_SALVAGE_COOKIE *salvage,
-    WT_ITEM *value, bool deleted, uint8_t overflow_type,
-    wt_timestamp_t start_ts, wt_timestamp_t stop_ts, uint64_t rle)
+    WT_SALVAGE_COOKIE *salvage, WT_ITEM *value,
+    wt_timestamp_t start_ts, wt_timestamp_t stop_ts,
+    uint64_t rle, bool deleted, bool overflow_type)
 {
 	WT_BTREE *btree;
 	WT_KV *val;
 
 	btree = S2BT(session);
-
 	val = &r->v;
 
 	/*
@@ -4047,14 +4089,14 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	}
 
 	if (deleted) {
-		val->cell_len =
-		    __wt_cell_pack_del(&val->cell, start_ts, stop_ts, rle);
+		val->cell_len = __wt_cell_pack_del(
+		    session, &val->cell, start_ts, stop_ts, rle);
 		val->buf.data = NULL;
 		val->buf.size = 0;
 		val->len = val->cell_len;
 	} else if (overflow_type) {
-		val->cell_len = __wt_cell_pack_ovfl(&val->cell,
-		    overflow_type, start_ts, stop_ts, rle, value->size);
+		val->cell_len = __wt_cell_pack_ovfl(session, &val->cell,
+		    WT_CELL_VALUE_OVFL, start_ts, stop_ts, rle, value->size);
 		val->buf.data = value->data;
 		val->buf.size = value->size;
 		val->len = val->cell_len + value->size;
@@ -4088,6 +4130,11 @@ __rec_col_var(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_REF *pageref, WT_SALVAGE_COOKIE *salvage)
 {
 	enum { OVFL_IGNORE, OVFL_UNUSED, OVFL_USED } ovfl_state;
+	struct {
+		WT_ITEM	*value;				/* Value */
+		wt_timestamp_t start_ts, stop_ts;	/* Timestamps */
+		bool deleted;				/* If deleted */
+	} last;
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *vpack, _vpack;
@@ -4096,30 +4143,38 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(orig);
 	WT_DECL_RET;
 	WT_INSERT *ins;
-	WT_ITEM *last;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
+	WT_UPDATE_SELECT upd_select;
 	wt_timestamp_t start_ts, stop_ts;
 	uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
 	uint32_t i, size;
-	bool deleted, last_deleted, orig_deleted, update_no_copy;
+	bool deleted, orig_deleted, update_no_copy;
 	const void *data;
 
 	btree = S2BT(session);
-	page = pageref->page;
-	last = r->last;
 	vpack = &_vpack;
 	cbt = &r->update_modify_cbt;
+	page = pageref->page;
+	upd = NULL;
+	size = 0;
+	data = NULL;
+
+	/* Set the "last" values to cause failure if they're not set. */
+	last.value = r->last;
+	last.start_ts = last.stop_ts = WT_TS_NONE;
+	last.deleted = false;
+
+	/*
+	 * Set the start/stop values to cause failure if they're not set.
+	 * [-Werror=maybe-uninitialized]
+	 */
+	start_ts = stop_ts = WT_TS_NONE;
 
 	WT_RET(__rec_split_init(session,
 	    r, page, pageref->ref_recno, btree->maxleafpage_precomp));
 
 	WT_RET(__wt_scr_alloc(session, 0, &orig));
-	data = NULL;
-	size = 0;
-	upd = NULL;
-
-	start_ts = stop_ts = WT_TS_FIXME;
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
@@ -4133,11 +4188,12 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	 * helper function's assistance.)
 	 */
 	rle = 0;
-	last_deleted = false;
 	if (salvage != NULL && salvage->missing != 0) {
 		if (salvage->skip == 0) {
 			rle = salvage->missing;
-			last_deleted = true;
+			last.start_ts = WT_TS_NONE;
+			last.stop_ts = WT_TS_MAX;
+			last.deleted = true;
 
 			/*
 			 * Correct the number of records we're going to "take",
@@ -4145,9 +4201,9 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 */
 			salvage->take += salvage->missing;
 		} else
-			WT_ERR(__rec_col_var_helper(session,
-			    r, NULL, NULL, true, false,
-			    WT_TS_NONE, WT_TS_MAX, salvage->missing));
+			WT_ERR(__rec_col_var_helper(session, r,
+			    NULL, NULL, WT_TS_NONE, WT_TS_MAX,
+			    salvage->missing, true, false));
 	}
 
 	/*
@@ -4167,11 +4223,15 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_COL_FOREACH(page, cip, i) {
 		ovfl_state = OVFL_IGNORE;
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
+			start_ts = WT_TS_NONE;
+			stop_ts = WT_TS_MAX;
 			nrepeat = 1;
 			ins = NULL;
 			orig_deleted = true;
 		} else {
-			__wt_cell_unpack(page, cell, vpack);
+			__wt_cell_unpack(session, page, cell, vpack);
+			start_ts = vpack->start_ts;
+			stop_ts = vpack->stop_ts;
 			nrepeat = __wt_cell_rle(vpack);
 			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
 
@@ -4227,8 +4287,23 @@ record_loop:	/*
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
 			upd = NULL;
 			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
-				WT_ERR(__rec_txn_read(
-				    session, r, ins, cip, vpack, NULL, &upd));
+				WT_ERR(__rec_upd_select(
+				    session, r, ins, cip, vpack, &upd_select));
+				upd = upd_select.upd;
+				if (upd == NULL) {
+					/*
+					 * TIMESTAMP-FIXME
+					 * I'm pretty sure this is wrong: a NULL
+					 * update means an item was deleted, and
+					 * I think that requires a tombstone on
+					 * the page.
+					 */
+					start_ts = WT_TS_NONE;
+					stop_ts = WT_TS_MAX;
+				} else {
+					start_ts = upd_select.start_ts;
+					stop_ts = upd_select.stop_ts;
+				}
 				ins = WT_SKIP_NEXT(ins);
 			}
 
@@ -4316,18 +4391,19 @@ record_loop:	/*
 					 */
 					if (rle != 0) {
 						WT_ERR(__rec_col_var_helper(
-						    session, r, salvage, last,
-						    last_deleted, 0,
-						    start_ts, stop_ts, rle));
+						    session, r, salvage,
+						    last.value,
+						    last.start_ts, last.stop_ts,
+						    rle, last.deleted, false));
 						rle = 0;
 					}
 
-					last->data = vpack->data;
-					last->size = vpack->size;
-					WT_ERR(__rec_col_var_helper(
-					    session, r, salvage, last, false,
-					    WT_CELL_VALUE_OVFL,
-					    start_ts, stop_ts, repeat_count));
+					last.value->data = vpack->data;
+					last.value->size = vpack->size;
+					WT_ERR(__rec_col_var_helper(session, r,
+					    salvage,
+					    last.value, start_ts, stop_ts,
+					    repeat_count, false, true));
 
 					/* Track if page has overflow items. */
 					r->ovfl_items = true;
@@ -4367,16 +4443,20 @@ compare:		/*
 			 * we've been doing that all along.
 			 */
 			if (rle != 0) {
-				if ((deleted && last_deleted) ||
-				    (!last_deleted && !deleted &&
-				    last->size == size &&
-				    memcmp(last->data, data, size) == 0)) {
+				if ((!__wt_process.page_version_ts ||
+				    (last.start_ts == start_ts &&
+				    last.stop_ts == stop_ts)) &&
+				    ((deleted && last.deleted) ||
+				    (!deleted && !last.deleted &&
+				    last.value->size == size &&
+				    memcmp(
+				    last.value->data, data, size) == 0))) {
 					rle += repeat_count;
 					continue;
 				}
-				WT_ERR(__rec_col_var_helper(session, r,
-				    salvage, last, last_deleted, 0,
-				    start_ts, stop_ts, rle));
+				WT_ERR(__rec_col_var_helper(session, r, salvage,
+				    last.value, last.start_ts, last.stop_ts,
+				    rle, last.deleted, false));
 			}
 
 			/*
@@ -4399,13 +4479,15 @@ compare:		/*
 				 * the pointers, they're not moving.
 				 */
 				if (data == vpack->data || update_no_copy) {
-					last->data = data;
-					last->size = size;
+					last.value->data = data;
+					last.value->size = size;
 				} else
 					WT_ERR(__wt_buf_set(
-					    session, last, data, size));
+					    session, last.value, data, size));
 			}
-			last_deleted = deleted;
+			last.start_ts = start_ts;
+			last.stop_ts = stop_ts;
+			last.deleted = deleted;
 			rle = repeat_count;
 		}
 
@@ -4449,9 +4531,23 @@ compare:		/*
 
 			upd = NULL;
 		} else {
-			WT_ERR(__rec_txn_read(
-			    session, r, ins, NULL, NULL, NULL, &upd));
+			WT_ERR(__rec_upd_select(
+			    session, r, ins, NULL, NULL, &upd_select));
+			upd = upd_select.upd;
 			n = WT_INSERT_RECNO(ins);
+		}
+		if (upd == NULL) {
+			/*
+			 * TIMESTAMP-FIXME
+			 * I'm pretty sure this is wrong: a NULL update means
+			 * an item was deleted, and I think that requires a
+			 * tombstone on the page.
+			 */
+			start_ts = WT_TS_NONE;
+			stop_ts = WT_TS_MAX;
+		} else {
+			start_ts = upd_select.start_ts;
+			stop_ts = upd_select.stop_ts;
 		}
 		while (src_recno <= n) {
 			deleted = false;
@@ -4465,7 +4561,10 @@ compare:		/*
 			 */
 			if (src_recno < n) {
 				deleted = true;
-				if (last_deleted) {
+				if (last.deleted &&
+				    (!__wt_process.page_version_ts ||
+				    (last.start_ts == start_ts &&
+				    last.stop_ts == stop_ts))) {
 					/*
 					 * The record adjustment is decremented
 					 * by one so we can naturally fall into
@@ -4478,9 +4577,22 @@ compare:		/*
 					rle += skip;
 					src_recno += skip;
 				}
-			} else if (upd == NULL)
+			} else if (upd == NULL) {
+				/*
+				 * TIMESTAMP-FIXME
+				 * I'm pretty sure this is wrong: a NULL
+				 * update means an item was deleted, and
+				 * I think that requires a tombstone on
+				 * the page.
+				 */
+				start_ts = WT_TS_NONE;
+				stop_ts = WT_TS_MAX;
+
 				deleted = true;
-			else
+			} else {
+				start_ts = upd_select.start_ts;
+				stop_ts = upd_select.stop_ts;
+
 				switch (upd->type) {
 				case WT_UPDATE_MODIFY:
 					/*
@@ -4504,22 +4616,27 @@ compare:		/*
 					break;
 				WT_ILLEGAL_VALUE_ERR(session, upd->type);
 				}
+			}
 
 			/*
 			 * Handle RLE accounting and comparisons -- see comment
 			 * above, this code fragment does the same thing.
 			 */
 			if (rle != 0) {
-				if ((deleted && last_deleted) ||
-				    (!last_deleted && !deleted &&
-				    last->size == size &&
-				    memcmp(last->data, data, size) == 0)) {
+				if ((!__wt_process.page_version_ts ||
+				    (last.start_ts == start_ts &&
+				    last.stop_ts == stop_ts)) &&
+				    ((deleted && last.deleted) ||
+				    (!deleted && !last.deleted &&
+				    last.value->size == size &&
+				    memcmp(
+				    last.value->data, data, size) == 0))) {
 					++rle;
 					goto next;
 				}
-				WT_ERR(__rec_col_var_helper(session, r,
-				    salvage, last, last_deleted, 0,
-				    start_ts, stop_ts, rle));
+				WT_ERR(__rec_col_var_helper(session, r, salvage,
+				    last.value, last.start_ts, last.stop_ts,
+				    rle, last.deleted, false));
 			}
 
 			/*
@@ -4533,15 +4650,17 @@ compare:		/*
 			 */
 			if (!deleted) {
 				if (update_no_copy) {
-					last->data = data;
-					last->size = size;
+					last.value->data = data;
+					last.value->size = size;
 				} else
 					WT_ERR(__wt_buf_set(
-					    session, last, data, size));
+					    session, last.value, data, size));
 			}
 
 			/* Ready for the next loop, reset the RLE counter. */
-			last_deleted = deleted;
+			last.start_ts = start_ts;
+			last.stop_ts = stop_ts;
+			last.deleted = deleted;
 			rle = 1;
 
 			/*
@@ -4564,8 +4683,8 @@ next:			if (src_recno == UINT64_MAX)
 
 	/* If we were tracking a record, write it. */
 	if (rle != 0)
-		WT_ERR(__rec_col_var_helper(session, r, salvage,
-		    last, last_deleted, 0, start_ts, stop_ts, rle));
+		WT_ERR(__rec_col_var_helper(session, r, salvage, last.value,
+		    last.start_ts, last.stop_ts, rle, last.deleted, false));
 
 	/* Write the remnant page. */
 	ret = __rec_split_finish(session, r);
@@ -4651,7 +4770,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (ikey != NULL && ikey->cell_offset != 0) {
 				cell =
 				    WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-				__wt_cell_unpack(page, cell, kpack);
+				__wt_cell_unpack(session, page, cell, kpack);
 				key_onpage_ovfl = kpack->ovfl &&
 				    kpack->raw != WT_CELL_KEY_OVFL_RM;
 			}
@@ -4748,7 +4867,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			newest_start_ts = addr->newest_start_ts;
 			newest_stop_ts = addr->newest_stop_ts;
 		} else {
-			__wt_cell_unpack(page, ref->addr, vpack);
+			__wt_cell_unpack(session, page, ref->addr, vpack);
 			if (state == WT_CHILD_PROXY) {
 				WT_ERR(__wt_buf_set(session, &val->buf,
 				    ref->addr, __wt_cell_total_len(vpack)));
@@ -4886,9 +5005,10 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	WT_KV *key, *val;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
+	WT_UPDATE_SELECT upd_select;
 	wt_timestamp_t start_ts, stop_ts;
 	size_t size;
-	uint64_t slvg_skip;
+	uint64_t slvg_skip, txnid;
 	uint32_t i;
 	bool dictionary, key_onpage_ovfl, ovfl_key;
 	void *copy;
@@ -4947,17 +5067,23 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			kpack = NULL;
 		else {
 			kpack = &_kpack;
-			__wt_cell_unpack(page, cell, kpack);
+			__wt_cell_unpack(session, page, cell, kpack);
 		}
 
 		/* Unpack the on-page value cell, set the default timestamps. */
-		__wt_row_leaf_value_cell(page, rip, NULL, vpack);
+		__wt_row_leaf_value_cell(session, page, rip, NULL, vpack);
 		start_ts = vpack->start_ts;
 		stop_ts = vpack->stop_ts;
+		txnid = WT_TXN_NONE;
 
 		/* Look for an update. */
-		WT_ERR(__rec_txn_read(
-		    session, r, NULL, rip, vpack, NULL, &upd));
+		WT_ERR(__rec_upd_select(
+		    session, r, NULL, rip, vpack, &upd_select));
+		if ((upd = upd_select.upd) != NULL) {
+			txnid = upd_select.txnid;
+			start_ts = upd_select.start_ts;
+			stop_ts = upd_select.stop_ts;
+		}
 
 		/* Build value cell. */
 		dictionary = false;
@@ -5147,7 +5273,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				goto build;
 
 			kpack = &_kpack;
-			__wt_cell_unpack(page, cell, kpack);
+			__wt_cell_unpack(session, page, cell, kpack);
 			if (btree->huffman_key == NULL &&
 			    kpack->type == WT_CELL_KEY &&
 			    tmpkey->size >= kpack->prefix) {
@@ -5215,13 +5341,11 @@ build:
 		/*
 		 * Copy the key/value pair onto the page. Zero-length items must
 		 * be globally visible as we're writing nothing to the page.
-		 *
-		 * WT_TS_FIXME: NONE-MAX is too pessimistic a test, and we may
-		 * want to adjust start_ts/stop_ts.
 		 */
 		__rec_image_copy(session, r, key);
 		if (val->len == 0 &&
-		    start_ts == WT_TS_NONE && stop_ts == WT_TS_MAX)
+		    (!__wt_process.page_version_ts ||
+		    __wt_txn_visible_all(session, txnid, stop_ts)))
 			r->any_empty_value = true;
 		else {
 			r->all_empty_value = false;
@@ -5259,7 +5383,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 	WT_CURSOR_BTREE *cbt;
 	WT_KV *key, *val;
 	WT_UPDATE *upd;
+	WT_UPDATE_SELECT upd_select;
 	wt_timestamp_t start_ts, stop_ts;
+	uint64_t txnid;
 	bool ovfl_key, upd_saved;
 
 	btree = S2BT(session);
@@ -5269,9 +5395,13 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 	val = &r->v;
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
-		WT_RET(__rec_txn_read(
-		    session, r, ins, NULL, NULL, &upd_saved, &upd));
-		start_ts = stop_ts = WT_TS_FIXME;
+		WT_RET(__rec_upd_select(
+		    session, r, ins, NULL, NULL, &upd_select));
+		upd = upd_select.upd;
+		txnid = upd_select.txnid;
+		start_ts = upd_select.start_ts;
+		stop_ts = upd_select.stop_ts;
+		upd_saved = upd_select.upd_saved;
 
 		if (upd == NULL) {
 			/*
@@ -5345,13 +5475,11 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 		/*
 		 * Copy the key/value pair onto the page. Zero-length items must
 		 * be globally visible as we're writing nothing to the page.
-		 *
-		 * WT_TS_FIXME: NONE-MAX is too pessimistic a test, and we may
-		 * want to adjust start_ts/stop_ts.
 		 */
 		__rec_image_copy(session, r, key);
 		if (val->len == 0 &&
-		    start_ts == WT_TS_NONE && stop_ts == WT_TS_MAX)
+		    (!__wt_process.page_version_ts &&
+		    __wt_txn_visible_all(session, txnid, stop_ts)))
 			r->any_empty_value = true;
 		else {
 			r->all_empty_value = false;
@@ -5949,7 +6077,8 @@ __rec_cell_build_addr(WT_SESSION_IMPL *session,
 	 */
 	val->buf.data = addr->addr;
 	val->buf.size = addr->size;
-	val->cell_len = __wt_cell_pack_addr(&val->cell, cell_type, recno,
+	val->cell_len = __wt_cell_pack_addr(session,
+	    &val->cell, cell_type, recno,
 	    addr->oldest_start_ts, addr->newest_start_ts, addr->newest_stop_ts,
 	    val->buf.size);
 	val->len = val->cell_len + val->buf.size;
@@ -5996,7 +6125,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		}
 	}
 	val->cell_len = __wt_cell_pack_data(
-	    &val->cell, start_ts, stop_ts, rle, val->buf.size);
+	    session, &val->cell, start_ts, stop_ts, rle, val->buf.size);
 	val->len = val->cell_len + val->buf.size;
 
 	return (0);
@@ -6069,7 +6198,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 
 	/* Build the cell and return. */
 	kv->cell_len = __wt_cell_pack_ovfl(
-	    &kv->cell, type, start_ts, stop_ts, rle, kv->buf.size);
+	    session, &kv->cell, type, start_ts, stop_ts, rle, kv->buf.size);
 	kv->len = kv->cell_len + kv->buf.size;
 
 err:	__wt_scr_free(session, &tmp);

@@ -185,7 +185,7 @@ __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 	ikey->cell_offset = 0;
 
 	cell = WT_PAGE_REF_OFFSET(page, cell_offset);
-	__wt_cell_unpack(page, cell, &kpack);
+	__wt_cell_unpack(session, page, cell, &kpack);
 	if (kpack.ovfl && kpack.raw != WT_CELL_KEY_OVFL_RM)
 		WT_RET(__wt_ovfl_discard(session, page, cell));
 
@@ -260,7 +260,8 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
 	 */
 	WT_ORDERED_READ(ref_addr, ref->addr);
 	if (ref_addr != NULL && !__wt_off_page(from_home, ref_addr)) {
-		__wt_cell_unpack(from_home, (WT_CELL *)ref_addr, &unpack);
+		__wt_cell_unpack(
+		    session, from_home, (WT_CELL *)ref_addr, &unpack);
 		WT_RET(__wt_calloc_one(session, &addr));
 		addr->oldest_start_ts = unpack.oldest_start_ts;
 		addr->newest_start_ts = unpack.newest_start_ts;

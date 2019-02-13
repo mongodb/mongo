@@ -201,6 +201,8 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
     def corrupt_log(self, homedir):
         if not self.corrupted():
             return
+        # Mark this test has having corrupted files
+        self.databaseCorrupted()
         self.f(self.log_number_to_file_name(homedir, self.corruptpos))
 
         # Corrupt a second log file if needed

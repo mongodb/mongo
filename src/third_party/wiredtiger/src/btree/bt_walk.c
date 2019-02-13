@@ -85,7 +85,7 @@ found:	WT_ASSERT(session, pindex->index[slot] == ref);
  *	Check if a reference is for a leaf page.
  */
 static inline bool
-__ref_is_leaf(WT_REF *ref)
+__ref_is_leaf(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	size_t addr_size;
 	const uint8_t *addr;
@@ -96,7 +96,7 @@ __ref_is_leaf(WT_REF *ref)
 	 * this page is a leaf page or not. If there's no address, the page
 	 * isn't on disk and we don't know the page type.
 	 */
-	__wt_ref_info(ref, &addr, &addr_size, &type);
+	__wt_ref_info(session, ref, &addr, &addr_size, &type);
 	return (addr == NULL ?
 	    false : type == WT_CELL_ADDR_LEAF || type == WT_CELL_ADDR_LEAF_NO);
 }
@@ -650,7 +650,7 @@ __tree_walk_skip_count_callback(
 	if (ref->state == WT_REF_DELETED &&
 	    __wt_delete_page_skip(session, ref, false))
 		*skipp = true;
-	else if (*skipleafcntp > 0 && __ref_is_leaf(ref)) {
+	else if (*skipleafcntp > 0 && __ref_is_leaf(session, ref)) {
 		--*skipleafcntp;
 		*skipp = true;
 	} else

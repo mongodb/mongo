@@ -1018,7 +1018,7 @@ __wt_row_leaf_key(WT_SESSION_IMPL *session,
  *	Return the unpacked value for a row-store leaf page key.
  */
 static inline void
-__wt_row_leaf_value_cell(
+__wt_row_leaf_value_cell(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *kpack, WT_CELL_UNPACK *vpack)
 {
 	WT_CELL *kcell, *vcell;
@@ -1048,13 +1048,14 @@ __wt_row_leaf_value_cell(
 		    page, copy, NULL, &kcell, &key, &size) && kcell == NULL)
 			vcell = (WT_CELL *)((uint8_t *)key + size);
 		else {
-			__wt_cell_unpack(page, kcell, &unpack);
+			__wt_cell_unpack(session, page, kcell, &unpack);
 			vcell = (WT_CELL *)((uint8_t *)
 			    unpack.cell + __wt_cell_total_len(&unpack));
 		}
 	}
 
-	__wt_cell_unpack(page, __wt_cell_leaf_value_parse(page, vcell), vpack);
+	__wt_cell_unpack(session,
+	    page, __wt_cell_leaf_value_parse(page, vcell), vpack);
 }
 
 /*
@@ -1087,7 +1088,8 @@ __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_ITEM *value)
  *	Return the addr/size and type triplet for a reference.
  */
 static inline void
-__wt_ref_info(WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
+__wt_ref_info(WT_SESSION_IMPL *session,
+    WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -1128,7 +1130,7 @@ __wt_ref_info(WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 				break;
 			}
 	} else {
-		__wt_cell_unpack(page, (WT_CELL *)addr, unpack);
+		__wt_cell_unpack(session, page, (WT_CELL *)addr, unpack);
 		*addrp = unpack->data;
 		*sizep = unpack->size;
 		if (typep != NULL)
@@ -1149,7 +1151,7 @@ __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (ref->addr == NULL)
 		return (0);
 
-	__wt_ref_info(ref, &addr, &addr_size, NULL);
+	__wt_ref_info(session, ref, &addr, &addr_size, NULL);
 	WT_RET(__wt_btree_block_free(session, addr, addr_size));
 
 	/* Clear the address (so we don't free it twice). */

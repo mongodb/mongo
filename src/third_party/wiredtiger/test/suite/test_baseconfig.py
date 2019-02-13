@@ -36,6 +36,8 @@ class test_baseconfig(wttest.WiredTigerTestCase):
         # Open up another database and modify the baseconfig
         os.mkdir("A")
         conn = self.wiredtiger_open("A", 'create')
+        # Mark the new directory as corrupted
+        self.databaseCorrupted("A")
         self.assertTrue(os.path.exists("A/WiredTiger.basecfg"))
         with open("A/WiredTiger.basecfg", "a") as basecfg_file:
             basecfg_file.write("foo!")

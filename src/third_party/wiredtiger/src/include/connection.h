@@ -293,6 +293,12 @@ struct __wt_connection_impl {
 	uint32_t	 async_size;	/* Async op array size */
 	uint32_t	 async_workers;	/* Number of async workers */
 
+	WT_CAPACITY	 capacity;	/* Capacity structure */
+	WT_SESSION_IMPL *capacity_session;	/* Capacity thread session */
+	wt_thread_t	 capacity_tid;	/* Capacity thread */
+	bool		 capacity_tid_set;	/* Capacity thread set */
+	WT_CONDVAR	*capacity_cond;	/* Capacity wait mutex */
+
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
 
 	WT_KEYED_ENCRYPTOR *kencryptor;	/* Encryptor for metadata and log */
@@ -456,16 +462,17 @@ struct __wt_connection_impl {
 	 * delays have been requested.
 	 */
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_TIMING_STRESS_CHECKPOINT_SLOW	0x001u
-#define	WT_TIMING_STRESS_LOOKASIDE_SWEEP	0x002u
-#define	WT_TIMING_STRESS_SPLIT_1		0x004u
-#define	WT_TIMING_STRESS_SPLIT_2		0x008u
-#define	WT_TIMING_STRESS_SPLIT_3		0x010u
-#define	WT_TIMING_STRESS_SPLIT_4		0x020u
-#define	WT_TIMING_STRESS_SPLIT_5		0x040u
-#define	WT_TIMING_STRESS_SPLIT_6		0x080u
-#define	WT_TIMING_STRESS_SPLIT_7		0x100u
-#define	WT_TIMING_STRESS_SPLIT_8		0x200u
+#define	WT_TIMING_STRESS_AGGRESSIVE_SWEEP	0x001u
+#define	WT_TIMING_STRESS_CHECKPOINT_SLOW	0x002u
+#define	WT_TIMING_STRESS_LOOKASIDE_SWEEP	0x004u
+#define	WT_TIMING_STRESS_SPLIT_1		0x008u
+#define	WT_TIMING_STRESS_SPLIT_2		0x010u
+#define	WT_TIMING_STRESS_SPLIT_3		0x020u
+#define	WT_TIMING_STRESS_SPLIT_4		0x040u
+#define	WT_TIMING_STRESS_SPLIT_5		0x080u
+#define	WT_TIMING_STRESS_SPLIT_6		0x100u
+#define	WT_TIMING_STRESS_SPLIT_7		0x200u
+#define	WT_TIMING_STRESS_SPLIT_8		0x400u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint64_t timing_stress_flags;
 
@@ -500,12 +507,13 @@ struct __wt_connection_impl {
 #define	WT_CONN_RECOVERING		0x0020000u
 #define	WT_CONN_SALVAGE			0x0040000u
 #define	WT_CONN_SERVER_ASYNC		0x0080000u
-#define	WT_CONN_SERVER_CHECKPOINT	0x0100000u
-#define	WT_CONN_SERVER_LOG		0x0200000u
-#define	WT_CONN_SERVER_LSM		0x0400000u
-#define	WT_CONN_SERVER_STATISTICS	0x0800000u
-#define	WT_CONN_SERVER_SWEEP		0x1000000u
-#define	WT_CONN_WAS_BACKUP		0x2000000u
+#define	WT_CONN_SERVER_CAPACITY		0x0100000u
+#define	WT_CONN_SERVER_CHECKPOINT	0x0200000u
+#define	WT_CONN_SERVER_LOG		0x0400000u
+#define	WT_CONN_SERVER_LSM		0x0800000u
+#define	WT_CONN_SERVER_STATISTICS	0x1000000u
+#define	WT_CONN_SERVER_SWEEP		0x2000000u
+#define	WT_CONN_WAS_BACKUP		0x4000000u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };

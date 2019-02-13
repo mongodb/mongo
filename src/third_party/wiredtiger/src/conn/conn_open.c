@@ -56,6 +56,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	/* Initialize transaction support. */
 	WT_RET(__wt_txn_global_init(session, cfg));
 
+	WT_STAT_CONN_SET(session, dh_conn_handle_size, sizeof(WT_DATA_HANDLE));
 	return (0);
 }
 
@@ -101,6 +102,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_SET(conn, WT_CONN_CLOSING_NO_MORE_OPENS);
 	WT_FULL_BARRIER();
 
+	WT_TRET(__wt_capacity_server_destroy(session));
 	WT_TRET(__wt_checkpoint_server_destroy(session));
 	WT_TRET(__wt_statlog_destroy(session, true));
 	WT_TRET(__wt_sweep_destroy(session));
@@ -250,6 +252,9 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Start the optional async threads. */
 	WT_RET(__wt_async_create(session, cfg));
+
+	/* Start the optional capacity thread. */
+	WT_RET(__wt_capacity_server_create(session, cfg));
 
 	/* Start the optional checkpoint thread. */
 	WT_RET(__wt_checkpoint_server_create(session, cfg));

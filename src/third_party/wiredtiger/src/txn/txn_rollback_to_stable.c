@@ -106,10 +106,10 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 		 * updates were also rolled back.
 		 */
 		if (upd->txnid == WT_TXN_ABORTED ||
-		    upd->timestamp == WT_TS_NONE) {
+		    upd->start_ts == WT_TS_NONE) {
 			if (upd == first_upd)
 				first_upd = upd->next;
-		} else if (rollback_timestamp < upd->durable_timestamp) {
+		} else if (rollback_timestamp < upd->durable_ts) {
 			/*
 			 * If any updates are aborted, all newer updates
 			 * better be aborted as well.
@@ -127,8 +127,8 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 
 			upd->txnid = WT_TXN_ABORTED;
 			WT_STAT_CONN_INCR(session, txn_rollback_upd_aborted);
-			upd->timestamp = 0;
-			upd->durable_timestamp = 0;
+			upd->durable_ts = 0;
+			upd->start_ts = 0;
 		}
 	}
 }

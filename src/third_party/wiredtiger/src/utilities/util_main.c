@@ -256,6 +256,7 @@ main(int argc, char *argv[])
 	/* Build the configuration string. */
 	len = 10;					/* some slop */
 	p1 = p2 = p3 = "";
+	len += strlen("error_prefix=wt");
 	if (config != NULL)
 		len += strlen(config);
 	if (cmd_config != NULL)
@@ -271,7 +272,7 @@ main(int argc, char *argv[])
 		(void)util_err(NULL, errno, NULL);
 		goto err;
 	}
-	if ((ret = __wt_snprintf(p, len, "%s,%s,%s%s%s%s",
+	if ((ret = __wt_snprintf(p, len, "error_prefix=wt,%s,%s,%s%s%s%s",
 	    config == NULL ? "" : config,
 	    cmd_config == NULL ? "" : cmd_config,
 	    rec_config, p1, p2, p3)) != 0) {

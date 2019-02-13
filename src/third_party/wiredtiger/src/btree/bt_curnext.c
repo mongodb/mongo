@@ -229,7 +229,7 @@ new_page:	/* Find the matching WT_COL slot. */
 		if (cbt->cip_saved != cip) {
 			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				continue;
-			__wt_cell_unpack(page, cell, &unpack);
+			__wt_cell_unpack(session, page, cell, &unpack);
 			if (unpack.type == WT_CELL_DEL) {
 				if ((rle = __wt_cell_rle(&unpack)) == 1)
 					continue;

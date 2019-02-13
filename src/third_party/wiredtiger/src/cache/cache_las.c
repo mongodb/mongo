@@ -727,12 +727,12 @@ __wt_las_insert_block(WT_CURSOR *cursor,
 			    upd->type == WT_UPDATE_MODIFY)) {
 				las_value.size = 0;
 				cursor->set_value(cursor, upd->txnid,
-				    upd->timestamp, upd->durable_timestamp,
+				    upd->start_ts, upd->durable_ts,
 				    upd->prepare_state, WT_UPDATE_BIRTHMARK,
 				    &las_value);
 			} else
 				cursor->set_value(cursor, upd->txnid,
-				    upd->timestamp, upd->durable_timestamp,
+				    upd->start_ts, upd->durable_ts,
 				    upd->prepare_state, upd->type, &las_value);
 
 			/*

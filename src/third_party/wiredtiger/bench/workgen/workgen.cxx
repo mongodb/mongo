@@ -948,7 +948,8 @@ int Throttle::throttle(uint64_t op_count, uint64_t *op_limit) {
         _next_div = ts_add_ms(now, _ms_per_div);
         _started = true;
     } else {
-        _ops_delta += (op_count - _ops_prev);
+        if (_burst != 0.0)
+            _ops_delta += (op_count - _ops_prev);
 
         // Sleep until the next division, but potentially with some randomness.
         if (now < _next_div) {
@@ -961,7 +962,12 @@ int Throttle::throttle(uint64_t op_count, uint64_t *op_limit) {
         }
         _next_div = ts_add_ms(_next_div, _ms_per_div);
     }
-    ops = _ops_per_div;
+
+    if (_burst == 0.0)
+        ops = _ops_left_this_second;
+    else
+        ops = _ops_per_div;
+
     if (_ops_delta < (int64_t)ops) {
         ops -= _ops_delta;
         _ops_delta = 0;

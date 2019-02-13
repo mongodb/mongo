@@ -68,6 +68,7 @@ each of which is ordered by one or more columns.
 - @subpage_single tune_build_options
 - @subpage_single tune_bulk_load
 - @subpage_single tune_cache
+- @subpage_single tune_capacity
 - @subpage_single tune_checksum
 - @subpage_single tune_close
 - @subpage_single tune_cursor_persist

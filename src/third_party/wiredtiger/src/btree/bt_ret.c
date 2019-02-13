@@ -101,7 +101,7 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			return (0);
 
 		/* Take the value from the original page cell. */
-		__wt_row_leaf_value_cell(page, rip, NULL, &unpack);
+		__wt_row_leaf_value_cell(session, page, rip, NULL, &unpack);
 		return (__wt_page_cell_data_ref(
 		    session, page, &unpack, &cursor->value));
 
@@ -110,7 +110,7 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	if (page->type == WT_PAGE_COL_VAR) {
 		/* Take the value from the original page cell. */
 		cell = WT_COL_PTR(page, &page->pg_var[cbt->slot]);
-		__wt_cell_unpack(page, cell, &unpack);
+		__wt_cell_unpack(session, page, cell, &unpack);
 		return (__wt_page_cell_data_ref(
 		    session, page, &unpack, &cursor->value));
 	}

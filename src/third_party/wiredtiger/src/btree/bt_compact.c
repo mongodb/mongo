@@ -30,7 +30,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
 	/* If the page is clean, test the original addresses. */
 	if (__wt_page_evict_clean(page)) {
-		__wt_ref_info(ref, &addr, &addr_size, NULL);
+		__wt_ref_info(session, ref, &addr, &addr_size, NULL);
 		if (addr == NULL)
 			return (0);
 		return (
@@ -249,7 +249,7 @@ __wt_compact_page_skip(
 	 * if it's useful to rewrite leaf pages, don't do the I/O if a rewrite
 	 * won't help.
 	 */
-	__wt_ref_info(ref, &addr, &addr_size, &type);
+	__wt_ref_info(session, ref, &addr, &addr_size, &type);
 	WT_ASSERT(session, addr != NULL);
 	if (addr != NULL && type != WT_CELL_ADDR_INT) {
 		bm = S2BT(session)->bm;

@@ -109,9 +109,12 @@ struct __wt_fh {
 	const char *name;			/* File name */
 
 	uint64_t name_hash;			/* hash of name */
+	uint64_t last_sync;			/* time of background fsync */
+	volatile uint64_t written;		/* written since fsync */
 	TAILQ_ENTRY(__wt_fh) q;			/* internal queue */
 	TAILQ_ENTRY(__wt_fh) hashq;		/* internal hash queue */
 	u_int ref;				/* reference count */
+	WT_FS_OPEN_FILE_TYPE file_type;		/* file type */
 
 	WT_FILE_HANDLE *handle;
 };

@@ -425,7 +425,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	 */
 	kpack = &_kpack;
 	memset(kpack, 0, sizeof(*kpack));
-	__wt_cell_unpack(page, cell, kpack);
+	__wt_cell_unpack(session, page, cell, kpack);
 	if (kpack->type == WT_CELL_KEY &&
 	    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
 		WT_ASSERT(session, cbt->row_key->size >= kpack->prefix);
@@ -470,7 +470,7 @@ value:
 		return (0);
 
 	/* Else, take the value from the original page cell. */
-	__wt_row_leaf_value_cell(page, rip, kpack, vpack);
+	__wt_row_leaf_value_cell(session, page, rip, kpack, vpack);
 	return (__wt_page_cell_data_ref(session, cbt->ref->page, vpack, vb));
 }
 /*

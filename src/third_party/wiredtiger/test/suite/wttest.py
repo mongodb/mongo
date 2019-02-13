@@ -585,6 +585,15 @@ class WiredTigerTestCase(unittest.TestCase):
         msg = '**** ' + myname + ' HAS A KNOWN LIMITATION: ' + name + ' ****'
         self.printOnce(msg)
 
+    def databaseCorrupted(self, directory = None):
+        """
+        Mark this test as having a corrupted database by creating a
+        DATABASE_CORRUPTED file in the home directory.
+        """
+        if directory == None:
+            directory = self.home
+        open(os.path.join(directory, "DATABASE_CORRUPTED"), "a").close()
+
     @staticmethod
     def printVerbose(level, message):
         if level <= WiredTigerTestCase._verbose:

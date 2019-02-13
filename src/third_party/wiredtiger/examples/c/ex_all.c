@@ -1284,6 +1284,12 @@ main(int argc, char *argv[])
 	/*! [Configure file_extend] */
 	error_check(conn->close(conn, NULL));
 
+	/*! [Configure capacity] */
+	error_check(wiredtiger_open(
+	    home, NULL, "create,io_capacity=(total=40MB)", &conn));
+	/*! [Configure capacity] */
+	error_check(conn->close(conn, NULL));
+
 	/*! [Eviction configuration] */
 	/*
 	 * Configure eviction to begin at 90% full, and run until the cache

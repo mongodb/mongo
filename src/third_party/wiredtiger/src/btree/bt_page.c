@@ -286,7 +286,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 	refp = pindex->index;
 	hint = 0;
-	WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, true) {
+	WT_CELL_FOREACH_BEGIN(session, btree, page->dsk, unpack, true) {
 		ref = *refp++;
 		ref->home = page;
 		ref->pindex_hint = hint++;
@@ -310,7 +310,7 @@ __inmem_col_var_repeats(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *np)
 	btree = S2BT(session);
 
 	/* Walk the page, counting entries for the repeats array. */
-	WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, true) {
+	WT_CELL_FOREACH_BEGIN(session, btree, page->dsk, unpack, true) {
 		if (__wt_cell_rle(&unpack) > 1)
 			++*np;
 	} WT_CELL_FOREACH_END;
@@ -346,7 +346,7 @@ __inmem_col_var(
 	 */
 	indx = 0;
 	cip = page->pg_var;
-	WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, true) {
+	WT_CELL_FOREACH_BEGIN(session, btree, page->dsk, unpack, true) {
 		WT_COL_PTR_SET(cip, WT_PAGE_DISK_OFFSET(page, unpack.cell));
 		cip++;
 
@@ -409,7 +409,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	refp = pindex->index;
 	overflow_keys = false;
 	hint = 0;
-	WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, true) {
+	WT_CELL_FOREACH_BEGIN(session, btree, page->dsk, unpack, true) {
 		ref = *refp;
 		ref->home = page;
 		ref->pindex_hint = hint++;
@@ -522,7 +522,7 @@ __inmem_row_leaf_entries(
 	 * single on-page (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
 	 */
 	nindx = 0;
-	WT_CELL_FOREACH_BEGIN(btree, dsk, unpack, true) {
+	WT_CELL_FOREACH_BEGIN(session, btree, dsk, unpack, true) {
 		switch (unpack.type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
@@ -554,7 +554,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Walk the page, building indices. */
 	rip = page->pg_row;
-	WT_CELL_FOREACH_BEGIN(btree, page->dsk, unpack, true) {
+	WT_CELL_FOREACH_BEGIN(session, btree, page->dsk, unpack, true) {
 		switch (unpack.type) {
 		case WT_CELL_KEY_OVFL:
 			__wt_row_leaf_key_set_cell(page, rip, unpack.cell);

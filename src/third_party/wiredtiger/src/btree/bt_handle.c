@@ -488,15 +488,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	 *	Don't do compression adjustment for fixed-size column store, the
 	 * leaf page sizes don't change. (We could adjust internal pages but not
 	 * internal pages, but that seems an unlikely use case.)
-	 * 	XXX
-	 * 	Don't do compression adjustment of snappy-compressed blocks.
 	 */
 	btree->intlpage_compadjust = false;
 	btree->maxintlpage_precomp = btree->maxintlpage;
 	btree->leafpage_compadjust = false;
 	btree->maxleafpage_precomp = btree->maxleafpage;
 	if (btree->compressor != NULL && btree->compressor->compress != NULL &&
-	    !WT_STRING_MATCH("snappy", cval.str, cval.len) &&
 	    btree->type != BTREE_COL_FIX) {
 		/*
 		 * Don't do compression adjustment when on-disk page sizes are
@@ -611,6 +608,12 @@ __wt_btree_tree_open(
 	F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
 	if ((ret = __wt_bt_read(session, &dsk, addr, addr_size)) == 0)
 		ret = __wt_verify_dsk(session, tmp->data, &dsk);
+	/*
+	 * Flag any failed read or verification: if we're in startup, it may
+	 * be fatal.
+	 */
+	if (ret != 0)
+		F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
 	F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
 	if (ret != 0)
 		__wt_err(session, ret,
@@ -783,7 +786,7 @@ __btree_preload(WT_SESSION_IMPL *session)
 
 	/* Pre-load the second-level internal pages. */
 	WT_INTL_FOREACH_BEGIN(session, btree->root.page, ref) {
-		__wt_ref_info(ref, &addr, &addr_size, NULL);
+		__wt_ref_info(session, ref, &addr, &addr_size, NULL);
 		if (addr != NULL)
 			WT_RET(bm->preload(bm, session, addr, addr_size));
 	} WT_INTL_FOREACH_END;

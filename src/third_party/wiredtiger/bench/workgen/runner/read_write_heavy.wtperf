@@ -1,0 +1,20 @@
+# Warning: This config includes unwritten, implicit configuration defaults.
+# Changes to those values may cause differences in behavior.
+conn_config="cache_size=2GB,eviction=(threads_max=8),log=(enabled=true),session_max=250,statistics=(fast),statistics_log=(wait=1,json),io_capacity=(total=30M)"
+checkpoint_interval=60
+checkpoint_threads=1
+compression="snappy"
+create=true
+close_conn=false
+icount=4000000
+log_like_table=true
+populate_threads=4
+report_interval=1
+run_time=900
+sample_interval=1
+sample_rate=1
+table_count=100
+threads=((count=80,updates=1,throttle=11,throttle_burst=0),(count=80,reads=1,throttle=60,throttle_burst=0))
+value_sz=7000
+warmup=0
+table_config="memory_page_max=10m,leaf_value_max=64MB,checksum=on,split_pct=90,type=file,log=(enabled=false),leaf_page_max=32k,block_compressor=snappy"

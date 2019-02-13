@@ -2019,6 +2019,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * conditions aren't encountered.
 	 */
 	static const WT_NAME_FLAG stress_types[] = {
+		{ "aggressive_sweep",   WT_TIMING_STRESS_AGGRESSIVE_SWEEP },
 		{ "checkpoint_slow",	WT_TIMING_STRESS_CHECKPOINT_SLOW },
 		{ "lookaside_sweep_race",WT_TIMING_STRESS_LOOKASIDE_SWEEP },
 		{ "split_1",		WT_TIMING_STRESS_SPLIT_1 },
@@ -2138,6 +2139,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    "config_base=,"
 	    "create=,"
 	    "encryption=(secretkey=),"
+	    "error_prefix=,"
 	    "exclusive=,"
 	    "in_memory=,"
 	    "log=(recover=),"

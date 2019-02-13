@@ -349,7 +349,6 @@ __im_file_read(WT_FILE_HANDLE *file_handle,
 	__wt_spin_unlock(session, &im_fs->lock);
 	if (ret == 0)
 		return (0);
-	F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
 	WT_RET_MSG(session, WT_ERROR,
 	    "%s: handle-read: failed to read %" WT_SIZET_FMT " bytes at "
 	    "offset %" WT_SIZET_FMT,

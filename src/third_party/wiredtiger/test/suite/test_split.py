@@ -45,9 +45,13 @@ class test_split(wttest.WiredTigerTestCase):
             'allocation_size=4KB,leaf_page_max=4KB,split_pct=75')
         cursor = self.session.open_cursor(self.uri, None)
 
+        # THIS TEST IS DEPENDENT ON THE PAGE SIZES CREATED BY RECONCILIATION.
+        # IF IT FAILS, IT MAY BE RECONCILIATION ISN'T CREATING THE SAME SIZE
+        # PAGES AS BEFORE.
+
         # Create a 4KB page (more than 3KB): 40 records w / 10 byte keys
         # and 81 byte values.
-        for i in range(40):
+        for i in range(35):
             cursor['%09d' % i] = 8 * ('%010d' % i)
 
         # Stabilize
@@ -59,7 +63,7 @@ class test_split(wttest.WiredTigerTestCase):
 
         # Now append a few records so we're definitely (a little) over 4KB
         cursor = self.session.open_cursor(self.uri, None)
-        for i in range(50,55):
+        for i in range(50,60):
             cursor['%09d' % i] = 8 * ('%010d' % i)
 
         # Stabilize

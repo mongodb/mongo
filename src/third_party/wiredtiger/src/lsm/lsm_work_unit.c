@@ -697,11 +697,11 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 }
 
 /*
- * __wt_lsm_free_chunks --
+ * __lsm_free_chunks --
  *	Try to drop chunks from the tree that are no longer required.
  */
-int
-__wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+static int
+__lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
@@ -712,15 +712,6 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	flush_metadata = false;
 
-	if (lsm_tree->nold_chunks == 0)
-		return (0);
-
-	/*
-	 * Make sure only a single thread is freeing the old chunk array
-	 * at any time.
-	 */
-	if (!__wt_atomic_cas32(&lsm_tree->freeing_old_chunks, 0, 1))
-		return (0);
 	/*
 	 * Take a copy of the current state of the LSM tree and look for chunks
 	 * to drop.  We do it this way to avoid holding the LSM tree lock while
@@ -741,16 +732,6 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			++skipped;
 			continue;
 		}
-
-		/*
-		 * Don't remove files if a hot backup is in progress.
-		 *
-		 * The schema lock protects the set of live files, this check
-		 * prevents us from removing a file that hot backup already
-		 * knows about.
-		 */
-		if (S2C(session)->hot_backup)
-			break;
 
 		/*
 		 * Drop any bloom filters and chunks we can. Don't try to drop
@@ -822,11 +803,49 @@ err:	/* Flush the metadata unless the system is in panic */
 	}
 	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
-	lsm_tree->freeing_old_chunks = 0;
 
 	/* Returning non-zero means there is no work to do. */
 	if (!flush_metadata)
 		WT_TRET(WT_NOTFOUND);
 
+	return (ret);
+}
+
+/*
+ * __wt_lsm_free_chunks --
+ *	Try to drop chunks from the tree that are no longer required.
+ */
+int
+__wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	if (lsm_tree->nold_chunks == 0)
+		return (0);
+
+	/*
+	 * Make sure only a single thread is freeing the old chunk array
+	 * at any time.
+	 */
+	if (!__wt_atomic_cas32(&lsm_tree->freeing_old_chunks, 0, 1))
+		return (0);
+
+	/*
+	 * Don't remove files if a hot backup is in progress.
+	 *
+	 * The schema lock protects the set of live files, this check prevents
+	 * us from removing a file that hot backup already knows about.
+	 */
+	if (!conn->hot_backup) {
+		__wt_readlock(session, &conn->hot_backup_lock);
+		if (!conn->hot_backup)
+			ret = __lsm_free_chunks(session, lsm_tree);
+		__wt_readunlock(session, &conn->hot_backup_lock);
+	}
+
+	lsm_tree->freeing_old_chunks = 0;
 	return (ret);
 }

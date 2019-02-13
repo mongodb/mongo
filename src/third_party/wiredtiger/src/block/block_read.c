@@ -98,6 +98,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	    block, "read", offset, size, bm->is_live, __func__, __LINE__));
 #endif
 	/* Read the block. */
+	__wt_capacity_throttle(session, size, WT_THROTTLE_READ);
 	WT_RET(
 	    __wt_block_read_off(session, block, buf, offset, size, checksum));
 

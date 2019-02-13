@@ -52,10 +52,10 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	WT_DECL_RET;
 	uint64_t chunk, quota, reserve, size, used_cache;
 	char *pool_name;
-	bool created, updating;
+	bool cp_locked, created, updating;
 
 	conn = S2C(session);
-	created = updating = false;
+	cp_locked = created = updating = false;
 	pool_name = NULL;
 	cp = NULL;
 
@@ -117,7 +117,16 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		    "Attempting to join a cache pool that does not exist: %s",
 		    pool_name);
 
+	/*
+	 * At this point we have a cache pool to use. We need to take its
+	 * lock. We need to drop the process lock first to avoid deadlock
+	 * and acquire in the proper order.
+	 */
+	__wt_spin_unlock(session, &__wt_process.spinlock);
 	cp = __wt_process.cache_pool;
+	__wt_spin_lock(session, &cp->cache_pool_lock);
+	cp_locked = true;
+	__wt_spin_lock(session, &__wt_process.spinlock);
 
 	/*
 	 * The cache pool requires a reference count to avoid a race between
@@ -209,6 +218,8 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 
 	conn->cache->cp_reserved = reserve;
 	conn->cache->cp_quota = quota;
+	__wt_spin_unlock(session, &cp->cache_pool_lock);
+	cp_locked = false;
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (updating)
@@ -221,6 +232,8 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 
 	F_SET(conn, WT_CONN_CACHE_POOL);
 err:	__wt_spin_unlock(session, &__wt_process.spinlock);
+	if (cp_locked)
+		__wt_spin_unlock(session, &cp->cache_pool_lock);
 	__wt_free(session, pool_name);
 	if (ret != 0 && created) {
 		__wt_free(session, cp->name);

@@ -52,6 +52,10 @@ class CacheWalkStat(Stat):
     def __init__(self, name, desc, flags=''):
         flags += ',cache_walk'
         Stat.__init__(self, name, CacheWalkStat.prefix, desc, flags)
+class CapacityStat(Stat):
+    prefix = 'capacity'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, CapacityStat.prefix, desc, flags)
 class CompressStat(Stat):
     prefix = 'compression'
     def __init__(self, name, desc, flags=''):
@@ -134,6 +138,7 @@ groups['memory'] = [
     ConnStat.prefix,
     RecStat.prefix]
 groups['system'] = [
+    CapacityStat.prefix,
     ConnStat.prefix,
     DhandleStat.prefix,
     PerfHistStat.prefix,
@@ -294,6 +299,24 @@ connection_stats = [
     CacheStat('cache_write_restore', 'pages written requiring in-memory restoration'),
 
     ##########################################
+    # Capacity statistics
+    ##########################################
+    CapacityStat('capacity_bytes_ckpt', 'throttled bytes written for checkpoint'),
+    CapacityStat('capacity_bytes_evict', 'throttled bytes written for eviction'),
+    CapacityStat('capacity_bytes_log', 'throttled bytes written for log'),
+    CapacityStat('capacity_bytes_read', 'throttled bytes read'),
+    CapacityStat('capacity_bytes_written', 'throttled bytes written total'),
+    CapacityStat('capacity_threshold', 'threshold to call fsync'),
+    CapacityStat('capacity_time_ckpt', 'time waiting during checkpoint (usecs)'),
+    CapacityStat('capacity_time_evict', 'time waiting during eviction (usecs)'),
+    CapacityStat('capacity_time_log', 'time waiting during logging (usecs)'),
+    CapacityStat('capacity_time_read', 'time waiting during read (usecs)'),
+    CapacityStat('capacity_time_total', 'time waiting due to total capacity (usecs)'),
+    CapacityStat('fsync_all_fh', 'background fsync file handles synced'),
+    CapacityStat('fsync_all_fh_total', 'background fsync file handles considered'),
+    CapacityStat('fsync_all_time', 'background fsync time (msecs)', 'no_clear,no_scale'),
+
+    ##########################################
     # Cursor operations
     ##########################################
     CursorStat('cursor_open_count', 'open cursor count', 'no_clear,no_scale'),
@@ -333,6 +356,7 @@ connection_stats = [
     # Dhandle statistics
     ##########################################
     DhandleStat('dh_conn_handle_count', 'connection data handles currently active', 'no_clear,no_scale'),
+    DhandleStat('dh_conn_handle_size', 'connection data handle size', 'no_clear,no_scale,size'),
     DhandleStat('dh_session_handles', 'session dhandles swept'),
     DhandleStat('dh_session_sweeps', 'session sweep attempts'),
     DhandleStat('dh_sweep_close', 'connection sweep dhandles closed'),
