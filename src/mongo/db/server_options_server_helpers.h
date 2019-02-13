@@ -36,11 +36,6 @@
 namespace mongo {
 
 /**
- * General server options for most standalone applications. Includes addBaseServerOptions.
- */
-Status addGeneralServerOptions(optionenvironment::OptionSection* options);
-
-/**
  * Handle custom validation of server options that can not currently be done by using
  * Constraints in the Environment.  See the "validate" function in the Environment class for
  * more details.

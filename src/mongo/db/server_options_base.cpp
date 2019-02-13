@@ -32,7 +32,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/server_options_base_gen.h"
+#include "mongo/db/server_options_general_gen.h"
 #include "mongo/logger/log_component.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/startup_option_init.h"
@@ -76,6 +78,17 @@ Status addBaseServerOptions(moe::OptionSection* options) {
     return options->addSection(general_options);
 }
 
+// Proxies call to IDL generated general option registrations,
+// and implicitly includes base options as well.
+Status addGeneralServerOptions(moe::OptionSection* options) {
+    auto status = addGeneralServerOptionDefinitions(options);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return addBaseServerOptions(options);
+}
+
 Status validateSystemLogDestinationSetting(const std::string& value) {
     constexpr auto kSyslog = "syslog"_sd;
     constexpr auto kFile = "file"_sd;
@@ -85,6 +98,39 @@ Status validateSystemLogDestinationSetting(const std::string& value) {
     }
 
     return Status::OK();
+}
+
+Status validateSecurityClusterAuthModeSetting(const std::string& value) {
+    // keyFile|sendKeyFile|sendX509|x509
+    constexpr auto kKeyFile = "keyFile"_sd;
+    constexpr auto kSendKeyFile = "sendKeyFile"_sd;
+    constexpr auto kSendX509 = "sendX509"_sd;
+    constexpr auto kX509 = "X509"_sd;
+
+    if (!kKeyFile.equalCaseInsensitive(value) && !kSendKeyFile.equalCaseInsensitive(value) &&
+        !kSendX509.equalCaseInsensitive(value) && !kX509.equalCaseInsensitive(value)) {
+        return {ErrorCodes::BadValue,
+                "security.clusterAuthMode expects one of 'keyFile', 'sendKeyFile', 'sendX509', or "
+                "'X509'"};
+    }
+
+    return Status::OK();
+}
+
+Status canonicalizeNetBindIpAll(moe::Environment* env) {
+    const bool all = (*env)["net.bindIpAll"].as<bool>();
+    auto status = env->remove("net.bindIpAll");
+    if (!status.isOK()) {
+        return status;
+    }
+    return all ? env->set("net.bindIp", moe::Value("*")) : Status::OK();
+}
+
+std::string getUnixDomainSocketFilePermissionsHelpText() {
+    std::stringstream ss;
+    ss << "Permissions to set on UNIX domain socket file - "
+       << "0" << std::oct << DEFAULT_UNIX_PERMS << " by default";
+    return ss.str();
 }
 
 }  // namespace mongo

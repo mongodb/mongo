@@ -50,6 +50,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/logger/logger.h"
 #include "mongo/unittest/unittest.h"

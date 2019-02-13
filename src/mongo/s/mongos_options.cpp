@@ -41,7 +41,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/util/log.h"
@@ -54,17 +54,6 @@
 namespace mongo {
 
 MongosGlobalParams mongosGlobalParams;
-
-Status addMongosOptions(moe::OptionSection* options) {
-    moe::OptionSection general_options("General options");
-
-    Status ret = addGeneralServerOptions(&general_options);
-    if (!ret.isOK()) {
-        return ret;
-    }
-
-    return options->addSection(general_options);
-}
 
 void printMongosHelp(const moe::OptionSection& options) {
     std::cout << options.helpString() << std::endl;

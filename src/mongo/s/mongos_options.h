@@ -52,8 +52,6 @@ struct MongosGlobalParams {
 
 extern MongosGlobalParams mongosGlobalParams;
 
-Status addMongosOptions(moe::OptionSection* options);
-
 void printMongosHelp(const moe::OptionSection& options);
 
 /**

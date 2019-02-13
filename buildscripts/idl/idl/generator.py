@@ -2056,6 +2056,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 if (opt.positional_start is not None) and (opt.positional_end is not None):
                     self._writer.write_line('.positional(%d, %d)' % (opt.positional_start,
                                                                      opt.positional_end))
+                if opt.canonicalize:
+                    self._writer.write_line('.canonicalize(%s)' % opt.canonicalize)
 
                 if opt.validator:
                     if opt.validator.callback:

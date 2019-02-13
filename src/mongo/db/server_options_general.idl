@@ -1,0 +1,221 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/server_options.h"
+        - "mongo/db/server_options_base.h"
+    configs:
+        section: 'General options'
+        source: [ cli, ini, yaml ]
+        initializer:
+            register: addGeneralServerOptionDefinitions
+
+configs:
+    help:
+        description: 'Show this usage information'
+        single_name: h
+        arg_vartype: Switch
+        source: [ cli, ini ]
+    version:
+        description: 'Show version information'
+        arg_vartype: Switch
+        source: [ cli, ini ]
+    config:
+        description: 'Configuration file specifying additional options'
+        single_name: f
+        arg_vartype: String
+        source: [ cli, ini ]
+    outputConfig:
+        description: 'Display the resolved configuration and exit'
+        arg_vartype: Switch
+        source: cli
+        hidden: true
+    configExpand:
+        description: 'Process expansion directives in config file (none, exec, rest)'
+        arg_vartype: String
+        source: cli
+    configExpandTimeoutSecs:
+        description: >-
+            Maximum number of seconds to wait for a single configuration expansion to resolve
+        arg_vartype: Int
+        source: cli
+        hidden: true
+        default: 30
+
+    'net.bindIp':
+        description: 'Comma separated list of ip addresses to listen on - localhost by default'
+        short_name: bind_ip
+        arg_vartype: String
+    'net.bindIpAll':
+        description: 'Bind to all ip addresses'
+        short_name: bind_ip_all
+        arg_vartype: Switch
+        canonicalize: canonicalizeNetBindIpAll
+    'net.ipv6':
+        description: 'Enable IPv6 support (disabled by default)'
+        short_name: ipv6
+        arg_vartype: Switch
+    'net.listenBacklog':
+        description: 'Set socket listen backlog size'
+        short_name: listenBacklog
+        arg_vartype: Int
+        default: { expr: 'SOMAXCONN' }
+    'net.maxIncomingConnections':
+        description: 'Max number of simultaneous connections'
+        short_name: maxConns
+        arg_vartype: Int
+        default: { expr: 'static_cast<int>(DEFAULT_MAX_CONN)' }
+    'net.maxIncomingConnectionsOverride':
+        description: 'CIDR ranges that do not count towards the maxIncomingConnections limit'
+        arg_vartype: StringVector
+        source: yaml
+        hidden: true
+    'net.reservedAdminThreads':
+        description: 'Number of worker threads to reserve for admin and internal connections'
+        arg_vartype: Int
+        source: yaml
+        hidden: true
+    'net.transportLayer':
+        description: 'Sets the ingress transport layer implementation'
+        short_name: transportLayer
+        arg_vartype: String
+        default: asio
+        hidden: true
+    'net.serviceExecutor':
+        description: 'Sets the service executor implementation'
+        short_name: serviceExecutor
+        arg_vartype: String
+        default: synchronous
+        hidden: true
+    'processManagement.pidFilePath':
+        description: 'Full path to pidfile (if not set, no pidfile is created)'
+        short_name: pidfilepath
+        arg_vartype: String
+    'processManagement.timeZoneInfo':
+        description: 'Full path to time zone info directory, e.g. /usr/share/zoneinfo'
+        short_name: timeZoneInfo
+        arg_vartype: String
+    'security.keyFile':
+        description: 'Private key for cluster authentication'
+        short_name: keyFile
+        arg_vartype: String
+        conflicts: noauth
+    noauth:
+        description: 'Run without security'
+        arg_vartype: Switch
+        source: [ cli, ini ]
+        conflicts:
+            - auth
+            - 'security.keyFile'
+            - 'security.transitionToAuth'
+            - clusterAuthMode
+    'security.transitionToAuth':
+        description: >-
+            For rolling access control upgrade. Attempt to authenticate over outgoing
+            connections and proceed regardless of success. Accept incoming connections
+            with or without authentication.
+        short_name: transitionToAuth
+        arg_vartype: Switch
+        conflicts: noauth
+    'security.clusterAuthMode':
+        description: >-
+            Authentication mode used for cluster authentication. Alternatives are
+            (keyFile|sendKeyFile|sendX509|x509)
+        short_name: clusterAuthMode
+        arg_vartype: String
+        validator:
+            callback: validateSecurityClusterAuthModeSetting
+
+    nounixsocket:
+        description: 'Disable listening on unix sockets'
+        arg_vartype: Switch
+        source: [ cli, ini ]
+        condition:
+            preprocessor: '!defined(_WIN32)'
+    'net.unixDomainSocket.enabled':
+        description: 'Disable listening on unix sockets'
+        arg_vartype: Bool
+        source: yaml
+        condition:
+            preprocessor: '!defined(_WIN32)'
+    'net.unixDomainSocket.pathPrefix':
+        short_name: unixSocketPrefix
+        description: 'Alternative directory for UNIX domain sockets (defaults to /tmp)'
+        arg_vartype: String
+        condition:
+            preprocessor: '!defined(_WIN32)'
+    'net.unixDomainSocket.filePermissions':
+        description:
+            expr: 'getUnixDomainSocketFilePermissionsHelpText()'
+            is_constexpr: false
+        short_name: filePermissions
+        arg_vartype: Int
+        condition:
+            preprocessor: '!defined(_WIN32)'
+    'processManagement.fork':
+        description: 'Fork server process'
+        short_name: fork
+        arg_vartype: Switch
+        condition:
+            preprocessor: '!defined(_WIN32)'
+
+    objcheck:
+        description: 'Inspect client data for validity on receipt (DEFAULT)'
+        arg_vartype: Switch
+        source: [ cli, ini ]
+        conflicts: noobjcheck
+        hidden: true
+    noobjcheck:
+        description: 'Do NOT inspect client data for validity on receipt'
+        arg_vartype: Switch
+        source: [ cli, ini ]
+        conflicts: objcheck
+        hidden: true
+    'net.wireObjectCheck':
+        description: 'Inspect client data for validity on receipt (DEFAULT)'
+        arg_vartype: Bool
+        source: yaml
+        hidden: true
+    enableExperimentalStorageDetailsCmd:
+        description: 'EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on storage.'
+        arg_vartype: Switch
+        source: [ cli, ini ]
+        hidden: true
+    'operationProfiling.slowOpThresholdMs':
+        description: 'Value of slow for profile and console log'
+        short_name: slowms
+        arg_vartype: Int
+        default: 100
+    'operationProfiling.slowOpSampleRate':
+        description: 'Fraction of slow ops to include in the profile and console log'
+        short_name: slowOpSampleRate
+        arg_vartype: Double
+        default: 1.0
+

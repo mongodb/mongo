@@ -637,6 +637,7 @@ def _parse_config_option(ctxt, spec, name, node):
             "default": _RuleDesc('scalar_or_mapping', mapping_parser_func=_parse_expression),
             "implicit": _RuleDesc('scalar_or_mapping', mapping_parser_func=_parse_expression),
             "source": _RuleDesc('scalar_or_sequence'),
+            "canonicalize": _RuleDesc('scalar'),
             "duplicate_behavior": _RuleDesc('scalar'),
             "positional": _RuleDesc('scalar'),
             "validator": _RuleDesc('mapping', mapping_parser_func=_parse_validator),

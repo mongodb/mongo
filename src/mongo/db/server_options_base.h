@@ -35,6 +35,10 @@
 
 namespace mongo {
 
+namespace optionenvironment {
+class Environment;
+}  // namespace optionenvironment
+
 /**
  * Base server options that are available in all applications, standalone and embedded.
  *
@@ -42,6 +46,15 @@ namespace mongo {
  */
 Status addBaseServerOptions(optionenvironment::OptionSection*);
 
+/**
+ * General server options for most standalone applications. Includes addBaseServerOptions.
+ */
+Status addGeneralServerOptions(optionenvironment::OptionSection*);
+
 Status validateSystemLogDestinationSetting(const std::string&);
+Status validateSecurityClusterAuthModeSetting(const std::string&);
+Status canonicalizeNetBindIpAll(optionenvironment::Environment*);
+
+std::string getUnixDomainSocketFilePermissionsHelpText();
 
 }  // namespace mongo

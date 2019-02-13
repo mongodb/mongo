@@ -43,6 +43,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -56,13 +57,12 @@ namespace mongo {
 using std::endl;
 
 Status addMongodOptions(moe::OptionSection* options) {
-    moe::OptionSection general_options("General options");
-
-    Status ret = addGeneralServerOptions(&general_options);
+    Status ret = addGeneralServerOptions(options);
     if (!ret.isOK()) {
         return ret;
     }
 
+    moe::OptionSection general_options("General options");
     moe::OptionSection rs_options("Replica set options");
     moe::OptionSection replication_options("Replication options");
     moe::OptionSection sharding_options("Sharding options");

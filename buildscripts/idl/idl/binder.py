@@ -1085,6 +1085,7 @@ def _bind_config_option(ctxt, globals_spec, option):
     node.conflicts = option.conflicts
     node.hidden = option.hidden
     node.redact = option.redact
+    node.canonicalize = option.canonicalize
 
     if option.default:
         node.default = _bind_expression(option.default)

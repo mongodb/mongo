@@ -584,6 +584,7 @@ class ConfigOption(common.SourceLocation):
         self.default = None  # type: Expression
         self.implicit = None  # type: Expression
         self.source = []  # type: List[unicode]
+        self.canonicalize = None  # type: unicode
 
         self.duplicate_behavior = None  # type: unicode
         self.positional = None  # type unicode
