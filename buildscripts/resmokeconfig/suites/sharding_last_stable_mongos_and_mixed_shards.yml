@@ -38,7 +38,6 @@ selector:
   - jstests/sharding/failcommand_ignores_internal.js
   - jstests/sharding/geo_near_random1.js
   - jstests/sharding/geo_near_random2.js
-  - jstests/sharding/graph_lookup.js
   - jstests/sharding/lookup.js
   - jstests/sharding/lookup_mongod_unaware.js
   - jstests/sharding/lookup_stale_mongos.js
