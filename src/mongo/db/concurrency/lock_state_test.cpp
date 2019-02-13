@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -120,6 +121,34 @@ TEST(LockerImpl, ConflictUpgradeWithTimeout) {
     locker2.unlockGlobal();
 }
 
+TEST(LockerImpl, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediatelyGranted) {
+    // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
+    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    LockerImpl locker1;
+    locker1.lockGlobal(MODE_IX);
+    locker1.lock(resId, MODE_X);
+
+    {
+        FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
+
+        // MODE_S attempt.
+        LockerImpl locker2;
+        locker2.lockGlobal(MODE_IS);
+        ASSERT_THROWS_CODE(
+            locker2.lock(resId, MODE_S, Date_t::max()), DBException, ErrorCodes::LockTimeout);
+        locker2.unlockGlobal();
+
+        // MODE_X attempt.
+        LockerImpl locker3;
+        locker3.lockGlobal(MODE_IX);
+        ASSERT_THROWS_CODE(
+            locker3.lock(resId, MODE_X, Date_t::max()), DBException, ErrorCodes::LockTimeout);
+        locker3.unlockGlobal();
+    }
+
+    locker1.unlockGlobal();
+}
 
 TEST(LockerImpl, ReadTransaction) {
     LockerImpl locker;

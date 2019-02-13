@@ -42,11 +42,15 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(failNonIntentLocksIfWaitNeeded);
+
 namespace {
 
 /**
@@ -473,6 +477,15 @@ void LockerImpl::lock(OperationContext* opCtx, ResourceId resId, LockMode mode, 
         return;
 
     invariant(result == LOCK_WAITING);
+
+    // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
+    // Testing-only.
+    if (MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
+        uassert(ErrorCodes::LockTimeout,
+                str::stream() << "Cannot immediately acquire lock '" << resId.toString()
+                              << "'. Timing out due to failpoint.",
+                (mode == MODE_IS || mode == MODE_IX));
+    }
 
     lockComplete(opCtx, resId, mode, deadline);
 }
