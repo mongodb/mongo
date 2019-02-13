@@ -58,8 +58,12 @@ extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
 /*
  * Given a linearizable read command, confirm that
  * current primary is still the true primary of the replica set.
+ *
+ * A readConcernTimeout of 0 indicates that the operation will block indefinitely waiting for read
+ * concern.
  */
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx)->Status) waitForLinearizableReadConcern;
+extern MONGO_DECLARE_SHIM((OperationContext * opCtx, const int readConcernTimeout)->Status)
+    waitForLinearizableReadConcern;
 
 /**
  * Waits to satisfy a "speculative" majority read.
