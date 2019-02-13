@@ -185,7 +185,20 @@ public:
      * Any callbacks invoked from setAlarm must observe onNetworkThread to
      * return true. See that method for why.
      */
-    virtual Status setAlarm(Date_t when, unique_function<void()> action) = 0;
+    virtual Status setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
+                            Date_t when,
+                            unique_function<void(Status)> action) = 0;
+
+    /**
+     * Requests cancellation of the alarm associated with "cbHandle" if it has not yet completed.
+     */
+    virtual void cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) = 0;
+
+    /**
+     * Schedules the specified action to run as soon as possible on the network interface's
+     * execution resource
+     */
+    virtual Status schedule(unique_function<void(Status)> action) = 0;
 
     /**
      * Returns true if called from a thread dedicated to networking. I.e. not a

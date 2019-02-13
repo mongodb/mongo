@@ -99,6 +99,7 @@ public:
     WorkQueue::iterator iter;
     Date_t readyDate;
     bool isNetworkOperation = false;
+    bool isTimerOperation = false;
     AtomicWord<bool> isFinished{false};
     boost::optional<stdx::condition_variable> finishedCondition;
     BatonHandle baton;
@@ -343,6 +344,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
         return scheduleWork(std::move(work));
     }
     auto wq = makeSingletonWorkQueue(std::move(work), nullptr, when);
+    wq.front()->isTimerOperation = true;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto cbHandle = enqueueCallbackState_inlock(&_sleepersQueue, &wq);
     if (!cbHandle.isOK()) {
@@ -350,17 +352,20 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
     }
     lk.unlock();
 
-    auto status = _net->setAlarm(when, [this, cbHandle] {
-        auto cbState = checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
-        if (cbState->canceled.load()) {
-            return;
-        }
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (cbState->canceled.load()) {
-            return;
-        }
-        scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
-    });
+    auto status = _net->setAlarm(
+        cbHandle.getValue(), when, [ this, cbHandle = cbHandle.getValue() ](Status status) {
+            if (status == ErrorCodes::CallbackCanceled) {
+                return;
+            }
+
+            auto cbState = checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle));
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            if (cbState->canceled.load()) {
+                return;
+            }
+
+            scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
+        });
 
     if (!status.isOK()) {
         cancel(cbHandle.getValue());
@@ -489,6 +494,11 @@ void ThreadPoolTaskExecutor::cancel(const CallbackHandle& cbHandle) {
         lk.unlock();
         _net->cancelCommand(cbHandle, cbState->baton);
         return;
+    }
+    if (cbState->isTimerOperation) {
+        lk.unlock();
+        _net->cancelAlarm(cbHandle);
+        lk.lock();
     }
     if (cbState->readyDate != Date_t{}) {
         // This callback might still be in the sleeper queue; if it is, schedule it now

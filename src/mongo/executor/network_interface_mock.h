@@ -124,10 +124,13 @@ public:
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                        const BatonHandle& baton = nullptr) override;
 
-    /**
-     * Not implemented.
-     */
-    Status setAlarm(Date_t when, unique_function<void()> action) override;
+    Status setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
+                    Date_t when,
+                    unique_function<void(Status)> action) override;
+
+    void cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) override;
+
+    Status schedule(unique_function<void(Status)> action) override;
 
     bool onNetworkThread() override;
 
@@ -288,13 +291,14 @@ private:
      * Information describing a scheduled alarm.
      */
     struct AlarmInfo {
-        using AlarmAction = unique_function<void()>;
-        AlarmInfo(Date_t inWhen, AlarmAction inAction)
-            : when(inWhen), action(std::move(inAction)) {}
+        using AlarmAction = unique_function<void(Status)>;
+        AlarmInfo(TaskExecutor::CallbackHandle inHandle, Date_t inWhen, AlarmAction inAction)
+            : handle(inHandle), when(inWhen), action(std::move(inAction)) {}
         bool operator>(const AlarmInfo& rhs) const {
             return when > rhs.when;
         }
 
+        TaskExecutor::CallbackHandle handle;
         Date_t when;
         mutable AlarmAction action;
     };
@@ -404,6 +408,9 @@ private:
 
     // Heap of alarms, with the next alarm always on top.
     std::priority_queue<AlarmInfo, std::vector<AlarmInfo>, std::greater<AlarmInfo>> _alarms;  // (M)
+
+    // A set of CallbackHandles for canceled alarms
+    stdx::unordered_set<TaskExecutor::CallbackHandle> _canceledAlarms;  // (M^:)
 
     // The connection hook.
     std::unique_ptr<NetworkConnectionHook> _hook;  // (R)
@@ -551,7 +558,9 @@ public:
         return _net->now();
     }
     Status setAlarm(Date_t when, unique_function<void()> action) override {
-        return _net->setAlarm(when, std::move(action));
+        return _net->setAlarm(TaskExecutor::CallbackHandle(),
+                              when,
+                              [action = std::move(action)](Status) { action(); });
     }
 
 private:

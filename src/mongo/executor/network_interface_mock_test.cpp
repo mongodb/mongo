@@ -376,6 +376,44 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookHandleReplyFails) {
     ASSERT(errorPropagated);
 }
 
+TEST_F(NetworkInterfaceMockTest, SetAlarmFires) {
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb{};
+    bool alarmHasFired = false;
+
+    const auto deadline = net().now() + Milliseconds(100);
+    ASSERT_OK(net().setAlarm(cb, deadline, [&](Status) { alarmHasFired = true; }));
+    ASSERT_FALSE(alarmHasFired);
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(&net());
+
+        net().advanceTime(deadline);
+        ASSERT_TRUE(alarmHasFired);
+    }
+}
+
+TEST_F(NetworkInterfaceMockTest, SetAlarmCanceled) {
+    startNetwork();
+
+    TaskExecutor::CallbackHandle cb{};
+    bool alarmHasFired = false;
+
+    const auto deadline = net().now() + Milliseconds(100);
+    ASSERT_OK(net().setAlarm(cb, deadline, [&](Status) { alarmHasFired = true; }));
+    ASSERT_FALSE(alarmHasFired);
+
+    net().cancelAlarm(cb);
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(&net());
+
+        net().advanceTime(deadline);
+        ASSERT_FALSE(alarmHasFired);
+    }
+}
+
 TEST_F(NetworkInterfaceMockTest, InShutdown) {
     startNetwork();
     ASSERT_FALSE(net().inShutdown());
@@ -395,7 +433,8 @@ TEST_F(NetworkInterfaceMockTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
 TEST_F(NetworkInterfaceMockTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
     startNetwork();
     tearDown();
-    ASSERT_NOT_OK(net().setAlarm(net().now() + Milliseconds(100), [] {}));
+    ASSERT_NOT_OK(net().setAlarm(
+        TaskExecutor::CallbackHandle(), net().now() + Milliseconds(100), [](Status) {}));
 }
 
 TEST_F(NetworkInterfaceMockTest, CommandTimeout) {

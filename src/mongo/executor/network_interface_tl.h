@@ -71,7 +71,13 @@ public:
 
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                        const BatonHandle& baton) override;
-    Status setAlarm(Date_t when, unique_function<void()> action) override;
+    Status setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
+                    Date_t when,
+                    unique_function<void(Status)> action) override;
+
+    Status schedule(unique_function<void(Status)> action) override;
+
+    void cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) override;
 
     bool onNetworkThread() override;
 
@@ -108,6 +114,26 @@ private:
         Promise<RemoteCommandResponse> promise;
     };
 
+    struct AlarmState {
+        AlarmState(Date_t when_,
+                   TaskExecutor::CallbackHandle cbHandle_,
+                   std::unique_ptr<transport::ReactorTimer> timer_,
+                   Promise<void> promise_)
+            : cbHandle(std::move(cbHandle_)),
+              when(when_),
+              timer(std::move(timer_)),
+              promise(std::move(promise_)) {}
+
+        TaskExecutor::CallbackHandle cbHandle;
+        Date_t when;
+        std::unique_ptr<transport::ReactorTimer> timer;
+
+        Promise<void> promise;
+    };
+
+    void _cancelAllAlarms();
+    void _answerAlarm(Status status, std::shared_ptr<AlarmState> state);
+
     void _run();
     void _eraseInUseConn(const TaskExecutor::CallbackHandle& handle);
     Future<RemoteCommandResponse> _onAcquireConn(std::shared_ptr<CommandState> state,
@@ -134,7 +160,8 @@ private:
 
     stdx::mutex _inProgressMutex;
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::shared_ptr<CommandState>> _inProgress;
-    stdx::unordered_set<std::shared_ptr<transport::ReactorTimer>> _inProgressAlarms;
+    stdx::unordered_map<TaskExecutor::CallbackHandle, std::shared_ptr<AlarmState>>
+        _inProgressAlarms;
 
     stdx::condition_variable _workReadyCond;
     bool _isExecutorRunnable = false;

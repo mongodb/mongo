@@ -322,14 +322,18 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
     Date_t expiration = net().now() + Milliseconds(100);
     auto makeTimerFuture = [&] {
         auto pf = makePromiseFuture<Date_t>();
-        return std::make_pair([ this, promise = std::move(pf.promise) ]() mutable {
-            promise.emplaceValue(net().now());
+        return std::make_pair([ this, promise = std::move(pf.promise) ](Status status) mutable {
+            if (status.isOK()) {
+                promise.emplaceValue(net().now());
+            } else {
+                promise.setError(status);
+            }
         },
                               std::move(pf.future));
     };
 
     auto futurePair = makeTimerFuture();
-    ASSERT_OK(net().setAlarm(expiration, std::move(futurePair.first)));
+    ASSERT_OK(net().setAlarm(makeCallbackHandle(), expiration, std::move(futurePair.first)));
 
     // assert that it executed after "expiration"
     auto& result = futurePair.second.get();
@@ -337,10 +341,11 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
 
     expiration = net().now() + Milliseconds(99999999);
     auto futurePair2 = makeTimerFuture();
-    ASSERT_OK(net().setAlarm(expiration, std::move(futurePair2.first)));
+    ASSERT_OK(net().setAlarm(makeCallbackHandle(), expiration, std::move(futurePair2.first)));
 
     net().shutdown();
-    ASSERT_TRUE(!futurePair2.second.isReady());
+    auto swResult = futurePair2.second.getNoThrow();
+    ASSERT_FALSE(swResult.isOK());
 }
 
 TEST_F(NetworkInterfaceTest, IsMasterRequestContainsOutgoingWireVersionInternalClientInfo) {

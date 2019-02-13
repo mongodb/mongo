@@ -169,7 +169,9 @@ void NetworkInterfaceMock::_interruptWithResponse_inlock(
     }
 }
 
-Status NetworkInterfaceMock::setAlarm(const Date_t when, unique_function<void()> action) {
+Status NetworkInterfaceMock::setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
+                                      const Date_t when,
+                                      unique_function<void(Status)> action) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
     }
@@ -178,11 +180,25 @@ Status NetworkInterfaceMock::setAlarm(const Date_t when, unique_function<void()>
 
     if (when <= _now_inlock()) {
         lk.unlock();
-        action();
+        action(Status::OK());
         return Status::OK();
     }
-    _alarms.emplace(when, std::move(action));
+    _alarms.emplace(cbHandle, when, std::move(action));
 
+    return Status::OK();
+}
+
+void NetworkInterfaceMock::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) {
+    // Alarms live in a priority queue, so removing them isn't worth it
+    // Thus we add the handle to a map and check at fire time
+    _canceledAlarms.insert(cbHandle);
+}
+
+Status NetworkInterfaceMock::schedule(unique_function<void(Status)> action) {
+    // Call the task immediately, we have no out-of-line executor
+    action(Status::OK());
+
+    // Say we scheduled the task fine, because we ran it inline
     return Status::OK();
 }
 
@@ -468,12 +484,12 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(
         ResponseStatus rs(
             ErrorCodes::NetworkInterfaceExceededTimeLimit, "Network timeout", Milliseconds(0));
         std::vector<NetworkOperationList*> queuesToCheck{&_unscheduled, &_blackHoled, &_scheduled};
-        _alarms.emplace(_now_inlock() + timeout, [
+        _alarms.emplace(cbh, _now_inlock() + timeout, [
             this,
             cbh = std::move(cbh),
             queuesToCheck = std::move(queuesToCheck),
             rs = std::move(rs)
-        ] { _interruptWithResponse_inlock(cbh, queuesToCheck, rs); });
+        ](Status) { _interruptWithResponse_inlock(cbh, queuesToCheck, rs); });
     }
 }
 
@@ -568,11 +584,19 @@ void NetworkInterfaceMock::signalWorkAvailable() {
 
 void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>* lk) {
     while (!_alarms.empty() && _now_inlock() >= _alarms.top().when) {
-        auto fn = std::move(_alarms.top().action);
+        auto& alarm = _alarms.top();
+
+        // If the handle isn't cancelled, then run it
+        auto iter = _canceledAlarms.find(alarm.handle);
+        if (iter == _canceledAlarms.end()) {
+            lk->unlock();
+            alarm.action(Status::OK());
+            lk->lock();
+        } else {
+            _canceledAlarms.erase(iter);
+        }
+
         _alarms.pop();
-        lk->unlock();
-        fn();
-        lk->lock();
     }
     while (!_scheduled.empty() && _scheduled.front().getResponseDate() <= _now_inlock()) {
         invariant(_currentlyRunning == kNetworkThread);

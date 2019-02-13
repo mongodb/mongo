@@ -44,10 +44,10 @@ namespace executor {
 NetworkInterfaceThreadPool::NetworkInterfaceThreadPool(NetworkInterface* net) : _net(net) {}
 
 NetworkInterfaceThreadPool::~NetworkInterfaceThreadPool() {
-    DESTRUCTOR_GUARD(dtorImpl());
+    DESTRUCTOR_GUARD(_dtorImpl());
 }
 
-void NetworkInterfaceThreadPool::dtorImpl() {
+void NetworkInterfaceThreadPool::_dtorImpl() {
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -70,7 +70,7 @@ void NetworkInterfaceThreadPool::startup() {
     }
     _started = true;
 
-    consumeTasks(std::move(lk));
+    _consumeTasks(std::move(lk));
 }
 
 void NetworkInterfaceThreadPool::shutdown() {
@@ -94,13 +94,15 @@ void NetworkInterfaceThreadPool::join() {
         _joining = true;
         _started = true;
 
-        consumeTasks(std::move(lk));
+        if (_consumeState == ConsumeState::kNeutral)
+            _consumeTasksInline(std::move(lk));
     }
 
     _net->signalWorkAvailable();
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _joiningCondition.wait(lk, [&] { return _tasks.empty() && (!_consumingTasks); });
+    _joiningCondition.wait(
+        lk, [&] { return _tasks.empty() && (_consumeState == ConsumeState::kNeutral); });
 }
 
 Status NetworkInterfaceThreadPool::schedule(Task task) {
@@ -111,7 +113,7 @@ Status NetworkInterfaceThreadPool::schedule(Task task) {
     _tasks.emplace_back(std::move(task));
 
     if (_started)
-        consumeTasks(std::move(lk));
+        _consumeTasks(std::move(lk));
 
     return Status::OK();
 }
@@ -119,34 +121,36 @@ Status NetworkInterfaceThreadPool::schedule(Task task) {
 /**
  * Consumes available tasks.
  *
- * We distinguish between calls to consume on the networking thread and off of
- * it. For off thread calls, we try to initiate a consume via setAlarm, while on
- * it we invoke directly. This allows us to use the network interface's threads
- * as our own pool, which should reduce context switches if our tasks are
- * getting scheduled by network interface tasks.
+ * We distinguish between calls to consume on the networking thread and off of it. For off thread
+ * calls, we try to initiate a consume via schedule and invoke directly inside the executor. This
+ * allows us to use the network interface's threads as our own pool, which should reduce context
+ * switches if our tasks are getting scheduled by network interface tasks.
  */
-void NetworkInterfaceThreadPool::consumeTasks(stdx::unique_lock<stdx::mutex> lk) {
-    if (_consumingTasks || _tasks.empty())
+void NetworkInterfaceThreadPool::_consumeTasks(stdx::unique_lock<stdx::mutex> lk) {
+    if ((_consumeState != ConsumeState::kNeutral) || _tasks.empty())
         return;
 
-    if (!(_inShutdown || _net->onNetworkThread())) {
-        if (!_registeredAlarm) {
-            _registeredAlarm = true;
-            lk.unlock();
-            _net->setAlarm(_net->now(),
-                           [this] {
-                               stdx::unique_lock<stdx::mutex> lk(_mutex);
-                               _registeredAlarm = false;
-                               consumeTasks(std::move(lk));
-                           })
-                .transitional_ignore();
-        }
-
+    auto shouldNotSchedule = _inShutdown || _net->onNetworkThread();
+    if (shouldNotSchedule) {
+        _consumeTasksInline(std::move(lk));
         return;
     }
 
-    _consumingTasks = true;
-    const auto consumingTasksGuard = makeGuard([&] { _consumingTasks = false; });
+    _consumeState = ConsumeState::kScheduled;
+    lk.unlock();
+    auto ret = _net->schedule([this](Status status) {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+        if (_consumeState != ConsumeState::kScheduled)
+            return;
+        _consumeTasksInline(std::move(lk));
+    });
+    invariant(ret.isOK() || ErrorCodes::isShutdownError(ret.code()));
+}
+
+void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<stdx::mutex> lk) {
+    _consumeState = ConsumeState::kConsuming;
+    const auto consumingTasksGuard = makeGuard([&] { _consumeState = ConsumeState::kNeutral; });
 
     decltype(_tasks) tasks;
 

@@ -132,6 +132,8 @@ void NetworkInterfaceTL::shutdown() {
     // Stop the reactor/thread first so that nothing runs on a partially dtor'd pool.
     _reactor->stop();
 
+    _cancelAllAlarms();
+
     _ioThread.join();
 }
 
@@ -449,53 +451,125 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
     }
 }
 
-Status NetworkInterfaceTL::setAlarm(Date_t when, unique_function<void()> action) {
+Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {
+    if (inShutdown()) {
+        return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
+    }
+
+    _reactor->schedule([action = std::move(action)]() { action(Status::OK()); });
+    return Status::OK();
+}
+
+Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
+                                    Date_t when,
+                                    unique_function<void(Status)> action) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
 
     if (when <= now()) {
-        _reactor->schedule(std::move(action));
+        _reactor->schedule([action = std::move(action)]()->void { action(Status::OK()); });
         return Status::OK();
     }
 
-    std::shared_ptr<transport::ReactorTimer> alarmTimer = _reactor->makeTimer();
-    std::weak_ptr<transport::ReactorTimer> weakTimer = alarmTimer;
+    auto pf = makePromiseFuture<void>();
+    std::move(pf.future).getAsync(std::move(action));
+
+    auto alarmState =
+        std::make_shared<AlarmState>(when, cbHandle, _reactor->makeTimer(), std::move(pf.promise));
+
     {
-        // We do this so that the lifetime of the alarmTimers is the lifetime of the NITL.
         stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-        _inProgressAlarms.insert(alarmTimer);
+
+        // If a user has already scheduled an alarm with a handle, make sure they intentionally
+        // override it by canceling and setting a new one.
+        auto alarmPair = std::make_pair(cbHandle, std::shared_ptr<AlarmState>(alarmState));
+        auto && [ _, wasInserted ] = _inProgressAlarms.insert(std::move(alarmPair));
+        invariant(wasInserted);
     }
 
-    alarmTimer->waitUntil(when, nullptr)
-        .getAsync([ this, weakTimer, action = std::move(action), when ](Status status) mutable {
-            auto alarmTimer = weakTimer.lock();
-            if (!alarmTimer) {
-                return;
-            } else {
-                stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-                _inProgressAlarms.erase(alarmTimer);
-            }
+    alarmState->timer->waitUntil(alarmState->when, nullptr).getAsync([
+        this,
+        state = std::move(alarmState)
+    ](Status status) mutable { _answerAlarm(status, state); });
 
-            auto nowVal = now();
-            if (nowVal < when) {
-                warning() << "Alarm returned early. Expected at: " << when
-                          << ", fired at: " << nowVal;
-                if (const auto alarmStatus = setAlarm(when, std::move(action));
-                    (!alarmStatus.isOK()) && (alarmStatus != ErrorCodes::ShutdownInProgress)) {
-                    fassertFailedWithStatus(50785, alarmStatus);
-                }
-
-                return;
-            }
-
-            if (status.isOK()) {
-                _reactor->schedule(std::move(action));
-            } else if (status != ErrorCodes::CallbackCanceled) {
-                warning() << "setAlarm() received an error: " << status;
-            }
-        });
     return Status::OK();
+}
+
+void NetworkInterfaceTL::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) {
+    stdx::unique_lock<stdx::mutex> lk(_inProgressMutex);
+
+    auto iter = _inProgressAlarms.find(cbHandle);
+
+    if (iter == _inProgressAlarms.end()) {
+        return;
+    }
+
+    auto alarmState = std::move(iter->second);
+
+    _inProgressAlarms.erase(iter);
+
+    lk.unlock();
+
+    alarmState->timer->cancel();
+    alarmState->promise.setError(Status(ErrorCodes::CallbackCanceled, "Alarm cancelled"));
+}
+
+void NetworkInterfaceTL::_cancelAllAlarms() {
+    auto alarms = [&] {
+        stdx::unique_lock<stdx::mutex> lk(_inProgressMutex);
+        return std::exchange(_inProgressAlarms, {});
+    }();
+
+    for (auto && [ cbHandle, state ] : alarms) {
+        state->timer->cancel();
+        state->promise.setError(Status(ErrorCodes::CallbackCanceled, "Alarm cancelled"));
+    }
+}
+
+void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState> state) {
+    // Since the lock is released before canceling the timer, this thread can win the race with
+    // cancelAlarm(). Thus if status is CallbackCanceled, then this alarm is already removed from
+    // _inProgressAlarms.
+    if (status == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+
+    // transport::Reactor timers do not involve spurious wake ups, however, this check is nearly
+    // free and allows us to be resilient to a world where timers impls do have spurious wake ups.
+    auto currentTime = now();
+    if (status.isOK() && currentTime < state->when) {
+        LOG(2) << "Alarm returned early. Expected at: " << state->when
+               << ", fired at: " << currentTime;
+        state->timer->waitUntil(state->when, nullptr).getAsync([
+            this,
+            state = std::move(state)
+        ](Status status) mutable { _answerAlarm(status, state); });
+        return;
+    }
+
+    // Erase the AlarmState from the map.
+    {
+        stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+
+        auto iter = _inProgressAlarms.find(state->cbHandle);
+        if (iter == _inProgressAlarms.end()) {
+            return;
+        }
+
+        _inProgressAlarms.erase(iter);
+    }
+
+    // A not OK status here means the timer experienced a system error.
+    // It is not reasonable to complete the promise on a reactor thread because there is likely no
+    // properly functioning reactor.
+    if (!status.isOK()) {
+        state->promise.setError(status);
+        return;
+    }
+
+    // Fulfill the promise on a reactor thread
+    _reactor->schedule([state = std::move(state)]() { state->promise.emplaceValue(); });
 }
 
 bool NetworkInterfaceTL::onNetworkThread() {
