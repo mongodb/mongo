@@ -103,27 +103,48 @@ public:
     bool transactionPrepared = false;
     stdx::function<void()> onTransactionPrepareFn = [this]() { transactionPrepared = true; };
 
-    void onTransactionCommit(OperationContext* opCtx,
-                             boost::optional<OplogSlot> commitOplogEntryOpTime,
-                             boost::optional<Timestamp> commitTimestamp,
-                             std::vector<repl::ReplOperation>& statements) override {
+    void onUnpreparedTransactionCommit(
+        OperationContext* opCtx, const std::vector<repl::ReplOperation>& statements) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-        OpObserverNoop::onTransactionCommit(
+        OpObserverNoop::onUnpreparedTransactionCommit(opCtx, statements);
+
+        uassert(ErrorCodes::OperationFailed,
+                "onUnpreparedTransactionCommit() failed",
+                !onUnpreparedTransactionCommitThrowsException);
+
+        onUnpreparedTransactionCommitFn();
+    }
+
+    bool onUnpreparedTransactionCommitThrowsException = false;
+    bool unpreparedTransactionCommitted = false;
+
+    stdx::function<void()> onUnpreparedTransactionCommitFn = [this]() {
+        unpreparedTransactionCommitted = true;
+    };
+
+
+    void onPreparedTransactionCommit(
+        OperationContext* opCtx,
+        OplogSlot commitOplogEntryOpTime,
+        Timestamp commitTimestamp,
+        const std::vector<repl::ReplOperation>& statements) noexcept override {
+        ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
+        OpObserverNoop::onPreparedTransactionCommit(
             opCtx, commitOplogEntryOpTime, commitTimestamp, statements);
 
         uassert(ErrorCodes::OperationFailed,
-                "onTransactionCommit() failed",
-                !onTransactionCommitThrowsException);
+                "onPreparedTransactionCommit() failed",
+                !onPreparedTransactionCommitThrowsException);
 
-        onTransactionCommitFn(commitOplogEntryOpTime, commitTimestamp);
+        onPreparedTransactionCommitFn(commitOplogEntryOpTime, commitTimestamp);
     }
 
-    bool onTransactionCommitThrowsException = false;
-    bool transactionCommitted = false;
-    stdx::function<void(boost::optional<OplogSlot>, boost::optional<Timestamp>)>
-        onTransactionCommitFn =
-            [this](boost::optional<OplogSlot> commitOplogEntryOpTime,
-                   boost::optional<Timestamp> commitTimestamp) { transactionCommitted = true; };
+    bool onPreparedTransactionCommitThrowsException = false;
+    bool preparedTransactionCommitted = false;
+    stdx::function<void(OplogSlot, Timestamp)> onPreparedTransactionCommitFn =
+        [this](OplogSlot commitOplogEntryOpTime, Timestamp commitTimestamp) {
+            preparedTransactionCommitted = true;
+        };
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,

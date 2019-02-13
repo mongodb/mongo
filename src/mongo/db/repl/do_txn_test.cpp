@@ -52,6 +52,13 @@ namespace mongo {
 namespace repl {
 namespace {
 
+boost::optional<OplogEntry> onAllTransactionCommit(OperationContext* opCtx) {
+    OplogInterfaceLocal oplogInterface(opCtx, NamespaceString::kRsOplogNamespace.ns());
+    auto oplogIter = oplogInterface.makeIterator();
+    auto opEntry = unittest::assertGet(oplogIter->next());
+    return unittest::assertGet(OplogEntry::parse(opEntry.first));
+}
+
 /**
  * Mock OpObserver that tracks doTxn commit events.
  */
@@ -60,27 +67,36 @@ public:
     /**
      * Called by doTxn() when ops are ready to commit.
      */
-    void onTransactionCommit(OperationContext* opCtx,
-                             boost::optional<OplogSlot> commitOplogEntryOpTime,
-                             boost::optional<Timestamp> commitTimestamp,
-                             std::vector<repl::ReplOperation>& statements) override;
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const std::vector<repl::ReplOperation>& statements) override;
+
+
+    /**
+     * Called by doTxn() when ops are ready to commit.
+     */
+    void onPreparedTransactionCommit(
+        OperationContext* opCtx,
+        OplogSlot commitOplogEntryOpTime,
+        Timestamp commitTimestamp,
+        const std::vector<repl::ReplOperation>& statements) noexcept override;
 
     // If present, holds the applyOps oplog entry written out by the ObObserverImpl
-    // onTransactionCommit.
+    // onPreparedTransactionCommit or onUnpreparedTransactionCommit.
     boost::optional<OplogEntry> applyOpsOplogEntry;
 };
 
-void OpObserverMock::onTransactionCommit(OperationContext* opCtx,
-                                         boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                         boost::optional<Timestamp> commitTimestamp,
-                                         std::vector<repl::ReplOperation>& statements) {
-    ASSERT(!commitOplogEntryOpTime) << commitOplogEntryOpTime->opTime;
-    ASSERT(!commitTimestamp) << *commitTimestamp;
+void OpObserverMock::onUnpreparedTransactionCommit(
+    OperationContext* opCtx, const std::vector<repl::ReplOperation>& statements) {
 
-    OplogInterfaceLocal oplogInterface(opCtx, NamespaceString::kRsOplogNamespace.ns());
-    auto oplogIter = oplogInterface.makeIterator();
-    auto opEntry = unittest::assertGet(oplogIter->next());
-    applyOpsOplogEntry = unittest::assertGet(OplogEntry::parse(opEntry.first));
+    applyOpsOplogEntry = onAllTransactionCommit(opCtx);
+}
+
+void OpObserverMock::onPreparedTransactionCommit(
+    OperationContext* opCtx,
+    OplogSlot commitOplogEntryOpTime,
+    Timestamp commitTimestamp,
+    const std::vector<repl::ReplOperation>& statements) noexcept {
+    applyOpsOplogEntry = onAllTransactionCommit(opCtx);
 }
 
 /**

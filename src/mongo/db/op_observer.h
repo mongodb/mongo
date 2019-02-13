@@ -279,20 +279,31 @@ public:
     virtual void onEmptyCapped(OperationContext* opCtx,
                                const NamespaceString& collectionName,
                                OptionalCollectionUUID uuid) = 0;
+
     /**
-     * The onTransactionCommit method is called on the commit of an atomic transaction, before the
-     * RecoveryUnit onCommit() is called.  It must not be called when no transaction is active.
-     *
-     * If the transaction was prepared, then 'commitOplogEntryOpTime' is passed in to be used as the
-     * OpTime of the oplog entry. The 'commitTimestamp' is the timestamp at which the multi-document
-     * transaction was committed. Either these fields should both be 'none' or neither should.
+     * The onUnpreparedTransactionCommit method is called on the commit of an unprepared
+     * transaction, before the RecoveryUnit onCommit() is called.  It must not be called when no
+     * transaction is active.
      *
      * The 'statements' are the list of CRUD operations to be applied in this transaction.
      */
-    virtual void onTransactionCommit(OperationContext* opCtx,
-                                     boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                     boost::optional<Timestamp> commitTimestamp,
-                                     std::vector<repl::ReplOperation>& statements) = 0;
+    virtual void onUnpreparedTransactionCommit(
+        OperationContext* opCtx, const std::vector<repl::ReplOperation>& statements) = 0;
+    /**
+     * The onPreparedTransactionCommit method is called on the commit of a prepared transaction,
+     * after the RecoveryUnit onCommit() is called.  It must not be called when no transaction is
+     * active.
+     *
+     * The 'commitOplogEntryOpTime' is passed in to be used as the OpTime of the oplog entry. The
+     * 'commitTimestamp' is the timestamp at which the multi-document transaction was committed.
+     *
+     * The 'statements' are the list of CRUD operations to be applied in this transaction.
+     */
+    virtual void onPreparedTransactionCommit(
+        OperationContext* opCtx,
+        OplogSlot commitOplogEntryOpTime,
+        Timestamp commitTimestamp,
+        const std::vector<repl::ReplOperation>& statements) noexcept = 0;
 
     /**
      * The onTransactionPrepare method is called when an atomic transaction is prepared. It must be

@@ -137,10 +137,13 @@ public:
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
                        OptionalCollectionUUID uuid);
-    void onTransactionCommit(OperationContext* opCtx,
-                             boost::optional<OplogSlot> commitOplogEntryOpTime,
-                             boost::optional<Timestamp> commitTimestamp,
-                             std::vector<repl::ReplOperation>& statements) final;
+    void onUnpreparedTransactionCommit(OperationContext* opCtx,
+                                       const std::vector<repl::ReplOperation>& statements) final;
+    void onPreparedTransactionCommit(
+        OperationContext* opCtx,
+        OplogSlot commitOplogEntryOpTime,
+        Timestamp commitTimestamp,
+        const std::vector<repl::ReplOperation>& statements) noexcept final;
     void onTransactionPrepare(OperationContext* opCtx,
                               const OplogSlot& prepareOpTime,
                               std::vector<repl::ReplOperation>& statments) final;

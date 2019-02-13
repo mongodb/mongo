@@ -1049,8 +1049,7 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
-    opObserver->onTransactionCommit(
-        opCtx, boost::none, boost::none, retrieveCompletedTransactionOperations(opCtx));
+    opObserver->onUnpreparedTransactionCommit(opCtx, retrieveCompletedTransactionOperations(opCtx));
     clearOperationsInMemory(opCtx);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1129,7 +1128,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         invariant(opObserver);
 
         // Once the transaction is committed, the oplog entry must be written.
-        opObserver->onTransactionCommit(
+        opObserver->onPreparedTransactionCommit(
             opCtx, commitOplogSlot, commitTimestamp, retrieveCompletedTransactionOperations(opCtx));
 
         clearOperationsInMemory(opCtx);

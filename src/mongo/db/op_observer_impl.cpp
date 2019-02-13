@@ -1096,36 +1096,40 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
 }  //  namespace
 
-void OpObserverImpl::onTransactionCommit(OperationContext* opCtx,
-                                         boost::optional<OplogSlot> commitOplogEntryOpTime,
-                                         boost::optional<Timestamp> commitTimestamp,
-                                         std::vector<repl::ReplOperation>& statements) {
+void OpObserverImpl::onUnpreparedTransactionCommit(
+    OperationContext* opCtx, const std::vector<repl::ReplOperation>& statements) {
     invariant(opCtx->getTxnNumber());
 
     if (!opCtx->writesAreReplicated()) {
         return;
     }
 
-    if (commitOplogEntryOpTime) {
-        invariant(commitTimestamp);
-        invariant(!commitTimestamp->isNull());
+    // It is possible that the transaction resulted in no changes.  In that case, we should
+    // not write an empty applyOps entry.
+    if (statements.empty())
+        return;
 
-        CommitTransactionOplogObject cmdObj;
-        cmdObj.setCommitTimestamp(*commitTimestamp);
-        logCommitOrAbortForPreparedTransaction(
-            opCtx, *commitOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kCommitted);
-    } else {
-        invariant(!commitTimestamp);
+    const auto commitOpTime = logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
+    invariant(!commitOpTime.isNull());
+}
 
-        // It is possible that the transaction resulted in no changes.  In that case, we should
-        // not write an empty applyOps entry.
-        if (statements.empty())
-            return;
+void OpObserverImpl::onPreparedTransactionCommit(
+    OperationContext* opCtx,
+    OplogSlot commitOplogEntryOpTime,
+    Timestamp commitTimestamp,
+    const std::vector<repl::ReplOperation>& statements) noexcept {
+    invariant(opCtx->getTxnNumber());
 
-        const auto commitOpTime =
-            logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
-        invariant(!commitOpTime.isNull());
+    if (!opCtx->writesAreReplicated()) {
+        return;
     }
+
+    invariant(!commitTimestamp.isNull());
+
+    CommitTransactionOplogObject cmdObj;
+    cmdObj.setCommitTimestamp(commitTimestamp);
+    logCommitOrAbortForPreparedTransaction(
+        opCtx, commitOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kCommitted);
 }
 
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
