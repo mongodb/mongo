@@ -1,5 +1,5 @@
 // Test basic multi-statement transaction abort.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_snapshot_read_concern]
 (function() {
     "use strict";
 

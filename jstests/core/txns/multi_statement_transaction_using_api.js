@@ -1,5 +1,5 @@
 // Test basic transaction write ops, reads, and commit/abort using the shell helper.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_snapshot_read_concern]
 (function() {
     "use strict";
 

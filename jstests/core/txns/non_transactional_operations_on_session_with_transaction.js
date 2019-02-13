@@ -3,7 +3,7 @@
  * are non-transactional, and do not see or affect any transaction state. This test avoids using
  * shell helpers to not inherit transaction state.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_snapshot_read_concern]
  */
 
 (function() {

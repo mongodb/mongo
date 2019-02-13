@@ -1,5 +1,5 @@
 // Test parsing of readConcern level 'snapshot' on mongos.
-// @tags: [requires_replication,requires_sharding, uses_transactions]
+// @tags: [requires_replication,requires_sharding, uses_transactions, uses_atclustertime]
 (function() {
     "use strict";
 

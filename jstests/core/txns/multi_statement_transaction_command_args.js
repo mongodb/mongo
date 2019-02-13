@@ -1,7 +1,7 @@
 /**
  * Verify that multi-statement transaction command arguments behave correctly.
  *
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_snapshot_read_concern]
  */
 
 (function() {

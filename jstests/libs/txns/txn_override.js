@@ -55,11 +55,12 @@
     // the entire transaction. For help with debugging.
     let transientErrorToLog;
 
-    // Default read concern level to use for transactions.
+    // Default read concern level to use for transactions. Snapshot read concern is not supported in
+    // sharded transactions when majority reads are disabled.
     const kDefaultTransactionReadConcernLevel =
         TestData.hasOwnProperty("defaultTransactionReadConcernLevel")
         ? TestData.defaultTransactionReadConcernLevel
-        : "snapshot";
+        : (TestData.enableMajorityReadConcern !== false ? "snapshot" : "local");
 
     const kDefaultTransactionWriteConcernW =
         TestData.hasOwnProperty("defaultTransactionWriteConcernW")

@@ -5615,6 +5615,14 @@ tasks:
       resmoke_args: --suites=sharded_jscore_txns --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: sharded_jscore_txns_without_snapshot
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharded_jscore_txns --storageEngine=wiredTiger --excludeWithAnyTags=uses_snapshot_read_concern
+
+- <<: *task_template
   name: sharded_jscore_txns_sharded_collections
   commands:
   - func: "do setup"
@@ -5636,6 +5644,15 @@ tasks:
     vars:
       task: sharded_causally_consistent_jscore_txns_passthrough
       resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
+
+- name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot
+      suite: sharded_causally_consistent_jscore_txns_passthrough
+      resmoke_args: --storageEngine=wiredTiger --excludeWithAnyTags=uses_snapshot_read_concern
       fallback_num_sub_suites: 1
 
 - <<: *task_template
@@ -10685,7 +10702,7 @@ buildvariants:
     # enableMajorityReadConcern:"false" (SERVER-37559).
     test_flags: >-
       --majorityReadConcern=off
-      --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction
+      --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction,uses_atclustertime
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
@@ -10829,8 +10846,11 @@ buildvariants:
   - name: sasl
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
-  - name: sharded_causally_consistent_jscore_txns_passthrough_gen
-  - name: sharded_jscore_txns
+  # Sharded transactions suites exclude tests that use snapshot read concern, since snapshot read
+  # concern uses 'atClusterTime' in sharded clusters, and this is not supported with
+  # enableMajorityReadConcern=false.
+  - name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
+  - name: sharded_jscore_txns_without_snapshot
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: sharding_gen
   - name: sharding_auth_gen

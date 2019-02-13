@@ -1,5 +1,5 @@
 // Test committed and aborted transactions cannot be changed but commitTransaction is retryable.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_snapshot_read_concern]
 (function() {
     "use strict";
 

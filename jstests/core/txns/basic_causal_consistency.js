@@ -1,5 +1,5 @@
 // Test that the shell helper supports causal consistency.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_snapshot_read_concern]
 (function() {
     "use strict";
 

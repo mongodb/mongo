@@ -1269,6 +1269,11 @@ Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
                               << readConcern.toString()};
     }
 
+    if (readConcern.getArgsAtClusterTime() && !serverGlobalParams.enableMajorityReadConcern) {
+        return {ErrorCodes::InvalidOptions,
+                "'atClusterTime' is not supported when enableMajorityReadConcern=false"};
+    }
+
     return Status::OK();
 }
 

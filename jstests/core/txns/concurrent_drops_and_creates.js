@@ -1,6 +1,6 @@
 // Test that a transaction cannot write to a collection that has been dropped or created since the
 // transaction started.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_snapshot_read_concern]
 (function() {
     "use strict";
 

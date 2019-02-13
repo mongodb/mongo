@@ -2,7 +2,7 @@
 //
 // Only run this test with the WiredTiger storage engine, since we expect other storage engines to
 // return early because they do not support snapshot read concern.
-// @tags: [requires_wiredtiger, uses_transactions]
+// @tags: [requires_wiredtiger, uses_transactions, uses_atclustertime]
 
 function _getClusterTime(rst) {
     const pingRes = assert.commandWorked(rst.getPrimary().adminCommand({ping: 1}));
@@ -145,6 +145,24 @@ function _getClusterTime(rst) {
             {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
         assert.commandWorked(sessionDb.runCommand({find: collName}));
         session.commitTransaction();
+        session.endSession();
+        rst.stopSet();
+    }
+
+    // readConcern with 'atClusterTime' is not allowed when enableMajorityReadConcern=false.
+    {
+        let rst = new ReplSetTest({nodes: [{"enableMajorityReadConcern": "false"}]});
+        rst.startSet();
+        rst.initiate();
+        let session =
+            rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+        let sessionDb = session.getDatabase(dbName);
+        session.startTransaction(
+            {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
+        assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
+                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
         session.endSession();
         rst.stopSet();
     }

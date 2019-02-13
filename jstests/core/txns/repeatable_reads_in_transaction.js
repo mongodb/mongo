@@ -1,6 +1,6 @@
 // Test to guarantee read repeatability, meaning that while in a transaction, we should repeatedly
 // read the same data even if it was modified outside of the transaction.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_snapshot_read_concern]
 (function() {
     "use strict";
 
