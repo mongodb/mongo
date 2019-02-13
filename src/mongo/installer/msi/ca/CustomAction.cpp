@@ -102,10 +102,11 @@ std::string do_replace(MSIHANDLE hInstall,
 
     if (pos == std::string::npos) {
         LogMessage(hInstall,
-                   INSTALLMESSAGE_WARNING,
+                   INSTALLMESSAGE_INFO,
                    "Failed to find '%s' in '%s'",
                    original.c_str(),
                    source.c_str());
+        return source;
     }
 
     return source.replace(pos, original.length(), replacement);
