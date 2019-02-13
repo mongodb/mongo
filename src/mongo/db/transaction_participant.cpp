@@ -1014,7 +1014,7 @@ void TransactionParticipant::addTransactionOperation(OperationContext* opCtx,
                           << BSONObjMaxInternalSize
                           << ". Actual size is "
                           << _transactionOperationBytes,
-            !useMultipleOplogEntryFormatForTransactions &&
+            useMultipleOplogEntryFormatForTransactions ||
                 _transactionOperationBytes <= BSONObjMaxInternalSize);
 }
 
