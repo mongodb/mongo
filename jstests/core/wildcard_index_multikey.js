@@ -239,4 +239,29 @@
     // Finally, confirm that a collection scan produces the same results.
     assertArrayEq(coll.find(trimTestQuery).toArray(),
                   coll.find(trimTestQuery).hint({$natural: 1}).toArray());
+
+    // Verify that no overlapping bounds are generated and all the expected documents are returned
+    // for fieldname-or-array-index queries.
+    const existenceQuery = {"a.0.1": {$exists: true}};
+    assert.commandWorked(coll.insert({a: [{1: "exists"}, 1]}));
+    assert.commandWorked(coll.insert({a: {0: {1: "exists"}}}));
+    assert.commandWorked(coll.insert({a: {0: [2, "exists"]}}));
+    assert.commandWorked(coll.insert({a: {0: [2, {"object_exists": 1}]}}));
+    assert.commandWorked(coll.insert({a: {0: [2, ["array_exists"]]}}));
+    assert.commandWorked(coll.insert({a: {0: [{1: "exists"}]}}));
+    assert.commandWorked(coll.insert({a: {0: [{1: []}]}}));
+    assert.commandWorked(coll.insert({a: {0: [{1: {}}]}}));
+    assert.commandWorked(coll.insert({a: [{0: [{1: ["exists"]}]}]}));
+    assert.commandWorked(coll.insert({a: [{}, {0: [{1: ["exists"]}]}]}));
+    assert.commandWorked(coll.insert({a: [{}, {0: [[], {}, {1: ["exists"]}]}]}));
+
+    assert.commandWorked(coll.insert({a: {0: ["not_exist"]}}));
+    assert.commandWorked(coll.insert({a: {"01": ["not_exist"]}}));
+    assert.commandWorked(coll.insert({a: [{11: "not_exist"}]}));
+
+    assertWildcardQuery(existenceQuery, 'a.0.1', {'executionStats.nReturned': 11});
+    // Finally, confirm that a collection scan produces the same results.
+    assertArrayEq(coll.find(existenceQuery).toArray(),
+                  coll.find(existenceQuery).hint({$natural: 1}).toArray());
+
 })();
