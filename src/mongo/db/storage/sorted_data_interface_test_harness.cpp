@@ -1,6 +1,3 @@
-// sorted_data_interface_test_harness.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

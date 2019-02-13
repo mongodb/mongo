@@ -1,6 +1,3 @@
-// @file log_process_details.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

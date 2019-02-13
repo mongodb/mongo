@@ -1,6 +1,3 @@
-// bson_validate.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

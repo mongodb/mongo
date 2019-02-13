@@ -1,6 +1,3 @@
-// expression_parser_tree.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

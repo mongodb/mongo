@@ -1,6 +1,3 @@
-// server_status_internal.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

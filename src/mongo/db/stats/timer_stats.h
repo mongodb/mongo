@@ -1,6 +1,3 @@
-// timer_stats.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

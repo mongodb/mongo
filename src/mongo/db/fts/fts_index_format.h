@@ -1,6 +1,3 @@
-// fts_index_format.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

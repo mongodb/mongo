@@ -1,6 +1,3 @@
-// bson_collection_catalog_entry.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

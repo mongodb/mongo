@@ -1,8 +1,3 @@
-/** @file jsobj.h
-    BSON classes
-*/
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -33,13 +28,13 @@
  */
 
 /**
-   BSONObj and its helpers
-
-   "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
-   represented in JSON (plus a few extensions useful for databases & other languages).
-
-   http://www.bsonspec.org/
-*/
+ * BSONObj and its helpers
+ *
+ * "BSON" stands for "binary JSON" -- ie a binary way to represent objects that would be
+ * represented in JSON (plus a few extensions useful for databases & other languages).
+ *
+ * http://www.bsonspec.org/
+ */
 
 #pragma once
 

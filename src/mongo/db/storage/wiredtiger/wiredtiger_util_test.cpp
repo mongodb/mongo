@@ -1,6 +1,3 @@
-// wiredtiger_util_test.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

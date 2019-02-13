@@ -1,6 +1,3 @@
-// wiredtiger_recovery_unit.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

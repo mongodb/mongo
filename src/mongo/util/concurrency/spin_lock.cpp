@@ -1,6 +1,3 @@
-// spin_lock.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

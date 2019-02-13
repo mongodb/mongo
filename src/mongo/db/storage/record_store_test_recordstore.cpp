@@ -1,6 +1,3 @@
-// record_store_test_recordstore.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

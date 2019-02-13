@@ -1,6 +1,3 @@
-// wiredtiger_record_store_mock.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

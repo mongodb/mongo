@@ -1,6 +1,3 @@
-// expression_parser_array_test.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

@@ -1,9 +1,3 @@
-/* hasher.cpp
- *
- * Defines a simple hash function class
- */
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -31,6 +25,10 @@
  *    delete this exception statement from your version. If you delete this
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
+ */
+
+/**
+ * Defines a simple hash function class.
  */
 
 #include "mongo/db/hasher.h"

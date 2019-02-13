@@ -1,6 +1,3 @@
-// sorted_data_interface_test_rollback.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

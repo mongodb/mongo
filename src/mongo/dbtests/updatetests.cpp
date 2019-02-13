@@ -1,7 +1,3 @@
-// updatetests.cpp : unit tests relating to update requests
-//
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -29,6 +25,10 @@
  *    delete this exception statement from your version. If you delete this
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
+ */
+
+/**
+ * unit tests relating to update requests
  */
 
 #include "mongo/platform/basic.h"

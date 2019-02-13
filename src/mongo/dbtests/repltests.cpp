@@ -1,7 +1,3 @@
-// repltests.cpp : Unit tests for replication
-//
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

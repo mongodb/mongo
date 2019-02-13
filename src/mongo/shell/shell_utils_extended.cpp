@@ -1,5 +1,3 @@
-// mongo/shell/shell_utils_extended.cpp
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

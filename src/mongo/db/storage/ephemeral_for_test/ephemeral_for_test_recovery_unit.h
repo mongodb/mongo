@@ -1,6 +1,3 @@
-// ephemeral_for_test_recovery_unit.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

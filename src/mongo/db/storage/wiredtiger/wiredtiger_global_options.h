@@ -1,6 +1,3 @@
-// wiredtiger_global_options.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

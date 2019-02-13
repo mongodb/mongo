@@ -1,6 +1,3 @@
-// ordering.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

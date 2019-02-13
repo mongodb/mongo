@@ -1,6 +1,3 @@
-// file.h cross platform basic file class. supports 64 bit offsets and such.
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -31,6 +28,8 @@
  */
 
 #pragma once
+
+// Cross-platform basic file class. Supports 64-bit offsets and such.
 
 #include <cstdint>
 #include <string>

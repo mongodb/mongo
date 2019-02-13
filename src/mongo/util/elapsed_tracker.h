@@ -1,6 +1,3 @@
-// @file elapsed_tracker.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

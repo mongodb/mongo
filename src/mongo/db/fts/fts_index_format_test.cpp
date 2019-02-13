@@ -1,6 +1,3 @@
-// fts_index_format_test.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

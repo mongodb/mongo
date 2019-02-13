@@ -1,8 +1,3 @@
-/* @file value.h
-   concurrency helpers DiagStr
-*/
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -33,6 +28,10 @@
  */
 
 #pragma once
+
+/**
+ * DiagStr concurrency helper
+ */
 
 #include "spin_lock.h"
 

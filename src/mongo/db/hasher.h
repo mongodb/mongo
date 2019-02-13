@@ -1,9 +1,3 @@
-/* hasher.h
- *
- * Defines a simple hash function class
- */
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -34,6 +28,11 @@
  */
 
 #pragma once
+
+/**
+ * Defines a simple hash function class
+ */
+
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonelement.h"

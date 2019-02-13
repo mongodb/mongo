@@ -1,6 +1,3 @@
-// @file winutil.cpp : Windows related utility functions
-//
-//
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -29,9 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-//
 
 #pragma once
+
+/**
+ * Windows related utility functions
+ */
 
 #if defined(_WIN32)
 #include "text.h"

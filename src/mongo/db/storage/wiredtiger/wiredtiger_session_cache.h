@@ -1,6 +1,3 @@
-// wiredtiger_session_cache.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

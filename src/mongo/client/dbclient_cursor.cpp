@@ -1,6 +1,3 @@
-// dbclient.cpp - connect to a Mongo database as a database, from C++
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -28,6 +25,10 @@
  *    delete this exception statement from your version. If you delete this
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
+ */
+
+/**
+ * Connect to a Mongo database as a database, from C++.
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork

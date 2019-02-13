@@ -1,6 +1,3 @@
-// find_and_modify.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

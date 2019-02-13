@@ -1,6 +1,3 @@
-// kv_collection_catalog_entry.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

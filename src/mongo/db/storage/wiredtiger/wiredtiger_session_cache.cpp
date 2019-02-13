@@ -1,6 +1,3 @@
-// wiredtiger_session_cache.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

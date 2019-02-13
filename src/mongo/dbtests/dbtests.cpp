@@ -1,7 +1,3 @@
-// #file dbtests.cpp : Runs db unit tests.
-//
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -29,6 +25,10 @@
  *    delete this exception statement from your version. If you delete this
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
+ */
+
+/**
+ * Runs db unit tests.
  */
 
 #include "mongo/platform/basic.h"

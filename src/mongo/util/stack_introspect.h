@@ -1,6 +1,3 @@
-// stack_introspect.h
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

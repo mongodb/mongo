@@ -1,11 +1,3 @@
-/* bsonobjbuilder.h
-
-   Classes in this file:
-   BSONObjBuilder
-   BSONArrayBuilder
-*/
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -36,6 +28,12 @@
  */
 
 #pragma once
+
+/**
+ * Classes in this file:
+ * BSONObjBuilder
+ * BSONArrayBuilder
+ */
 
 #include <cmath>
 #include <cstdint>

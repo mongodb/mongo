@@ -1,6 +1,3 @@
-// wiredtiger_kv_engine.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

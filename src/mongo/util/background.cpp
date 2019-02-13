@@ -1,6 +1,3 @@
-// @file background.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

@@ -1,6 +1,3 @@
-/** @file dbclient_rs.h Connect to a Replica Set, from C++ */
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -31,6 +28,10 @@
  */
 
 #pragma once
+
+/**
+ * Connect to a Replica Set, from C++.
+ */
 
 #include <utility>
 

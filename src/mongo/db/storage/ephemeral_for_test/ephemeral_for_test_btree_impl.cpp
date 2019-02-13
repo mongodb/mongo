@@ -1,6 +1,3 @@
-// ephemeral_for_test_btree_impl.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

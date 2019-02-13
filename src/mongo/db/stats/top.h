@@ -1,6 +1,3 @@
-// top.h : DB usage monitor.
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -31,6 +28,10 @@
  */
 
 #pragma once
+
+/**
+ * DB usage monitor.
+ */
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 

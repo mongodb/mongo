@@ -1,6 +1,3 @@
-// indexcatalogtests.cpp : index_catalog.{h,cpp} unit tests.
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

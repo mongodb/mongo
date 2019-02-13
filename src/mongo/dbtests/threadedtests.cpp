@@ -1,7 +1,3 @@
-// @file threadedtests.cpp - Tests for threaded code
-//
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

@@ -1,6 +1,3 @@
-// server_status_metric.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

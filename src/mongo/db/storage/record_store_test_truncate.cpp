@@ -1,6 +1,3 @@
-// record_store_test_truncate.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

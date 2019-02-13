@@ -1,9 +1,3 @@
-/** @file mongo/util/exit_code.h
- *
- * Mongo exit codes.
- */
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -34,6 +28,10 @@
  */
 
 #pragma once
+
+/**
+ * Mongo exit codes.
+ */
 
 namespace mongo {
 

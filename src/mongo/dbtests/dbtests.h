@@ -1,7 +1,3 @@
-// dbtests.h : Test suite generator headers.
-//
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -32,6 +28,10 @@
  */
 
 #pragma once
+
+/**
+ * Test suite generator headers.
+ */
 
 #include "mongo/db/db_raii.h"
 #include "mongo/unittest/unittest.h"

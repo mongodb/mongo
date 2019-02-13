@@ -1,6 +1,3 @@
-// write_conflict_exception.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

@@ -1,6 +1,3 @@
-//@file indexupdatetests.cpp : mongo/db/index_update.{h,cpp} tests
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

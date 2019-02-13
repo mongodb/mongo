@@ -1,6 +1,3 @@
-// fts_query_impl_test.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

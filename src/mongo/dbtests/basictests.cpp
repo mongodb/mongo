@@ -1,7 +1,3 @@
-// basictests.cpp : basic unit tests
-//
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

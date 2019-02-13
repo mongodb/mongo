@@ -1,6 +1,3 @@
-// cloner.h - copy a database (export/import basically)
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -31,6 +28,10 @@
  */
 
 #pragma once
+
+/**
+ * copy a database (export/import basically)
+ */
 
 #include <string>
 #include <vector>

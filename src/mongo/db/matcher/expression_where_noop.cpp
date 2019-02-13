@@ -1,6 +1,3 @@
-// expression_where_noop.cpp
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *

@@ -1,6 +1,3 @@
-// @file bufreader.h parse a memory region into usable pieces
-
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -31,6 +28,10 @@
  */
 
 #pragma once
+
+/**
+ * Parse a memory region into usable pieces.
+ */
 
 #include <utility>
 
