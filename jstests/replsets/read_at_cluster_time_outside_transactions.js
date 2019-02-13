@@ -1,6 +1,8 @@
 /**
  * Tests that the "find" and "dbHash" commands support reading at a Timestamp by using the
  * $_internalReadAtClusterTime option.
+ *
+ * @tags: [requires_document_locking]
  */
 (function() {
     "use strict";
