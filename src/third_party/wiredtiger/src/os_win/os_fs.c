@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2018 MongoDB, Inc.
+ * Copyright (c) 2014-2019 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -7,6 +7,28 @@
  */
 
 #include "wt_internal.h"
+
+#define	WT_WINCALL_RETRY(call, ret) do {				\
+	int __retry;							\
+	for (__retry = 0; __retry < WT_RETRY_MAX; ++__retry) {		\
+		ret = 0;						\
+		if ((call) == FALSE) {					\
+			windows_error = __wt_getlasterror();		\
+			ret = __wt_map_windows_error(windows_error);	\
+			if (windows_error == ERROR_ACCESS_DENIED) {	\
+				if (__retry == 0)			\
+					__wt_errx(session,		\
+	"Access denied to a file owned by WiredTiger."			\
+	" It will attempt a few more times. You should confirm"		\
+	" no other processes, such as virus scanners, are"		\
+	" accessing the WiredTiger files.");				\
+				__wt_sleep(0L, 50000L);			\
+				continue;				\
+			}						\
+		}							\
+		break;							\
+	}								\
+} while (0)
 
 /*
  * __win_fs_exist --
@@ -53,9 +75,8 @@ __win_fs_remove(WT_FILE_SYSTEM *file_system,
 
 	WT_RET(__wt_to_utf16_string(session, name, &name_wide));
 
-	if (DeleteFileW(name_wide->data) == FALSE) {
-		windows_error = __wt_getlasterror();
-		ret = __wt_map_windows_error(windows_error);
+	WT_WINCALL_RETRY(DeleteFileW(name_wide->data), ret);
+	if (ret != 0) {
 		__wt_err(session, ret,
 		    "%s: file-remove: DeleteFileW: %s",
 		    name, __wt_formatmessage(session, windows_error));
@@ -96,10 +117,9 @@ __win_fs_rename(WT_FILE_SYSTEM *file_system,
 	 * directory and we expect that to be an atomic metadata update on any
 	 * modern filesystem.
 	 */
-	if (MoveFileExW(from_wide->data, to_wide->data,
-	    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == FALSE) {
-		windows_error = __wt_getlasterror();
-		ret = __wt_map_windows_error(windows_error);
+	WT_WINCALL_RETRY(MoveFileExW(from_wide->data, to_wide->data,
+	    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH), ret);
+	if (ret != 0) {
 		__wt_err(session, ret,
 		    "%s to %s: file-rename: MoveFileExW: %s",
 		    from, to, __wt_formatmessage(session, windows_error));
