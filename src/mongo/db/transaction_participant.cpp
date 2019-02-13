@@ -379,8 +379,12 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(Oper
         }
         _abortTransactionOnSession(opCtx);
 
-        uasserted(ErrorCodes::NoSuchTransaction,
-                  str::stream() << "Transaction " << txnNumber << " has been aborted.");
+        uasserted(
+            ErrorCodes::NoSuchTransaction,
+            str::stream()
+                << "Transaction "
+                << txnNumber
+                << " has been aborted because an earlier command in this transaction failed.");
     }
 
     return;
