@@ -80,4 +80,9 @@ Status canonicalizeMongodOptions(moe::Environment* params);
 StatusWith<repl::ReplSettings> parseMongodReplicationOptions(const moe::Environment& params);
 
 Status storeMongodOptions(const moe::Environment& params);
+
+/**
+ * Help test user for storage.dbPath config option.
+ */
+std::string storageDBPathDescription();
 }

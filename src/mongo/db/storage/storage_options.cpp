@@ -72,7 +72,6 @@ const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
 #endif
 
 const int StorageGlobalParams::kMaxJournalCommitIntervalMs = 500;
-const double StorageGlobalParams::kMaxSyncdelaySecs = 9.0 * 1000.0 * 1000.0;
 
 namespace {
 /**

@@ -510,6 +510,11 @@ env.Library(
     target="mongod_options",
     source=[
         "mongod_options.cpp",
+        env.Idlc('mongod_options_general.idl')[0],
+        env.Idlc('mongod_options_legacy.idl')[0],
+        env.Idlc('mongod_options_replication.idl')[0],
+        env.Idlc('mongod_options_sharding.idl')[0],
+        env.Idlc('mongod_options_storage.idl')[0],
     ],
     LIBDEPS=[
         'repl/repl_settings',

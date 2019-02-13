@@ -95,7 +95,7 @@ struct StorageGlobalParams {
     // via an fsync operation.
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
-    static const double kMaxSyncdelaySecs;
+    static constexpr double kMaxSyncdelaySecs = 9.0 * 1000.0 * 1000.0;
     AtomicDouble syncdelay;  // seconds between fsyncs
 
     // --queryableBackupMode

@@ -41,6 +41,11 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/mongod_options_general_gen.h"
+#include "mongo/db/mongod_options_legacy_gen.h"
+#include "mongo/db/mongod_options_replication_gen.h"
+#include "mongo/db/mongod_options_sharding_gen.h"
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
@@ -56,331 +61,32 @@ namespace mongo {
 
 using std::endl;
 
-Status addMongodOptions(moe::OptionSection* options) {
-    Status ret = addGeneralServerOptions(options);
-    if (!ret.isOK()) {
-        return ret;
-    }
+std::string storageDBPathDescription() {
+    StringBuilder sb;
 
-    moe::OptionSection general_options("General options");
-    moe::OptionSection rs_options("Replica set options");
-    moe::OptionSection replication_options("Replication options");
-    moe::OptionSection sharding_options("Sharding options");
-    moe::OptionSection storage_options("Storage options");
-
-    // Authentication Options
-
-    // Way to enable or disable auth on command line and in Legacy config file
-    general_options.addOptionChaining("auth", "auth", moe::Switch, "run with security")
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("noauth");
-
-    // IP Whitelisting Options
-    general_options
-        .addOptionChaining("security.clusterIpSourceWhitelist",
-                           "clusterIpSourceWhitelist",
-                           moe::StringVector,
-                           "Network CIDR specification of permitted origin for `__system` access.")
-        .composing();
-
-
-    // Way to enable or disable auth in JSON Config
-    general_options
-        .addOptionChaining(
-            "security.authorization",
-            "",
-            moe::String,
-            "How the database behaves with respect to authorization of clients.  "
-            "Options are \"disabled\", which means that authorization checks are not "
-            "performed, and \"enabled\" which means that a client cannot perform actions it is "
-            "not authorized to do.")
-        .setSources(moe::SourceYAMLConfig)
-        .format("(:?disabled)|(:?enabled)", "(disabled/enabled)");
-
-    // setParameter parameters that we want as config file options
-    // TODO: Actually read these into our environment.  Currently they have no effect
-    general_options.addOptionChaining("security.authSchemaVersion", "", moe::String, "TODO")
-        .setSources(moe::SourceYAMLConfig);
-
-    general_options.addOptionChaining("security.enableLocalhostAuthBypass", "", moe::String, "TODO")
-        .setSources(moe::SourceYAMLConfig);
-
-    // Diagnostic Options
-
-    general_options.addOptionChaining("profile", "profile", moe::Int, "0=off 1=slow, 2=all")
-        .setSources(moe::SourceAllLegacy);
-
-    general_options
-        .addOptionChaining("operationProfiling.mode", "", moe::String, "(off/slowOp/all)")
-        .setSources(moe::SourceYAMLConfig)
-        .format("(:?off)|(:?slowOp)|(:?all)", "(off/slowOp/all)");
-
-    general_options
-        .addOptionChaining(
-            "cpu", "cpu", moe::Switch, "periodically show cpu and iowait utilization")
-        .setSources(moe::SourceAllLegacy);
-
-    general_options
-        .addOptionChaining(
-            "sysinfo", "sysinfo", moe::Switch, "print some diagnostic system information")
-        .setSources(moe::SourceAllLegacy);
-
-    // Storage Options
-
-    storage_options.addOptionChaining(
-        "storage.engine",
-        "storageEngine",
-        moe::String,
-        "what storage engine to use - defaults to wiredTiger if no data files present");
-
+    sb << "Directory for datafiles - defaults to " << storageGlobalParams.kDefaultDbPath;
 
 #ifdef _WIN32
     boost::filesystem::path currentPath = boost::filesystem::current_path();
 
-    std::string defaultPath = currentPath.root_name().string() + storageGlobalParams.kDefaultDbPath;
-    storage_options.addOptionChaining("storage.dbPath",
-                                      "dbpath",
-                                      moe::String,
-                                      std::string("directory for datafiles - defaults to ") +
-                                          storageGlobalParams.kDefaultDbPath + " which is " +
-                                          defaultPath + " based on the current working drive");
-
-#else
-    storage_options.addOptionChaining("storage.dbPath",
-                                      "dbpath",
-                                      moe::String,
-                                      std::string("directory for datafiles - defaults to ") +
-                                          storageGlobalParams.kDefaultDbPath);
-
-#endif
-    storage_options.addOptionChaining("storage.directoryPerDB",
-                                      "directoryperdb",
-                                      moe::Switch,
-                                      "each database will be stored in a separate directory");
-
-    storage_options
-        .addOptionChaining("storage.queryableBackupMode",
-                           "queryableBackupMode",
-                           moe::Switch,
-                           "enable read-only mode - if true the server will not accept writes.")
-        .setSources(moe::SourceAll)
-        .hidden();
-
-    storage_options
-        .addOptionChaining("storage.groupCollections",
-                           "groupCollections",
-                           moe::Switch,
-                           "group collections - if true the storage engine may group "
-                           "collections within a database into a shared record store.")
-        .hidden();
-
-    storage_options
-        .addOptionChaining("storage.syncPeriodSecs",
-                           "syncdelay",
-                           moe::Double,
-                           "seconds between disk syncs (0=never, but not recommended)")
-        .setDefault(moe::Value(60.0));
-
-    // Upgrade and repair are disallowed in JSON configs since they trigger very heavyweight
-    // actions rather than specify configuration data
-    storage_options.addOptionChaining("upgrade", "upgrade", moe::Switch, "upgrade db if needed")
-        .setSources(moe::SourceAllLegacy);
-
-    storage_options.addOptionChaining("repair", "repair", moe::Switch, "run repair on all dbs")
-        .setSources(moe::SourceAllLegacy);
-
-    // Javascript Options
-
-    general_options
-        .addOptionChaining("noscripting", "noscripting", moe::Switch, "disable scripting engine")
-        .setSources(moe::SourceAllLegacy);
-
-    general_options
-        .addOptionChaining(
-            "security.javascriptEnabled", "", moe::Bool, "Enable javascript execution")
-        .setSources(moe::SourceYAMLConfig);
-
-    // Query Options
-
-    general_options
-        .addOptionChaining("notablescan", "notablescan", moe::Switch, "do not allow table scans")
-        .setSources(moe::SourceAllLegacy);
-
-    // Journaling Options
-
-    // Way to enable or disable journaling on command line and in Legacy config file
-    storage_options.addOptionChaining("journal", "journal", moe::Switch, "enable journaling")
-        .setSources(moe::SourceAllLegacy);
-
-    storage_options
-        .addOptionChaining("nojournal",
-                           "nojournal",
-                           moe::Switch,
-                           "disable journaling (journaling is on by default for 64 bit)")
-        .setSources(moe::SourceAllLegacy);
-
-    storage_options.addOptionChaining("dur", "dur", moe::Switch, "enable journaling")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
-    storage_options.addOptionChaining("nodur", "nodur", moe::Switch, "disable journaling")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
-    // Way to enable or disable journaling in JSON Config
-    general_options.addOptionChaining("storage.journal.enabled", "", moe::Bool, "enable journaling")
-        .setSources(moe::SourceYAMLConfig);
-
-#if defined(__linux__)
-    general_options.addOptionChaining(
-        "shutdown", "shutdown", moe::Switch, "kill a running server (for init scripts)");
-
+    sb << " which is " << currentPath.root_name().string() << storageGlobalParams.kDefaultDbPath
+       << " based on the current working drive";
 #endif
 
-    // Replication Options
+    return sb.str();
+}
 
-    replication_options.addOptionChaining(
-        "replication.oplogSizeMB",
-        "oplogSize",
-        moe::Int,
-        "size to use (in MB) for replication op log. default is 5% of disk space "
-        "(i.e. large is good)");
-
-    rs_options
-        .addOptionChaining("replication.replSet",
-                           "replSet",
-                           moe::String,
-                           "arg is <setname>[/<optionalseedhostlist>]")
-        .setSources(moe::SourceAllLegacy);
-
-    rs_options.addOptionChaining("replication.replSetName", "", moe::String, "arg is <setname>")
-        .setSources(moe::SourceYAMLConfig)
-        .format("[^/]+", "[replica set name with no \"/\"]");
-
-    // `enableMajorityReadConcern` is enabled by default starting in 3.6.
-    rs_options
-        .addOptionChaining("replication.enableMajorityReadConcern",
-                           "enableMajorityReadConcern",
-                           moe::Bool,
-                           "enables majority readConcern")
-        .setDefault(moe::Value(true))
-        .setImplicit(moe::Value(true));
-
-    replication_options.addOptionChaining(
-        "master", "master", moe::Switch, "Master/slave replication no longer supported");
-
-    replication_options.addOptionChaining(
-        "slave", "slave", moe::Switch, "Master/slave replication no longer supported");
-
-    // Sharding Options
-
-    sharding_options
-        .addOptionChaining("configsvr",
-                           "configsvr",
-                           moe::Switch,
-                           "declare this is a config db of a cluster; default port 27019; "
-                           "default dir /data/configdb")
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("shardsvr")
-        .incompatibleWith("nojournal");
-
-    sharding_options
-        .addOptionChaining("shardsvr",
-                           "shardsvr",
-                           moe::Switch,
-                           "declare this is a shard db of a cluster; default port 27018")
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("configsvr");
-
-    sharding_options
-        .addOptionChaining(
-            "sharding.clusterRole",
-            "",
-            moe::String,
-            "Choose what role this mongod has in a sharded cluster.  Possible values are:\n"
-            "    \"configsvr\": Start this node as a config server.  Starts on port 27019 by "
-            "default."
-            "    \"shardsvr\": Start this node as a shard server.  Starts on port 27018 by "
-            "default.")
-        .setSources(moe::SourceYAMLConfig)
-        .format("(:?configsvr)|(:?shardsvr)", "(configsvr/shardsvr)");
-
-    sharding_options
-        .addOptionChaining(
-            "sharding._overrideShardIdentity",
-            "",
-            moe::String,
-            "overrides the shardIdentity document settings stored in the local storage with "
-            "a MongoDB Extended JSON document in string format")
-        .setSources(moe::SourceYAMLConfig)
-        .incompatibleWith("configsvr")
-        .requires("storage.queryableBackupMode");
-
-    sharding_options
-        .addOptionChaining("noMoveParanoia",
-                           "noMoveParanoia",
-                           moe::Switch,
-                           "turn off paranoid saving of data for the moveChunk command; default")
-        .hidden()
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("moveParanoia");
-
-    sharding_options
-        .addOptionChaining("moveParanoia",
-                           "moveParanoia",
-                           moe::Switch,
-                           "turn on paranoid saving of data during the moveChunk command "
-                           "(used for internal system diagnostics)")
-        .hidden()
-        .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("noMoveParanoia");
-
-    sharding_options
-        .addOptionChaining("sharding.archiveMovedChunks",
-                           "",
-                           moe::Bool,
-                           "config file option to turn on paranoid saving of data during the "
-                           "moveChunk command (used for internal system diagnostics)")
-        .hidden()
-        .setSources(moe::SourceYAMLConfig);
-
-
-    options->addSection(general_options).transitional_ignore();
-    options->addSection(replication_options).transitional_ignore();
-    options->addSection(rs_options).transitional_ignore();
-    options->addSection(sharding_options).transitional_ignore();
-    options->addSection(storage_options).transitional_ignore();
-
-    // The following are legacy options that are disallowed in the JSON config file
-
-    // This is a deprecated option that we are supporting for backwards compatibility
-    // The first value for this option can be either 'dbpath' or 'run'.
-    // If it is 'dbpath', mongod prints the dbpath and exits.  Any extra values are ignored.
-    // If it is 'run', mongod runs normally.  Providing extra values is an error.
-    options->addOptionChaining("command", "command", moe::StringVector, "command")
-        .hidden()
-        .positional(1, 3)
-        .setSources(moe::SourceAllLegacy);
-
-    options
-        ->addOptionChaining("cacheSize", "cacheSize", moe::Long, "cache size (in MB) for rec store")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
-    // deprecated pairing command line options
-    options->addOptionChaining("pairwith", "pairwith", moe::Switch, "DEPRECATED")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
-    options->addOptionChaining("arbiter", "arbiter", moe::Switch, "DEPRECATED")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
-    options->addOptionChaining("opIdMem", "opIdMem", moe::Switch, "DEPRECATED")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
+Status addMongodOptions(moe::OptionSection* options) try {
+    uassertStatusOK(addGeneralServerOptions(options));
+    uassertStatusOK(addMongodGeneralOptions(options));
+    uassertStatusOK(addMongodReplicationOptions(options));
+    uassertStatusOK(addMongodShardingOptions(options));
+    uassertStatusOK(addMongodStorageOptions(options));
+    uassertStatusOK(addMongodLegacyOptions(options));
 
     return Status::OK();
+} catch (const AssertionException& ex) {
+    return ex.toStatus();
 }
 
 void printMongodHelp(const moe::OptionSection& options) {
@@ -434,8 +140,7 @@ Status validateMongodOptions(const moe::Environment& params) {
         return ret;
     }
 
-    if ((params.count("nodur") || params.count("nojournal")) &&
-        (params.count("dur") || params.count("journal"))) {
+    if (params.count("nojournal") && params.count("storage.journal.enabled")) {
         return Status(ErrorCodes::BadValue,
                       "Can't specify both --journal and --nojournal options.");
     }
@@ -484,19 +189,6 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
         return ret;
     }
 
-    // "storage.journal.enabled" comes from the config file, so override it if any of "journal",
-    // "nojournal", "dur", and "nodur" are set, since those come from the command line.
-    if (params->count("journal")) {
-        Status ret =
-            params->set("storage.journal.enabled", moe::Value((*params)["journal"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("journal");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
     if (params->count("nojournal")) {
         Status ret =
             params->set("storage.journal.enabled", moe::Value(!(*params)["nojournal"].as<bool>()));
@@ -504,28 +196,6 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
             return ret;
         }
         ret = params->remove("nojournal");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-    if (params->count("dur")) {
-        Status ret =
-            params->set("storage.journal.enabled", moe::Value((*params)["dur"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("dur");
-        if (!ret.isOK()) {
-            return ret;
-        }
-    }
-    if (params->count("nodur")) {
-        Status ret =
-            params->set("storage.journal.enabled", moe::Value(!(*params)["nodur"].as<bool>()));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = params->remove("nodur");
         if (!ret.isOK()) {
             return ret;
         }
