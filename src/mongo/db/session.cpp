@@ -591,7 +591,9 @@ void Session::_beginOrContinueTxn(WithLock wl,
                     ->decrementCurrentInactive();
                 _abortTransaction(wl);
                 uasserted(ErrorCodes::NoSuchTransaction,
-                          str::stream() << "Transaction " << txnNumber << " has been aborted.");
+                          str::stream() << "Transaction " << txnNumber
+                                        << " has been aborted because an earlier command in this "
+                                           "transaction failed.");
             }
         }
         return;
