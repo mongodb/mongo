@@ -572,7 +572,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
         }
 
         log(`Stopping node ${hostName} with signal ${signal}`);
-        rst.stop(nodeId, signal, opts);
+        rst.stop(nodeId, signal, opts, {forRestart: true});
 
         log(`Restarting node ${hostName}`);
         const restart = true;

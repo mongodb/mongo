@@ -369,7 +369,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         }
 
         log(`Stopping node ${hostName} with signal ${signal}`);
-        rst.stop(nodeId, signal, opts);
+        rst.stop(nodeId, signal, opts, {forRestart: true});
         log(`Restarting node ${hostName}`);
         rst.start(nodeId, {}, true /* restart */);
 
