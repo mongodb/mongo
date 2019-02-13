@@ -33,10 +33,35 @@
 
 namespace mongo {
 
+using executor::NetworkTestEnv;
+
 constexpr Seconds ShardingTestFixtureCommon::kFutureTimeout;
 
 ShardingTestFixtureCommon::ShardingTestFixtureCommon() = default;
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() = default;
+
+void ShardingTestFixtureCommon::onCommand(NetworkTestEnv::OnCommandFunction func) {
+    _networkTestEnv->onCommand(func);
+}
+
+void ShardingTestFixtureCommon::onCommands(
+    std::vector<executor::NetworkTestEnv::OnCommandFunction> funcs) {
+    _networkTestEnv->onCommands(std::move(funcs));
+}
+
+void ShardingTestFixtureCommon::onCommandWithMetadata(
+    NetworkTestEnv::OnCommandWithMetadataFunction func) {
+    _networkTestEnv->onCommandWithMetadata(func);
+}
+
+void ShardingTestFixtureCommon::onFindCommand(NetworkTestEnv::OnFindCommandFunction func) {
+    _networkTestEnv->onFindCommand(func);
+}
+
+void ShardingTestFixtureCommon::onFindWithMetadataCommand(
+    NetworkTestEnv::OnFindCommandWithMetadataFunction func) {
+    _networkTestEnv->onFindWithMetadataCommand(func);
+}
 
 }  // namespace mongo

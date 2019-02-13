@@ -358,22 +358,4 @@ RemoteCommandTargeterFactoryMock* ShardingMongodTestFixture::targeterFactory() c
     return _targeterFactory;
 }
 
-void ShardingMongodTestFixture::onCommand(NetworkTestEnv::OnCommandFunction func) {
-    _networkTestEnv->onCommand(func);
-}
-
-void ShardingMongodTestFixture::onCommandWithMetadata(
-    NetworkTestEnv::OnCommandWithMetadataFunction func) {
-    _networkTestEnv->onCommandWithMetadata(func);
-}
-
-void ShardingMongodTestFixture::onFindCommand(NetworkTestEnv::OnFindCommandFunction func) {
-    _networkTestEnv->onFindCommand(func);
-}
-
-void ShardingMongodTestFixture::onFindWithMetadataCommand(
-    NetworkTestEnv::OnFindCommandWithMetadataFunction func) {
-    _networkTestEnv->onFindWithMetadataCommand(func);
-}
-
 }  // namespace mongo

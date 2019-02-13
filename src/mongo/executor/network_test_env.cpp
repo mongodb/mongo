@@ -43,22 +43,29 @@ NetworkTestEnv::NetworkTestEnv(TaskExecutor* executor, NetworkInterfaceMock* net
     : _executor(executor), _mockNetwork(network) {}
 
 void NetworkTestEnv::onCommand(OnCommandFunction func) {
+    onCommands({std::move(func)});
+}
+
+void NetworkTestEnv::onCommands(std::vector<OnCommandFunction> funcs) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_mockNetwork);
 
-    const NetworkInterfaceMock::NetworkOperationIterator noi = _mockNetwork->getNextReadyRequest();
-    const RemoteCommandRequest& request = noi->getRequest();
+    for (auto&& func : funcs) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi =
+            _mockNetwork->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
 
-    auto resultStatus = func(request);
+        auto resultStatus = func(request);
 
-    if (resultStatus.isOK()) {
-        BSONObjBuilder result(std::move(resultStatus.getValue()));
-        CommandHelpers::appendCommandStatusNoThrow(result, resultStatus.getStatus());
-        const RemoteCommandResponse response(result.obj(), Milliseconds(1));
+        if (resultStatus.isOK()) {
+            BSONObjBuilder result(std::move(resultStatus.getValue()));
+            CommandHelpers::appendCommandStatusNoThrow(result, resultStatus.getStatus());
+            const RemoteCommandResponse response(result.obj(), Milliseconds(1));
 
-        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
-    } else {
-        _mockNetwork->scheduleResponse(
-            noi, _mockNetwork->now(), {resultStatus.getStatus(), Milliseconds(0)});
+            _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
+        } else {
+            _mockNetwork->scheduleResponse(
+                noi, _mockNetwork->now(), {resultStatus.getStatus(), Milliseconds(0)});
+        }
     }
 
     _mockNetwork->runReadyNetworkOperations();

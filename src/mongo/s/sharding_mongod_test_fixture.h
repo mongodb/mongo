@@ -103,17 +103,6 @@ public:
         return _opCtx.get();
     }
 
-    /**
-     * Blocking methods, which receive one message from the network and respond using the
-     * responses returned from the input function. This is a syntactic sugar for simple,
-     * single request + response or find tests.
-     */
-    void onCommand(executor::NetworkTestEnv::OnCommandFunction func);
-    void onCommandWithMetadata(executor::NetworkTestEnv::OnCommandWithMetadataFunction func);
-    void onFindCommand(executor::NetworkTestEnv::OnFindCommandFunction func);
-    void onFindWithMetadataCommand(
-        executor::NetworkTestEnv::OnFindCommandWithMetadataFunction func);
-
 protected:
     /**
      * Sets up this fixture with a storage engine, OpObserver, and as a member of a replica set.
