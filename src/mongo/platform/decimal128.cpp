@@ -323,7 +323,7 @@ Decimal128 Decimal128::toAbs() const {
 
 Decimal128 Decimal128::acos(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return acos(&throwAwayFlag);
+    return acos(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::acos(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -334,7 +334,7 @@ Decimal128 Decimal128::acos(std::uint32_t* signalingFlags, RoundingMode roundMod
 
 Decimal128 Decimal128::acosh(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return acosh(&throwAwayFlag);
+    return acosh(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::acosh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -345,7 +345,7 @@ Decimal128 Decimal128::acosh(std::uint32_t* signalingFlags, RoundingMode roundMo
 
 Decimal128 Decimal128::asin(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return asin(&throwAwayFlag);
+    return asin(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::asin(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -356,7 +356,7 @@ Decimal128 Decimal128::asin(std::uint32_t* signalingFlags, RoundingMode roundMod
 
 Decimal128 Decimal128::asinh(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return asinh(&throwAwayFlag);
+    return asinh(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::asinh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -367,7 +367,7 @@ Decimal128 Decimal128::asinh(std::uint32_t* signalingFlags, RoundingMode roundMo
 
 Decimal128 Decimal128::atan(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return atan(&throwAwayFlag);
+    return atan(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::atan(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -394,7 +394,7 @@ Decimal128 Decimal128::atan2(const Decimal128& other,
 
 Decimal128 Decimal128::atanh(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return atanh(&throwAwayFlag);
+    return atanh(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::atanh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -405,7 +405,7 @@ Decimal128 Decimal128::atanh(std::uint32_t* signalingFlags, RoundingMode roundMo
 
 Decimal128 Decimal128::cosh(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return cosh(&throwAwayFlag);
+    return cosh(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::cosh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -416,7 +416,7 @@ Decimal128 Decimal128::cosh(std::uint32_t* signalingFlags, RoundingMode roundMod
 
 Decimal128 Decimal128::cos(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return cos(&throwAwayFlag);
+    return cos(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::cos(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -529,7 +529,7 @@ double Decimal128::toDouble(std::uint32_t* signalingFlags, RoundingMode roundMod
 
 Decimal128 Decimal128::sin(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return sin(&throwAwayFlag);
+    return sin(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::sin(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -540,7 +540,7 @@ Decimal128 Decimal128::sin(std::uint32_t* signalingFlags, RoundingMode roundMode
 
 Decimal128 Decimal128::sinh(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return sinh(&throwAwayFlag);
+    return sinh(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::sinh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -617,7 +617,7 @@ std::string Decimal128::toString() const {
 
 Decimal128 Decimal128::tanh(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return tanh(&throwAwayFlag);
+    return tanh(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::tanh(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -628,7 +628,7 @@ Decimal128 Decimal128::tanh(std::uint32_t* signalingFlags, RoundingMode roundMod
 
 Decimal128 Decimal128::tan(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return tan(&throwAwayFlag);
+    return tan(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::tan(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -773,7 +773,7 @@ Decimal128 Decimal128::divide(const Decimal128& other,
 
 Decimal128 Decimal128::exponential(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return exponential(&throwAwayFlag);
+    return exponential(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::exponential(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -784,7 +784,7 @@ Decimal128 Decimal128::exponential(std::uint32_t* signalingFlags, RoundingMode r
 
 Decimal128 Decimal128::logarithm(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return logarithm(&throwAwayFlag);
+    return logarithm(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::logarithm(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -887,7 +887,7 @@ Decimal128 Decimal128::quantize(const Decimal128& reference,
 
 Decimal128 Decimal128::squareRoot(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return exponential(&throwAwayFlag);
+    return squareRoot(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::squareRoot(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
