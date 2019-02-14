@@ -336,62 +336,6 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, boo
     wuow.commit();
 }
 
-Status RecordStore::validate(OperationContext* opCtx,
-                             ValidateCmdLevel level,
-                             ValidateAdaptor* adaptor,
-                             ValidateResults* results,
-                             BSONObjBuilder* output) {
-    long long nrecords = 0;
-    long long dataSizeTotal = 0;
-    long long nInvalid = 0;
-
-    results->valid = true;
-    int interruptInterval = 4096;
-
-    auto ru = RecoveryUnit::get(opCtx);
-    StringStore* workingCopy(ru->getHead());
-    auto end = workingCopy->upper_bound(_postfix);
-    for (auto it = workingCopy->lower_bound(_prefix); it != end; ++it) {
-        if (!(nrecords % interruptInterval))
-            opCtx->checkForInterrupt();
-        ++nrecords;
-        Record record{RecordId(extractRecordId(it->first)),
-                      RecordData(it->second.c_str(), it->second.length())};
-        auto dataSize = record.data.size();
-        dataSizeTotal += dataSize;
-        size_t validatedSize;
-        Status status = adaptor->validate(record.id, record.data, &validatedSize);
-
-        // The validatedSize equals dataSize below is not a general requirement, but is true
-        // for this storage engine as we don't pad records.
-        if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
-            if (results->valid) {
-                // Only log once.
-                results->errors.push_back("detected one or more invalid documents (see logs)");
-            }
-            nInvalid++;
-            results->valid = false;
-            log() << "document at location: " << record.id << " is corrupted";
-        }
-    }
-
-    const bool strictChecking = false;  // TODO(SERVER-38883): enable this
-    if (results->valid && strictChecking) {
-        auto numRecords = this->numRecords(opCtx);
-        auto dataSize = this->dataSize(opCtx);
-        invariant(
-            nrecords == numRecords,
-            str::stream() << "nrecords == " << nrecords << ", store numRecords == " << numRecords);
-        invariant(dataSizeTotal == dataSize,
-                  str::stream() << "dataSizeTotal == " << dataSizeTotal << ", store dataSize == "
-                                << dataSize);
-    }
-
-    output->append("nInvalidDocuments", nInvalid);
-    output->appendNumber("nrecords", nrecords);
-    return Status::OK();
-}
-
 void RecordStore::appendCustomStats(OperationContext* opCtx,
                                     BSONObjBuilder* result,
                                     double scale) const {

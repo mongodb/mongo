@@ -65,7 +65,12 @@ KeyString makeWildCardMultikeyMetadataKeyString(const BSONObj& indexKey) {
 Status RecordStoreValidateAdaptor::validate(const RecordId& recordId,
                                             const RecordData& record,
                                             size_t* dataSize) {
-    BSONObj recordBson = record.toBson();
+    BSONObj recordBson;
+    try {
+        recordBson = record.toBson();
+    } catch (...) {
+        return exceptionToStatus();
+    }
 
     const Status status = validateBSON(
         recordBson.objdata(), recordBson.objsize(), Validator<BSONObj>::enabledBSONVersion());

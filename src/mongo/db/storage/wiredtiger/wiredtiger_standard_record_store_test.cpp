@@ -297,23 +297,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     rs.reset(nullptr);  // this has to be deleted before ss
 }
 
-class GoodValidateAdaptor : public ValidateAdaptor {
-public:
-    virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
-        *dataSize = static_cast<size_t>(record.size());
-        return Status::OK();
-    }
-};
-
-class BadValidateAdaptor : public ValidateAdaptor {
-public:
-    virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
-        *dataSize = static_cast<size_t>(record.size());
-        return Status(ErrorCodes::UnknownError, "");
-    }
-};
-
-class SizeStorerValidateTest : public mongo::unittest::Test {
+class SizeStorerUpdateTest : public mongo::unittest::Test {
 private:
     virtual void setUp() {
         harnessHelper.reset(new WiredTigerHarnessHelper());
@@ -327,26 +311,8 @@ private:
         wtrs->setSizeStorer(sizeStorer.get());
         ident = wtrs->getIdent();
         uri = wtrs->getURI();
-
-        expectedNumRecords = 100;
-        expectedDataSize = expectedNumRecords * 2;
-        {
-            ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-            WriteUnitOfWork uow(opCtx.get());
-            for (int i = 0; i < expectedNumRecords; i++) {
-                ASSERT_OK(rs->insertRecord(opCtx.get(), "a", 2, Timestamp()).getStatus());
-            }
-            uow.commit();
-        }
-        auto info = sizeStorer->load(uri);
-        info->numRecords.store(0);
-        info->dataSize.store(0);
-        sizeStorer->store(uri, info);
     }
     virtual void tearDown() {
-        expectedNumRecords = 0;
-        expectedDataSize = 0;
-
         rs.reset(nullptr);
         sizeStorer->flush(false);
         sizeStorer.reset(nullptr);
@@ -367,90 +333,15 @@ protected:
     std::unique_ptr<RecordStore> rs;
     std::string ident;
     std::string uri;
-
-    long long expectedNumRecords;
-    long long expectedDataSize;
 };
 
 // Basic validation - size storer data is updated.
-TEST_F(SizeStorerValidateTest, Basic) {
+TEST_F(SizeStorerUpdateTest, Basic) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    GoodValidateAdaptor adaptor;
-    ValidateResults results;
-    BSONObjBuilder output;
-    ASSERT_OK(rs->validate(opCtx.get(), kValidateIndex, &adaptor, &results, &output));
-    BSONObj obj = output.obj();
-    ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
-    ASSERT_EQUALS(expectedNumRecords, getNumRecords());
-    ASSERT_EQUALS(expectedDataSize, getDataSize());
-}
-
-// Full validation - size storer data is updated.
-TEST_F(SizeStorerValidateTest, FullWithGoodAdaptor) {
-    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    GoodValidateAdaptor adaptor;
-    ValidateResults results;
-    BSONObjBuilder output;
-    ASSERT_OK(rs->validate(opCtx.get(), kValidateFull, &adaptor, &results, &output));
-    BSONObj obj = output.obj();
-    ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
-    ASSERT_EQUALS(expectedNumRecords, getNumRecords());
-    ASSERT_EQUALS(expectedDataSize, getDataSize());
-}
-
-// Full validation with a validation adaptor that fails - size storer data is not updated.
-TEST_F(SizeStorerValidateTest, FullWithBadAdapter) {
-    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    BadValidateAdaptor adaptor;
-    ValidateResults results;
-    BSONObjBuilder output;
-    ASSERT_OK(rs->validate(opCtx.get(), kValidateFull, &adaptor, &results, &output));
-    BSONObj obj = output.obj();
-    ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
-    ASSERT_EQUALS(0, getNumRecords());
-    ASSERT_EQUALS(0, getDataSize());
-}
-
-// Load bad _numRecords and _dataSize values at record store creation.
-TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
-    rs.reset(NULL);
-
-    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    auto info = sizeStorer->load(uri);
-    info->numRecords.store(expectedNumRecords * 2);
-    info->dataSize.store(expectedDataSize * 2);
-    sizeStorer->store(uri, info);
-
-    WiredTigerRecordStore::Params params;
-    params.ns = "a.b"_sd;
-    params.ident = ident;
-    params.engineName = kWiredTigerEngineName;
-    params.isCapped = false;
-    params.isEphemeral = false;
-    params.cappedMaxSize = -1;
-    params.cappedMaxDocs = -1;
-    params.cappedCallback = nullptr;
-    params.sizeStorer = sizeStorer.get();
-
-    auto ret = new StandardWiredTigerRecordStore(nullptr, opCtx.get(), params);
-    ret->postConstructorInit(opCtx.get());
-    rs.reset(ret);
-
-    ASSERT_EQUALS(expectedNumRecords * 2, rs->numRecords(opCtx.get()));
-    ASSERT_EQUALS(expectedDataSize * 2, rs->dataSize(opCtx.get()));
-
-    // Full validation should fix record and size counters.
-    GoodValidateAdaptor adaptor;
-    ValidateResults results;
-    BSONObjBuilder output;
-    ASSERT_OK(rs->validate(opCtx.get(), kValidateFull, &adaptor, &results, &output));
-    BSONObj obj = output.obj();
-    ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
-    ASSERT_EQUALS(expectedNumRecords, getNumRecords());
-    ASSERT_EQUALS(expectedDataSize, getDataSize());
-
-    ASSERT_EQUALS(expectedNumRecords, rs->numRecords(opCtx.get()));
-    ASSERT_EQUALS(expectedDataSize, rs->dataSize(opCtx.get()));
+    long long val = 5;
+    rs->updateStatsAfterRepair(opCtx.get(), val, val);
+    ASSERT_EQUALS(getNumRecords(), val);
+    ASSERT_EQUALS(getDataSize(), val);
 }
 
 }  // namespace

@@ -187,11 +187,10 @@ public:
         return true;
     }
 
-    virtual Status validate(OperationContext* opCtx,
-                            ValidateCmdLevel level,
-                            ValidateAdaptor* adaptor,
-                            ValidateResults* results,
-                            BSONObjBuilder* output);
+    virtual void validate(OperationContext* opCtx,
+                          ValidateCmdLevel level,
+                          ValidateResults* results,
+                          BSONObjBuilder* output);
 
     virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,

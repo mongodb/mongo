@@ -1008,6 +1008,61 @@ namespace {
 
 using ValidateResultsMap = std::map<std::string, ValidateResults>;
 
+// General validation logic for any RecordStore. Performs sanity checks to confirm that each
+// record in the store is valid according to the given RecordStoreValidateAdaptor and updates
+// record store stats to match.
+void _genericRecordStoreValidate(OperationContext* opCtx,
+                                 RecordStore* recordStore,
+                                 RecordStoreValidateAdaptor* indexValidator,
+                                 ValidateResults* results,
+                                 BSONObjBuilder* output) {
+    long long nrecords = 0;
+    long long dataSizeTotal = 0;
+    long long nInvalid = 0;
+
+    results->valid = true;
+    std::unique_ptr<SeekableRecordCursor> cursor = recordStore->getCursor(opCtx, true);
+    int interruptInterval = 4096;
+    RecordId prevRecordId;
+
+    while (auto record = cursor->next()) {
+        if (!(nrecords % interruptInterval)) {
+            opCtx->checkForInterrupt();
+        }
+        ++nrecords;
+        auto dataSize = record->data.size();
+        dataSizeTotal += dataSize;
+        size_t validatedSize;
+        Status status = indexValidator->validate(record->id, record->data, &validatedSize);
+
+        // Check to ensure isInRecordIdOrder() is being used properly.
+        if (prevRecordId.isValid()) {
+            invariant(prevRecordId < record->id);
+        }
+
+        // ValidatedSize = dataSize is not a general requirement as some storage engines may use
+        // padding, but we still require that they return the unpadded record data.
+        if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
+            if (results->valid) {
+                // Only log once.
+                results->errors.push_back("detected one or more invalid documents (see logs)");
+            }
+            nInvalid++;
+            results->valid = false;
+            log() << "document at location: " << record->id << " is corrupted";
+        }
+
+        prevRecordId = record->id;
+    }
+
+    if (results->valid) {
+        recordStore->updateStatsAfterRepair(opCtx, nrecords, dataSizeTotal);
+    }
+
+    output->append("nInvalidDocuments", nInvalid);
+    output->append("nrecords", nrecords);
+}
+
 void _validateRecordStore(OperationContext* opCtx,
                           RecordStore* recordStore,
                           ValidateCmdLevel level,
@@ -1021,10 +1076,8 @@ void _validateRecordStore(OperationContext* opCtx,
     if (background) {
         indexValidator->traverseRecordStore(recordStore, level, results, output);
     } else {
-        auto status = recordStore->validate(opCtx, level, indexValidator, results, output);
-        // RecordStore::validate always returns Status::OK(). Errors are reported through
-        // `results`.
-        dassert(status.isOK());
+        recordStore->validate(opCtx, level, results, output);
+        _genericRecordStoreValidate(opCtx, recordStore, indexValidator, results, output);
     }
 }
 

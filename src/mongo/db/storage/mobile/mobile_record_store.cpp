@@ -412,94 +412,13 @@ Status MobileRecordStore::truncate(OperationContext* opCtx) {
  * Note: on full validation, this validates the entire database file, not just the table used by
  * this record store.
  */
-Status MobileRecordStore::validate(OperationContext* opCtx,
-                                   ValidateCmdLevel level,
-                                   ValidateAdaptor* adaptor,
-                                   ValidateResults* results,
-                                   BSONObjBuilder* output) {
+void MobileRecordStore::validate(OperationContext* opCtx,
+                                 ValidateCmdLevel level,
+                                 ValidateResults* results,
+                                 BSONObjBuilder* output) {
     if (level == kValidateFull) {
         doValidate(opCtx, results);
     }
-
-    if (!results->valid) {
-        // The database was corrupt, so return without checking the table.
-        return Status::OK();
-    }
-
-    MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    try {
-        std::string selectQuery = "SELECT rec_id, data FROM \"" + _ident + "\";";
-        SqliteStatement selectStmt(*session, selectQuery);
-
-        int interruptInterval = 4096;
-        long long actualNumRecs = 0;
-        long long actualDataSize = 0;
-        long long numInvalidRecs = 0;
-
-        int status;
-        while ((status = selectStmt.step()) == SQLITE_ROW) {
-            if (!(actualNumRecs % interruptInterval)) {
-                opCtx->checkForInterrupt();
-            }
-
-            long long id = selectStmt.getColInt(0);
-            const void* data = selectStmt.getColBlob(1);
-            int dataSize = selectStmt.getColBytes(1);
-
-            ++actualNumRecs;
-            actualDataSize += dataSize;
-
-            RecordId recId(id);
-            RecordData recData(reinterpret_cast<const char*>(data), dataSize);
-
-            size_t validatedSize;
-            Status status = adaptor->validate(recId, recData, &validatedSize);
-
-            if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
-                if (results->valid) {
-                    std::string errMsg = "detected one or more invalid documents";
-                    validateLogAndAppendError(results, errMsg);
-                }
-
-                ++numInvalidRecs;
-                log() << "document at location " << recId << " is corrupted";
-            }
-        }
-
-        if (status == SQLITE_CORRUPT) {
-            uasserted(ErrorCodes::UnknownError, sqlite3_errstr(status));
-        }
-        checkStatus(status, SQLITE_DONE, "sqlite3_step");
-
-        // Verify that _numRecs and _dataSize are accurate.
-        int64_t cachedNumRecs = numRecords(opCtx);
-        if (_resetNumRecsIfNeeded(opCtx, actualNumRecs)) {
-            str::stream errMsg;
-            errMsg << "cached number of records does not match actual number of records - ";
-            errMsg << "cached number of records = " << cachedNumRecs << "; ";
-            errMsg << "actual number of records = " << actualNumRecs;
-            validateLogAndAppendError(results, errMsg);
-        }
-        int64_t cachedDataSize = dataSize(opCtx);
-        if (_resetDataSizeIfNeeded(opCtx, actualDataSize)) {
-            str::stream errMsg;
-            errMsg << "cached data size does not match actual data size - ";
-            errMsg << "cached data size = " << cachedDataSize << "; ";
-            errMsg << "actual data size = " << actualDataSize;
-            validateLogAndAppendError(results, errMsg);
-        }
-
-        if (level == kValidateFull) {
-            output->append("nInvalidDocuments", numInvalidRecs);
-        }
-        output->appendNumber("nrecords", actualNumRecs);
-
-    } catch (const DBException& e) {
-        std::string errMsg = "record store is corrupt, could not read documents - " + e.toString();
-        validateLogAndAppendError(results, errMsg);
-    }
-
-    return Status::OK();
 }
 
 Status MobileRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* output) const {
@@ -611,6 +530,13 @@ void MobileRecordStore::create(OperationContext* opCtx, const std::string& ident
     std::string sqlQuery =
         "CREATE TABLE IF NOT EXISTS \"" + ident + "\"(rec_id INT, data BLOB, PRIMARY KEY(rec_id));";
     SqliteStatement::execQuery(session, sqlQuery);
+}
+
+void MobileRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
+                                               long long numRecords,
+                                               long long dataSize) {
+    _resetDataSizeIfNeeded(opCtx, (int64_t)dataSize);
+    _resetNumRecsIfNeeded(opCtx, (int64_t)numRecords);
 }
 
 }  // namespace mongo

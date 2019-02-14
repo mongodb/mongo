@@ -1494,72 +1494,39 @@ Status WiredTigerRecordStore::compact(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status WiredTigerRecordStore::validate(OperationContext* opCtx,
-                                       ValidateCmdLevel level,
-                                       ValidateAdaptor* adaptor,
-                                       ValidateResults* results,
-                                       BSONObjBuilder* output) {
+void WiredTigerRecordStore::validate(OperationContext* opCtx,
+                                     ValidateCmdLevel level,
+                                     ValidateResults* results,
+                                     BSONObjBuilder* output) {
     dassert(opCtx->lockState()->isReadLocked());
 
-    if (!_isEphemeral && level == kValidateFull) {
-        int err = WiredTigerUtil::verifyTable(opCtx, _uri, &results->errors);
-        if (err == EBUSY) {
-            std::string msg = str::stream()
-                << "Could not complete validation of " << _uri << ". "
-                << "This is a transient issue as the collection was actively "
-                   "in use by other operations.";
-
-            warning() << msg;
-            results->warnings.push_back(msg);
-        } else if (err) {
-            std::string msg = str::stream() << "verify() returned " << wiredtiger_strerror(err)
-                                            << ". "
-                                            << "This indicates structural damage. "
-                                            << "Not examining individual documents.";
-            error() << msg;
-            results->errors.push_back(msg);
-            results->valid = false;
-            return Status::OK();
-        }
+    // Only full validate should verify table.
+    if (_isEphemeral || level != kValidateFull) {
+        return;
     }
 
-    long long nrecords = 0;
-    long long dataSizeTotal = 0;
-    long long nInvalid = 0;
-
-    results->valid = true;
-    std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, true);
-    int interruptInterval = 4096;
-
-    while (auto record = cursor->next()) {
-        if (!(nrecords % interruptInterval))
-            opCtx->checkForInterrupt();
-        ++nrecords;
-        auto dataSize = record->data.size();
-        dataSizeTotal += dataSize;
-        size_t validatedSize;
-        Status status = adaptor->validate(record->id, record->data, &validatedSize);
-
-        // The validatedSize equals dataSize below is not a general requirement, but must be
-        // true for WT today because we never pad records.
-        if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
-            if (results->valid) {
-                // Only log once.
-                results->errors.push_back("detected one or more invalid documents (see logs)");
-            }
-            nInvalid++;
-            results->valid = false;
-            log() << "document at location: " << record->id << " is corrupted";
-        }
+    int err = WiredTigerUtil::verifyTable(opCtx, _uri, &results->errors);
+    if (!err) {
+        return;
     }
 
-    if (results->valid) {
-        updateStatsAfterRepair(opCtx, nrecords, dataSizeTotal);
+    if (err == EBUSY) {
+        std::string msg = str::stream()
+            << "Could not complete validation of " << _uri << ". "
+            << "This is a transient issue as the collection was actively "
+               "in use by other operations.";
+
+        warning() << msg;
+        results->warnings.push_back(msg);
+        return;
     }
 
-    output->append("nInvalidDocuments", nInvalid);
-    output->appendNumber("nrecords", nrecords);
-    return Status::OK();
+    std::string msg = str::stream() << "verify() returned " << wiredtiger_strerror(err) << ". "
+                                    << "This indicates structural damage. "
+                                    << "Not examining individual documents.";
+    error() << msg;
+    results->errors.push_back(msg);
+    results->valid = false;
 }
 
 void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,

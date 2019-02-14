@@ -95,12 +95,6 @@ public:
 
     virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 
-    virtual Status validate(OperationContext* opCtx,
-                            ValidateCmdLevel level,
-                            ValidateAdaptor* adaptor,
-                            ValidateResults* results,
-                            BSONObjBuilder* output);
-
     virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,
                                    double scale) const;

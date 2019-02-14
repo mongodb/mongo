@@ -99,11 +99,10 @@ public:
         return false;
     }
 
-    Status validate(OperationContext* opCtx,
-                    ValidateCmdLevel level,
-                    ValidateAdaptor* adaptor,
-                    ValidateResults* results,
-                    BSONObjBuilder* output) override;
+    void validate(OperationContext* opCtx,
+                  ValidateCmdLevel level,
+                  ValidateResults* results,
+                  BSONObjBuilder* output) override;
 
     void appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* result,
@@ -126,9 +125,7 @@ public:
 
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override {}
 
-    void updateStatsAfterRepair(OperationContext* opCtx,
-                                long long numRecords,
-                                long long dataSize) override {}
+    void updateStatsAfterRepair(OperationContext* opCtx, long long numRecords, long long dataSize);
 
     bool isCapped() const override {
         // Capped Collections are not supported
