@@ -955,6 +955,94 @@ TEST_F(ExpressionTruncTest, NullArg) {
     assertEvaluates(Value(BSONNULL), Value(BSONNULL));
 }
 
+/* ------------------------- ExpressionSqrt -------------------------- */
+
+class ExpressionSqrtTest : public ExpressionNaryTestOneArg {
+public:
+    virtual void assertEvaluates(Value input, Value output) override {
+        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        _expr = new ExpressionSqrt(expCtx);
+        ExpressionNaryTestOneArg::assertEvaluates(input, output);
+    }
+};
+
+TEST_F(ExpressionSqrtTest, SqrtIntArg) {
+    assertEvaluates(Value(0), Value(0.0));
+    assertEvaluates(Value(1), Value(1.0));
+    assertEvaluates(Value(25), Value(5.0));
+}
+
+TEST_F(ExpressionSqrtTest, SqrtLongArg) {
+    assertEvaluates(Value(0LL), Value(0.0));
+    assertEvaluates(Value(1LL), Value(1.0));
+    assertEvaluates(Value(25LL), Value(5.0));
+    assertEvaluates(Value(40000000000LL), Value(200000.0));
+}
+
+TEST_F(ExpressionSqrtTest, SqrtDoubleArg) {
+    assertEvaluates(Value(0.0), Value(0.0));
+    assertEvaluates(Value(1.0), Value(1.0));
+    assertEvaluates(Value(25.0), Value(5.0));
+}
+
+TEST_F(ExpressionSqrtTest, SqrtDecimalArg) {
+    assertEvaluates(Value(Decimal128("0")), Value(Decimal128("0")));
+    assertEvaluates(Value(Decimal128("1")), Value(Decimal128("1")));
+    assertEvaluates(Value(Decimal128("25")), Value(Decimal128("5")));
+    assertEvaluates(Value(Decimal128("30.25")), Value(Decimal128("5.5")));
+}
+
+TEST_F(ExpressionSqrtTest, SqrtNullArg) {
+    assertEvaluates(Value(BSONNULL), Value(BSONNULL));
+}
+
+TEST_F(ExpressionSqrtTest, SqrtNaNArg) {
+    assertEvaluates(Value(std::numeric_limits<double>::quiet_NaN()),
+                    Value(std::numeric_limits<double>::quiet_NaN()));
+}
+
+/* ------------------------- ExpressionExp -------------------------- */
+
+class ExpressionExpTest : public ExpressionNaryTestOneArg {
+public:
+    virtual void assertEvaluates(Value input, Value output) override {
+        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        _expr = new ExpressionExp(expCtx);
+        ExpressionNaryTestOneArg::assertEvaluates(input, output);
+    }
+
+    const Decimal128 decimalE = Decimal128("2.718281828459045235360287471352662");
+};
+
+TEST_F(ExpressionExpTest, ExpIntArg) {
+    assertEvaluates(Value(0), Value(1.0));
+    assertEvaluates(Value(1), Value(exp(1.0)));
+}
+
+TEST_F(ExpressionExpTest, ExpLongArg) {
+    assertEvaluates(Value(0LL), Value(1.0));
+    assertEvaluates(Value(1LL), Value(exp(1.0)));
+}
+
+TEST_F(ExpressionExpTest, ExpDoubleArg) {
+    assertEvaluates(Value(0.0), Value(1.0));
+    assertEvaluates(Value(1.0), Value(exp(1.0)));
+}
+
+TEST_F(ExpressionExpTest, ExpDecimalArg) {
+    assertEvaluates(Value(Decimal128("0")), Value(Decimal128("1")));
+    assertEvaluates(Value(Decimal128("1")), Value(decimalE));
+}
+
+TEST_F(ExpressionExpTest, ExpNullArg) {
+    assertEvaluates(Value(BSONNULL), Value(BSONNULL));
+}
+
+TEST_F(ExpressionExpTest, ExpNaNArg) {
+    assertEvaluates(Value(std::numeric_limits<double>::quiet_NaN()),
+                    Value(std::numeric_limits<double>::quiet_NaN()));
+}
+
 /* ------------------------- Old-style tests -------------------------- */
 
 namespace Add {
