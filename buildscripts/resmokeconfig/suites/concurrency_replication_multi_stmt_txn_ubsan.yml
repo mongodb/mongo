@@ -23,6 +23,9 @@ selector:
   # of a transaction (e.g. ErrorCodes.LockTimeout).
   - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
 
+  # Performs direct writes to system.views
+  - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+
   exclude_with_any_tags:
   - requires_sharding
   # Sharing cursors between state functions will fail in this suite because it will attempt to use

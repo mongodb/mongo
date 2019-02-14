@@ -131,6 +131,9 @@ selector:
   # of a transaction (e.g. ErrorCodes.LockTimeout).
   - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
 
+  # Performs direct writes to system.views
+  - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+
   ##
   # Blacklists from concurrency_sharded_replication_multi_stmt_txn
   ##

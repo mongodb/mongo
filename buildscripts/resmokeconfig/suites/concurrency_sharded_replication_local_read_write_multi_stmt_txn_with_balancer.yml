@@ -131,6 +131,9 @@ selector:
   - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
   - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
 
+  # Performs direct writes to system.views
+  - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+
   ##
   # Blacklists from concurrency_sharded_replication_multi_stmt_txn
   ##
