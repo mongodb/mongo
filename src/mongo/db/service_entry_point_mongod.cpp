@@ -118,7 +118,7 @@ public:
         // from the primary.
         if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
             repl::ReadConcernLevel::kLinearizableReadConcern) {
-            uassertStatusOK(mongo::waitForLinearizableReadConcern(opCtx, 0));
+            uassertStatusOK(mongo::waitForLinearizableReadConcern(opCtx));
         }
     }
 
