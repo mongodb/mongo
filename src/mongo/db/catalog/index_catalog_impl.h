@@ -298,7 +298,7 @@ public:
 
     private:
         IndexCatalogImpl* const _catalog;
-        const std::string _ns;
+        const NamespaceString& _nss;
 
         BSONObj _spec;
         IndexBuildMethod _method;

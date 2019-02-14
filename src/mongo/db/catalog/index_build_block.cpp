@@ -50,7 +50,7 @@ IndexCatalogImpl::IndexBuildBlock::IndexBuildBlock(IndexCatalogImpl* catalog,
                                                    const NamespaceString& nss,
                                                    const BSONObj& spec,
                                                    IndexBuildMethod method)
-    : _catalog(catalog), _ns(nss.ns()), _spec(spec.getOwned()), _method(method), _entry(nullptr) {}
+    : _catalog(catalog), _nss(nss), _spec(spec.getOwned()), _method(method), _entry(nullptr) {}
 
 void IndexCatalogImpl::IndexBuildBlock::deleteTemporaryTables(OperationContext* opCtx) {
     if (_indexBuildInterceptor) {
@@ -137,14 +137,7 @@ void IndexCatalogImpl::IndexBuildBlock::fail(OperationContext* opCtx,
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     fassert(17204, collection->ok());  // defensive
 
-    NamespaceString ns(_indexNamespace);
-    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
-    // be no longer a special case.
-    if (ns.coll().startsWith(NamespaceString::kSystemDotViewsCollectionName)) {
-        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_IX));
-    } else {
-        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
-    }
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
     if (_entry) {
         invariant(_catalog->_dropIndex(opCtx, _entry).isOK());
@@ -161,14 +154,7 @@ void IndexCatalogImpl::IndexBuildBlock::success(OperationContext* opCtx, Collect
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     fassert(17207, collection->ok());
-    NamespaceString ns(_indexNamespace);
-    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
-    // be no longer a special case.
-    if (ns.coll().startsWith(NamespaceString::kSystemDotViewsCollectionName)) {
-        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_IX));
-    } else {
-        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
-    }
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
     if (_indexBuildInterceptor) {
         // An index build should never be completed with writes remaining in the interceptor.
@@ -178,7 +164,7 @@ void IndexCatalogImpl::IndexBuildBlock::success(OperationContext* opCtx, Collect
         invariant(_indexBuildInterceptor->areAllConstraintsChecked(opCtx));
     }
 
-    log() << "index build: done building index " << _indexName << " on ns " << _ns;
+    log() << "index build: done building index " << _indexName << " on ns " << _nss;
 
     collection->indexBuildSuccess(opCtx, _entry);
 

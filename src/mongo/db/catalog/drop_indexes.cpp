@@ -200,7 +200,7 @@ Status dropIndexes(OperationContext* opCtx,
                    const BSONObj& cmdObj,
                    BSONObjBuilder* result) {
     return writeConflictRetry(opCtx, "dropIndexes", nss.db(), [opCtx, &nss, &cmdObj, result] {
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
         bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
@@ -215,9 +215,9 @@ Status dropIndexes(OperationContext* opCtx,
         }
 
         // If db/collection does not exist, short circuit and return.
-        Database* db = autoDb.getDb();
-        Collection* collection = db ? db->getCollection(opCtx, nss) : nullptr;
-        if (!db || !collection) {
+        Database* db = autoColl.getDb();
+        Collection* collection = autoColl.getCollection();
+        if (!collection) {
             if (db && ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
                 return Status(ErrorCodes::CommandNotSupportedOnView,
                               str::stream() << "Cannot drop indexes on view " << nss);

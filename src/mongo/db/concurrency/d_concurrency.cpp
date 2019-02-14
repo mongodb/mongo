@@ -265,8 +265,9 @@ void Lock::DBLock::relockWithMode(LockMode newMode) {
     // 2PL would delay the unlocking
     invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
 
-    // Not allowed to change global intent
-    invariant(!isSharedLockMode(_mode) || isSharedLockMode(newMode));
+    // Not allowed to change global intent, so check when going from shared to exclusive.
+    if (isSharedLockMode(_mode) && !isSharedLockMode(newMode))
+        invariant(_opCtx->lockState()->isWriteLocked());
 
     _opCtx->lockState()->unlock(_id);
     _mode = newMode;
