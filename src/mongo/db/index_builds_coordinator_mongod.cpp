@@ -35,6 +35,8 @@
 
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
@@ -42,6 +44,8 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+using namespace indexbuildentryhelpers;
 
 namespace {
 
@@ -227,11 +231,66 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(const UUID& buildUUID,
     return Status::OK();
 }
 
-Status IndexBuildsCoordinatorMongod::setCommitQuorum(const NamespaceString& nss,
+Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
                                                      const std::vector<StringData>& indexNames,
                                                      const CommitQuorumOptions& newCommitQuorum) {
-    // TODO: not yet implemented.
-    return Status::OK();
+    if (indexNames.empty()) {
+        return Status(ErrorCodes::IndexNotFound,
+                      str::stream()
+                          << "Cannot set a new commit quorum on an index build in collection '"
+                          << nss
+                          << "' without providing any indexes.");
+    }
+
+    AutoGetCollectionForRead autoColl(opCtx, nss);
+    Collection* collection = autoColl.getCollection();
+    if (!collection) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Collection '" << nss << "' was not found.");
+    }
+
+    UUID collectionUUID = *collection->uuid();
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto collectionIt = _collectionIndexBuilds.find(collectionUUID);
+    if (collectionIt == _collectionIndexBuilds.end()) {
+        return Status(ErrorCodes::IndexNotFound,
+                      str::stream() << "No index builds found on collection '" << nss << "'.");
+    }
+
+    if (!collectionIt->second->hasIndexBuildState(lk, indexNames.front())) {
+        return Status(ErrorCodes::IndexNotFound,
+                      str::stream() << "Cannot find an index build on collection '" << nss
+                                    << "' with the provided index names");
+    }
+
+    // Use the first index to get the ReplIndexBuildState.
+    std::shared_ptr<ReplIndexBuildState> buildState =
+        collectionIt->second->getIndexBuildState(lk, indexNames.front());
+
+    // Ensure the ReplIndexBuildState has the same indexes as 'indexNames'.
+    bool equal = std::equal(
+        buildState->indexNames.begin(), buildState->indexNames.end(), indexNames.begin());
+    if (buildState->indexNames.size() != indexNames.size() || !equal) {
+        return Status(ErrorCodes::IndexNotFound,
+                      str::stream() << "Provided indexes are not all being "
+                                    << "built by the same index builder in collection '"
+                                    << nss
+                                    << "'.");
+    }
+
+    // See if the new commit quorum is satisfiable.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    Status status = replCoord->checkIfCommitQuorumCanBeSatisfied(newCommitQuorum);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Persist the new commit quorum for the index build and write it to the collection.
+    buildState->commitQuorum = newCommitQuorum;
+    const UUID buildUUID = buildState->buildUUID;
+    return indexbuildentryhelpers::setCommitQuorum(opCtx, buildUUID, newCommitQuorum);
 }
 
 Status IndexBuildsCoordinatorMongod::_finishScanningPhase() {

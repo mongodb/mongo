@@ -388,7 +388,7 @@
         serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
         setIndexCommitQuorum: {
             skipProfilerCheck: true,
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.

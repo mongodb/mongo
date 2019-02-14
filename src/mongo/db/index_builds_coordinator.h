@@ -230,10 +230,12 @@ public:
     virtual Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) = 0;
 
     /**
-     * TODO: This is not yet implemented. (This will have to take a collection IS lock to look up
-     * the collection UUID.)
+     * Sets a new commit quorum on an index build that manages 'indexNames' on collection 'nss'.
+     * If the 'newCommitQuorum' is not satisfiable by the current replica set config, then the
+     * previous commit quorum is kept and the UnsatisfiableCommitQuorum error code is returned.
      */
-    virtual Status setCommitQuorum(const NamespaceString& nss,
+    virtual Status setCommitQuorum(OperationContext* opCtx,
+                                   const NamespaceString& nss,
                                    const std::vector<StringData>& indexNames,
                                    const CommitQuorumOptions& newCommitQuorum) = 0;
 

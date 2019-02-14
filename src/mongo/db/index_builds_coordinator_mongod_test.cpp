@@ -406,6 +406,50 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
     }
 }
 
+TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
+    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
+
+    CommitQuorumOptions newCommitQuorum("majority");
+
+    // Pass in an empty index list.
+    Status status =
+        _indexBuildsCoord->setCommitQuorum(operationContext(), _testFooNss, {}, newCommitQuorum);
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+
+    // Use an invalid collection namespace.
+    NamespaceString nss("bad.collection");
+    status = _indexBuildsCoord->setCommitQuorum(
+        operationContext(), nss, {"a_1", "b_1"}, newCommitQuorum);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+
+    // No index builds are happening on the collection.
+    status = _indexBuildsCoord->setCommitQuorum(
+        operationContext(), _testFooNss, {"a_1", "b_1"}, newCommitQuorum);
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+
+    // Register an index build on _testFooNss.
+    auto testFoo1Future =
+        assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                     _testFooUUID,
+                                                     makeSpecs(_testFooNss, {"a", "b"}),
+                                                     UUID::gen(),
+                                                     IndexBuildProtocol::kTwoPhase,
+                                                     _indexBuildOptions));
+
+    // No index with the name "c" is being built.
+    status =
+        _indexBuildsCoord->setCommitQuorum(operationContext(), _testFooNss, {"c"}, newCommitQuorum);
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+
+    // Pass in extra indexes not being built by the same index builder.
+    status = _indexBuildsCoord->setCommitQuorum(
+        operationContext(), _testFooNss, {"a_1", "b_1", "c_1"}, newCommitQuorum);
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+
+    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+    unittest::assertGet(testFoo1Future.getNoThrow());
+}
+
 }  // namespace
 
 }  // namespace mongo

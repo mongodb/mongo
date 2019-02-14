@@ -90,7 +90,8 @@ public:
 
     Status voteCommitIndexBuild(const UUID& buildUUID, const HostAndPort& hostAndPort) override;
 
-    Status setCommitQuorum(const NamespaceString& nss,
+    Status setCommitQuorum(OperationContext* opCtx,
+                           const NamespaceString& nss,
                            const std::vector<StringData>& indexNames,
                            const CommitQuorumOptions& newCommitQuorum) override;
 

@@ -86,8 +86,11 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassertStatusOK(IndexBuildsCoordinator::get(opCtx)->setCommitQuorum(
-                request().getNamespace(), request().getIndexNames(), request().getCommitQuorum()));
+            uassertStatusOK(
+                IndexBuildsCoordinator::get(opCtx)->setCommitQuorum(opCtx,
+                                                                    request().getNamespace(),
+                                                                    request().getIndexNames(),
+                                                                    request().getCommitQuorum()));
         }
 
     private:

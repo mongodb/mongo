@@ -943,6 +943,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'curop',
+        'db_raii',
+        'index_build_entry_helpers',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
