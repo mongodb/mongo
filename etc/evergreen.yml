@@ -4422,6 +4422,10 @@ tasks:
           --prefix='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
           --dbg=off
           --link-model=dynamic-sdk
+          --enable-free-mon=off
+          --ssl=off
+          --enable-http-client=off
+          --modules=
     - command: shell.exec
       params:
         working_dir: "src/build"
