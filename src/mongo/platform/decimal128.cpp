@@ -626,7 +626,7 @@ Decimal128 Decimal128::divide(const Decimal128& other,
 
 Decimal128 Decimal128::exponential(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return exponential(&throwAwayFlag);
+    return exponential(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::exponential(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -637,7 +637,7 @@ Decimal128 Decimal128::exponential(std::uint32_t* signalingFlags, RoundingMode r
 
 Decimal128 Decimal128::logarithm(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return logarithm(&throwAwayFlag);
+    return logarithm(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::logarithm(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
@@ -719,7 +719,7 @@ Decimal128 Decimal128::quantize(const Decimal128& reference,
 
 Decimal128 Decimal128::squareRoot(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
-    return exponential(&throwAwayFlag);
+    return squareRoot(&throwAwayFlag, roundMode);
 }
 
 Decimal128 Decimal128::squareRoot(std::uint32_t* signalingFlags, RoundingMode roundMode) const {

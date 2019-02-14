@@ -1292,4 +1292,36 @@ TEST(Decimal128Test, TestDecimal128GetLargestNegativeExponentZero) {
     ASSERT_EQUALS(d.getValue().low64, largestNegativeExponentZeroLow64);
 }
 
+/**
+ * Test data was generated using 64 bit versions of these functions, so we must test
+ * approximate results.
+ */
+
+void assertDecimal128ApproxEqual(Decimal128 x, Decimal128 y) {
+    ASSERT_TRUE(x.subtract(y).toAbs().isLess(Decimal128("0.00000005")));
+}
+
+TEST(Decimal128Test, TestExp) {
+    assertDecimal128ApproxEqual(Decimal128("-1").exponential(),
+                                Decimal128("0.3678794411714423215955237701614609"));
+    assertDecimal128ApproxEqual(Decimal128("0").exponential(), Decimal128("1"));
+    assertDecimal128ApproxEqual(Decimal128("1").exponential(),
+                                Decimal128("2.718281828459045235360287471352662"));
+    assertDecimal128ApproxEqual(Decimal128("1.5").exponential(),
+                                Decimal128("4.481689070338064822602055460119276"));
+    assertDecimal128ApproxEqual(Decimal128("1.79769313486231E+308")
+                                    .exponential(Decimal128::RoundingMode::kRoundTowardNegative),
+                                Decimal128("9.999999999999999999999999999999999E+6144"));
+}
+
+TEST(Decimal128Test, TestSqrt) {
+    assertDecimal128ApproxEqual(Decimal128("0").squareRoot(), Decimal128("0"));
+    assertDecimal128ApproxEqual(Decimal128("1").squareRoot(), Decimal128("1"));
+    assertDecimal128ApproxEqual(Decimal128("25").squareRoot(), Decimal128("5"));
+    assertDecimal128ApproxEqual(Decimal128("25.5").squareRoot(),
+                                Decimal128("5.049752469181038976681692958534800"));
+    assertDecimal128ApproxEqual(Decimal128("1.79769313486231E+308")
+                                    .squareRoot(Decimal128::RoundingMode::kRoundTowardNegative),
+                                Decimal128("1.340780792994257506864497209340836E+154"));
+}
 }  // namespace mongo
