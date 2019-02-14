@@ -3987,5 +3987,30 @@ DEATH_TEST_F(TxnParticipantTest,
     txnParticipant->commitPreparedTransaction(opCtx(), commitTimestamp, commitOplogEntryOpTime);
 }
 
+TEST_F(TxnParticipantTest, AbortTransactionOnSessionCheckoutWithoutRefresh) {
+    // This test is intended to mimic the behavior in applyAbortTransaction from
+    // transaction_oplog_application.cpp. This is to ensure that when secondaries see an abort oplog
+    // entry for a non-existent transaction, the state of the transaction is set to aborted.
+
+    // Simulate aborting a transaction on a secondary.
+    repl::UnreplicatedWritesBlock uwb(opCtx());
+    ASSERT(!opCtx()->writesAreReplicated());
+
+    const auto txnNumber = *opCtx()->getTxnNumber();
+
+    // MongoDOperationContextSessionWithoutRefresh will begin a new transaction with txnNumber
+    // unconditionally since the participant's _activeTxnNumber is kUninitializedTxnNumber at time
+    // of session checkout.
+    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx());
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant->inMultiDocumentTransaction());
+    ASSERT_EQ(txnParticipant->getActiveTxnNumber(), txnNumber);
+
+    txnParticipant->unstashTransactionResources(opCtx(), "abortTransaction");
+    txnParticipant->abortActiveTransaction(opCtx());
+    ASSERT_TRUE(txnParticipant->transactionIsAborted());
+}
+
 }  // namespace
 }  // namespace mongo
