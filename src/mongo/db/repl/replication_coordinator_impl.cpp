@@ -99,16 +99,6 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions
 MONGO_FAIL_POINT_DEFINE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
 MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 
-// Tracks the number of operations killed on step down.
-Counter64 userOpsKilled;
-ServerStatusMetricField<Counter64> displayuserOpsKilled("repl.stepDown.userOperationsKilled",
-                                                        &userOpsKilled);
-
-// Tracks the number of operations left running on step down.
-Counter64 userOpsRunning;
-ServerStatusMetricField<Counter64> displayUserOpsRunning("repl.stepDown.userOperationsRunning",
-                                                         &userOpsRunning);
-
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
@@ -1050,10 +1040,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         invariant(status);
     }
 
-    // Reset the counters on step up.
-    userOpsKilled.decrement(userOpsKilled.get());
-    userOpsRunning.decrement(userOpsRunning.get());
-
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
     // our election in onTransitionToPrimary(), above.
     _updateLastCommittedOpTime(lk);
@@ -1765,18 +1751,8 @@ void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
     }
 }
 
-void ReplicationCoordinatorImpl::_updateAndLogStatsOnStepDown(const KillOpContainer* koc) const {
-    userOpsRunning.increment(koc->getUserOpsRunning());
-
-    BSONObjBuilder bob;
-    bob.appendNumber("userOpsKilled", userOpsKilled.get());
-    bob.appendNumber("userOpsRunning", userOpsRunning.get());
-
-    log() << "Successfully stepped down from primary, stats: " << bob.obj();
-}
-
 void ReplicationCoordinatorImpl::_killUserOperationsOnStepDown(
-    const OperationContext* stepDownOpCtx, KillOpContainer* koc) {
+    const OperationContext* stepDownOpCtx) {
     ServiceContext* serviceCtx = stepDownOpCtx->getServiceContext();
     invariant(serviceCtx);
 
@@ -1790,15 +1766,12 @@ void ReplicationCoordinatorImpl::_killUserOperationsOnStepDown(
         OperationContext* toKill = client->getOperationContext();
 
         // Don't kill the stepdown thread.
-        if (toKill && !toKill->isKillPending() && toKill->getOpID() != stepDownOpCtx->getOpID()) {
+        if (toKill && toKill->getOpID() != stepDownOpCtx->getOpID()) {
             const GlobalLockAcquisitionTracker& globalLockTracker =
                 GlobalLockAcquisitionTracker::get(toKill);
             if (globalLockTracker.getGlobalWriteLocked() ||
                 globalLockTracker.getGlobalSharedLockTaken()) {
                 serviceCtx->killOperation(lk, toKill, ErrorCodes::InterruptedDueToStepDown);
-                userOpsKilled.increment();
-            } else {
-                koc->incrUserOpsRunningBy();
             }
         }
     }
@@ -1819,10 +1792,7 @@ void ReplicationCoordinatorImpl::KillOpContainer::killOpThreadFn() {
     OperationContext* opCtx = uniqueOpCtx.get();
 
     while (true) {
-        // Reset the value before killing user operations as we only want to track the number
-        // of operations that's running after step down.
-        _userOpsRunning = 0;
-        _replCord->_killUserOperationsOnStepDown(_stepDownOpCtx, this);
+        _replCord->_killUserOperationsOnStepDown(_stepDownOpCtx);
 
         // Destroy all stashed transaction resources, in order to release locks.
         SessionKiller::Matcher matcherAllSessions(
@@ -1859,14 +1829,6 @@ void ReplicationCoordinatorImpl::KillOpContainer::stopAndWaitForKillOpThread() {
     }
     _killOpThread->join();
     _killOpThread.reset();
-}
-
-size_t ReplicationCoordinatorImpl::KillOpContainer::getUserOpsRunning() const {
-    return _userOpsRunning;
-}
-
-void ReplicationCoordinatorImpl::KillOpContainer::incrUserOpsRunningBy(size_t val) {
-    _userOpsRunning += val;
 }
 
 void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
@@ -2017,7 +1979,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     onExitGuard.dismiss();
     updateMemberState();
-    _updateAndLogStatsOnStepDown(&koc);
 
     // Schedule work to (potentially) step back up once the stepdown period has ended.
     _scheduleWorkAt(stepDownUntil, [=](const executor::TaskExecutor::CallbackArgs& cbData) {

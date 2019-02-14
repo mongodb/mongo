@@ -7,11 +7,6 @@
 
     load("jstests/libs/check_log.js");
 
-    function getNotMasterUnackWritesCounter() {
-        return assert.commandWorked(primaryDB.adminCommand({serverStatus: 1}))
-            .metrics.repl.network.notMasterUnacknowledgedWrites;
-    }
-
     const collName = "not_master_unacknowledged_write";
 
     var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
@@ -60,8 +55,6 @@
 
     var awaitShell = startParallelShell(command, primary.port);
 
-    let failedUnackWritesBefore = getNotMasterUnackWritesCounter();
-
     jsTestLog("Beginning unacknowledged insert");
     primaryColl.insertOne({}, {writeConcern: {w: 0}});
 
@@ -73,11 +66,5 @@
         primary.getDB("admin").isMaster();
     }, [], "network");
     assert.includes(result.toString(), "network error while attempting to run command 'isMaster'");
-
-    // Validate the number of unacknowledged writes failed due to step down resulted in network
-    // disconnection.
-    let failedUnackWritesAfter = getNotMasterUnackWritesCounter();
-    assert.eq(failedUnackWritesAfter, failedUnackWritesBefore + 1);
-
     rst.stopSet();
 })();

@@ -414,7 +414,6 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     }
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-    _updateAndLogStatsOnStepDown(&koc);
     _replExecutor->signalEvent(finishedEvent);
 }
 
