@@ -313,10 +313,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj
     wunit.commit();
 
     if (MONGO_FAIL_POINT(crashAfterStartingIndexBuild)) {
-        log() << "Index build interrupted due to 'crashAfterStartingIndexBuild' failpoint. Exiting "
-                 "after waiting for changes to become durable.";
-        Locker::LockSnapshot lockInfo;
-        invariant(_opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
+        log() << "Index build interrupted due to 'crashAfterStartingIndexBuild' failpoint. Will "
+                 "exit after waiting for changes to become durable (while holding onto locks).";
+        // We are holding onto locks when calling waitUntilDurable, which is unsafe, but acceptable
+        // for this failpoint until further work can be done. See SERVER-39591.
         if (_opCtx->recoveryUnit()->waitUntilDurable()) {
             quickExit(EXIT_TEST);
         }
