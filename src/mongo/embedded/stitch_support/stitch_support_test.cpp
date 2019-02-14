@@ -421,6 +421,8 @@ TEST_F(StitchSupportTest, CheckProjectionProducesExpectedStatus) {
     ASSERT_EQ(
         "$textScore, $sortKey, $recordId, $geoNear and $returnKey are not allowed in this context",
         checkProjectionStatus("{a: {$meta: 'textScore'}}", "{_id: 1, a: 100, b: 200}"));
+    ASSERT_EQ("Unsupported projection option: a: { b: 0 }",
+              checkProjectionStatus("{a: {b: 0}}", "{_id: 1, a: {b: 200}}"));
 }
 
 TEST_F(StitchSupportTest, CheckProjectionCollatesRespectfully) {
