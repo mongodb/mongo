@@ -57,31 +57,13 @@ CommitQuorumOptions::CommitQuorumOptions(const std::string& modeOpts) {
     invariant(!mode.empty());
 }
 
-Status CommitQuorumOptions::parse(const BSONObj& obj) {
+Status CommitQuorumOptions::parse(const BSONElement& commitQuorumElement) {
     reset();
-    if (obj.isEmpty()) {
-        return Status(ErrorCodes::FailedToParse, "commit quorum object cannot be empty");
-    }
-
-    BSONElement commitQuorumElement;
-
-    for (auto field : obj) {
-        const auto fieldName = field.fieldNameStringData();
-        if (fieldName == kCommitQuorumField) {
-            commitQuorumElement = field;
-        } else {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "unrecognized commit quorum field: " << fieldName);
-        }
-    }
 
     if (commitQuorumElement.isNumber()) {
         numNodes = commitQuorumElement.numberInt();
     } else if (commitQuorumElement.type() == String) {
         mode = commitQuorumElement.valuestrsafe();
-    } else if (commitQuorumElement.eoo() || commitQuorumElement.type() == jstNULL ||
-               commitQuorumElement.type() == Undefined) {
-        numNodes = 1;
     } else {
         return Status(ErrorCodes::FailedToParse, "commitQuorum has to be a number or a string");
     }
@@ -89,22 +71,25 @@ Status CommitQuorumOptions::parse(const BSONObj& obj) {
     return Status::OK();
 }
 
-CommitQuorumOptions CommitQuorumOptions::deserializerForIDL(const BSONObj& obj) {
+CommitQuorumOptions CommitQuorumOptions::deserializerForIDL(
+    const BSONElement& commitQuorumElement) {
     CommitQuorumOptions commitQuorumOptions;
-    uassertStatusOK(commitQuorumOptions.parse(obj));
+    uassertStatusOK(commitQuorumOptions.parse(commitQuorumElement));
     return commitQuorumOptions;
 }
 
 BSONObj CommitQuorumOptions::toBSON() const {
     BSONObjBuilder builder;
-
-    if (mode.empty()) {
-        builder.append(kCommitQuorumField, numNodes);
-    } else {
-        builder.append(kCommitQuorumField, mode);
-    }
-
+    append(kCommitQuorumField, &builder);
     return builder.obj();
+}
+
+void CommitQuorumOptions::append(StringData fieldName, BSONObjBuilder* builder) const {
+    if (mode.empty()) {
+        builder->append(kCommitQuorumField, numNodes);
+    } else {
+        builder->append(kCommitQuorumField, mode);
+    }
 }
 
 }  // namespace mongo

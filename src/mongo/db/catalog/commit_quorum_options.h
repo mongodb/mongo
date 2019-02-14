@@ -60,14 +60,14 @@ public:
 
     explicit CommitQuorumOptions(const std::string& modeOpts);
 
-    Status parse(const BSONObj& obj);
+    Status parse(const BSONElement& commitQuorumElement);
 
     /**
-     * Returns an instance of CommitQuorumOptions from a BSONObj.
+     * Returns an instance of CommitQuorumOptions from a BSONElement.
      *
-     * uasserts() if the obj cannot be deserialized.
+     * uasserts() if the 'commitQuorumElement' cannot be deserialized.
      */
-    static CommitQuorumOptions deserializerForIDL(const BSONObj& obj);
+    static CommitQuorumOptions deserializerForIDL(const BSONElement& commitQuorumElement);
 
     void reset() {
         numNodes = 0;
@@ -76,6 +76,9 @@ public:
 
     // Returns the BSON representation of this object.
     BSONObj toBSON() const;
+
+    // Appends the BSON representation of this object.
+    void append(StringData fieldName, BSONObjBuilder* builder) const;
 
     // The 'commitQuorum' parameter to define the required quorum for the index builds to commit.
     // The 'mode' represents the string format and takes precedence over the number format

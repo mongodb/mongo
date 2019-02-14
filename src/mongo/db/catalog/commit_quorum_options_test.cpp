@@ -36,49 +36,49 @@
 namespace mongo {
 namespace {
 
-TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseOnEmptyDocument) {
-    auto status = CommitQuorumOptions().parse({});
+TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseOnEmptyElement) {
+    BSONObj obj = BSON("commitQuorum" << BSONObj());
+    auto status = CommitQuorumOptions().parse(obj.getField("commitQuorum"));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("commit quorum object cannot be empty", status.reason());
+    ASSERT_EQUALS("commitQuorum has to be a number or a string", status.reason());
 }
 
 TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseIfCommitQuorumIsNotNumberOrString) {
-    auto status = CommitQuorumOptions().parse(BSON("commitQuorum" << BSONObj()));
+    BSONObj obj = BSON("commitQuorum" << BSONObj());
+    auto status = CommitQuorumOptions().parse(obj.getField("commitQuorum"));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
     ASSERT_EQUALS("commitQuorum has to be a number or a string", status.reason());
 }
 
 TEST(CommitQuorumOptionsTest, ParseSetsNumNodesIfCommitQuorumIsANumber) {
     CommitQuorumOptions options;
-    ASSERT_OK(options.parse(BSON("commitQuorum" << 3)));
+    BSONObj obj = BSON("commitQuorum" << 3);
+    ASSERT_OK(options.parse(obj.getField("commitQuorum")));
     ASSERT_EQUALS(3, options.numNodes);
     ASSERT_EQUALS("", options.mode);
 }
 
 TEST(CommitQuorumOptionsTest, ParseSetsModeIfCommitQuorumIsAString) {
     CommitQuorumOptions options;
-    ASSERT_OK(options.parse(BSON("commitQuorum" << CommitQuorumOptions::kMajority)));
+    BSONObj obj = BSON("commitQuorum" << CommitQuorumOptions::kMajority);
+    ASSERT_OK(options.parse(obj.getField("commitQuorum")));
     ASSERT_EQUALS(0, options.numNodes);
     ASSERT_EQUALS(CommitQuorumOptions::kMajority, options.mode);
-}
-
-TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseOnUnknownField) {
-    auto status = CommitQuorumOptions().parse(BSON("x" << 123));
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("unrecognized commit quorum field: x", status.reason());
 }
 
 TEST(CommitQuorumOptionsTest, ToBSON) {
     {
         CommitQuorumOptions options;
-        ASSERT_OK(options.parse(BSON("commitQuorum" << 1)));
+        BSONObj obj = BSON("commitQuorum" << 1);
+        ASSERT_OK(options.parse(obj.getField("commitQuorum")));
         ASSERT_TRUE(options.toBSON().woCompare(BSON("commitQuorum" << 1)) == 0);
     }
 
     {
         CommitQuorumOptions options;
-        ASSERT_OK(options.parse(BSON("commitQuorum"
-                                     << "someTag")));
+        BSONObj obj = BSON("commitQuorum"
+                           << "someTag");
+        ASSERT_OK(options.parse(obj.getField("commitQuorum")));
         ASSERT_TRUE(options.toBSON().woCompare(BSON("commitQuorum"
                                                     << "someTag")) == 0);
     }

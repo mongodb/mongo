@@ -33,9 +33,9 @@ global:
 
 types:
     CommitQuorum:
-        bson_serialization_type: object
+        bson_serialization_type: any
         description: "CommitQuorumOptions defines the required quorum for the index builds to 
                       commit."
         cpp_type: "mongo::CommitQuorumOptions"
-        serializer: "mongo::CommitQuorumOptions::toBSON"
+        serializer: "mongo::CommitQuorumOptions::append"
         deserializer: "mongo::CommitQuorumOptions::deserializerForIDL"
