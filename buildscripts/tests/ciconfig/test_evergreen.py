@@ -101,6 +101,34 @@ class TestTask(unittest.TestCase):
         self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
         self.assertEqual("core", task.resmoke_suite)
 
+    def test_resmoke_args_gen(self):
+        task_dict = {
+            "name":
+                "jsCore", "commands": [{
+                    "func": "generate resmoke tasks",
+                    "vars": {"task": "core", "resmoke_args": "--shellWriteMode=commands"}
+                }]
+        }
+        task = _evergreen.Task(task_dict)
+
+        self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
+        self.assertEqual("core", task.resmoke_suite)
+
+    def test_resmoke_args_gen_with_suite(self):
+        task_dict = {
+            "name":
+                "jsCore", "commands": [{
+                    "func": "generate resmoke tasks", "vars": {
+                        "task": "jsCore", "suite": "core",
+                        "resmoke_args": "--shellWriteMode=commands"
+                    }
+                }]
+        }
+        task = _evergreen.Task(task_dict)
+
+        self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
+        self.assertEqual("core", task.resmoke_suite)
+
 
 class TestTaskGroup(unittest.TestCase):
     """Unit tests for the TaskGroup class."""
