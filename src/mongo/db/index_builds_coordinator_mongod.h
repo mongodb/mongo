@@ -74,7 +74,8 @@ public:
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
-        IndexBuildProtocol protocol) override;
+        IndexBuildProtocol protocol,
+        IndexBuildOptions indexBuildOptions) override;
 
     /**
      * TODO: not yet implemented.

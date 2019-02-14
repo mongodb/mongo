@@ -142,6 +142,11 @@ public:
     }
 
     /**
+     * Gets the number of data-bearing members in this configuration.
+     */
+    int getNumDataBearingMembers() const;
+
+    /**
      * Gets a begin iterator over the MemberConfigs stored in this ReplSetConfig.
      */
     MemberIterator membersBegin() const {

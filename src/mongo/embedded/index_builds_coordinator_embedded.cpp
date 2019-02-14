@@ -48,11 +48,12 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
                                                 CollectionUUID collectionUUID,
                                                 const std::vector<BSONObj>& specs,
                                                 const UUID& buildUUID,
-                                                IndexBuildProtocol protocol) {
+                                                IndexBuildProtocol protocol,
+                                                IndexBuildOptions indexBuildOptions) {
     invariant(!opCtx->lockState()->isLocked());
 
-    auto statusWithOptionalResult =
-        _registerAndSetUpIndexBuild(opCtx, collectionUUID, specs, buildUUID, protocol);
+    auto statusWithOptionalResult = _registerAndSetUpIndexBuild(
+        opCtx, collectionUUID, specs, buildUUID, protocol, indexBuildOptions.commitQuorum);
     if (!statusWithOptionalResult.isOK()) {
         return statusWithOptionalResult.getStatus();
     }

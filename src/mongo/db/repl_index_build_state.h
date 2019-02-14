@@ -36,9 +36,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
@@ -76,13 +76,15 @@ struct ReplIndexBuildState {
                         const UUID& collUUID,
                         const std::string& dbName,
                         const std::vector<BSONObj>& specs,
-                        IndexBuildProtocol protocol)
+                        IndexBuildProtocol protocol,
+                        boost::optional<CommitQuorumOptions> commitQuorum)
         : buildUUID(indexBuildUUID),
           collectionUUID(collUUID),
           dbName(dbName),
           indexNames(extractIndexNames(specs)),
           indexSpecs(specs),
-          protocol(protocol) {}
+          protocol(protocol),
+          commitQuorum(commitQuorum) {}
 
     // Uniquely identifies this index build across replica set members.
     const UUID buildUUID;
@@ -109,9 +111,9 @@ struct ReplIndexBuildState {
     // Protects the state below.
     mutable stdx::mutex mutex;
 
-    // The quorum required of commit ready replica set members before the index build will be
-    // allowed to commit.
-    WriteConcernOptions commitQuorum;
+    // Secondaries do not set this information, so it is only set on primaries or on
+    // transition to primary.
+    boost::optional<CommitQuorumOptions> commitQuorum;
 
     // Tracks the members of the replica set that have finished building the index(es) and are ready
     // to commit the index(es).

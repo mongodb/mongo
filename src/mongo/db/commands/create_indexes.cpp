@@ -51,6 +51,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -68,6 +69,7 @@ namespace {
 
 constexpr auto kIndexesFieldName = "indexes"_sd;
 constexpr auto kCommandName = "createIndexes"_sd;
+constexpr auto kCommitQuorumFieldName = "commitQuorum"_sd;
 constexpr auto kTwoPhaseCommandName = "twoPhaseCreateIndexes"_sd;
 constexpr auto kCreateCollectionAutomaticallyFieldName = "createdCollectionAutomatically"_sd;
 constexpr auto kNumIndexesBeforeFieldName = "numIndexesBefore"_sd;
@@ -135,7 +137,8 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             }
 
             hasIndexesField = true;
-        } else if (kCommandName == cmdElemFieldName || kTwoPhaseCommandName == cmdElemFieldName ||
+        } else if (kCommandName == cmdElemFieldName || kCommitQuorumFieldName == cmdElemFieldName ||
+                   kTwoPhaseCommandName == cmdElemFieldName ||
                    isGenericArgument(cmdElemFieldName)) {
             continue;
         } else {
@@ -158,6 +161,25 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
     }
 
     return indexSpecs;
+}
+
+/**
+ * Retrieves the commit quorum from 'cmdObj' if it is present. If it isn't, we provide a default
+ * commit quorum, which consists of all the data-bearing nodes.
+ */
+boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* opCtx,
+                                                             const BSONObj& cmdObj) {
+    if (cmdObj.hasField(kCommitQuorumFieldName)) {
+        CommitQuorumOptions commitQuorum;
+        uassertStatusOK(commitQuorum.parse(cmdObj.getField(kCommitQuorumFieldName)));
+        return commitQuorum;
+    } else {
+        // Retrieve the default commit quorum if one wasn't passed in, which consists of all
+        // data-bearing nodes.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        int numDataBearingMembers = replCoord->getConfig().getNumDataBearingMembers();
+        return CommitQuorumOptions(numDataBearingMembers);
+    }
 }
 
 /**
@@ -450,6 +472,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
     auto specs = uassertStatusOK(
         parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
+    boost::optional<CommitQuorumOptions> commitQuorum = parseAndGetCommitQuorum(opCtx, cmdObj);
 
     // Preliminary checks before handing control over to IndexBuildsCoordinator:
     // 1) We are in a replication mode that allows for index creation.
@@ -548,9 +571,11 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         (runTwoPhaseBuild) ? IndexBuildProtocol::kTwoPhase : IndexBuildProtocol::kSinglePhase;
     log() << "Registering index build: " << buildUUID;
     ReplIndexBuildState::IndexCatalogStats stats;
+    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {commitQuorum};
+
     try {
-        auto buildIndexFuture = uassertStatusOK(
-            indexBuildsCoord->startIndexBuild(opCtx, *collectionUUID, specs, buildUUID, protocol));
+        auto buildIndexFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
+            opCtx, *collectionUUID, specs, buildUUID, protocol, indexBuildOptions));
 
         auto deadline = opCtx->getDeadline();
         // Date_t::max() means no deadline.
@@ -613,7 +638,9 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 }
 
 /**
- * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
+ * { createIndexes : "bar",
+ *   indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ],
+ *   commitQuorum: "majority" }
  */
 class CmdCreateIndex : public ErrmsgCommandDeprecated {
 public:
@@ -658,7 +685,9 @@ public:
  * Builds project would have to be turned on all at once because so much testing already exists that
  * would break with incremental changes.
  *
- * {twoPhaseCreateIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ]}
+ * {twoPhaseCreateIndexes : "bar",
+ *  indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ],
+ *  commitQuorum: "majority" }
  */
 class CmdTwoPhaseCreateIndex : public ErrmsgCommandDeprecated {
 public:

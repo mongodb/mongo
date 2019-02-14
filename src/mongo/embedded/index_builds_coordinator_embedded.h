@@ -61,7 +61,8 @@ public:
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
-        IndexBuildProtocol protocol) override;
+        IndexBuildProtocol protocol,
+        IndexBuildOptions indexBuildOptions) override;
 
     /**
      * None of the following functions should ever be called on an embedded server node.

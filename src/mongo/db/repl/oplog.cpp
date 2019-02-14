@@ -287,13 +287,18 @@ Status startIndexBuild(OperationContext* opCtx,
     if (!statusWithIndexes.isOK()) {
         return statusWithIndexes.getStatus();
     }
+
+    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {/*commitQuorum=*/boost::none};
+
+    // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of it.
     return IndexBuildsCoordinator::get(opCtx)
         ->startIndexBuild(opCtx,
                           collUUID,
                           statusWithIndexes.getValue(),
                           indexBuildUUID,
                           /* This oplog entry is only replicated for two-phase index builds */
-                          IndexBuildProtocol::kTwoPhase)
+                          IndexBuildProtocol::kTwoPhase,
+                          indexBuildOptions)
         .getStatus();
 }
 

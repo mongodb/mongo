@@ -943,7 +943,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'curop',
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
@@ -958,6 +957,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         '$BUILD_DIR/mongo/db/catalog_raii',
+        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
         "$BUILD_DIR/mongo/db/catalog/index_builds_manager",
     ],
     LIBDEPS_PRIVATE=[
@@ -976,8 +976,8 @@ env.CppUnitTest(
         "index_builds_coordinator_mongod_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
         "index_builds_coordinator_mongod",
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
     ]
 )
 

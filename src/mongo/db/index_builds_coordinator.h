@@ -68,6 +68,13 @@ class ServiceContext;
 class IndexBuildsCoordinator {
 public:
     /**
+     * Contains additional information required by 'startIndexBuild()'.
+     */
+    struct IndexBuildOptions {
+        boost::optional<CommitQuorumOptions> commitQuorum;
+    };
+
+    /**
      * Invariants that there are no index builds in-progress.
      */
     virtual ~IndexBuildsCoordinator();
@@ -104,7 +111,8 @@ public:
         CollectionUUID collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
-        IndexBuildProtocol protocol) = 0;
+        IndexBuildProtocol protocol,
+        IndexBuildOptions indexBuildOptions) = 0;
 
     /**
      * Sets up the in-memory and persisted state of the index build.
@@ -345,7 +353,8 @@ protected:
                                 CollectionUUID collectionUUID,
                                 const std::vector<BSONObj>& specs,
                                 const UUID& buildUUID,
-                                IndexBuildProtocol protocol);
+                                IndexBuildProtocol protocol,
+                                boost::optional<CommitQuorumOptions> commitQuorum);
 
     /**
      * Runs the index build on the caller thread. Handles unregistering the index build and setting

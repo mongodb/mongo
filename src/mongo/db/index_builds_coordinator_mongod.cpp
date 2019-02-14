@@ -85,9 +85,10 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                                               CollectionUUID collectionUUID,
                                               const std::vector<BSONObj>& specs,
                                               const UUID& buildUUID,
-                                              IndexBuildProtocol protocol) {
-    auto statusWithOptionalResult =
-        _registerAndSetUpIndexBuild(opCtx, collectionUUID, specs, buildUUID, protocol);
+                                              IndexBuildProtocol protocol,
+                                              IndexBuildOptions indexBuildOptions) {
+    auto statusWithOptionalResult = _registerAndSetUpIndexBuild(
+        opCtx, collectionUUID, specs, buildUUID, protocol, indexBuildOptions.commitQuorum);
     if (!statusWithOptionalResult.isOK()) {
         return statusWithOptionalResult.getStatus();
     }

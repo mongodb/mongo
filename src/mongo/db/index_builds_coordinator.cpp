@@ -218,8 +218,13 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
 
         // We run the index build using the single phase protocol as we already hold the global
         // write lock.
-        auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-            buildUUID, collectionUUID, dbName, specs, IndexBuildProtocol::kSinglePhase);
+        auto replIndexBuildState =
+            std::make_shared<ReplIndexBuildState>(buildUUID,
+                                                  collectionUUID,
+                                                  dbName,
+                                                  specs,
+                                                  IndexBuildProtocol::kSinglePhase,
+                                                  /*commitQuorum=*/boost::none);
 
         Status status = [&]() {
             stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -495,11 +500,13 @@ void IndexBuildsCoordinator::_unregisterIndexBuild(
 }
 
 StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
-IndexBuildsCoordinator::_registerAndSetUpIndexBuild(OperationContext* opCtx,
-                                                    CollectionUUID collectionUUID,
-                                                    const std::vector<BSONObj>& specs,
-                                                    const UUID& buildUUID,
-                                                    IndexBuildProtocol protocol) {
+IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
+    OperationContext* opCtx,
+    CollectionUUID collectionUUID,
+    const std::vector<BSONObj>& specs,
+    const UUID& buildUUID,
+    IndexBuildProtocol protocol,
+    boost::optional<CommitQuorumOptions> commitQuorum) {
     auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(collectionUUID);
     if (nss.isEmpty()) {
         return Status(ErrorCodes::NamespaceNotFound,
@@ -546,7 +553,7 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(OperationContext* opCtx,
     }
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, dbName, filteredSpecs, protocol);
+        buildUUID, collectionUUID, dbName, filteredSpecs, protocol, commitQuorum);
     replIndexBuildState->stats.numIndexesBefore = _getNumIndexesTotal(opCtx, collection);
 
     Status status = _registerIndexBuild(lk, replIndexBuildState);
