@@ -62,7 +62,13 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
     }
 
     auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(collectionUUID);
+    if (nss.isEmpty()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Cannot create index on collection '" << collectionUUID
+                                    << "' because the collection no longer exists.");
+    }
     auto dbName = nss.db().toString();
+
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
         buildUUID, collectionUUID, dbName, indexNames, specs, protocol);
 
