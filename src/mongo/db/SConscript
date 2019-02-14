@@ -962,6 +962,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'db_raii',
+        'index_build_entry_helpers',
+        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
@@ -996,7 +998,6 @@ env.Library(
         "service_context",
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
-        "$BUILD_DIR/mongo/db/catalog/catalog_impl",
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
         "$BUILD_DIR/mongo/db/catalog/index_build_entry_idl",
         "$BUILD_DIR/mongo/db/matcher/expressions_mongod_only",

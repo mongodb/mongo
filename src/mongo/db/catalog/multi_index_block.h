@@ -106,7 +106,7 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    using OnInitFn = stdx::function<void()>;
+    using OnInitFn = stdx::function<Status(std::vector<BSONObj>& specs)>;
     StatusWith<std::vector<BSONObj>> init(OperationContext* opCtx,
                                           Collection* collection,
                                           const std::vector<BSONObj>& specs,

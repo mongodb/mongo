@@ -176,11 +176,12 @@ void MultiIndexBlock::ignoreUniqueConstraint() {
     _ignoreUnique = true;
 }
 
-MultiIndexBlock::OnInitFn MultiIndexBlock::kNoopOnInitFn = [] {};
+MultiIndexBlock::OnInitFn MultiIndexBlock::kNoopOnInitFn =
+    [](std::vector<BSONObj>& specs) -> Status { return Status::OK(); };
 
 MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(OperationContext* opCtx,
                                                                         const Collection* coll) {
-    return [ opCtx, ns = coll->ns() ]() {
+    return [ opCtx, ns = coll->ns() ](std::vector<BSONObj> & specs)->Status {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
             replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
@@ -191,6 +192,8 @@ MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(Operatio
                 opCtx,
                 BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
         }
+
+        return Status::OK();
     };
 }
 
@@ -342,7 +345,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
     if (isBackgroundBuilding())
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
-    onInit();
+    status = onInit(indexInfoObjs);
+    if (!status.isOK()) {
+        return status;
+    }
 
     wunit.commit();
 

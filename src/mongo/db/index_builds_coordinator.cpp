@@ -33,14 +33,18 @@
 
 #include "mongo/db/index_builds_coordinator.h"
 
+#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -51,6 +55,8 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+using namespace indexbuildentryhelpers;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
@@ -530,6 +536,12 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
                                     << "' because the collection no longer exists");
     }
 
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->canAcceptWritesFor(opCtx, nss)) {
+        // TODO: Put in a well-defined initialization function within the coordinator.
+        ensureIndexBuildEntriesNamespaceExists(opCtx);
+    }
+
     // Lock from when we ascertain what indexes to build through to when the build is registered
     // on the Coordinator and persistedly set up in the catalog. This serializes setting up an
     // index build so that no attempts are made to register the same build twice.
@@ -565,7 +577,26 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
     // Two-phase index builds write a different oplog entry than the default behavior which
     // writes a no-op just to generate an optime.
     if (IndexBuildProtocol::kTwoPhase == replIndexBuildState->protocol) {
-        onInitFn = [&] {
+        onInitFn = [&](std::vector<BSONObj>& specs) {
+            // Only the primary node writes an index build entry to the collection as the
+            // secondaries will replicate it.
+            if (replCoord->canAcceptWritesFor(opCtx, nss)) {
+                invariant(replIndexBuildState->commitQuorum);
+                std::vector<std::string> indexNames;
+                for (const auto& spec : specs) {
+                    indexNames.push_back(spec.getStringField(IndexDescriptor::kIndexNameFieldName));
+                }
+
+                IndexBuildEntry entry(replIndexBuildState->buildUUID,
+                                      *collection->uuid(),
+                                      *replIndexBuildState->commitQuorum,
+                                      indexNames);
+                Status status = addIndexBuildEntry(opCtx, entry);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+
             opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
                 opCtx,
                 nss,
@@ -573,6 +604,8 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
                 replIndexBuildState->buildUUID,
                 filteredSpecs,
                 false /* fromMigrate */);
+
+            return Status::OK();
         };
     } else {
         onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection);
@@ -585,7 +618,8 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
                                                  onInitFn,
                                                  /*forRecovery=*/false);
     if (!status.isOK()) {
-        // Unregister the index build before setting the promise, so callers do not see the build
+        // Unregister the index build before setting the promise, so callers do not see the
+        // build
         // again.
         _unregisterIndexBuild(lk, replIndexBuildState);
 
@@ -665,6 +699,20 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
     }
 
     invariant(opCtx->lockState()->isDbLockedForMode(replState->dbName, MODE_X));
+
+    if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+        // Only the primary node removes the index build entry, as the secondaries will
+        // replicate.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
+            status = removeIndexBuildEntry(opCtx, buildUUID);
+            if (!status.isOK()) {
+                logFailure(status, nss, replState);
+                return;
+            }
+        }
+    }
+
     _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
 
     log() << "Index build completed successfully: " << replState->buildUUID << ": " << nss << " ( "
