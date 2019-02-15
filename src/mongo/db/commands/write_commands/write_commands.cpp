@@ -262,7 +262,7 @@ private:
 
     void _transactionChecks(OperationContext* opCtx) const {
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        if (!txnParticipant || !txnParticipant->inMultiDocumentTransaction())
+        if (!txnParticipant || !txnParticipant.inMultiDocumentTransaction())
             return;
         uassert(50791,
                 str::stream() << "Cannot write to system collection " << ns().toString()

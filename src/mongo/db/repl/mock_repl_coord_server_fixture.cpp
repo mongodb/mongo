@@ -92,14 +92,6 @@ void MockReplCoordServerFixture::setUp() {
         stdx::make_unique<repl::DropPendingCollectionReaper>(repl::StorageInterface::get(service)));
 }
 
-void MockReplCoordServerFixture::tearDown() {
-    // ServiceContextMongoDTest::tearDown() will try to create it's own opCtx, and it's not
-    // allowed to have 2 present per client, so destroy this one.
-    _opCtx.reset();
-
-    ServiceContextMongoDTest::tearDown();
-}
-
 void MockReplCoordServerFixture::insertOplogEntry(const repl::OplogEntry& entry) {
     AutoGetCollection autoColl(opCtx(), NamespaceString::kRsOplogNamespace, MODE_IX);
     auto coll = autoColl.getCollection();

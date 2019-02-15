@@ -93,7 +93,7 @@ public:
                << opCtx->getTxnNumber() << " on session " << opCtx->getLogicalSessionId()->toBSON();
 
         // commitTransaction is retryable.
-        if (txnParticipant->transactionIsCommitted()) {
+        if (txnParticipant.transactionIsCommitted()) {
             // We set the client last op to the last optime observed by the system to ensure that
             // we wait for the specified write concern on an optime greater than or equal to the
             // commit oplog entry.
@@ -109,7 +109,7 @@ public:
 
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
-                txnParticipant->inMultiDocumentTransaction());
+                txnParticipant.inMultiDocumentTransaction());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeCommitingTxn, opCtx, "hangBeforeCommitingTxn");
@@ -117,10 +117,10 @@ public:
         auto optionalCommitTimestamp = cmd.getCommitTimestamp();
         if (optionalCommitTimestamp) {
             // commitPreparedTransaction will throw if the transaction is not prepared.
-            txnParticipant->commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
+            txnParticipant.commitPreparedTransaction(opCtx, optionalCommitTimestamp.get(), {});
         } else {
             // commitUnpreparedTransaction will throw if the transaction is prepared.
-            txnParticipant->commitUnpreparedTransaction(opCtx);
+            txnParticipant.commitUnpreparedTransaction(opCtx);
         }
         if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
             uasserted(ErrorCodes::HostUnreachable,
@@ -172,12 +172,12 @@ public:
 
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
-                txnParticipant->inMultiDocumentTransaction());
+                txnParticipant.inMultiDocumentTransaction());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeAbortingTxn, opCtx, "hangBeforeAbortingTxn");
 
-        txnParticipant->abortActiveTransaction(opCtx);
+        txnParticipant.abortActiveTransaction(opCtx);
 
         if (MONGO_FAIL_POINT(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic)) {
             uasserted(ErrorCodes::HostUnreachable,

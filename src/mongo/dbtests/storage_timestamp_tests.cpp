@@ -2638,14 +2638,14 @@ public:
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
 
-        txnParticipant->beginOrContinue(
-            *_opCtx->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
-        txnParticipant->unstashTransactionResources(_opCtx, "insert");
+        txnParticipant.beginOrContinue(
+            _opCtx, *_opCtx->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+        txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);
             insertDocument(autoColl.getCollection(), InsertStatement(doc));
         }
-        txnParticipant->stashTransactionResources(_opCtx);
+        txnParticipant.stashTransactionResources(_opCtx);
 
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
@@ -2687,11 +2687,11 @@ public:
         ASSERT(txnParticipant);
         logTimestamps();
 
-        txnParticipant->unstashTransactionResources(_opCtx, "insert");
+        txnParticipant.unstashTransactionResources(_opCtx, "insert");
 
-        txnParticipant->commitUnpreparedTransaction(_opCtx);
+        txnParticipant.commitUnpreparedTransaction(_opCtx);
 
-        txnParticipant->stashTransactionResources(_opCtx);
+        txnParticipant.stashTransactionResources(_opCtx);
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
@@ -2746,11 +2746,11 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitTimestamp, false);
         }
-        txnParticipant->unstashTransactionResources(_opCtx, "insert");
+        txnParticipant.unstashTransactionResources(_opCtx, "insert");
 
-        txnParticipant->prepareTransaction(_opCtx, {});
+        txnParticipant.prepareTransaction(_opCtx, {});
 
-        txnParticipant->stashTransactionResources(_opCtx);
+        txnParticipant.stashTransactionResources(_opCtx);
         {
             const auto prepareFilter = BSON("ts" << prepareTs);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -2768,11 +2768,11 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitTimestamp, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, false);
         }
-        txnParticipant->unstashTransactionResources(_opCtx, "commitTransaction");
+        txnParticipant.unstashTransactionResources(_opCtx, "commitTransaction");
 
-        txnParticipant->commitPreparedTransaction(_opCtx, commitTimestamp, {});
+        txnParticipant.commitPreparedTransaction(_opCtx, commitTimestamp, {});
 
-        txnParticipant->stashTransactionResources(_opCtx);
+        txnParticipant.stashTransactionResources(_opCtx);
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();

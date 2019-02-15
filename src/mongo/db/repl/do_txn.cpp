@@ -263,7 +263,7 @@ Status doTxn(OperationContext* opCtx,
              BSONObjBuilder* result) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     uassert(ErrorCodes::InvalidOptions, "doTxn must be run within a transaction", txnParticipant);
-    invariant(txnParticipant->inMultiDocumentTransaction());
+    invariant(txnParticipant.inMultiDocumentTransaction());
     invariant(opCtx->getWriteUnitOfWork());
     uassert(
         ErrorCodes::InvalidOptions, "doTxn supports only CRUD opts.", _areOpsCrudOnly(doTxnCmd));
@@ -294,10 +294,10 @@ Status doTxn(OperationContext* opCtx,
 
         numApplied = 0;
         uassertStatusOK(_doTxn(opCtx, dbName, doTxnCmd, &intermediateResult, &numApplied));
-        txnParticipant->commitUnpreparedTransaction(opCtx);
+        txnParticipant.commitUnpreparedTransaction(opCtx);
         result->appendElements(intermediateResult.obj());
     } catch (const DBException& ex) {
-        txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
+        txnParticipant.abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
         BSONArrayBuilder ab;
         ++numApplied;
         for (int j = 0; j < numApplied; j++)

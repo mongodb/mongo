@@ -127,16 +127,16 @@ void onWriteOpCompleted(OperationContext* opCtx,
     if (lastStmtIdWriteOpTime.isNull())
         return;
 
-    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     if (!txnParticipant)
         return;
 
-    txnParticipant->onWriteOpCompletedOnPrimary(opCtx,
-                                                *opCtx->getTxnNumber(),
-                                                std::move(stmtIdsWritten),
-                                                lastStmtIdWriteOpTime,
-                                                lastStmtIdWriteDate,
-                                                txnState);
+    txnParticipant.onWriteOpCompletedOnPrimary(opCtx,
+                                               *opCtx->getTxnNumber(),
+                                               std::move(stmtIdsWritten),
+                                               lastStmtIdWriteOpTime,
+                                               lastStmtIdWriteDate,
+                                               txnState);
 }
 
 /**
@@ -192,7 +192,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
     if (txnParticipant) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
+        oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
     }
 
     OpTimeBundle opTimes;
@@ -256,7 +256,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     if (txnParticipant) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
+        oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
     }
 
     OpTimeBundle opTimes;
@@ -481,9 +481,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                bool fromMigrate) {
-    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction = txnParticipant && opCtx->writesAreReplicated() &&
-        txnParticipant->inMultiDocumentTransaction();
+        txnParticipant.inMultiDocumentTransaction();
 
     Date_t lastWriteDate;
 
@@ -499,7 +499,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         }
         for (auto iter = first; iter != last; iter++) {
             auto operation = OplogEntry::makeInsertOperation(nss, uuid, iter->doc);
-            txnParticipant->addTransactionOperation(opCtx, operation);
+            txnParticipant.addTransactionOperation(opCtx, operation);
         }
     } else {
         lastWriteDate = getWallClockTimeForOpLog(opCtx);
@@ -564,15 +564,15 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         return;
     }
 
-    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction = txnParticipant && opCtx->writesAreReplicated() &&
-        txnParticipant->inMultiDocumentTransaction();
+        txnParticipant.inMultiDocumentTransaction();
 
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
         auto operation = OplogEntry::makeUpdateOperation(
             args.nss, args.uuid, args.updateArgs.update, args.updateArgs.criteria);
-        txnParticipant->addTransactionOperation(opCtx, operation);
+        txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         opTime = replLogUpdate(opCtx, args);
         onWriteOpCompleted(opCtx,
@@ -625,15 +625,15 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     auto& documentKey = documentKeyDecoration(opCtx);
     invariant(!documentKey.isEmpty());
 
-    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction = txnParticipant && opCtx->writesAreReplicated() &&
-        txnParticipant->inMultiDocumentTransaction();
+        txnParticipant.inMultiDocumentTransaction();
 
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
         auto operation =
             OplogEntry::makeDeleteOperation(nss, uuid, deletedDoc ? deletedDoc.get() : documentKey);
-        txnParticipant->addTransactionOperation(opCtx, operation);
+        txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         opTime = replLogDelete(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
         onWriteOpCompleted(opCtx,
@@ -1000,8 +1000,8 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
 
-    const auto txnParticipant = TransactionParticipant::get(opCtx);
-    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
     // Until we support multiple oplog entries per transaction, prevOpTime should always be null.
     invariant(oplogLink.prevOpTime.isNull());
 
@@ -1043,8 +1043,8 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
 
-    const auto txnParticipant = TransactionParticipant::get(opCtx);
-    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
 
     const StmtId stmtId(1);
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
@@ -1123,7 +1123,6 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                                           const OplogSlot& prepareOpTime,
                                           std::vector<repl::ReplOperation>& statements) {
     invariant(opCtx->getTxnNumber());
-
     invariant(!prepareOpTime.opTime.isNull());
 
     // Don't write oplog entry on secondaries.
@@ -1159,11 +1158,11 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
         return;
     }
 
-    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(txnParticipant);
 
     if (!abortOplogEntryOpTime) {
-        invariant(!txnParticipant->transactionIsCommitted());
+        invariant(!txnParticipant.transactionIsCommitted());
         return;
     }
 

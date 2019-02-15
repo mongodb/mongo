@@ -86,16 +86,16 @@ void killSessionsAction(
 void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                                              const SessionKiller::Matcher& matcher,
                                              ErrorCodes::Error reason) {
-    killSessionsAction(
-        opCtx,
-        matcher,
-        [](const ObservableSession& session) {
-            return !TransactionParticipant::get(session.get())->transactionIsPrepared();
-        },
-        [](OperationContext* opCtx, const SessionToKill& session) {
-            TransactionParticipant::get(session.get())->abortArbitraryTransaction();
-        },
-        reason);
+    killSessionsAction(opCtx,
+                       matcher,
+                       [](const ObservableSession& session) {
+                           return !TransactionParticipant::get(session).transactionIsPrepared();
+                       },
+                       [](OperationContext* opCtx, const SessionToKill& session) {
+                           TransactionParticipant::get(session).abortTransactionIfNotPrepared(
+                               opCtx);
+                       },
+                       reason);
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
@@ -119,31 +119,15 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
         [when = opCtx->getServiceContext()->getPreciseClockSource()->now()](
             const ObservableSession& session) {
 
-            return TransactionParticipant::get(session.get())->expired();
+            return TransactionParticipant::get(session).expiredAsOf(when);
         },
         [](OperationContext* opCtx, const SessionToKill& session) {
-            auto txnParticipant = TransactionParticipant::get(session.get());
-
-            LOG(0)
-                << "Aborting transaction with txnNumber " << txnParticipant->getActiveTxnNumber()
+            auto txnParticipant = TransactionParticipant::get(session);
+            log()
+                << "Aborting transaction with txnNumber " << txnParticipant.getActiveTxnNumber()
                 << " on session " << session.getSessionId().getId()
                 << " because it has been running for longer than 'transactionLifetimeLimitSeconds'";
-
-            // The try/catch block below is necessary because expiredAsOf() in the filterFn above
-            // could return true for expired, but unprepared transaction, but by the time we get to
-            // actually kill it, the participant could theoretically become prepared (being under
-            // the SessionCatalog mutex doesn't prevent the concurrently running thread from doing
-            // preparing the participant).
-            //
-            // Then when the execution reaches the killSessionFn, it would find the transaction is
-            // prepared and not allowed to be killed, which would cause the exception below
-            try {
-                txnParticipant->abortArbitraryTransaction();
-            } catch (const DBException& ex) {
-                // TODO(schwerin): Can we catch a more specific exception?
-                warning() << "May have failed to abort expired transaction on session "
-                          << session.getSessionId().getId() << " due to " << redact(ex.toStatus());
-            }
+            txnParticipant.abortTransactionIfNotPrepared(opCtx);
         },
         ErrorCodes::ExceededTimeLimit);
 }
@@ -155,7 +139,7 @@ void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
                        matcherAllSessions,
                        [](const ObservableSession&) { return true; },
                        [](OperationContext* opCtx, const SessionToKill& session) {
-                           TransactionParticipant::get(session.get())->shutdown();
+                           TransactionParticipant::get(session).shutdown(opCtx);
                        },
                        ErrorCodes::InterruptedAtShutdown);
 }
@@ -163,18 +147,18 @@ void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
 void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsAction(
-        opCtx,
-        matcherAllSessions,
-        [](const ObservableSession& session) {
-            // Filter for sessions that have a prepared transaction.
-            return TransactionParticipant::get(session.get())->transactionIsPrepared();
-        },
-        [](OperationContext* opCtx, const SessionToKill& session) {
-            // Abort the prepared transaction and invalidate the session it is
-            // associated with.
-            TransactionParticipant::get(session.get())->abortPreparedTransactionForRollback();
-        });
+    killSessionsAction(opCtx,
+                       matcherAllSessions,
+                       [](const ObservableSession& session) {
+                           // Filter for sessions that have a prepared transaction.
+                           return TransactionParticipant::get(session).transactionIsPrepared();
+                       },
+                       [](OperationContext* opCtx, const SessionToKill& session) {
+                           // Abort the prepared transaction and invalidate the session it is
+                           // associated with.
+                           TransactionParticipant::get(session).abortPreparedTransactionForRollback(
+                               opCtx);
+                       });
 }
 
 void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
@@ -187,26 +171,28 @@ void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
     // to yield their locks.
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(newOpCtx.get())});
-    killSessionsAction(
-        newOpCtx.get(),
-        matcherAllSessions,
-        [](const ObservableSession& session) {
-            return TransactionParticipant::get(session.get())->transactionIsPrepared();
-        },
-        [](OperationContext* killerOpCtx, const SessionToKill& session) {
-            auto const txnParticipant = TransactionParticipant::get(session.get());
-            // Yield locks for prepared transactions.
-            // When scanning and killing operations, all prepared transactions are included in the
-            // list. Even though new sessions may be created after the scan, none of them can become
-            // prepared during stepdown, since the RSTL has been enqueued, preventing any new
-            // writes.
-            if (txnParticipant->transactionIsPrepared()) {
-                LOG(3) << "Yielding locks of prepared transaction. SessionId: "
-                       << session.getSessionId().getId()
-                       << " TxnNumber: " << txnParticipant->getActiveTxnNumber();
-                txnParticipant->refreshLocksForPreparedTransaction(killerOpCtx, true);
-            }
-        });
+    killSessionsAction(newOpCtx.get(),
+                       matcherAllSessions,
+                       [](const ObservableSession& session) {
+                           return TransactionParticipant::get(session).transactionIsPrepared();
+                       },
+                       [](OperationContext* killerOpCtx, const SessionToKill& session) {
+                           auto txnParticipant = TransactionParticipant::get(session);
+                           // Yield locks for prepared transactions.
+                           // When scanning and killing operations, all prepared transactions are
+                           // included in the
+                           // list. Even though new sessions may be created after the scan, none of
+                           // them can become
+                           // prepared during stepdown, since the RSTL has been enqueued, preventing
+                           // any new
+                           // writes.
+                           if (txnParticipant.transactionIsPrepared()) {
+                               LOG(3) << "Yielding locks of prepared transaction. SessionId: "
+                                      << session.getSessionId().getId()
+                                      << " TxnNumber: " << txnParticipant.getActiveTxnNumber();
+                               txnParticipant.refreshLocksForPreparedTransaction(killerOpCtx, true);
+                           }
+                       });
 }
 
 }  // namespace mongo

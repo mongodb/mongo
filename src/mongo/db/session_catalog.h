@@ -248,8 +248,8 @@ public:
     /**
      * Increments the number of "killers" for this session and returns a 'kill token' to to be
      * passed later on to 'checkOutSessionForKill' method of the SessionCatalog in order to permit
-     * the caller to execute any kill cleanup tasks. This token is later on passed to
-     * '_markNotKilled' in order to decrement the number of "killers".
+     * the caller to execute any kill cleanup tasks. This token is later used to decrement the
+     * number of "killers".
      *
      * Marking session as killed is an internal property only that will cause any further calls to
      * 'checkOutSession' to block until 'checkOutSessionForKill' is called the same number of times
@@ -277,22 +277,17 @@ private:
         return {};
     }
 
-    ObservableSession(WithLock wl, Session& session) : _session(&session) {}
+    ObservableSession(WithLock wl, Session& session)
+        : _session(&session), _clientLock(_lockClientForSession(std::move(wl), _session)) {}
 
     /**
      * Returns whether 'kill' has been called on this session.
      */
     bool _killed() const;
 
-    /**
-     * Used by the session catalog when checking a session back in after a call to 'kill'. See the
-     * comments for 'kill for more details.
-     */
-    void _markNotKilled(WithLock sessionCatalogLock, SessionCatalog::KillToken killToken);
-
     Session* _session;
+    stdx::unique_lock<Client> _clientLock;
 };
-
 
 /**
  * Scoped object, which checks out the session specified in the passed operation context and stores

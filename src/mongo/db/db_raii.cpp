@@ -334,7 +334,7 @@ LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<Name
 
     // Use IX locks for autocommit:false multi-statement transactions; otherwise, use IS locks.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
+    if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
         uassert(51071,
                 "Cannot query system.views within a transaction",
                 !nss || !nss->isSystemDotViews());

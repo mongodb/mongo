@@ -372,13 +372,14 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 
 void invokeWithSessionCheckedOut(OperationContext* opCtx,
                                  CommandInvocation* invocation,
-                                 TransactionParticipant* txnParticipant,
+                                 TransactionParticipant::Participant txnParticipant,
                                  const OperationSessionInfoFromClient& sessionOptions,
                                  rpc::ReplyBuilderInterface* replyBuilder) {
     if (!opCtx->getClient()->isInDirectClient()) {
-        txnParticipant->beginOrContinue(*sessionOptions.getTxnNumber(),
-                                        sessionOptions.getAutocommit(),
-                                        sessionOptions.getStartTransaction());
+        txnParticipant.beginOrContinue(opCtx,
+                                       *sessionOptions.getTxnNumber(),
+                                       sessionOptions.getAutocommit(),
+                                       sessionOptions.getStartTransaction());
         // Create coordinator if needed. If "startTransaction" is present, it must be true.
         if (sessionOptions.getStartTransaction()) {
             // If this shard has been selected as the coordinator, set up the coordinator state
@@ -386,18 +387,18 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
             if (sessionOptions.getCoordinator() == boost::optional<bool>(true)) {
                 createTransactionCoordinator(opCtx, *sessionOptions.getTxnNumber());
             }
-        } else if (txnParticipant->inMultiDocumentTransaction()) {
+        } else if (txnParticipant.inMultiDocumentTransaction()) {
             const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "Only the first command in a transaction may specify a readConcern",
                     readConcernArgs.isEmpty());
         }
 
-        txnParticipant->unstashTransactionResources(opCtx, invocation->definition()->getName());
+        txnParticipant.unstashTransactionResources(opCtx, invocation->definition()->getName());
     }
 
     auto guard = makeGuard([&txnParticipant, opCtx] {
-        txnParticipant->abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
+        txnParticipant.abortActiveUnpreparedOrStashPreparedTransaction(opCtx);
     });
 
     try {
@@ -420,7 +421,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
 
         // If this shard has completed an earlier statement for this transaction, it must already be
         // in the transaction's participant list, so it is guaranteed to learn its outcome.
-        txnParticipant->stashTransactionResources(opCtx);
+        txnParticipant.stashTransactionResources(opCtx);
         guard.dismiss();
         throw;
     }
@@ -433,7 +434,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     }
 
     // Stash or commit the transaction when the command succeeds.
-    txnParticipant->stashTransactionResources(opCtx);
+    txnParticipant.stashTransactionResources(opCtx);
     guard.dismiss();
 }
 

@@ -537,7 +537,7 @@ BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
 
     if (clientOpCtx) {
         if (auto txnParticipant = TransactionParticipant::get(clientOpCtx)) {
-            txnParticipant->reportUnstashedState(clientOpCtx, &builder);
+            txnParticipant.reportUnstashedState(clientOpCtx, &builder);
         }
 
         // Append lock stats before returning.
@@ -569,7 +569,7 @@ void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext
     sessionCatalog->scanSessions(
         {std::move(sessionFilter)},
         [&](const ObservableSession& session) {
-            auto op = TransactionParticipant::get(session.get())->reportStashedState();
+            auto op = TransactionParticipant::get(session).reportStashedState(opCtx);
             if (!op.isEmpty()) {
                 ops->emplace_back(op);
             }

@@ -633,7 +633,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     if (txnParticipant) {
         sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
         sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
-        oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
+        oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
     }
 
     auto timestamps = stdx::make_unique<Timestamp[]>(count);

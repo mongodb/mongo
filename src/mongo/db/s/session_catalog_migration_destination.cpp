@@ -251,10 +251,10 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
     opCtx->setTxnNumber(result.txnNum);
     MongoDOperationContextSession ocs(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant->beginOrContinue(result.txnNum, boost::none, boost::none);
+    txnParticipant.beginOrContinue(opCtx, result.txnNum, boost::none, boost::none);
 
     try {
-        if (txnParticipant->checkStatementExecuted(stmtId)) {
+        if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
             // Skip the incoming statement because it has already been logged locally
             return lastResult;
         }
@@ -278,7 +278,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                        ? oplogEntry.getObject()
                        : BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
     auto oplogLink = extractPrePostImageTs(lastResult, oplogEntry);
-    oplogLink.prevOpTime = txnParticipant->getLastWriteOpTime();
+    oplogLink.prevOpTime = txnParticipant.getLastWriteOpTime();
 
     writeConflictRetry(
         opCtx,
@@ -319,7 +319,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
             // Do not call onWriteOpCompletedOnPrimary if we inserted a pre/post image, because the
             // next oplog will contain the real operation
             if (!result.isPrePostImage) {
-                txnParticipant->onMigrateCompletedOnPrimary(
+                txnParticipant.onMigrateCompletedOnPrimary(
                     opCtx, result.txnNum, {stmtId}, oplogOpTime, *oplogEntry.getWallClockTime());
             }
 

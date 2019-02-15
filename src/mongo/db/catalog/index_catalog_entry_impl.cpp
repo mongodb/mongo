@@ -154,7 +154,7 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
     // minimumSnapshotVersion on a collection.  This means we are unprotected from reading
     // out-of-sync index catalog entries.  To fix this, we uassert if we detect that the
     // in-memory catalog is out-of-sync with the on-disk catalog.
-    if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
+    if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
         if (!_catalogIsPresent(opCtx) || _catalogIsReady(opCtx) != _isReady) {
             uasserted(ErrorCodes::SnapshotUnavailable,
                       str::stream() << "Unable to read from a snapshot due to pending collection"
@@ -180,11 +180,11 @@ bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
     // and the read-path will query this state before determining there is no interesting multikey
     // state. Note, it's always legal, though potentially wasteful, to return `true`.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (!txnParticipant || !txnParticipant->inMultiDocumentTransaction()) {
+    if (!txnParticipant || !txnParticipant.inMultiDocumentTransaction()) {
         return false;
     }
 
-    for (const MultikeyPathInfo& path : txnParticipant->getUncommittedMultikeyPathInfos()) {
+    for (const MultikeyPathInfo& path : txnParticipant.getUncommittedMultikeyPathInfos()) {
         if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
             return true;
         }
@@ -197,12 +197,12 @@ MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx) c
     stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (!txnParticipant || !txnParticipant->inMultiDocumentTransaction()) {
+    if (!txnParticipant || !txnParticipant.inMultiDocumentTransaction()) {
         return _indexMultikeyPaths;
     }
 
     MultikeyPaths ret = _indexMultikeyPaths;
-    for (const MultikeyPathInfo& path : txnParticipant->getUncommittedMultikeyPathInfos()) {
+    for (const MultikeyPathInfo& path : txnParticipant.getUncommittedMultikeyPathInfos()) {
         if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
             MultikeyPathTracker::mergeMultikeyPaths(&ret, path.multikeyPaths);
         }
@@ -330,8 +330,8 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
 
     // Keep multikey changes in memory to correctly service later reads using this index.
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (txnParticipant && txnParticipant->inMultiDocumentTransaction()) {
-        txnParticipant->addUncommittedMultikeyPathInfo(
+    if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
+        txnParticipant.addUncommittedMultikeyPathInfo(
             MultikeyPathInfo{_collection->ns(), _descriptor->indexName(), std::move(paths)});
     }
 }

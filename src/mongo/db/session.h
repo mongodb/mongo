@@ -68,8 +68,8 @@ private:
     // A pointer back to the currently running operation on this Session, or nullptr if there
     // is no operation currently running for the Session.
     //
-    // May be read by holders of the SessionCatalog mutex. May only be set when clear or cleared
-    // when set, and the opCtx being set or cleared must have its client locked at the time.
+    // This field is only safe to read or write while holding the SessionCatalog::_mutex. In
+    // practice, it is only used inside of the SessionCatalog itself.
     OperationContext* _checkoutOpCtx{nullptr};
 
     // Counter indicating the number of times ObservableSession::kill has been called on this

@@ -255,12 +255,11 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     "It is illegal to open a tailable cursor in a transaction",
                     !txnParticipant ||
-                        !(txnParticipant->inMultiDocumentTransaction() && qr->isTailable()));
+                        !(txnParticipant.inMultiDocumentTransaction() && qr->isTailable()));
 
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     "The 'readOnce' option is not supported within a transaction.",
-                    !txnParticipant ||
-                        !txnParticipant->inActiveOrKilledMultiDocumentTransaction() ||
+                    !txnParticipant || !txnParticipant.inActiveOrKilledMultiDocumentTransaction() ||
                         !qr->isReadOnce());
 
             uassert(ErrorCodes::InvalidOptions,

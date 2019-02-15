@@ -170,7 +170,7 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
     // cache, and attempt to do a network request while holding locks.
     // TODO: SERVER-39162 allow $lookup in sharded transactions.
     auto txnParticipant = TransactionParticipant::get(expCtx->opCtx);
-    const bool inTxn = txnParticipant && txnParticipant->inMultiDocumentTransaction();
+    const bool inTxn = txnParticipant && txnParticipant.inMultiDocumentTransaction();
 
     const bool isSharded = [&]() {
         if (inTxn || !ShardingState::get(expCtx->opCtx)->enabled()) {

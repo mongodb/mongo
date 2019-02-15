@@ -113,8 +113,8 @@ Status applyCommitTransaction(OperationContext* opCtx,
 
     auto transaction = TransactionParticipant::get(opCtx);
     invariant(transaction);
-    transaction->unstashTransactionResources(opCtx, "commitTransaction");
-    transaction->commitPreparedTransaction(
+    transaction.unstashTransactionResources(opCtx, "commitTransaction");
+    transaction.commitPreparedTransaction(
         opCtx, commitCommand.getCommitTimestamp(), entry.getOpTime());
     return Status::OK();
 }
@@ -147,8 +147,8 @@ Status applyAbortTransaction(OperationContext* opCtx,
     MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
     auto transaction = TransactionParticipant::get(opCtx);
-    transaction->unstashTransactionResources(opCtx, "abortTransaction");
-    transaction->abortActiveTransaction(opCtx);
+    transaction.unstashTransactionResources(opCtx, "abortTransaction");
+    transaction.abortActiveTransaction(opCtx);
     return Status::OK();
 }
 

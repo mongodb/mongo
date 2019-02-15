@@ -89,10 +89,7 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSession(Operati
         return !osession.currentOperation() && !osession._killed();
     });
 
-    {
-        stdx::lock_guard<Client> lockClient(*opCtx->getClient());
-        sri->session._checkoutOpCtx = opCtx;
-    }
+    sri->session._checkoutOpCtx = opCtx;
 
     return ScopedCheckedOutSession(
         *this, std::move(sri), boost::none /* Not checked out for kill */);
@@ -114,10 +111,7 @@ SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationCo
         return !ObservableSession(ul, sri->session).currentOperation();
     });
 
-    {
-        stdx::lock_guard<Client> lockClient(*opCtx->getClient());
-        sri->session._checkoutOpCtx = opCtx;
-    }
+    sri->session._checkoutOpCtx = opCtx;
 
     return SessionToKill(ScopedCheckedOutSession(*this, std::move(sri), std::move(killToken)));
 }
@@ -162,10 +156,7 @@ void SessionCatalog::_releaseSession(std::shared_ptr<SessionCatalog::SessionRunt
     // operation context (meaning checked-out)
     invariant(_sessions[sri->session.getSessionId()] == sri);
     invariant(sri->session._checkoutOpCtx);
-    {
-        stdx::lock_guard<Client> lockClient(*sri->session._checkoutOpCtx->getClient());
-        sri->session._checkoutOpCtx = nullptr;
-    }
+    sri->session._checkoutOpCtx = nullptr;
     sri->availableCondVar.notify_all();
 
     if (killToken) {
@@ -185,10 +176,9 @@ SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) cons
     // For currently checked-out sessions, interrupt the operation context so that the current owner
     // can release the session
     if (firstKiller && _session->_checkoutOpCtx) {
-        stdx::lock_guard<Client> lg(*_session->_checkoutOpCtx->getClient());
-
+        invariant(_clientLock);
         const auto serviceContext = _session->_checkoutOpCtx->getServiceContext();
-        serviceContext->killOperation(lg, _session->_checkoutOpCtx, reason);
+        serviceContext->killOperation(_clientLock, _session->_checkoutOpCtx, reason);
     }
 
     return SessionCatalog::KillToken(getSessionId());

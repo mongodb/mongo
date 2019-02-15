@@ -298,7 +298,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
     auto transaction = TransactionParticipant::get(opCtx);
-    transaction->unstashTransactionResources(opCtx, "prepareTransaction");
+    transaction.unstashTransactionResources(opCtx, "prepareTransaction");
 
     // Apply the operations via applysOps functionality.
     int numApplied = 0;
@@ -315,8 +315,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         return status;
     }
     invariant(!entry.getOpTime().isNull());
-    transaction->prepareTransaction(opCtx, entry.getOpTime());
-    transaction->stashTransactionResources(opCtx);
+    transaction.prepareTransaction(opCtx, entry.getOpTime());
+    transaction.stashTransactionResources(opCtx);
     return Status::OK();
 }
 
