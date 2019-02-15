@@ -3950,7 +3950,7 @@ tasks:
     - name: embedded_sdk_s3_put
       variant: embedded-sdk-ubuntu-1604-x86_64
     - name: embedded_sdk_s3_put
-      variant: embedded-sdk-macosx-10.11
+      variant: embedded-sdk-macos
   commands:
     - command: manifest.load
     - func: "git get project"
@@ -3971,7 +3971,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-macosx-10.11/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-macos/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "embedded-sdk-java-darwin.tgz"
     - func: "setup gradle signing keys"
@@ -4027,19 +4027,19 @@ tasks:
 - name: embedded_sdk_multiarch_apple_package
   depends_on:
     - name: embedded_sdk_s3_put
-      variant: embedded-sdk-macosx-10.11
+      variant: embedded-sdk-macos
     - name: embedded_sdk_s3_put
-      variant: embedded-sdk-iphoneos-11.0
+      variant: embedded-sdk-iphoneos
     - name: embedded_sdk_s3_put
-      variant: embedded-sdk-iphonesimulator-11.0
+      variant: embedded-sdk-iphonesimulator
     - name: embedded_sdk_s3_put
-      variant: embedded-sdk-appletvos-10.2
+      variant: embedded-sdk-appletvos
     - name: embedded_sdk_s3_put
-      variant: embedded-sdk-appletvsimulator-10.2
+      variant: embedded-sdk-appletvsimulator
     - name: embedded_sdk_s3_put
-      variant: embedded-sdk-watchos-4.2
+      variant: embedded-sdk-watchos
     - name: embedded_sdk_s3_put
-      variant: embedded-sdk-watchsimulator-4.2
+      variant: embedded-sdk-watchsimulator
 
   commands:
     - command: manifest.load
@@ -4054,7 +4054,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-macosx-10.11/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-macos/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "mongo-embedded-sdk-${version}/MacOS/embedded-sdk.tgz"
 
@@ -4062,7 +4062,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-iphoneos-11.0/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-iphoneos/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "mongo-embedded-sdk-${version}/iPhoneOS/embedded-sdk.tgz"
 
@@ -4070,7 +4070,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-iphonesimulator-11.0/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-iphonesimulator/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "mongo-embedded-sdk-${version}/iPhoneSimulator/embedded-sdk.tgz"
 
@@ -4078,7 +4078,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvos-10.2/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvos/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "mongo-embedded-sdk-${version}/AppleTVOS/embedded-sdk.tgz"
 
@@ -4086,7 +4086,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvsimulator-10.2/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-appletvsimulator/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "mongo-embedded-sdk-${version}/AppleTVSimulator/embedded-sdk.tgz"
 
@@ -4094,7 +4094,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-watchos-4.2/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-watchos/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "mongo-embedded-sdk-${version}/WatchOS/embedded-sdk.tgz"
 
@@ -4102,7 +4102,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/embedded-sdk/embedded-sdk-watchsimulator-4.2/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project}/embedded-sdk/embedded-sdk-watchsimulator/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         local_file: "mongo-embedded-sdk-${version}/WatchSimulator/embedded-sdk.tgz"
 
@@ -9945,8 +9945,8 @@ buildvariants:
 #             OSX buildvariants           #
 ###########################################
 
-- name: osx-1010
-  display_name: macOS 10.10
+- name: macos
+  display_name: macOS
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
@@ -10067,8 +10067,8 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: osx-1010-debug
-  display_name: "* macOS 10.10 DEBUG"
+- name: macos-debug
+  display_name: "* macOS DEBUG"
   run_on:
   - macos-1014
   expansions:
@@ -10099,8 +10099,8 @@ buildvariants:
   - name: stitch_support_lib_build_and_archive
   - name: tool
 
-- name: enterprise-osx-1010
-  display_name: Enterprise macOS 10.10
+- name: enterprise-macos
+  display_name: Enterprise macOS
   modules:
   - enterprise
   run_on:
@@ -10148,8 +10148,8 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: enterprise-osx-1010-openssl
-  display_name: ~ Enterprise macOS 10.10 OpenSSL
+- name: enterprise-macos-openssl
+  display_name: ~ Enterprise macOS OpenSSL
   modules:
   - enterprise
   run_on:
@@ -10167,7 +10167,7 @@ buildvariants:
     resmoke_jobs_max: 1
     build_mongoreplay: true
     build_openssl: true
-    openssl_config_flags: "-mmacosx-version-min=10.11"
+    openssl_config_flags: "-mmacosx-version-min=10.12"
     openssl_make_flags: "-j$(sysctl -n hw.logicalcpu)"
   display_tasks:
   - *dbtest
@@ -10198,8 +10198,8 @@ buildvariants:
 #          Mobile SDK buildvariants       #
 ###########################################
 
-- name: embedded-sdk-macosx-10.11
-  display_name: "Embedded SDK - macOS 10.11"
+- name: embedded-sdk-macos
+  display_name: "Embedded SDK - macOS"
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
@@ -10212,7 +10212,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_macosx.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: "10.11"
+    cdriver_cmake_osx_deployment_target: "10.12"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
@@ -10228,8 +10228,8 @@ buildvariants:
   tasks:
   - name: embedded_sdk_build_and_test
 
-- name: embedded-sdk-iphoneos-11.0
-  display_name: "Embedded SDK - iOS 11.0"
+- name: embedded-sdk-iphoneos
+  display_name: "Embedded SDK - iOS"
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
@@ -10260,8 +10260,8 @@ buildvariants:
   tasks:
   - name: embedded_sdk_build_and_test
 
-- name: embedded-sdk-iphonesimulator-11.0
-  display_name: "Embedded SDK - iOS Simulator 11.0"
+- name: embedded-sdk-iphonesimulator
+  display_name: "Embedded SDK - iOS Simulator"
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
@@ -10295,8 +10295,8 @@ buildvariants:
   tasks:
   - name: embedded_sdk_build_and_test
 
-- name: embedded-sdk-appletvos-10.2
-  display_name: "Embedded SDK - tvOS 10.2"
+- name: embedded-sdk-appletvos
+  display_name: "Embedded SDK - tvOS"
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
@@ -10327,8 +10327,8 @@ buildvariants:
   tasks:
   - name: embedded_sdk_build_and_test
 
-- name: embedded-sdk-appletvsimulator-10.2
-  display_name: "Embedded SDK - tvOS Simulator 10.2"
+- name: embedded-sdk-appletvsimulator
+  display_name: "Embedded SDK - tvOS Simulator"
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
@@ -10362,8 +10362,8 @@ buildvariants:
   tasks:
   - name: embedded_sdk_build_and_test
 
-- name: embedded-sdk-watchos-4.2
-  display_name: "Embedded SDK - watchOS 4.2"
+- name: embedded-sdk-watchos
+  display_name: "Embedded SDK - watchOS"
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
@@ -10394,8 +10394,8 @@ buildvariants:
   tasks:
   - name: embedded_sdk_build_and_test
 
-- name: embedded-sdk-watchsimulator-4.2
-  display_name: "Embedded SDK - watchOS Simulator 4.2"
+- name: embedded-sdk-watchsimulator
+  display_name: "Embedded SDK - watchOS Simulator"
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
@@ -13259,8 +13259,8 @@ buildvariants:
   - name: burn_in_tests
   - name: jsCore_mobile
 
-- name: osx-1011-mobile
-  display_name: macOS 10.11 (mobile)
+- name: macos-mobile
+  display_name: macOS (mobile)
   run_on:
   - macos-1014
   batchtime: 1440 # 1 day
