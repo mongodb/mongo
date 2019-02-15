@@ -7,6 +7,8 @@
 // 4. Use an existing client to check current op for that special appname.  Return true if it's
 //    still there at the end of a timeout
 // 5. Disable the fail point
+//
+// @tags: [requires_sharding]
 
 (function() {
     "use strict";
