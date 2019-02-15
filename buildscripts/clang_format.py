@@ -395,7 +395,7 @@ def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-ma
             "Your working tree has pending changes. You must have a clean working tree before proceeding."
         )
 
-    merge_base = repo.get_merge_base(commit_prior_to_reformat)
+    merge_base = repo.get_merge_base(["HEAD", commit_prior_to_reformat])
 
     if not merge_base == commit_prior_to_reformat:
         raise ValueError(

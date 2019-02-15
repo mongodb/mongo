@@ -20,52 +20,58 @@ import yaml
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from buildscripts import resmokelib  # pylint: disable=wrong-import-position
-from buildscripts.ciconfig import evergreen  # pylint: disable=wrong-import-position
+
+# pylint: disable=wrong-import-position
+from buildscripts import git
+from buildscripts import resmokelib
+from buildscripts.ciconfig import evergreen
+from buildscripts.client import evergreen as evergreen_client
+# pylint: enable=wrong-import-position
 
 API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
+REST_PREFIX = "/rest/v1/"
 
 
 def parse_command_line():
     """Parse command line options."""
     parser = optparse.OptionParser(usage="Usage: %prog [options] [resmoke command]")
 
-    parser.add_option("--maxRevisions", dest="max_revisions",
-                      help="Maximum number of revisions to check for changes. Default is 25.")
+    parser.add_option("--maxRevisions", dest="max_revisions", default=25,
+                      help=("Maximum number of revisions to check for changes. Default is"
+                            " %default."))
 
-    parser.add_option("--branch", dest="branch",
-                      help="The name of the branch the working branch was based on.")
+    parser.add_option("--branch", dest="branch", default="master",
+                      help=("The name of the branch the working branch was based on. Default is"
+                            " '%default'."))
 
-    parser.add_option("--baseCommit", dest="base_commit",
+    parser.add_option("--baseCommit", dest="base_commit", default=None,
                       help="The base commit to compare to for determining changes.")
 
-    parser.add_option("--buildVariant", dest="buildvariant",
+    parser.add_option("--buildVariant", dest="buildvariant", default=None,
                       help=("The buildvariant the tasks will execute on. Required when"
                             " generating the JSON file with test executor information"))
 
-    parser.add_option("--checkEvergreen", dest="check_evergreen", action="store_true",
+    parser.add_option("--checkEvergreen", dest="check_evergreen", default=False,
+                      action="store_true",
                       help=("Checks Evergreen for the last commit that was scheduled."
                             " This way all the tests that haven't been burned in will be run."))
 
-    parser.add_option("--noExec", dest="no_exec", action="store_true",
+    parser.add_option("--noExec", dest="no_exec", default=False, action="store_true",
                       help="Do not run resmoke loop on new tests.")
 
-    parser.add_option("--reportFile", dest="report_file",
-                      help="Write a JSON file with test results.")
+    parser.add_option("--reportFile", dest="report_file", default="report.json",
+                      help="Write a JSON file with test results. Default is '%default'.")
 
-    parser.add_option("--testListFile", dest="test_list_file", metavar="TESTLIST",
+    parser.add_option("--testListFile", dest="test_list_file", default=None, metavar="TESTLIST",
                       help="Load a JSON file with tests to run.")
 
-    parser.add_option("--testListOutfile", dest="test_list_outfile",
+    parser.add_option("--testListOutfile", dest="test_list_outfile", default=None,
                       help="Write a JSON file with test executor information.")
 
     # The executor_file and suite_files defaults are required to make the
     # suite resolver work correctly.
-    parser.set_defaults(base_commit=None, branch="master", buildvariant=None, check_evergreen=False,
-                        evergreen_file="etc/evergreen.yml", selector_file="etc/burn_in_tests.yml",
-                        max_revisions=25, no_exec=False, executor_file=None,
-                        report_file="report.json", suite_files="with_server", test_list_file=None,
-                        test_list_outfile=None)
+    parser.set_defaults(evergreen_file="etc/evergreen.yml", selector_file="etc/burn_in_tests.yml",
+                        suite_files="with_server")
 
     # This disables argument parsing on the first unrecognized parameter. This allows us to pass
     # a complete resmoke.py command line without accidentally parsing its options.
@@ -74,50 +80,30 @@ def parse_command_line():
     return parser.parse_args()
 
 
-def callo(args):
-    """Call a program, and capture its output."""
-    return subprocess.check_output(args)
-
-
-def read_evg_config():
-    """Read evg config file."""
-    # Expand out evergreen config file possibilities
-    file_list = [
-        "./.evergreen.yml",
-        os.path.expanduser("~/.evergreen.yml"),
-        os.path.expanduser("~/cli_bin/.evergreen.yml")
-    ]
-
-    for filename in file_list:
-        if os.path.isfile(filename):
-            with open(filename, "r") as fstream:
-                return yaml.load(fstream)
-    return None
-
-
 def find_last_activated_task(revisions, variant, branch_name):
     """Get the git hash of the most recently activated build before this one."""
-    rest_prefix = "/rest/v1/"
     project = "mongodb-mongo-" + branch_name
     build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
 
-    evg_cfg = read_evg_config()
+    evg_cfg = evergreen_client.read_evg_config()
     if evg_cfg is not None and "api_server_host" in evg_cfg:
         api_server = "{url.scheme}://{url.netloc}".format(
             url=urlparse.urlparse(evg_cfg["api_server_host"]))
     else:
         api_server = API_SERVER_DEFAULT
 
-    api_prefix = api_server + rest_prefix
+    api_prefix = api_server + REST_PREFIX
 
     for githash in revisions:
-        response = requests.get(api_prefix + "projects/" + project + "/revisions/" + githash)
+        url = "{}projects/{}/revisions/{}".format(api_prefix, project, githash)
+        response = requests.get(url)
         revision_data = response.json()
 
         try:
             for build in revision_data["builds"]:
                 if build.startswith(build_prefix):
-                    build_resp = requests.get(api_prefix + "builds/" + build)
+                    url = "{}builds/{}".format(api_prefix, build)
+                    build_resp = requests.get(url)
                     build_data = build_resp.json()
                     if build_data["activated"]:
                         return build_data["revision"]
@@ -128,7 +114,8 @@ def find_last_activated_task(revisions, variant, branch_name):
     return None
 
 
-def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, check_evergreen):
+def find_changed_tests(  # pylint: disable=too-many-locals
+        branch_name, base_commit, max_revisions, buildvariant, check_evergreen):
     """Find the changed tests.
 
     Use git to find which files have changed in this patch.
@@ -137,15 +124,16 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
     """
     changed_tests = []
 
+    repo = git.Repository(".")
+
     if base_commit is None:
-        base_commit = callo(["git", "merge-base", branch_name + "@{upstream}", "HEAD"]).rstrip()
+        base_commit = repo.get_merge_base([branch_name + "@{upstream}", "HEAD"])
     if check_evergreen:
         # We're going to check up to 200 commits in Evergreen for the last scheduled one.
         # The current commit will be activated in Evergreen; we use --skip to start at the
         # previous commit when trying to find the most recent preceding commit that has been
         # activated.
-        revs_to_check = callo(["git", "rev-list", base_commit, "--max-count=200",
-                               "--skip=1"]).splitlines()
+        revs_to_check = repo.git_rev_list([base_commit, "--max-count=200", "--skip=1"]).splitlines()
         last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
         if last_activated is None:
             # When the current commit is the first time 'buildvariant' has run, there won't be a
@@ -153,22 +141,22 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
             # only considering tests changed in the current commit.
             last_activated = "HEAD"
         print "Comparing current branch against", last_activated
-        revisions = callo(["git", "rev-list", base_commit + "..." + last_activated]).splitlines()
+        revisions = repo.git_rev_list([base_commit + "..." + last_activated]).splitlines()
         base_commit = last_activated
     else:
-        revisions = callo(["git", "rev-list", base_commit + "...HEAD"]).splitlines()
+        revisions = repo.git_rev_list([base_commit + "...HEAD"]).splitlines()
 
     revision_count = len(revisions)
     if revision_count > max_revisions:
         print "There are too many revisions included (%d)." % revision_count, \
               "This is likely because your base branch is not " + branch_name + ".", \
-              "You can allow us to review more than 25 revisions by using", \
-              "the --maxRevisions option."
+              "You can allow us to review more than %d" % max_revisions + \
+              " revisions by using the --maxRevisions option."
         return changed_tests
 
-    changed_files = callo(["git", "diff", "--name-only", base_commit]).splitlines()
+    changed_files = repo.git_diff(["--name-only", base_commit]).splitlines()
     # New files ("untracked" in git terminology) won't show up in the git diff results.
-    untracked_files = callo(["git", "status", "--porcelain"]).splitlines()
+    untracked_files = repo.git_status(["--porcelain"]).splitlines()
 
     # The lines with untracked files start with '?? '.
     for line in untracked_files:
@@ -187,7 +175,7 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
     return changed_tests
 
 
-def find_exclude_tests(selector_file):
+def find_excludes(selector_file):
     """Parse etc/burn_in_tests.yml. Returns lists of excluded suites, tasks & tests."""
 
     if not selector_file:
@@ -225,21 +213,6 @@ def filter_tests(tests, exclude_tests):
     return set(tests) - excluded_globbed
 
 
-def find_tests_by_executor(suites):
-    """Find tests by executor.
-
-    Looks up what other resmoke suites run the tests specified in the suites
-    parameter. Returns a dict keyed by test name, value is array of suite names.
-    """
-
-    memberships = {}
-    test_membership = resmokelib.suitesconfig.create_test_membership_map()
-    for suite in suites:
-        for test in suite.tests:
-            memberships[test] = test_membership[test]
-    return memberships
-
-
 def create_executor_list(suites, exclude_suites):
     """Create the executor list.
 
@@ -253,7 +226,8 @@ def create_executor_list(suites, exclude_suites):
     for suite in suites:
         for test in suite.tests:
             for executor in set(test_membership[test]) - set(exclude_suites):
-                memberships[executor].append(test)
+                if test not in memberships[executor]:
+                    memberships[executor].append(test)
     return memberships
 
 
@@ -361,7 +335,7 @@ def main():
 
         changed_tests = find_changed_tests(values.branch, values.base_commit, values.max_revisions,
                                            values.buildvariant, values.check_evergreen)
-        exclude_suites, exclude_tasks, exclude_tests = find_exclude_tests(values.selector_file)
+        exclude_suites, exclude_tasks, exclude_tests = find_excludes(values.selector_file)
         changed_tests = filter_tests(changed_tests, exclude_tests)
         # If there are no changed tests, exit cleanly.
         if not changed_tests:

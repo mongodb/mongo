@@ -31,6 +31,7 @@ class TestRepository(unittest.TestCase):
         self._check_gito_command(repo.git_rev_parse, "rev-parse", params)
         self._check_gito_command(repo.git_rm, "rm", params)
         self._check_gito_command(repo.git_show, "show", params)
+        self._check_gito_command(repo.git_status, "status", params)
 
     def test_base_gito_methods_errors(self):
         params = ["param1", "param2", "param3"]
@@ -45,6 +46,7 @@ class TestRepository(unittest.TestCase):
         self._check_gito_command_error(repo.git_rev_parse, "rev-parse", params)
         self._check_gito_command_error(repo.git_rm, "rm", params)
         self._check_gito_command_error(repo.git_show, "show", params)
+        self._check_gito_command_error(repo.git_status, "status", params)
 
     def _check_gito_command(self, method, command, params):
         # Initialize subprocess mock.

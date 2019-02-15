@@ -92,6 +92,10 @@ class Repository(object):  # pylint: disable=too-many-public-methods
         """Run a git show command."""
         return self._callgito("show", args)
 
+    def git_status(self, args):
+        """Run a git status command."""
+        return self._callgito("status", args)
+
     def get_origin_url(self):
         """Return the URL of the origin repository."""
         return self._callgito("config", ["--local", "--get", "remote.origin.url"]).rstrip()
@@ -143,9 +147,9 @@ class Repository(object):  # pylint: disable=too-many-public-methods
         # rev-parse returns 0 if the branch exists
         return not self._callgit("rev-parse", ["--verify", branch])
 
-    def get_merge_base(self, commit):
-        """Get the merge base between 'commit' and HEAD."""
-        return self._callgito("merge-base", ["HEAD", commit]).rstrip()
+    def get_merge_base(self, commits):
+        """Get the merge base between commits."""
+        return self._callgito("merge-base", commits).rstrip()
 
     def commit_with_message(self, message):
         """Commit the staged changes with the given message."""
