@@ -26,7 +26,8 @@
         Object.extend(rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: true}));
 
     // Create a user to login as when auth is enabled later
-    rst.getPrimary().getDB('admin').createUser({user: 'root', pwd: 'root', roles: ['root']});
+    rst.getPrimary().getDB('admin').createUser({user: 'root', pwd: 'root', roles: ['root']},
+                                               {w: 3});
     rst.nodes.forEach((node) => {
         assert(node.getDB("admin").auth("root", "root"));
     });
