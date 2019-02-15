@@ -317,6 +317,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
+	size_t footprint;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -332,8 +333,20 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (__wt_page_evict_clean(page))
 		return (false);
 
+	/*
+	 * Exclude the disk image size from the footprint checks.  Usually the
+	 * disk image size is small compared with the in-memory limit (e.g.
+	 * 16KB vs 5MB), so this doesn't make a big difference.  Where it is
+	 * important is for pages with a small number of large values, where
+	 * the disk image size takes into account large values that have
+	 * already been written and should not trigger forced eviction.
+	 */
+	footprint = page->memory_footprint;
+	if (page->dsk != NULL)
+		footprint -= page->dsk->mem_size;
+
 	/* Pages are usually small enough, check that first. */
-	if (page->memory_footprint < btree->splitmempage)
+	if (footprint < btree->splitmempage)
 		return (false);
 
 	/*
@@ -346,7 +359,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	/* If we can do an in-memory split, do it. */
 	if (__wt_leaf_page_can_split(session, page))
 		return (true);
-	if (page->memory_footprint < btree->maxmempage)
+	if (footprint < btree->maxmempage)
 		return (false);
 
 	/* Bump the oldest ID, we're about to do some visibility checks. */

@@ -1395,10 +1395,11 @@ __cursor_chain_exceeded(WT_CURSOR_BTREE *cbt)
 		upd_size += WT_UPDATE_MEMSIZE(upd);
 		if (upd_size >= WT_MODIFY_MEM_FACTOR * cursor->value.size)
 			return (true);
-		if (__wt_txn_upd_visible_all(session, upd) &&
-		    i >= WT_MAX_MODIFY_UPDATE)
-			return (true);
 	}
+	if (upd != NULL && upd->type == WT_UPDATE_STANDARD &&
+	    __wt_txn_upd_visible_all(session, upd) &&
+	    i >= WT_MAX_MODIFY_UPDATE)
+		return (true);
 	return (false);
 }
 
