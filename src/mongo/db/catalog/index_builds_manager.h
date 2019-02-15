@@ -67,7 +67,8 @@ public:
                            Collection* collection,
                            const std::vector<BSONObj>& specs,
                            const UUID& buildUUID,
-                           OnInitFn onInit);
+                           OnInitFn onInit,
+                           bool forRecovery);
 
     /**
      * Recovers the index build from its persisted state and sets it up to run again.

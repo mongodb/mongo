@@ -90,7 +90,8 @@ TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
                                                   autoColl.getCollection(),
                                                   specs,
                                                   _buildUUID,
-                                                  MultiIndexBlock::kNoopOnInitFn));
+                                                  MultiIndexBlock::kNoopOnInitFn,
+                                                  /*forRecovery=*/false));
 
     _indexBuildsManager.tearDownIndexBuild(_buildUUID);
 }

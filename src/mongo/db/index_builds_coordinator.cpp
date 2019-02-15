@@ -176,7 +176,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
         indexNames.push_back(name);
     }
 
-    auto collectionUUID = *collection->uuid();
+    // During recovery, collections may not have UUIDs present yet to due upgrading. We don't
+    // require collection UUIDs during recovery except to create a ReplIndexBuildState object.
+    auto collectionUUID = UUID::gen();
     auto nss = collection->ns();
     auto dbName = nss.db().toString();
     // We run the index build using the single phase protocol as we already hold the global write
@@ -184,10 +186,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
         buildUUID, collectionUUID, dbName, indexNames, specs, IndexBuildProtocol::kSinglePhase);
 
-    Status status = _registerIndexBuild(opCtx, replIndexBuildState);
-    if (!status.isOK()) {
-        return status;
-    }
+    invariant(_registerIndexBuild(opCtx, replIndexBuildState).isOK());
 
     return _runIndexRebuildForRecovery(opCtx, collection.get(), buildUUID);
 }
@@ -569,7 +568,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
         onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection);
     }
     uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
-        opCtx, collection, filteredSpecs, replState->buildUUID, onInitFn));
+        opCtx, collection, filteredSpecs, replState->buildUUID, onInitFn, /*forRecovery=*/false));
 
     // If we're a background index, replace exclusive db lock with an intent lock, so that
     // other readers and writers can proceed during this phase.
@@ -705,7 +704,6 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
 
     // We rely on 'collection' for any collection information because no databases are open during
     // recovery.
-    auto collectionUUID = *collection->uuid();
     NamespaceString nss = collection->ns();
     invariant(!nss.isEmpty());
 
@@ -718,8 +716,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     long long dataSize = 0;
 
     try {
-        log() << "Index builds manager starting: " << buildUUID << ": " << nss << " ("
-              << collectionUUID << ")";
+        log() << "Index builds manager starting: " << buildUUID << ": " << nss;
 
         indexCatalogStats.numIndexesBefore = _getNumIndexesTotal(opCtx, collection);
 
@@ -750,8 +747,12 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
 
         mustTearDown = true;
 
-        uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
-            opCtx, collection, replState->indexSpecs, buildUUID, MultiIndexBlock::kNoopOnInitFn));
+        uassertStatusOK(_indexBuildsManager.setUpIndexBuild(opCtx,
+                                                            collection,
+                                                            replState->indexSpecs,
+                                                            buildUUID,
+                                                            MultiIndexBlock::kNoopOnInitFn,
+                                                            /*forRecovery=*/true));
 
         std::tie(numRecords, dataSize) = uassertStatusOK(
             _indexBuildsManager.startBuildingIndexForRecovery(opCtx, collection->ns(), buildUUID));
@@ -766,15 +767,13 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
         indexCatalogStats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
 
         log() << "Index builds manager completed successfully: " << buildUUID << ": " << nss
-              << " ( " << collectionUUID
-              << " ). Index specs requested: " << replState->indexSpecs.size()
+              << ". Index specs requested: " << replState->indexSpecs.size()
               << ". Indexes in catalog before build: " << indexCatalogStats.numIndexesBefore
               << ". Indexes in catalog after build: " << indexCatalogStats.numIndexesAfter;
     } catch (const DBException& ex) {
         status = ex.toStatus();
         invariant(status != ErrorCodes::IndexAlreadyExists);
-        log() << "Index builds manager failed: " << buildUUID << ": " << nss << " ( "
-              << collectionUUID << " ): " << status;
+        log() << "Index builds manager failed: " << buildUUID << ": " << nss << ": " << status;
     }
 
     // Index build is registered in manager regardless of IndexBuildsManager::setUpIndexBuild()
@@ -800,10 +799,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
                           << "Index builds manager failed to clean up partially built index: "
                           << buildUUID
                           << ": "
-                          << nss
-                          << " ( "
-                          << collectionUUID
-                          << " )");
+                          << nss);
             fassertNoTrace(51076, ex.toStatus());
         }
     }

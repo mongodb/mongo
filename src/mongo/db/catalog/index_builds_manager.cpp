@@ -77,7 +77,8 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            Collection* collection,
                                            const std::vector<BSONObj>& specs,
                                            const UUID& buildUUID,
-                                           OnInitFn onInit) {
+                                           OnInitFn onInit,
+                                           bool forRecovery) {
     _registerIndexBuild(opCtx, collection, buildUUID);
 
     const auto& nss = collection->ns();
@@ -97,8 +98,13 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         return initResult.getStatus();
     }
 
-    log() << "Index build initialized: " << buildUUID << ": " << nss << " (" << *collection->uuid()
-          << " ): indexes: " << initResult.getValue().size();
+    if (forRecovery) {
+        log() << "Index build initialized: " << buildUUID << ": " << nss
+              << ": indexes: " << initResult.getValue().size();
+    } else {
+        log() << "Index build initialized: " << buildUUID << ": " << nss << " ("
+              << *collection->uuid() << " ): indexes: " << initResult.getValue().size();
+    }
 
     return Status::OK();
 }
