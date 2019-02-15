@@ -456,12 +456,12 @@ struct __wt_connection_stats {
 	int64_t fsync_all_fh_total;
 	int64_t fsync_all_fh;
 	int64_t fsync_all_time;
-	int64_t capacity_threshold;
 	int64_t capacity_bytes_read;
 	int64_t capacity_bytes_ckpt;
 	int64_t capacity_bytes_evict;
 	int64_t capacity_bytes_log;
 	int64_t capacity_bytes_written;
+	int64_t capacity_threshold;
 	int64_t capacity_time_total;
 	int64_t capacity_time_ckpt;
 	int64_t capacity_time_evict;

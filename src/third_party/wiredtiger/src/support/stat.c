@@ -885,12 +885,12 @@ static const char * const __stats_connection_desc[] = {
 	"capacity: background fsync file handles considered",
 	"capacity: background fsync file handles synced",
 	"capacity: background fsync time (msecs)",
+	"capacity: bytes read",
+	"capacity: bytes written for checkpoint",
+	"capacity: bytes written for eviction",
+	"capacity: bytes written for log",
+	"capacity: bytes written total",
 	"capacity: threshold to call fsync",
-	"capacity: throttled bytes read",
-	"capacity: throttled bytes written for checkpoint",
-	"capacity: throttled bytes written for eviction",
-	"capacity: throttled bytes written for log",
-	"capacity: throttled bytes written total",
 	"capacity: time waiting due to total capacity (usecs)",
 	"capacity: time waiting during checkpoint (usecs)",
 	"capacity: time waiting during eviction (usecs)",
@@ -1316,12 +1316,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->fsync_all_fh_total = 0;
 	stats->fsync_all_fh = 0;
 		/* not clearing fsync_all_time */
-	stats->capacity_threshold = 0;
 	stats->capacity_bytes_read = 0;
 	stats->capacity_bytes_ckpt = 0;
 	stats->capacity_bytes_evict = 0;
 	stats->capacity_bytes_log = 0;
 	stats->capacity_bytes_written = 0;
+	stats->capacity_threshold = 0;
 	stats->capacity_time_total = 0;
 	stats->capacity_time_ckpt = 0;
 	stats->capacity_time_evict = 0;
@@ -1793,13 +1793,13 @@ __wt_stat_connection_aggregate(
 	to->fsync_all_fh_total += WT_STAT_READ(from, fsync_all_fh_total);
 	to->fsync_all_fh += WT_STAT_READ(from, fsync_all_fh);
 	to->fsync_all_time += WT_STAT_READ(from, fsync_all_time);
-	to->capacity_threshold += WT_STAT_READ(from, capacity_threshold);
 	to->capacity_bytes_read += WT_STAT_READ(from, capacity_bytes_read);
 	to->capacity_bytes_ckpt += WT_STAT_READ(from, capacity_bytes_ckpt);
 	to->capacity_bytes_evict += WT_STAT_READ(from, capacity_bytes_evict);
 	to->capacity_bytes_log += WT_STAT_READ(from, capacity_bytes_log);
 	to->capacity_bytes_written +=
 	    WT_STAT_READ(from, capacity_bytes_written);
+	to->capacity_threshold += WT_STAT_READ(from, capacity_threshold);
 	to->capacity_time_total += WT_STAT_READ(from, capacity_time_total);
 	to->capacity_time_ckpt += WT_STAT_READ(from, capacity_time_ckpt);
 	to->capacity_time_evict += WT_STAT_READ(from, capacity_time_evict);

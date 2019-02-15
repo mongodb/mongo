@@ -818,10 +818,7 @@ err:	/* Flush the metadata unless the system is in panic */
 int
 __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-
-	conn = S2C(session);
 
 	if (lsm_tree->nold_chunks == 0)
 		return (0);
@@ -833,18 +830,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (!__wt_atomic_cas32(&lsm_tree->freeing_old_chunks, 0, 1))
 		return (0);
 
-	/*
-	 * Don't remove files if a hot backup is in progress.
-	 *
-	 * The schema lock protects the set of live files, this check prevents
-	 * us from removing a file that hot backup already knows about.
-	 */
-	if (!conn->hot_backup) {
-		__wt_readlock(session, &conn->hot_backup_lock);
-		if (!conn->hot_backup)
-			ret = __lsm_free_chunks(session, lsm_tree);
-		__wt_readunlock(session, &conn->hot_backup_lock);
-	}
+	ret = __lsm_free_chunks(session, lsm_tree);
 
 	lsm_tree->freeing_old_chunks = 0;
 	return (ret);

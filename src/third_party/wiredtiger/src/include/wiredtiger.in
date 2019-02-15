@@ -5244,18 +5244,18 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_FSYNC_ALL_FH			1130
 /*! capacity: background fsync time (msecs) */
 #define	WT_STAT_CONN_FSYNC_ALL_TIME			1131
+/*! capacity: bytes read */
+#define	WT_STAT_CONN_CAPACITY_BYTES_READ		1132
+/*! capacity: bytes written for checkpoint */
+#define	WT_STAT_CONN_CAPACITY_BYTES_CKPT		1133
+/*! capacity: bytes written for eviction */
+#define	WT_STAT_CONN_CAPACITY_BYTES_EVICT		1134
+/*! capacity: bytes written for log */
+#define	WT_STAT_CONN_CAPACITY_BYTES_LOG			1135
+/*! capacity: bytes written total */
+#define	WT_STAT_CONN_CAPACITY_BYTES_WRITTEN		1136
 /*! capacity: threshold to call fsync */
-#define	WT_STAT_CONN_CAPACITY_THRESHOLD			1132
-/*! capacity: throttled bytes read */
-#define	WT_STAT_CONN_CAPACITY_BYTES_READ		1133
-/*! capacity: throttled bytes written for checkpoint */
-#define	WT_STAT_CONN_CAPACITY_BYTES_CKPT		1134
-/*! capacity: throttled bytes written for eviction */
-#define	WT_STAT_CONN_CAPACITY_BYTES_EVICT		1135
-/*! capacity: throttled bytes written for log */
-#define	WT_STAT_CONN_CAPACITY_BYTES_LOG			1136
-/*! capacity: throttled bytes written total */
-#define	WT_STAT_CONN_CAPACITY_BYTES_WRITTEN		1137
+#define	WT_STAT_CONN_CAPACITY_THRESHOLD			1137
 /*! capacity: time waiting due to total capacity (usecs) */
 #define	WT_STAT_CONN_CAPACITY_TIME_TOTAL		1138
 /*! capacity: time waiting during checkpoint (usecs) */

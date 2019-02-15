@@ -306,10 +306,6 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes,
 
 	conn = S2C(session);
 	cap = &conn->capacity;
-	/* If not using capacity there's nothing to do. */
-	if (cap->total == 0)
-		return;
-
 	capacity = steal_capacity = 0;
 	reservation = steal = NULL;
 	switch (type) {
@@ -317,16 +313,19 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes,
 		capacity = cap->ckpt;
 		reservation = &cap->reservation_ckpt;
 		WT_STAT_CONN_INCRV(session, capacity_bytes_ckpt, bytes);
+		WT_STAT_CONN_INCRV(session, capacity_bytes_written, bytes);
 		break;
 	case WT_THROTTLE_EVICT:
 		capacity = cap->evict;
 		reservation = &cap->reservation_evict;
 		WT_STAT_CONN_INCRV(session, capacity_bytes_evict, bytes);
+		WT_STAT_CONN_INCRV(session, capacity_bytes_written, bytes);
 		break;
 	case WT_THROTTLE_LOG:
 		capacity = cap->log;
 		reservation = &cap->reservation_log;
 		WT_STAT_CONN_INCRV(session, capacity_bytes_log, bytes);
+		WT_STAT_CONN_INCRV(session, capacity_bytes_written, bytes);
 		break;
 	case WT_THROTTLE_READ:
 		capacity = cap->read;
@@ -342,7 +341,8 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes,
 	 * at some point in the future. If this subsystem is not throttled
 	 * there's nothing to do.
 	 */
-	if (capacity == 0 || F_ISSET(conn, WT_CONN_RECOVERING))
+	if (cap->total == 0 || capacity == 0 ||
+	    F_ISSET(conn, WT_CONN_RECOVERING))
 		return;
 
 	/*
@@ -352,7 +352,6 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes,
 	 */
 	if (type != WT_THROTTLE_READ) {
 		(void)__wt_atomic_addv64(&cap->written, bytes);
-		WT_STAT_CONN_INCRV(session, capacity_bytes_written, bytes);
 		__capacity_signal(session);
 	}
 
