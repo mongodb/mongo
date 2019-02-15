@@ -46,15 +46,16 @@
         admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
 
     //
-    // Insert 100 documents into sharded collection, such that each shard owns 50.
+    // Insert 1000 documents into sharded collection, such that each shard owns 500.
     //
+    const nDocsPerShard = 500;
     var bulk = coll.initializeUnorderedBulkOp();
-    for (var i = -50; i < 50; i++) {
+    for (var i = -nDocsPerShard; i < nDocsPerShard; i++) {
         bulk.insert({_id: i});
     }
     assert.writeOK(bulk.execute());
-    assert.eq(50, shards[0].getCollection(coll.getFullName()).count());
-    assert.eq(50, shards[1].getCollection(coll.getFullName()).count());
+    assert.eq(nDocsPerShard, shards[0].getCollection(coll.getFullName()).count());
+    assert.eq(nDocsPerShard, shards[1].getCollection(coll.getFullName()).count());
 
     //
     // Test that mongos correctly forwards max time to shards for sharded queries.  Uses
@@ -85,10 +86,10 @@
     configureMaxTimeNeverTimeOut("alwaysOn");
 
     // Positive test. ~10s operation, 2s limit. The operation takes ~10s because each shard
-    // processes 25 batches of ~400ms each, and the shards are processing getMores in parallel.
+    // processes 250 batches of ~40ms each, and the shards are processing getMores in parallel.
     cursor = coll.find({
         $where: function() {
-            sleep(200);
+            sleep(20);
             return true;
         }
     });
@@ -101,7 +102,7 @@
     // Negative test. ~5s operation, with a high (1-day) limit.
     cursor = coll.find({
         $where: function() {
-            sleep(100);
+            sleep(10);
             return true;
         }
     });
@@ -215,9 +216,9 @@
         filter: {
             $where: function() {
                 if (this._id < 0) {
-                    // Slow down the query only on one of the shards. Each shard has 50 documents so
-                    // we expect this shard to take ~5 seconds to return a batch.
-                    sleep(200);
+                    // Slow down the query only on one of the shards. Each shard has 500 documents
+                    // so we expect this shard to take ~10 seconds to return a batch of 500.
+                    sleep(20);
                 }
                 return true;
             }
@@ -225,12 +226,12 @@
         maxTimeMS: 2000,
         batchSize: 0
     }));
-    // Use a batch size of 50 to allow returning results from the fast shard as soon as they're
+    // Use a batch size of 500 to allow returning results from the fast shard as soon as they're
     // ready, as opposed to waiting to return one 16MB batch at a time.
-    const kBatchSize = 50;
+    const kBatchSize = nDocsPerShard;
     cursor = new DBCommandCursor(coll.getDB(), res, kBatchSize);
     // The fast shard should return relatively quickly.
-    for (let i = 0; i < 50; ++i) {
+    for (let i = 0; i < nDocsPerShard; ++i) {
         let next = assert.doesNotThrow(
             () => cursor.next(), [], "did not expect mongos to time out first batch of query");
         assert.gte(next._id, 0);
