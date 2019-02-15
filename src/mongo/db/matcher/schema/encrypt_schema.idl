@@ -86,6 +86,7 @@ structs:
         description: "The fields that can be applied to children in the schema 
             with the encrypt keyword."
         strict: true
+        generate_comparison_operators: true
         fields:
           algorithm:
             description: "The encryption algorithm to be used."

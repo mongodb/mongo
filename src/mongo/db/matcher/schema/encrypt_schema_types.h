@@ -82,6 +82,26 @@ public:
         return _strKeyId;
     }
 
+    bool operator==(const EncryptSchemaKeyId& other) const {
+        if (_type != other.type()) {
+            return false;
+        }
+
+        return _type == Type::kUUIDs ? _uuids == other.uuids() : _strKeyId == other.jsonPointer();
+    }
+
+    /**
+     * IDL requires overload of all comparison operators, however for this class the only viable
+     * comparison is equality. These should be removed once SERVER-39677 is implemented.
+     */
+    bool operator>(const EncryptSchemaKeyId& other) const {
+        MONGO_UNREACHABLE;
+    }
+
+    bool operator<(const EncryptSchemaKeyId& other) const {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     // The default constructor is required to exist by IDL, but is private because it does not
     // construct a valid EncryptSchemaKeyId and should not be called.
