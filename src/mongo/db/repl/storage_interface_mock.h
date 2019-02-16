@@ -389,7 +389,7 @@ public:
                                          const BSONObj& startKey,
                                          BoundInclusion boundInclusion,
                                          std::size_t limit) {
-        return Status{ErrorCodes::IllegalOperation, "FindOneFn not implemented."};
+        return Status{ErrorCodes::IllegalOperation, "FindDocumentsFn not implemented."};
     };
     DeleteDocumentsFn deleteDocumentsFn = [](OperationContext* opCtx,
                                              const NamespaceString& nss,

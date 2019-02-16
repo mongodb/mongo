@@ -74,8 +74,12 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
             ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) {
             switch (entry.getCommandType()) {
                 case repl::OplogEntry::CommandType::kApplyOps:
-                    newTxnRecord.setState(entry.shouldPrepare() ? DurableTxnStateEnum::kPrepared
-                                                                : DurableTxnStateEnum::kCommitted);
+                    if (entry.shouldPrepare()) {
+                        newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
+                        newTxnRecord.setStartTimestamp(entry.getOpTime().getTimestamp());
+                    } else {
+                        newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
+                    }
                     break;
                 case repl::OplogEntry::CommandType::kCommitTransaction:
                     newTxnRecord.setState(DurableTxnStateEnum::kCommitted);

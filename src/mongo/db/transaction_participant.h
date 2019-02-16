@@ -40,6 +40,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog.h"
@@ -350,7 +351,7 @@ public:
             return _tp;
         }
 
-        /**
+        /*
          * Blocking method, which loads the transaction state from storage if it has been marked as
          * needing refresh.
          *
@@ -637,8 +638,9 @@ public:
             return o().txnResourceStash->locker();
         }
 
-        void transitionToPreparedforTest(OperationContext* opCtx) {
+        void transitionToPreparedforTest(OperationContext* opCtx, repl::OpTime prepareOpTime) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
+            o(lk).prepareOpTime = prepareOpTime;
             o(lk).txnState.transitionTo(TransactionState::kPrepared);
         }
 
@@ -783,6 +785,13 @@ public:
     static Observer get(const ObservableSession& osession) {
         return Observer(osession);
     }
+
+
+    /**
+     * Returns the timestamp of the oldest oplog entry written across all open transactions.
+     * Returns boost::none if there are no active transactions.
+     */
+    static boost::optional<Timestamp> getOldestActiveTimestamp(OperationContext* opCtx);
 
     /**
      * Append a no-op to the oplog, for cases where we haven't written in this unit of work but

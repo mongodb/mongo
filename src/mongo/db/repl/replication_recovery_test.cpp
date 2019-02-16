@@ -927,6 +927,7 @@ TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConf
     expectedTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
     expectedTxnRecord.setLastWriteOpTime({Timestamp(2, 0), 1});
     expectedTxnRecord.setLastWriteDate(lastDate);
+    expectedTxnRecord.setStartTimestamp(Timestamp(2, 0));
     expectedTxnRecord.setState(DurableTxnStateEnum::kPrepared);
 
     std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
@@ -983,6 +984,8 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
+    // Leave startTimestamp unset. The assert below tests there's no startTimestamp in the
+    // config.transactions record after the prepared transaction is aborted.
     SessionTxnRecord expectedTxnRecord;
     expectedTxnRecord.setSessionId(*sessionInfo.getSessionId());
     expectedTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
@@ -1087,6 +1090,8 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
 
     recovery.recoverFromOplog(opCtx, boost::none);
 
+    // Leave startTimestamp unset. The assert below tests there's no startTimestamp in the
+    // config.transactions record after the prepared transaction is committed.
     SessionTxnRecord expectedTxnRecord;
     expectedTxnRecord.setSessionId(*sessionInfo.getSessionId());
     expectedTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());

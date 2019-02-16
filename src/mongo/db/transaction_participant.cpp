@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
@@ -332,6 +333,21 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
             wuow.commit();
         });
     }
+}
+
+boost::optional<Timestamp> TransactionParticipant::getOldestActiveTimestamp(
+    OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    Query q(BSON(SessionTxnRecord::kStateFieldName << "prepared"));
+    q.sort(SessionTxnRecord::kStartTimestampFieldName.toString());
+    auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(), q);
+    if (result.isEmpty()) {
+        return boost::none;
+    }
+
+    auto txnRecord =
+        SessionTxnRecord::parse(IDLParserErrorContext("parse oldest active txn record"), result);
+    return txnRecord.getStartTimestamp();
 }
 
 const LogicalSessionId& TransactionParticipant::Observer::_sessionId() const {
@@ -1943,6 +1959,10 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
         newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
         newTxnRecord.setLastWriteDate(newLastWriteDate);
         newTxnRecord.setState(newState);
+        if (newState == DurableTxnStateEnum::kPrepared) {
+            newTxnRecord.setStartTimestamp(o().prepareOpTime.getTimestamp());
+        }
+
         return newTxnRecord.toBSON();
     }();
     updateRequest.setUpdates(updateBSON);
