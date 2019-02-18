@@ -118,25 +118,19 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
     if (indexSpecs.empty())
         return Status::OK();
 
-    const auto& ns = cce->ns().ns();
-    auto rs = dbce->getRecordStore(ns);
-
-    // Open the collection.
-    const auto uuid = cce->getCollectionOptions(opCtx).uuid;
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    std::unique_ptr<Collection> collection =
-        databaseHolder->makeCollection(opCtx, ns, uuid, cce, rs, dbce);
-
     // Rebuild the indexes provided by 'indexSpecs'.
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     UUID buildUUID = UUID::gen();
-    auto swRebuild = indexBuildsCoord->startIndexRebuildForRecovery(
-        opCtx, std::move(collection), indexSpecs, buildUUID);
+    auto swRebuild =
+        indexBuildsCoord->startIndexRebuildForRecovery(opCtx, dbce, cce, indexSpecs, buildUUID);
     if (!swRebuild.isOK()) {
         return swRebuild.getStatus();
     }
 
     auto[numRecords, dataSize] = swRebuild.getValue();
+
+    const auto& ns = cce->ns().ns();
+    auto rs = dbce->getRecordStore(ns);
 
     // Update the record store stats after finishing and committing the index builds.
     WriteUnitOfWork wuow(opCtx);

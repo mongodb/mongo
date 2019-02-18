@@ -266,18 +266,6 @@ bool IndexBuildsManager::isBackgroundBuilding(const UUID& buildUUID) {
     return builder->isBackgroundBuilding();
 }
 
-void IndexBuildsManager::initializeIndexesWithoutCleanupForRecovery(
-    OperationContext* opCtx, Collection* collection, const std::vector<BSONObj>& indexSpecs) {
-    // Sanity check to ensure we're in recovery mode.
-    invariant(opCtx->lockState()->isW());
-    invariant(indexSpecs.size() > 0);
-
-    MultiIndexBlock indexer(opCtx, collection);
-    WriteUnitOfWork wuow(opCtx);
-    invariant(indexer.init(indexSpecs, MultiIndexBlock::kNoopOnInitFn).isOK());
-    wuow.commit();
-}
-
 void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {
     invariant(_builders.empty());
 }

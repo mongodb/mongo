@@ -165,17 +165,6 @@ public:
     bool isBackgroundBuilding(const UUID& buildUUID);
 
     /**
-     * Initializes the 'indexSpecs' with a MultiIndexBlock on 'collection', then aborts them without
-     * cleaning them up.
-     *
-     * This is to be used only during recovery mode when the index build process fails to ensure
-     * that we don't lose any indexes.
-     */
-    void initializeIndexesWithoutCleanupForRecovery(OperationContext* opCtx,
-                                                    Collection* collection,
-                                                    const std::vector<BSONObj>& indexSpecs);
-
-    /**
      * Checks via invariant that the manager has no index builds presently.
      */
     void verifyNoIndexBuilds_forTestOnly();

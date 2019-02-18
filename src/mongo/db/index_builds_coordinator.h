@@ -117,7 +117,8 @@ public:
      */
     StatusWith<std::pair<long long, long long>> startIndexRebuildForRecovery(
         OperationContext* opCtx,
-        std::unique_ptr<Collection> collection,
+        DatabaseCatalogEntry* dbce,
+        CollectionCatalogEntry* cce,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID);
 
@@ -378,7 +379,10 @@ protected:
      * Returns the number of records and the size of the data iterated over, if successful.
      */
     StatusWith<std::pair<long long, long long>> _runIndexRebuildForRecovery(
-        OperationContext* opCtx, Collection* collection, const UUID& buildUUID) noexcept;
+        OperationContext* opCtx,
+        Collection* collection,
+        ReplIndexBuildState::IndexCatalogStats& indexCatalogStats,
+        const UUID& buildUUID) noexcept;
 
     // Protects the below state.
     mutable stdx::mutex _mutex;
