@@ -17,15 +17,19 @@
     let conn = replSetTest.getPrimary();
     let testDB = conn.getDB('test');
 
-    // Run 'func' while failpoint is enabled.
-    let doDuringFailpoint = function(failPointName, logMessage, func, i) {
+    // Enables a failpoint, runs 'hitFailpointFunc' to hit the failpoint, then runs
+    // 'duringFailpointFunc' while the failpoint is active.
+    let doDuringFailpoint = function(
+        failPointName, logMessage, hitFailpointFunc, duringFailpointFunc, i) {
         clearRawMongoProgramOutput();
         assert.commandWorked(testDB.adminCommand(
             {configureFailPoint: failPointName, mode: "alwaysOn", data: {"i": i}}));
 
+        hitFailpointFunc();
+
         assert.soon(() => rawMongoProgramOutput().indexOf(logMessage) >= 0);
 
-        func();
+        duringFailpointFunc();
 
         assert.commandWorked(testDB.adminCommand({configureFailPoint: failPointName, mode: "off"}));
     };
@@ -77,7 +81,11 @@
         // Expect the build to fail with a duplicate key error if we insert a duplicate key and
         // don't resolve it.
         let expectDuplicate = config.resolve === false;
-        let awaitBuild = buildIndexInBackground(expectDuplicate);
+
+        let awaitBuild;
+        let buildIndex = function() {
+            awaitBuild = buildIndexInBackground(expectDuplicate);
+        };
 
         // Introduce a duplicate key, either from an insert or update. Optionally, follow-up with an
         // operation that will resolve the duplicate by removing it or updating it.
@@ -98,13 +106,15 @@
 
         const stopKey = 0;
         switch (config.phase) {
-            // Don't hang the build.
+            // Just build the index without any failpoints.
             case undefined:
+                buildIndex();
                 break;
             // Hang before scanning the first document.
             case 0:
                 doDuringFailpoint("hangBeforeIndexBuildOf",
                                   "Hanging before index build of i=" + stopKey,
+                                  buildIndex,
                                   doOperation,
                                   stopKey);
                 break;
@@ -112,6 +122,7 @@
             case 1:
                 doDuringFailpoint("hangAfterIndexBuildOf",
                                   "Hanging after index build of i=" + stopKey,
+                                  buildIndex,
                                   doOperation,
                                   stopKey);
                 break;
@@ -120,18 +131,21 @@
             case 2:
                 doDuringFailpoint("hangAfterIndexBuildDumpsInsertsFromBulk",
                                   "Hanging after dumping inserts from bulk builder",
+                                  buildIndex,
                                   doOperation);
                 break;
             // Hang before the second drain.
             case 3:
                 doDuringFailpoint("hangAfterIndexBuildFirstDrain",
                                   "Hanging after index build first drain",
+                                  buildIndex,
                                   doOperation);
                 break;
             // Hang before the final drain and commit.
             case 4:
                 doDuringFailpoint("hangAfterIndexBuildSecondDrain",
                                   "Hanging after index build second drain",
+                                  buildIndex,
                                   doOperation);
                 break;
             default:
