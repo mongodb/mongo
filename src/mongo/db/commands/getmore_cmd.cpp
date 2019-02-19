@@ -406,12 +406,7 @@ public:
             // repeatedly release and re-acquire the collection readLock at regular intervals until
             // the failpoint is released. This is done in order to avoid deadlocks caused by the
             // pinned-cursor failpoints in this file (see SERVER-21997).
-            MONGO_FAIL_POINT_BLOCK(waitAfterPinningCursorBeforeGetMoreBatch, options) {
-                const BSONObj& data = options.getData();
-                if (data["shouldNotdropLock"].booleanSafe()) {
-                    dropAndReacquireReadLock = []() {};
-                }
-
+            if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterPinningCursorBeforeGetMoreBatch,
                     opCtx,
@@ -498,12 +493,16 @@ public:
             // the 'waitWithPinnedCursorDuringGetMoreBatch' failpoint is active, set the 'msg' field
             // of this operation's CurOp to signal that we've hit this point and then spin until the
             // failpoint is released.
-            if (MONGO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
+            MONGO_FAIL_POINT_BLOCK(waitWithPinnedCursorDuringGetMoreBatch, options) {
+                const BSONObj& data = options.getData();
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitWithPinnedCursorDuringGetMoreBatch,
                     opCtx,
                     "waitWithPinnedCursorDuringGetMoreBatch",
-                    dropAndReacquireReadLock);
+                    data["shouldNotdropLock"].booleanSafe() ? []() {} /*empty function*/
+                                                            : dropAndReacquireReadLock,
+                    false,
+                    _request.nss);
             }
 
             uassertStatusOK(generateBatch(

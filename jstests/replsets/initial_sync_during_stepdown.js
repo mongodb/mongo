@@ -11,7 +11,7 @@
     const dbName = testName;
     const collName = "testcoll";
 
-    // Start a 3 node replica set to avoid primary step down after secondary resstart.
+    // Start a 3 node replica set to avoid primary step down after secondary restart.
     const rst = new ReplSetTest({
         nodes: [{}, {rsConfig: {priority: 0}}, {arbiter: true}],
         settings: {chainingAllowed: false}
@@ -119,17 +119,21 @@
 
     jsTestLog("Testing stepdown between collection data batches.");
     runStepDownTest({
-        failPoint: "waitAfterPinningCursorBeforeGetMoreBatch",
+        failPoint: "waitWithPinnedCursorDuringGetMoreBatch",
         nss: collNss,
         secondaryStartupParams: {collectionClonerBatchSize: 1}
     });
 
     // Restart secondary with "oplogFetcherInitialSyncMaxFetcherRestarts"
-    // set to zero to avoid masking the oplog fetcher error.
+    // set to zero to avoid masking the oplog fetcher error and enable fail point
+    // "waitAfterPinningCursorBeforeGetMoreBatch" which drops and reacquires read lock
+    // to prevent deadlock between getmore and insert thread for ephemeral storage
+    // engine.
     jsTestLog("Testing stepdown during oplog fetching");
+    const oplogNss = "local.oplog.rs";
     setupTest({
         failPoint: "waitAfterPinningCursorBeforeGetMoreBatch",
-        nss: "local.oplog.rs",
+        nss: oplogNss,
         secondaryStartupParams: {
             initialSyncOplogFetcherBatchSize: 1,
             oplogFetcherInitialSyncMaxFetcherRestarts: 0,
@@ -144,12 +148,25 @@
     jsTestLog("Inserting more data on primary.");
     assert.writeOK(primaryColl.insert([{_id: 3}, {_id: 4}]));
 
-    // Disable failpoint on secondary to allow initial sync to continue.
+    // Insert is successful. So, enable fail point "waitWithPinnedCursorDuringGetMoreBatch"
+    // such that it doesn't drop locks when getmore cmd waits inside the fail point block.
+    assert.commandWorked(primary.adminCommand({
+        configureFailPoint: "waitWithPinnedCursorDuringGetMoreBatch",
+        data: {nss: oplogNss, shouldCheckForInterrupt: true, shouldNotdropLock: true},
+        mode: "alwaysOn"
+    }));
+
+    // Now, disable fail point "waitAfterPinningCursorBeforeGetMoreBatch" to allow getmore to
+    // continue and hang on "waitWithPinnedCursorDuringGetMoreBatch" fail point.
+    assert.commandWorked(primary.adminCommand(
+        {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "off"}));
+
+    // Disable fail point on secondary to allow initial sync to continue.
     assert.commandWorked(secondary.adminCommand(
         {configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
 
     finishTest({
-        failPoint: "waitAfterPinningCursorBeforeGetMoreBatch",
+        failPoint: "waitWithPinnedCursorDuringGetMoreBatch",
         nss: "local.oplog.rs",
         DocsCopiedByOplogFetcher: 2
     });
