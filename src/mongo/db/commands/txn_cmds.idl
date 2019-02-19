@@ -59,6 +59,13 @@ structs:
                 type: int
                 default: 1
 
+    PrepareTransactionOplogObject:
+        description: A document representing the 'o' field of a 'prepareTransaction' oplog entry.
+        fields:
+            prepareTransaction:
+                type: int
+                default: 1
+
 commands:
     commitTransaction:
         description: "commitTransaction Command"
