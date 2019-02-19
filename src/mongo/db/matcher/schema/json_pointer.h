@@ -53,7 +53,7 @@ public:
      *
      * This class assumes 'ptr' is valid UTF-8 and does not do any validation.
      */
-    JSONPointer(const std::string& ptr);
+    JSONPointer(std::string ptr);
 
     /**
      * Resolves the JSONPointer against 'source'. Returns the pointed to key-value pair in
@@ -61,8 +61,26 @@ public:
      */
     BSONElement evaluate(const BSONObj& source) const;
 
+    const std::string& toString() const {
+        return _original;
+    }
+
+    bool operator==(const JSONPointer& other) const {
+        return _original == other.toString();
+    }
+
+
 private:
+    friend class EncryptSchemaKeyId;
+
+    /**
+     * Private because an empty JSONPointer is not valid, but IDL requires the default constructor.
+     */
+    JSONPointer() = default;
+
     std::vector<std::string> _parsed;
+
+    std::string _original;
 };
 
 }  // namespace mongo

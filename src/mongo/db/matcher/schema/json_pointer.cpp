@@ -65,7 +65,7 @@ std::string replaceEscapeChars(std::string str) {
 
 namespace mongo {
 
-JSONPointer::JSONPointer(const std::string& ptr) {
+JSONPointer::JSONPointer(std::string ptr) {
     // Check if pointer specifies root.
     uassert(51064, "Empty JSONPointers are not supported", ptr.length() != 0);
     uassert(51065, "JSONPointer must start with a '/'", ptr[0] == '/');
@@ -83,6 +83,8 @@ JSONPointer::JSONPointer(const std::string& ptr) {
     key = ptr.substr(startOfKeyIndex, nextSlashIndex - startOfKeyIndex);
     key = replaceEscapeChars(std::move(key));
     _parsed.push_back(std::move(key));
+
+    _original = ptr;
 }
 
 BSONElement JSONPointer::evaluate(const BSONObj& obj) const {

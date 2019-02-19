@@ -47,7 +47,7 @@ TEST(EncryptSchemaTest, KeyIDTypePointerTest) {
     auto elem = tempObj["pointer"];
     auto keyid = EncryptSchemaKeyId::parseFromBSON(elem);
     ASSERT(keyid.type() == EncryptSchemaKeyId::Type::kJSONPointer);
-    ASSERT_FALSE(UUID::parse(keyid.jsonPointer()).isOK());
+    ASSERT_FALSE(UUID::parse(keyid.jsonPointer().toString()).isOK());
 }
 
 TEST(EncryptSchemaTest, KeyIDTypeArrayTest) {
@@ -103,7 +103,7 @@ TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
     ASSERT_TRUE(encryptInfo.getAlgorithm().get() == FleAlgorithmEnum::kDeterministic);
     EncryptSchemaKeyId keyid = encryptInfo.getKeyId().get();
     ASSERT_TRUE(keyid.type() == EncryptSchemaKeyId::Type::kJSONPointer);
-    ASSERT_EQ(keyid.jsonPointer(), "/pointer");
+    ASSERT_EQ(keyid.jsonPointer().toString(), "/pointer");
 }
 
 TEST(EncryptSchemaTest, WrongTypeFailsParse) {

@@ -41,13 +41,18 @@ EncryptSchemaKeyId EncryptSchemaKeyId::parseFromBSON(const BSONElement& element)
         std::vector<UUID> keys;
 
         for (auto&& arrayElement : element.embeddedObject()) {
+            if (arrayElement.type() != BSONType::BinData) {
+                uasserted(51088,
+                          str::stream() << "Array elements must have type BinData, found "
+                                        << arrayElement.type());
+            }
             if (arrayElement.binDataType() == BinDataType::newUUID) {
                 const auto uuid = uassertStatusOK(UUID::parse(arrayElement));
 
                 keys.emplace_back(uuid);
             } else {
                 uasserted(51084,
-                          str::stream() << "Array elements must have type UUID, found "
+                          str::stream() << "Array elements must have bindata type UUID, found "
                                         << arrayElement.binDataType());
             }
         }
@@ -69,7 +74,7 @@ void EncryptSchemaKeyId::serializeToBSON(StringData fieldName, BSONObjBuilder* b
         }
         arrBuilder.doneFast();
     } else {
-        builder->append(fieldName, _strKeyId);
+        builder->append(fieldName, _pointer.toString());
     }
 }
 }  // namespace mongo

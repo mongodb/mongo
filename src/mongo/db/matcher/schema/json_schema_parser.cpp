@@ -40,6 +40,7 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher_type_set.h"
+#include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/matcher/schema/json_pointer.h"
 #include "mongo/logger/log_component_settings.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -1274,6 +1276,32 @@ Status translateScalarKeywords(StringMap<BSONElement>& keywordMap,
 }
 
 /**
+ * Parses the parameters to the 'encrypt' keyword. Returns an OK status if these parameters
+ * are valid, and a non-OK status otherwise."
+ */
+Status verifyEncryptOptions(BSONObj encryptObj) {
+    const IDLParserErrorContext encryptCtxt("encrypt");
+
+    // This checks the types of all the fields. Will throw on any parsing error.
+    EncryptionInfo encryptInfo;
+    try {
+        encryptInfo = EncryptionInfo::parse(encryptCtxt, encryptObj);
+    } catch (...) {
+        return exceptionToStatus();
+    }
+    auto typePointer = encryptInfo.getBsonType();
+    if (typePointer) {
+        auto it = kTypeAliasMap.find(typePointer.get());
+        if (it == kTypeAliasMap.end()) {
+            return {ErrorCodes::FailedToParse,
+                    "Invalid BSON type found in encrypt object: " + typePointer.get()};
+        }
+    }
+
+    return Status::OK();
+}
+
+/**
  * Parses JSON Schema encrypt keyword in 'keywordMap' and adds it to 'andExpr'. Returns a
  * non-OK status if an error occurs during parsing.
  */
@@ -1287,11 +1315,10 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
                     str::stream() << "$jsonSchema keyword '"
                                   << JSONSchemaParser::kSchemaEncryptKeyword
                                   << "' must be an object "};
-        } else if (!encryptElt.embeddedObject().isEmpty()) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << "$jsonSchema keyword '"
-                                  << JSONSchemaParser::kSchemaEncryptKeyword
-                                  << "' must be an empty object "};
+        }
+        auto encryptStatus = verifyEncryptOptions(encryptElt.embeddedObject());
+        if (!encryptStatus.isOK()) {
+            return encryptStatus;
         }
         andExpr->add(new InternalSchemaBinDataSubTypeExpression(path, BinDataType::Encrypt));
     }

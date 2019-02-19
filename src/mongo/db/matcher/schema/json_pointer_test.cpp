@@ -158,5 +158,15 @@ TEST(JSONPointerTest, DashCharacterBehavior) {
     assertPointerEvaluatesTo("/transit/-", topLevel, "-", 2);
 }
 
+TEST(JSONPointerTest, ToStringParsesToSamePointer) {
+    auto small = BSON("top" << BSON("fi~eld"
+                                    << "second"));
+    JSONPointer pointer{"/top/fi~0eld"};
+    auto reclaimedString = pointer.toString();
+    JSONPointer secondPointer{reclaimedString};
+    ASSERT_BSONELT_EQ(pointer.evaluate(small), secondPointer.evaluate(small));
+    ASSERT_EQ(reclaimedString, "/top/fi~0eld");
+}
+
 }  // namespace
 }  // namespace mongo

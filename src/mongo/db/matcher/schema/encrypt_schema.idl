@@ -60,7 +60,7 @@ enums:
 structs:
     # Maps to the encrypt keyword in JSON Schema.
     EncryptionInfo:
-        description: "Represents the fields that users can specify within the encryptMetadata 
+        description: "Represents the fields that users can specify within the encryptMetadata
             subobject in a JSON Schema."
         strict: true
         fields:
@@ -81,9 +81,9 @@ structs:
             type: encryptSchemaKeyId
             optional: true
 
-    # Maps to "encryptMetadata" in JSON Schema. 
+    # Maps to "encryptMetadata" in JSON Schema.
     EncryptionMetadata:
-        description: "The fields that can be applied to children in the schema 
+        description: "The fields that can be applied to children in the schema
             with the encrypt keyword."
         strict: true
         generate_comparison_operators: true
@@ -118,16 +118,16 @@ structs:
             optional: true
           ki:
             description: "Used to query the key vault by _id. If omitted, ka must be specified."
-            type: uuid 
-            cpp_name: keyId 
+            type: uuid
+            cpp_name: keyId
             optional: true
           ka:
-            description: "Used to query the key vault by keyAltName. If omitted, 
+            description: "Used to query the key vault by keyAltName. If omitted,
                 ki must be specified."
-            type: encryptSchemaAnyType 
+            type: encryptSchemaAnyType
             cpp_name: keyAltName
             optional: true
           v:
             description: "value to encrypt"
-            type: encryptSchemaAnyType 
-            cpp_name: encryptSchemaAnyType 
+            type: encryptSchemaAnyType
+            cpp_name: encryptSchemaAnyType

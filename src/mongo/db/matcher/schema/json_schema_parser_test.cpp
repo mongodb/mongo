@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -1957,12 +1958,81 @@ TEST(JSONSchemaParserTest, FailsToParseIfEncryptValueIsNotObject) {
     ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 }
 
-TEST(JSONSchemaParserTest, FailsToParseIfEncryptValueIsNotEmptyObject) {
-    BSONObj schema = fromjson("{properties: {foo: {encrypt: {foo: 12}}}}");
+TEST(JSONSchemaParserTest, ParseSucceedsWithEmptyEncryptObject) {
+    BSONObj schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSONObj())));
     auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+    ASSERT_OK(result.getStatus());
 }
 
+TEST(JSONSchemaParserTest, ParseSucceedsIfEncryptFieldsAreValid) {
+    auto schema = BSON(
+        "properties" << BSON(
+            "foo" << BSON("encrypt" << BSON("bsonType"
+                                            << "string"
+                                            << "keyId"
+                                            << "/pointer"
+                                            << "initializationVector"
+                                            << BSONBinData("four", 4, BinDataType::BinDataGeneral)
+                                            << "algorithm"
+                                            << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"))));
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+}
+TEST(JSONSchemaParserTest, FailsToParseIfEncryptHasBadFieldName) {
+    BSONObj schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyIdx"
+                                                                               << "/pointer"))));
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus().code(), 40415);
+    schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType"
+                                                                       << "bool"
+                                                                       << "keyIdx"
+                                                                       << "/pointer"))));
+    result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus().code(), 40415);
+}
 
+TEST(JSONSchemaParserTest, FailsToParseWithBadKeyIdArray) {
+    auto schema = BSON(
+        "properties" << BSON("foo" << BSON("encrypt" << BSON("keyId" << BSON_ARRAY("nonsense"
+                                                                                   << "again")))));
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus().code(), 51088);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseWithBadBSONType) {
+    auto schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType"
+                                                                            << "Stringx"))));
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+
+    schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType" << 1))));
+    result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseWithBadAlgorithm) {
+    auto schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("algorithm"
+                                                                            << "Stringx"))));
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseWithBadPointer) {
+    auto schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyId"
+                                                                            << "invalidPointer"))));
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus().code(), 51065);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseWithNonUUIDArrayElement) {
+    BSONArrayBuilder builder;
+    UUID::gen().appendToArrayBuilder(&builder);
+    UUID::gen().appendToArrayBuilder(&builder);
+    builder.appendBinData(16, BinDataType::Encrypt, "16charactershere");
+    auto schema =
+        BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyId" << builder.arr()))));
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus().code(), 51084);
+}
 }  // namespace
 }  // namespace mongo
