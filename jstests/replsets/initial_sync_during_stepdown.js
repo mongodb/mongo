@@ -11,7 +11,11 @@
     const dbName = testName;
     const collName = "testcoll";
 
-    const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
+    // Start a 3 node replica set to avoid primary step down after secondary restart.
+    const rst = new ReplSetTest({
+        nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+        settings: {chainingAllowed: false}
+    });
     rst.startSet();
     rst.initiate();
 
@@ -48,9 +52,7 @@
         secondaryStartupParams['numInitialSyncAttempts'] = 1;
         rst.start(secondary, {startClean: true, setParameter: secondaryStartupParams});
 
-        // Restarting the secondary may have resulted in an election. Wait until the system
-        // stabilizes and reaches RS_STARTUP2 state.
-        rst.getPrimary();
+        // Wait until secondary reaches RS_STARTUP2 state.
         rst.waitForState(secondary, ReplSetTest.State.STARTUP_2);
     }
 
