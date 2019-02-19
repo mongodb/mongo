@@ -50,17 +50,15 @@ void executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
                                              const BSONObj& deleteCmdObj,
                                              const BSONObj& insertCmdObj,
                                              const StringData db) {
-
     auto deleteOpMsg = OpMsgRequest::fromDBAndBody(db, deleteCmdObj);
     auto deleteRequest = BatchedCommandRequest::parseDelete(deleteOpMsg);
 
     BatchedCommandResponse deleteResponse;
     BatchWriteExecStats deleteStats;
-
     ClusterWriter::write(opCtx, deleteRequest, &deleteStats, &deleteResponse);
     uassertStatusOK(deleteResponse.toStatus());
     // If we do not delete any document, this is essentially equivalent to not matching a doc.
-    if (deleteResponse.getNModified() == 1)
+    if (deleteResponse.getN() != 1)
         return;
 
     auto insertOpMsg = OpMsgRequest::fromDBAndBody(db, insertCmdObj);
@@ -68,13 +66,12 @@ void executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     BatchedCommandResponse insertResponse;
     BatchWriteExecStats insertStats;
-
     ClusterWriter::write(opCtx, insertRequest, &insertStats, &insertResponse);
-    uassertStatusOK(deleteResponse.toStatus());
+    uassertStatusOK(insertResponse.toStatus());
     uassert(ErrorCodes::NamespaceNotFound,
             "Document not successfully inserted while changing shard key for namespace " +
                 insertRequest.getNS().toString(),
-            insertResponse.getNModified() == 1);
+            insertResponse.getN() == 1);
 }
 
 /**
@@ -153,6 +150,7 @@ BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
                                       const BSONObj& updatePostImage,
                                       int stmtId) {
     auto deleteOp = createShardKeyDeleteOp(nss, originalQueryPredicate, updatePostImage);
+    // TODO SERVER-40181: Do not set the stmtId once we remove stmtIds from txn oplog entries
     deleteOp.getWriteCommandBase().setStmtId(stmtId);
     return deleteOp.toBSON({});
 }
@@ -161,6 +159,7 @@ BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
                                       const BSONObj& updatePostImage,
                                       int stmtId) {
     auto insertOp = createShardKeyInsertOp(nss, updatePostImage);
+    // TODO SERVER-40181: Do not set the stmtId once we remove stmtIds from txn oplog entries
     insertOp.getWriteCommandBase().setStmtId(stmtId);
     return insertOp.toBSON({});
 }

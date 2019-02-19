@@ -44,9 +44,11 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_explain.h"
+#include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/chunk_manager_targeter.h"
@@ -119,6 +121,78 @@ void batchErrorToLastError(const BatchedCommandRequest& request,
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
         error->recordDelete(response.getN());
     }
+}
+
+bool updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
+                                                      BatchedCommandRequest& request,
+                                                      BatchedCommandResponse& response) {
+    if (!response.getOk() || !response.isErrDetailsSet()) {
+        return false;
+    }
+
+    for (const auto& err : response.getErrDetails()) {
+        if (err->toStatus() != ErrorCodes::WouldChangeOwningShard) {
+            continue;
+        }
+
+        auto txnRouter = TransactionRouter::get(opCtx);
+        bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+
+        // Updating the shard key when batch size > 1 is disallowed when the document would move
+        // shards. If the update is in a transaction uassert. If the write is not in a transaction,
+        // change any WouldChangeOwningShard errors in this batch to InvalidOptions to be reported
+        // to the user.
+        if (request.sizeWriteOps() != 1U) {
+            if (!isRetryableWrite)
+                uasserted(ErrorCodes::InvalidOptions,
+                          "Document shard key value updates that cause the doc to move shards "
+                          "must be sent with write batch of size 1");
+
+            err->setStatus({ErrorCodes::InvalidOptions,
+                            "Document shard key value updates that cause the doc to move shards "
+                            "must be sent with write batch of size 1"});
+            continue;
+        }
+
+        BSONObjBuilder extraInfoBuilder;
+        err->toStatus().extraInfo()->serialize(&extraInfoBuilder);
+        auto extraInfo = extraInfoBuilder.obj();
+        auto wouldChangeOwningShardExtraInfo =
+            WouldChangeOwningShardInfo::parseFromCommandError(extraInfo);
+
+        if (isRetryableWrite) {
+            // TODO: SERVER-39842 Start txn and resend update
+            uasserted(
+                ErrorCodes::ImmutableField,
+                "After applying the update, an immutable field was found to have been altered.");
+        }
+
+        try {
+            documentShardKeyUpdateUtil::updateShardKeyForDocument(
+                opCtx,
+                request.getNS(),
+                wouldChangeOwningShardExtraInfo,
+                request.getWriteCommandBase().getStmtId().get());
+
+            // If we get here, the batch size is 1 and we have successfully deleted the old doc and
+            // inserted the new one, so it is safe to unset the error details.
+            response.unsetErrDetails();
+            response.setN(response.getN() + 1);
+            response.setNModified(response.getNModified() + 1);
+
+            return true;
+        } catch (const DBException& e) {
+            auto status = e.toStatus();
+
+            if (!isRetryableWrite)
+                uasserted(status.code(), status.reason());
+
+            err->setStatus(status);
+            txnRouter->implicitlyAbortTransaction(opCtx, status);
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -253,6 +327,12 @@ private:
         BatchedCommandResponse response;
         ClusterWriter::write(opCtx, batchedRequest, &stats, &response);
 
+        bool updatedShardKey = false;
+        if (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+            updatedShardKey =
+                updateShardKeyValueOnWouldChangeOwningShardError(opCtx, batchedRequest, response);
+        }
+
         // Populate the lastError object based on the write response
         batchErrorToLastError(batchedRequest, response, &LastError::get(opCtx->getClient()));
 
@@ -298,7 +378,8 @@ private:
         ClusterLastErrorInfo::get(opCtx->getClient())->addHostOpTimes(stats.getWriteOpTimes());
 
         // Record the number of shards targeted by this write.
-        CurOp::get(opCtx)->debug().nShards = stats.getTargetedShards().size();
+        CurOp::get(opCtx)->debug().nShards =
+            stats.getTargetedShards().size() + (updatedShardKey ? 1 : 0);
 
         result.appendElements(response.toBSON());
         return response.getOk();

@@ -425,6 +425,10 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
         txnParticipant.stashTransactionResources(opCtx);
         guard.dismiss();
         throw;
+    } catch (const ExceptionFor<ErrorCodes::WouldChangeOwningShard>&) {
+        txnParticipant.stashTransactionResources(opCtx);
+        guard.dismiss();
+        throw;
     }
 
     if (auto okField = replyBuilder->getBodyBuilder().asTempObj()["ok"]) {

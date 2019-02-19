@@ -274,13 +274,14 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     trackedErrors.startTracking(ErrorCodes::CannotImplicitlyCreateCollection);
 
                     LOG(4) << "Write results received from " << shardHost.toString() << ": "
-                           << redact(batchedCommandResponse.toString());
+                           << redact(batchedCommandResponse.toStatus());
 
                     // If we are in a transaction, we must fail the whole batch on any error.
                     if (TransactionRouter::get(opCtx)) {
                         // Note: this returns a bad status if any part of the batch failed.
                         auto batchStatus = batchedCommandResponse.toStatus();
-                        if (!batchStatus.isOK()) {
+                        if (!batchStatus.isOK() &&
+                            batchStatus != ErrorCodes::WouldChangeOwningShard) {
                             batchOp.forgetTargetedBatchesOnTransactionAbortingError();
                             uassertStatusOK(batchStatus.withContext(
                                 str::stream() << "Encountered error from " << shardHost.toString()

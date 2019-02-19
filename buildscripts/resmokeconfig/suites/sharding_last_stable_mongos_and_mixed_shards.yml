@@ -66,6 +66,7 @@ selector:
   - jstests/sharding/array_shard_key.js
   - jstests/sharding/update_immutable_fields.js
   - jstests/sharding/update_shard_key_doc_on_same_shard.js
+  - jstests/sharding/update_shard_key_doc_moves_shards.js
   # TODO: SERVER-38541 remove from blacklist
   - jstests/sharding/shard_collection_existing_zones.js
   - jstests/sharding/single_shard_transaction_with_arbiter.js
