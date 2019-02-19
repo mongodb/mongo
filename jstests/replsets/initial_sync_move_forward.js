@@ -38,7 +38,7 @@
     assert.commandWorked(masterColl.ensureIndex({x: 1}, {unique: true}));
 
     // Add a secondary.
-    var secondary = rst.add();
+    var secondary = rst.add({setParameter: "numInitialSyncAttempts=1"});
     secondary.setSlaveOk();
     var secondaryColl = secondary.getDB("test").coll;
 

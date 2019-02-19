@@ -168,17 +168,11 @@ Status CollectionBulkLoaderImpl::commit() {
         // Commit before deleting dups, so the dups will be removed from secondary indexes when
         // deleted.
         if (_secondaryIndexesBlock) {
-            std::set<RecordId> secDups;
-            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(_opCtx.get(), &secDups);
+            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(_opCtx.get());
             if (!status.isOK()) {
                 return status;
             }
-            if (secDups.size()) {
-                return Status{ErrorCodes::UserDataInconsistent,
-                              str::stream() << "Found " << secDups.size()
-                                            << " duplicates on secondary index(es) even though "
-                                               "MultiIndexBlock::ignoreUniqueConstraint set."};
-            }
+
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
@@ -207,8 +201,37 @@ Status CollectionBulkLoaderImpl::commit() {
                 return status;
             }
 
-            // Commit _id index without duplicate keys even though there may still be documents
-            // with duplicate _ids. These duplicates will be deleted in the following step.
+            // If we were to delete the documents after committing the index build, it's possible
+            // that the storage engine unindexes a different record with the same key, but different
+            // RecordId. By deleting documents before committing the index build, the index removal
+            // code uses 'dupsAllowed', which forces the storage engine to only unindex records that
+            // match the same key and RecordId.
+            for (auto&& it : dups) {
+                writeConflictRetry(
+                    _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &it] {
+                        WriteUnitOfWork wunit(_opCtx.get());
+                        _autoColl->getCollection()->deleteDocument(_opCtx.get(),
+                                                                   kUninitializedStmtId,
+                                                                   it,
+                                                                   nullptr /** OpDebug **/,
+                                                                   false /* fromMigrate */,
+                                                                   true /* noWarn */);
+                        wunit.commit();
+                    });
+            }
+
+            status = _idIndexBlock->drainBackgroundWrites(_opCtx.get());
+            if (!status.isOK()) {
+                return status;
+            }
+
+            status = _idIndexBlock->checkConstraints(_opCtx.get());
+            if (!status.isOK()) {
+                return status;
+            }
+
+            // Commit the _id index, there won't be any documents with duplicate _ids as they were
+            // deleted prior to this.
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
@@ -225,23 +248,8 @@ Status CollectionBulkLoaderImpl::commit() {
             if (!status.isOK()) {
                 return status;
             }
-
-            // Delete duplicate records after committing the index so these writes are not
-            // intercepted by the still in-progress index builder.
-            for (auto&& it : dups) {
-                writeConflictRetry(
-                    _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &it] {
-                        WriteUnitOfWork wunit(_opCtx.get());
-                        _autoColl->getCollection()->deleteDocument(_opCtx.get(),
-                                                                   kUninitializedStmtId,
-                                                                   it,
-                                                                   nullptr /** OpDebug **/,
-                                                                   false /* fromMigrate */,
-                                                                   true /* noWarn */);
-                        wunit.commit();
-                    });
-            }
         }
+
         _stats.endBuildingIndexes = Date_t::now();
         LOG(2) << "Done creating indexes for ns: " << _nss.ns() << ", stats: " << _stats.toString();
 

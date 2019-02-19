@@ -33,6 +33,7 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/log.h"
 
@@ -46,6 +47,10 @@ bool requiresGhostCommitTimestampForWrite(OperationContext* opCtx, const Namespa
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (!replCoord->isReplEnabled()) {
+        return false;
+    }
+
+    if (replCoord->getMemberState().startup2()) {
         return false;
     }
 
