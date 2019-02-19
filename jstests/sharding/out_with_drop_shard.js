@@ -4,8 +4,6 @@
     'use strict';
 
     const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
-    // We need the balancer to remove a shard.
-    st.startBalancer();
 
     const mongosDB = st.s.getDB(jsTestName());
     const sourceColl = mongosDB["source"];
@@ -22,6 +20,9 @@
     }
 
     function removeShard(shard) {
+        // We need the balancer to drain all the chunks out of the shard that is being removed.
+        assert.commandWorked(st.startBalancer());
+        st.waitForBalancer(true, 60000);
         var res = st.s.adminCommand({removeShard: shard.shardName});
         assert.commandWorked(res);
         assert.eq('started', res.state);
@@ -38,6 +39,8 @@
         // are needed or not.
         st.configRS.awaitLastOpCommitted();
         assert.commandWorked(st.s.adminCommand({flushRouterConfig: 1}));
+        assert.commandWorked(st.stopBalancer());
+        st.waitForBalancer(false, 60000);
     }
 
     function addShard(shard) {
