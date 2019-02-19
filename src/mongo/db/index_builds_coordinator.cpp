@@ -602,6 +602,8 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     {
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), nss.ns(), MODE_IS);
+
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(replState->buildUUID));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
