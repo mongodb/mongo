@@ -64,6 +64,10 @@ protected:
                               const repl::OpTime& opTime,
                               const repl::OpTime& preImageOpTime,
                               const bool inMultiDocumentTransaction) override;
+    void shardObserveTransactionCommit(OperationContext* opCtx,
+                                       const std::vector<repl::ReplOperation>& stmts,
+                                       const repl::OpTime& opTime,
+                                       const bool fromPreparedTransactionCommit) override;
 };
 
 }  // namespace mongo

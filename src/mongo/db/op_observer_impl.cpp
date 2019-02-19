@@ -1111,6 +1111,8 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
 
     const auto commitOpTime = logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
     invariant(!commitOpTime.isNull());
+
+    shardObserveTransactionCommit(opCtx, statements, commitOpTime, false);
 }
 
 void OpObserverImpl::onPreparedTransactionCommit(
@@ -1130,6 +1132,8 @@ void OpObserverImpl::onPreparedTransactionCommit(
     cmdObj.setCommitTimestamp(commitTimestamp);
     logCommitOrAbortForPreparedTransaction(
         opCtx, commitOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kCommitted);
+
+    shardObserveTransactionCommit(opCtx, statements, commitOplogEntryOpTime.opTime, true);
 }
 
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
