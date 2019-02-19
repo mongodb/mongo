@@ -1,6 +1,4 @@
 """Mypy linter support module."""
-from __future__ import absolute_import
-from __future__ import print_function
 
 import os
 from typing import List
@@ -26,7 +24,12 @@ class MypyLinter(base.LinterBase):
     def get_lint_cmd_args(self, file_name):
         # type: (str) -> List[str]
         """Get the command to run a linter."""
-        return [file_name]
+        # Only idl and linter should be type checked by mypy. Other
+        # files return errors under python 3 type checking. If we
+        # return an empty list the runner will skip this file.
+        if 'idl' in file_name or 'linter' in file_name:
+            return [file_name]
+        return []
 
     def ignore_interpreter(self):
         # type: () -> bool

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 #
 # Copyright (C) 2018-present MongoDB, Inc.
 #
@@ -29,8 +29,6 @@
 #
 """Test cases for IDL parser."""
 # pylint: disable=too-many-lines
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import textwrap
 import unittest
@@ -964,7 +962,8 @@ class TestParser(testcase.IDLTestcase):
         """)
 
         # Commands and structs with same name
-        self.assert_parse_fail(test_preamble + textwrap.dedent("""
+        self.assert_parse_fail(
+            test_preamble + textwrap.dedent("""
             commands: 
                 foo:
                     description: foo
@@ -980,7 +979,8 @@ class TestParser(testcase.IDLTestcase):
             """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
 
         # Commands and types with same name
-        self.assert_parse_fail(test_preamble + textwrap.dedent("""
+        self.assert_parse_fail(
+            test_preamble + textwrap.dedent("""
             commands: 
                 string:
                     description: foo

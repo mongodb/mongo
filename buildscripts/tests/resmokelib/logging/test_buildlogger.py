@@ -1,7 +1,5 @@
 """Unit tests for the buildscripts.resmokelib.logging.buildlogger module."""
 
-from __future__ import absolute_import
-
 import json
 import unittest
 
@@ -54,7 +52,7 @@ class TestLogsSplitter(unittest.TestCase):
         # The size of [ "x" ] is 5. This is the minimum size we generate.
         self.assertTrue(size >= 5)
         # Each new "x" adds 5 to the size.
-        nb_lines = size / 5
+        nb_lines = int(size / 5)
         # Each additional "x" on a line adds 1 to the size.
         last_line_extra = size % 5
         logs = ["x"] * nb_lines
@@ -65,4 +63,4 @@ class TestLogsSplitter(unittest.TestCase):
     @staticmethod
     def size(logs):
         """Returns the size of the log lines when represented in JSON."""
-        return len(json.dumps(logs, encoding="utf-8"))
+        return len(json.dumps(logs))

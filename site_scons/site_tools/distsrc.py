@@ -20,7 +20,7 @@ import shutil
 import tarfile
 import time
 import zipfile
-import StringIO
+import io
 
 from distutils.spawn import find_executable
 
@@ -28,7 +28,7 @@ __distsrc_callbacks = []
 
 class DistSrcFile:
     def __init__(self, **kwargs):
-        [ setattr(self, key, val) for (key, val) in kwargs.items() ]
+        [ setattr(self, key, val) for (key, val) in list(kwargs.items()) ]
 
     def __str__(self):
         return self.name
@@ -60,6 +60,7 @@ class DistSrcArchive:
     def close(self):
         self.archive_file.close()
 
+
 class DistSrcTarArchive(DistSrcArchive):
     def __iter__(self):
         file_list = self.archive_file.getnames()
@@ -82,7 +83,7 @@ class DistSrcTarArchive(DistSrcArchive):
 
     def append_file_contents(self, filename, file_contents,
             mtime=time.time(),
-            mode=0644,
+            mode=0o644,
             uname="root",
             gname="root"):
         file_metadata = tarfile.TarInfo(name=filename)
@@ -91,7 +92,7 @@ class DistSrcTarArchive(DistSrcArchive):
         file_metadata.uname = uname
         file_metadata.gname = gname
         file_metadata.size = len(file_contents)
-        file_buf = StringIO.StringIO(file_contents)
+        file_buf = io.BytesIO(file_contents.encode('utf-8'))
         if self.archive_mode == 'r':
             self.archive_file.close()
             self.archive_file = tarfile.open(
@@ -104,6 +105,7 @@ class DistSrcTarArchive(DistSrcArchive):
 
     def append_file(self, filename, localfile):
         self.archive_file.add(localfile, arcname=filename)
+
 
 class DistSrcZipArchive(DistSrcArchive):
     def __iter__(self):
@@ -119,7 +121,7 @@ class DistSrcZipArchive(DistSrcArchive):
             name=key,
             size=item_data.file_size,
             mtime=time.mktime(fixed_time),
-            mode=0775 if is_dir else 0664,
+            mode=0o775 if is_dir else 0o664,
             type=tarfile.DIRTYPE if is_dir else tarfile.REGTYPE,
             uid=0,
             gid=0,
@@ -129,7 +131,7 @@ class DistSrcZipArchive(DistSrcArchive):
 
     def append_file_contents(self, filename, file_contents,
             mtime=time.time(),
-            mode=0644,
+            mode=0o644,
             uname="root",
             gname="root"):
         self.archive_file.writestr(filename, file_contents)
@@ -139,7 +141,7 @@ class DistSrcZipArchive(DistSrcArchive):
 
 def build_error_action(msg):
     def error_stub(target=None, source=None, env=None):
-        print msg
+        print(msg)
         env.Exit(1)
     return [ error_stub ]
 
@@ -162,7 +164,7 @@ def distsrc_action_generator(source, target, env, for_signature):
 
     target_ext = str(target[0])[-3:]
     if not target_ext in [ 'zip', 'tar' ]:
-        print "Invalid file format for distsrc. Must be tar or zip file"
+        print("Invalid file format for distsrc. Must be tar or zip file")
         env.Exit(1)
 
     git_cmd = "\"%s\" archive --format %s --output %s --prefix ${MONGO_DIST_SRC_PREFIX} HEAD" % (
@@ -173,14 +175,14 @@ def distsrc_action_generator(source, target, env, for_signature):
         SCons.Action.Action(run_distsrc_callbacks, "Running distsrc callbacks for $TARGET")
     ]
 
+
 def add_callback(env, fn):
     __distsrc_callbacks.append(fn)
 
+
 def generate(env, **kwargs):
     env.AddMethod(add_callback, 'AddDistSrcCallback')
-    env['BUILDERS']['__DISTSRC'] = SCons.Builder.Builder(
-        generator=distsrc_action_generator,
-    )
+    env['BUILDERS']['__DISTSRC'] = SCons.Builder.Builder(generator=distsrc_action_generator, )
 
     def DistSrc(env, target):
         result = env.__DISTSRC(target=target, source=[])
@@ -189,6 +191,7 @@ def generate(env, **kwargs):
         return result
 
     env.AddMethod(DistSrc, 'DistSrc')
+
 
 def exists(env):
     return True

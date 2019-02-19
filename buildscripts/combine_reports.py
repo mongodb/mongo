@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Combine JSON report files used in Evergreen."""
 
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import errno
 import json
@@ -45,7 +45,7 @@ def check_error(input_count, output_count):
     if (not input_count) and (not output_count):
         raise ValueError("None of the input file(s) or output file exists")
 
-    elif input_count and output_count:
+    if input_count and output_count:
         raise ValueError("Both input file and output files exist")
 
 
@@ -53,10 +53,11 @@ def main():
     """Execute Main program."""
     usage = "usage: %prog [options] report1.json report2.json ..."
     parser = OptionParser(description=__doc__, usage=usage)
-    parser.add_option("-o", "--output-file", dest="outfile", default="-",
-                      help=("If '-', then the combined report file is written to stdout."
-                            " Any other value is treated as the output file name. By default,"
-                            " output is written to stdout."))
+    parser.add_option(
+        "-o", "--output-file", dest="outfile", default="-",
+        help=("If '-', then the combined report file is written to stdout."
+              " Any other value is treated as the output file name. By default,"
+              " output is written to stdout."))
     parser.add_option("-x", "--no-report-exit", dest="report_exit", default=True,
                       action="store_false",
                       help="Do not exit with a non-zero code if any test in the report fails.")

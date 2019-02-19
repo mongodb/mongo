@@ -6,6 +6,7 @@ import sys
 from gen_helper import getCopyrightNotice, openNamespaces, closeNamespaces, \
     include
 
+
 def generate(unicode_casefold_file, target):
     """Generates a C++ source file that contains a Unicode case folding
        function.
@@ -13,7 +14,7 @@ def generate(unicode_casefold_file, target):
     The case folding function contains a switch statement with cases for every
     Unicode codepoint that has a case folding mapping.
     """
-    out = open(target, "w")
+    out = open(target, "w", encoding='utf-8')
 
     out.write(getCopyrightNotice())
     out.write(include("mongo/db/fts/unicode/codepoints.h"))
@@ -22,9 +23,10 @@ def generate(unicode_casefold_file, target):
 
     case_mappings = {}
 
-    cf_file = open(unicode_casefold_file, 'rU')
+    cf_file = open(unicode_casefold_file, 'rb')
 
     for line in cf_file:
+        line = line.decode('utf-8')
         # Filter out blank lines and lines that start with #
         data = line[:line.find('#')]
         if(data == ""):
@@ -76,18 +78,19 @@ def generate(unicode_casefold_file, target):
 
     for mapping in sorted_mappings:
         if mapping[0] <= 0x7f:
-            continue # ascii is special cased above.
+            continue  # ascii is special cased above.
 
         if mapping[0] in turkishMapping:
-            out.write("case 0x%x: return mode == CaseFoldMode::kTurkish ? 0x%x : 0x%x;\n"
-                      % (mapping[0], turkishMapping[mapping[0]], mapping[1]))
+            out.write("case 0x%x: return mode == CaseFoldMode::kTurkish ? 0x%x : 0x%x;\n" %
+                      (mapping[0], turkishMapping[mapping[0]], mapping[1]))
         else:
-            out.write("case 0x%x: return 0x%x;\n"%mapping)
+            out.write("case 0x%x: return 0x%x;\n" % mapping)
 
     out.write("\
     default: return codepoint;\n    }\n}")
 
     out.write(closeNamespaces())
+
 
 if __name__ == "__main__":
     generate(sys.argv[1], sys.argv[2])

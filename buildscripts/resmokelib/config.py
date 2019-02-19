@@ -1,7 +1,5 @@
 """Configuration options for resmoke.py."""
 
-from __future__ import absolute_import
-
 import collections
 import datetime
 import itertools
@@ -75,7 +73,7 @@ DEFAULTS = {
     "repeat_tests_secs": None,
     "report_failure_status": "fail",
     "report_file": None,
-    "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.
+    "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
     "shell_conn_string": None,
     "shell_port": None,
@@ -181,18 +179,19 @@ class SuiteOptions(_SuiteOptions):
         description = None
         include_tags = None
         parent = dict(
-            zip(SuiteOptions._fields, [
-                description,
-                FAIL_FAST,
-                include_tags,
-                JOBS,
-                REPEAT_SUITES,
-                REPEAT_TESTS,
-                REPEAT_TESTS_MAX,
-                REPEAT_TESTS_MIN,
-                REPEAT_TESTS_SECS,
-                REPORT_FAILURE_STATUS,
-            ]))
+            list(
+                zip(SuiteOptions._fields, [
+                    description,
+                    FAIL_FAST,
+                    include_tags,
+                    JOBS,
+                    REPEAT_SUITES,
+                    REPEAT_TESTS,
+                    REPEAT_TESTS_MAX,
+                    REPEAT_TESTS_MIN,
+                    REPEAT_TESTS_SECS,
+                    REPORT_FAILURE_STATUS,
+                ])))
 
         options = self._asdict()
         for field in SuiteOptions._fields:
@@ -203,7 +202,7 @@ class SuiteOptions(_SuiteOptions):
 
 
 SuiteOptions.ALL_INHERITED = SuiteOptions(  # type: ignore
-    **dict(zip(SuiteOptions._fields, itertools.repeat(SuiteOptions.INHERIT))))
+    **dict(list(zip(SuiteOptions._fields, itertools.repeat(SuiteOptions.INHERIT)))))
 
 ##
 # Variables that are set by the user at the command line or with --options.

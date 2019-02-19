@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Command line utility for determining what jstests have been added or modified."""
 
-from __future__ import absolute_import
-from __future__ import print_function
 
 import collections
 import copy
@@ -13,7 +11,7 @@ import subprocess
 import re
 import shlex
 import sys
-import urlparse
+import urllib.parse
 
 import requests
 import yaml
@@ -56,13 +54,15 @@ def parse_command_line():
 
     parser = optparse.OptionParser(usage="Usage: %prog [options] [resmoke command]")
 
-    parser.add_option("--maxRevisions", dest="max_revisions", type=int, default=25,
-                      help=("Maximum number of revisions to check for changes. Default is"
-                            " %default."))
+    parser.add_option(
+        "--maxRevisions", dest="max_revisions", type=int, default=25,
+        help=("Maximum number of revisions to check for changes. Default is"
+              " %default."))
 
-    parser.add_option("--branch", dest="branch", default="master",
-                      help=("The name of the branch the working branch was based on. Default is"
-                            " '%default'."))
+    parser.add_option(
+        "--branch", dest="branch", default="master",
+        help=("The name of the branch the working branch was based on. Default is"
+              " '%default'."))
 
     parser.add_option("--baseCommit", dest="base_commit", default=None,
                       help="The base commit to compare to for determining changes.")
@@ -79,14 +79,15 @@ def parse_command_line():
                       help=("The distro the tasks will execute on. Can only be specified"
                             " with --generateTasksFile."))
 
-    parser.add_option("--checkEvergreen", dest="check_evergreen", default=False,
-                      action="store_true",
-                      help=("Checks Evergreen for the last commit that was scheduled."
-                            " This way all the tests that haven't been burned in will be run."))
+    parser.add_option(
+        "--checkEvergreen", dest="check_evergreen", default=False, action="store_true",
+        help=("Checks Evergreen for the last commit that was scheduled."
+              " This way all the tests that haven't been burned in will be run."))
 
-    parser.add_option("--generateTasksFile", dest="generate_tasks_file", default=None,
-                      help=("Write an Evergreen generate.tasks JSON file. If this option is"
-                            " specified then no tests will be executed."))
+    parser.add_option(
+        "--generateTasksFile", dest="generate_tasks_file", default=None,
+        help=("Write an Evergreen generate.tasks JSON file. If this option is"
+              " specified then no tests will be executed."))
 
     parser.add_option("--noExec", dest="no_exec", default=False, action="store_true",
                       help="Do not run resmoke loop on new tests.")
@@ -100,21 +101,25 @@ def parse_command_line():
     parser.add_option("--testListOutfile", dest="test_list_outfile", default=None,
                       help="Write a JSON file with test executor information.")
 
-    parser.add_option("--repeatTests", dest="repeat_tests_num", default=None, type=int,
-                      help="The number of times to repeat each test. If --repeatTestsSecs is not"
-                      " specified then this will be set to {}.".format(REPEAT_SUITES))
+    parser.add_option(
+        "--repeatTests", dest="repeat_tests_num", default=None, type=int,
+        help="The number of times to repeat each test. If --repeatTestsSecs is not"
+        " specified then this will be set to {}.".format(REPEAT_SUITES))
 
-    parser.add_option("--repeatTestsMin", dest="repeat_tests_min", default=None, type=int,
-                      help="The minimum number of times to repeat each test when --repeatTestsSecs"
-                      " is specified.")
+    parser.add_option(
+        "--repeatTestsMin", dest="repeat_tests_min", default=None, type=int,
+        help="The minimum number of times to repeat each test when --repeatTestsSecs"
+        " is specified.")
 
-    parser.add_option("--repeatTestsMax", dest="repeat_tests_max", default=None, type=int,
-                      help="The maximum number of times to repeat each test when --repeatTestsSecs"
-                      " is specified.")
+    parser.add_option(
+        "--repeatTestsMax", dest="repeat_tests_max", default=None, type=int,
+        help="The maximum number of times to repeat each test when --repeatTestsSecs"
+        " is specified.")
 
-    parser.add_option("--repeatTestsSecs", dest="repeat_tests_secs", default=None, type=float,
-                      help="Time, in seconds, to repeat each test. Note that this option is"
-                      " mutually exclusive with with --repeatTests.")
+    parser.add_option(
+        "--repeatTestsSecs", dest="repeat_tests_secs", default=None, type=float,
+        help="Time, in seconds, to repeat each test. Note that this option is"
+        " mutually exclusive with with --repeatTests.")
 
     # This disables argument parsing on the first unrecognized parameter. This allows us to pass
     # a complete resmoke.py command line without accidentally parsing its options.
@@ -169,7 +174,7 @@ def find_last_activated_task(revisions, variant, branch_name):
     evg_cfg = evergreen_client.read_evg_config()
     if evg_cfg is not None and "api_server_host" in evg_cfg:
         api_server = "{url.scheme}://{url.netloc}".format(
-            url=urlparse.urlparse(evg_cfg["api_server_host"]))
+            url=urllib.parse.urlparse(evg_cfg["api_server_host"]))
     else:
         api_server = API_SERVER_DEFAULT
 
@@ -210,6 +215,7 @@ def find_changed_tests(  # pylint: disable=too-many-locals
 
     if base_commit is None:
         base_commit = repo.get_merge_base([branch_name + "@{upstream}", "HEAD"])
+
     if check_evergreen:
         # We're going to check up to 200 commits in Evergreen for the last scheduled one.
         # The current commit will be activated in Evergreen; we use --skip to start at the
@@ -268,8 +274,8 @@ def find_excludes(selector_file):
     try:
         js_test = yml["selector"]["js_test"]
     except KeyError:
-        raise Exception(
-            "The selector file " + selector_file + " is missing the 'selector.js_test' key")
+        raise Exception("The selector file " + selector_file +
+                        " is missing the 'selector.js_test' key")
 
     return (resmokelib.utils.default_if_none(js_test.get("exclude_suites"), []),
             resmokelib.utils.default_if_none(js_test.get("exclude_tasks"), []),
@@ -352,7 +358,7 @@ def create_task_list(  #pylint: disable=too-many-locals
 
     evg_buildvariant = evergreen_conf.get_variant(buildvariant)
     if not evg_buildvariant:
-        print("Buildvariant '{}' not found".format(buildvariant))
+        print("Buildvariant '{}' not found in {}".format(buildvariant, evergreen_conf.path))
         sys.exit(1)
 
     # Find all the buildvariant tasks.

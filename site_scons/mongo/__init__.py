@@ -5,4 +5,4 @@
 def print_build_failures():
     from SCons.Script import GetBuildFailures
     for bf in GetBuildFailures():
-        print "%s failed: %s" % (bf.node, bf.errstr)
+        print("%s failed: %s" % (bf.node, bf.errstr))

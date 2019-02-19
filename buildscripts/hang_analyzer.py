@@ -11,7 +11,7 @@ A prototype hang analyzer for Evergreen integration to help investigate test tim
 Supports Linux, MacOS X, Solaris, and Windows.
 """
 
-import StringIO
+import io
 import csv
 import glob
 import itertools
@@ -60,7 +60,7 @@ def callo(args, logger):
     """Call subprocess on args string."""
     logger.info("%s", str(args))
 
-    return subprocess.check_output(args)
+    return subprocess.check_output(args).decode('utf-8')
 
 
 def find_program(prog, paths):
@@ -186,7 +186,7 @@ class WindowsProcessList(object):
 
         ret = callo([ps, "/FO", "CSV"], logger)
 
-        buff = StringIO.StringIO(ret)
+        buff = io.StringIO(ret)
         csv_reader = csv.reader(buff)
 
         return [[int(row[1]), row[0]] for row in csv_reader if row[1] != "PID"]
@@ -201,7 +201,7 @@ class LLDBDumper(object):
         """Find the installed debugger."""
         return find_program(debugger, ['/usr/bin'])
 
-    def dump_info(  # pylint: disable=too-many-arguments
+    def dump_info(  # pylint: disable=too-many-arguments,too-many-locals
             self, root_logger, logger, pid, process_name, take_dump):
         """Dump info."""
         debugger = "lldb"
@@ -283,7 +283,7 @@ class DarwinProcessList(object):
 
         ret = callo([ps, "-axco", "pid,comm"], logger)
 
-        buff = StringIO.StringIO(ret)
+        buff = io.StringIO(ret)
         csv_reader = csv.reader(buff, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         return [[int(row[0]), row[1]] for row in csv_reader if row[0] != "PID"]
@@ -390,8 +390,8 @@ class GDBDumper(object):
             "quit",
         ]
 
-        call([dbg, "--quiet", "--nx"] +
-             list(itertools.chain.from_iterable([['-ex', b] for b in cmds])), logger)
+        call([dbg, "--quiet", "--nx"] + list(
+            itertools.chain.from_iterable([['-ex', b] for b in cmds])), logger)
 
         root_logger.info("Done analyzing %s process with PID %d", process_name, pid)
 
@@ -428,7 +428,7 @@ class LinuxProcessList(object):
 
         ret = callo([ps, "-eo", "pid,args"], logger)
 
-        buff = StringIO.StringIO(ret)
+        buff = io.StringIO(ret)
         csv_reader = csv.reader(buff, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         return [[int(row[0]), os.path.split(row[1])[1]] for row in csv_reader if row[0] != "PID"]
@@ -450,7 +450,7 @@ class SolarisProcessList(object):
 
         ret = callo([ps, "-eo", "pid,args"], logger)
 
-        buff = StringIO.StringIO(ret)
+        buff = io.StringIO(ret)
         csv_reader = csv.reader(buff, delimiter=' ', quoting=csv.QUOTE_NONE, skipinitialspace=True)
 
         return [[int(row[0]), os.path.split(row[1])[1]] for row in csv_reader if row[0] != "PID"]
@@ -562,7 +562,7 @@ def signal_process(logger, pid, signalnum):
 
         logger.info("Waiting for process to report")
         time.sleep(5)
-    except OSError, err:
+    except OSError as err:
         logger.error("Hit OS error trying to signal process: %s", err)
 
     except AttributeError:
@@ -619,32 +619,34 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
     process_ids = []
 
     parser = OptionParser(description=__doc__)
-    parser.add_option('-m', '--process-match', dest='process_match', choices=['contains', 'exact'],
-                      default='contains',
-                      help="Type of match for process names (-p & -g), specify 'contains', or"
-                      " 'exact'. Note that the process name match performs the following"
-                      " conversions: change all process names to lowecase, strip off the file"
-                      " extension, like '.exe' on Windows. Default is 'contains'.")
+    parser.add_option(
+        '-m', '--process-match', dest='process_match', choices=['contains', 'exact'],
+        default='contains', help="Type of match for process names (-p & -g), specify 'contains', or"
+        " 'exact'. Note that the process name match performs the following"
+        " conversions: change all process names to lowecase, strip off the file"
+        " extension, like '.exe' on Windows. Default is 'contains'.")
     parser.add_option('-p', '--process-names', dest='process_names',
                       help='Comma separated list of process names to analyze')
     parser.add_option('-g', '--go-process-names', dest='go_process_names',
                       help='Comma separated list of go process names to analyze')
-    parser.add_option('-d', '--process-ids', dest='process_ids', default=None,
-                      help='Comma separated list of process ids (PID) to analyze, overrides -p &'
-                      ' -g')
+    parser.add_option(
+        '-d', '--process-ids', dest='process_ids', default=None,
+        help='Comma separated list of process ids (PID) to analyze, overrides -p &'
+        ' -g')
     parser.add_option('-c', '--dump-core', dest='dump_core', action="store_true", default=False,
                       help='Dump core file for each analyzed process')
     parser.add_option('-s', '--max-core-dumps-size', dest='max_core_dumps_size', default=10000,
                       help='Maximum total size of core dumps to keep in megabytes')
-    parser.add_option('-o', '--debugger-output', dest='debugger_output', action="append",
-                      choices=['file', 'stdout'], default=None,
-                      help="If 'stdout', then the debugger's output is written to the Python"
-                      " process's stdout. If 'file', then the debugger's output is written"
-                      " to a file named debugger_<process>_<pid>.log for each process it"
-                      " attaches to. This option can be specified multiple times on the"
-                      " command line to have the debugger's output written to multiple"
-                      " locations. By default, the debugger's output is written only to the"
-                      " Python process's stdout.")
+    parser.add_option(
+        '-o', '--debugger-output', dest='debugger_output', action="append",
+        choices=['file', 'stdout'], default=None,
+        help="If 'stdout', then the debugger's output is written to the Python"
+        " process's stdout. If 'file', then the debugger's output is written"
+        " to a file named debugger_<process>_<pid>.log for each process it"
+        " attaches to. This option can be specified multiple times on the"
+        " command line to have the debugger's output written to multiple"
+        " locations. By default, the debugger's output is written only to the"
+        " Python process's stdout.")
 
     (options, _) = parser.parse_args()
 
@@ -681,7 +683,7 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
         processes = [(pid, pname) for (pid, pname) in all_processes
                      if pid in process_ids and pid != os.getpid()]
 
-        running_pids = set([pid for (pid, pname) in all_processes])
+        running_pids = {pid for (pid, pname) in all_processes}
         missing_pids = set(process_ids) - running_pids
         if missing_pids:
             root_logger.warning("The following requested process ids are not running %s",
@@ -716,8 +718,9 @@ def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statem
          process_name) in [(p, pn) for (p, pn) in processes if not re.match("^(java|python)", pn)]:
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
         try:
-            dbg.dump_info(root_logger, process_logger, pid, process_name, options.dump_core
-                          and check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
+            dbg.dump_info(
+                root_logger, process_logger, pid, process_name, options.dump_core
+                and check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
         except Exception as err:  # pylint: disable=broad-except
             root_logger.info("Error encountered when invoking debugger %s", err)
             trapped_exceptions.append(traceback.format_exc())

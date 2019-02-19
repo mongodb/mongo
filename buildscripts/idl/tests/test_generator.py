@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 #
 # Copyright (C) 2018-present MongoDB, Inc.
 #
@@ -36,8 +36,6 @@ idl base directory:
 $ coverage run run_tests.py && coverage html
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import os
 import unittest
 
@@ -72,8 +70,8 @@ class TestGenerator(testcase.IDLTestcase):
 
         unittest_idl_file = os.path.join(idl_dir, 'unittest.idl')
         if not os.path.exists(unittest_idl_file):
-            unittest.skip("Skipping IDL Generator testing since %s could not be found." %
-                          (unittest_idl_file))
+            unittest.skip(
+                "Skipping IDL Generator testing since %s could not be found." % (unittest_idl_file))
             return
 
         args.input_file = os.path.join(idl_dir, 'unittest_import.idl')

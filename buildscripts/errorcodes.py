@@ -5,14 +5,15 @@ Parses .cpp files for assertions and verifies assertion codes are distinct.
 Optionally replaces zero codes in source code with new distinct values.
 """
 
-from __future__ import absolute_import
-from __future__ import print_function
+
+
 
 import bisect
 import os.path
 import sys
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
+from functools import reduce
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -44,21 +45,21 @@ list_files = False  # pylint: disable=invalid-name
 def parse_source_files(callback):
     """Walk MongoDB sourcefiles and invoke a callback for each AssertLocation found."""
 
-    quick = ["assert", "Exception", "ErrorCodes::Error"]
+    quick = [b"assert", b"Exception", b"ErrorCodes::Error"]
 
     patterns = [
-        re.compile(r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE),
-        re.compile(r"(?:DB|Assertion)Exception\s*[({]\s*(\d+)", re.MULTILINE),
-        re.compile(r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
+        re.compile(b"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE),
+        re.compile(b"(?:DB|Assertion)Exception\s*[({]\s*(\d+)", re.MULTILINE),
+        re.compile(b"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
                    re.MULTILINE),
-        re.compile(r"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE)
+        re.compile(b"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE)
     ]
 
     for source_file in utils.get_all_source_files(prefix='src/mongo/'):
         if list_files:
             print('scanning file: ' + source_file)
 
-        with open(source_file) as fh:
+        with open(source_file, 'rb') as fh:
             text = fh.read()
 
             if not any([zz in text for zz in quick]):
@@ -168,7 +169,7 @@ def read_error_codes():
         print("EXCESSIVE SKIPPING OF ERROR CODES:")
         print("  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines))
 
-    for code, locations in dups.items():
+    for code, locations in list(dups.items()):
         print("DUPLICATE IDS: %s" % code)
         for loc in locations:
             line, col = get_line_and_column_for_position(loc)

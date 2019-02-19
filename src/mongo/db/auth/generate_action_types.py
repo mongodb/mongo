@@ -26,7 +26,6 @@
 # delete this exception statement from your version. If you delete this
 # exception statement from all source files in the program, then also delete
 # it in the license file.
-
 """Generate action_type.{h,cpp}
 
 Usage:
@@ -34,7 +33,6 @@ Usage:
 """
 
 import sys
-
 
 headerFileTemplate = """// AUTO-GENERATED FILE DO NOT EDIT
 // See src/mongo/db/auth/generate_action_types.py
@@ -194,14 +192,14 @@ namespace mongo {
 } // namespace mongo
 """
 
+
 def writeSourceFile(actionTypes, sourceOutputFile):
     actionTypeConstants = ""
     fromStringIfStatements = ""
     toStringCaseStatements = ""
     for actionType in actionTypes:
         actionTypeConstants += ("    const ActionType ActionType::%(actionType)s"
-                                "(%(actionType)sValue);\n" %
-                                dict(actionType=actionType))
+                                "(%(actionType)sValue);\n" % dict(actionType=actionType))
         fromStringIfStatements += """        if (action == "%(actionType)s") {
             *result = %(actionType)s;
             return Status::OK();
@@ -215,6 +213,7 @@ def writeSourceFile(actionTypes, sourceOutputFile):
 
     pass
 
+
 def writeHeaderFile(actionTypes, headerOutputFile):
     actionTypeConstants = ""
     actionTypeIdentifiers = ""
@@ -225,6 +224,7 @@ def writeHeaderFile(actionTypes, headerOutputFile):
                                                     actionTypeIdentifiers=actionTypeIdentifiers)
     headerOutputFile.write(formattedHeaderFile)
 
+
 def hasDuplicateActionTypes(actionTypes):
     sortedActionTypes = sorted(actionTypes)
 
@@ -232,7 +232,7 @@ def hasDuplicateActionTypes(actionTypes):
     prevActionType = sortedActionTypes[0]
     for actionType in sortedActionTypes[1:]:
         if actionType == prevActionType:
-            print 'Duplicate actionType %s\n' % actionType
+            print('Duplicate actionType %s\n' % actionType)
             didFail = True
         prevActionType = actionType
 
@@ -245,7 +245,7 @@ def parseActionTypesFromFile(actionTypesFilename):
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
-        print "Usage: generate_action_types.py <path to action_types.txt> <header file path> <source file path>"
+        print("Usage: generate_action_types.py <path to action_types.txt> <header file path> <source file path>")
         sys.exit(-1)
 
     actionTypes = parseActionTypesFromFile(sys.argv[1])

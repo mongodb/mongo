@@ -4,34 +4,13 @@ Uses job objects when running on Windows to ensure that all created
 processes are terminated.
 """
 
-from __future__ import absolute_import
-
 import atexit
 import logging
 import os
 import os.path
 import sys
 import threading
-
-# The subprocess32 module resolves the thread-safety issues of the subprocess module in Python 2.x
-# when the _posixsubprocess C extension module is also available. Additionally, the _posixsubprocess
-# C extension module avoids triggering invalid free() calls on Python's internal data structure for
-# thread-local storage by skipping the PyOS_AfterFork() call when the 'preexec_fn' parameter isn't
-# specified to subprocess.Popen(). See SERVER-22219 for more details.
-#
-# The subprocess32 module is untested on Windows and thus isn't recommended for use, even when it's
-# installed. See https://github.com/google/python-subprocess32/blob/3.2.7/README.md#usage.
-if os.name == "posix" and sys.version_info[0] == 2:
-    try:
-        import subprocess32 as subprocess
-    except ImportError:
-        import warnings
-        warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
-                       " available. When using the subprocess module, a child process may trigger"
-                       " an invalid free(). See SERVER-22219 for more details."), RuntimeWarning)
-        import subprocess  # type: ignore
-else:
-    import subprocess
+import subprocess
 
 from . import pipe  # pylint: disable=wrong-import-position
 from .. import utils  # pylint: disable=wrong-import-position
@@ -182,8 +161,8 @@ class Process(object):
                 finally:
                     win32api.CloseHandle(mongo_signal_handle)
 
-                print "Failed to cleanly exit the program, calling TerminateProcess() on PID: " +\
-                    str(self._process.pid)
+                print("Failed to cleanly exit the program, calling TerminateProcess() on PID: " +\
+                    str(self._process.pid))
 
             # Adapted from implementation of Popen.terminate() in subprocess.py of Python 2.7
             # because earlier versions do not catch exceptions.

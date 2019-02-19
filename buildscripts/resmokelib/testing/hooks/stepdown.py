@@ -1,5 +1,4 @@
 """Test hook that periodically makes the primary of a replica set step down."""
-from __future__ import absolute_import
 
 import collections
 import os.path
@@ -179,7 +178,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
 
         try:
             while True:
-                if self._is_stopped():
+                if self.__is_stopped():
                     break
                 self._wait_for_permission_or_resume()
                 now = time.time()
@@ -210,7 +209,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self.resume()
         self.join()
 
-    def _is_stopped(self):
+    def __is_stopped(self):
         return self._is_stopped_evt.is_set()
 
     def pause(self):
@@ -234,7 +233,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
     def _wait_for_permission_or_resume(self):
         # Wait until stop, _stepdown_permitted_file or resume.
         if self._stepdown_permitted_file:
-            while not os.path.isfile(self._stepdown_permitted_file) and not self._is_stopped():
+            while not os.path.isfile(self._stepdown_permitted_file) and not self.__is_stopped():
                 # Set a short sleep during busy wait time for self._stepdown_permitted_file.
                 self._wait(0.1)
         else:

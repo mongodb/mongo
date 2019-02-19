@@ -12,7 +12,7 @@ from buildscripts import evergreen_task_tags as ett
 
 
 def gen_tag_set(prefix, size):
-    return set([prefix + " " + str(index) for index in range(size)])
+    return {prefix + " " + str(index) for index in range(size)}
 
 
 class TestGetAllTaskTags(unittest.TestCase):

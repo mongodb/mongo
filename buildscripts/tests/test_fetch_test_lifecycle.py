@@ -1,5 +1,4 @@
 """Unit tests for the fetch_test_lifecycle.py script."""
-from __future__ import absolute_import
 
 import unittest
 
@@ -10,11 +9,11 @@ import buildscripts.fetch_test_lifecycle as fetch
 
 class TestFetchTestLifecycle(unittest.TestCase):
     def test_get_metadata_revision(self):
-        metadata_repo = MockMetadataRepository(
-            [("metadata_revision_05", "mongo_revision_06"),
-             ("metadata_revision_04", "mongo_revision_06"), ("metadata_revision_03",
-                                                             "mongo_revision_02"),
-             ("metadata_revision_02", "mongo_revision_02"), ("metadata_revision_01", None)])
+        metadata_repo = MockMetadataRepository([("metadata_revision_05", "mongo_revision_06"),
+                                                ("metadata_revision_04", "mongo_revision_06"),
+                                                ("metadata_revision_03", "mongo_revision_02"),
+                                                ("metadata_revision_02", "mongo_revision_02"),
+                                                ("metadata_revision_01", None)])
 
         mongo_repo = MockMongoRepository([
             "mongo_revision_07", "mongo_revision_06", "mongo_revision_05", "mongo_revision_04",

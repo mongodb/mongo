@@ -1,10 +1,9 @@
 """Replica set fixture for executing JSTests against."""
 
-from __future__ import absolute_import
-
 import os.path
 import time
 
+import bson.errors
 import pymongo
 import pymongo.errors
 import pymongo.write_concern
@@ -77,11 +76,11 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.replset_name = self.mongod_options.get("replSet", "rs")
 
         if not self.nodes:
-            for i in xrange(self.num_nodes):
+            for i in range(self.num_nodes):
                 node = self._new_mongod(i, self.replset_name)
                 self.nodes.append(node)
 
-        for i in xrange(self.num_nodes):
+        for i in range(self.num_nodes):
             if self.linear_chain and i > 0:
                 self.nodes[i].mongod_options["set_parameters"][
                     "failpoint.forceSyncSourceCandidate"] = {
@@ -207,10 +206,17 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         def check_rcmaj_optime(client, node):
             """Return True if all nodes have caught up with the primary."""
-            res = client.admin.command({"replSetGetStatus": 1})
+            # TODO SERVER-40078: The server is reporting invalid
+            # dates in its response to the replSetGetStatus
+            # command
+            try:
+                res = client.admin.command({"replSetGetStatus": 1})
+            except bson.errors.InvalidBSON:
+                return False
             read_concern_majority_optime = res["optimes"]["readConcernMajorityOpTime"]
 
-            if read_concern_majority_optime >= primary_optime:
+            if (read_concern_majority_optime["t"] == primary_optime["t"]
+                    and read_concern_majority_optime["ts"] >= primary_optime["ts"]):
                 up_to_date_nodes.add(node.port)
 
             return len(up_to_date_nodes) == len(self.nodes)
@@ -303,7 +309,15 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             client_admin = client["admin"]
 
             while True:
-                status = client_admin.command("replSetGetStatus")
+                # TODO SERVER-40078: The server is reporting invalid
+                # dates in its response to the replSetGetStatus
+                # command
+                try:
+                    status = client_admin.command("replSetGetStatus")
+                except bson.errors.InvalidBSON:
+                    time.sleep(0.1)
+                    continue
+
                 # The `lastStableRecoveryTimestamp` field contains a stable timestamp guaranteed to
                 # exist on storage engine recovery to a stable timestamp.
                 last_stable_recovery_timestamp = status.get("lastStableRecoveryTimestamp", None)

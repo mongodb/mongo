@@ -1,7 +1,5 @@
 """The unittest.TestCase for C++ integration tests."""
 
-from __future__ import absolute_import
-
 from . import interface
 from ... import core
 from ... import utils

@@ -63,7 +63,7 @@ def download_pkg(link, pkg_format=''):
             ' to download the compass installer for your platform.'
 
     try:
-        out = subprocess.check_output(['file', filename])
+        out = subprocess.check_output(['file', filename]).decode('utf-8')
     except subprocess.CalledProcessError as error:
         print 'Got an unexpected error checking file type %s' % error
         sys.exit(1)
@@ -80,8 +80,9 @@ def install_mac(dmg):
     tmp = tempfile.mkdtemp()
     with open(os.devnull, 'w') as fnull:
         try:
-            subprocess.check_call(['hdiutil', 'attach', '-nobrowse', '-noautoopen',
-                                    '-mountpoint', tmp, dmg], stdout=fnull, stderr=fnull)
+            subprocess.check_call(
+                ['hdiutil', 'attach', '-nobrowse', '-noautoopen', '-mountpoint', tmp, dmg],
+                stdout=fnull, stderr=fnull)
         except subprocess.CalledProcessError as error:
             print 'Problem running hdiutil: %s' % error
 
@@ -98,16 +99,13 @@ def install_mac(dmg):
         except IOError:
             print 'Unknown error copying MongoDB Compass to /Applications/'
         finally:
-            subprocess.check_call(
-                ['hdiutil', 'detach', tmp], stdout=fnull, stderr=fnull)
+            subprocess.check_call(['hdiutil', 'detach', tmp], stdout=fnull, stderr=fnull)
 
         if path.isdir('/Applications/MongoDB Compass.app'):
-            subprocess.check_call(
-                ['open', '/Applications/MongoDB Compass.app'])
+            subprocess.check_call(['open', '/Applications/MongoDB Compass.app'])
             return
         if path.isdir('/Applications/MongoDB Compass Community.app'):
-            subprocess.check_call(
-                ['open', '/Applications/MongoDB Compass Community.app'])
+            subprocess.check_call(['open', '/Applications/MongoDB Compass Community.app'])
             return
 
 
@@ -135,9 +133,8 @@ def is_supported_distro():
     if (distro_name == 'Ubuntu' and float(version_number) >= 14.04):
         return True
 
-    if ((distro_name == 'Red Hat Enterprise Linux Server' or
-         'CentOS' in distro_name) and
-            (float(version_number) >= 7.0)):
+    if ((distro_name == 'Red Hat Enterprise Linux Server' or 'CentOS' in distro_name)
+            and (float(version_number) >= 7.0)):
         return True
 
     return False

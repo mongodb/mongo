@@ -1,6 +1,4 @@
 """PyLint linter support module."""
-from __future__ import absolute_import
-from __future__ import print_function
 
 import os
 from typing import List
@@ -15,7 +13,7 @@ class PyLintLinter(base.LinterBase):
     def __init__(self):
         # type: () -> None
         """Create a pylint linter."""
-        super(PyLintLinter, self).__init__("pylint", "pylint 1.9.3")
+        super(PyLintLinter, self).__init__("pylint", "pylint 2.3.1")
 
     def get_lint_version_cmd_args(self):
         # type: () -> List[str]

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Setup an Android device to run the benchrun_embedded test suite."""
 
-from __future__ import print_function
-
 import glob
 import logging
 import optparse
@@ -13,7 +11,7 @@ import sys
 import tarfile
 import tempfile
 import time
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 # pylint: disable=wrong-import-position
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
@@ -30,7 +28,7 @@ def download_and_untar(url, root_dir):
     """Download url and untar into root_dir."""
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".tgz").name
     LOGGER.info("Downloading %s", url)
-    urllib.urlretrieve(url, temp_file)
+    urllib.request.urlretrieve(url, temp_file)
     with tarfile.open(temp_file, "r:gz") as tar:
         tar.extractall(root_dir)
     os.remove(temp_file)
@@ -130,10 +128,10 @@ def main():
         help="The remote directory to store the embedded SDK files. Defaults to '%default'.",
         default=posixpath.join(benchrun_root, "sdk"))
 
-    device_options.add_option("--benchrunJsonRemoteDir", dest="json_remote_dir",
-                              help="The remote directory to store the benchrun JSON files."
-                              " Defaults to '%default'.", default=posixpath.join(
-                                  benchrun_root, "testcases"))
+    device_options.add_option(
+        "--benchrunJsonRemoteDir", dest="json_remote_dir",
+        help="The remote directory to store the benchrun JSON files."
+        " Defaults to '%default'.", default=posixpath.join(benchrun_root, "testcases"))
 
     sdk_url = "https://s3.amazonaws.com/mciuploads/mongodb-mongo-master/embedded-sdk-test/embedded-sdk-android-arm64-latest.tgz"
     sdk_options.add_option(
@@ -142,9 +140,10 @@ def main():
               " any required shared object (.so) libraries. Defaults to '%default'."),
         default=sdk_url)
 
-    sdk_options.add_option("--sdkLocalDir", dest="sdk_local_dir",
-                           help="The local directory of embedded SDK files to be copied."
-                           "If specified, overrides --sdkUrl.", default=None)
+    sdk_options.add_option(
+        "--sdkLocalDir", dest="sdk_local_dir",
+        help="The local directory of embedded SDK files to be copied."
+        "If specified, overrides --sdkUrl.", default=None)
 
     sdk_options.add_option(
         "--sdkSaveLocalDir", dest="sdk_save_local_dir",
@@ -159,9 +158,10 @@ def main():
               " files to be used in the benchrun embedded test."
               " Defaults to '%default'."), default=json_url)
 
-    json_options.add_option("--benchrunJsonLocalDir", dest="json_local_dir",
-                            help="The local directory of benchrun JSON files to be copied."
-                            "If specified, overrides --benchrunJsonUrl.", default=None)
+    json_options.add_option(
+        "--benchrunJsonLocalDir", dest="json_local_dir",
+        help="The local directory of benchrun JSON files to be copied."
+        "If specified, overrides --benchrunJsonUrl.", default=None)
 
     json_options.add_option(
         "--benchrunJsonSaveLocalDir", dest="json_save_local_dir",

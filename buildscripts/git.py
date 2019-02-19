@@ -1,30 +1,9 @@
 """Module to run git commands on a repository."""
 
-from __future__ import absolute_import
-
 import logging
 import os
 import sys
-
-# The subprocess32 module resolves the thread-safety issues of the subprocess module in Python 2.x
-# when the _posixsubprocess C extension module is also available. Additionally, the _posixsubprocess
-# C extension module avoids triggering invalid free() calls on Python's internal data structure for
-# thread-local storage by skipping the PyOS_AfterFork() call when the 'preexec_fn' parameter isn't
-# specified to subprocess.Popen(). See SERVER-22219 for more details.
-#
-# The subprocess32 module is untested on Windows and thus isn't recommended for use, even when it's
-# installed. See https://github.com/google/python-subprocess32/blob/3.2.7/README.md#usage.
-if os.name == "posix" and sys.version_info[0] == 2:
-    try:
-        import subprocess32 as subprocess
-    except ImportError:
-        import warnings
-        warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
-                       " available. When using the subprocess module, a child process may trigger"
-                       " an invalid free(). See SERVER-22219 for more details."), RuntimeWarning)
-        import subprocess  # type: ignore
-else:
-    import subprocess
+import subprocess
 
 LOGGER = logging.getLogger(__name__)
 
@@ -203,7 +182,7 @@ class Repository(object):  # pylint: disable=too-many-public-methods
         params.extend(["rev-parse", "--show-toplevel"])
         result = Repository._run_process("rev-parse", params)
         result.check_returncode()
-        return result.stdout.rstrip()
+        return result.stdout.decode('utf-8').rstrip()
 
     @staticmethod
     def current_repository():
@@ -214,7 +193,7 @@ class Repository(object):  # pylint: disable=too-many-public-methods
         """Call git for this repository, and return the captured output."""
         result = self._run_cmd(cmd, args)
         result.check_returncode()
-        return result.stdout
+        return result.stdout.decode('utf-8')
 
     def _callgit(self, cmd, args, raise_exception=False):
         """
@@ -291,6 +270,7 @@ class GitCommandResult(object):
     def check_returncode(self):
         """Raise GitException if the exit code is non-zero."""
         if self.returncode:
-            raise GitException("Command '{0}' failed with code '{1}'".format(
-                " ".join(self.process_args), self.returncode), self.returncode, self.cmd,
-                               self.process_args, self.stdout, self.stderr)
+            raise GitException(
+                "Command '{0}' failed with code '{1}'".format(" ".join(self.process_args),
+                                                              self.returncode), self.returncode,
+                self.cmd, self.process_args, self.stdout, self.stderr)

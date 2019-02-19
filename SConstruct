@@ -27,7 +27,7 @@ import mongo.platform as mongo_platform
 import mongo.toolchain as mongo_toolchain
 import mongo.generators as mongo_generators
 
-EnsurePythonVersion(2, 7)
+EnsurePythonVersion(3, 5)
 EnsureSConsVersion(3, 0, 4)
 
 from buildscripts import utils
@@ -466,7 +466,7 @@ win_version_min_choices = {
 }
 
 add_option('win-version-min',
-    choices=win_version_min_choices.keys(),
+    choices=list(win_version_min_choices.keys()),
     default=None,
     help='minimum Windows version to support',
     type='choice',
@@ -581,7 +581,7 @@ try:
 except IOError as e:
     # If the file error wasn't because the file is missing, error out
     if e.errno != errno.ENOENT:
-        print("Error opening version.json: {0}".format(e.strerror))
+        print(("Error opening version.json: {0}".format(e.strerror)))
         Exit(1)
 
     version_data = {
@@ -590,14 +590,14 @@ except IOError as e:
     }
 
 except ValueError as e:
-    print("Error decoding version.json: {0}".format(e))
+    print(("Error decoding version.json: {0}".format(e)))
     Exit(1)
 
 # Setup the command-line variables
 def variable_shlex_converter(val):
     # If the argument is something other than a string, propogate
     # it literally.
-    if not isinstance(val, basestring):
+    if not isinstance(val, str):
         return val
     parse_mode = get_option('variable-parse-mode')
     if parse_mode == 'auto':
@@ -661,7 +661,7 @@ def variable_distsrc_converter(val):
 
 variables_files = variable_shlex_converter(get_option('variables-files'))
 for file in variables_files:
-    print("Using variable customization file %s" % file)
+    print(("Using variable customization file %s" % file))
 
 env_vars = Variables(
     files=variables_files,
@@ -670,7 +670,7 @@ env_vars = Variables(
 
 sconsflags = os.environ.get('SCONSFLAGS', None)
 if sconsflags:
-    print("Using SCONSFLAGS environment variable arguments: %s" % sconsflags)
+    print(("Using SCONSFLAGS environment variable arguments: %s" % sconsflags))
 
 env_vars.Add('ABIDW',
     help="Configures the path to the 'abidw' (a libabigail) utility")
@@ -800,7 +800,7 @@ env_vars.Add('MONGO_DISTNAME',
 def validate_mongo_version(key, val, env):
     regex = r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?'
     if not re.match(regex, val):
-        print("Invalid MONGO_VERSION '{}', or could not derive from version.json or git metadata. Please add a conforming MONGO_VERSION=x.y.z[-extra] as an argument to SCons".format(val))
+        print(("Invalid MONGO_VERSION '{}', or could not derive from version.json or git metadata. Please add a conforming MONGO_VERSION=x.y.z[-extra] as an argument to SCons".format(val)))
         Exit(1)
 
 env_vars.Add('MONGO_VERSION',
@@ -935,12 +935,12 @@ if installDir[0] not in ['$', '#']:
         Exit(1)
 
 sconsDataDir = Dir(buildDir).Dir('scons')
-SConsignFile(str(sconsDataDir.File('sconsign')))
+SConsignFile(str(sconsDataDir.File('sconsign.py3')))
 
 def printLocalInfo():
     import sys, SCons
-    print( "scons version: " + SCons.__version__ )
-    print( "python version: " + " ".join( [ `i` for i in sys.version_info ] ) )
+    print(( "scons version: " + SCons.__version__ ))
+    print(( "python version: " + " ".join( [ repr(i) for i in sys.version_info ] ) ))
 
 printLocalInfo()
 
@@ -1020,12 +1020,12 @@ env.AddMethod(mongo_platform.env_os_is_wrapper, 'TargetOSIs')
 env.AddMethod(mongo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
 
 def fatal_error(env, msg, *args):
-    print(msg.format(*args))
+    print((msg.format(*args)))
     Exit(1)
 
 def conf_error(env, msg, *args):
-    print(msg.format(*args))
-    print("See {0} for details".format(env.File('$CONFIGURELOG').abspath))
+    print((msg.format(*args)))
+    print(("See {0} for details".format(env.File('$CONFIGURELOG').abspath)))
     Exit(1)
 
 env.AddMethod(fatal_error, 'FatalError')
@@ -1044,12 +1044,12 @@ else:
 env.AddMethod(lambda env: env['VERBOSE'], 'Verbose')
 
 if has_option('variables-help'):
-    print(env_vars.GenerateHelpText(env))
+    print((env_vars.GenerateHelpText(env)))
     Exit(0)
 
 unknown_vars = env_vars.UnknownVariables()
 if unknown_vars:
-    env.FatalError("Unknown variables specified: {0}", ", ".join(unknown_vars.keys()))
+    env.FatalError("Unknown variables specified: {0}", ", ".join(list(unknown_vars.keys())))
 
 def set_config_header_define(env, varname, varval = 1):
     env['CONFIG_HEADER_DEFINES'][varname] = varval
@@ -1135,7 +1135,7 @@ def CheckForProcessor(context, which_arch):
         context.Result(ret)
         return ret;
 
-    for k in processor_macros.keys():
+    for k in list(processor_macros.keys()):
         ret = run_compile_check(k)
         if ret:
             context.Result('Detected a %s processor' % k)
@@ -1258,7 +1258,7 @@ else:
     env['TARGET_ARCH'] = detected_processor
 
 if env['TARGET_OS'] not in os_macros:
-    print("No special config for [{0}] which probably means it won't work".format(env['TARGET_OS']))
+    print(("No special config for [{0}] which probably means it won't work".format(env['TARGET_OS'])))
 elif not detectConf.CheckForOS(env['TARGET_OS']):
     env.ConfError("TARGET_OS ({0}) is not supported by compiler", env['TARGET_OS'])
 
@@ -1393,8 +1393,8 @@ if link_model.startswith("dynamic"):
 
     if env.TargetOSIs('darwin'):
         if link_model.startswith('dynamic'):
-            print("WARNING: Building MongoDB server with dynamic linking " +
-                  "on macOS is not supported. Static linking is recommended.")
+            print(("WARNING: Building MongoDB server with dynamic linking " +
+                  "on macOS is not supported. Static linking is recommended."))
 
         if link_model == "dynamic-strict":
             # Darwin is strict by default
@@ -2151,7 +2151,7 @@ def doConfigure(myenv):
             # form -Wno-xxx (but not -Wno-error=xxx), we also add -Wxxx to the flags. GCC does
             # warn on unknown -Wxxx style flags, so this lets us probe for availablity of
             # -Wno-xxx.
-            for kw in test_mutation.keys():
+            for kw in list(test_mutation.keys()):
                 test_flags = test_mutation[kw]
                 for test_flag in test_flags:
                     if test_flag.startswith("-Wno-") and not test_flag.startswith("-Wno-error="):
@@ -2165,7 +2165,7 @@ def doConfigure(myenv):
         # to make them real errors.
         cloned.Append(CCFLAGS=['-Werror'])
         conf = Configure(cloned, help=False, custom_tests = {
-                'CheckFlag' : lambda(ctx) : CheckFlagTest(ctx, tool, extension, flag)
+                'CheckFlag' : lambda ctx : CheckFlagTest(ctx, tool, extension, flag)
         })
         available = conf.CheckFlag()
         conf.Finish()
@@ -2645,7 +2645,7 @@ def doConfigure(myenv):
         # Select those unique black files that are associated with the
         # currently enabled sanitizers, but filter out those that are
         # zero length.
-        blackfiles = {v for (k, v) in blackfiles_map.iteritems() if k in sanitizer_list}
+        blackfiles = {v for (k, v) in blackfiles_map.items() if k in sanitizer_list}
         blackfiles = [f for f in blackfiles if os.stat(f.path).st_size != 0]
 
         # Filter out any blacklist options that the toolchain doesn't support.
@@ -2676,7 +2676,7 @@ def doConfigure(myenv):
         llvm_symbolizer = get_option('llvm-symbolizer')
         if os.path.isabs(llvm_symbolizer):
             if not myenv.File(llvm_symbolizer).exists():
-                print("WARNING: Specified symbolizer '%s' not found" % llvm_symbolizer)
+                print(("WARNING: Specified symbolizer '%s' not found" % llvm_symbolizer))
                 llvm_symbolizer = None
         else:
             llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
@@ -2997,7 +2997,7 @@ def doConfigure(myenv):
                         # TODO: If we could programmatically extract the paths from the info output
                         # we could give a better message here, but brew info's machine readable output
                         # doesn't seem to include the whole 'caveats' section.
-                        message = subprocess.check_output([brew, "info", "openssl"])
+                        message = subprocess.check_output([brew, "info", "openssl"]).decode('utf-8')
                         advice = textwrap.dedent(
                             """\
                             NOTE: HomeBrew installed to {0} appears to have OpenSSL installed.
@@ -3159,7 +3159,7 @@ def doConfigure(myenv):
         # Either crypto engine is native,
         # or it's OpenSSL and has been checked to be working.
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
-        print("Using SSL Provider: {0}".format(ssl_provider))
+        print(("Using SSL Provider: {0}".format(ssl_provider)))
     else:
         ssl_provider = "none"
 
@@ -3182,7 +3182,7 @@ def doConfigure(myenv):
         files = ['ssleay32.dll', 'libeay32.dll']
         for extra_file in files:
             if not addOpenSslLibraryToDistArchive(extra_file):
-                print("WARNING: Cannot find SSL library '%s'" % extra_file)
+                print(("WARNING: Cannot find SSL library '%s'" % extra_file))
 
     def checkHTTPLib(required=False):
         # WinHTTP available on Windows
@@ -3558,7 +3558,7 @@ def doConfigure(myenv):
 
         outputIndex = next((idx for idx in [0,1] if conf.CheckAltivecVbpermqOutput(idx)), None)
         if outputIndex is not None:
-	    conf.env.SetConfigHeaderDefine("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", outputIndex)
+            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", outputIndex)
         else:
             myenv.ConfError("Running on ppc64le, but can't find a correct vec_vbpermq output index.  Compiler or platform not supported")
 
@@ -3658,9 +3658,12 @@ def doLint( env , target , source ):
     import buildscripts.pylinters
     buildscripts.pylinters.lint_all(None, {}, [])
 
-    import buildscripts.lint
-    if not buildscripts.lint.run_lint( [ "src/mongo/" ] ):
-        raise Exception( "lint errors" )
+    env.Command(
+        target="#run_lint",
+        source=["buildscripts/lint.py", "src/mongo"],
+        action="$PYTHON $SOURCES[0] $SOURCES[1]",
+    )
+
 
 env.Alias( "lint" , [] , [ doLint ] )
 env.AlwaysBuild( "lint" )

@@ -7,7 +7,7 @@
 4. Has support for checking which files are to be checked.
 5. Supports validating and updating a set of files to the right coding style.
 """
-from __future__ import print_function, absolute_import
+
 
 import difflib
 import glob
@@ -20,7 +20,7 @@ import sys
 import tarfile
 import tempfile
 import threading
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from distutils import spawn  # pylint: disable=no-name-in-module
 from optparse import OptionParser
 from multiprocessing import cpu_count
@@ -52,14 +52,14 @@ CLANG_FORMAT_HTTP_LINUX_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/
 CLANG_FORMAT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/clang%2Bllvm-3.8.0-x86_64-apple-darwin.tar.xz"
 
 # Path in the tarball to the clang-format binary
-CLANG_FORMAT_SOURCE_TAR_BASE = string.Template(
-    "clang+llvm-$version-$tar_path/bin/" + CLANG_FORMAT_PROGNAME)
+CLANG_FORMAT_SOURCE_TAR_BASE = string.Template("clang+llvm-$version-$tar_path/bin/" +
+                                               CLANG_FORMAT_PROGNAME)
 
 
 ##############################################################################
 def callo(args):
     """Call a program, and capture its output."""
-    return subprocess.check_output(args)
+    return subprocess.check_output(args).decode('utf-8')
 
 
 def get_tar_path(version, tar_path):
@@ -96,11 +96,11 @@ def get_clang_format_from_cache_and_extract(url, tarball_ext):
     num_tries = 5
     for attempt in range(num_tries):
         try:
-            resp = urllib2.urlopen(url)
+            resp = urllib.request.urlopen(url)
             with open(temp_tar_file, 'wb') as fh:
                 fh.write(resp.read())
             break
-        except urllib2.URLError:
+        except urllib.error.URLError:
             if attempt == num_tries - 1:
                 raise
             continue
@@ -229,7 +229,7 @@ class ClangFormat(object):
     def _lint(self, file_name, print_diff):
         """Check the specified file has the correct format."""
         with open(file_name, 'rb') as original_text:
-            original_file = original_text.read()
+            original_file = original_text.read().decode('utf-8')
 
         # Get formatted file as clang-format would format the file
         formatted_file = callo([self.path, "--style=file", file_name])
@@ -381,9 +381,9 @@ def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-ma
             "Commit After Reformat '%s' is not a valid commit in this repo" % commit_after_reformat)
 
     if not repo.is_ancestor(commit_prior_to_reformat, commit_after_reformat):
-        raise ValueError(("Commit Prior to Reformat '%s' is not a valid ancestor of Commit After" +
-                          " Reformat '%s' in this repo") % (commit_prior_to_reformat,
-                                                            commit_after_reformat))
+        raise ValueError(
+            ("Commit Prior to Reformat '%s' is not a valid ancestor of Commit After" +
+             " Reformat '%s' in this repo") % (commit_prior_to_reformat, commit_after_reformat))
 
     # Validate the user is on a local branch that has the right merge base
     if repo.is_detached():

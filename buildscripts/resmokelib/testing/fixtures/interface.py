@@ -1,7 +1,5 @@
 """Interface of the different fixtures for executing JSTests against."""
 
-from __future__ import absolute_import
-
 import os.path
 import time
 
@@ -25,10 +23,8 @@ def make_fixture(class_name, *args, **kwargs):
     return _FIXTURES[class_name](*args, **kwargs)
 
 
-class Fixture(object):
+class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
     """Base class for all fixtures."""
-
-    __metaclass__ = registry.make_registry_metaclass(_FIXTURES)  # type: ignore
 
     # We explicitly set the 'REGISTERED_NAME' attribute so that PyLint realizes that the attribute
     # is defined for all subclasses of Fixture.

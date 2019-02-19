@@ -7,6 +7,7 @@ URL_PATH_LAST_METRICS = "/last_metrics"
 URL_DISABLE_FAULTS = "/disable_faults"
 URL_ENABLE_FAULTS = "/enable_faults"
 
+
 class Stats:
     """Stats class shared between client and server."""
 

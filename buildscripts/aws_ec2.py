@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """AWS EC2 instance launcher and controller."""
 
-from __future__ import print_function
+
 
 import base64
 import collections
@@ -88,12 +88,13 @@ class AwsEc2(object):
             if reached_state:
                 print(" Instance {}!".format(instance.state["Name"]), file=sys.stdout)
             else:
-                print(" Instance in state '{}', failed to reach state '{}'{}!".format(
-                    instance.state["Name"], state, client_error), file=sys.stdout)
+                print(
+                    " Instance in state '{}', failed to reach state '{}'{}!".format(
+                        instance.state["Name"], state, client_error), file=sys.stdout)
             sys.stdout.flush()
         return 0 if reached_state else 1
 
-    def control_instance(  #pylint: disable=too-many-arguments,too-many-branches
+    def control_instance(  #pylint: disable=too-many-arguments,too-many-branches,too-many-locals
             self, mode, image_id, wait_time_secs=0, show_progress=False, console_output_file=None,
             console_screenshot_file=None):
         """Control an AMI instance. Returns 0 & status information, if successful."""
@@ -238,27 +239,29 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
     create_options = optparse.OptionGroup(parser, "Create options")
     status_options = optparse.OptionGroup(parser, "Status options")
 
-    parser.add_option("--mode", dest="mode", choices=_MODES, default="status",
-                      help=("Operations to perform on an EC2 instance, choose one of"
-                            " '{}', defaults to '%default'.".format(", ".join(_MODES))))
+    parser.add_option(
+        "--mode", dest="mode", choices=_MODES, default="status",
+        help=("Operations to perform on an EC2 instance, choose one of"
+              " '{}', defaults to '%default'.".format(", ".join(_MODES))))
 
     control_options.add_option("--imageId", dest="image_id", default=None,
                                help="EC2 image_id to perform operation on [REQUIRED for control].")
 
-    control_options.add_option("--waitTimeSecs", dest="wait_time_secs", type=int, default=5 * 60,
-                               help=("Time to wait for EC2 instance to reach it's new state,"
-                                     " defaults to '%default'."))
+    control_options.add_option(
+        "--waitTimeSecs", dest="wait_time_secs", type=int, default=5 * 60,
+        help=("Time to wait for EC2 instance to reach it's new state,"
+              " defaults to '%default'."))
 
     create_options.add_option("--ami", dest="ami", default=None,
                               help="EC2 AMI to launch [REQUIRED for create].")
 
-    create_options.add_option("--blockDevice", dest="block_devices",
-                              metavar="DEVICE-NAME DEVICE-SIZE-GB", action="append", default=[],
-                              nargs=2,
-                              help=("EBS device name and volume size in GiB."
-                                    " More than one device can be attached, by specifying"
-                                    " this option more than once."
-                                    " The device will be deleted on termination of the instance."))
+    create_options.add_option(
+        "--blockDevice", dest="block_devices", metavar="DEVICE-NAME DEVICE-SIZE-GB",
+        action="append", default=[], nargs=2,
+        help=("EBS device name and volume size in GiB."
+              " More than one device can be attached, by specifying"
+              " this option more than once."
+              " The device will be deleted on termination of the instance."))
 
     create_options.add_option("--instanceType", dest="instance_type", default="t1.micro",
                               help="EC2 instance type to launch, defaults to '%default'.")
@@ -266,15 +269,15 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
     create_options.add_option("--keyName", dest="key_name", default=None,
                               help="EC2 key name [REQUIRED for create].")
 
-    create_options.add_option("--securityGroupIds", dest="security_group_ids", action="append",
-                              default=[],
-                              help=("EC2 security group ids. More than one security group id can be"
-                                    " added, by specifying this option more than once."))
+    create_options.add_option(
+        "--securityGroupIds", dest="security_group_ids", action="append", default=[],
+        help=("EC2 security group ids. More than one security group id can be"
+              " added, by specifying this option more than once."))
 
-    create_options.add_option("--securityGroup", dest="security_groups", action="append",
-                              default=[],
-                              help=("EC2 security group. More than one security group can be added,"
-                                    " by specifying this option more than once."))
+    create_options.add_option(
+        "--securityGroup", dest="security_groups", action="append", default=[],
+        help=("EC2 security group. More than one security group can be added,"
+              " by specifying this option more than once."))
 
     create_options.add_option("--subnetId", dest="subnet_id", default=None,
                               help="EC2 subnet id to use in VPC.")
@@ -296,14 +299,15 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
     status_options.add_option("--yamlFile", dest="yaml_file", default=None,
                               help="Save the status into the specified YAML file.")
 
-    status_options.add_option("--consoleOutputFile", dest="console_output_file", default=None,
-                              help="Save the console output into the specified file, if"
-                              " available.")
+    status_options.add_option(
+        "--consoleOutputFile", dest="console_output_file", default=None,
+        help="Save the console output into the specified file, if"
+        " available.")
 
-    status_options.add_option("--consoleScreenshotFile", dest="console_screenshot_file",
-                              default=None,
-                              help="Save the console screenshot (JPG format) into the specified"
-                              " file, if available.")
+    status_options.add_option(
+        "--consoleScreenshotFile", dest="console_screenshot_file", default=None,
+        help="Save the console screenshot (JPG format) into the specified"
+        " file, if available.")
 
     parser.add_option_group(control_options)
     parser.add_option_group(create_options)
@@ -331,8 +335,8 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
         # The 'expire-on' key is a UTC time.
         expire_dt = datetime.datetime.utcnow() + datetime.timedelta(hours=options.tag_expire_hours)
         tags = [{"Key": "expire-on", "Value": expire_dt.strftime("%Y-%m-%d %H:%M:%S")},
-                {"Key": "Name",
-                 "Value": options.tag_name}, {"Key": "owner", "Value": options.tag_owner}]
+                {"Key": "Name", "Value": options.tag_name},
+                {"Key": "owner", "Value": options.tag_owner}]
 
         my_kwargs = {}
         if options.extra_args is not None:

@@ -160,9 +160,9 @@ js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else 
 
 # On windows, we need to escape the backslashes in the command-line
 # so that windows paths look okay.
-cmd_line = " ".join(sys.argv).encode('string-escape')
+cmd_line = " ".join(sys.argv).encode('unicode_escape')
 if env.TargetOSIs('windows'):
-    cmd_line = cmd_line.replace('\\', r'\\')
+    cmd_line = cmd_line.replace(b'\\', b'\\')
 
 module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODULES'] ])
 
@@ -751,7 +751,7 @@ env.Append(MODULE_BANNERS = [distsrc.File('README'),
 
 # If no module has introduced a file named LICENSE-Enterprise.txt then this
 # is a Community build, so inject the AGPL and the Community license
-if sum(itertools.imap(lambda x: x.name == "LICENSE-Enterprise.txt", env['MODULE_BANNERS'])) == 0:
+if sum(map(lambda x: x.name == "LICENSE-Enterprise.txt", env['MODULE_BANNERS'])) == 0:
     env.Append(MODULE_BANNERS = [distsrc.File('LICENSE-Community.txt')])
 
 # All module banners get staged to the top level of the tarfile, so we
@@ -770,7 +770,7 @@ module_banner_transforms = ["--transform %s=$SERVER_DIST_BASENAME" % d for d in 
 # Allow modules to map original file name directories to subdirectories
 # within the archive (e.g. { "src/mongo/db/modules/enterprise/docs": "snmp"})
 archive_addition_transforms = []
-for full_dir, archive_dir in env["ARCHIVE_ADDITION_DIR_MAP"].items():
+for full_dir, archive_dir in list(env["ARCHIVE_ADDITION_DIR_MAP"].items()):
   archive_addition_transforms.append("--transform \"%s=$SERVER_DIST_BASENAME/%s\"" %
                                      (full_dir, archive_dir))
 

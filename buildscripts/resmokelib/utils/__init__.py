@@ -1,8 +1,5 @@
 """Helper functions."""
 
-from __future__ import absolute_import
-from __future__ import print_function
-
 import contextlib
 import os.path
 import shutil
@@ -40,19 +37,7 @@ def default_if_none(value, default):
 
 
 def rmtree(path, **kwargs):
-    """Wrap shutil.rmtreee.
-
-    Use a UTF-8 unicode path if Windows.
-    See https://bugs.python.org/issue24672, where shutil.rmtree can fail with UTF-8.
-    Use a bytes path to rmtree, otherwise.
-    See https://github.com/pypa/setuptools/issues/706.
-    """
-    if is_windows():
-        if not isinstance(path, unicode):
-            path = unicode(path, "utf-8")
-    else:
-        if isinstance(path, unicode):
-            path = path.encode("utf-8")
+    """Wrap shutil.rmtree."""
     shutil.rmtree(path, **kwargs)
 
 
@@ -72,12 +57,12 @@ def remove_if_exists(path):
 
 def is_string_list(lst):
     """Return true if 'lst' is a list of strings, and false otherwise."""
-    return isinstance(lst, list) and all(isinstance(x, basestring) for x in lst)
+    return isinstance(lst, list) and all(isinstance(x, str) for x in lst)
 
 
 def is_string_set(value):
     """Return true if 'value' is a set of strings, and false otherwise."""
-    return isinstance(value, set) and all(isinstance(x, basestring) for x in value)
+    return isinstance(value, set) and all(isinstance(x, str) for x in value)
 
 
 def is_js_file(filename):

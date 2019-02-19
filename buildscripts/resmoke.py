@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Command line utility for executing MongoDB tests of all kinds."""
 
-from __future__ import absolute_import
-
 import os.path
 import platform
 import random
@@ -331,7 +329,8 @@ class Resmoke(object):  # pylint: disable=too-many-instance-attributes
         curator_exists = os.path.isfile(curator_path)
         curator_same_version = False
         if curator_exists:
-            curator_version = subprocess.check_output([curator_path, "--version"]).split()
+            curator_version = subprocess.check_output([curator_path,
+                                                       "--version"]).decode('utf-8').split()
             curator_same_version = git_hash in curator_version
 
         if curator_exists and not curator_same_version:

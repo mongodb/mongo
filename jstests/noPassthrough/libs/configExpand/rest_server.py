@@ -10,6 +10,7 @@ import urllib.parse
 
 connect_count = 0
 
+
 class ConfigExpandRestHandler(http.server.BaseHTTPRequestHandler):
     """
     Handle requests from mongod during config expansion.
@@ -73,6 +74,7 @@ class ConfigExpandRestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write('POST not supported')
 
+
 def run(port):
     """Run web server."""
 
@@ -82,6 +84,7 @@ def run(port):
 
     print("Mock Web Server Listening on %s" % (str(server_address)))
     httpd.serve_forever()
+
 
 def main():
     """Main Method."""

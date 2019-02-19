@@ -33,8 +33,6 @@ It maps 1-1 to the YAML file, and has not been checked if
 it follows the rules of the IDL, etc.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import itertools
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -72,7 +70,7 @@ class IDLSpec(object):
 
 
 def parse_array_type(name):
-    # type: (unicode) -> unicode
+    # type: (str) -> str
     """Parse a type name of the form 'array<type>' and extract type."""
     if not name.startswith("array<") and not name.endswith(">"):
         return None
@@ -96,8 +94,7 @@ def _zip_scalar(items, obj):
 def _item_and_type(dic):
     # type: (Dict[Any, List[Any]]) -> Iterator[Tuple[Any, Any]]
     """Return an Iterator of (key, value) pairs from a dictionary."""
-    return itertools.chain.from_iterable(
-        (_zip_scalar(value, key) for (key, value) in dic.viewitems()))
+    return itertools.chain.from_iterable((_zip_scalar(value, key) for (key, value) in dic.items()))
 
 
 class SymbolTable(object):
@@ -117,7 +114,7 @@ class SymbolTable(object):
         self.types = []  # type: List[Type]
 
     def _is_duplicate(self, ctxt, location, name, duplicate_class_name):
-        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> bool
+        # type: (errors.ParserContext, common.SourceLocation, str, str) -> bool
         """Return true if the given item already exist in the symbol table."""
         for (item, entity_type) in _item_and_type({
                 "command": self.commands,
@@ -181,12 +178,12 @@ class SymbolTable(object):
             self.add_type(ctxt, idltype)
 
     def resolve_field_type(self, ctxt, location, field_name, type_name):
-        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Optional[Union[Command, Enum, Struct, Type]]
+        # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Command, Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
         return self._resolve_field_type(ctxt, location, field_name, type_name)
 
     def _resolve_field_type(self, ctxt, location, field_name, type_name):
-        # type: (errors.ParserContext, common.SourceLocation, unicode, unicode) -> Optional[Union[Command, Enum, Struct, Type]]
+        # type: (errors.ParserContext, common.SourceLocation, str, str) -> Optional[Union[Command, Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
         # pylint: disable=too-many-return-statements
 
@@ -228,10 +225,10 @@ class Global(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Global."""
-        self.cpp_namespace = None  # type: unicode
-        self.cpp_includes = []  # type: List[unicode]
+        self.cpp_namespace = None  # type: str
+        self.cpp_includes = []  # type: List[str]
         self.configs = None  # type: ConfigGlobal
 
         super(Global, self).__init__(file_name, line, column)
@@ -241,15 +238,15 @@ class Import(common.SourceLocation):
     """IDL imports object."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Imports section."""
-        self.imports = []  # type: List[unicode]
+        self.imports = []  # type: List[str]
 
         # These are not part of the IDL syntax but are produced by the parser.
         # List of imports with structs.
-        self.resolved_imports = []  # type: List[unicode]
+        self.resolved_imports = []  # type: List[str]
         # All imports directly or indirectly included
-        self.dependencies = []  # type: List[unicode]
+        self.dependencies = []  # type: List[str]
 
         super(Import, self).__init__(file_name, line, column)
 
@@ -266,16 +263,16 @@ class Type(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Type."""
-        self.name = None  # type: unicode
-        self.description = None  # type: unicode
-        self.cpp_type = None  # type: unicode
-        self.bson_serialization_type = None  # type: List[unicode]
-        self.bindata_subtype = None  # type: unicode
-        self.serializer = None  # type: unicode
-        self.deserializer = None  # type: unicode
-        self.default = None  # type: unicode
+        self.name = None  # type: str
+        self.description = None  # type: str
+        self.cpp_type = None  # type: str
+        self.bson_serialization_type = None  # type: List[str]
+        self.bindata_subtype = None  # type: str
+        self.serializer = None  # type: str
+        self.deserializer = None  # type: str
+        self.default = None  # type: str
 
         super(Type, self).__init__(file_name, line, column)
 
@@ -291,7 +288,7 @@ class Validator(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Validator."""
         # Don't lint gt/lt as bad attibute names.
         # pylint: disable=C0103
@@ -299,7 +296,7 @@ class Validator(common.SourceLocation):
         self.lt = None  # type: Expression
         self.gte = None  # type: Expression
         self.lte = None  # type: Expression
-        self.callback = None  # type: unicode
+        self.callback = None  # type: str
 
         super(Validator, self).__init__(file_name, line, column)
 
@@ -316,15 +313,15 @@ class Field(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Field."""
-        self.name = None  # type: unicode
-        self.cpp_name = None  # type: unicode
-        self.description = None  # type: unicode
-        self.type = None  # type: unicode
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
+        self.description = None  # type: str
+        self.type = None  # type: str
         self.ignore = False  # type: bool
         self.optional = False  # type: bool
-        self.default = None  # type: unicode
+        self.default = None  # type: str
         self.supports_doc_sequence = False  # type: bool
         self.comparison_order = -1  # type: int
         self.validator = None  # type: Validator
@@ -344,10 +341,10 @@ class ChainedStruct(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Type."""
-        self.name = None  # type: unicode
-        self.cpp_name = None  # type: unicode
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
 
         super(ChainedStruct, self).__init__(file_name, line, column)
 
@@ -360,10 +357,10 @@ class ChainedType(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Type."""
-        self.name = None  # type: unicode
-        self.cpp_name = None  # type: unicode
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
 
         super(ChainedType, self).__init__(file_name, line, column)
 
@@ -378,10 +375,10 @@ class Struct(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Struct."""
-        self.name = None  # type: unicode
-        self.description = None  # type: unicode
+        self.name = None  # type: str
+        self.description = None  # type: str
         self.strict = True  # type: bool
         self.immutable = False  # type: bool
         self.inline_chained_structs = True  # type: bool
@@ -391,14 +388,14 @@ class Struct(common.SourceLocation):
         self.fields = None  # type: List[Field]
 
         # Command only property
-        self.cpp_name = None  # type: unicode
+        self.cpp_name = None  # type: str
 
         # Internal property that is not represented as syntax. An imported struct is read from an
         # imported file, and no code is generated for it.
         self.imported = False  # type: bool
 
         # Internal property: cpp_namespace from globals section
-        self.cpp_namespace = None  # type: unicode
+        self.cpp_namespace = None  # type: str
 
         super(Struct, self).__init__(file_name, line, column)
 
@@ -411,10 +408,10 @@ class Command(Struct):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Command."""
-        self.namespace = None  # type: unicode
-        self.type = None  # type: unicode
+        self.namespace = None  # type: str
+        self.type = None  # type: str
 
         super(Command, self).__init__(file_name, line, column)
 
@@ -427,10 +424,10 @@ class EnumValue(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Enum."""
-        self.name = None  # type: unicode
-        self.value = None  # type: unicode
+        self.name = None  # type: str
+        self.value = None  # type: str
 
         super(EnumValue, self).__init__(file_name, line, column)
 
@@ -443,11 +440,11 @@ class Enum(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Enum."""
-        self.name = None  # type: unicode
-        self.description = None  # type: unicode
-        self.type = None  # type: unicode
+        self.name = None  # type: str
+        self.description = None  # type: str
+        self.type = None  # type: str
         self.values = None  # type: List[EnumValue]
 
         # Internal property that is not represented as syntax. An imported enum is read from an
@@ -455,7 +452,7 @@ class Enum(common.SourceLocation):
         self.imported = False  # type: bool
 
         # Internal property: cpp_namespace from globals section
-        self.cpp_namespace = None  # type: unicode
+        self.cpp_namespace = None  # type: str
 
         super(Enum, self).__init__(file_name, line, column)
 
@@ -464,11 +461,11 @@ class Condition(common.SourceLocation):
     """Condition(s) for a ServerParameter or ConfigOption."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Condition."""
-        self.expr = None  # type: unicode
-        self.constexpr = None  # type: unicode
-        self.preprocessor = None  # type: unicode
+        self.expr = None  # type: str
+        self.constexpr = None  # type: str
+        self.preprocessor = None  # type: str
 
         super(Condition, self).__init__(file_name, line, column)
 
@@ -477,11 +474,11 @@ class Expression(common.SourceLocation):
     """Description of a valid C++ expression."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Expression."""
 
-        self.literal = None  # type: unicode
-        self.expr = None  # type: unicode
+        self.literal = None  # type: str
+        self.expr = None  # type: str
         self.is_constexpr = True  # type: bool
 
         super(Expression, self).__init__(file_name, line, column)
@@ -491,11 +488,11 @@ class ServerParameterClass(common.SourceLocation):
     """ServerParameter as C++ class specialization."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a ServerParameterClass."""
 
-        self.name = None  # type: unicode
-        self.data = None  # type: unicode
+        self.name = None  # type: str
+        self.data = None  # type: str
         self.override_ctor = False  # type: bool
         self.override_set = False  # type: bool
 
@@ -508,23 +505,23 @@ class ServerParameter(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a ServerParameter."""
-        self.name = None  # type: unicode
-        self.set_at = None  # type: List[unicode]
-        self.description = None  # type: unicode
-        self.cpp_vartype = None  # type: unicode
-        self.cpp_varname = None  # type: unicode
+        self.name = None  # type: str
+        self.set_at = None  # type: List[str]
+        self.description = None  # type: str
+        self.cpp_vartype = None  # type: str
+        self.cpp_varname = None  # type: str
         self.cpp_class = None  # type: ServerParameterClass
         self.condition = None  # type: Condition
-        self.deprecated_name = []  # type: List[unicode]
+        self.deprecated_name = []  # type: List[str]
         self.redact = False  # type: bool
         self.test_only = False  # type: bool
         self.default = None  # type: Expression
 
         # Only valid if cpp_varname is specified.
         self.validator = None  # type: Validator
-        self.on_update = None  # type: unicode
+        self.on_update = None  # type: str
 
         super(ServerParameter, self).__init__(file_name, line, column)
 
@@ -533,12 +530,12 @@ class GlobalInitializer(common.SourceLocation):
     """Initializer details for custom registration/storage."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a GlobalInitializer."""
 
-        self.name = None  # type: unicode
-        self.register = None  # type: unicode
-        self.store = None  # type: unicode
+        self.name = None  # type: str
+        self.register = None  # type: str
+        self.store = None  # type: str
 
         super(GlobalInitializer, self).__init__(file_name, line, column)
 
@@ -547,10 +544,10 @@ class ConfigGlobal(common.SourceLocation):
     """Global values to apply to all ConfigOptions."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a ConfigGlobal."""
-        self.section = None  # type: unicode
-        self.source = []  # type: List[unicode]
+        self.section = None  # type: str
+        self.source = []  # type: List[str]
         self.initializer = None  # type: GlobalInitializer
 
         super(ConfigGlobal, self).__init__(file_name, line, column)
@@ -562,32 +559,32 @@ class ConfigOption(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a ConfigOption."""
-        self.name = None  # type: unicode
-        self.deprecated_name = []  # type: List[unicode]
-        self.short_name = None  # type: unicode
-        self.single_name = None  # type: unicode
-        self.deprecated_short_name = []  # type: List[unicode]
+        self.name = None  # type: str
+        self.deprecated_name = []  # type: List[str]
+        self.short_name = None  # type: str
+        self.single_name = None  # type: str
+        self.deprecated_short_name = []  # type: List[str]
 
         self.description = None  # type: Expression
-        self.section = None  # type: unicode
-        self.arg_vartype = None  # type: unicode
-        self.cpp_vartype = None  # type: unicode
-        self.cpp_varname = None  # type: unicode
+        self.section = None  # type: str
+        self.arg_vartype = None  # type: str
+        self.cpp_vartype = None  # type: str
+        self.cpp_varname = None  # type: str
         self.condition = None  # type: Condition
 
-        self.conflicts = []  # type: List[unicode]
-        self.requires = []  # type: List[unicode]
+        self.conflicts = []  # type: List[str]
+        self.requires = []  # type: List[str]
         self.hidden = False  # type: bool
         self.redact = False  # type: bool
         self.default = None  # type: Expression
         self.implicit = None  # type: Expression
-        self.source = []  # type: List[unicode]
-        self.canonicalize = None  # type: unicode
+        self.source = []  # type: List[str]
+        self.canonicalize = None  # type: str
 
-        self.duplicate_behavior = None  # type: unicode
-        self.positional = None  # type unicode
+        self.duplicate_behavior = None  # type: str
+        self.positional = None  # type str
         self.validator = None  # type: Validator
 
         super(ConfigOption, self).__init__(file_name, line, column)

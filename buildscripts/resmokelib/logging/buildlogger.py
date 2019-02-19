@@ -1,7 +1,5 @@
 """Define handlers for communicating with a buildlogger server."""
 
-from __future__ import absolute_import
-
 import functools
 import json
 import os
@@ -85,7 +83,7 @@ class _LogsSplitter(object):
             2 is added to each string size to account for the array representation of the logs,
             as each line is preceded by a '[' or a space and followed by a ',' or a ']'.
             """
-            return len(json.dumps(line, encoding="utf-8")) + 2
+            return len(json.dumps(line)) + 2
 
         curr_logs = []
         curr_logs_size = 0
@@ -200,8 +198,8 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
             # writing the messages to the fallback logkeeper to avoid putting additional pressure on
             # the Evergreen database.
             BUILDLOGGER_FALLBACK.warning(
-                "Failed to flush all log output (%d messages) to logkeeper.", len(
-                    self.retry_buffer))
+                "Failed to flush all log output (%d messages) to logkeeper.",
+                len(self.retry_buffer))
 
             # We set a flag to indicate that we failed to flush all log output to logkeeper so
             # resmoke.py can exit with a special return code.
@@ -226,10 +224,11 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
     @_log_on_error
     def _finish_test(self, failed=False):
         """Send a POST request to the APPEND_TEST_LOGS_ENDPOINT with the test status."""
-        self.post(self.endpoint, headers={
-            "X-Sendlogs-Test-Done": "true",
-            "X-Sendlogs-Test-Failed": "true" if failed else "false",
-        })
+        self.post(
+            self.endpoint, headers={
+                "X-Sendlogs-Test-Done": "true",
+                "X-Sendlogs-Test-Failed": "true" if failed else "false",
+            })
 
     def close(self):
         """Close the buildlogger handler."""
@@ -262,7 +261,9 @@ class BuildloggerServer(object):
         """Initialize BuildloggerServer."""
         tmp_globals = {}
         self.config = {}
-        execfile(_BUILDLOGGER_CONFIG, tmp_globals, self.config)
+        exec(
+            compile(open(_BUILDLOGGER_CONFIG, "rb").read(), _BUILDLOGGER_CONFIG, 'exec'),
+            tmp_globals, self.config)
 
         # Rename "slavename" to "username" if present.
         if "slavename" in self.config and "username" not in self.config:
@@ -285,11 +286,12 @@ class BuildloggerServer(object):
         handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL, username=username,
                                        password=password, should_retry=True)
 
-        response = handler.post(CREATE_BUILD_ENDPOINT, data={
-            "builder": builder,
-            "buildnum": build_num,
-            "task_id": _config.EVERGREEN_TASK_ID,
-        })
+        response = handler.post(
+            CREATE_BUILD_ENDPOINT, data={
+                "builder": builder,
+                "buildnum": build_num,
+                "task_id": _config.EVERGREEN_TASK_ID,
+            })
 
         return response["id"]
 

@@ -1,8 +1,5 @@
 """Module for generating the test results file fed into the perf plugin."""
 
-from __future__ import absolute_import
-from __future__ import division
-
 import collections
 import datetime
 import json
@@ -71,7 +68,7 @@ class CombineBenchmarkResults(interface.Hook):
             "results": []
         }
 
-        for name, report in self.benchmark_reports.items():
+        for name, report in list(self.benchmark_reports.items()):
             test_report = {
                 "name": name, "context": report.context._asdict(),
                 "results": report.generate_perf_plugin_dict()
@@ -168,7 +165,7 @@ class _BenchmarkThreadsReport(object):
         """
 
         res = {}
-        for thread_count, reports in self.thread_benchmark_map.items():
+        for thread_count, reports in list(self.thread_benchmark_map.items()):
             thread_report = {
                 "error_values": [0 for _ in range(len(reports))],
                 "ops_per_sec_values": []  # This is actually storing latency per op, not ops/s

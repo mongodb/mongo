@@ -1,13 +1,11 @@
 """Utility for parsing JS comments."""
 
-from __future__ import absolute_import
-
 import re
 
 import yaml
 
 # TODO: use a more robust regular expression for matching tags
-_JSTEST_TAGS_RE = re.compile(r".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
+_JSTEST_TAGS_RE = re.compile(b".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
 
 
 def get_tags(pathname):
@@ -29,19 +27,19 @@ def get_tags(pathname):
       */
     """
 
-    with open(pathname) as fp:
+    with open(pathname, 'rb') as fp:
         match = _JSTEST_TAGS_RE.match(fp.read())
         if match:
             try:
                 # TODO: it might be worth supporting the block (indented) style of YAML lists in
                 #       addition to the flow (bracketed) style
                 tags = yaml.safe_load(_strip_jscomments(match.group(1)))
-                if not isinstance(tags, list) and all(isinstance(tag, basestring) for tag in tags):
+                if not isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
                     raise TypeError("Expected a list of string tags, but got '%s'" % (tags))
                 return tags
             except yaml.YAMLError as err:
-                raise ValueError("File '%s' contained invalid tags (expected YAML): %s" % (pathname,
-                                                                                           err))
+                raise ValueError(
+                    "File '%s' contained invalid tags (expected YAML): %s" % (pathname, err))
 
     return []
 
@@ -68,6 +66,9 @@ def _strip_jscomments(string):
 
     yaml_lines = []
 
+    if isinstance(string, bytes):
+        string = string.decode("utf-8")
+        
     for line in string.splitlines():
         # Remove leading whitespace and symbols that commonly appear in JS comments.
         line = line.lstrip("\t ").lstrip("*/")

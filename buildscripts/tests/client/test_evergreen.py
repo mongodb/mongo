@@ -1,7 +1,5 @@
 """Unit tests for the client.evergreen module."""
 
-from __future__ import absolute_import
-
 import datetime
 import unittest
 

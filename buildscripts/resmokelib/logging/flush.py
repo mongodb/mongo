@@ -3,13 +3,10 @@
 These instances are used to send logs to buildlogger.
 """
 
-from __future__ import absolute_import
-
 import logging
+import sched
 import threading
 import time
-
-from ..utils import scheduler
 
 _FLUSH_THREAD_LOCK = threading.Lock()
 _FLUSH_THREAD = None
@@ -96,7 +93,7 @@ class _FlushThread(threading.Thread):
             self.__schedule_updated.wait(secs)
             self.__schedule_updated.clear()
 
-        self.__scheduler = scheduler.Scheduler(time.time, interruptible_sleep)
+        self.__scheduler = sched.scheduler(time.time, interruptible_sleep)
         self.__schedule_updated = threading.Event()
         self.__should_stop = threading.Event()
         self.__terminated = threading.Event()

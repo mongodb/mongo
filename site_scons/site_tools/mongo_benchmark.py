@@ -11,10 +11,10 @@ def register_benchmark(env, test):
     env.Alias('$BENCHMARK_ALIAS', test)
 
 def benchmark_list_builder_action(env, target, source):
-    ofile = open(str(target[0]), 'wb')
+    ofile = open(str(target[0]), 'w')
     try:
         for s in _benchmarks:
-            print '\t' + str(s)
+            print('\t' + str(s))
             ofile.write('%s\n' % s)
     finally:
         ofile.close()
@@ -40,9 +40,10 @@ def build_benchmark(env, target, source, **kwargs):
         bmEnv.Install("#/build/benchmark/", result[0])
     return result
 
+
 def generate(env):
     env.Command('$BENCHMARK_LIST', env.Value(_benchmarks),
-            Action(benchmark_list_builder_action, "Generating $TARGET"))
+                Action(benchmark_list_builder_action, "Generating $TARGET"))
     env.AddMethod(register_benchmark, 'RegisterBenchmark')
     env.AddMethod(build_benchmark, 'Benchmark')
     env.Alias('$BENCHMARK_ALIAS', '$BENCHMARK_LIST')

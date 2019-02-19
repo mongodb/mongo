@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Command line utility for executing MongoDB tests in Evergreen."""
 
-from __future__ import absolute_import
-
 import collections
 import os.path
 import sys

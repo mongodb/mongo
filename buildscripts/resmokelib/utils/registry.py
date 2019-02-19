@@ -6,8 +6,6 @@ This pattern enables the associated class to be looked up later by using
 its name.
 """
 
-from __future__ import absolute_import
-
 # Specifying 'LEAVE_UNREGISTERED' as the "REGISTERED_NAME" attribute will cause the class to be
 # omitted from the registry. This is particularly useful for base classes that define an interface
 # or common functionality, and aren't intended to be constructed explicitly.
@@ -23,7 +21,7 @@ def make_registry_metaclass(registry_store):
     class Registry(type):
         """A metaclass that stores a reference to all registered classes."""
 
-        def __new__(mcs, class_name, base_classes, class_dict):
+        def __new__(mcs, class_name, base_classes, class_dict):  # pylint: disable=bad-mcs-classmethod-argument
             """Create and returns a new instance of Registry.
 
             The registry is a class named 'class_name' derived from 'base_classes'
@@ -46,9 +44,9 @@ def make_registry_metaclass(registry_store):
 
             if registered_name is not LEAVE_UNREGISTERED:
                 if registered_name in registry_store:
-                    raise ValueError("The name %s is already registered; a different value for the"
-                                     " 'REGISTERED_NAME' attribute must be chosen" %
-                                     (registered_name))
+                    raise ValueError(
+                        "The name %s is already registered; a different value for the"
+                        " 'REGISTERED_NAME' attribute must be chosen" % (registered_name))
                 registry_store[registered_name] = cls
 
             return cls

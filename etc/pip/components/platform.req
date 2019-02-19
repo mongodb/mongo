@@ -1,4 +1,2 @@
 # Platform-specific components
-pypiwin32==219; sys_platform == "win32" and python_version < "3"
 pypiwin32==223; sys_platform == "win32" and python_version > "3"
-subprocess32==3.5.2; os_name == "posix" and platform_release != "2.6.18-194.el5xen" and platform_release != "2.6.18-274.el5xen" and python_version < "3"

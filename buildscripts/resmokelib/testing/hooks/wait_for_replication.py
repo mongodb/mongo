@@ -1,7 +1,5 @@
 """Test hook to wait for replication to complete on a replica set."""
 
-from __future__ import absolute_import
-
 import time
 
 from buildscripts.resmokelib import core

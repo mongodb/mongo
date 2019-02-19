@@ -1,7 +1,5 @@
 """ Unit tests for adb_monitor. """
 
-from __future__ import absolute_import
-
 import distutils.spawn  # pylint: disable=no-name-in-module
 import os
 import shutil
@@ -37,7 +35,7 @@ def mock_adb_and_systrace(directory):
     systrace = os.path.join(systrace_dir, "systrace.py")
     with open(systrace, "w") as fh:
         fh.write("import optparse\n")
-        fh.write("raw_input('waiting...')\n")
+        fh.write("input('waiting...')\n")
         fh.write("print('Wrote trace')\n")
         fh.write("parser = optparse.OptionParser()\n")
         fh.write("parser.add_option('-o', dest='output_file')\n")

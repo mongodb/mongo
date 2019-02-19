@@ -6,35 +6,40 @@
 
 # Common requirements
 asn1crypto==0.24.0
-astroid==1.6.5
-boto3==1.9.99
-botocore==1.12.99
-certifi==2018.11.29
-cffi==1.12.1
+astroid==2.2.5
+boto3==1.9.126
+botocore==1.12.126
+certifi==2019.3.9
+cffi==1.12.2
 chardet==3.0.4
+Cheetah3==3.2.1
 cryptography==2.3
 defusedxml==0.5.0
 docutils==0.14
+enum34==1.1.6
 idna==2.8
-isort==4.3.4
+isort==4.3.16
 Jinja2==2.10
 jira==2.0.0
-jmespath==0.9.3
+jmespath==0.9.4
 lazy-object-proxy==1.3.1
-MarkupSafe==1.1.0
+MarkupSafe==1.1.1
 mccabe==0.6.1
+mock==2.0.0
+mypy==0.580
 oauthlib==3.0.1
 pathspec==0.5.9
-pbr==5.1.2
-psutil==5.5.1
+pbr==5.1.3
+psutil==5.6.1
 pycparser==2.19
 pydocstyle==2.1.1
 PyJWT==1.7.1
-pylint==1.9.3
-pymongo==3.5.1
+PyKMIP==0.4.0
+pylint==2.3.1
+pymongo==3.7.2
 python-dateutil==2.8.0
-PyYAML==3.13
-regex==2019.2.21
+PyYAML==5.1
+regex==2019.3.12
 requests==2.21.0
 requests-oauth==0.4.1
 requests-oauthlib==1.2.0
@@ -43,30 +48,13 @@ s3transfer==0.2.0
 shrub.py==0.2.0
 six==1.12.0
 snowballstemmer==1.2.1
+typed-ast==1.1.2
 typing==3.6.6
-unittest-xml-reporting==2.2.1
+unittest-xml-reporting==2.5.1
 urllib3==1.24.1
 wrapt==1.11.1
 yamllint==1.15.0
-yapf==0.21.0
-
-# Python2 requirements
-backports.functools-lru-cache==1.5; python_version < "3"
-Cheetah3==3.2.0; python_version < "3"
-configparser==3.7.1; python_version < "3"
-enum34==1.1.6; python_version < "3"
-funcsigs==1.0.2; python_version < "3"
-futures==3.2.0; python_version < "3"
-ipaddress==1.0.22; python_version < "3"
-mock==2.0.0; python_version < "3"
-PyKMIP==0.4.0; python_version < "3"
-singledispatch==3.4.0.3; python_version < "3"
-
-# Python3 requirements
-mypy==0.580; python_version > "3"
-typed-ast==1.1.2; python_version > "3"
+yapf==0.26.0
 
 # Platform-specific components
-pypiwin32==219; sys_platform == "win32" and python_version < "3"
 pypiwin32==223; sys_platform == "win32" and python_version > "3"
-subprocess32==3.5.2; os_name == "posix" and platform_release != "2.6.18-194.el5xen" and platform_release != "2.6.18-274.el5xen" and python_version < "3"

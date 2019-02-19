@@ -3,8 +3,6 @@
 This is used to perform the actual test case.
 """
 
-from __future__ import absolute_import
-
 import os
 import os.path
 import unittest
@@ -23,10 +21,8 @@ def make_test_case(test_kind, *args, **kwargs):
     return _TEST_CASES[test_kind](*args, **kwargs)
 
 
-class TestCase(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
+class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TEST_CASES)):  # pylint: disable=too-many-instance-attributes
     """A test case to execute."""
-
-    __metaclass__ = registry.make_registry_metaclass(_TEST_CASES)  # type: ignore
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
@@ -37,10 +33,10 @@ class TestCase(unittest.TestCase):  # pylint: disable=too-many-instance-attribut
         if not isinstance(logger, logging.Logger):
             raise TypeError("logger must be a Logger instance")
 
-        if not isinstance(test_kind, basestring):
+        if not isinstance(test_kind, str):
             raise TypeError("test_kind must be a string")
 
-        if not isinstance(test_name, basestring):
+        if not isinstance(test_name, str):
             raise TypeError("test_name must be a string")
 
         self._id = uuid.uuid4()

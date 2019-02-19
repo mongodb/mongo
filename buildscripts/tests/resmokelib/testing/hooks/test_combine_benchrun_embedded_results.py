@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Unit tests for the resmokelib.testing.hooks.combine_benchrun_embedded_results module."""
 
-from __future__ import absolute_import
-
 import datetime
 import os
 import unittest
@@ -112,7 +110,7 @@ class TestCombineBenchmarkResults(CombineBenchrunEmbeddedResultsFixture):
         test_name = "test_cber2"
         thread_num = "1"
         self._setup_reports(_BM_ALL_REPORTS, test_name, thread_num)
-        self.assertEqual(len(self.report.keys()), 4)
+        self.assertEqual(len(list(self.report.keys())), 4)
         report_0 = self.report["results"][0]
         self.assertEqual(report_0["name"], test_name)
         self.assertEqual(report_0["results"][thread_num]["ops_per_sec"], self.ops_per_sec)
@@ -135,13 +133,13 @@ class TestBenchrunEmbeddedThreadsReport(CombineBenchrunEmbeddedResultsFixture):
         thread_num = "1"
         thread_report.add_report(thread_num, _BM_REPORT_INSERT_1)
         perf_report = thread_report.generate_perf_plugin_dict()
-        self.assertEqual(len(perf_report.keys()), 1)
+        self.assertEqual(len(list(perf_report.keys())), 1)
         self.assertEqual(perf_report[thread_num]["ops_per_sec"], _BM_REPORT_INSERT_1["totalOps/s"])
         self.assertEqual(len(perf_report[thread_num]["ops_per_sec_values"]), 1)
 
         thread_report.add_report(thread_num, _BM_REPORT_INSERT_2)
         perf_report = thread_report.generate_perf_plugin_dict()
-        self.assertEqual(len(perf_report.keys()), 1)
+        self.assertEqual(len(list(perf_report.keys())), 1)
         ops_per_sec = (_BM_REPORT_INSERT_1["totalOps/s"] + _BM_REPORT_INSERT_2["totalOps/s"]) / 2
         self.assertEqual(perf_report[thread_num]["ops_per_sec"], ops_per_sec)
         self.assertEqual(len(perf_report[thread_num]["ops_per_sec_values"]), 2)
@@ -151,14 +149,14 @@ class TestBenchrunEmbeddedThreadsReport(CombineBenchrunEmbeddedResultsFixture):
         thread_num = "1"
         thread_report.add_report(thread_num, _BM_REPORT_INSERT_1)
         perf_report = thread_report.generate_perf_plugin_dict()
-        self.assertEqual(len(perf_report.keys()), 1)
+        self.assertEqual(len(list(perf_report.keys())), 1)
         self.assertEqual(perf_report[thread_num]["ops_per_sec"], _BM_REPORT_INSERT_1["totalOps/s"])
         self.assertEqual(len(perf_report[thread_num]["ops_per_sec_values"]), 1)
 
         thread_num = "2"
         thread_report.add_report(thread_num, _BM_REPORT_INSERT_2)
         perf_report = thread_report.generate_perf_plugin_dict()
-        self.assertEqual(len(perf_report.keys()), 2)
+        self.assertEqual(len(list(perf_report.keys())), 2)
         self.assertEqual(perf_report["1"]["ops_per_sec"], _BM_REPORT_INSERT_1["totalOps/s"])
         self.assertEqual(len(perf_report["1"]["ops_per_sec_values"]), 1)
         self.assertEqual(perf_report[thread_num]["ops_per_sec"], _BM_REPORT_INSERT_2["totalOps/s"])

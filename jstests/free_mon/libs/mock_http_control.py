@@ -11,6 +11,7 @@ import urllib.request
 
 import mock_http_common
 
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='MongoDB Mock Free Monitoring Endpoint.')

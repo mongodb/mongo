@@ -6,7 +6,7 @@ Analyze the evergreen history for tests run under the given task and create new 
 to attempt to keep the task runtime under a specified amount.
 """
 
-from __future__ import absolute_import
+
 
 import argparse
 import datetime
@@ -463,7 +463,7 @@ class TestStats(object):
     def get_tests_runtimes(self):
         """Return the list of (test_file, runtime_in_secs) tuples ordered by decreasing runtime."""
         tests = []
-        for test_file, runtime_info in self._runtime_by_test.items():
+        for test_file, runtime_info in list(self._runtime_by_test.items()):
             duration = runtime_info["duration"]
             test_name = testname.get_short_name_from_test_file(test_file)
             hook_runtime_info = self._hook_runtime_by_test[test_name]
@@ -536,9 +536,10 @@ class Main(object):
                             help="Target execution time (in minutes).")
         parser.add_argument("--max-sub-suites", dest="max_sub_suites", type=int,
                             help="Max number of suites to divide into.")
-        parser.add_argument("--fallback-num-sub-suites", dest="fallback_num_sub_suites", type=int,
-                            help="The number of suites to divide into if the Evergreen test "
-                            "statistics are not available.")
+        parser.add_argument(
+            "--fallback-num-sub-suites", dest="fallback_num_sub_suites", type=int,
+            help="The number of suites to divide into if the Evergreen test "
+            "statistics are not available.")
         parser.add_argument("--project", dest="project", help="The Evergreen project to analyse.")
         parser.add_argument("--resmoke-args", dest="resmoke_args",
                             help="Arguments to pass to resmoke calls.")

@@ -1,7 +1,5 @@
 """Hook for cleaning up sharded collections created during tests."""
 
-from __future__ import absolute_import
-
 import os.path
 
 from . import jsfile

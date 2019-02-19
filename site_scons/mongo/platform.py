@@ -1,5 +1,4 @@
 # -*- mode: python; -*-
-
 """
 Support code related to OS detection in general. System specific facilities or customization
 hooks live in mongo_platform_<PLATFORM>.py files.
@@ -11,6 +10,7 @@ import os
 #
 # This needs to precede the options section so that we can only offer some options on certain
 # operating systems.
+
 
 # This function gets the running OS as identified by Python
 # It should only be used to set up defaults for options/variables, because
@@ -34,24 +34,27 @@ def get_running_os_name():
         running_os = 'unknown'
     return running_os
 
+
 def env_get_os_name_wrapper(self):
     return self['TARGET_OS']
 
+
 def is_os_raw(target_os, os_list_to_check):
-    darwin_os_list = [ 'macOS', 'tvOS', 'tvOS-sim', 'iOS', 'iOS-sim', 'watchOS', 'watchOS-sim' ]
-    linux_os_list = [ 'android', 'linux' ]
-    posix_os_list = [ 'openbsd', 'freebsd', 'solaris', 'emscripten' ] + darwin_os_list + linux_os_list
+    darwin_os_list = ['macOS', 'tvOS', 'tvOS-sim', 'iOS', 'iOS-sim', 'watchOS', 'watchOS-sim']
+    linux_os_list = ['android', 'linux']
+    posix_os_list = ['openbsd', 'freebsd', 'solaris', 'emscripten'] + darwin_os_list + linux_os_list
 
     os_families = {
-            "darwin": darwin_os_list,
-            "posix": posix_os_list,
-            "linux": linux_os_list,
+        "darwin": darwin_os_list,
+        "posix": posix_os_list,
+        "linux": linux_os_list,
     }
 
     for os in os_list_to_check:
-        if os == target_os or ( os in os_families and target_os in os_families[os] ):
+        if os == target_os or (os in os_families and target_os in os_families[os]):
             return True
     return False
+
 
 # This function tests the running OS as identified by Python
 # It should only be used to set up defaults for options/variables, because
@@ -59,6 +62,7 @@ def is_os_raw(target_os, os_list_to_check):
 # command-line. Treat this output as the value of HOST_OS
 def is_running_os(*os_list):
     return is_os_raw(get_running_os_name(), os_list)
+
 
 def env_os_is_wrapper(self, *os_list):
     return is_os_raw(self['TARGET_OS'], os_list)

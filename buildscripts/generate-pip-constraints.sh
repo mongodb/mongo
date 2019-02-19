@@ -64,10 +64,8 @@ if [[ -d $WORKING_DIR ]]; then
 fi
 ABSOLUTE_WORKING_DIR="$(mkdir -p "${WORKING_DIR}" && cd "${WORKING_DIR}" && pwd)"
 
-PIP2_DIR="${ABSOLUTE_WORKING_DIR}/python2"
 PIP3_DIR="${ABSOLUTE_WORKING_DIR}/python3"
 
-generateConstraints python2 "${PIP2_DIR}"
 generateConstraints python3 "${PIP3_DIR}"
 
 if [[ -z $CON_FILE ]]; then
@@ -83,15 +81,7 @@ fi
     printf '\n'
 
     printf '\n# Common requirements\n'
-    comm -12 "${PIP2_DIR}/requirements.txt" "${PIP3_DIR}/requirements.txt"
-
-    printf '\n# Python2 requirements\n'
-    comm -23 "${PIP2_DIR}/requirements.txt" "${PIP3_DIR}/requirements.txt" |
-        sed -e 's/$/; python_version < "3"/'
-
-    printf '\n# Python3 requirements\n'
-    comm -13 "${PIP2_DIR}/requirements.txt" "${PIP3_DIR}/requirements.txt" |
-        sed -e 's/$/; python_version > "3"/'
+    cat "${PIP3_DIR}/requirements.txt"
 
     printf '\n'
     cat "${SCRIPT_DIR}/../etc/pip/components/platform.req"

@@ -1,7 +1,5 @@
 """Class used to allocate ports for mongod and mongos processes involved in running the tests."""
 
-from __future__ import absolute_import
-
 import collections
 import functools
 import threading

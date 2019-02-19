@@ -22,8 +22,15 @@ variable-rgx=[a-z_][a-z0-9_]{1,50}$
 # R1705 - no-else-return - sometimes an unnecessary else helps readability
 # W0511 - fixme - ignore TODOs in comments
 # W0611 - unused-import - typing module is needed for mypy
+# R0205 - useless-object-inheritance - See PM-1380
+# W0402 - deprecated-module - See PM-1380
+# W1505 - deprecated-method - See PM-1380
+# W0107 - unnecessary-pass - See PM-1380
+# R1720 - no-else-raise - See PM-1380
+# W0122 - exec-used - See PM-1380
+# R0801 - duplicate-code - See PM-1380
 
-disable=bad-continuation,fixme,import-error,line-too-long,no-member,locally-disabled,no-else-return,redefined-variable-type,too-few-public-methods,unused-import
+disable=bad-continuation,fixme,import-error,line-too-long,no-member,locally-disabled,no-else-return,redefined-variable-type,too-few-public-methods,unused-import,useless-object-inheritance,deprecated-module,unnecessary-pass,duplicate-code,no-else-raise,deprecated-method,exec-used
 
 [IMPORTS]
 known-third-party=boto3,botocore,psutil,yaml,xmlrunner

@@ -249,14 +249,11 @@ class Distro(object):
                 self.dname, self.repo_os_version(build_os), repo_directory, self.repo_component(),
                 self.archname(arch))
         elif re.search("(redhat|fedora|centos|amazon)", self.dname):
-            return "repo/yum/%s/%s/mongodb-org/%s/%s/RPMS/" % (self.dname,
-                                                               self.repo_os_version(build_os),
-                                                               repo_directory, self.archname(arch))
+            return "repo/yum/%s/%s/mongodb-org/%s/%s/RPMS/" % (
+                self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         elif re.search("(suse)", self.dname):
-            return "repo/zypper/%s/%s/mongodb-org/%s/%s/RPMS/" % (self.dname,
-                                                                  self.repo_os_version(build_os),
-                                                                  repo_directory,
-                                                                  self.archname(arch))
+            return "repo/zypper/%s/%s/mongodb-org/%s/%s/RPMS/" % (
+                self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -409,7 +406,7 @@ def main():
     prefix = args.prefix
     if prefix is None:
         prefix = tempfile.mkdtemp()
-    print "Working in directory %s" % prefix
+    print("Working in directory %s" % prefix)
 
     os.chdir(prefix)
     try:
@@ -449,7 +446,7 @@ def crossproduct(*seqs):
 
 def sysassert(argv):
     """Run argv and assert that it exited with status 0."""
-    print "In %s, running %s" % (os.getcwd(), " ".join(argv))
+    print("In %s, running %s" % (os.getcwd(), " ".join(argv)))
     sys.stdout.flush()
     sys.stderr.flush()
     assert subprocess.Popen(argv).wait() == 0
@@ -457,7 +454,7 @@ def sysassert(argv):
 
 def backtick(argv):
     """Run argv and return its output string."""
-    print "In %s, running %s" % (os.getcwd(), " ".join(argv))
+    print("In %s, running %s" % (os.getcwd(), " ".join(argv)))
     sys.stdout.flush()
     sys.stderr.flush()
     return subprocess.Popen(argv, stdout=subprocess.PIPE).communicate()[0]
@@ -493,11 +490,11 @@ def unpack_binaries_into(build_os, arch, spec, where):
         sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
         release_dir = glob('mongodb-linux-*')[0]
         for releasefile in "bin", "LICENSE-Community.txt", "README", "THIRD-PARTY-NOTICES", "THIRD-PARTY-NOTICES.gotools", "MPL-2":
-            print "moving file: %s/%s" % (release_dir, releasefile)
+            print("moving file: %s/%s" % (release_dir, releasefile))
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
     except Exception:
-        exc = sys.exc_value
+        exc = sys.exc_info()[1]
         os.chdir(rootdir)
         raise exc
     os.chdir(rootdir)
@@ -515,7 +512,7 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # directory, so the debian directory is needed in all cases (and
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
-        print "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
+        print("Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir))
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         sysassert([
             "sh", "-c",
@@ -609,11 +606,13 @@ def make_deb_repo(repo, distro, build_os):
     oldpwd = os.getcwd()
     os.chdir(repo + "../../../../../../")
     try:
-        dirs = set(
-            [os.path.dirname(deb)[2:] for deb in backtick(["find", ".", "-name", "*.deb"]).split()])
+        dirs = set([
+            os.path.dirname(deb)[2:]
+            for deb in backtick(["find", ".", "-name", "*.deb"]).decode('utf-8').split()
+        ])
         for directory in dirs:
             st = backtick(["dpkg-scanpackages", directory, "/dev/null"])
-            with open(directory + "/Packages", "w") as fh:
+            with open(directory + "/Packages", "wb") as fh:
                 fh.write(st)
             bt = backtick(["gzip", "-9c", directory + "/Packages"])
             with open(directory + "/Packages.gz", "wb") as fh:
@@ -639,8 +638,8 @@ Description: MongoDB packages
     os.chdir(repo + "../../")
     s2 = backtick(["apt-ftparchive", "release", "."])
     try:
-        with open("Release", 'w') as fh:
-            fh.write(s1)
+        with open("Release", 'wb') as fh:
+            fh.write(s1.encode('utf-8'))
             fh.write(s2)
     finally:
         os.chdir(oldpwd)
@@ -662,7 +661,7 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
             os.mkdir(dname)
             break
         except OSError:
-            exc = sys.exc_value
+            exc = sys.exc_info()[1]
             if exc.errno == errno.EEXIST:
                 pass
             else:
@@ -682,7 +681,7 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
             os.symlink(dname, tmpnam)
             break
         except OSError:  # as exc: # Python >2.5
-            exc = sys.exc_value
+            exc = sys.exc_info()[1]
             if exc.errno == errno.EEXIST:
                 pass
             else:
@@ -700,7 +699,7 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
                 os.symlink(os.readlink(dst), oldnam)
                 break
             except OSError:  # as exc: # Python >2.5
-                exc = sys.exc_value
+                exc = sys.exc_info()[1]
                 if exc.errno == errno.EEXIST:
                     pass
                 else:
@@ -717,9 +716,10 @@ def write_debian_changelog(path, spec, srcdir):
     os.chdir(srcdir)
     preamble = ""
     try:
-        sb = preamble + backtick(
-            ["sh", "-c",
-             "git archive %s debian/changelog | tar xOf -" % spec.metadata_gitspec()])
+        sb = preamble + backtick([
+            "sh", "-c",
+            "git archive %s debian/changelog | tar xOf -" % spec.metadata_gitspec()
+        ]).decode('utf-8')
     finally:
         os.chdir(oldcwd)
     lines = sb.split("\n")
@@ -789,7 +789,8 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
     # --macros will be used in Ubuntu.
     #
     macrofiles = [
-        l for l in backtick(["rpm", "--showrc"]).split("\n") if l.startswith("macrofiles")
+        l for l in backtick(["rpm", "--showrc"]).decode('utf-8').split("\n")
+        if l.startswith("macrofiles")
     ]
     flags = []
     macropath = os.getcwd() + "/macros"
@@ -877,7 +878,7 @@ def ensure_dir(filename):
     try:
         os.makedirs(dirpart)
     except OSError:  # as exc: # Python >2.5
-        exc = sys.exc_value
+        exc = sys.exc_info()[1]
         if exc.errno == errno.EEXIST:
             pass
         else:

@@ -40,8 +40,8 @@ import sys
 
 import SCons
 
-import graph
-import graph_consts
+from . import graph
+from . import graph_consts
 
 
 LIB_DB = [] # Stores every SCons library nodes
@@ -92,11 +92,9 @@ def get_symbol_worker(object_file, task):
     uses = p.communicate()[0].decode()
 
     if platform == 'linux':
-        return list_process([use[19:] for use in uses.split('\n')
-                             if use != ''])
+        return list_process([use[19:] for use in uses.split('\n') if use != ''])
     elif platform == 'darwin':
-        return list_process([use.strip() for use in uses.split('\n')
-                             if use != ''])
+        return list_process([use.strip() for use in uses.split('\n') if use != ''])
 
 
 def emit_obj_db_entry(target, source, env):
@@ -109,6 +107,7 @@ def emit_obj_db_entry(target, source, env):
         OBJ_DB.append(t)
     return target, source
 
+
 def emit_prog_db_entry(target, source, env):
     for t in target:
         if str(t) is None:
@@ -116,6 +115,7 @@ def emit_prog_db_entry(target, source, env):
         EXE_DB[t] = [str(s) for s in source]
 
     return target, source
+
 
 def emit_lib_db_entry(target, source, env):
     """Emitter for libraries. We add each library
@@ -210,6 +210,7 @@ def __generate_file_rels(obj, g):
         for obj in objs:
             g.add_edge(graph_consts.FIL_FIL, file_node.id, obj)
 
+
 def __generate_exe_rels(exe, g):
     """Generates all executable to library relationships, and populates the
     contained files field in each NodeExe object"""
@@ -222,6 +223,7 @@ def __generate_exe_rels(exe, g):
         g.add_edge(graph_consts.EXE_LIB, exe_node.id, lib_node.id)
 
     exe_node.contained_files = set(EXE_DB[exe])
+
 
 def write_obj_db(target, source, env):
     """The bulk of the tool. This method takes all the objects and libraries
@@ -240,7 +242,7 @@ def write_obj_db(target, source, env):
     for obj in OBJ_DB:
         __generate_file_rels(obj, g)
 
-    for exe in EXE_DB.keys():
+    for exe in list(EXE_DB.keys()):
         __generate_exe_rels(exe, g)
 
     # target is given as a list of target SCons nodes - this builder is only responsible for

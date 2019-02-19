@@ -1,7 +1,5 @@
 """Sharded cluster fixture for executing JSTests against."""
 
-from __future__ import absolute_import
-
 import os.path
 import time
 
@@ -69,7 +67,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         self.configsvr.setup()
 
         if not self.shards:
-            for i in xrange(self.num_shards):
+            for i in range(self.num_shards):
                 if self.num_rs_nodes_per_shard is None:
                     shard = self._new_standalone_shard(i)
                 elif isinstance(self.num_rs_nodes_per_shard, int):

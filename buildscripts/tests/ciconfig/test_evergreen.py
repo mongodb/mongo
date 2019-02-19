@@ -1,7 +1,5 @@
 """Unit tests for the buildscripts.ciconfig.evergreen module."""
 
-from __future__ import absolute_import
-
 import datetime
 import os
 import unittest
@@ -122,12 +120,13 @@ class TestTask(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     def test_run_tests_multiversion(self):
         multiversion_path = "/data/multiversion"
-        task_commands = [{"func": "do multiversion setup"}, {
-            "func": "run tests", "vars": {
-                "task_path_suffix": multiversion_path,
-                "resmoke_args": "--suites=core --shellWriteMode=commands"
-            }
-        }]
+        task_commands = [{"func": "do multiversion setup"},
+                         {
+                             "func": "run tests", "vars": {
+                                 "task_path_suffix": multiversion_path,
+                                 "resmoke_args": "--suites=core --shellWriteMode=commands"
+                             }
+                         }]
         task_dict = {"name": "jsCore", "commands": task_commands}
         task = _evergreen.Task(task_dict)
 

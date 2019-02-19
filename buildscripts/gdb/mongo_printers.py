@@ -1,5 +1,4 @@
 """GDB Pretty-printers for MongoDB."""
-from __future__ import print_function
 
 import re
 import struct
@@ -17,12 +16,6 @@ except ImportError as err:
     print("Warning: Could not load bson library for Python '" + str(sys.version) + "'.")
     print("Check with the pip command if pymongo 3.x is installed.")
     bson = None
-
-if sys.version_info[0] >= 3:
-    # GDB only permits converting a gdb.Value instance to its numerical address when using the
-    # long() constructor in Python 2 and not when using the int() constructor. We define the
-    # 'long' class as an alias for the 'int' class in Python 3 for compatibility.
-    long = int  # pylint: disable=redefined-builtin,invalid-name
 
 
 def get_unique_ptr(obj):
@@ -132,7 +125,7 @@ class BSONObjPrinter(object):
         options = CodecOptions(document_class=collections.OrderedDict)
         bsondoc = buf.decode(codec_options=options)
 
-        for key, val in bsondoc.items():
+        for key, val in list(bsondoc.items()):
             yield 'key', key
             yield 'value', bson.json_util.dumps(val)
 
@@ -187,7 +180,7 @@ class DecorablePrinter(object):
         decorable_t = val.type.template_argument(0)
         decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
             str(decorable_t).replace("class", "").strip()))
-        self.count = long((long(finish) - long(self.start)) / decinfo_t.sizeof)
+        self.count = int((int(finish) - int(self.start)) / decinfo_t.sizeof)
 
     @staticmethod
     def display_hint():
@@ -388,9 +381,8 @@ class AbslHashSetPrinterBase(object):
 
     def to_string(self):
         """Return absl::[node/flat]_hash_set for printing."""
-        return "absl::%s_hash_set<%s> with %s elems " % (self.to_str,
-                                                         self.val.type.template_argument(0),
-                                                         self.val["size_"])
+        return "absl::%s_hash_set<%s> with %s elems " % (
+            self.to_str, self.val.type.template_argument(0), self.val["size_"])
 
 
 class AbslNodeHashSetPrinter(AbslHashSetPrinterBase):
@@ -438,10 +430,9 @@ class AbslHashMapPrinterBase(object):
 
     def to_string(self):
         """Return absl::[node/flat]_hash_map for printing."""
-        return "absl::%s_hash_map<%s, %s> with %s elems " % (self.to_str,
-                                                             self.val.type.template_argument(0),
-                                                             self.val.type.template_argument(1),
-                                                             self.val["size_"])
+        return "absl::%s_hash_map<%s, %s> with %s elems " % (
+            self.to_str, self.val.type.template_argument(0), self.val.type.template_argument(1),
+            self.val["size_"])
 
 
 class AbslNodeHashMapPrinter(AbslHashMapPrinterBase):

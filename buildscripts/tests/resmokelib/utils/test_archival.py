@@ -1,7 +1,5 @@
 """ Unit tests for archival. """
 
-from __future__ import absolute_import
-
 import logging
 import os
 import random
@@ -19,7 +17,7 @@ _BUCKET = "mongodatafiles"
 def create_random_file(file_name, num_chars_mb):
     """ Creates file with random characters, which will have minimal compression. """
     with open(file_name, "wb") as fileh:
-        for _ in xrange(num_chars_mb * 1024 * 1024):
+        for _ in range(num_chars_mb * 1024 * 1024):
             fileh.write(chr(random.randint(0, 255)))
 
 
@@ -29,15 +27,12 @@ class MockS3Client(object):
     def __init__(self, logger):
         self.logger = logger
         self.logger.info("MockS3Client init")
-        return
 
     def upload_file(self, *args, **kwargs):
         self.logger.info("MockS3Client upload_file %s %s", args, kwargs)
-        return
 
     def delete_object(self, *args, **kwargs):
         self.logger.info("MockS3Client delete_object %s %s", args, kwargs)
-        return
 
 
 class ArchivalTestCase(unittest.TestCase):
@@ -144,7 +139,7 @@ class ArchivalFileTests(ArchivalTestCase):
         temp_dir = tempfile.mkdtemp(dir=self.temp_dir)
         s3_path = self.s3_path("unittest/directory_with_files.tgz")
         # Create 10 empty files
-        for _ in xrange(10):
+        for _ in range(10):
             tempfile.mkstemp(dir=temp_dir)
         status, message = self.archive.archive_files_to_s3(display_name, temp_dir, self.bucket,
                                                            s3_path)
@@ -154,7 +149,7 @@ class ArchivalFileTests(ArchivalTestCase):
         temp_dir2 = tempfile.mkdtemp(dir=self.temp_dir)
         s3_path = self.s3_path("unittest/directories_with_files.tgz")
         # Create 10 empty files
-        for _ in xrange(10):
+        for _ in range(10):
             tempfile.mkstemp(dir=temp_dir2)
         status, message = self.archive.archive_files_to_s3(display_name, [temp_dir, temp_dir2],
                                                            self.bucket, s3_path)

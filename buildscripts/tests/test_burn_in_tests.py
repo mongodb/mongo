@@ -618,7 +618,7 @@ class UpdateReportDataTests(unittest.TestCase):
 
         pathname = "file_exists"
         with patch("os.path.isfile", return_value=True),\
-             patch("__builtin__.open", mock_open()),\
+             patch("builtins.open", mock_open()),\
              patch("json.load", return_value=new_data):
             burn_in._update_report_data(data, pathname, task2)
             self.assertEqual(len(data["results"]), 4)
@@ -948,9 +948,8 @@ class FindChangedTests(unittest.TestCase):
 
     NUM_COMMITS = 10
     MOD_FILES = [os.path.normpath("jstests/test1.js"), os.path.normpath("jstests/test2.js")]
-    REV_DIFF = dict(
-        zip([str(x) for x in range(NUM_COMMITS)],
-            [MOD_FILES for _ in range(NUM_COMMITS)]))  #type: ignore
+    REV_DIFF = dict(zip([str(x) for x in range(NUM_COMMITS)],
+                        [MOD_FILES] * NUM_COMMITS))  #type: ignore
     NO_REV_DIFF = dict(
         zip([str(x) for x in range(NUM_COMMITS)], [None for _ in range(NUM_COMMITS)]))
 

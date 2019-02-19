@@ -1,7 +1,5 @@
 """Module for generating and collecting embedded resource results."""
 
-from __future__ import absolute_import
-
 import os
 
 from buildscripts.mobile import adb_monitor

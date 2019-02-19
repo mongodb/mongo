@@ -34,7 +34,8 @@ def enumerate_tls_ciphers(protocol_options, host, port, cert, cafile):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MongoDB TLS Cipher Suite Enumerator')
     parser.add_argument('--port', type=int, default=27017, help='Port to connect to')
-    parser.add_argument('-o', '--outfile', type=str, default='ciphers.json', help='file to write the output to')
+    parser.add_argument('-o', '--outfile', type=str, default='ciphers.json',
+                        help='file to write the output to')
     parser.add_argument('--host', type=str, default='localhost', help='host to connect to')
     parser.add_argument('--cafile', type=str, help='Path to CA certificate')
     parser.add_argument('--cert', type=str, help='Path to client certificate')
@@ -68,11 +69,8 @@ if __name__ == '__main__':
     }
 
     results = {
-        key: enumerate_tls_ciphers(protocol_options=proto,
-                                   host=args.host,
-                                   port=args.port,
-                                   cafile=args.cafile,
-                                   cert=args.cert)
+        key: enumerate_tls_ciphers(protocol_options=proto, host=args.host, port=args.port,
+                                   cafile=args.cafile, cert=args.cert)
         for key, proto in suites.items()
     }
 

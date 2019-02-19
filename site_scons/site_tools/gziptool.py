@@ -18,7 +18,7 @@ import shutil
 
 def GZipAction(target, source, env, **kw):
     dst_gzip = gzip.GzipFile(str(target[0]), 'wb')
-    with open(str(source[0]), 'r') as src_file:
+    with open(str(source[0]), 'rb') as src_file:
         shutil.copyfileobj(src_file, dst_gzip)
     dst_gzip.close()
 
@@ -37,6 +37,7 @@ def generate(env, **kwargs):
         return result
 
     env.AddMethod(GZipTool, 'GZip')
+
 
 def exists(env):
     return True

@@ -1,7 +1,5 @@
 """The unittest.TestCase for FSM workloads."""
 
-from __future__ import absolute_import
-
 import hashlib
 import threading
 
@@ -97,5 +95,5 @@ class ParallelFSMWorkloadTestCase(FSMWorkloadTestCase):
         """Get an unique identifier for a workload group."""
         uid = hashlib.md5()
         for workload_name in sorted(selected_tests):
-            uid.update(workload_name)
+            uid.update(workload_name.encode("utf-8"))
         return uid.hexdigest()

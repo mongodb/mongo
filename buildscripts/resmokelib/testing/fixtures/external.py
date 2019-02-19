@@ -1,7 +1,5 @@
 """External fixture for executing JSTests against."""
 
-from __future__ import absolute_import
-
 from . import interface
 
 

@@ -21,6 +21,7 @@ import sys
 
 import SCons
 
+
 def idlc_emitter(target, source, env):
     """For each input IDL file, the tool produces a .cpp and .h file."""
     first_source = str(source[0])
@@ -44,9 +45,9 @@ def idl_scanner(node, env, path):
     # Use the import scanner mode of the IDL compiler to file imported files
     cmd = [sys.executable, "buildscripts/idl/idlc.py",  '--include','src', str(node), '--write-dependencies']
     try:
-        deps_str = subprocess.check_output(cmd)
+        deps_str = subprocess.check_output(cmd).decode('utf-8')
     except subprocess.CalledProcessError as e:
-        print("IDLC ERROR: %s" % (e.output) )
+        print(("IDLC ERROR: %s" % (e.output) ))
         raise
 
     deps_list = deps_str.splitlines()
@@ -61,29 +62,26 @@ def idl_scanner(node, env, path):
 idl_scanner = SCons.Scanner.Scanner(function=idl_scanner, skeys=['.idl'])
 
 # TODO: create a scanner for imports when imports are implemented
-IDLCBuilder = SCons.Builder.Builder(
-    action=IDLCAction,
-    emitter=idlc_emitter,
-    srcsuffx=".idl",
-    suffix=".cpp",
-    source_scanner = idl_scanner
-    )
+IDLCBuilder = SCons.Builder.Builder(action=IDLCAction, emitter=idlc_emitter, srcsuffx=".idl",
+                                    suffix=".cpp", source_scanner=idl_scanner)
 
 
 def generate(env):
     bld = IDLCBuilder
 
-    env.Append(SCANNERS = idl_scanner)
+    env.Append(SCANNERS=idl_scanner)
 
     env['BUILDERS']['Idlc'] = bld
 
     env['IDLC'] = sys.executable + " buildscripts/idl/idlc.py"
     env['IDLCFLAGS'] = ''
     base_dir = env.subst('$BUILD_ROOT/$VARIANT_DIR').replace("#", "")
-    env['IDLCCOM'] = '$IDLC --include src --base_dir %s --target_arch $TARGET_ARCH --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES ' % (base_dir)
+    env['IDLCCOM'] = '$IDLC --include src --base_dir %s --target_arch $TARGET_ARCH --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES ' % (
+        base_dir)
     env['IDLCSUFFIX'] = '.idl'
 
     env['IDL_HAS_INLINE_DEPENDENCIES'] = True
+
 
 def exists(env):
     return True

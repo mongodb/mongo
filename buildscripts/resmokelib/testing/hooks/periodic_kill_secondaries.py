@@ -1,7 +1,5 @@
 """Test hook for verifying correctness of secondary's behavior during an unclean shutdown."""
 
-from __future__ import absolute_import
-
 import time
 
 import bson
@@ -189,8 +187,9 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         for secondary in self.fixture.get_secondaries():
             self._check_invariants_as_standalone(secondary)
 
-            self.logger.info("Restarting the secondary on port %d as a replica set node with"
-                             " its data files intact...", secondary.port)
+            self.logger.info(
+                "Restarting the secondary on port %d as a replica set node with"
+                " its data files intact...", secondary.port)
             # Start the 'secondary' mongod back up as part of the replica set and wait for it to
             # reach state SECONDARY.
             secondary.setup()
@@ -253,12 +252,13 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         self.fixture.setup()
         self.fixture.await_ready()
 
-    def _check_invariants_as_standalone(self, secondary):
+    def _check_invariants_as_standalone(self, secondary):  # pylint: disable=too-many-locals
         # pylint: disable=too-many-branches,too-many-statements
         # We remove the --replSet option in order to start the node as a standalone.
         replset_name = secondary.mongod_options.pop("replSet")
-        self.logger.info("Restarting the secondary on port %d as a standalone node with"
-                         " its data files intact...", secondary.port)
+        self.logger.info(
+            "Restarting the secondary on port %d as a standalone node with"
+            " its data files intact...", secondary.port)
 
         try:
             secondary.setup()

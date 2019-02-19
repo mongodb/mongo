@@ -66,8 +66,9 @@ def main():
     if not args.variant in expected_variants:
         print("ERROR: Expected to find variant %s in list %s" % (args.variant, expected_variants),
               file=sys.stderr)
-        print("ERROR:  Please add the build variant %s to the %s list in '%s'" %
-              (args.variant, MONGOCRYPTD_VARIANTS, args.file), file=sys.stderr)
+        print(
+            "ERROR:  Please add the build variant %s to the %s list in '%s'" %
+            (args.variant, MONGOCRYPTD_VARIANTS, args.file), file=sys.stderr)
         sys.exit(1)
 
     sys.exit(0)

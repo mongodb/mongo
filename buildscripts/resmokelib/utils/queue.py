@@ -6,16 +6,14 @@ in order for KeyboardInterrupt exceptions to get propagated.
 See https://bugs.python.org/issue1167930 for more details.
 """
 
-from __future__ import absolute_import
-
-import Queue as _Queue
+import queue as _queue
 import time
 
 # Exception that is raised when get_nowait() is called on an empty Queue.
-Empty = _Queue.Empty
+Empty = _queue.Empty
 
 
-class Queue(_Queue.Queue):
+class Queue(_queue.Queue):
     """A multi-producer, multi-consumer queue."""
 
     def join(self, timeout=None):  # pylint: disable=arguments-differ

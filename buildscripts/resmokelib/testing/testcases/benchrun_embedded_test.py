@@ -1,7 +1,5 @@
 """The unittest.TestCase for tests using benchrun embedded (mongoebench)."""
 
-from __future__ import absolute_import
-
 import os
 import posixpath
 
@@ -73,7 +71,7 @@ class BenchrunEmbeddedTestCase(  # pylint: disable=too-many-instance-attributes
         # 3. Override Benchmark options with options set through resmoke's command line.
         resmoke_benchrun_options = {"dbpath": self.dbpath, "time": _config.BENCHMARK_MIN_TIME}
 
-        for key, value in resmoke_benchrun_options.items():
+        for key, value in list(resmoke_benchrun_options.items()):
             if value is not None:
                 # 4. sanitize options before passing them to Benchmark's command line.
                 if key == "time":
@@ -104,7 +102,7 @@ class BenchrunEmbeddedTestCase(  # pylint: disable=too-many-instance-attributes
 
     def run_test(self):
         """Run the test for specified number of iterations."""
-        for iter_num in xrange(self.benchrun_repetitions):
+        for iter_num in range(self.benchrun_repetitions):
             # Set the output file for each iteration.
             local_report_path = self._report_path(iter_num)
             device_report_path = self._device_report_path(iter_num)
@@ -134,8 +132,8 @@ class BenchrunEmbeddedTestCase(  # pylint: disable=too-many-instance-attributes
 
     def _report_dir(self):
         """Return the report directory. Reports are stored in <report_root>/<testname>/<thread>."""
-        return os.path.join(self.report_root, self.short_name(), "thread{}".format(
-            self.benchrun_threads))
+        return os.path.join(self.report_root, self.short_name(),
+                            "thread{}".format(self.benchrun_threads))
 
     @staticmethod
     def _report_name(iter_num):

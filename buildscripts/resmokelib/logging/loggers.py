@@ -1,7 +1,5 @@
 """Module to hold the logger instances themselves."""
 
-from __future__ import absolute_import
-
 import logging
 import sys
 
@@ -304,8 +302,8 @@ class FixtureNodeLogger(BaseLogger):
 
     def new_fixture_node_logger(self, node_name):
         """Create a new child FixtureNodeLogger."""
-        return FixtureNodeLogger(self.fixture_class, self.job_num, "%s:%s" % (self.node_name,
-                                                                              node_name), self)
+        return FixtureNodeLogger(self.fixture_class, self.job_num,
+                                 "%s:%s" % (self.node_name, node_name), self)
 
 
 class TestsRootLogger(RootLogger):

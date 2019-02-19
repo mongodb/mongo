@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Remote access utilities, via ssh & scp."""
 
-from __future__ import print_function
-
 import optparse
 import os
 import posixpath
@@ -10,20 +8,7 @@ import re
 import shlex
 import sys
 import time
-
-# The subprocess32 module is untested on Windows and thus isn't recommended for use, even when it's
-# installed. See https://github.com/google/python-subprocess32/blob/3.2.7/README.md#usage.
-if os.name == "posix" and sys.version_info[0] == 2:
-    try:
-        import subprocess32 as subprocess
-    except ImportError:
-        import warnings
-        warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
-                       " available. When using the subprocess module, a child process may trigger"
-                       " an invalid free(). See SERVER-22219 for more details."), RuntimeWarning)
-        import subprocess  # type: ignore
-else:
-    import subprocess
+import subprocess
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -231,44 +216,50 @@ def main():  # pylint: disable=too-many-branches,too-many-statements
     shell_options = optparse.OptionGroup(parser, "Shell options")
     copy_options = optparse.OptionGroup(parser, "Copy options")
 
-    parser.add_option("--userHost", dest="user_host", default=None,
-                      help=("User and remote host to execute commands on [REQUIRED]."
-                            " Examples, 'user@1.2.3.4' or 'user@myhost.com'."))
+    parser.add_option(
+        "--userHost", dest="user_host", default=None,
+        help=("User and remote host to execute commands on [REQUIRED]."
+              " Examples, 'user@1.2.3.4' or 'user@myhost.com'."))
 
-    parser.add_option("--operation", dest="operation", default="shell", choices=_OPERATIONS,
-                      help=("Remote operation to perform, choose one of '{}',"
-                            " defaults to '%default'.".format(", ".join(_OPERATIONS))))
+    parser.add_option(
+        "--operation", dest="operation", default="shell", choices=_OPERATIONS,
+        help=("Remote operation to perform, choose one of '{}',"
+              " defaults to '%default'.".format(", ".join(_OPERATIONS))))
 
-    control_options.add_option("--sshConnectionOptions", dest="ssh_connection_options",
-                               default=None, action="append",
-                               help=("SSH connection options which are common to ssh and scp."
-                                     " More than one option can be specified either"
-                                     " in one quoted string or by specifying"
-                                     " this option more than once. Example options:"
-                                     " '-i $HOME/.ssh/access.pem -o ConnectTimeout=10"
-                                     " -o ConnectionAttempts=10'"))
+    control_options.add_option(
+        "--sshConnectionOptions", dest="ssh_connection_options", default=None, action="append",
+        help=("SSH connection options which are common to ssh and scp."
+              " More than one option can be specified either"
+              " in one quoted string or by specifying"
+              " this option more than once. Example options:"
+              " '-i $HOME/.ssh/access.pem -o ConnectTimeout=10"
+              " -o ConnectionAttempts=10'"))
 
-    control_options.add_option("--sshOptions", dest="ssh_options", default=None, action="append",
-                               help=("SSH specific options."
-                                     " More than one option can be specified either"
-                                     " in one quoted string or by specifying"
-                                     " this option more than once. Example options:"
-                                     " '-t' or '-T'"))
+    control_options.add_option(
+        "--sshOptions", dest="ssh_options", default=None, action="append",
+        help=("SSH specific options."
+              " More than one option can be specified either"
+              " in one quoted string or by specifying"
+              " this option more than once. Example options:"
+              " '-t' or '-T'"))
 
-    control_options.add_option("--scpOptions", dest="scp_options", default=None, action="append",
-                               help=("SCP specific options."
-                                     " More than one option can be specified either"
-                                     " in one quoted string or by specifying"
-                                     " this option more than once. Example options:"
-                                     " '-l 5000'"))
+    control_options.add_option(
+        "--scpOptions", dest="scp_options", default=None, action="append",
+        help=("SCP specific options."
+              " More than one option can be specified either"
+              " in one quoted string or by specifying"
+              " this option more than once. Example options:"
+              " '-l 5000'"))
 
-    control_options.add_option("--retries", dest="retries", type=int, default=0,
-                               help=("Number of retries to attempt for operation,"
-                                     " defaults to '%default'."))
+    control_options.add_option(
+        "--retries", dest="retries", type=int, default=0,
+        help=("Number of retries to attempt for operation,"
+              " defaults to '%default'."))
 
-    control_options.add_option("--retrySleep", dest="retry_sleep", type=int, default=10,
-                               help=("Number of seconds to wait between retries,"
-                                     " defaults to '%default'."))
+    control_options.add_option(
+        "--retrySleep", dest="retry_sleep", type=int, default=10,
+        help=("Number of seconds to wait between retries,"
+              " defaults to '%default'."))
 
     control_options.add_option("--debug", dest="debug", action="store_true", default=False,
                                help="Provides debug output.")
@@ -276,32 +267,37 @@ def main():  # pylint: disable=too-many-branches,too-many-statements
     control_options.add_option("--verbose", dest="verbose", action="store_true", default=False,
                                help="Print exit status and output at end.")
 
-    shell_options.add_option("--commands", dest="remote_commands", default=None, action="append",
-                             help=("Commands to excute on the remote host. The"
-                                   " commands must be separated by a ';' and can either"
-                                   " be specifed in a quoted string or by specifying"
-                                   " this option more than once. A ';' will be added"
-                                   " between commands when this option is specifed"
-                                   " more than once."))
+    shell_options.add_option(
+        "--commands", dest="remote_commands", default=None, action="append",
+        help=("Commands to excute on the remote host. The"
+              " commands must be separated by a ';' and can either"
+              " be specifed in a quoted string or by specifying"
+              " this option more than once. A ';' will be added"
+              " between commands when this option is specifed"
+              " more than once."))
 
-    shell_options.add_option("--commandDir", dest="command_dir", default=None,
-                             help=("Working directory on remote to execute commands"
-                                   " form. Defaults to remote login directory."))
+    shell_options.add_option(
+        "--commandDir", dest="command_dir", default=None,
+        help=("Working directory on remote to execute commands"
+              " form. Defaults to remote login directory."))
 
-    copy_options.add_option("--file", dest="files", default=None, action="append",
-                            help=("The file to copy to/from remote host. To"
-                                  " support spaces in the file, each file must be"
-                                  " specified using this option more than once."))
+    copy_options.add_option(
+        "--file", dest="files", default=None, action="append",
+        help=("The file to copy to/from remote host. To"
+              " support spaces in the file, each file must be"
+              " specified using this option more than once."))
 
-    copy_options.add_option("--remoteDir", dest="remote_dir", default=None,
-                            help=("Remote directory to copy to, only applies when"
-                                  " operation is 'copy_to'. Defaults to the login"
-                                  " directory on the remote host."))
+    copy_options.add_option(
+        "--remoteDir", dest="remote_dir", default=None,
+        help=("Remote directory to copy to, only applies when"
+              " operation is 'copy_to'. Defaults to the login"
+              " directory on the remote host."))
 
-    copy_options.add_option("--localDir", dest="local_dir", default=".",
-                            help=("Local directory to copy to, only applies when"
-                                  " operation is 'copy_from'. Defaults to the"
-                                  " current directory, '%default'."))
+    copy_options.add_option(
+        "--localDir", dest="local_dir", default=".",
+        help=("Local directory to copy to, only applies when"
+              " operation is 'copy_from'. Defaults to the"
+              " current directory, '%default'."))
 
     parser.add_option_group(control_options)
     parser.add_option_group(shell_options)

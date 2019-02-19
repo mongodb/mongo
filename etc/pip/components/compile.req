@@ -1,5 +1,4 @@
 # Mongo compile
-Cheetah3; python_version < "3" # src/mongo/base/generate_error_codes.py
+Cheetah3 # src/mongo/base/generate_error_codes.py
 psutil
 regex
-typing; python_version < "3"

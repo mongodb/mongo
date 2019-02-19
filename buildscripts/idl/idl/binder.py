@@ -28,8 +28,6 @@
 # pylint: disable=too-many-lines
 """Transform idl.syntax trees from the parser into well-defined idl.ast trees."""
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 import re
 from typing import cast, List, Set, Union
 
@@ -43,7 +41,7 @@ from . import syntax
 
 
 def _validate_single_bson_type(ctxt, idl_type, syntax_type):
-    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], unicode) -> bool
+    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], str) -> bool
     """Validate bson serialization type is correct for a type."""
     bson_type = idl_type.bson_serialization_type[0]
 
@@ -72,7 +70,7 @@ def _validate_single_bson_type(ctxt, idl_type, syntax_type):
 
 
 def _validate_bson_types_list(ctxt, idl_type, syntax_type):
-    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], unicode) -> bool
+    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], str) -> bool
     """Validate bson serialization type(s) is correct for a type."""
 
     bson_types = idl_type.bson_serialization_type
@@ -113,7 +111,7 @@ def _validate_type(ctxt, idl_type):
 
 
 def _validate_cpp_type(ctxt, idl_type, syntax_type):
-    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], unicode) -> None
+    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], str) -> None
     """Validate the cpp_type is correct."""
 
     # Validate cpp_type
@@ -158,7 +156,7 @@ def _validate_cpp_type(ctxt, idl_type, syntax_type):
 
 
 def _validate_chain_type_properties(ctxt, idl_type, syntax_type):
-    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], unicode) -> None
+    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], str) -> None
     """Validate a chained type has both a deserializer and serializer."""
     assert len(
         idl_type.bson_serialization_type) == 1 and idl_type.bson_serialization_type[0] == 'chain'
@@ -173,7 +171,7 @@ def _validate_chain_type_properties(ctxt, idl_type, syntax_type):
 
 
 def _validate_type_properties(ctxt, idl_type, syntax_type):
-    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], unicode) -> None
+    # type: (errors.ParserContext, Union[syntax.Type, ast.Field], str) -> None
     # pylint: disable=too-many-branches
     """Validate each type or field is correct."""
 
@@ -233,7 +231,7 @@ def _validate_types(ctxt, parsed_spec):
 
 
 def _is_duplicate_field(ctxt, field_container, fields, ast_field):
-    # type: (errors.ParserContext, unicode, List[ast.Field], ast.Field) -> bool
+    # type: (errors.ParserContext, str, List[ast.Field], ast.Field) -> bool
     """Return True if there is a naming conflict for a given field."""
 
     # This is normally tested in the parser as part of duplicate detection in a map
@@ -494,7 +492,7 @@ def _validate_doc_sequence_field(ctxt, ast_field):
 
 
 def _normalize_method_name(cpp_type_name, cpp_method_name):
-    # type: (unicode, unicode) -> unicode
+    # type: (str, str) -> str
     """Normalize the method name to be fully-qualified with the type name."""
     # Default deserializer
     if not cpp_method_name:
@@ -540,7 +538,7 @@ def _bind_expression(expr, allow_literal_string=True):
     # int32_t
     try:
         intval = int(expr.literal)
-        if (intval >= -0x80000000) and (intval <= 0x7FFFFFFF):
+        if intval >= -0x80000000 and intval <= 0x7FFFFFFF:  # pylint: disable=chained-comparison
             node.expr = repr(intval)
             return node
     except ValueError:
@@ -847,7 +845,7 @@ def _validate_enum_int(ctxt, idl_enum):
     min_value = min(int_values_set)
     max_value = max(int_values_set)
 
-    valid_int = {x for x in xrange(min_value, max_value + 1)}
+    valid_int = {x for x in range(min_value, max_value + 1)}
 
     if valid_int != int_values_set:
         ctxt.add_enum_non_continuous_range_error(idl_enum, idl_enum.name)
@@ -879,7 +877,7 @@ def _bind_enum(ctxt, idl_enum):
         ast_enum_value.value = enum_value.value
         ast_enum.values.append(ast_enum_value)
 
-    values_set = set()  # type: Set[unicode]
+    values_set = set()  # type: Set[str]
     for enum_value in idl_enum.values:
         values_set.add(enum_value.value)
 
@@ -953,7 +951,7 @@ def _bind_server_parameter_with_storage(ctxt, ast_param, param):
 
 
 def _bind_server_parameter_set_at(ctxt, param):
-    # type: (errors.ParserContext, syntax.ServerParameter) -> unicode
+    # type: (errors.ParserContext, syntax.ServerParameter) -> str
     """Translate set_at options to C++ enum value."""
 
     set_at = 0
@@ -1003,13 +1001,13 @@ def _bind_server_parameter(ctxt, param):
 
 
 def _is_invalid_config_short_name(name):
-    # type: (unicode) -> bool
+    # type: (str) -> bool
     """Check if a given name is valid as a short name."""
     return ('.' in name) or (',' in name)
 
 
 def _parse_config_option_sources(source_list):
-    # type: (List[unicode]) -> unicode
+    # type: (List[str]) -> str
     """Parse source list into enum value used by runtime."""
     sources = 0
     if not source_list:

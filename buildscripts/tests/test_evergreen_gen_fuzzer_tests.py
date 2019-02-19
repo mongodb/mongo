@@ -1,7 +1,5 @@
 """Unit tests for the evergreen_gen_fuzzer_tests.py script."""
 
-from __future__ import absolute_import
-
 import unittest
 import mock
 

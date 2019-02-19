@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 """Determine the number of resmoke jobs to run."""
 
-from __future__ import division
-from __future__ import print_function
-
 import argparse
 import platform
 import re
@@ -76,15 +73,18 @@ def main():
     parser.add_argument("--taskName", dest="task", required=True, help="Task being executed.")
     parser.add_argument("--buildVariant", dest="variant", required=True,
                         help="Build variant task is being executed on.")
-    parser.add_argument("--jobFactor", dest="jobs_factor", type=float, default=1.0,
-                        help=("Job factor to use as a mulitplier with the number of CPUs. Defaults"
-                              " to %(default)s."))
-    parser.add_argument("--jobsMax", dest="jobs_max", type=int, default=0,
-                        help=("Maximum number of jobs to use. Specify 0 to indicate the number of"
-                              " jobs is determined by --jobFactor and the number of CPUs. Defaults"
-                              " to %(default)s."))
-    parser.add_argument("--outFile", dest="outfile", help=("File to write configuration to. If"
-                                                           " unspecified no file is generated."))
+    parser.add_argument(
+        "--jobFactor", dest="jobs_factor", type=float, default=1.0,
+        help=("Job factor to use as a mulitplier with the number of CPUs. Defaults"
+              " to %(default)s."))
+    parser.add_argument(
+        "--jobsMax", dest="jobs_max", type=int, default=0,
+        help=("Maximum number of jobs to use. Specify 0 to indicate the number of"
+              " jobs is determined by --jobFactor and the number of CPUs. Defaults"
+              " to %(default)s."))
+    parser.add_argument(
+        "--outFile", dest="outfile", help=("File to write configuration to. If"
+                                           " unspecified no file is generated."))
 
     options = parser.parse_args()
 

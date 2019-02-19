@@ -31,8 +31,6 @@ IDL Enum type information.
 Support the code generation for enums
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 from abc import ABCMeta, abstractmethod
 import textwrap
 from typing import cast, List, Optional, Union
@@ -43,10 +41,8 @@ from . import syntax
 from . import writer
 
 
-class EnumTypeInfoBase(object):
+class EnumTypeInfoBase(object, metaclass=ABCMeta):
     """Base type for enumeration type information."""
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, idl_enum):
         # type: (Union[syntax.Enum,ast.Enum]) -> None
@@ -73,8 +69,8 @@ class EnumTypeInfoBase(object):
     def _get_enum_deserializer_name(self):
         # type: () -> unicode
         """Return the name of deserializer function without prefix."""
-        return common.template_args("${enum_name}_parse", enum_name=common.title_case(
-            self._enum.name))
+        return common.template_args("${enum_name}_parse",
+                                    enum_name=common.title_case(self._enum.name))
 
     def get_enum_deserializer_name(self):
         # type: () -> unicode
@@ -85,8 +81,8 @@ class EnumTypeInfoBase(object):
     def _get_enum_serializer_name(self):
         # type: () -> unicode
         """Return the name of serializer function without prefix."""
-        return common.template_args("${enum_name}_serializer", enum_name=common.title_case(
-            self._enum.name))
+        return common.template_args("${enum_name}_serializer",
+                                    enum_name=common.title_case(self._enum.name))
 
     def get_enum_serializer_name(self):
         # type: () -> unicode
@@ -114,7 +110,7 @@ class EnumTypeInfoBase(object):
 
     @abstractmethod
     def get_serializer_declaration(self):
-        # type: () -> unicode
+        # type: () -> str
         """Get the serializer function declaration minus trailing semicolon."""
         pass
 
@@ -125,10 +121,8 @@ class EnumTypeInfoBase(object):
         pass
 
 
-class _EnumTypeInt(EnumTypeInfoBase):
+class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
     """Type information for integer enumerations."""
-
-    __metaclass__ = ABCMeta
 
     def get_cpp_type_name(self):
         # type: () -> unicode
@@ -174,7 +168,7 @@ class _EnumTypeInt(EnumTypeInfoBase):
                 """))
 
     def get_serializer_declaration(self):
-        # type: () -> unicode
+        # type: () -> str
         """Get the serializer function declaration minus trailing semicolon."""
         return common.template_args("std::int32_t ${function_name}(${enum_name} value)",
                                     enum_name=self.get_cpp_type_name(),
@@ -200,15 +194,13 @@ def _get_constant_enum_name(idl_enum, enum_value):
                                 name=enum_value.name)
 
 
-class _EnumTypeString(EnumTypeInfoBase):
+class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
     """Type information for string enumerations."""
-
-    __metaclass__ = ABCMeta
 
     def get_cpp_type_name(self):
         # type: () -> unicode
-        return common.template_args("${enum_name}Enum", enum_name=common.title_case(
-            self._enum.name))
+        return common.template_args("${enum_name}Enum",
+                                    enum_name=common.title_case(self._enum.name))
 
     def get_bson_types(self):
         # type: () -> List[unicode]
@@ -236,24 +228,25 @@ class _EnumTypeString(EnumTypeInfoBase):
         with writer.NamespaceScopeBlock(indented_writer, ['']):
             for enum_value in self._enum.values:
                 indented_writer.write_line(
-                    common.template_args('constexpr StringData ${constant_name} = "${value}"_sd;',
-                                         constant_name=_get_constant_enum_name(
-                                             self._enum, enum_value), value=enum_value.value))
+                    common.template_args(
+                        'constexpr StringData ${constant_name} = "${value}"_sd;',
+                        constant_name=_get_constant_enum_name(self._enum,
+                                                              enum_value), value=enum_value.value))
         indented_writer.write_empty_line()
 
         with writer.TemplateContext(indented_writer, template_params):
             with writer.IndentedScopedBlock(indented_writer, "${function_name} {", "}"):
                 for enum_value in self._enum.values:
-                    predicate = 'if (value == %s) {' % (
-                        _get_constant_enum_name(self._enum, enum_value))
+                    predicate = 'if (value == %s) {' % (_get_constant_enum_name(
+                        self._enum, enum_value))
                     with writer.IndentedScopedBlock(indented_writer, predicate, "}"):
-                        indented_writer.write_template('return ${enum_name}::%s;' %
-                                                       (enum_value.name))
+                        indented_writer.write_template(
+                            'return ${enum_name}::%s;' % (enum_value.name))
 
                 indented_writer.write_line("ctxt.throwBadEnumValue(value);")
 
     def get_serializer_declaration(self):
-        # type: () -> unicode
+        # type: () -> str
         """Get the serializer function declaration minus trailing semicolon."""
         return common.template_args("StringData ${function_name}(${enum_name} value)",
                                     enum_name=self.get_cpp_type_name(),
@@ -270,9 +263,9 @@ class _EnumTypeString(EnumTypeInfoBase):
         with writer.TemplateContext(indented_writer, template_params):
             with writer.IndentedScopedBlock(indented_writer, "${function_name} {", "}"):
                 for enum_value in self._enum.values:
-                    with writer.IndentedScopedBlock(indented_writer,
-                                                    'if (value == ${enum_name}::%s) {' %
-                                                    (enum_value.name), "}"):
+                    with writer.IndentedScopedBlock(
+                            indented_writer, 'if (value == ${enum_name}::%s) {' % (enum_value.name),
+                            "}"):
                         indented_writer.write_line(
                             'return %s;' % (_get_constant_enum_name(self._enum, enum_value)))
 

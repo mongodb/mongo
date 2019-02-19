@@ -34,8 +34,6 @@ This is a lossy translation from the IDL Syntax tree as the IDL AST only contain
 the enums and structs that need code generated for them, and just enough information to do that.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 from typing import List, Union, Any, Optional, Tuple
 
 from . import common
@@ -78,10 +76,10 @@ class Global(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Global."""
-        self.cpp_namespace = None  # type: unicode
-        self.cpp_includes = []  # type: List[unicode]
+        self.cpp_namespace = None  # type: str
+        self.cpp_includes = []  # type: List[str]
         self.configs = None  # type: ConfigGlobal
 
         super(Global, self).__init__(file_name, line, column)
@@ -97,11 +95,11 @@ class Struct(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a struct."""
-        self.name = None  # type: unicode
-        self.cpp_name = None  # type: unicode
-        self.description = None  # type: unicode
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
+        self.description = None  # type: str
         self.strict = True  # type: bool
         self.immutable = False  # type: bool
         self.inline_chained_structs = False  # type: bool
@@ -114,9 +112,9 @@ class Expression(common.SourceLocation):
     """Literal of C++ expression representation."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Expression."""
-        self.expr = None  # type: unicode
+        self.expr = None  # type: str
         self.validate_constexpr = True  # type: bool
         self.export = False  # type: bool
 
@@ -134,7 +132,7 @@ class Validator(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Validator."""
         # Don't lint gt/lt as bad attribute names.
         # pylint: disable=C0103
@@ -142,7 +140,7 @@ class Validator(common.SourceLocation):
         self.lt = None  # type: Expression
         self.gte = None  # type: Expression
         self.lte = None  # type: Expression
-        self.callback = None  # type: Optional[unicode]
+        self.callback = None  # type: Optional[str]
 
         super(Validator, self).__init__(file_name, line, column)
 
@@ -159,26 +157,26 @@ class Field(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Field."""
-        self.name = None  # type: unicode
-        self.description = None  # type: unicode
-        self.cpp_name = None  # type: unicode
+        self.name = None  # type: str
+        self.description = None  # type: str
+        self.cpp_name = None  # type: str
         self.optional = False  # type: bool
         self.ignore = False  # type: bool
         self.chained = False  # type: bool
         self.comparison_order = -1  # type: int
 
         # Properties specific to fields which are types.
-        self.cpp_type = None  # type: unicode
-        self.bson_serialization_type = None  # type: List[unicode]
-        self.serializer = None  # type: unicode
-        self.deserializer = None  # type: unicode
-        self.bindata_subtype = None  # type: unicode
-        self.default = None  # type: unicode
+        self.cpp_type = None  # type: str
+        self.bson_serialization_type = None  # type: List[str]
+        self.serializer = None  # type: str
+        self.deserializer = None  # type: str
+        self.bindata_subtype = None  # type: str
+        self.default = None  # type: str
 
         # Properties specific to fields which are structs.
-        self.struct_type = None  # type: unicode
+        self.struct_type = None  # type: str
 
         # Properties specific to fields which are arrays.
         self.array = False  # type: bool
@@ -208,9 +206,9 @@ class Command(Struct):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a command."""
-        self.namespace = None  # type: unicode
+        self.namespace = None  # type: str
         self.command_field = None  # type: Field
         super(Command, self).__init__(file_name, line, column)
 
@@ -223,10 +221,10 @@ class EnumValue(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Enum."""
-        self.name = None  # type: unicode
-        self.value = None  # type: unicode
+        self.name = None  # type: str
+        self.value = None  # type: str
 
         super(EnumValue, self).__init__(file_name, line, column)
 
@@ -239,12 +237,12 @@ class Enum(common.SourceLocation):
     """
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct an Enum."""
-        self.name = None  # type: unicode
-        self.description = None  # type: unicode
-        self.cpp_namespace = None  # type: unicode
-        self.type = None  # type: unicode
+        self.name = None  # type: str
+        self.description = None  # type: str
+        self.cpp_namespace = None  # type: str
+        self.type = None  # type: str
         self.values = []  # type: List[EnumValue]
 
         super(Enum, self).__init__(file_name, line, column)
@@ -254,11 +252,11 @@ class Condition(common.SourceLocation):
     """Condition(s) for a ServerParameter or ConfigOption."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a Condition."""
-        self.expr = None  # type: unicode
-        self.constexpr = None  # type: unicode
-        self.preprocessor = None  # type: unicode
+        self.expr = None  # type: str
+        self.constexpr = None  # type: str
+        self.preprocessor = None  # type: str
 
         super(Condition, self).__init__(file_name, line, column)
 
@@ -267,11 +265,11 @@ class ServerParameterClass(common.SourceLocation):
     """ServerParameter as C++ class specialization."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a ServerParameterClass."""
 
-        self.name = None  # type: unicode
-        self.data = None  # type: unicode
+        self.name = None  # type: str
+        self.data = None  # type: str
         self.override_ctor = False  # type: bool
         self.override_set = False  # type: bool
 
@@ -284,23 +282,23 @@ class ServerParameter(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a ServerParameter."""
-        self.name = None  # type: unicode
-        self.set_at = None  # type: unicode
-        self.description = None  # type: unicode
+        self.name = None  # type: str
+        self.set_at = None  # type: str
+        self.description = None  # type: str
         self.cpp_class = None  # type: ServerParameterClass
-        self.cpp_vartype = None  # type: unicode
-        self.cpp_varname = None  # type: unicode
+        self.cpp_vartype = None  # type: str
+        self.cpp_varname = None  # type: str
         self.condition = None  # type: Condition
         self.redact = False  # type: bool
         self.test_only = False  # type: bool
-        self.deprecated_name = []  # type: List[unicode]
+        self.deprecated_name = []  # type: List[str]
         self.default = None  # type: Expression
 
         # Only valid if cpp_varname is specified.
         self.validator = None  # type: Validator
-        self.on_update = None  # type: unicode
+        self.on_update = None  # type: str
 
         super(ServerParameter, self).__init__(file_name, line, column)
 
@@ -309,12 +307,12 @@ class GlobalInitializer(common.SourceLocation):
     """Initializer details for custom registration/storage."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a GlobalInitializer."""
 
-        self.name = None  # type: unicode
-        self.register = None  # type: unicode
-        self.store = None  # type: unicode
+        self.name = None  # type: str
+        self.register = None  # type: str
+        self.store = None  # type: str
 
         super(GlobalInitializer, self).__init__(file_name, line, column)
 
@@ -323,7 +321,7 @@ class ConfigGlobal(common.SourceLocation):
     """IDL ConfigOption Globals."""
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a ConfigGlobal."""
 
         # Other config globals are consumed in bind phase.
@@ -338,28 +336,28 @@ class ConfigOption(common.SourceLocation):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
-        # type: (unicode, int, int) -> None
+        # type: (str, int, int) -> None
         """Construct a ConfigOption."""
-        self.name = None  # type: unicode
-        self.short_name = None  # type: unicode
-        self.deprecated_name = []  # type: List[unicode]
-        self.deprecated_short_name = []  # type: List[unicode]
+        self.name = None  # type: str
+        self.short_name = None  # type: str
+        self.deprecated_name = []  # type: List[str]
+        self.deprecated_short_name = []  # type: List[str]
 
         self.description = None  # type: Expression
-        self.section = None  # type: unicode
-        self.arg_vartype = None  # type: unicode
-        self.cpp_vartype = None  # type: unicode
-        self.cpp_varname = None  # type: unicode
+        self.section = None  # type: str
+        self.arg_vartype = None  # type: str
+        self.cpp_vartype = None  # type: str
+        self.cpp_varname = None  # type: str
         self.condition = None  # type: Condition
 
-        self.conflicts = []  # type: List[unicode]
-        self.requires = []  # type: List[unicode]
+        self.conflicts = []  # type: List[str]
+        self.requires = []  # type: List[str]
         self.hidden = False  # type: bool
         self.redact = False  # type: bool
         self.default = None  # type: Expression
         self.implicit = None  # type: Expression
-        self.source = None  # type: unicode
-        self.canonicalize = None  # type: unicode
+        self.source = None  # type: str
+        self.canonicalize = None  # type: str
 
         self.duplicates_append = False  # type: bool
         self.positional_start = None  # type: int

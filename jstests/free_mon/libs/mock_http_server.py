@@ -23,22 +23,16 @@ last_metrics = None
 last_register = None
 disable_faults = False
 fault_type = None
-
 """Fault which causes the server to return an HTTP failure on register."""
 FAULT_FAIL_REGISTER = "fail_register"
-
 """Fault which causes the server to return a response with a document with a bad version."""
 FAULT_INVALID_REGISTER = "invalid_register"
-
 """Fault which causes metrics to return halt after 5 metric uploads have occurred."""
 FAULT_HALT_METRICS_5 = "halt_metrics_5"
-
 """Fault which causes metrics to return permanentlyDelete = true after 3 uploads."""
 FAULT_PERMANENTLY_DELETE_AFTER_3 = "permanently_delete_after_3"
-
 """Fault which causes metrics to trigger resentRegistration at 3 uploads."""
 FAULT_RESEND_REGISTRATION_AT_3 = "resend_registration_at_3"
-
 """Fault which causes metrics to trigger resentRegistration once."""
 FAULT_RESEND_REGISTRATION_ONCE = "resend_registration_once"
 
@@ -132,14 +126,20 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
             })
         else:
             data = bson.BSON.encode({
-                'version': bson.int64.Int64(1),
-                'haltMetricsUploading': False,
-                'id': 'mock123',
-                'informationalURL': 'http://www.example.com/123',
-                'message': 'Welcome to the Mock Free Monitoring Endpoint',
-                'reportingInterval': bson.int64.Int64(1),
+                'version':
+                    bson.int64.Int64(1),
+                'haltMetricsUploading':
+                    False,
+                'id':
+                    'mock123',
+                'informationalURL':
+                    'http://www.example.com/123',
+                'message':
+                    'Welcome to the Mock Free Monitoring Endpoint',
+                'reportingInterval':
+                    bson.int64.Int64(1),
                 'userReminder':
-"""To see your monitoring data, navigate to the unique URL below.
+                    """To see your monitoring data, navigate to the unique URL below.
 Anyone you share the URL with will also be able to view this page.
 
 https://localhost:8080/someUUID6v5jLKTIZZklDvN5L8sZ
@@ -196,7 +196,7 @@ You can disable monitoring at any time by running db.disableFreeMonitoring()."""
                 'id': 'mock123',
                 'reportingInterval': bson.int64.Int64(1),
                 'message': 'Thanks for all the metrics',
-                'resendRegistration' : True,
+                'resendRegistration': True,
             })
         elif not disable_faults and \
             stats.metrics_calls == 3 and fault_type == FAULT_RESEND_REGISTRATION_AT_3:
@@ -208,7 +208,7 @@ You can disable monitoring at any time by running db.disableFreeMonitoring()."""
                 'id': 'mock123',
                 'reportingInterval': bson.int64.Int64(1),
                 'message': 'Thanks for all the metrics',
-                'resendRegistration' : True,
+                'resendRegistration': True,
             })
         else:
             data = bson.BSON.encode({
@@ -250,6 +250,7 @@ You can disable monitoring at any time by running db.disableFreeMonitoring()."""
         disable_faults = False
         self._send_header()
 
+
 def run(port, server_class=http.server.HTTPServer, handler_class=FreeMonHandler):
     """Run web server."""
     server_address = ('', port)
@@ -284,7 +285,8 @@ def main():
 
     if args.fault:
         if args.fault not in SUPPORTED_FAULT_TYPES:
-            print("Unsupported fault type %s, supports types are %s" % (args.fault, SUPPORTED_FAULT_TYPES))
+            print("Unsupported fault type %s, supports types are %s" % (args.fault,
+                                                                        SUPPORTED_FAULT_TYPES))
             sys.exit(1)
 
         fault_type = args.fault

@@ -1,4 +1,4 @@
-mock; python_version < "3"
-PyKMIP == 0.4.0; python_version < "3" # It's now 0.8.0. We're far enough back to have API conflicts.
+mock
+PyKMIP == 0.4.0 # It's now 0.8.0. We're far enough back to have API conflicts.
 jinja2
 shrub.py == 0.2.0

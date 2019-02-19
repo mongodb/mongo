@@ -23,7 +23,6 @@ alter those programs' behavior.
 MongoDB module SConscript files can describe libraries, programs and unit tests, just as other
 MongoDB SConscript files do.
 """
-from __future__ import print_function
 
 __all__ = ('discover_modules', 'discover_module_directories', 'configure_modules',
            'register_module_test')  # pylint: disable=undefined-all-variable

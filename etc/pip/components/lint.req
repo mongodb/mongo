@@ -1,6 +1,6 @@
 # Linters
 # Note: These versions are checked by python modules in buildscripts/linter/
-pylint == 1.9.3
-yapf == 0.21.0
+pylint == 2.3.1
+yapf == 0.26.0
 pydocstyle == 2.1.1
 yamllint == 1.15.0

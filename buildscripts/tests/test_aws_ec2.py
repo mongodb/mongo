@@ -1,7 +1,5 @@
 """Unit test for buildscripts/aws_ec2.py."""
 
-from __future__ import absolute_import
-
 import datetime
 import unittest
 
@@ -23,8 +21,8 @@ class AwsEc2TestCase(unittest.TestCase):  # pylint: disable=too-many-instance-at
         self.security_groups = None
         self.expire_dt = datetime.datetime.utcnow() + datetime.timedelta(hours=1)
         self.tags = [{"Key": "expire-on", "Value": self.expire_dt.strftime("%Y-%m-%d %H:%M:%S")},
-                     {"Key": "Name",
-                      "Value": "Unittest AWS EC2 Launcher"}, {"Key": "owner", "Value": ""}]
+                     {"Key": "Name", "Value": "Unittest AWS EC2 Launcher"},
+                     {"Key": "owner", "Value": ""}]
 
     def tearDown(self):
         for instance in self.launched_instances:
@@ -129,7 +127,7 @@ class AwsEc2ControlStatus(AwsEc2TestCase):
 
         code, ret = self.aws_ec2.control_instance(mode="status", image_id="bad_id")
         self.assertNotEqual(0, code, ret)
-        self.assertRegexpMatches(ret, "Invalid", ret)
+        self.assertRegex(ret, "Invalid", ret)
 
 
 class AwsEc2ControlStart(AwsEc2TestCase):

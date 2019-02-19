@@ -31,8 +31,6 @@ BSON Type Information.
 Utilities for validating bson types, etc.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
-
 from typing import Dict, List
 
 # Dictionary of BSON type Information
@@ -100,7 +98,7 @@ def cpp_bson_type_name(name):
 def list_valid_types():
     # type: () -> List[unicode]
     """Return a list of supported bson types."""
-    return [a for a in _BSON_TYPE_INFORMATION.iterkeys()]
+    return [a for a in _BSON_TYPE_INFORMATION.keys()]
 
 
 def is_valid_bindata_subtype(name):

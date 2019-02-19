@@ -11,7 +11,7 @@ if not env.TargetOSIs('windows'):
 
 import re
 import subprocess
-import _winreg
+import winreg
 
 env = env.Clone()
 
@@ -40,12 +40,12 @@ if programfilesx86 is None:
     programfilesx86 = "C:\\Program Files (x86)"
 
 # Use vswhere (it has a fixed stable path) to query where Visual Studio is installed.
-vsinstall_path = subprocess.check_output([os.path.join(programfilesx86, "Microsoft Visual Studio", "Installer", "vswhere.exe"), "-version", "[15.0,16.0)", "-property", "installationPath", "-nologo"]).strip()
+vsinstall_path = subprocess.check_output([os.path.join(programfilesx86, "Microsoft Visual Studio", "Installer", "vswhere.exe"), "-version", "[15.0,16.0)", "-property", "installationPath", "-nologo"]).decode('utf-8').strip()
 
 # Check the registry key that has the runtime lib version
 try:
-    vsruntime_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64")
-    vslib_version,vslib_version_type = _winreg.QueryValueEx(vsruntime_key, "Version")
+    vsruntime_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64")
+    vslib_version,vslib_version_type = winreg.QueryValueEx(vsruntime_key, "Version")
 except WindowsError:
     print("Visual Studio Runtime not found in registry, disabling msi installer")
     Return()

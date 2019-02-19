@@ -38,8 +38,9 @@ def collect_cache_contents(cache_path):
             for file_name in os.listdir(path):
                 file_path = os.path.join(path, file_name)
                 if os.path.isdir(file_path):
-                    LOGGER.warning("cache item %s is a directory and not a file. "
-                                   "The cache may be corrupt.", file_path)
+                    LOGGER.warning(
+                        "cache item %s is a directory and not a file. "
+                        "The cache may be corrupt.", file_path)
                     continue
 
                 try:
@@ -113,9 +114,10 @@ def main():
     parser.add_argument("--cache-dir", "-d", default=None, help="path to the cache directory.")
     parser.add_argument("--cache-size", "-s", default=200, type=int,
                         help="maximum size of cache in GB.")
-    parser.add_argument("--prune-ratio", "-p", default=0.8, type=float,
-                        help=("ratio (as 1.0 > x > 0) of total cache size to prune "
-                              "to when cache exceeds quota."))
+    parser.add_argument(
+        "--prune-ratio", "-p", default=0.8, type=float,
+        help=("ratio (as 1.0 > x > 0) of total cache size to prune "
+              "to when cache exceeds quota."))
     parser.add_argument("--print-cache-dir", default=False, action="store_true")
 
     args = parser.parse_args()

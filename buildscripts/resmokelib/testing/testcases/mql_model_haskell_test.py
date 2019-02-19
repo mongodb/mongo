@@ -1,7 +1,5 @@
 """The unittest.TestCase for MQL Haskell tests."""
 
-from __future__ import absolute_import
-
 import os
 import os.path
 

@@ -1,7 +1,5 @@
 """Driver of the test execution framework."""
 
-from __future__ import absolute_import
-
 import threading
 import time
 
@@ -68,7 +66,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             jobs_to_start = self.num_tests
 
         # Must be done after getting buildlogger configuration.
-        self._jobs = [self._make_job(job_num) for job_num in xrange(jobs_to_start)]
+        self._jobs = [self._make_job(job_num) for job_num in range(jobs_to_start)]
 
     def run(self):
         """Execute the test suite.
@@ -130,8 +128,9 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 test_results_num = len(test_report["results"])
                 # There should be at least as many tests results as expected number of tests.
                 if test_results_num < self.num_tests:
-                    raise errors.ResmokeError("{} reported tests is less than {} expected tests"
-                                              .format(test_results_num, self.num_tests))
+                    raise errors.ResmokeError(
+                        "{} reported tests is less than {} expected tests".format(
+                            test_results_num, self.num_tests))
 
                 # Clear the report so it can be reused for the next execution.
                 for job in self._jobs:
@@ -157,8 +156,9 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         try:
             # Run each Job instance in its own thread.
             for job in self._jobs:
-                thr = threading.Thread(target=job, args=(test_queue, interrupt_flag), kwargs=dict(
-                    setup_flag=setup_flag, teardown_flag=teardown_flag))
+                thr = threading.Thread(
+                    target=job, args=(test_queue, interrupt_flag), kwargs=dict(
+                        setup_flag=setup_flag, teardown_flag=teardown_flag))
                 # Do not wait for tests to finish executing if interrupted by the user.
                 thr.daemon = True
                 thr.start()

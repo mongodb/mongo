@@ -1,5 +1,4 @@
 """GDB commands for MongoDB."""
-from __future__ import print_function
 
 import os
 import re
@@ -21,12 +20,6 @@ try:
 except Exception as e:
     print("Failed to load the libstdc++ pretty printers: " + str(e))
 # pylint: enable=invalid-name,wildcard-import
-
-if sys.version_info[0] >= 3:
-    # GDB only permits converting a gdb.Value instance to its numerical address when using the
-    # long() constructor in Python 2 and not when using the int() constructor. We define the
-    # 'long' class as an alias for the 'int' class in Python 3 for compatibility.
-    long = int  # pylint: disable=redefined-builtin,invalid-name
 
 
 def get_process_name():
@@ -104,7 +97,7 @@ def get_decorations(obj):
     decorable_t = decorable.type.template_argument(0)
     decinfo_t = gdb.lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
         str(decorable_t).replace("class", "").strip()))
-    count = long((long(finish) - long(start)) / decinfo_t.sizeof)
+    count = int((int(finish) - int(start)) / decinfo_t.sizeof)
 
     for i in range(count):
         descriptor = start[i]
@@ -480,7 +473,7 @@ class MongoDBUniqueStack(gdb.Command):
             """Return the first tid."""
             return stack['threads'][0]['gdb_thread_num']
 
-        for stack in sorted(stacks.values(), key=first_tid, reverse=True):
+        for stack in sorted(list(stacks.values()), key=first_tid, reverse=True):
             for i, thread in enumerate(stack['threads']):
                 prefix = '' if i == 0 else 'Duplicate '
                 print(prefix + thread['header'])
@@ -527,9 +520,10 @@ class MongoDBJavaScriptStack(gdb.Command):
                 if gdb.parse_and_eval(
                         'mongo::mozjs::kCurrentScope && mongo::mozjs::kCurrentScope->_inOp'):
                     gdb.execute('thread', from_tty=False, to_string=False)
-                    gdb.execute('printf "%s\\n", ' +
-                                'mongo::mozjs::kCurrentScope->buildStackString().c_str()',
-                                from_tty=False, to_string=False)
+                    gdb.execute(
+                        'printf "%s\\n", ' +
+                        'mongo::mozjs::kCurrentScope->buildStackString().c_str()', from_tty=False,
+                        to_string=False)
             except gdb.error as err:
                 print("Ignoring GDB error '%s' in javascript_stack" % str(err))
                 continue

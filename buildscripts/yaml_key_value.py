@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """Utility to return YAML value from key in YAML file."""
 
-from __future__ import print_function
-
 import optparse
 
 import yaml

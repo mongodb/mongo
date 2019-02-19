@@ -1,7 +1,5 @@
 """Module for retrieving the configuration of resmoke.py test suites."""
 
-from __future__ import absolute_import
-
 import collections
 import optparse
 import os
@@ -33,7 +31,7 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     """
 
     if test_kind is not None:
-        if isinstance(test_kind, basestring):
+        if isinstance(test_kind, str):
             test_kind = [test_kind]
 
         test_kind = frozenset(test_kind)
@@ -117,6 +115,6 @@ def _get_yaml_config(kind, pathname):
         pathname = resmokeconfig.NAMED_SUITES[pathname]  # Expand 'pathname' to full path.
 
     if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
-        raise optparse.OptionValueError("Expected a %s YAML config, but got '%s'" % (kind,
-                                                                                     pathname))
+        raise optparse.OptionValueError(
+            "Expected a %s YAML config, but got '%s'" % (kind, pathname))
     return utils.load_yaml_file(pathname)

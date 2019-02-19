@@ -398,7 +398,7 @@ class TestWriteJsonFile(unittest.TestCase):
     def test_write_json_file(self):
         my_data = {"key1": "val1", "key_list": ["l1", "l2"]}
         path = "myfile"
-        with patch("__builtin__.open") as mock_file,\
+        with patch("builtins.open") as mock_file,\
              patch("json.dump") as mock_json_dump:
             burn_in.write_json_file(my_data, path)
             mock_file.assert_called_once_with("myfile", "w")
@@ -813,71 +813,3 @@ class TestReport(unittest.TestCase):
 
     def test__is_patch_build_completed_no_builds(self):
         self.assertTrue(burn_in.Report._is_patch_build_completed([]))
-
-
-class TestMain(unittest.TestCase):
-    def test_main(self):
-        options = MagicMock()
-        options.log_level = "NOTSET"
-        options.evg_client_log_level = "NOTSET"
-        options.days = 30000
-        options.project = "myproject"
-        projects = Projects(PROJECT_PATCHES)
-        version_builds = VersionBuilds(VERSION_BUILDS)
-        build_tasks = BuildTasks(BUILD_TASKS_WITH_BURN_IN)
-        task_tests = TaskTests(TASKS_TESTS)
-        with patch("argparse.ArgumentParser.parse_args", return_value=options),\
-             patch(EVERGREEN + ".EvergreenApiV2.project_patches_gen", projects._project_patches_gen),\
-             patch(EVERGREEN + ".EvergreenApiV2.version_builds", version_builds._version_builds),\
-             patch(EVERGREEN + ".EvergreenApiV2.tasks_by_build_id", build_tasks._tasks_by_build_id),\
-             patch(EVERGREEN + ".EvergreenApiV2.tests_by_task", task_tests._tests_by_task),\
-             patch(BURN_IN + ".write_json_file") as mock_write_json:
-            burn_in.main()
-            report = mock_write_json.call_args_list[0][0][0]
-            self.assertEqual(len(burn_in.REPORT_FIELDS) + 1, len(report))
-            for field in burn_in.REPORT_FIELDS:
-                self.assertIn(field, report)
-            self.assertEqual(17, report["tasks"])
-            self.assertEqual(12, report["tasks_succeeded"])
-            self.assertEqual(5, report["tasks_failed"])
-            self.assertEqual(3, report["tasks_failed_burn_in"])
-            self.assertEqual(2, report["tasks_failed_only_burn_in"])
-            self.assertEqual(6, report["burn_in_generated_tasks"])
-            self.assertEqual(4, report["patch_builds_with_burn_in_task"])
-            self.assertEqual(5, report["burn_in_tests"])
-            self.assertEqual(2, report[burn_in.BURN_IN_TASKS_EXCEED])
-            self.assertEqual("2019-01-01T00:00:00.000Z", report["report_start_time"])
-            self.assertEqual("2019-04-01T00:00:00.000Z", report["report_end_time"])
-
-    def test_main_nodata(self):
-        options = MagicMock()
-        options.log_level = "NOTSET"
-        options.evg_client_log_level = "NOTSET"
-        options.days = 30000
-        options.project = "myproject"
-        projects = Projects(PROJECT_PATCHES)
-        version_builds = VersionBuilds([])
-        build_tasks = BuildTasks([])
-        task_tests = TaskTests([])
-        with patch("argparse.ArgumentParser.parse_args", return_value=options),\
-             patch(EVERGREEN + ".EvergreenApiV2.project_patches_gen", projects._project_patches_gen),\
-             patch(EVERGREEN + ".EvergreenApiV2.version_builds", version_builds._version_builds),\
-             patch(EVERGREEN + ".EvergreenApiV2.tasks_by_build_id", build_tasks._tasks_by_build_id),\
-             patch(EVERGREEN + ".EvergreenApiV2.tests_by_task", task_tests._tests_by_task),\
-             patch(BURN_IN + ".write_json_file") as mock_write_json:
-            burn_in.main()
-            report = mock_write_json.call_args_list[0][0][0]
-            self.assertEqual(len(burn_in.REPORT_FIELDS) + 1, len(report))
-            for field in burn_in.REPORT_FIELDS:
-                self.assertIn(field, report)
-            self.assertEqual(0, report["tasks"])
-            self.assertEqual(0, report["tasks_succeeded"])
-            self.assertEqual(0, report["tasks_failed"])
-            self.assertEqual(0, report["tasks_failed_burn_in"])
-            self.assertEqual(0, report["tasks_failed_only_burn_in"])
-            self.assertEqual(0, report["burn_in_generated_tasks"])
-            self.assertEqual(0, report["patch_builds_with_burn_in_task"])
-            self.assertEqual(0, report["burn_in_tests"])
-            self.assertEqual(0, report[burn_in.BURN_IN_TASKS_EXCEED])
-            self.assertIsNone(report["report_start_time"])
-            self.assertIsNone(report["report_end_time"])

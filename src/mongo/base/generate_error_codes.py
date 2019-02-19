@@ -26,7 +26,6 @@
 # delete this exception statement from your version. If you delete this
 # exception statement from all source files in the program, then also delete
 # it in the license file.
-
 """Generate error_codes.{h,cpp} from error_codes.err.
 
 Format of error_codes.err:
@@ -46,20 +45,17 @@ from collections import namedtuple
 from Cheetah.Template import Template
 import sys
 
+
 def render_template(template_path, **kw):
     '''Renders the template file located at template_path, using the variables defined by kw, and
        returns the result as a string'''
 
     template = Template.compile(
-            file=template_path,
-            compilerSettings=dict(
-                directiveStartToken="//#",
-                directiveEndToken="//#",
-                commentStartToken="//##"
-            ),
-            baseclass=dict,
-            useCache=False)
+        file=template_path,
+        compilerSettings=dict(directiveStartToken="//#", directiveEndToken="//#",
+                              commentStartToken="//##"), baseclass=dict, useCache=False)
     return str(template(**kw))
+
 
 class ErrorCode:
     def __init__(self, name, code, extra=None):
@@ -69,11 +65,11 @@ class ErrorCode:
         if extra:
             split = extra.split('::')
             if not split[0]:
-                die("Error for %s with extra info %s: fully qualified namespaces aren't supported"
-                    % (name, extra))
+                die("Error for %s with extra info %s: fully qualified namespaces aren't supported" %
+                    (name, extra))
             if split[0] == "mongo":
-                die("Error for %s with extra info %s: don't include the mongo namespace"
-                    % (name, extra))
+                die("Error for %s with extra info %s: don't include the mongo namespace" % (name,
+                                                                                            extra))
             if len(split) > 1:
                 self.extra_class = split.pop()
                 self.extra_ns = "::".join(split)
@@ -82,10 +78,12 @@ class ErrorCode:
                 self.extra_ns = None
         self.categories = []
 
+
 class ErrorClass:
     def __init__(self, name, codes):
         self.name = name
         self.codes = codes
+
 
 def main(argv):
     # Parse and validate argv.
@@ -113,7 +111,7 @@ def main(argv):
                 categories=error_classes,
                 )
 
-        with open(output, 'wb') as outfile:
+        with open(output, 'w') as outfile:
             outfile.write(text)
 
 def die(message=None):
@@ -145,6 +143,7 @@ def check_for_conflicts(error_codes, error_classes):
     if failed:
         die()
 
+
 def has_duplicate_error_codes(error_codes):
     sorted_by_name = sorted(error_codes, key=lambda x: x.name)
     sorted_by_code = sorted(error_codes, key=lambda x: x.code)
@@ -153,20 +152,21 @@ def has_duplicate_error_codes(error_codes):
     prev = sorted_by_name[0]
     for curr in sorted_by_name[1:]:
         if curr.name == prev.name:
-            sys.stdout.write('Duplicate name %s with codes %s and %s\n'
-                    % (curr.name, curr.code, prev.code))
+            sys.stdout.write(
+                'Duplicate name %s with codes %s and %s\n' % (curr.name, curr.code, prev.code))
             failed = True
         prev = curr
 
     prev = sorted_by_code[0]
     for curr in sorted_by_code[1:]:
         if curr.code == prev.code:
-            sys.stdout.write('Duplicate code %s with names %s and %s\n'
-                    % (curr.code, curr.name, prev.name))
+            sys.stdout.write(
+                'Duplicate code %s with names %s and %s\n' % (curr.code, curr.name, prev.name))
             failed = True
         prev = curr
 
     return failed
+
 
 def has_duplicate_error_classes(error_classes):
     names = sorted(ec.name for ec in error_classes)
@@ -180,6 +180,7 @@ def has_duplicate_error_classes(error_classes):
         prev_name = name
     return failed
 
+
 def has_missing_error_codes(error_codes, error_classes):
     code_names = dict((ec.name, ec) for ec in error_codes)
     failed = False
@@ -192,6 +193,7 @@ def has_missing_error_codes(error_codes, error_classes):
                 failed = True
 
     return failed
+
 
 if __name__ == '__main__':
     main(sys.argv)
