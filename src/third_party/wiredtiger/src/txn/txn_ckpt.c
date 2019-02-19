@@ -1442,12 +1442,11 @@ __checkpoint_lock_dirty_tree(WT_SESSION_IMPL *session,
 		}
 
 	/*
-	 * There are special tree: those being bulk-loaded, salvaged, upgraded
+	 * There are special trees: those being bulk-loaded, salvaged, upgraded
 	 * or verified during the checkpoint. They should never be part of a
 	 * checkpoint: we will fail to lock them because the operations have
 	 * exclusive access to the handles. Named checkpoints will fail in that
-	 * case, ordinary checkpoints will skip files that cannot be opened
-	 * normally.
+	 * case, ordinary checkpoints skip files that cannot be opened normally.
 	 */
 	WT_ASSERT(session,
 	    !is_checkpoint || !F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS));
@@ -1537,6 +1536,39 @@ __checkpoint_mark_skip(
 }
 
 /*
+ * __wt_checkpoint_tree_reconcile_update --
+ *	Update a checkpoint based on reconciliation's results.
+ */
+void
+__wt_checkpoint_tree_reconcile_update(
+    WT_SESSION_IMPL *session, wt_timestamp_t oldest_start_ts,
+    wt_timestamp_t newest_start_ts, wt_timestamp_t newest_stop_ts)
+{
+	WT_BTREE *btree;
+	WT_CKPT *ckpt, *ckptbase;
+
+	btree = S2BT(session);
+
+	__wt_timestamp_addr_check(session,
+	    oldest_start_ts, newest_start_ts, newest_stop_ts);
+
+	/*
+	 * Reconciliation just wrote a checkpoint, everything has been written.
+	 * Update the checkpoint with reconciliation's information. The reason
+	 * for this function is the reconciliation code just passes through the
+	 * btree structure's checkpoint array, it doesn't know any more.
+	 */
+	ckptbase = btree->ckpt;
+	WT_CKPT_FOREACH(ckptbase, ckpt)
+		if (F_ISSET(ckpt, WT_CKPT_ADD)) {
+			ckpt->write_gen = btree->write_gen;
+			ckpt->oldest_start_ts = oldest_start_ts;
+			ckpt->newest_start_ts = newest_start_ts;
+			ckpt->newest_stop_ts = newest_stop_ts;
+		}
+}
+
+/*
  * __checkpoint_tree --
  *	Checkpoint a single tree.
  *	Assumes all necessary locks have been acquired by the caller.
@@ -1547,7 +1579,6 @@ __checkpoint_tree(
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
-	WT_CKPT *ckpt, *ckptbase;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -1558,7 +1589,6 @@ __checkpoint_tree(
 
 	btree = S2BT(session);
 	bm = btree->bm;
-	ckptbase = btree->ckpt;
 	conn = S2C(session);
 	dhandle = session->dhandle;
 	fake_ckpt = resolve_bm = false;
@@ -1585,11 +1615,13 @@ __checkpoint_tree(
 	 * same name you would have to use the bulk-load's fake checkpoint to
 	 * delete a physical checkpoint, and that will end in tears.
 	 */
-	if (is_checkpoint)
-		if (btree->original) {
-			fake_ckpt = true;
-			goto fake;
-		}
+	if (is_checkpoint && btree->original) {
+		__wt_checkpoint_tree_reconcile_update(
+		    session, WT_TS_NONE, WT_TS_NONE, WT_TS_MAX);
+
+		fake_ckpt = true;
+		goto fake;
+	}
 
 	/*
 	 * Mark the root page dirty to ensure something gets written. (If the
@@ -1631,17 +1663,9 @@ __checkpoint_tree(
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
-		WT_ERR(__wt_cache_op(session, WT_SYNC_CHECKPOINT));
+		WT_ERR(__wt_sync_file(session, WT_SYNC_CHECKPOINT));
 	else
-		WT_ERR(__wt_cache_op(session, WT_SYNC_CLOSE));
-
-	/*
-	 * All blocks being written have been written; set the object's write
-	 * generation.
-	 */
-	WT_CKPT_FOREACH(ckptbase, ckpt)
-		if (F_ISSET(ckpt, WT_CKPT_ADD))
-			ckpt->write_gen = btree->write_gen;
+		WT_ERR(__wt_evict_file(session, WT_SYNC_CLOSE));
 
 fake:	/*
 	 * If we're faking a checkpoint and logging is enabled, recovery should
@@ -1670,7 +1694,7 @@ fake:	/*
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
 
 	WT_ERR(__wt_meta_ckptlist_set(
-	    session, dhandle->name, ckptbase, &ckptlsn));
+	    session, dhandle->name, btree->ckpt, &ckptlsn));
 
 	/*
 	 * If we wrote a checkpoint (rather than faking one), we have to resolve
@@ -1855,7 +1879,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	 * validate exit accounting.
 	 */
 	if (final && !WT_IS_METADATA(session->dhandle))
-		return (__wt_cache_op(session, WT_SYNC_DISCARD));
+		return (__wt_evict_file(session, WT_SYNC_DISCARD));
 
 	/*
 	 * If closing an unmodified file, check that no update is required
@@ -1866,7 +1890,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 		    session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 		return (__wt_txn_visible_all(session, btree->rec_max_txn,
 		    btree->rec_max_timestamp) ?
-		    __wt_cache_op(session, WT_SYNC_DISCARD) : EBUSY);
+		    __wt_evict_file(session, WT_SYNC_DISCARD) : EBUSY);
 	}
 
 	/*

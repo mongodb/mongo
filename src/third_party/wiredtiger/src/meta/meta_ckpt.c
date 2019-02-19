@@ -314,6 +314,7 @@ __ckpt_load(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_CKPT *ckpt)
 {
 	WT_CONFIG_ITEM a;
+	WT_DECL_RET;
 	char timebuf[64];
 
 	/*
@@ -343,16 +344,27 @@ __ckpt_load(WT_SESSION_IMPL *session,
 		goto format;
 
 	WT_RET(__wt_config_subgets(session, v, "size", &a));
-	ckpt->ckpt_size = (uint64_t)a.val;
+	ckpt->size = (uint64_t)a.val;
+
+	/* Default to durability. */
+	ret = __wt_config_subgets(session, v, "oldest_start_ts", &a);
+	WT_RET_NOTFOUND_OK(ret);
+	ckpt->oldest_start_ts =
+	    ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
+	ret = __wt_config_subgets(session, v, "newest_start_ts", &a);
+	WT_RET_NOTFOUND_OK(ret);
+	ckpt->newest_start_ts =
+	    ret == WT_NOTFOUND || a.len == 0 ? WT_TS_NONE : (uint64_t)a.val;
+	ret = __wt_config_subgets(session, v, "newest_stop_ts", &a);
+	WT_RET_NOTFOUND_OK(ret);
+	ckpt->newest_stop_ts =
+	    ret == WT_NOTFOUND || a.len == 0 ? WT_TS_MAX : (uint64_t)a.val;
+	__wt_timestamp_addr_check(session,
+	    ckpt->oldest_start_ts, ckpt->newest_start_ts, ckpt->newest_stop_ts);
 
 	WT_RET(__wt_config_subgets(session, v, "write_gen", &a));
 	if (a.len == 0)
 		goto format;
-	/*
-	 * The largest value a WT_CONFIG_ITEM can handle is signed: this value
-	 * appears on disk and I don't want to sign it there, so I'm casting it
-	 * here instead.
-	 */
 	ckpt->write_gen = (uint64_t)a.val;
 
 	return (0);
@@ -427,25 +439,37 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 			__wt_seconds(session, &secs);
 			ckpt->sec = (uintmax_t)secs;
 		}
+
+		__wt_timestamp_addr_check(session, ckpt->oldest_start_ts,
+		    ckpt->newest_start_ts, ckpt->newest_stop_ts);
+
+		WT_ERR(__wt_buf_catfmt(session, buf, "%s%s", sep, ckpt->name));
+		sep = ",";
+
 		if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s.%" PRId64 "=(addr=\"%.*s\",order=%" PRId64
-			    ",time=%" PRIuMAX ",size=%" PRIu64
-			    ",write_gen=%" PRIu64 ")",
-			    sep, ckpt->name, ckpt->order,
-			    (int)ckpt->addr.size, (char *)ckpt->addr.data,
-			    ckpt->order, ckpt->sec, ckpt->ckpt_size,
-			    ckpt->write_gen));
-		else
-			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%.*s\",order=%" PRId64
-			    ",time=%" PRIuMAX ",size=%" PRIu64
-			    ",write_gen=%" PRIu64 ")",
-			    sep, ckpt->name,
-			    (int)ckpt->addr.size, (char *)ckpt->addr.data,
-			    ckpt->order, ckpt->sec, ckpt->ckpt_size,
-			    ckpt->write_gen));
-		sep = ",";
+			    ".%" PRId64, ckpt->order));
+
+		/*
+		 * Use PRId64 formats: WiredTiger's configuration code handles
+		 * signed 8B values.
+		 */
+		WT_ERR(__wt_buf_catfmt(session, buf,
+		    "=(addr=\"%.*s\",order=%" PRId64
+		    ",time=%" PRId64
+		    ",size=%" PRId64
+		    ",oldest_start_ts=%" PRId64
+		    ",newest_start_ts=%" PRId64
+		    ",newest_stop_ts=%" PRId64
+		    ",write_gen=%" PRId64 ")",
+		    (int)ckpt->addr.size, (char *)ckpt->addr.data,
+		    ckpt->order,
+		    (int64_t)ckpt->sec,
+		    (int64_t)ckpt->size,
+		    (int64_t)ckpt->oldest_start_ts,
+		    (int64_t)ckpt->newest_start_ts,
+		    (int64_t)ckpt->newest_stop_ts,
+		    (int64_t)ckpt->write_gen));
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));
 	if (ckptlsn != NULL)

@@ -219,7 +219,7 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 		t = (time_t)ckpt->sec;
 		printf("\t%*s: %.24s", (int)len, ckpt->name, ctime(&t));
 
-		v = ckpt->ckpt_size;
+		v = ckpt->size;
 		if (v >= WT_PETABYTE)
 			printf(" (%" PRIu64 " PB)\n", v / WT_PETABYTE);
 		else if (v >= WT_TERABYTE)

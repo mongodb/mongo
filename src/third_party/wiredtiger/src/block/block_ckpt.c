@@ -660,7 +660,7 @@ live_update:
 			 * cookie into its components, and that's a fair amount
 			 * of work.
 			 */
-			ckpt->ckpt_size = ckpt_size;
+			ckpt->size = ckpt_size;
 
 			/*
 			 * Set the rolling checkpoint size for the live system.

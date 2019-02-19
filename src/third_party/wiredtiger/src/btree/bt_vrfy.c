@@ -231,19 +231,18 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 			__wt_evict_file_exclusive_off(session);
 
 			/*
-			 * XXX
-			 * Fake the timestamp range until the checkpoint
-			 * includes it.
+			 * Create a fake, unpacked parent cell for the tree
+			 * based on the checkpoint information.
 			 */
 			memset(&addr_unpack, 0, sizeof(addr_unpack));
-			addr_unpack.oldest_start_ts = WT_TS_NONE;
-			addr_unpack.newest_start_ts =
-			    addr_unpack.newest_stop_ts = WT_TS_MAX;
+			addr_unpack.oldest_start_ts = ckpt->oldest_start_ts;
+			addr_unpack.newest_start_ts = ckpt->newest_start_ts;
+			addr_unpack.newest_stop_ts = ckpt->newest_stop_ts;
 			addr_unpack.raw = WT_CELL_ADDR_INT;
 
 			/* Verify the tree. */
 			WT_WITH_PAGE_INDEX(session, ret = __verify_tree(
-				session, &btree->root, &addr_unpack, vs));
+			    session, &btree->root, &addr_unpack, vs));
 
 			/*
 			 * We have an exclusive lock on the handle, but we're
@@ -257,7 +256,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 			 * lock at the top of the loop and re-acquire it here.
 			 */
 			WT_TRET(__wt_evict_file_exclusive_on(session));
-			WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
+			WT_TRET(__wt_evict_file(session, WT_SYNC_DISCARD));
 		}
 
 		/* Unload the checkpoint. */

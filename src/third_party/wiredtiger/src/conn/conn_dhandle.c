@@ -348,7 +348,7 @@ __wt_conn_dhandle_close(
 	 * so discard mapped files before closing, otherwise, close first.
 	 */
 	if (discard && is_mapped)
-		WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
+		WT_TRET(__wt_evict_file(session, WT_SYNC_DISCARD));
 
 	/* Close the underlying handle. */
 	switch (dhandle->type) {
@@ -382,7 +382,7 @@ __wt_conn_dhandle_close(
 	 * pages.
 	 */
 	if (discard && !is_mapped)
-		WT_TRET(__wt_cache_op(session, WT_SYNC_DISCARD));
+		WT_TRET(__wt_evict_file(session, WT_SYNC_DISCARD));
 
 	/*
 	 * If we marked a handle dead it will be closed by sweep, via another

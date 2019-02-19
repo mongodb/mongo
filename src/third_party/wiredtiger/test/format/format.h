@@ -28,6 +28,8 @@
 
 #include "test_util.h"
 
+#include <signal.h>
+
 #ifdef BDB
 /*
  * Berkeley DB has an #ifdef we need to provide a value for, we'll see an

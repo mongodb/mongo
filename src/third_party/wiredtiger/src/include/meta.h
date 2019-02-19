@@ -63,26 +63,30 @@
 	for ((ckpt) = (ckptbase); (ckpt)->name != NULL; ++(ckpt))
 
 struct __wt_ckpt {
-	char	*name;				/* Name or NULL */
+	char	*name;			/* Name or NULL */
 
-	WT_ITEM  addr;				/* Checkpoint cookie string */
-	WT_ITEM  raw;				/* Checkpoint cookie raw */
+	WT_ITEM  addr;			/* Checkpoint cookie string */
+	WT_ITEM  raw;			/* Checkpoint cookie raw */
 
-	int64_t	 order;				/* Checkpoint order */
+	int64_t	 order;			/* Checkpoint order */
 
-	uintmax_t sec;				/* Timestamp */
+	uintmax_t sec;			/* Wall clock time */
 
-	uint64_t ckpt_size;			/* Checkpoint size */
+	uint64_t size;			/* Checkpoint size */
 
-	uint64_t write_gen;			/* Write generation */
+	uint64_t write_gen;		/* Write generation */
 
-	void	*bpriv;				/* Block manager private */
+	wt_timestamp_t oldest_start_ts;	/* Aggregated timestamp information */
+	wt_timestamp_t newest_start_ts;
+	wt_timestamp_t newest_stop_ts;
+
+	void	*bpriv;			/* Block manager private */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_CKPT_ADD	0x1u			/* Checkpoint to be added */
-#define	WT_CKPT_DELETE	0x2u			/* Checkpoint to be deleted */
-#define	WT_CKPT_FAKE	0x4u			/* Checkpoint is a fake */
-#define	WT_CKPT_UPDATE	0x8u			/* Checkpoint requires update */
+#define	WT_CKPT_ADD	0x1u		/* Checkpoint to be added */
+#define	WT_CKPT_DELETE	0x2u		/* Checkpoint to be deleted */
+#define	WT_CKPT_FAKE	0x4u		/* Checkpoint is a fake */
+#define	WT_CKPT_UPDATE	0x8u		/* Checkpoint requires update */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };

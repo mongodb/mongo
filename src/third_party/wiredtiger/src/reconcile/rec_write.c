@@ -5687,11 +5687,18 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_STAT_CONN_INCR(session, rec_page_delete);
 		WT_STAT_DATA_INCR(session, rec_page_delete);
 
-		/* If this is the root page, we need to create a sync point. */
+		/*
+		 * If this is the root page, we need to create a sync point.
+		 * For a page to be empty, it has to contain nothing at all,
+		 * which means it has no records of any kind and is durable.
+		 */
 		ref = r->ref;
-		if (__wt_ref_is_root(ref))
+		if (__wt_ref_is_root(ref)) {
 			WT_RET(bm->checkpoint(
 			    bm, session, NULL, btree->ckpt, false));
+			__wt_checkpoint_tree_reconcile_update(
+			    session, WT_TS_NONE, WT_TS_NONE, WT_TS_MAX);
+		}
 
 		/*
 		 * If the page was empty, we want to discard it from the tree
@@ -5731,11 +5738,16 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			mod->mod_disk_image = r->multi->disk_image;
 			r->multi->disk_image = NULL;
 			mod->mod_page_las = r->multi->page_las;
-		} else
+		} else {
 			WT_RET(__wt_bt_write(session, r->wrapup_checkpoint,
 			    NULL, NULL, NULL,
 			    true, F_ISSET(r, WT_REC_CHECKPOINT),
 			    r->wrapup_checkpoint_compressed));
+			__wt_checkpoint_tree_reconcile_update(session,
+			    r->multi->addr.oldest_start_ts,
+			    r->multi->addr.newest_start_ts,
+			    r->multi->addr.newest_stop_ts);
+		}
 
 		mod->rec_result = WT_PM_REC_REPLACE;
 		break;
