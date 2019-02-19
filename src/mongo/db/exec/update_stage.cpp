@@ -103,24 +103,24 @@ void addObjectIDIdField(mb::Document* doc) {
 }
 
 /**
- * Uasserts if any of the paths in 'immutablePaths' are not present in 'document', or if they are
+ * Uasserts if any of the paths in 'requiredPaths' are not present in 'document', or if they are
  * arrays or array descendants.
  */
-void checkImmutablePathsPresent(const mb::Document& document, const FieldRefSet& immutablePaths) {
-    for (auto path = immutablePaths.begin(); path != immutablePaths.end(); ++path) {
+void assertRequiredPathsPresent(const mb::Document& document, const FieldRefSet& requiredPaths) {
+    for (const auto& path : requiredPaths) {
         auto elem = document.root();
-        for (size_t i = 0; i < (*path)->numParts(); ++i) {
-            elem = elem[(*path)->getPart(i)];
+        for (size_t i = 0; i < (*path).numParts(); ++i) {
+            elem = elem[(*path).getPart(i)];
             uassert(ErrorCodes::NoSuchKey,
                     str::stream() << "After applying the update, the new document was missing the "
                                      "required field '"
-                                  << (*path)->dottedField()
+                                  << (*path).dottedField()
                                   << "'",
                     elem.ok());
             uassert(
                 ErrorCodes::NotSingleValueField,
                 str::stream() << "After applying the update to the document, the required field '"
-                              << (*path)->dottedField()
+                              << (*path).dottedField()
                               << "' was found to be an array or array descendant.",
                 elem.getType() != BSONType::Array);
         }
@@ -138,17 +138,6 @@ bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
     // should automatically retry if it gets a WCE.
     return params.request->shouldReturnAnyDocs() && !params.request->getSort().isEmpty();
 };
-
-const std::vector<std::unique_ptr<FieldRef>>* getImmutableFields(OperationContext* opCtx,
-                                                                 const NamespaceString& ns) {
-    auto metadata = CollectionShardingState::get(opCtx, ns)->getCurrentMetadata();
-    if (metadata->isSharded()) {
-        const std::vector<std::unique_ptr<FieldRef>>& fields = metadata->getKeyPatternFields();
-        // Return shard-keys as immutable for the update system.
-        return &fields;
-    }
-    return NULL;
-}
 
 CollectionUpdateArgs::StoreDocOption getStoreDocMode(const UpdateRequest& updateRequest) {
     if (updateRequest.shouldReturnNewDocs()) {
@@ -224,11 +213,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     const bool isInsert = false;
     FieldRefSet immutablePaths;
     if (getOpCtx()->writesAreReplicated() && !request->isFromMigration()) {
-        auto immutablePathsVector = getImmutableFields(getOpCtx(), request->getNamespaceString());
-        if (immutablePathsVector) {
-            immutablePaths.fillFrom(
-                transitional_tools_do_not_use::unspool_vector(*immutablePathsVector));
-        }
         immutablePaths.keepShortest(&idFieldRef);
     }
     if (!driver->needMatchDetails()) {
@@ -328,7 +312,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
                 if (isFCV42 && metadata->isSharded()) {
-                    assertDocStillBelongsToNode(metadata, oldObj);
+                    assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(metadata, oldObj);
                 }
 
                 WriteUnitOfWork wunit(getOpCtx());
@@ -351,7 +335,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     newObj.objsize() <= BSONObjMaxUserSize);
 
             if (isFCV42 && metadata->isSharded()) {
-                assertDocStillBelongsToNode(metadata, oldObj);
+                assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(metadata, oldObj);
             }
 
             if (!request->isExplain()) {
@@ -367,7 +351,6 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 wunit.commit();
             }
         }
-
 
         // If the document moved, we might see it again in a collection scan (maybe it's
         // a document after our current document).
@@ -407,17 +390,20 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     driver->setLogOp(false);
 
     FieldRefSet immutablePaths;
-    if (!isInternalRequest) {
-        auto immutablePathsVector = getImmutableFields(opCtx, ns);
-        if (immutablePathsVector) {
-            immutablePaths.fillFrom(
-                transitional_tools_do_not_use::unspool_vector(*immutablePathsVector));
-        }
-    }
     immutablePaths.keepShortest(&idFieldRef);
 
+    auto* const css = CollectionShardingState::get(opCtx, ns);
+    auto metadata = css->getCurrentMetadata();
+
     if (cq) {
-        uassertStatusOK(driver->populateDocumentWithQueryFields(*cq, immutablePaths, *doc));
+        FieldRefSet requiredPaths;
+        if (metadata->isSharded()) {
+            const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
+            requiredPaths.fillFrom(
+                transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
+        }
+        requiredPaths.keepShortest(&idFieldRef);
+        uassertStatusOK(driver->populateDocumentWithQueryFields(*cq, requiredPaths, *doc));
         if (driver->isDocReplacement())
             stats->fastmodinsert = true;
     } else {
@@ -448,13 +434,20 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     }
 
     // Validate that the object replacement or modifiers resulted in a document
-    // that contains all the immutable keys and can be stored if it isn't coming
+    // that contains all the required keys and can be stored if it isn't coming
     // from a migration or via replication.
     if (!isInternalRequest) {
         if (enforceOkForStorage) {
             storage_validation::storageValid(*doc);
         }
-        checkImmutablePathsPresent(*doc, immutablePaths);
+        FieldRefSet requiredPaths;
+        if (metadata->isSharded()) {
+            const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
+            requiredPaths.fillFrom(
+                transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
+        }
+        requiredPaths.keepShortest(&idFieldRef);
+        assertRequiredPathsPresent(*doc, requiredPaths);
     }
 
     BSONObj newObj = doc->getObject();
@@ -883,16 +876,24 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     return NEED_YIELD;
 }
 
-void UpdateStage::assertDocStillBelongsToNode(ScopedCollectionMetadata metadata,
-                                              const Snapshotted<BSONObj>& oldObj) {
+void UpdateStage::assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
+    ScopedCollectionMetadata metadata, const Snapshotted<BSONObj>& oldObj) {
+    auto newObj = _doc.getObject();
     auto oldShardKey = metadata->extractDocumentKey(oldObj.value());
-    auto newShardKey = metadata->extractDocumentKey(_doc.getObject());
+    auto newShardKey = metadata->extractDocumentKey(newObj);
 
-    // If this document is an orphan and so does not belong to this shard or if the shard key fields
-    // remain unchanged by this update, we can skip the rest of the checks.
-    if (!metadata->keyBelongsToMe(oldShardKey) || (newShardKey.woCompare(oldShardKey) == 0)) {
+    // If the shard key fields remain unchanged by this update or if this document is an orphan and
+    // so does not belong to this shard, we can skip the rest of the checks.
+    if ((newShardKey.woCompare(oldShardKey) == 0) || !metadata->keyBelongsToMe(oldShardKey)) {
         return;
     }
+
+    // Assert that the updated doc has all shard key fields and none are arrays or array
+    // descendants.
+    FieldRefSet shardKeyPaths;
+    const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
+    shardKeyPaths.fillFrom(transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
+    assertRequiredPathsPresent(_doc, shardKeyPaths);
 
     // We do not allow updates to the shard key when 'multi' is true.
     uassert(ErrorCodes::InvalidOptions,
@@ -909,12 +910,9 @@ void UpdateStage::assertDocStillBelongsToNode(ScopedCollectionMetadata metadata,
             txnParticipant);
 
     if (!metadata->keyBelongsToMe(newShardKey)) {
-        // If this update is in a multi-stmt txn, attach the post image to the error. Otherwise,
-        // attach the original update field.
         boost::optional<BSONObj> originalQuery{txnParticipant.inMultiDocumentTransaction(),
                                                _params.request->getQuery()};
-        boost::optional<BSONObj> postImg{txnParticipant.inMultiDocumentTransaction(),
-                                         _doc.getObject()};
+        boost::optional<BSONObj> postImg{txnParticipant.inMultiDocumentTransaction(), newObj};
 
         uasserted(WouldChangeOwningShardInfo(originalQuery, postImg),
                   str::stream() << "This update would cause the doc to change owning shards");
