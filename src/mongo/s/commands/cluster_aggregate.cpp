@@ -930,6 +930,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const AggregationRequest& request,
                                       BSONObj cmdObj,
                                       BSONObjBuilder* result) {
+    uassert(51089,
+            str::stream() << "Internal parameter(s) [" << AggregationRequest::kNeedsMergeName
+                          << ", "
+                          << AggregationRequest::kFromMongosName
+                          << ", "
+                          << AggregationRequest::kMergeByPBRTName
+                          << "] cannot be set to 'true' when sent to mongos",
+            !request.needsMerge() && !request.isFromMongos() && !request.mergeByPBRT());
     auto executionNsRoutingInfoStatus = getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
     boost::optional<CachedCollectionRoutingInfo> routingInfo;
     LiteParsedPipeline litePipe(request);

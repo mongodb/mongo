@@ -59,12 +59,12 @@ class ClusterAggregateTest : public CatalogCacheTestFixture {
 protected:
     const BSONObj kAggregateCmdTargeted{
         fromjson("{aggregate: 'coll', pipeline: [{$match: {_id: 0}}], explain: false, "
-                 "allowDiskUse: false, fromMongos: true, "
-                 "cursor: {batchSize: 10}, maxTimeMS: 100, readConcern: {level: 'snapshot'}}")};
+                 "allowDiskUse: false, cursor: {batchSize: 10}, maxTimeMS: 100, readConcern: "
+                 "{level: 'snapshot'}}")};
 
-    const BSONObj kAggregateCmdScatterGather{fromjson(
-        "{aggregate: 'coll', pipeline: [], explain: false, allowDiskUse: false, fromMongos: true, "
-        "cursor: {batchSize: 10}, readConcern: {level: 'snapshot'}}")};
+    const BSONObj kAggregateCmdScatterGather{
+        fromjson("{aggregate: 'coll', pipeline: [], explain: false, allowDiskUse: false, cursor: "
+                 "{batchSize: 10}, readConcern: {level: 'snapshot'}}")};
 
     void setUp() {
         CatalogCacheTestFixture::setUp();
@@ -188,6 +188,27 @@ protected:
 
         future.timed_get(kFutureTimeout);
     }
+
+    /**
+     * This method should only be used to test early exits from Cluster::runAggregate, before
+     * a request is sent to the shards. Otherwise the call would get blocked as no expect* hooks
+     * are provided in this method.
+     */
+    Status testRunAggregateEarlyExit(const BSONObj& inputBson) {
+        BSONObjBuilder result;
+        NamespaceString nss{"a.collection"};
+        auto client = getServiceContext()->makeClient("ClusterCmdClient");
+        auto opCtx = client->makeOperationContext();
+        auto request = AggregationRequest::parseFromBSON(nss, inputBson);
+        if (request.getStatus() != Status::OK()) {
+            return request.getStatus();
+        }
+        return ClusterAggregate::runAggregate(opCtx.get(),
+                                              ClusterAggregate::Namespaces{nss, nss},
+                                              request.getValue(),
+                                              inputBson,
+                                              &result);
+    }
 };
 
 TEST_F(ClusterAggregateTest, NoErrors) {
@@ -240,6 +261,28 @@ TEST_F(ClusterAggregateTest, MaxRetriesSnapshotErrors) {
     // Target all shards
     runAggCommandMaxErrors(kAggregateCmdScatterGather, ErrorCodes::SnapshotUnavailable, false);
     runAggCommandMaxErrors(kAggregateCmdScatterGather, ErrorCodes::SnapshotTooOld, false);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenFromMongosIsTrue) {
+    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}, fromMongos: true}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson).ignore(), AssertionException, 51089);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsFalse) {
+    const BSONObj inputBson =
+        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMongos: false}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson).ignore(), AssertionException, 51089);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsTrue) {
+    const BSONObj inputBson =
+        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMongos: true}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson).ignore(), AssertionException, 51089);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenMergeByPBRTIsTrue) {
+    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}, mergeByPBRT: true}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson).ignore(), AssertionException, 51089);
 }
 
 }  // namespace

@@ -13,6 +13,7 @@ selector:
   - jstests/sharding/database_versioning_upgrade_downgrade.js
   - jstests/sharding/shard_collection_cache_upgrade_downgrade.js
   #### Enable when 4.0 becomes last-stable.
+  - jstests/sharding/aggregation_internal_parameters.js
   - jstests/sharding/change_stream_no_shards.js
   - jstests/sharding/clone_catalog_data.js
   - jstests/sharding/create_database.js

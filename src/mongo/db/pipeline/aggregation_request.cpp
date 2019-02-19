@@ -327,5 +327,4 @@ Document AggregationRequest::serializeToCommandObj() const {
         {QueryRequest::cmdOptionMaxTimeMS,
          _maxTimeMS == 0 ? Value() : Value(static_cast<int>(_maxTimeMS))}};
 }
-
 }  // namespace mongo
