@@ -46,8 +46,11 @@
 
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates
-        assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
-        assert.writeError(sessionDB.foo.update({x: 30}, {x: 5}));
+
+        // TODO SERVER-40225: Uncomment the assertions below
+        // assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
+        // assert.writeError(sessionDB.foo.update({x: 30}, {x: 5}));
+
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: {x: 80}, update: {$set: {x: 100}}});
         });
@@ -81,8 +84,11 @@
 
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates
-        assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
-        assert.writeError(sessionDB.foo.update({x: 30}, {x: 5}));
+
+        // TODO SERVER-40225: Uncomment the assertions below
+        // assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
+        // assert.writeError(sessionDB.foo.update({x: 30}, {x: 5}));
+
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: {x: 80}, update: {$set: {x: 100}}});
         });
@@ -113,7 +119,9 @@
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates
         session.startTransaction();
-        assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
+        // TODO SERVER-40225: Uncomment the assertions below
+        // assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 5}}));
+        assert.writeError(sessionDB.foo.update({x: 80}, {$set: {x: 100}}));
         session.abortTransaction();
 
         session.startTransaction();

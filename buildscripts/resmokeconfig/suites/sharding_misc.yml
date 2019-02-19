@@ -256,7 +256,6 @@ selector:
   - jstests/sharding/autosplit.js
   - jstests/sharding/limit_push.js
   - jstests/sharding/shard_keycount.js
-  - jstests/sharding/shard_key_immutable.js
   - jstests/sharding/sharding_system_namespaces.js
   - jstests/sharding/logical_time_metadata.js
   - jstests/sharding/time_zone_info_mongos.js
@@ -290,7 +289,6 @@ selector:
   - jstests/sharding/authConnectionHook.js
   - jstests/sharding/update_immutable_fields.js
   - jstests/sharding/min_optime_recovery_on_failed_move_chunk_commit.js
-  - jstests/sharding/SERVER-7379.js
   - jstests/sharding/create_database.js
   - jstests/sharding/shard_aware_on_add_shard.js
   - jstests/sharding/killop.js
