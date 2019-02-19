@@ -29,6 +29,7 @@ selector:
   - jstests/sharding/stale_mongos_updates_and_removes.js
   - jstests/sharding/geo_near_sharded.js
   # Enable when 4.2 becomes last-stable.
+  - jstests/sharding/aggregation_internal_parameters.js
   - jstests/sharding/agg_error_reports_shard_host_and_port.js
   - jstests/sharding/collation_lookup.js
   - jstests/sharding/collation_targeting.js
@@ -40,6 +41,7 @@ selector:
   - jstests/sharding/geo_near_random2.js
   - jstests/sharding/lookup.js
   - jstests/sharding/lookup_mongod_unaware.js
+  - jstests/sharding/lookup_on_shard.js
   - jstests/sharding/lookup_stale_mongos.js
   - jstests/sharding/out_cannot_run_on_mongos.js
   - jstests/sharding/out_command_options.js
@@ -58,7 +60,6 @@ selector:
   - jstests/sharding/restart_transactions.js
   - jstests/sharding/shard7.js
   - jstests/sharding/shard_config_db_collections.js
-  - jstests/sharding/lookup_on_shard.js
   - jstests/sharding/unsharded_collection_targetting.js
   # TODO: SERVER-38541 remove from blacklist
   - jstests/sharding/shard_collection_existing_zones.js

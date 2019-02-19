@@ -33,6 +33,7 @@
 
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
+#include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -42,12 +43,11 @@ class ClusterAggregateTest : public ClusterCommandTestFixture {
 protected:
     const BSONObj kAggregateCmdTargeted{
         fromjson("{aggregate: 'coll', pipeline: [{$match: {_id: 0}}], explain: false, "
-                 "allowDiskUse: false, fromMongos: true, "
-                 "cursor: {batchSize: 10}, maxTimeMS: 100}")};
+                 "allowDiskUse: false, cursor: {batchSize: 10}, maxTimeMS: 100}")};
 
-    const BSONObj kAggregateCmdScatterGather{fromjson(
-        "{aggregate: 'coll', pipeline: [], explain: false, allowDiskUse: false, fromMongos: true, "
-        "cursor: {batchSize: 10}}")};
+    const BSONObj kAggregateCmdScatterGather{
+        fromjson("{aggregate: 'coll', pipeline: [], explain: false, allowDiskUse: false, cursor: "
+                 "{batchSize: 10}}")};
 
     // The index of the shard expected to receive the response is used to prevent different shards
     // from returning documents with the same shard key. This is expected to be 0 for queries
@@ -73,6 +73,27 @@ protected:
             return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
         });
     }
+
+    /**
+     * This method should only be used to test early exits from Cluster::runAggregate, before
+     * a request is sent to the shards. Otherwise the call would get blocked as no expect* hooks
+     * are provided in this method.
+     */
+    Status testRunAggregateEarlyExit(const BSONObj& inputBson) {
+        BSONObjBuilder result;
+        NamespaceString nss{"a.collection"};
+        auto client = getServiceContext()->makeClient("ClusterCmdClient");
+        auto opCtx = client->makeOperationContext();
+        auto request = AggregationRequest::parseFromBSON(nss, inputBson);
+        if (request.getStatus() != Status::OK()) {
+            return request.getStatus();
+        }
+        return ClusterAggregate::runAggregate(opCtx.get(),
+                                              ClusterAggregate::Namespaces{nss, nss},
+                                              request.getValue(),
+                                              PrivilegeVector(),
+                                              &result);
+    }
 };
 
 TEST_F(ClusterAggregateTest, NoErrors) {
@@ -94,6 +115,34 @@ TEST_F(ClusterAggregateTest, AttachesAtClusterTimeForSnapshotReadConcern) {
 
 TEST_F(ClusterAggregateTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kAggregateCmdTargeted, kAggregateCmdScatterGather);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenFromMongosIsTrue) {
+    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}, fromMongos: true}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsFalse) {
+    const BSONObj inputBson =
+        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMongos: false}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsTrue) {
+    const BSONObj inputBson =
+        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMongos: true}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenMergeByPBRTIsTrue) {
+    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}, mergeByPBRT: true}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
+}
+
+TEST_F(ClusterAggregateTest, ShouldFailWhenExchengeIsPresent) {
+    const BSONObj inputBson = fromjson(
+        "{pipeline: [], cursor: {}, exchange: {policy: 'roundrobin', consumers: NumberInt(2)}}");
+    ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51028);
 }
 
 }  // namespace

@@ -344,5 +344,4 @@ Document AggregationRequest::serializeToCommandObj() const {
          _writeConcern ? Value(_writeConcern->toBSON()) : Value()},
     };
 }
-
 }  // namespace mongo

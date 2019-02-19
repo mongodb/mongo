@@ -700,6 +700,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
     uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchangeSpec());
+    uassert(51089,
+            str::stream() << "Internal parameter(s) [" << AggregationRequest::kNeedsMergeName
+                          << ", "
+                          << AggregationRequest::kFromMongosName
+                          << ", "
+                          << AggregationRequest::kMergeByPBRTName
+                          << "] cannot be set to 'true' when sent to mongos",
+            !request.needsMerge() && !request.isFromMongos() && !request.mergeByPBRT());
     auto executionNsRoutingInfoStatus =
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
     boost::optional<CachedCollectionRoutingInfo> routingInfo;
