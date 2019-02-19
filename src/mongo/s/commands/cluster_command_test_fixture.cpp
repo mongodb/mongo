@@ -41,6 +41,7 @@
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/s/cluster_last_error_info.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -66,6 +67,9 @@ void ClusterCommandTestFixture::setUp() {
     LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
 
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+
+    _staleVersionAndSnapshotRetriesBlock = stdx::make_unique<FailPointEnableBlock>(
+        "enableStaleVersionAndSnapshotRetriesWithinTransactions");
 }
 
 BSONObj ClusterCommandTestFixture::_makeCmd(BSONObj cmdObj, bool includeAfterClusterTime) {

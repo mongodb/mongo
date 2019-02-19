@@ -20,6 +20,8 @@
 
     const st = new ShardingTest({shards: 3, mongos: 2, config: 1});
 
+    enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
+
     // Disable the best-effort recipient metadata refresh after migrations to simplify simulating
     // stale shard version errors.
     assert.commandWorked(st.rs0.getPrimary().adminCommand(
@@ -255,6 +257,8 @@
 
     assert.commandWorked(st.rs0.getPrimary().adminCommand(
         {configureFailPoint: "skipShardFilteringMetadataRefresh", mode: "off"}));
+
+    disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
     st.stop();
 })();

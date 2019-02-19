@@ -104,6 +104,11 @@ private:
      * is true, also appends afterClusterTime to the read concern.
      */
     BSONObj _makeCmd(BSONObj cmdObj, bool includeAfterClusterTime = false);
+
+    // Enables the transaction router to retry within a transaction on stale version and snapshot
+    // errors for the duration of each test.
+    // TODO SERVER-39704: Remove this failpoint block.
+    std::unique_ptr<FailPointEnableBlock> _staleVersionAndSnapshotRetriesBlock;
 };
 
 }  // namespace mongo

@@ -9,11 +9,15 @@
 (function() {
     "use strict";
 
+    load("jstests/sharding/libs/sharded_transactions_helpers.js");
+
     const dbName = "test";
     const collName = "foo";
     const ns = dbName + "." + collName;
 
     const st = new ShardingTest({shards: 2, mongos: 2});
+
+    enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
     // Set up a sharded collection with 2 chunks, [min, 0) and [0, max), one on each shard, with one
     // document in each.
@@ -73,6 +77,8 @@
     for (let readConcernLevel of kAllowedReadConcernLevels) {
         runTest(st, {level: readConcernLevel});
     }
+
+    disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
     st.stop();
 })();

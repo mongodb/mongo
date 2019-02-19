@@ -3,6 +3,8 @@
  * multiversion/sharded_txn_downgrade_cluster.js.
  */
 
+load("jstests/sharding/libs/sharded_transactions_helpers.js");
+
 // Define autocommit as a variable so it can be used in object literals w/o an explicit value.
 const autocommit = false;
 
@@ -29,6 +31,8 @@ function setUpTwoShardClusterWithBinVersion(dbName, collName, binVersion) {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 0}}));
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {skey: 1}, to: st.shard1.shardName}));
+
+    flushRoutersAndRefreshShardMetadata(st, {ns, dbNames: [dbName]});
 
     return st;
 }

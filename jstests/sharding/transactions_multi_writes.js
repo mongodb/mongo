@@ -8,11 +8,15 @@
 (function() {
     "use strict";
 
+    load("jstests/sharding/libs/sharded_transactions_helpers.js");
+
     const dbName = "test";
     const collName = "foo";
     const ns = dbName + "." + collName;
 
     const st = new ShardingTest({shards: 3, config: 1, mongos: 2});
+
+    enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
     // Set up a sharded collection with 3 chunks, [min, 0), [0, 10), [10, max), one on each shard,
     // with one document in each.
@@ -135,6 +139,8 @@
     multiDelete.ordered = true;
     runTest(st, session, multiDelete, false /*staleRouter*/);
     runTest(st, session, multiDelete, true /*staleRouter*/);
+
+    disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
     st.stop();
 })();

@@ -110,6 +110,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             assert.commandWorked(
                 st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
 
+            flushRoutersAndRefreshShardMetadata(st, {ns});
+
             // Start a new transaction by inserting a document onto each shard.
             assert.commandWorked(st.s.getDB(dbName).runCommand({
                 insert: collName,

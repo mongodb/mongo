@@ -11,6 +11,8 @@
 
     const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 
+    enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
+
     // Set up two unsharded collections in different databases with shard0 as their primary.
 
     assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
@@ -120,6 +122,8 @@
 
     assert.commandWorked(st.rs0.getPrimary().adminCommand(
         {configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}));
+
+    disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
     st.stop();
 })();

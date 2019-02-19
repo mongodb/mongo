@@ -88,3 +88,44 @@ function waitForFailpoint(hitFailpointStr, numTimes) {
         return (rawMongoProgramOutput().match(re) || []).length == numTimes;
     }, 'Failed to find "' + hitFailpointStr + '" logged ' + numTimes + ' times');
 }
+
+// Enables the transaction router to retry on stale version (db or shard version) and snapshot
+// errors within a transaction.
+//
+// TODO SERVER-39704: Remove this function.
+function enableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
+    assert.commandWorked(st.s.adminCommand({
+        configureFailPoint: "enableStaleVersionAndSnapshotRetriesWithinTransactions",
+        mode: "alwaysOn"
+    }));
+}
+
+// TODO SERVER-39704: Remove this function.
+function disableStaleVersionAndSnapshotRetriesWithinTransactions(st) {
+    assert.commandWorked(st.s.adminCommand({
+        configureFailPoint: "enableStaleVersionAndSnapshotRetriesWithinTransactions",
+        mode: "off"
+    }));
+}
+
+// Flush each router's metadata and force refreshes on each shard for the given namespace and/or
+// database names.
+//
+// TODO SERVER-39704: Remove this function.
+function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {}) {
+    st._mongos.forEach((s) => {
+        assert.commandWorked(s.adminCommand({flushRouterConfig: 1}));
+    });
+
+    st._rs.forEach((rs) => {
+        if (ns) {
+            assert.commandWorked(
+                rs.test.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        }
+
+        dbNames.forEach((dbName) => {
+            assert.commandWorked(
+                rs.test.getPrimary().adminCommand({_flushDatabaseCacheUpdates: dbName}));
+        });
+    });
+}

@@ -43,6 +43,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace {
@@ -91,6 +92,13 @@ protected:
         auto logicalClock = stdx::make_unique<LogicalClock>(getServiceContext());
         logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
+
+        _staleVersionAndSnapshotRetriesBlock = stdx::make_unique<FailPointEnableBlock>(
+            "enableStaleVersionAndSnapshotRetriesWithinTransactions");
+    }
+
+    void disableRouterRetriesFailPoint() {
+        _staleVersionAndSnapshotRetriesBlock.reset();
     }
 
     /**
@@ -130,6 +138,12 @@ protected:
 
         ASSERT(expectedHostAndPorts == seenHostAndPorts);
     }
+
+private:
+    // Enables the transaction router to retry within a transaction on stale version and snapshot
+    // errors for the duration of each test.
+    // TODO SERVER-39704: Remove this failpoint block.
+    std::unique_ptr<FailPointEnableBlock> _staleVersionAndSnapshotRetriesBlock;
 };
 
 class TransactionRouterTestWithDefaultSession : public TransactionRouterTest {
@@ -1498,6 +1512,28 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
 
     // Shouldn't throw.
     future.timed_get(kFutureTimeout);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       CannotContinueOnSnapshotOrStaleVersionErrorsWithoutFailpoint) {
+    TxnNumber txnNum{3};
+
+    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    disableRouterRetriesFailPoint();
+
+    // Cannot retry on snapshot errors on the first statement.
+    ASSERT_FALSE(txnRouter.canContinueOnSnapshotError());
+
+    // Cannot retry on stale shard or db version errors for read or write commands.
+    ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("find"));
+    ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("insert"));
+
+    // Can still continue on view resolution errors.
+    txnRouter.onViewResolutionError(operationContext(), kViewNss);  // Should not throw.
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, ContinuingTransactionPlacesItsReadConcernOnOpCtx) {

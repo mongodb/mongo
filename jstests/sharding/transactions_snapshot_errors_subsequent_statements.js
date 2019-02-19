@@ -67,6 +67,8 @@
 
     const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 
+    enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
+
     jsTestLog("Unsharded transaction");
 
     assert.writeOK(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
@@ -107,6 +109,8 @@
     for (let errorCode of kSnapshotErrors) {
         runTest(st, collName, errorCode);
     }
+
+    disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
     st.stop();
 })();

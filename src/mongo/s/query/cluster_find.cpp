@@ -453,10 +453,13 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             catalogCache->onStaleShardVersion(std::move(routingInfo));
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                // A transaction can always continue on a stale version error during find because
-                // the operation must be idempotent. Reset the default global read timestamp so the
-                // retry's routing table reflects the chunk placement after the refresh (no-op if
-                // the transaction is not running with snapshot read concern).
+                if (!txnRouter->canContinueOnStaleShardOrDbError(kFindCmdName)) {
+                    throw;
+                }
+
+                // Reset the default global read timestamp so the retry's routing table reflects the
+                // chunk placement after the refresh (no-op if the transaction is not running with
+                // snapshot read concern).
                 txnRouter->onStaleShardOrDbError(opCtx, kFindCmdName, ex.toStatus());
                 txnRouter->setDefaultAtClusterTime(opCtx);
             }

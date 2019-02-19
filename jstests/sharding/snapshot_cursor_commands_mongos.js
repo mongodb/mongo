@@ -8,6 +8,7 @@
     TestData.disableImplicitSessions = true;
 
     load("jstests/libs/global_snapshot_reads_util.js");
+    load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
     const dbName = "test";
     const shardedCollName = "shardedColl";
@@ -100,6 +101,8 @@
                 assert.eq(
                     1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
 
+                flushRoutersAndRefreshShardMetadata(st, {ns});
+
                 return st;
             }
         },
@@ -134,6 +137,8 @@
                     1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard1.shardName}));
                 assert.eq(
                     1, mongos.getDB('config').chunks.count({ns: ns, shard: st.shard2.shardName}));
+
+                flushRoutersAndRefreshShardMetadata(st, {ns});
 
                 return st;
             }

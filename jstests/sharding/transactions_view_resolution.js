@@ -10,6 +10,7 @@
     "use strict";
 
     load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+    load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
     const shardedDbName = "shardedDB";
     const shardedCollName = "sharded";
@@ -51,6 +52,8 @@
         const shardedView = session.getDatabase(shardedDbName)[shardedViewName];
         assert.commandWorked(shardedView.runCommand(
             "create", {viewOn: shardedCollName, pipeline: [], writeConcern: {w: "majority"}}));
+
+        flushRoutersAndRefreshShardMetadata(st, {ns, dbNames: [shardedDbName, unshardedDbName]});
 
         return shardedView;
     }

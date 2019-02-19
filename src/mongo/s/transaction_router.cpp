@@ -56,6 +56,10 @@ namespace {
 // have a local participant.
 MONGO_FAIL_POINT_DEFINE(sendCoordinateCommitToConfigServer);
 
+// TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
+// on stale version and snapshot errors.
+MONGO_FAIL_POINT_DEFINE(enableStaleVersionAndSnapshotRetriesWithinTransactions);
+
 const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
 
@@ -381,23 +385,25 @@ void TransactionRouter::_clearPendingParticipants(OperationContext* opCtx) {
 }
 
 bool TransactionRouter::canContinueOnStaleShardOrDbError(StringData cmdName) const {
-    // We can always retry on the first overall statement because all targeted participants must
-    // be pending, so the retry will restart the local transaction on each one, overwriting any
-    // effects from the first attempt.
-    if (_latestStmtId == _firstStmtId) {
-        return true;
-    }
+    if (MONGO_FAIL_POINT(enableStaleVersionAndSnapshotRetriesWithinTransactions)) {
+        // We can always retry on the first overall statement because all targeted participants must
+        // be pending, so the retry will restart the local transaction on each one, overwriting any
+        // effects from the first attempt.
+        if (_latestStmtId == _firstStmtId) {
+            return true;
+        }
 
-    // Only idempotent operations can be retried if the error came from a later statement because
-    // non-pending participants targeted by the statement may receive the same statement id more
-    // than once, and currently statement ids are not tracked by participants so the operation would
-    // be applied each time.
-    //
-    // Note that the retry will fail if any non-pending participants returned a stale version error
-    // during the latest statement, because the error will abort their local transactions but the
-    // router's retry will expect them to be in-progress.
-    if (alwaysRetryableCmds.count(cmdName)) {
-        return true;
+        // Only idempotent operations can be retried if the error came from a later statement
+        // because non-pending participants targeted by the statement may receive the same statement
+        // id more than once, and currently statement ids are not tracked by participants so the
+        // operation would be applied each time.
+        //
+        // Note that the retry will fail if any non-pending participants returned a stale version
+        // error during the latest statement, because the error will abort their local transactions
+        // but the router's retry will expect them to be in-progress.
+        if (alwaysRetryableCmds.count(cmdName)) {
+            return true;
+        }
     }
 
     return false;
@@ -429,7 +435,11 @@ void TransactionRouter::onViewResolutionError(OperationContext* opCtx, const Nam
 }
 
 bool TransactionRouter::canContinueOnSnapshotError() const {
-    return _atClusterTime && _atClusterTime->canChange(_latestStmtId);
+    if (MONGO_FAIL_POINT(enableStaleVersionAndSnapshotRetriesWithinTransactions)) {
+        return _atClusterTime && _atClusterTime->canChange(_latestStmtId);
+    }
+
+    return false;
 }
 
 void TransactionRouter::onSnapshotError(OperationContext* opCtx, const Status& errorStatus) {

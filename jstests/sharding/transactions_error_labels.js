@@ -3,6 +3,8 @@
 (function() {
     "use strict";
 
+    load("jstests/sharding/libs/sharded_transactions_helpers.js");
+
     const dbName = "test";
     const collName = "foo";
     const ns = dbName + "." + collName;
@@ -163,6 +165,7 @@
     // commitTransaction for multi-shard transaction (mongos sends coordinateCommitTransaction)
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+    flushRoutersAndRefreshShardMetadata(st, {ns});
     runCommitTests("coordinateCommitTransaction");
 
     st.stop();

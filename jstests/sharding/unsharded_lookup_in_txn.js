@@ -6,6 +6,8 @@
 (function() {
     "use strict";
 
+    load("jstests/sharding/libs/sharded_transactions_helpers.js");
+
     const st = new ShardingTest({shards: 2, mongos: 1});
     const kDBName = "unsharded_lookup_in_txn";
 
@@ -24,6 +26,7 @@
     // Move all of the data to shard 1.
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: shardedColl.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
+    flushRoutersAndRefreshShardMetadata(st, {ns: shardedColl.getFullName()});
 
     // Insert a bunch of documents, all of which reside on the same chunk (on shard 1).
     for (let i = -10; i < 10; i++) {
@@ -85,6 +88,7 @@
     assert.commandWorked(st.s.adminCommand({split: shardedColl.getFullName(), middle: {_id: 0}}));
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: shardedColl.getFullName(), find: {_id: -1}, to: st.shard0.shardName}));
+    flushRoutersAndRefreshShardMetadata(st, {ns: shardedColl.getFullName()});
 
     // Run the test again.
     testLookupDoesNotSeeDocumentsOutsideSnapshot();

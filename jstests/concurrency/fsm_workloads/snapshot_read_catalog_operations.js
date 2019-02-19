@@ -33,6 +33,7 @@ var $config = (function() {
             const readErrorCodes = [
                 ErrorCodes.NoSuchTransaction,
                 ErrorCodes.SnapshotUnavailable,
+                ErrorCodes.SnapshotTooOld,
                 ErrorCodes.LockTimeout,
                 ErrorCodes.ConflictingOperationInProgress
             ];
