@@ -47,6 +47,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/logger/log_component.h"
+#include "mongo/logger/log_severity_limiter.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/redaction.h"

@@ -725,15 +725,18 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status,
     // connections
     _generation++;
 
+    if (!_readyPool.empty() || !_processingPool.empty()) {
+        auto severity = MONGO_GET_LIMITED_SEVERITY(_hostAndPort, Seconds{1}, 0, 2);
+        LOG(severity) << "Dropping all pooled connections to " << _hostAndPort << " due to "
+                      << redact(status);
+    }
+
     // When a connection enters the ready pool, its timer is set to eventually refresh the
     // connection. This requires a lifetime extension of the specific pool because the connection
     // timer is tied to the lifetime of the connection, not the pool. That said, we can destruct
     // all of the connections and thus timers of which we have ownership.
     // In short, clearing the ready pool helps the SpecificPool drain.
     _readyPool.clear();
-
-    // Log something helpful
-    log() << "Dropping all pooled connections to " << _hostAndPort << " due to " << status;
 
     // Migrate processing connections to the dropped pool
     for (auto&& x : _processingPool) {
@@ -823,6 +826,10 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
     while ((_state != State::kInShutdown) &&
            (_readyPool.size() + _processingPool.size() + _checkedOutPool.size() < target()) &&
            (_processingPool.size() < _parent->_options.maxConnecting)) {
+        if (_readyPool.empty() && _processingPool.empty()) {
+            auto severity = MONGO_GET_LIMITED_SEVERITY(_hostAndPort, Seconds{1}, 0, 2);
+            LOG(severity) << "Connecting to " << _hostAndPort;
+        }
 
         OwnedConnection handle;
         try {
