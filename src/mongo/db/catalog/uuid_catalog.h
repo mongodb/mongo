@@ -179,6 +179,39 @@ class UUIDCatalog {
     MONGO_DISALLOW_COPYING(UUIDCatalog);
 
 public:
+    class iterator {
+    public:
+        using value_type = Collection*;
+        using pointer = const value_type*;
+        using reference = const value_type&;
+
+        iterator(std::string dbName, uint64_t genNum, const UUIDCatalog& uuidCatalog);
+        iterator(
+            std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator mapIter);
+        pointer operator->();
+        reference operator*();
+        iterator operator++();
+        iterator operator++(int);
+
+        /*
+         * Equality operators == and != do not attempt to reposition the iterators being compared.
+         * The behavior for comparing invalid iterators is undefined.
+         */
+        bool operator==(const iterator& other);
+        bool operator!=(const iterator& other);
+
+    private:
+        bool _repositionIfNeeded();
+        bool _exhausted();
+
+        std::string _dbName;
+        boost::optional<CollectionUUID> _uuid;
+        uint64_t _genNum;
+        std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator _mapIter;
+        const UUIDCatalog* _uuidCatalog;
+        static constexpr Collection* _nullCollection = nullptr;
+    };
+
     static UUIDCatalog& get(ServiceContext* svcCtx);
     static UUIDCatalog& get(OperationContext* opCtx);
     UUIDCatalog() = default;
@@ -254,14 +287,17 @@ public:
      *
      * Return `boost::none` if `uuid` is not found, or is the first UUID in that database.
      */
-    boost::optional<CollectionUUID> prev(const StringData& db, CollectionUUID uuid);
+    boost::optional<CollectionUUID> prev(StringData db, CollectionUUID uuid);
 
     /**
      * Return the UUID lexicographically following `uuid` in the database named by `db`.
      *
      * Return `boost::none` if `uuid` is not found, or is the last UUID in that database.
      */
-    boost::optional<CollectionUUID> next(const StringData& db, CollectionUUID uuid);
+    boost::optional<CollectionUUID> next(StringData db, CollectionUUID uuid);
+
+    iterator begin(StringData db) const;
+    iterator end() const;
 
 private:
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
@@ -279,13 +315,18 @@ private:
         _shadowCatalog;
 
     /**
-     * Map from database names to ordered `vector`s of their UUIDs.
-     *
-     * Works as a cache of such orderings: every ordering in this map is guaranteed to be valid, but
-     * not all databases are guaranteed to have an ordering in it.
+     * Ordered map from <database name, collection UUID> to a Collection object.
      */
-    StringMap<std::vector<CollectionUUID>> _orderedCollections;
-    mongo::stdx::unordered_map<CollectionUUID, Collection*, CollectionUUID::Hash> _catalog;
-};
+    std::map<std::pair<std::string, CollectionUUID>, Collection*> _orderedCollections;
 
+    /**
+     * Unordered map from Collection UUID to the corresponding Collection object.
+     */
+    mongo::stdx::unordered_map<CollectionUUID, Collection*, CollectionUUID::Hash> _catalog;
+
+    /**
+     * Generation number to track changes to the catalog that could invalidate iterators.
+     */
+    uint64_t _generationNumber;
+};
 }  // namespace mongo

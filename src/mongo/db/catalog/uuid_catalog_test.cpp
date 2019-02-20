@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/db/catalog/uuid_catalog.h"
 
 #include <algorithm>
@@ -71,7 +70,141 @@ protected:
     CollectionUUID prevUUID;
 };
 
+class UUIDCatalogIterationTest : public unittest::Test {
+public:
+    void setUp() {
+        for (int counter = 0; counter < 5; ++counter) {
+            NamespaceString fooNss("foo", "coll" + std::to_string(counter));
+            NamespaceString barNss("bar", "coll" + std::to_string(counter));
+
+            auto fooColl = std::make_unique<CollectionMock>(fooNss);
+            auto barColl = std::make_unique<CollectionMock>(barNss);
+
+            dbMap["foo"].insert(
+                std::make_pair(CollectionUUID::gen(), std::make_unique<CollectionMock>(fooNss)));
+            dbMap["bar"].insert(
+                std::make_pair(CollectionUUID::gen(), std::make_unique<CollectionMock>(barNss)));
+        }
+
+        for (auto& it : dbMap) {
+            for (auto& kv : it.second) {
+                catalog.onCreateCollection(&opCtx, kv.second.get(), kv.first);
+            }
+        }
+    }
+
+    void tearDown() {
+        for (auto& it : dbMap) {
+            for (auto& kv : it.second) {
+                catalog.onDropCollection(&opCtx, kv.first);
+            }
+        }
+    }
+
+    std::map<CollectionUUID, std::unique_ptr<CollectionMock>>::iterator collsIterator(
+        std::string dbName) {
+        auto it = dbMap.find(dbName);
+        ASSERT(it != dbMap.end());
+        return it->second.begin();
+    }
+
+    std::map<CollectionUUID, std::unique_ptr<CollectionMock>>::iterator collsIteratorEnd(
+        std::string dbName) {
+        auto it = dbMap.find(dbName);
+        ASSERT(it != dbMap.end());
+        return it->second.end();
+    }
+
+    void checkCollections(std::string dbName) {
+        unsigned long counter = 0;
+
+        for (auto[orderedIt, catalogIt] = std::tuple{collsIterator(dbName), catalog.begin(dbName)};
+             catalogIt != catalog.end() && orderedIt != collsIteratorEnd(dbName);
+             ++catalogIt, ++orderedIt) {
+
+            auto catalogColl = *catalogIt;
+            ASSERT(catalogColl != nullptr);
+            auto orderedColl = orderedIt->second.get();
+            ASSERT_EQ(catalogColl->ns(), orderedColl->ns());
+            ++counter;
+        }
+
+        ASSERT_EQUALS(counter, dbMap[dbName].size());
+    }
+
+protected:
+    UUIDCatalog catalog;
+    OperationContextNoop opCtx;
+    std::map<std::string, std::map<CollectionUUID, std::unique_ptr<CollectionMock>>> dbMap;
+};
+
 namespace {
+
+// Create an iterator over the UUIDCatalog and assert that all collections are present.
+// Iteration ends when the end of the catalog is reached.
+TEST_F(UUIDCatalogIterationTest, EndAtEndOfCatalog) {
+    checkCollections("foo");
+}
+
+// Create an iterator over the UUIDCatalog and test that all collections are present. Iteration ends
+// when the end of a database-specific section of the catalog is reached.
+TEST_F(UUIDCatalogIterationTest, EndAtEndOfSection) {
+    checkCollections("bar");
+}
+
+// Delete an entry in the catalog while iterating.
+TEST_F(UUIDCatalogIterationTest, InvalidateEntry) {
+    auto it = catalog.begin("bar");
+
+    // Invalidate bar.coll1.
+    for (auto collsIt = collsIterator("bar"); collsIt != collsIteratorEnd("bar"); ++collsIt) {
+        if (collsIt->second.get()->ns().ns() == "bar.coll1") {
+            catalog.onDropCollection(&opCtx, collsIt->first);
+            break;
+        }
+    }
+
+    // Ensure bar.coll1 is not returned by the iterator.
+    for (; it != catalog.end(); ++it) {
+        auto coll = *it;
+        ASSERT(coll && coll->ns().ns() != "bar.coll1");
+    }
+}
+
+// Delete the entry pointed to by the iterator and dereference the iterator.
+TEST_F(UUIDCatalogIterationTest, InvalidateAndDereference) {
+    auto it = catalog.begin("bar");
+    auto collsIt = collsIterator("bar");
+    catalog.onDropCollection(&opCtx, collsIt->first);
+    ++collsIt;
+
+    auto catalogColl = *it;
+    ASSERT(catalogColl != nullptr);
+    ASSERT_EQUALS(catalogColl->ns(), collsIt->second.get()->ns());
+}
+
+// Delete the last entry for a database while pointing to it and dereference the iterator.
+TEST_F(UUIDCatalogIterationTest, InvalidateLastEntryAndDereference) {
+    auto it = catalog.begin("bar");
+    NamespaceString lastNs;
+    boost::optional<CollectionUUID> uuid;
+    for (auto collsIt = collsIterator("bar"); collsIt != collsIteratorEnd("bar"); ++collsIt) {
+        lastNs = collsIt->second.get()->ns();
+        uuid = collsIt->first;
+    }
+
+    // Increment until it points to the last collection.
+    for (; it != catalog.end(); ++it) {
+        auto coll = *it;
+        ASSERT(coll != nullptr);
+        if (coll->ns() == lastNs) {
+            break;
+        }
+    }
+
+    catalog.onDropCollection(&opCtx, *uuid);
+    ASSERT(*it == nullptr);
+}
 
 TEST_F(UUIDCatalogTest, OnCreateCollection) {
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == &col);

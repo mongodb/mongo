@@ -96,6 +96,105 @@ repl::OpTime UUIDCatalogObserver::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
+UUIDCatalog::iterator::iterator(std::string dbName, uint64_t genNum, const UUIDCatalog& uuidCatalog)
+    : _dbName(dbName), _genNum(genNum), _uuidCatalog(&uuidCatalog) {
+    auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    _mapIter = _uuidCatalog->_orderedCollections.lower_bound(std::make_pair(_dbName, minUuid));
+    if (_mapIter != _uuidCatalog->_orderedCollections.end()) {
+        _uuid = _mapIter->first.second;
+    }
+}
+
+UUIDCatalog::iterator::iterator(
+    std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator mapIter)
+    : _mapIter(mapIter) {}
+
+UUIDCatalog::iterator::pointer UUIDCatalog::iterator::operator->() {
+    stdx::lock_guard<stdx::mutex> lock(_uuidCatalog->_catalogLock);
+    _repositionIfNeeded();
+    if (_exhausted()) {
+        return nullptr;
+    }
+
+    return &_mapIter->second;
+}
+
+UUIDCatalog::iterator::reference UUIDCatalog::iterator::operator*() {
+    stdx::lock_guard<stdx::mutex> lock(_uuidCatalog->_catalogLock);
+    _repositionIfNeeded();
+    if (_exhausted()) {
+        return _nullCollection;
+    }
+
+    return _mapIter->second;
+}
+
+UUIDCatalog::iterator UUIDCatalog::iterator::operator++() {
+    stdx::lock_guard<stdx::mutex> lock(_uuidCatalog->_catalogLock);
+
+    if (!_repositionIfNeeded()) {
+        _mapIter++;  // If the position was not updated, increment iterator to next element.
+    }
+
+    if (_exhausted()) {
+        // If the iterator is at the end of the map or now points to an entry that does not
+        // correspond to the correct database.
+        _mapIter = _uuidCatalog->_orderedCollections.end();
+        return *this;
+    }
+
+    _uuid = _mapIter->first.second;
+    return *this;
+}
+
+UUIDCatalog::iterator UUIDCatalog::iterator::operator++(int) {
+    auto oldPosition = *this;
+    ++(*this);
+    return oldPosition;
+}
+
+bool UUIDCatalog::iterator::operator==(const iterator& other) {
+    stdx::lock_guard<stdx::mutex> lock(_uuidCatalog->_catalogLock);
+
+    if (other._mapIter == _uuidCatalog->_orderedCollections.end()) {
+        return _mapIter == _uuidCatalog->_orderedCollections.end();
+    }
+
+    return _uuid == other._uuid;
+}
+
+bool UUIDCatalog::iterator::operator!=(const iterator& other) {
+    return !(*this == other);
+}
+
+// Check if _mapIter has been invalidated due to a change in the _orderedCollections map. If it
+// has, restart iteration through a call to lower_bound. If the element that the iterator is
+// currently pointing to has been deleted, the iterator will be repositioned to the element that
+// followed it.
+bool UUIDCatalog::iterator::_repositionIfNeeded() {
+    if (_genNum == _uuidCatalog->_generationNumber) {
+        return false;
+    }
+
+    _genNum = _uuidCatalog->_generationNumber;
+    // If the generation number has changed, the _orderedCollections map has been modified in a
+    // way that could possibly invalidate this iterator. In this case, try to find the same
+    // entry the iterator was on, or the one right before it.
+    _mapIter = _uuidCatalog->_orderedCollections.lower_bound(std::make_pair(_dbName, *_uuid));
+    if (_mapIter == _uuidCatalog->_orderedCollections.end() ||
+        (_mapIter->first.first == _dbName && _mapIter->first.second == _uuid)) {
+        // Element deleted was the last one in the map or the element we were pointing at was
+        // not deleted.
+        return false;
+    }
+
+    return true;  // repositioned to one element behind previous position
+}
+
+bool UUIDCatalog::iterator::_exhausted() {
+    return _mapIter == _uuidCatalog->_orderedCollections.end() || _mapIter->first.first != _dbName;
+}
+
 UUIDCatalog& UUIDCatalog::get(ServiceContext* svcCtx) {
     return getCatalog(svcCtx);
 }
@@ -207,74 +306,82 @@ Collection* UUIDCatalog::removeUUIDCatalogEntry(CollectionUUID uuid) {
     return _removeUUIDCatalogEntry_inlock(uuid);
 }
 
-boost::optional<CollectionUUID> UUIDCatalog::prev(const StringData& db, CollectionUUID uuid) {
+boost::optional<CollectionUUID> UUIDCatalog::prev(StringData db, CollectionUUID uuid) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-    const auto& ordering = _getOrdering_inlock(db, lock);
-    auto current = std::lower_bound(ordering.cbegin(), ordering.cend(), uuid);
+    auto dbIdPair = std::make_pair(db.toString(), uuid);
+    auto entry = _orderedCollections.find(dbIdPair);
 
-    // If the element does not appear, or is the first element.
-    if (current == ordering.cend() || *current != uuid || current == ordering.cbegin()) {
+    // If the element does not appear or is the first element.
+    if (entry == _orderedCollections.end() || entry == _orderedCollections.begin()) {
         return boost::none;
     }
 
-    return *(current - 1);
+    auto prevEntry = std::prev(entry, 1);
+    // If the entry is from a different database, there is no previous entry.
+    if (prevEntry->first.first != db) {
+        return boost::none;
+    }
+    return prevEntry->first.second;
 }
 
-boost::optional<CollectionUUID> UUIDCatalog::next(const StringData& db, CollectionUUID uuid) {
+boost::optional<CollectionUUID> UUIDCatalog::next(StringData db, CollectionUUID uuid) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
-    const auto& ordering = _getOrdering_inlock(db, lock);
-    auto current = std::lower_bound(ordering.cbegin(), ordering.cend(), uuid);
+    auto dbIdPair = std::make_pair(db.toString(), uuid);
+    auto entry = _orderedCollections.find(dbIdPair);
 
-    if (current == ordering.cend() || *current != uuid || current + 1 == ordering.cend()) {
+    // If the element does not appear.
+    if (entry == _orderedCollections.end()) {
         return boost::none;
     }
 
-    return *(current + 1);
+    auto nextEntry = std::next(entry, 1);
+    // If the element was the last entry or is from a different database.
+    if (nextEntry == _orderedCollections.end() || nextEntry->first.first != db) {
+        return boost::none;
+    }
+    return nextEntry->first.second;
 }
 
-const std::vector<CollectionUUID>& UUIDCatalog::_getOrdering_inlock(
-    const StringData& db, const stdx::lock_guard<stdx::mutex>&) {
-    // If an ordering is already cached,
-    auto it = _orderedCollections.find(db);
-    if (it != _orderedCollections.end()) {
-        // return it.
-        return it->second;
-    }
-
-    // Otherwise, get all of the UUIDs for this database,
-    auto& newOrdering = _orderedCollections[db];
-    for (const auto& pair : _catalog) {
-        if (pair.second->ns().db() == db) {
-            newOrdering.push_back(pair.first);
-        }
-    }
-
-    // and sort them.
-    std::sort(newOrdering.begin(), newOrdering.end());
-
-    return newOrdering;
-}
 void UUIDCatalog::_registerUUIDCatalogEntry_inlock(CollectionUUID uuid, Collection* coll) {
-    if (coll && !_catalog.count(uuid)) {
-        // Invalidate this database's ordering, since we're adding a new UUID.
-        _orderedCollections.erase(coll->ns().db());
-
-        std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
-        LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
-        invariant(_catalog.insert(entry).second == true);
+    // Collection is invalid or this UUID is already taken.
+    if (!coll || (_catalog.find(uuid) != _catalog.end())) {
+        return;
     }
+
+    LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid;
+
+    auto unorderedEntry = std::make_pair(uuid, coll);
+    invariant(_catalog.insert(unorderedEntry).second == true);
+
+    auto dbIdPair = std::make_pair(coll->ns().db().toString(), uuid);
+    auto orderedEntry = std::make_pair(dbIdPair, coll);
+    invariant(_orderedCollections.insert(orderedEntry).second == true);
 }
 Collection* UUIDCatalog::_removeUUIDCatalogEntry_inlock(CollectionUUID uuid) {
     auto foundIt = _catalog.find(uuid);
-    if (foundIt == _catalog.end())
+    if (foundIt == _catalog.end()) {
         return nullptr;
+    }
 
-    // Invalidate this database's ordering, since we're deleting a UUID.
-    _orderedCollections.erase(foundIt->second->ns().db());
-
-    auto foundCol = foundIt->second;
-    LOG(2) << "unregistering collection " << foundCol->ns() << " with UUID " << uuid.toString();
+    auto foundColl = foundIt->second;
+    LOG(2) << "unregistering collection " << foundColl->ns() << " with UUID " << uuid;
+    auto dbName = foundColl->ns().db().toString();
     _catalog.erase(foundIt);
-    return foundCol;
+    _orderedCollections.erase(std::make_pair(dbName, uuid));
+
+    // Removal from an ordered map will invalidate iterators and potentially references to the
+    // references to the erased element.
+    _generationNumber++;
+
+    return foundColl;
 }
+
+UUIDCatalog::iterator UUIDCatalog::begin(StringData db) const {
+    return iterator(db.toString(), _generationNumber, *this);
+}
+
+UUIDCatalog::iterator UUIDCatalog::end() const {
+    return iterator(_orderedCollections.end());
+}
+
 }  // namespace mongo
