@@ -32,10 +32,16 @@
         let writer = new ScopedThread(function(host, coll, stopLatch) {
             const conn = new Mongo(host);
             let id = 0;
-            while (stopLatch.getCount() > 0) {
+
+            // Cap the amount of data being inserted to avoid rolling over a 10MiB oplog. It takes
+            // ~70,000 "basic" ~150 byte oplog documents to fill a 10MiB oplog. Note this number is
+            // for each of two writer threads.
+            const maxDocsToInsert = 20 * 1000;
+            while (stopLatch.getCount() > 0 && id < maxDocsToInsert) {
                 conn.getDB("test").getCollection(coll).insert({_id: id});
                 id++;
             }
+            jsTestLog({"NumDocsWritten": id});
         }, replTest.getPrimary().host, coll, stopLatch);
 
         writer.start();
@@ -68,7 +74,9 @@
                 // for establishing their oplog reader transactions.
                 for (let num = 0; num < 200 && timestamps.length < 1000; ++num) {
                     try {
-                        cursor.hasNext();
+                        if (cursor.hasNext() == false) {
+                            break;
+                        }
                     } catch (exc) {
                         break;
                     }
