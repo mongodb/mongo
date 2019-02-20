@@ -2,9 +2,10 @@ load("jstests/libs/parallelTester.js");  // for ScopedThread.
 
 function backupData(mongo, destinationDirectory) {
     let backupCursor = openBackupCursor(mongo);
-    let res = copyBackupCursorFiles(backupCursor, destinationDirectory);
+    let metadata = getBackupCursorMetadata(backupCursor);
+    copyBackupCursorFiles(backupCursor, metadata.dbpath, destinationDirectory);
     backupCursor.close();
-    return res.metadata;
+    return metadata;
 }
 
 function openBackupCursor(mongo) {
@@ -21,7 +22,8 @@ function openBackupCursor(mongo) {
 
 function extendBackupCursor(mongo, backupId, extendTo) {
     return mongo.getDB("admin").aggregate(
-        [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}], {maxTimeMS: 10000});
+        [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}],
+        {maxTimeMS: 180 * 1000});
 }
 
 function startHeartbeatThread(host, backupCursor, session, stopCounter) {
@@ -46,24 +48,24 @@ function startHeartbeatThread(host, backupCursor, session, stopCounter) {
     return heartbeater;
 }
 
+function getBackupCursorMetadata(backupCursor) {
+    assert(backupCursor.hasNext());
+    let doc = backupCursor.next();
+    assert(doc.hasOwnProperty("metadata"));
+    return doc["metadata"];
+}
+
 /**
  * Exhaust the backup cursor and copy all the listed files to the destination directory. If `async`
  * is true, this function will spawn a ScopedThread doing the copy work and return the thread along
  * with the backup cursor metadata. The caller should `join` the thread when appropriate.
  */
-function copyBackupCursorFiles(backupCursor, destinationDirectory, async) {
+function copyBackupCursorFiles(backupCursor, dbpath, destinationDirectory, async) {
     resetDbpath(destinationDirectory);
     mkdir(destinationDirectory + "/journal");
 
-    assert(backupCursor.hasNext());
-    let doc = backupCursor.next();
-    assert(doc.hasOwnProperty("metadata"));
-    let metadata = doc["metadata"];
-
-    let copyThread =
-        copyBackupCursorExtendFiles(backupCursor, metadata["dbpath"], destinationDirectory, async);
-
-    return {"metadata": metadata, "copyThread": copyThread};
+    let copyThread = copyBackupCursorExtendFiles(backupCursor, dbpath, destinationDirectory, async);
+    return copyThread;
 }
 
 function copyBackupCursorExtendFiles(cursor, dbpath, destinationDirectory, async) {
