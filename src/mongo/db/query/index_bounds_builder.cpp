@@ -44,7 +44,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/expression_index.h"
-#include "mongo/db/query/expression_index_knobs.h"
+#include "mongo/db/query/expression_index_knobs_gen.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
@@ -729,7 +729,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             const R2Region& region = gme->getGeoExpression().getGeometry().getR2Region();
 
             ExpressionMapping::cover2d(
-                region, index.infoObj, internalGeoPredicateQuery2DMaxCoveringCells.load(), oilOut);
+                region, index.infoObj, gInternalGeoPredicateQuery2DMaxCoveringCells.load(), oilOut);
 
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else {

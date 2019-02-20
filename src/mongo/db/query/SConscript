@@ -30,7 +30,6 @@ env.Library(
         "planner_ixselect.cpp",
         "query_planner.cpp",
         "expression_index.cpp",
-        "expression_index_knobs.cpp",
         "index_bounds.cpp",
         "index_bounds_builder.cpp",
         "index_entry.cpp",
@@ -38,6 +37,7 @@ env.Library(
         "query_planner_common.cpp",
         "query_settings.cpp",
         "query_solution.cpp",
+        env.Idlc("expression_index_knobs.idl")[0],
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -47,11 +47,13 @@ env.Library(
         "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "$BUILD_DIR/mongo/db/mongohasher",
-        "$BUILD_DIR/mongo/db/server_parameters",
         "collation/collator_factory_interface",
         "collation/collator_interface",
         "command_request_response",
         "query_knobs",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/idl/server_parameter",
     ],
 )
 

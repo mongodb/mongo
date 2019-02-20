@@ -36,7 +36,7 @@
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/query/expression_index_knobs.h"
+#include "mongo/db/query/expression_index_knobs_gen.h"
 #include "mongo/db/server_parameters.h"
 #include "third_party/s2/s2cellid.h"
 #include "third_party/s2/s2region.h"
@@ -110,8 +110,8 @@ void ExpressionMapping::cover2d(const R2Region& region,
 }
 
 std::vector<S2CellId> ExpressionMapping::get2dsphereCovering(const S2Region& region) {
-    auto minLevel = internalQueryS2GeoCoarsestLevel.load();
-    auto maxLevel = internalQueryS2GeoFinestLevel.load();
+    auto minLevel = gInternalQueryS2GeoCoarsestLevel.load();
+    auto maxLevel = gInternalQueryS2GeoFinestLevel.load();
 
     uassert(28739, "Geo coarsest level must be in range [0,30]", 0 <= minLevel && minLevel <= 30);
     uassert(28740, "Geo finest level must be in range [0,30]", 0 <= maxLevel && maxLevel <= 30);
@@ -120,7 +120,7 @@ std::vector<S2CellId> ExpressionMapping::get2dsphereCovering(const S2Region& reg
     S2RegionCoverer coverer;
     coverer.set_min_level(minLevel);
     coverer.set_max_level(maxLevel);
-    coverer.set_max_cells(internalQueryS2GeoMaxCells.load());
+    coverer.set_max_cells(gInternalQueryS2GeoMaxCells.load());
 
     std::vector<S2CellId> cover;
     coverer.GetCovering(region, &cover);
