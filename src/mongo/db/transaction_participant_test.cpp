@@ -883,6 +883,51 @@ TEST_F(TxnParticipantTest, CannotAbortArbitraryPreparedTransactions) {
     ASSERT(_opObserver->transactionPrepared);
 }
 
+TEST_F(TxnParticipantTest, CannotStartNewTransactionIfNotPrimary) {
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+
+    auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Include 'autocommit=false' for transactions.
+    ASSERT_THROWS_CODE(
+        txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, true),
+        AssertionException,
+        ErrorCodes::NotMaster);
+}
+
+TEST_F(TxnParticipantTest, CannotStartRetryableWriteIfNotPrimary) {
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+
+    auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    // Omit the 'autocommit' field for retryable writes.
+    ASSERT_THROWS_CODE(
+        txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), boost::none, true),
+        AssertionException,
+        ErrorCodes::NotMaster);
+}
+
+TEST_F(TxnParticipantTest, CannotContinueTransactionIfNotPrimary) {
+    // Will start the transaction.
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_TRUE(txnParticipant.inMultiDocumentTransaction());
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+
+    // Technically, the transaction should have been aborted on stepdown anyway, but it
+    // doesn't hurt to have this kind of coverage.
+    ASSERT_THROWS_CODE(
+        txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, false),
+        AssertionException,
+        ErrorCodes::NotMaster);
+}
+
 TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInProgress) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());

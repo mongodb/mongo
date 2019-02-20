@@ -1,6 +1,6 @@
 /**
- * Test that commitTransaction and abortTransaction commands are not allowed to be issued against
- * replica set secondaries.
+ * Test that starting transactions and running commitTransaction and abortTransaction commands are
+ * not allowed on replica set secondaries.
  *
  * @tags: [uses_transactions]
  */
@@ -8,7 +8,7 @@
     "use strict";
 
     const dbName = "test";
-    const collName = "transaction_commit_abort_on_secondaries";
+    const collName = "transactions_on_secondaries_not_allowed";
 
     const rst = new ReplSetTest({name: collName, nodes: 2});
     rst.startSet();
@@ -32,34 +32,34 @@
     const sessionDb = session.getDatabase(dbName);
 
     /**
-     * Test commitTransaction.
+     * Test starting a transaction and issuing a commitTransaction command.
      */
 
     jsTestLog("Start a read-only transaction on the secondary.");
     session.startTransaction({readConcern: {level: "snapshot"}});
 
-    // Read a document.
-    assert.eq(initialDoc, sessionDb[collName].findOne({}));
+    // Try to read a document (the first statement in the transaction) and verify that this fails.
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.NotMaster);
 
-    jsTestLog("Make sure we are not allowed to commit the transaction on the secondary.");
+    // The check for "NotMaster" supercedes the check for "NoSuchTransaction" in this case.
+    jsTestLog(
+        "Make sure we are not allowed to run the commitTransaction command on the secondary.");
     assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NotMaster);
 
     /**
-     * Test abortTransaction.
+     * Test starting a transaction and issuing an abortTransaction command.
      */
 
     jsTestLog("Start a different read-only transaction on the secondary.");
     session.startTransaction({readConcern: {level: "snapshot"}});
 
-    // Read a document.
-    assert.eq(initialDoc, sessionDb[collName].findOne({}));
+    // Try to read a document (the first statement in the transaction) and verify that this fails.
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.NotMaster);
 
-    jsTestLog("Make sure we are not allowed to abort the transaction on the secondary.");
+    // The check for "NotMaster" supercedes the check for "NoSuchTransaction" in this case.
+    jsTestLog("Make sure we are not allowed to run the abortTransaction command on the secondary.");
     assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NotMaster);
 
     session.endSession();
-
-    // Terminate the secondary so we can end the test.
-    rst.stop(1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
     rst.stopSet(undefined, false, {skipValidation: true});
 }());
