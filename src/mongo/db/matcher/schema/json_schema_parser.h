@@ -80,6 +80,7 @@ public:
     // MongoDB-specific (non-standard) JSON Schema keyword constants.
     static constexpr StringData kSchemaBsonTypeKeyword = "bsonType"_sd;
     static constexpr StringData kSchemaEncryptKeyword = "encrypt"_sd;
+    static constexpr StringData kSchemaEncryptMetadataKeyword = "encryptMetadata"_sd;
 
     /**
      * Converts a JSON schema, represented as BSON, into a semantically equivalent match expression

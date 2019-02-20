@@ -1955,7 +1955,7 @@ TEST(JSONSchemaParserTest, FailsToParseIfBothEncryptAndBSONTypeArePresent) {
 TEST(JSONSchemaParserTest, FailsToParseIfEncryptValueIsNotObject) {
     BSONObj schema = fromjson("{properties: {foo: {encrypt: 12}}}");
     auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::TypeMismatch);
 }
 
 TEST(JSONSchemaParserTest, ParseSucceedsWithEmptyEncryptObject) {
@@ -1978,6 +1978,7 @@ TEST(JSONSchemaParserTest, ParseSucceedsIfEncryptFieldsAreValid) {
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_OK(result.getStatus());
 }
+
 TEST(JSONSchemaParserTest, FailsToParseIfEncryptHasBadFieldName) {
     BSONObj schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("keyIdx"
                                                                                << "/pointer"))));
@@ -2022,6 +2023,37 @@ TEST(JSONSchemaParserTest, FailsToParseWithBadPointer) {
                                                                             << "invalidPointer"))));
     auto result = JSONSchemaParser::parse(schema);
     ASSERT_EQ(result.getStatus().code(), 51065);
+}
+
+TEST(JSONSchemaParserTest, TopLevelEncryptMetadataValidatedCorrectly) {
+    BSONObj schema = fromjson(
+        "{encryptMetadata: {algorithm: \"AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic\","
+        "initializationVector: {$binary: \"four\", $type: \"00\"},"
+        " keyId: [{$binary: \"ASNFZ4mrze/ty6mHZUMhAQ==\", $type: \"04\"}]}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, NestedEncryptMetadataValidatedCorrectly) {
+    BSONObj schema = fromjson(
+        "{properties: {a: {encryptMetadata: {algorithm: \"AEAD_AES_256_CBC_HMAC_SHA_512-Random\", "
+        "keyId: [{$binary: \"ASNFZ4mrze/ty6mHZUMhAQ==\", $type: \"04\"}]}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfEncryptMetadataValueIsEmptyObject) {
+    BSONObj schema = fromjson("{encryptMetadata: {}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
+}
+
+TEST(JSONSchemaParserTest, FailsToParseIfBothEncryptAndEncryptMetadataAreSiblings) {
+    BSONObj schema = fromjson(
+        "{encrypt: {}, encryptMetadata: {algorithm: "
+        "\"AEAD_AES_256_CBC_HMAC_SHA_512-Random\"}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::FailedToParse);
 }
 
 TEST(JSONSchemaParserTest, FailsToParseWithNonUUIDArrayElement) {
