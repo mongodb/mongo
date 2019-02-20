@@ -327,6 +327,10 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
         }
 
         uassert(ErrorCodes::JSInterpreterFailure,
+                "UseInternalJobQueues",
+                js::UseInternalJobQueues(_context.get(), true));
+
+        uassert(ErrorCodes::JSInterpreterFailure,
                 "InitSelfHostedCode",
                 JS::InitSelfHostedCode(_context.get()));
 
@@ -614,7 +618,10 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
     JS::RootedValue out(_context);
     JS::RootedObject thisv(_context);
 
-    _checkErrorState(JS::Call(_context, thisv, function, argv, &out), false, true);
+    if (!_checkErrorState(JS::Call(_context, thisv, function, argv, &out), false, true)) {
+        // Run all of the async JS functions
+        js::RunJobs(_context);
+    }
 
     JS::RootedObject rout(_context, JS_NewPlainObject(_context));
     ObjectWrapper wout(_context, rout);
@@ -692,13 +699,19 @@ int MozJSImplScope::invoke(ScriptingFunction func,
         }
 
         JS::RootedValue out(_context);
-        JS::RootedObject obj(_context, smrecv.toObjectOrNull());
+        {
+            auto guard = makeGuard([&] { _engine->getDeadlineMonitor().stopDeadline(this); });
 
-        bool success = JS::Call(_context, obj, funcValue, args, &out);
+            JS::RootedObject obj(_context, smrecv.toObjectOrNull());
 
-        _engine->getDeadlineMonitor().stopDeadline(this);
+            bool success = JS::Call(_context, obj, funcValue, args, &out);
 
-        _checkErrorState(success);
+            if (!_checkErrorState(success)) {
+                // Run all of the async JS functions
+                js::RunJobs(_context);
+            }
+
+        }
 
         if (!ignoreReturn) {
             // must validate the handle because TerminateExecution may have
@@ -741,13 +754,16 @@ bool MozJSImplScope::exec(StringData code,
         }
 
         JS::RootedValue out(_context);
+        {
+            auto guard = makeGuard([&] { _engine->getDeadlineMonitor().stopDeadline(this); });
 
-        success = JS_ExecuteScript(_context, script, &out);
+            success = JS_ExecuteScript(_context, script, &out);
 
-        _engine->getDeadlineMonitor().stopDeadline(this);
-
-        if (_checkErrorState(success, reportError, assertOnError))
-            return false;
+            if (_checkErrorState(success, reportError, assertOnError))
+                return false;
+            // Run all of the async JS functions
+            js::RunJobs(_context);
+        }
 
         ObjectWrapper(_context, _global).setValue(kExecResult, out);
 

@@ -147,8 +147,8 @@ public:
         s->invoke("return 17;", 0, 0);
         ASSERT(17 == s->getNumber("__returnValue"));
 
-        s->invoke("function(){ return 17; }", 0, 0);
-        ASSERT(17 == s->getNumber("__returnValue"));
+        s->invoke("function(){ return 18; }", 0, 0);
+        ASSERT(18 == s->getNumber("__returnValue"));
 
         s->setNumber("x", 1.76);
         s->invoke("return x == 1.76; ", 0, 0);
@@ -1502,6 +1502,35 @@ public:
     }
 };
 
+/**
+ * A basic async test to make sure that async works and doesn't break
+ */
+template <ScopeFactory scopeFactory>
+class BasicAsyncJS {
+public:
+    void run() {
+        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
+
+        scope->setNumber("x", 0);
+        /* The async code will get run after the return, so
+         * 0 should be returned. Immediately after the return is
+         * evaluated the function within the then() will be executed,
+         * setting x to 28. */
+        scope->invoke(
+                "let f = async function() {  return 28; };"
+                "f().then(function(y){ x = y; });"
+                "return x;"
+                , 0, 0);
+        ASSERT(0 == scope->getNumber("__returnValue"));
+        /* When we return x the second time the value has been updated
+         * by the async function */
+        scope->invoke(
+                "return x;"
+                , 0, 0);
+        ASSERT(28 == scope->getNumber("__returnValue"));
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("js") {}
@@ -1554,6 +1583,8 @@ public:
         add<ErrorWithSidecarFromInvoke<scopeFactory>>();
         add<RequiresOwnedObjects<scopeFactory>>();
         add<ConvertShardKeyToHashed<scopeFactory>>();
+
+        add<BasicAsyncJS<scopeFactory>>();
     }
 
     void setupTests() {
