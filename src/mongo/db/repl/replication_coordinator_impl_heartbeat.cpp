@@ -205,7 +205,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             _cancelAndRescheduleElectionTimeout_inlock();
         }
     } else {
-        LOG_FOR_HEARTBEATS(0) << "Error in heartbeat (requestId: " << cbData.request.id << ") to "
+        LOG_FOR_HEARTBEATS(2) << "Error in heartbeat (requestId: " << cbData.request.id << ") to "
                               << target << ", response status: " << responseStatus;
 
         hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);

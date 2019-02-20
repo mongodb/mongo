@@ -30,6 +30,8 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 #define LOG_FOR_ELECTION(level) \
     MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationElection)
+#define LOG_FOR_HEARTBEATS(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationHeartbeats)
 
 #include "mongo/platform/basic.h"
 
@@ -731,6 +733,12 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
         nextHeartbeatStartDate = now;
     } else {
         nextHeartbeatStartDate = now + heartbeatInterval;
+    }
+
+    if (hbStats.failed()) {
+        LOG_FOR_HEARTBEATS(0) << "Heartbeat to " << target << " failed after "
+                              << kMaxHeartbeatRetries
+                              << " retries, response status: " << hbResponse.getStatus();
     }
 
     if (hbResponse.isOK() && hbResponse.getValue().hasConfig()) {
