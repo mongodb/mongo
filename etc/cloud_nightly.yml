@@ -1,14 +1,5 @@
 stepback: true
 
-# Needed til EVG-3714 is deployed
-functions:
-  something:
-  - command: shell.exec
-    params:
-      shell: bash
-      script: |
-        exit
-
 tasks:
 - name: GENERATE_MMS_TESTS
   commands:
