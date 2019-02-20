@@ -46,33 +46,43 @@
 
 namespace mongo {
 
+namespace {
+
+std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs) {
+    std::vector<std::string> indexNames;
+    for (const auto& spec : specs) {
+        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+        invariant(!name.empty(),
+                  str::stream() << "Bad spec passed into ReplIndexBuildState constructor, missing '"
+                                << IndexDescriptor::kIndexNameFieldName
+                                << "' field: "
+                                << spec);
+        indexNames.push_back(name);
+    }
+    return indexNames;
+}
+
+}  // namespace
+
 /**
  * Tracks the cross replica set progress of a particular index build identified by a build UUID.
  *
  * This is intended to only be used by the IndexBuildsCoordinator class.
  *
- * TODO: pass in commit quorum setting and FCV to decide the twoPhaseIndexBuild setting.
+ * TODO: pass in commit quorum setting.
  */
 struct ReplIndexBuildState {
     ReplIndexBuildState(const UUID& indexBuildUUID,
                         const UUID& collUUID,
                         const std::string& dbName,
-                        const std::vector<std::string> names,
                         const std::vector<BSONObj>& specs,
                         IndexBuildProtocol protocol)
         : buildUUID(indexBuildUUID),
           collectionUUID(collUUID),
           dbName(dbName),
-          indexNames(names),
+          indexNames(extractIndexNames(specs)),
           indexSpecs(specs),
-          protocol(protocol) {
-        // Verify that the given index names and index specs match.
-        invariant(names.size() == specs.size());
-        for (auto& spec : specs) {
-            std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
-            invariant(std::find(names.begin(), names.end(), name) != names.end());
-        }
-    }
+          protocol(protocol) {}
 
     // Uniquely identifies this index build across replica set members.
     const UUID buildUUID;

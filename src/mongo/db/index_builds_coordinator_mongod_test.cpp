@@ -99,7 +99,7 @@ std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::stri
     return indexSpecs;
 }
 
-TEST_F(IndexBuildsCoordinatorMongodTest, CannotBuildIndexWithSameIndexName) {
+TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexReturnsImmediateSuccess) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
@@ -112,14 +112,15 @@ TEST_F(IndexBuildsCoordinatorMongodTest, CannotBuildIndexWithSameIndexName) {
 
     // Attempt and fail to register an index build on _testFooNss with the same index name, while
     // the prior build is still running.
-    ASSERT_EQ(ErrorCodes::IndexKeySpecsConflict,
-              _indexBuildsCoord
-                  ->startIndexBuild(operationContext(),
-                                    _testFooUUID,
-                                    makeSpecs(_testFooNss, {"b"}),
-                                    UUID::gen(),
-                                    IndexBuildProtocol::kTwoPhase)
-                  .getStatus());
+    auto readyFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                    _testFooUUID,
+                                                                    makeSpecs(_testFooNss, {"b"}),
+                                                                    UUID::gen(),
+                                                                    IndexBuildProtocol::kTwoPhase));
+
+    auto readyStats = assertGet(readyFuture.getNoThrow());
+    ASSERT_EQ(3, readyStats.numIndexesBefore);
+    ASSERT_EQ(3, readyStats.numIndexesAfter);
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
@@ -304,7 +305,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
                   _indexBuildsCoord
                       ->startIndexBuild(operationContext(),
                                         _testFooUUID,
-                                        makeSpecs(_testFooNss, {"a", "b"}),
+                                        makeSpecs(_testFooNss, {"c", "d"}),
                                         UUID::gen(),
                                         IndexBuildProtocol::kTwoPhase)
                       .getStatus());
@@ -312,7 +313,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
                   _indexBuildsCoord
                       ->startIndexBuild(operationContext(),
                                         _testBarUUID,
-                                        makeSpecs(_testBarNss, {"c", "d"}),
+                                        makeSpecs(_testBarNss, {"a", "b"}),
                                         UUID::gen(),
                                         IndexBuildProtocol::kTwoPhase)
                       .getStatus());
@@ -356,7 +357,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
                       _indexBuildsCoord
                           ->startIndexBuild(operationContext(),
                                             _testFooUUID,
-                                            makeSpecs(_testFooNss, {"a", "b"}),
+                                            makeSpecs(_testFooNss, {"e", "f"}),
                                             UUID::gen(),
                                             IndexBuildProtocol::kTwoPhase)
                           .getStatus());
@@ -365,7 +366,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, DisallowNewBuildsOnNamespace) {
                   _indexBuildsCoord
                       ->startIndexBuild(operationContext(),
                                         _testFooUUID,
-                                        makeSpecs(_testFooNss, {"a", "b"}),
+                                        makeSpecs(_testFooNss, {"e", "f"}),
                                         UUID::gen(),
                                         IndexBuildProtocol::kTwoPhase)
                       .getStatus());
