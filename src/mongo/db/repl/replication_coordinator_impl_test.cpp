@@ -2440,8 +2440,7 @@ TEST_F(StepDownTest, UnconditionalStepDownFailsStepDownCommand) {
 }
 
 // Test that if a stepdown command is blocked waiting for secondaries to catch up when an
-// unconditional stepdown happens, and then is interrupted, we stay stepped down, even though
-// normally if we were just interrupted we would step back up.
+// unconditional stepdown happens, and then is interrupted, we step back up.
 TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     OpTime optime1(Timestamp(100, 1), 1);
     OpTime optime2(Timestamp(100, 2), 1);
@@ -2463,6 +2462,12 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     // We should still be primary at this point
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
+    // We should not indicate that we are master, nor that we are secondary.
+    IsMasterResponse response;
+    getReplCoord()->fillIsMasterForReplSet(&response);
+    ASSERT_FALSE(response.isMaster());
+    ASSERT_FALSE(response.isSecondary());
+
     // Interrupt the ongoing stepdown command.
     {
         stdx::lock_guard<Client> lk(*result.first.client.get());
@@ -2473,8 +2478,13 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     ASSERT_EQUALS(*result.second.get(), ErrorCodes::Interrupted);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-    // This is the important check, that we didn't accidentally step back up when aborting the
-    // stepdown command attempt.
+    // We should now report that we are master.
+    getReplCoord()->fillIsMasterForReplSet(&response);
+    ASSERT_TRUE(response.isMaster());
+    ASSERT_FALSE(response.isSecondary());
+
+    // This is the important check, that we stepped back up when aborting the stepdown command
+    // attempt.
     const auto opCtx = makeOperationContext();
     Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
@@ -2504,6 +2514,12 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
     // We should still be primary at this point
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
+    // We should not indicate that we are master, nor that we are secondary.
+    IsMasterResponse response;
+    getReplCoord()->fillIsMasterForReplSet(&response);
+    ASSERT_FALSE(response.isMaster());
+    ASSERT_FALSE(response.isSecondary());
+
     // Interrupt the ongoing stepdown command.
     {
         stdx::lock_guard<Client> lk(*result.first.client.get());
@@ -2523,6 +2539,10 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
     ASSERT(stepDownStatus == ErrorCodes::PrimarySteppedDown ||
            stepDownStatus == ErrorCodes::Interrupted);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    // We should still be indicating that we are not master.
+    getReplCoord()->fillIsMasterForReplSet(&response);
+    ASSERT_FALSE(response.isMaster());
 
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
