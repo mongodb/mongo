@@ -709,7 +709,7 @@ std::unique_ptr<TemporaryRecordStore> KVStorageEngine::makeTemporaryRecordStore(
     std::unique_ptr<RecordStore> rs =
         _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalIdent());
     LOG(1) << "created temporary record store: " << rs->getIdent();
-    return std::make_unique<TemporaryKVRecordStore>(opCtx, getEngine(), std::move(rs));
+    return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
 }
 
 void KVStorageEngine::setJournalListener(JournalListener* jl) {

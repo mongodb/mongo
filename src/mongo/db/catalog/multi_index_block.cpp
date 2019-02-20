@@ -95,6 +95,12 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
     }
 
     if (!_needToCleanup || _indexes.empty()) {
+        // The temp tables cannot be dropped in commit() because commit() can be called multiple
+        // times on write conflict errors and the drop does not rollback in WUOWs.
+        for (auto& index : _indexes) {
+            index.block->deleteTemporaryTables(opCtx);
+        }
+
         _buildIsCleanedUp = true;
         return;
     }
@@ -109,6 +115,7 @@ void MultiIndexBlock::cleanUpAfterBuild(OperationContext* opCtx, Collection* col
             // a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
                 _indexes[i].block->fail(opCtx, collection);
+                _indexes[i].block->deleteTemporaryTables(opCtx);
             }
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -228,7 +235,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
     // On rollback in init(), cleans up _indexes so that ~MultiIndexBlock doesn't try to clean up
     // _indexes manually (since the changes were already rolled back).
     // Due to this, it is thus legal to call init() again after it fails.
-    opCtx->recoveryUnit()->onRollback([this]() { _indexes.clear(); });
+    opCtx->recoveryUnit()->onRollback([this, opCtx]() {
+        for (auto& index : _indexes) {
+            index.block->deleteTemporaryTables(opCtx);
+        }
+        _indexes.clear();
+    });
 
     const auto& ns = collection->ns().ns();
 
@@ -630,7 +642,6 @@ Status MultiIndexBlock::drainBackgroundWrites(OperationContext* opCtx,
     return Status::OK();
 }
 
-
 Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
     if (State::kAborted == _getState()) {
         return {ErrorCodes::IndexBuildAborted,
@@ -657,8 +668,11 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void MultiIndexBlock::abortWithoutCleanup() {
+void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx) {
     _setStateToAbortedIfNotCommitted("aborted without cleanup"_sd);
+    for (auto& index : _indexes) {
+        index.block->deleteTemporaryTables(opCtx);
+    }
     _indexes.clear();
     _needToCleanup = false;
 }

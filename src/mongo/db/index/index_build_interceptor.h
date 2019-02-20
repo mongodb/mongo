@@ -47,11 +47,19 @@ public:
     enum class Op { kInsert, kDelete };
 
     /**
-     * The OperationContext is used to construct a temporary table in the storage engine to
-     * intercept side writes. This interceptor must not exist longer than the operation context used
-     * to construct it, as the underlying TemporaryRecordStore needs it to destroy itself.
+     * Creates a temporary table for writes during an index build. Additionally creates a temporary
+     * table to store any duplicate key constraint violations found during the build, if the index
+     * being built has uniqueness constraints.
+     *
+     * deleteTemporaryTable() must be called before destruction to delete the temporary tables.
      */
     IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
+
+    /**
+     * Deletes the temporary side writes and duplicate key constraint violations tables. Must be
+     * called before object destruction.
+     */
+    void deleteTemporaryTables(OperationContext* opCtx);
 
     /**
      * Client writes that are concurrent with an index build will have their index updates written

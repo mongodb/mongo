@@ -277,6 +277,8 @@ TEST_F(KVStorageEngineTest, ReconcileDropsTemporary) {
 
     // The storage engine is responsible for dropping its temporary idents.
     ASSERT(!identExists(opCtx.get(), ident));
+
+    rs->deleteTemporaryTable(opCtx.get());
 }
 
 TEST_F(KVStorageEngineTest, TemporaryDropsItself) {
@@ -289,6 +291,8 @@ TEST_F(KVStorageEngineTest, TemporaryDropsItself) {
         ident = rs->rs()->getIdent();
 
         ASSERT(identExists(opCtx.get(), ident));
+
+        rs->deleteTemporaryTable(opCtx.get());
     }
 
     // The temporary record store RAII class should drop itself.
@@ -330,6 +334,9 @@ TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTables) {
     // The owning index was dropped, and so should its temporary tables.
     ASSERT(!identExists(opCtx.get(), sideWrites->rs()->getIdent()));
     ASSERT(!identExists(opCtx.get(), constraintViolations->rs()->getIdent()));
+
+    sideWrites->deleteTemporaryTable(opCtx.get());
+    constraintViolations->deleteTemporaryTable(opCtx.get());
 }
 
 TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSecondary) {
@@ -372,6 +379,9 @@ TEST_F(KVStorageEngineTest, ReconcileDoesNotDropIndexBuildTempTablesBackgroundSe
     // dropped.
     ASSERT(identExists(opCtx.get(), sideWrites->rs()->getIdent()));
     ASSERT(identExists(opCtx.get(), constraintViolations->rs()->getIdent()));
+
+    sideWrites->deleteTemporaryTable(opCtx.get());
+    constraintViolations->deleteTemporaryTable(opCtx.get());
 }
 
 TEST_F(KVStorageEngineRepairTest, LoadCatalogRecoversOrphans) {

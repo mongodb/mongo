@@ -260,7 +260,7 @@ public:
      *
      * Must be called from owning thread.
      */
-    void abortWithoutCleanup();
+    void abortWithoutCleanup(OperationContext* opCtx);
 
     /**
      * Returns true if this build block supports background writes while building an index. This is

@@ -252,6 +252,11 @@ public:
         ~IndexBuildBlock();
 
         /**
+         * Being called in a 'WriteUnitOfWork' has no effect.
+         */
+        void deleteTemporaryTables(OperationContext* opCtx);
+
+        /**
          * Must be called from within a `WriteUnitOfWork`
          */
         Status init(OperationContext* opCtx, Collection* collection);

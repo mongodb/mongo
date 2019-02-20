@@ -156,6 +156,12 @@ public:
         virtual ~IndexBuildBlockInterface() = default;
 
         /**
+         * Must be called before the object is destructed if init() has been called.
+         * Cleans up the temporary tables that are created for an index build.
+         */
+        virtual void deleteTemporaryTables(OperationContext* opCtx) = 0;
+
+        /**
          * Initializes a new entry for the index in the IndexCatalog.
          *
          * On success, holds pointer to newly created IndexCatalogEntry that can be accessed using

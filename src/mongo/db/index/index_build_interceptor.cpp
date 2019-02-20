@@ -62,6 +62,13 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatal
     }
 }
 
+void IndexBuildInterceptor::deleteTemporaryTables(OperationContext* opCtx) {
+    _sideWritesTable->deleteTemporaryTable(opCtx);
+    if (_duplicateKeyTracker) {
+        _duplicateKeyTracker->deleteTemporaryTable(opCtx);
+    }
+}
+
 Status IndexBuildInterceptor::recordDuplicateKeys(OperationContext* opCtx,
                                                   const std::vector<BSONObj>& keys) {
     invariant(_indexCatalogEntry->descriptor()->unique());

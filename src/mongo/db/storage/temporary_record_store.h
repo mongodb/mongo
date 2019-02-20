@@ -34,10 +34,10 @@
 namespace mongo {
 
 /**
- * This is an RAII type that manages the lifetime of a temporary RecordStore.
+ * Manages the lifetime of a temporary RecordStore.
  *
- * Derived classes must implement a destructor that drops the underlying RecordStore from the
- * storage engine.
+ * Derived classes must implement and call deleteTemporaryTable() to delete the underlying
+ * RecordStore from the storage engine.
  */
 class TemporaryRecordStore {
 public:
@@ -51,6 +51,8 @@ public:
     TemporaryRecordStore(TemporaryRecordStore&& other) noexcept : _rs(std::move(other._rs)) {}
 
     virtual ~TemporaryRecordStore() {}
+
+    virtual void deleteTemporaryTable(OperationContext* opCtx) {}
 
     RecordStore* rs() {
         return _rs.get();

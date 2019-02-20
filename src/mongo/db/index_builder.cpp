@@ -185,7 +185,7 @@ Status IndexBuilder::_buildAndHandleErrors(OperationContext* opCtx,
 
     if (status.code() == ErrorCodes::InterruptedAtShutdown) {
         // leave it as-if kill -9 happened. This will be handled on restart.
-        indexer.abortWithoutCleanup();
+        indexer.abortWithoutCleanup(opCtx);
         return status;
     }
 

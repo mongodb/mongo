@@ -52,6 +52,12 @@ IndexCatalogImpl::IndexBuildBlock::IndexBuildBlock(IndexCatalogImpl* catalog,
                                                    IndexBuildMethod method)
     : _catalog(catalog), _ns(nss.ns()), _spec(spec.getOwned()), _method(method), _entry(nullptr) {}
 
+void IndexCatalogImpl::IndexBuildBlock::deleteTemporaryTables(OperationContext* opCtx) {
+    if (_indexBuildInterceptor) {
+        _indexBuildInterceptor->deleteTemporaryTables(opCtx);
+    }
+}
+
 Status IndexCatalogImpl::IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());

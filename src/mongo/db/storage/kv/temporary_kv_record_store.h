@@ -38,17 +38,14 @@ class KVEngine;
 class OperationContext;
 
 /**
- * This is an implementation of an RAII type that manages a temporary RecordStore on a KVEngine.
+ * Implementation of TemporaryRecordStore that manages a temporary RecordStore on a KVEngine.
  *
- * This object should not exist any longer than the provided OperationContext, as the destructor
- * uses it to drop the record store on the KVEngine.
+ * deleteTemporaryTable() must be called before destruction to delete the underlying RecordStore.
  */
 class TemporaryKVRecordStore : public TemporaryRecordStore {
 public:
-    TemporaryKVRecordStore(OperationContext* opCtx,
-                           KVEngine* kvEngine,
-                           std::unique_ptr<RecordStore> rs)
-        : TemporaryRecordStore(std::move(rs)), _opCtx(opCtx), _kvEngine(kvEngine){};
+    TemporaryKVRecordStore(KVEngine* kvEngine, std::unique_ptr<RecordStore> rs)
+        : TemporaryRecordStore(std::move(rs)), _kvEngine(kvEngine){};
 
     // Not copyable.
     TemporaryKVRecordStore(const TemporaryKVRecordStore&) = delete;
@@ -57,14 +54,18 @@ public:
     // Move constructor.
     TemporaryKVRecordStore(TemporaryKVRecordStore&& other) noexcept
         : TemporaryRecordStore(std::move(other._rs)),
-          _opCtx(other._opCtx),
           _kvEngine(other._kvEngine) {}
 
     ~TemporaryKVRecordStore();
 
+    /**
+     * Drops the persisted record store from the storage engine.
+     */
+    void deleteTemporaryTable(OperationContext* opCtx);
+
 private:
-    OperationContext* _opCtx;
     KVEngine* _kvEngine;
+    bool _recordStoreHasBeenDeleted = false;
 };
 
 }  // namespace mongo

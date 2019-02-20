@@ -40,10 +40,15 @@
 namespace mongo {
 
 TemporaryKVRecordStore::~TemporaryKVRecordStore() {
-    auto status = _kvEngine->dropIdent(_opCtx, _rs->getIdent());
+    invariant(_recordStoreHasBeenDeleted);
+}
+
+void TemporaryKVRecordStore::deleteTemporaryTable(OperationContext* opCtx) {
+    auto status = _kvEngine->dropIdent(opCtx, _rs->getIdent());
     fassert(
         51032,
         status.withContext(str::stream() << "failed to drop temporary ident: " << _rs->getIdent()));
+    _recordStoreHasBeenDeleted = true;
 }
 
 }  // namespace mongo

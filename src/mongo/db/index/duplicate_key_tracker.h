@@ -50,7 +50,17 @@ class DuplicateKeyTracker {
     MONGO_DISALLOW_COPYING(DuplicateKeyTracker);
 
 public:
+    /**
+     * Creates a temporary table in which to store any duplicate key constraint violations.
+     * deleteTemporaryTable() must be called before destruction.
+     */
     DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry);
+
+    /**
+     * Deletes the temporary table for the duplicate key constraint violations. Must be called
+     * before object destruction.
+     */
+    void deleteTemporaryTable(OperationContext* opCtx);
 
     /**
      * Given a set of duplicate keys, insert them into the key constraint table.
