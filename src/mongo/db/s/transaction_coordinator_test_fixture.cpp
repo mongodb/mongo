@@ -58,7 +58,7 @@ void TransactionCoordinatorTestFixture::setUp() {
     ASSERT_OK(ServerParameterSet::getGlobal()
                   ->getMap()
                   .find("logComponentVerbosity")
-                  ->second->setFromString("{verbosity: 3}"));
+                  ->second->setFromString("{transaction: {verbosity: 3}}"));
 
     for (const auto& shardId : kThreeShardIdList) {
         auto shardTargeter = RemoteCommandTargeterMock::get(
