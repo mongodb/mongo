@@ -1787,6 +1787,7 @@ env.Library(
     target='logical_clock',
     source=[
         'logical_clock.cpp',
+        env.Idlc('logical_clock.idl')[0],
     ],
     LIBDEPS=[
         'global_settings',

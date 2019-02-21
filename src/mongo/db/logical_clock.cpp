@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_clock_gen.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/global_settings.h"
@@ -42,21 +43,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-constexpr Seconds LogicalClock::kMaxAcceptableLogicalClockDriftSecs;
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxAcceptableLogicalClockDriftSecs,
-                                      long long,
-                                      LogicalClock::kMaxAcceptableLogicalClockDriftSecs.count())
-    ->withValidator([](const long long& potentialNewValue) {
-        if (potentialNewValue <= 0) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "maxAcceptableLogicalClockDriftSecs must be positive, "
-                                           "but attempted to set to: "
-                                        << potentialNewValue);
-        }
-        return Status::OK();
-    });
 
 namespace {
 const auto getLogicalClock = ServiceContext::declareDecoration<std::unique_ptr<LogicalClock>>();
@@ -173,7 +159,7 @@ void LogicalClock::setClusterTimeFromTrustedSource(LogicalTime newTime) {
 Status LogicalClock::_passesRateLimiter_inlock(LogicalTime newTime) {
     const unsigned wallClockSecs =
         durationCount<Seconds>(_service->getFastClockSource()->now().toDurationSinceEpoch());
-    auto maxAcceptableDriftSecs = static_cast<const unsigned>(maxAcceptableLogicalClockDriftSecs);
+    auto maxAcceptableDriftSecs = static_cast<const unsigned>(gMaxAcceptableLogicalClockDriftSecs);
     auto newTimeSecs = newTime.asTimestamp().getSecs();
 
     // Both values are unsigned, so compare them first to avoid wrap-around.

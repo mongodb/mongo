@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_clock_gen.h"
 #include "mongo/db/logical_clock_test_fixture.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -110,7 +111,7 @@ TEST_F(LogicalClockTest, RateLimiterRejectsLogicalTimesTooFarAhead) {
 
     Timestamp tooFarAheadTimestamp(
         durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) +
-            durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDriftSecs) +
+            kMaxAcceptableLogicalClockDriftSecsDefault +
             10,  // Add 10 seconds to ensure limit is exceeded.
         1);
     LogicalTime t1(tooFarAheadTimestamp);
@@ -120,12 +121,12 @@ TEST_F(LogicalClockTest, RateLimiterRejectsLogicalTimesTooFarAhead) {
 
 // Verify cluster time can be initialized to a very old time.
 TEST_F(LogicalClockTest, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
-    setMockClockSourceTime(Date_t::fromMillisSinceEpoch(
-        durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDriftSecs) * 10 * 1000));
+    setMockClockSourceTime(
+        Date_t::fromMillisSinceEpoch(kMaxAcceptableLogicalClockDriftSecsDefault * 10 * 1000));
 
     Timestamp veryOldTimestamp(
         durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) -
-        (durationCount<Seconds>(LogicalClock::kMaxAcceptableLogicalClockDriftSecs) * 5));
+        (kMaxAcceptableLogicalClockDriftSecsDefault * 5));
     auto veryOldTime = LogicalTime(veryOldTimestamp);
     getClock()->setClusterTimeFromTrustedSource(veryOldTime);
 
@@ -156,19 +157,19 @@ TEST_F(LogicalClockTest, WallClockSetTooFarInPast) {
     auto oneDay = Seconds(24 * 60 * 60);
 
     // Current wall clock and cluster time.
-    auto currentSecs = LogicalClock::kMaxAcceptableLogicalClockDriftSecs * 10;
+    auto currentSecs = Seconds(kMaxAcceptableLogicalClockDriftSecsDefault) * 10;
     LogicalTime currentTime(Timestamp(currentSecs, 0));
 
     // Set wall clock more than maxAcceptableLogicalClockDriftSecs seconds in the past.
-    auto pastSecs = currentSecs - LogicalClock::kMaxAcceptableLogicalClockDriftSecs - oneDay;
+    auto pastSecs = currentSecs - Seconds(kMaxAcceptableLogicalClockDriftSecsDefault) - oneDay;
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(pastSecs));
 
     // If cluster time is either uninitialized or even farther in the past, a write would set
     // cluster time more than maxAcceptableLogicalClockDriftSecs in the past.
     getDBClient()->insert(kDummyNamespaceString.ns(), BSON("x" << 1));
-    ASSERT_TRUE(
-        getClock()->getClusterTime() <
-        LogicalTime(Timestamp(currentSecs - LogicalClock::kMaxAcceptableLogicalClockDriftSecs, 0)));
+    ASSERT_TRUE(getClock()->getClusterTime() <
+                LogicalTime(Timestamp(
+                    currentSecs - Seconds(kMaxAcceptableLogicalClockDriftSecsDefault), 0)));
 
     // Set wall clock to the current time on the affected node.
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(currentSecs));
@@ -187,19 +188,19 @@ TEST_F(LogicalClockTest, WallClockSetTooFarInFuture) {
     auto oneDay = Seconds(24 * 60 * 60);
 
     // Current wall clock and cluster time.
-    auto currentSecs = LogicalClock::kMaxAcceptableLogicalClockDriftSecs * 10;
+    auto currentSecs = Seconds(kMaxAcceptableLogicalClockDriftSecsDefault) * 10;
     LogicalTime currentTime(Timestamp(currentSecs, 0));
 
     // Set wall clock more than maxAcceptableLogicalClockDriftSecs seconds in the future.
-    auto futureSecs = currentSecs + LogicalClock::kMaxAcceptableLogicalClockDriftSecs + oneDay;
+    auto futureSecs = currentSecs + Seconds(kMaxAcceptableLogicalClockDriftSecsDefault) + oneDay;
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(futureSecs));
 
     // A write gets through and advances cluster time more than maxAcceptableLogicalClockDriftSecs
     // in the future.
     getDBClient()->insert(kDummyNamespaceString.ns(), BSON("x" << 1));
-    ASSERT_TRUE(
-        getClock()->getClusterTime() >
-        LogicalTime(Timestamp(currentSecs + LogicalClock::kMaxAcceptableLogicalClockDriftSecs, 0)));
+    ASSERT_TRUE(getClock()->getClusterTime() >
+                LogicalTime(Timestamp(
+                    currentSecs + Seconds(kMaxAcceptableLogicalClockDriftSecsDefault), 0)));
 
     // Set wall clock to the current time on the affected node.
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(currentSecs));
@@ -325,7 +326,7 @@ TEST_F(LogicalClockTest, RejectsLogicalTimesGreaterThanMaxTime) {
     // The time can't be advanced through metadata to a time greater than the max possible.
     // Advance the wall clock close enough to the new value so the rate check is passed.
     auto almostMaxSecs =
-        Seconds(maxVal) - LogicalClock::kMaxAcceptableLogicalClockDriftSecs + Seconds(10);
+        Seconds(maxVal) - Seconds(kMaxAcceptableLogicalClockDriftSecsDefault) + Seconds(10);
     setMockClockSourceTime(Date_t::fromDurationSinceEpoch(almostMaxSecs));
     ASSERT_THROWS(getClock()->advanceClusterTime(beyondMaxTime), std::exception);
     ASSERT_TRUE(getClock()->getClusterTime() == LogicalTime());
