@@ -59,7 +59,7 @@ Status storeSASLSSPIOptions(const moe::Environment& params) {
                           "Unrecognized sspiHostnameCanonicalization option");
         }
     }
-    
+
     return Status::OK();
 }
 
