@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_parameters.h"
@@ -48,10 +49,6 @@ namespace {
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
 }  // namespace
-
-// If true, do not take the PBWM lock in AutoGetCollectionForRead on secondaries during batch
-// application.
-MONGO_EXPORT_SERVER_PARAMETER(allowSecondaryReadsDuringBatchApplication, bool, true);
 
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    const NamespaceString& nss,
@@ -93,7 +90,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    Date_t deadline) {
     // Don't take the ParallelBatchWriterMode lock when the server parameter is set and our
     // storage engine supports snapshot reads.
-    if (allowSecondaryReadsDuringBatchApplication.load() &&
+    if (gAllowSecondaryReadsDuringBatchApplication.load() &&
         opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         _shouldNotConflictWithSecondaryBatchApplicationBlock.emplace(opCtx->lockState());
     }

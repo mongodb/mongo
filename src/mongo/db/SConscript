@@ -694,12 +694,16 @@ env.Library(
     target='db_raii',
     source=[
         'db_raii.cpp',
+        env.Idlc('db_raii.idl')[0]
     ],
     LIBDEPS=[
         'catalog_raii',
         'curop',
         's/sharding_api_d',
         'stats/top',
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/idl/server_parameter",
     ],
 )
 
