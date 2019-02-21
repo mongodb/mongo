@@ -70,6 +70,7 @@ namespace {
 constexpr auto kIndexesFieldName = "indexes"_sd;
 constexpr auto kCommandName = "createIndexes"_sd;
 constexpr auto kCommitQuorumFieldName = "commitQuorum"_sd;
+constexpr auto kignoreUnknownIndexSpecFieldsName = "ignoreUnknownIndexSpecFields"_sd;
 constexpr auto kTwoPhaseCommandName = "twoPhaseCreateIndexes"_sd;
 constexpr auto kCreateCollectionAutomaticallyFieldName = "createdCollectionAutomatically"_sd;
 constexpr auto kNumIndexesBeforeFieldName = "numIndexesBefore"_sd;
@@ -87,6 +88,19 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
     const BSONObj& cmdObj,
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility) {
     bool hasIndexesField = false;
+
+    bool ignoreUnknownIndexSpecFields = false;
+    if (cmdObj.hasField(kignoreUnknownIndexSpecFieldsName)) {
+        auto ignoreUnknownIndexSpecFieldsElement =
+            cmdObj.getField(kignoreUnknownIndexSpecFieldsName);
+        if (ignoreUnknownIndexSpecFieldsElement.type() != BSONType::Bool) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << "The field '" << kignoreUnknownIndexSpecFieldsName
+                                  << "' must be a boolean, but got "
+                                  << typeName(ignoreUnknownIndexSpecFieldsElement.type())};
+        }
+        ignoreUnknownIndexSpecFields = ignoreUnknownIndexSpecFieldsElement.boolean();
+    }
 
     std::vector<BSONObj> indexSpecs;
     for (auto&& cmdElem : cmdObj) {
@@ -108,8 +122,13 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
                                           << typeName(indexesElem.type())};
                 }
 
+                BSONObj parsedIndexSpec = indexesElem.Obj();
+                if (ignoreUnknownIndexSpecFields) {
+                    parsedIndexSpec = index_key_validate::removeUnknownFields(parsedIndexSpec);
+                }
+
                 auto indexSpecStatus = index_key_validate::validateIndexSpec(
-                    opCtx, indexesElem.Obj(), ns, featureCompatibility);
+                    opCtx, parsedIndexSpec, ns, featureCompatibility);
                 if (!indexSpecStatus.isOK()) {
                     return indexSpecStatus.getStatus();
                 }
@@ -139,6 +158,7 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             hasIndexesField = true;
         } else if (kCommandName == cmdElemFieldName || kCommitQuorumFieldName == cmdElemFieldName ||
                    kTwoPhaseCommandName == cmdElemFieldName ||
+                   kignoreUnknownIndexSpecFieldsName == cmdElemFieldName ||
                    isGenericArgument(cmdElemFieldName)) {
             continue;
         } else {

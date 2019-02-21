@@ -62,6 +62,11 @@ StatusWith<BSONObj> validateIndexSpec(
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility);
 
 /**
+ * Returns a new index spec with any unknown field names removed from 'indexSpec'.
+ */
+BSONObj removeUnknownFields(const BSONObj& indexSpec);
+
+/**
  * Performs additional validation for _id index specifications. This should be called after
  * validateIndexSpec().
  */
