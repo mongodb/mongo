@@ -55,8 +55,6 @@ namespace {
 
 ConnectionString fixtureConnectionString{};
 
-const char kConnectionStringFlag[] = "connectionString";
-
 }  // namespace
 
 namespace mongo {
@@ -78,18 +76,6 @@ int main(int argc, char** argv, char** envp) {
 
 namespace moe = mongo::optionenvironment;
 
-MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(IntegrationTestOptions)(InitializerContext*) {
-    auto& opts = moe::startupOptions;
-    opts.addOptionChaining("help", "help", moe::Switch, "Display help");
-    opts.addOptionChaining(kConnectionStringFlag,
-                           kConnectionStringFlag,
-                           moe::String,
-                           "The connection string associated with the test fixture that this "
-                           "integration test should run against.")
-        .setDefault(moe::Value("localhost:27017"));
-    return Status::OK();
-}
-
 MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
     auto& env = moe::startupOptionsParsed;
     auto& opts = moe::startupOptions;
@@ -109,21 +95,18 @@ MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
 }
 
 MONGO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
-    auto& env = moe::startupOptionsParsed;
-    moe::Value connectionString;
-    auto ret = env.get(moe::Key(kConnectionStringFlag), &connectionString);
-    if (!ret.isOK()) {
-        return ret;
-    }
+    const auto& env = moe::startupOptionsParsed;
 
-    auto swConnectionString = ConnectionString::parse(connectionString.as<std::string>());
+    std::string connectionString = env["connectionString"].as<std::string>();
+
+    auto swConnectionString = ConnectionString::parse(connectionString);
     if (!swConnectionString.isOK()) {
         return swConnectionString.getStatus();
     }
 
-    log() << "Using test fixture with connection string = " << connectionString.as<std::string>();
-
     fixtureConnectionString = std::move(swConnectionString.getValue());
+    log() << "Using test fixture with connection string = " << connectionString;
+
 
     return Status::OK();
 }

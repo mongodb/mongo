@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/logger/logger.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/unittest/unittest_options_gen.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
@@ -42,35 +43,25 @@
 
 using mongo::Status;
 
+namespace moe = ::mongo::optionenvironment;
+
 int main(int argc, char** argv, char** envp) {
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
 
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
-    namespace moe = ::mongo::optionenvironment;
+    moe::OptionSection options;
+
+    Status status = mongo::unittest::addUnitTestOptions(&options);
+    if (!status.isOK()) {
+        std::cerr << status;
+        return EXIT_FAILURE;
+    }
+
     moe::OptionsParser parser;
     moe::Environment environment;
-    moe::OptionSection options;
     std::map<std::string, std::string> env;
-
-    // Register our allowed options with our OptionSection
-    auto listDesc = "List all test suites in this unit test.";
-    options.addOptionChaining("list", "list", moe::Switch, listDesc).setDefault(moe::Value(false));
-
-    auto suiteDesc = "Test suite name. Specify --suite more than once to run multiple suites.";
-    options.addOptionChaining("suite", "suite", moe::StringVector, suiteDesc);
-
-    auto filterDesc = "Test case name filter. Specify the substring of the test names.";
-    options.addOptionChaining("filter", "filter", moe::String, filterDesc);
-
-    auto repeatDesc = "Specifies the number of runs for each test.";
-    options.addOptionChaining("repeat", "repeat", moe::Int, repeatDesc).setDefault(moe::Value(1));
-
-    auto verboseDesc = "Log more verbose output.  Specify one or more 'v's to increase verbosity.";
-    options.addOptionChaining("verbose", "verbose", moe::String, verboseDesc)
-        .setImplicit(moe::Value(std::string("v")));
-
     std::vector<std::string> argVector(argv, argv + argc);
     Status ret = parser.run(options, argVector, env, &environment);
     if (!ret.isOK()) {
