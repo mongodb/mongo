@@ -35,6 +35,7 @@
 #include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_document.h"
+#include "mongo/db/keys_collection_manager_gen.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -48,8 +49,6 @@ class LogicalTime;
 class ServiceContext;
 class KeysCollectionClient;
 
-extern int KeysRotationIntervalSec;
-
 /**
  * The KeysCollectionManager queries the config servers for keys that can be used for
  * HMAC computation. It maintains an internal background thread that is used to periodically
@@ -57,7 +56,6 @@ extern int KeysRotationIntervalSec;
  */
 class KeysCollectionManager {
 public:
-    static const Seconds kKeyValidInterval;
     static const std::string kKeyManagerPurposeString;
 
     KeysCollectionManager(std::string purpose,

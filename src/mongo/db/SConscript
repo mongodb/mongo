@@ -1765,6 +1765,7 @@ env.Library(
 env.Library(
     target='keys_collection_manager',
     source=[
+        env.Idlc('keys_collection_manager.idl')[0],
         'keys_collection_manager.cpp',
         'keys_collection_cache.cpp',
         'key_generator.cpp',

@@ -49,12 +49,7 @@
 
 namespace mongo {
 
-const Seconds KeysCollectionManager::kKeyValidInterval{3 * 30 * 24 * 60 * 60};  // ~3 months
 const std::string KeysCollectionManager::kKeyManagerPurposeString = "HMAC";
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(KeysRotationIntervalSec,
-                                      int,
-                                      KeysCollectionManager::kKeyValidInterval.count());
 
 namespace {
 
