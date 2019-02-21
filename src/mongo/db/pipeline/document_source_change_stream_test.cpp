@@ -217,7 +217,8 @@ public:
      * Helper for running an applyOps through the pipeline, and getting all of the results.
      */
     std::vector<Document> getApplyOpsResults(const Document& applyOpsDoc,
-                                             const LogicalSessionFromClient& lsid) {
+                                             const LogicalSessionFromClient& lsid,
+                                             bool setPrepareTrue = false) {
         BSONObj applyOpsObj = applyOpsDoc.toBson();
 
         // Create an oplog entry and then glue on an lsid and txnNumber
@@ -230,6 +231,9 @@ public:
         BSONObjBuilder builder(baseOplogEntry.toBSON());
         builder.append("lsid", lsid.toBSON());
         builder.append("txnNumber", 0LL);
+        if (setPrepareTrue) {
+            builder.append("prepare", true);
+        }
         BSONObj oplogEntry = builder.done();
 
         // Create the stages and check that the documents produced matched those in the applyOps.
@@ -856,6 +860,35 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithEntriesOnDifferentNs) {
     ASSERT_EQ(results.size(), 0u);
 }
 
+TEST_F(ChangeStreamStageTest, PreparedTransactionApplyOpsEntriesAreIgnored) {
+    Document applyOpsDoc = Document{{"applyOps",
+                                     Value{std::vector<Document>{Document{
+                                         {"op", "i"_sd},
+                                         {"ns", nss.ns()},
+                                         {"ui", testUuid()},
+                                         {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}},
+                                         {"prepare", true}}}}}};
+    LogicalSessionFromClient lsid = testLsid();
+    vector<Document> results = getApplyOpsResults(applyOpsDoc, lsid, true);
+
+    // applyOps entries that are part of a prepared transaction are ignored. These entries will be
+    // fetched for changeStreams delivery as part of transaction commit.
+    ASSERT_EQ(results.size(), 0u);
+}
+
+// TODO SERVER-39675: This test should be replaced with one that validates a prepared transaction
+// event sequence.
+TEST_F(ChangeStreamStageTest, CommitTransactionReturnsInvalidate) {
+    OplogEntry oplogEntry = createCommand(BSON("commitTransaction" << 1));
+
+    Document expectedResult{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+    };
+
+    checkTransformation(oplogEntry, expectedResult);
+}
 
 TEST_F(ChangeStreamStageTest, TransformApplyOps) {
     // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple

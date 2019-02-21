@@ -299,6 +299,11 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 invariant(nextDoc);
 
                 return applyTransformation(*nextDoc);
+            } else if (!input.getNestedField("o.commitTransaction").missing()) {
+                // TODO SERVER-39675: Perform a lookup for the associated committed transaction
+                // operations. The current invalidate behavior is just a placeholder pending this
+                // work.
+                operationType = DocumentSourceChangeStream::kInvalidateOpType;
             } else if (!input.getNestedField("o.drop").missing()) {
                 operationType = DocumentSourceChangeStream::kDropCollectionOpType;
 
