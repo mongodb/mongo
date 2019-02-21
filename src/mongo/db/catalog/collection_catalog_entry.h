@@ -66,9 +66,6 @@ public:
 
     virtual void getAllIndexes(OperationContext* opCtx, std::vector<std::string>* names) const = 0;
 
-    virtual void getReadyIndexes(OperationContext* opCtx,
-                                 std::vector<std::string>* names) const = 0;
-
     virtual BSONObj getIndexSpec(OperationContext* opCtx, StringData idxName) const = 0;
 
     /**

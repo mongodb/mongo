@@ -109,19 +109,6 @@ void NamespaceDetailsCollectionCatalogEntry::getAllIndexes(OperationContext* opC
     }
 }
 
-void NamespaceDetailsCollectionCatalogEntry::getReadyIndexes(
-    OperationContext* opCtx, std::vector<std::string>* names) const {
-    NamespaceDetails::IndexIterator i = _details->ii(true);
-    while (i.more()) {
-        const IndexDetails& id = i.next();
-        const BSONObj obj = _indexRecordStore->dataFor(opCtx, id.info.toRecordId()).toBson();
-        const char* idxName = obj.getStringField("name");
-        if (isIndexReady(opCtx, StringData(idxName))) {
-            names->push_back(idxName);
-        }
-    }
-}
-
 bool NamespaceDetailsCollectionCatalogEntry::isIndexMultikey(OperationContext* opCtx,
                                                              StringData idxName,
                                                              MultikeyPaths* multikeyPaths) const {

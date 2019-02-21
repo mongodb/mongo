@@ -56,6 +56,14 @@ jsTest.log("Starting background indexing for test of: " + tojson(dc));
 masterDB.getCollection(collection).ensureIndex({b: 1});
 
 masterDB.getCollection(collection).ensureIndex({i: 1}, {background: true});
+assert.eq(3, masterDB.getCollection(collection).getIndexes().length);
+
+// Wait for the secondary to get the index entry
+assert.soon(function() {
+    return 3 == secondDB.getCollection(collection).getIndexes().length;
+}, "index not created on secondary (prior to drop)", 240000);
+
+jsTest.log("Index created and index entry exists on secondary");
 
 // make sure the index build has started on secondary
 assert.soon(function() {
