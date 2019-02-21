@@ -143,16 +143,6 @@ void BSONCollectionCatalogEntry::getAllIndexes(OperationContext* txn,
     }
 }
 
-void BSONCollectionCatalogEntry::getReadyIndexes(OperationContext* txn,
-                                                 std::vector<std::string>* names) const {
-    MetaData md = _getMetaData(txn);
-
-    for (unsigned i = 0; i < md.indexes.size(); i++) {
-        if (md.indexes[i].ready)
-            names->push_back(md.indexes[i].spec["name"].String());
-    }
-}
-
 bool BSONCollectionCatalogEntry::isIndexMultikey(OperationContext* txn,
                                                  StringData indexName,
                                                  MultikeyPaths* multikeyPaths) const {

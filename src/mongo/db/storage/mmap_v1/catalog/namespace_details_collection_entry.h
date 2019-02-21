@@ -67,8 +67,6 @@ public:
 
     BSONObj getIndexSpec(OperationContext* txn, StringData idxName) const final;
 
-    void getReadyIndexes(OperationContext* txn, std::vector<std::string>* names) const final;
-
     bool isIndexMultikey(OperationContext* txn,
                          StringData indexName,
                          MultikeyPaths* multikeyPaths) const final;

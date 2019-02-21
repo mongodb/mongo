@@ -1,7 +1,6 @@
 // Test background index creation
 
 load("jstests/libs/slow_weekly_util.js");
-load("jstests/noPassthrough/libs/index_build.js");
 
 var testServer = new SlowWeeklyMongod("indexbg1");
 var db = testServer.getDB("test");
@@ -57,7 +56,7 @@ while (1) {  // if indexing finishes before we can run checks, try indexing w/ m
         // wait for indexing to start
         print("wait for indexing to start");
         assert.soon(function() {
-            return getIndexBuildOpId(db) != -1;
+            return 2 === t.getIndexes().length;
         }, "no index created", 30000, 50);
         print("started.");
         sleep(1000);  // there is a race between when the index build shows up in curop and
