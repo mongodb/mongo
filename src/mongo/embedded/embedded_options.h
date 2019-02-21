@@ -48,6 +48,7 @@ Status canonicalizeOptions(optionenvironment::Environment* params);
 
 Status storeOptions(const optionenvironment::Environment& params);
 void resetOptions();
+std::string storageDBPathDescription();
 
 }  // namespace embedded
 }  // namespace mongo

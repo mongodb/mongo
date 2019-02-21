@@ -47,33 +47,6 @@ namespace mongo {
 
 MongoeBenchGlobalParams mongoeBenchGlobalParams;
 
-Status addMongoeBenchOptions(moe::OptionSection* options) {
-    options->addOptionChaining("help", "help", moe::Switch, "show this usage information");
-
-    options
-        ->addOptionChaining(
-            "benchRunConfigFile", "benchRunConfigFile", moe::String, "config file for benchRun")
-        .hidden()
-        .positional(1, 1);
-
-    options->addOptionChaining("seed", "seed", moe::Long, "random seed to use");
-
-    options
-        ->addOptionChaining(
-            "threads", "threads,t", moe::Unsigned, "number of benchRun worker threads")
-        .setDefault(moe::Value(1U));
-
-    options->addOptionChaining("time", "time,s", moe::Double, "seconds to run benchRun for")
-        .setDefault(moe::Value(1.0));
-
-    options->addOptionChaining("output",
-                               "output,o",
-                               moe::String,
-                               "output file for benchRun stats (defaults to <dbPath>/perf.json)");
-
-    return Status::OK();
-}
-
 void printMongoeBenchHelp(std::ostream* out) {
     *out << "Usage: mongoebench <config file> [options]" << std::endl;
     *out << moe::startupOptions.helpString();

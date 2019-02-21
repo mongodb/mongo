@@ -34,6 +34,7 @@
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/embedded/embedded_options_gen.h"
 
 #include <boost/filesystem.hpp>
 #include <string>
@@ -49,34 +50,7 @@ Status addOptions(optionenvironment::OptionSection* options) {
         return ret;
     }
 
-    moe::OptionSection storage_options("Storage options");
-
-    storage_options
-        .addOptionChaining(
-            "storage.engine", "storageEngine", moe::String, "what storage engine to use")
-        .setDefault(optionenvironment::Value("mobile"));
-
-#ifdef _WIN32
-    boost::filesystem::path currentPath = boost::filesystem::current_path();
-
-    std::string defaultPath = currentPath.root_name().string() + storageGlobalParams.kDefaultDbPath;
-    storage_options.addOptionChaining("storage.dbPath",
-                                      "dbpath",
-                                      optionenvironment::String,
-                                      std::string("directory for datafiles - defaults to ") +
-                                          storageGlobalParams.kDefaultDbPath + " which is " +
-                                          defaultPath + " based on the current working drive");
-
-#else
-    storage_options.addOptionChaining("storage.dbPath",
-                                      "dbpath",
-                                      optionenvironment::String,
-                                      std::string("directory for datafiles - defaults to ") +
-                                          storageGlobalParams.kDefaultDbPath);
-
-#endif
-
-    return options->addSection(storage_options);
+    return embedded::addStorageOptions(options);
 }
 
 Status canonicalizeOptions(optionenvironment::Environment* params) {
@@ -127,6 +101,21 @@ Status storeOptions(const moe::Environment& params) {
 
 void resetOptions() {
     storageGlobalParams.reset();
+}
+
+std::string storageDBPathDescription() {
+    StringBuilder sb;
+
+    sb << "Directory for datafiles - defaults to " << storageGlobalParams.kDefaultDbPath;
+
+#ifdef _WIN32
+    boost::filesystem::path currentPath = boost::filesystem::current_path();
+
+    sb << " which is " << currentPath.root_name().string() << storageGlobalParams.kDefaultDbPath
+       << " based on the current working drive";
+#endif
+
+    return sb.str();
 }
 
 }  // namespace embedded
