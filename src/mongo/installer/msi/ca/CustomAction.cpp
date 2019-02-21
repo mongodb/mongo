@@ -193,6 +193,15 @@ std::string toUtf8String(MSIHANDLE hInstall, const std::wstring& wide) {
         goto Exit;                                                                      \
     }
 
+#define CHECKGLE_AND_LOG_NOFAIL_EXIT(...)                                            \
+                                                                                     \
+    {                                                                                \
+        LONG _gle = GetLastError();                                                  \
+        LogMessage(hInstall, INSTALLMESSAGE_INFO, "Received GetLastError %x", _gle); \
+        LogMessage(hInstall, INSTALLMESSAGE_INFO, __VA_ARGS__);                      \
+        goto Exit;                                                                   \
+    }
+
 #define CHECKUINT_AND_LOG(x)                                                                   \
                                                                                                \
     {                                                                                          \
@@ -271,7 +280,7 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
 
         long gle = GetFileAttributesW(YamlFile.c_str());
         if (gle == INVALID_FILE_ATTRIBUTES) {
-            CHECKGLE_AND_LOG("Failed to find yaml file");
+            CHECKGLE_AND_LOG_NOFAIL_EXIT("Failed to find yaml file");
         }
 
         HANDLE hFile = CreateFileW(YamlFile.c_str(),
