@@ -360,6 +360,10 @@ private:
                     str::stream() << "$geoNear parameter '" << DocumentSourceGeoNear::kKeyFieldName
                                   << "' cannot be the empty string",
                     !fieldName.empty());
+
+            // Be sure that we can construct a FieldPath from the given fieldName. If we cannot,
+            // this constructor will uassert.
+            FieldPath path(fieldName);
             return fieldName;
         }
 
