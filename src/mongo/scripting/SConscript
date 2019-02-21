@@ -13,6 +13,7 @@ env.Library(
     target='scripting_common',
     source=[
         'deadline_monitor.cpp',
+        env.Idlc('deadline_monitor.idl')[0],
         'dbdirectclient_factory.cpp',
         'engine.cpp',
         'jsexception.cpp',
