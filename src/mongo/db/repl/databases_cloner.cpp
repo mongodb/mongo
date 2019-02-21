@@ -40,8 +40,8 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/databases_cloner_gen.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
@@ -58,9 +58,6 @@ using Request = executor::RemoteCommandRequest;
 using Response = executor::RemoteCommandResponse;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
-
-// The number of attempts for the listDatabases commands.
-MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListDatabasesAttempts, int, 3);
 
 }  // namespace
 

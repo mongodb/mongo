@@ -1315,11 +1315,15 @@ env.Library(
     target='databases_cloner',
     source=[
         'databases_cloner.cpp',
+        env.Idlc('databases_cloner.idl')[0],
     ],
     LIBDEPS=[
         'database_cloner',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/dbtests/mocklib',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
