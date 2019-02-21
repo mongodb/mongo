@@ -99,6 +99,7 @@ serveronlyEnv.Library(
     target="index_access_method",
     source=[
         "index_access_method.cpp",
+        env.Idlc('index_access_method.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -114,6 +115,7 @@ serveronlyEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

@@ -43,13 +43,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/index_access_method_gen.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
@@ -99,9 +99,6 @@ Status checkKeySize(const BSONObj& key) {
 }
 
 }  // namespace
-
-// TODO SERVER-36386: Remove the server parameter
-MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
 // TODO SERVER-36386: Remove the server parameter
 bool failIndexKeyTooLongParam() {
