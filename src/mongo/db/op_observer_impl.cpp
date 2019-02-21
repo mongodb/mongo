@@ -91,6 +91,7 @@ repl::OpTime logOperation(OperationContext* opCtx,
                           StmtId stmtId,
                           const repl::OplogLink& oplogLink,
                           bool prepare,
+                          bool inTxn,
                           const OplogSlot& oplogSlot) {
     auto& times = OpObserver::Times::get(opCtx).reservedOpTimes;
     auto opTime = repl::logOp(opCtx,
@@ -105,6 +106,7 @@ repl::OpTime logOperation(OperationContext* opCtx,
                               stmtId,
                               oplogLink,
                               prepare,
+                              inTxn,
                               oplogSlot);
 
     times.push_back(opTime);
@@ -211,6 +213,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
                                              args.updateArgs.stmtId,
                                              {},
                                              false /* prepare */,
+                                             false /* inTxn */,
                                              OplogSlot());
 
         opTimes.prePostImageOpTime = noteUpdateOpTime;
@@ -235,6 +238,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
                                        args.updateArgs.stmtId,
                                        oplogLink,
                                        false /* prepare */,
+                                       false /* inTxn */,
                                        OplogSlot());
 
     return opTimes;
@@ -275,6 +279,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                       stmtId,
                                       {},
                                       false /* prepare */,
+                                      false /* inTxn */,
                                       OplogSlot());
         opTimes.prePostImageOpTime = noteOplog;
         oplogLink.preImageOpTime = noteOplog;
@@ -293,6 +298,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                        stmtId,
                                        oplogLink,
                                        false /* prepare */,
+                                       false /* inTxn */,
                                        OplogSlot());
     return opTimes;
 }
@@ -322,6 +328,7 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
                                      stmtId,
                                      oplogLink,
                                      prepare,
+                                     false /* inTxn */,
                                      oplogSlot);
     return times;
 }
@@ -361,6 +368,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                  kUninitializedStmtId,
                  {},
                  false /* prepare */,
+                 false /* inTxn */,
                  OplogSlot());
 }
 
@@ -398,6 +406,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
                  kUninitializedStmtId,
                  {},
                  false /* prepare */,
+                 false /* inTxn */,
                  OplogSlot());
 }
 
@@ -435,6 +444,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
                  kUninitializedStmtId,
                  {},
                  false /* prepare */,
+                 false /* inTxn */,
                  OplogSlot());
 }
 
@@ -472,6 +482,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
                  kUninitializedStmtId,
                  {},
                  false /* prepare */,
+                 false /* inTxn */,
                  OplogSlot());
 }
 
@@ -688,6 +699,7 @@ void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
                  kUninitializedStmtId,
                  {},
                  false /* prepare */,
+                 false /* inTxn */,
                  OplogSlot());
 }
 
@@ -715,6 +727,7 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                      kUninitializedStmtId,
                      {},
                      false /* prepare */,
+                     false /* inTxn */,
                      createOpTime);
     }
 
@@ -760,6 +773,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                      kUninitializedStmtId,
                      {},
                      false /* prepare */,
+                     false /* inTxn */,
                      OplogSlot());
     }
 
@@ -796,6 +810,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
                  kUninitializedStmtId,
                  {},
                  false /* prepare */,
+                 false /* inTxn */,
                  OplogSlot());
 
     uassert(
@@ -831,6 +846,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                      kUninitializedStmtId,
                      {},
                      false /* prepare */,
+                     false /* inTxn */,
                      OplogSlot());
     }
 
@@ -870,6 +886,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                  kUninitializedStmtId,
                  {},
                  false /* prepare */,
+                 false /* inTxn */,
                  OplogSlot());
 }
 
@@ -911,6 +928,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                  kUninitializedStmtId,
                  {},
                  false /* prepare */,
+                 false /* inTxn */,
                  OplogSlot());
 
     return {};
@@ -977,6 +995,7 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
                      kUninitializedStmtId,
                      {},
                      false /* prepare */,
+                     false /* inTxn */,
                      OplogSlot());
     }
 }
@@ -1041,6 +1060,75 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+OpTimeBundle logReplOperationForTransaction(OperationContext* opCtx,
+                                            const OperationSessionInfo& sessionInfo,
+                                            repl::OpTime prevOpTime,
+                                            StmtId stmtId,
+                                            const repl::ReplOperation& stmt,
+                                            const OplogSlot& oplogSlot) {
+    repl::OplogLink oplogLink;
+    oplogLink.prevOpTime = prevOpTime;
+    OpTimeBundle times;
+    // The IDL serializer always returns null-terminated string literals, so rawData is safe.
+    const char* optype = repl::OpType_serializer(stmt.getOpType()).rawData();
+    times.wallClockTime = getWallClockTimeForOpLog(opCtx);
+    times.writeOpTime = logOperation(opCtx,
+                                     optype,
+                                     stmt.getNss(),
+                                     stmt.getUuid(),
+                                     stmt.getObject(),
+                                     stmt.getObject2() ? &*stmt.getObject2() : nullptr,
+                                     false /* fromMigrate*/,
+                                     times.wallClockTime,
+                                     sessionInfo,
+                                     stmtId,
+                                     oplogLink,
+                                     false /* prepare */,
+                                     true /* inTxn */,
+                                     oplogSlot);
+    return times;
+}
+
+void logOplogEntriesForTransaction(OperationContext* opCtx,
+                                   const std::vector<repl::ReplOperation>& stmts,
+                                   const std::vector<OplogSlot>& oplogSlots) {
+    invariant(!stmts.empty());
+    invariant(stmts.size() == oplogSlots.size());
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    OpTimeBundle prevWriteOpTime;
+    StmtId stmtId = 0;
+    writeConflictRetry(
+        opCtx, "logOplogEntriesForTransaction", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            // Writes to the oplog only require a Global intent lock.
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
+            WriteUnitOfWork wuow(opCtx);
+
+            prevWriteOpTime.writeOpTime = txnParticipant.getLastWriteOpTime();
+            // Note the logged statement IDs are not the same as the user-chosen statement IDs.
+            stmtId = 0;
+            const NamespaceString cmdNss{"admin", "$cmd"};
+            auto oplogSlot = oplogSlots.begin();
+            for (const auto& stmt : stmts) {
+                prevWriteOpTime = logReplOperationForTransaction(
+                    opCtx, sessionInfo, prevWriteOpTime.writeOpTime, stmtId, stmt, *oplogSlot++);
+                // This will update the transaction table for each oplog entry, so a read at any
+                // given timestamp in the transaction table will return the correct state.
+                onWriteOpCompleted(opCtx,
+                                   cmdNss,
+                                   {stmtId},
+                                   prevWriteOpTime.writeOpTime,
+                                   prevWriteOpTime.wallClockTime,
+                                   DurableTxnStateEnum::kInProgress);
+                stmtId++;
+            }
+            wuow.commit();
+        });
+}
+
 void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
                                             const OplogSlot& oplogSlot,
                                             const BSONObj& objectField,
@@ -1086,6 +1174,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
                                                   stmtId,
                                                   oplogLink,
                                                   false /* prepare */,
+                                                  false /* inTxn */,
                                                   oplogSlot);
             invariant(oplogSlot.opTime.isNull() || oplogSlot.opTime == oplogOpTime);
 
@@ -1109,10 +1198,23 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     if (statements.empty())
         return;
 
-    const auto commitOpTime = logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
-    invariant(!commitOpTime.isNull());
+    if (!useMultipleOplogEntryFormatForTransactions) {
+        const auto commitOpTime =
+            logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
+        invariant(!commitOpTime.isNull());
 
-    shardObserveTransactionCommit(opCtx, statements, commitOpTime, false);
+        shardObserveTransactionCommit(opCtx, statements, commitOpTime, false);
+    } else {
+        // It is possible that the transaction resulted in no changes.  In that case, we should
+        // not write any operations.
+        if (statements.empty())
+            return;
+
+        // Reserve all the optimes in advance, so we only need to get the optime mutex once.
+        // TODO(SERVER-39432): Also reserve a slot for the commit, and run the shard observer.
+        auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size());
+        logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
+    }
 }
 
 void OpObserverImpl::onPreparedTransactionCommit(

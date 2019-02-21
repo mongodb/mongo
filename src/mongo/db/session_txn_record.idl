@@ -47,6 +47,7 @@ enums:
             kPrepared: "prepared"
             kCommitted: "committed"
             kAborted: "aborted"
+            kInProgress: "inProgress"
 
 structs:
     sessionTxnRecord:

@@ -113,6 +113,7 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
                        kUninitializedStmtId,
                        {},
                        false /* prepare */,
+                       false /* inTxn */,
                        OplogSlot());
         ASSERT_FALSE(opTime.isNull());
         wunit.commit();
@@ -237,6 +238,7 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
                         kUninitializedStmtId,
                         {},
                         false /* prepare */,
+                        false /* inTxn */,
                         OplogSlot());
     ASSERT_FALSE(opTime.isNull());
 

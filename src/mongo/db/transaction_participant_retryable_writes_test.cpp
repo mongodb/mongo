@@ -219,6 +219,7 @@ protected:
                            stmtId,
                            link,
                            false /* prepare */,
+                           false /* inTxn */,
                            OplogSlot());
     }
 
@@ -587,6 +588,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
                                   1,
                                   {},
                                   false /* prepare */,
+                                  false /* inTxn */,
                                   OplogSlot());
         txnParticipant.onWriteOpCompletedOnPrimary(
             opCtx(), txnNum, {1}, opTime, wallClockTime, boost::none);
@@ -616,6 +618,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
                                   kIncompleteHistoryStmtId,
                                   link,
                                   false /* prepare */,
+                                  false /* inTxn */,
                                   OplogSlot());
 
         txnParticipant.onWriteOpCompletedOnPrimary(

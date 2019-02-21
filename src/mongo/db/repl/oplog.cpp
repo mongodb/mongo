@@ -426,7 +426,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             const OperationSessionInfo& sessionInfo,
                             StmtId statementId,
                             const OplogLink& oplogLink,
-                            bool prepare) {
+                            bool prepare,
+                            bool inTxn) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -452,6 +453,10 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
 
     if (prepare) {
         b.appendBool(OplogEntryBase::kPrepareFieldName, true);
+    }
+
+    if (inTxn) {
+        b.appendBool(OplogEntryBase::kInTxnFieldName, true);
     }
 
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
@@ -530,6 +535,7 @@ OpTime logOp(OperationContext* opCtx,
              StmtId statementId,
              const OplogLink& oplogLink,
              bool prepare,
+             bool inTxn,
              const OplogSlot& oplogSlot) {
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
@@ -584,7 +590,8 @@ OpTime logOp(OperationContext* opCtx,
                                sessionInfo,
                                statementId,
                                oplogLink,
-                               prepare);
+                               prepare,
+                               inTxn);
     const DocWriter* basePtr = &writer;
     auto timestamp = slot.opTime.getTimestamp();
     _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot.opTime);
@@ -660,7 +667,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                           sessionInfo,
                                           begin[i].stmtId,
                                           oplogLink,
-                                          prepare));
+                                          prepare,
+                                          false /* inTxn */));
         oplogLink.prevOpTime = insertStatementOplogSlot.opTime;
         timestamps[i] = oplogLink.prevOpTime.getTimestamp();
         opTimes.push_back(insertStatementOplogSlot.opTime);
