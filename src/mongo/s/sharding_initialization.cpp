@@ -65,6 +65,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_task_executor.h"
+#include "mongo/s/sharding_task_executor_pool_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
@@ -74,32 +75,9 @@
 
 namespace mongo {
 
-using executor::ConnectionPool;
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolHostTimeoutMS,
-                                      int,
-                                      ConnectionPool::kDefaultHostTimeout.count());
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxSize, int, -1);
-
-// By default, limit us to two concurrent pending connection attempts
-// in any one pool. Since pools are currently per-cpu, we still may
-// have something like 64 concurrent total connection attempts on a
-// modestly sized system. We could set it to one, but that seems too
-// restrictive.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxConnecting, int, 2);
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMinSize,
-                                      int,
-                                      static_cast<int>(ConnectionPool::kDefaultMinConns));
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshRequirementMS,
-                                      int,
-                                      ConnectionPool::kDefaultRefreshRequirement.count());
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshTimeoutMS,
-                                      int,
-                                      ConnectionPool::kDefaultRefreshTimeout.count());
-
 namespace {
 
+using executor::ConnectionPool;
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
 using executor::TaskExecutorPool;
@@ -198,16 +176,19 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     // MONGO_EXPORT_STARTUP_SERVER_PARAMETER because it's not guaranteed to be initialized.
     // The following code is a workaround.
     ConnectionPool::Options connPoolOptions;
-    connPoolOptions.hostTimeout = Milliseconds(ShardingTaskExecutorPoolHostTimeoutMS);
-    connPoolOptions.maxConnections = (ShardingTaskExecutorPoolMaxSize != -1)
-        ? ShardingTaskExecutorPoolMaxSize
+
+    connPoolOptions.minConnections = gShardingTaskExecutorPoolMinConnections;
+    connPoolOptions.maxConnections = (gShardingTaskExecutorPoolMaxConnections >= 0)
+        ? gShardingTaskExecutorPoolMaxConnections
         : ConnectionPool::kDefaultMaxConns;
-    connPoolOptions.maxConnecting = (ShardingTaskExecutorPoolMaxConnecting != -1)
-        ? ShardingTaskExecutorPoolMaxConnecting
+    connPoolOptions.maxConnecting = (gShardingTaskExecutorPoolMaxConnecting >= 0)
+        ? gShardingTaskExecutorPoolMaxConnecting
         : ConnectionPool::kDefaultMaxConnecting;
-    connPoolOptions.minConnections = ShardingTaskExecutorPoolMinSize;
-    connPoolOptions.refreshRequirement = Milliseconds(ShardingTaskExecutorPoolRefreshRequirementMS);
-    connPoolOptions.refreshTimeout = Milliseconds(ShardingTaskExecutorPoolRefreshTimeoutMS);
+
+    connPoolOptions.hostTimeout = Milliseconds(gShardingTaskExecutorPoolHostTimeoutMS);
+    connPoolOptions.refreshRequirement =
+        Milliseconds(gShardingTaskExecutorPoolRefreshRequirementMS);
+    connPoolOptions.refreshTimeout = Milliseconds(gShardingTaskExecutorPoolRefreshTimeoutMS);
 
     if (connPoolOptions.refreshRequirement <= connPoolOptions.refreshTimeout) {
         auto newRefreshTimeout = connPoolOptions.refreshRequirement - Milliseconds(1);
