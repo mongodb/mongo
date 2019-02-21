@@ -36,14 +36,11 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool_parameters_gen.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {
 namespace executor {
-
-// If less than or equal to 0, the suggested pool size will be determined by the number of cores. If
-// set to a particular positive value, this will be used as the pool size.
-MONGO_EXPORT_SERVER_PARAMETER(taskExecutorPoolSize, int, 1);
 
 size_t TaskExecutorPool::getSuggestedPoolSize() {
     auto poolSize = taskExecutorPoolSize.load();
