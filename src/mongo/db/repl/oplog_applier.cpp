@@ -35,38 +35,12 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/sync_tail.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
-
-namespace {
-
-/**
- * This server parameter determines the number of writer threads OplogApplier will have.
- */
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replWriterThreadCount, int, 16)
-    ->withValidator([](const int& newVal) {
-        if (newVal < 1 || newVal > 256) {
-            return Status(ErrorCodes::BadValue, "replWriterThreadCount must be between 1 and 256");
-        }
-
-        return Status::OK();
-    });
-
-MONGO_EXPORT_SERVER_PARAMETER(replBatchLimitOperations, int, 5 * 1000)
-    ->withValidator([](const int& newVal) {
-        if (newVal < 1 || newVal > (1000 * 1000)) {
-            return Status(ErrorCodes::BadValue,
-                          "replBatchLimitOperations must be between 1 and 1 million, inclusive");
-        }
-
-        return Status::OK();
-    });
-
-}  // namespace
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 

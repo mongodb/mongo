@@ -38,17 +38,10 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
-/**
- * Dont run any sharding validations. Can not be combined with --configsvr or shardvr. Intended to
- * allow restarting config server or shard as an independent replica set.
- */
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(skipShardingConfigurationChecks, bool, false);
-
 namespace repl {
 
 const size_t ReplSetConfig::kMaxMembers;

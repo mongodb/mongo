@@ -32,20 +32,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/server_parameters.h"
 
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_settings_gen.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
-namespace {
 
-// Tells the server to perform replication recovery as a standalone.
-constexpr bool recoverFromOplogAsStandaloneDefault = false;
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(recoverFromOplogAsStandalone,
-                                      bool,
-                                      recoverFromOplogAsStandaloneDefault);
-}  // namespace
 
 std::string ReplSettings::ourSetName() const {
     size_t sl = _replSetString.find('/');

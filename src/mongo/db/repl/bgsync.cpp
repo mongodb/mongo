@@ -47,6 +47,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
@@ -54,7 +55,6 @@
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
@@ -72,32 +72,6 @@ namespace {
 const int kSleepToAllowBatchingMillis = 2;
 const int kSmallBatchLimitBytes = 40000;
 const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
-// 16MB max batch size / 12 byte min doc size * 10 (for good measure) = defaultBatchSize to use.
-const auto defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
-
-// The batchSize to use for the find/getMore queries called by the OplogFetcher
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(bgSyncOplogFetcherBatchSize, int, defaultBatchSize);
-
-// The batchSize to use for the find/getMore queries called by the rollback common point resolver.
-// A batchSize of 0 means that the 'find' and 'getMore' commands will be given no batchSize.
-// We set the default to 2000 to prevent the sync source from having to read too much data at once,
-// and reduce the chance of a socket timeout.
-// We choose 2000 for (10 minute timeout) * (60 sec / min) * (50 MB / second) / (16 MB / document).
-constexpr int defaultRollbackBatchSize = 2000;
-MONGO_EXPORT_SERVER_PARAMETER(rollbackRemoteOplogQueryBatchSize, int, defaultRollbackBatchSize)
-    ->withValidator([](const auto& potentialNewValue) {
-        if (potentialNewValue < 0) {
-            return Status(ErrorCodes::BadValue,
-                          "rollbackRemoteOplogQueryBatchSize cannot be negative.");
-        }
-
-        return Status::OK();
-    });
-
-// If 'forceRollbackViaRefetch' is true, always perform rollbacks via the refetch algorithm, even if
-// the storage engine supports rollback via recover to timestamp.
-constexpr bool forceRollbackViaRefetchByDefault = false;
-MONGO_EXPORT_SERVER_PARAMETER(forceRollbackViaRefetch, bool, forceRollbackViaRefetchByDefault);
 
 /**
  * Extends DataReplicatorExternalStateImpl to be member state aware.

@@ -1,0 +1,239 @@
+# Copyright (C) 2018-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# server setParameters for replication
+
+global:
+    cpp_namespace: "mongo::repl"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+server_parameters:
+    # From data_replicator_external_state_impl.cpp
+    initialSyncOplogBuffer:
+        description: >-
+            Set this to specify whether to use a collection to buffer the oplog on the
+            destination server during initial sync to prevent rolling over the oplog.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: initialSyncOplogBuffer
+        default: "collection"
+
+    initialSyncOplogBufferPeekCacheSize:
+        description: Set this to specify size of read ahead buffer in the OplogBufferCollection.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: initialSyncOplogBufferPeekCacheSize
+        default: 10000
+
+    # From initial_syncer.cpp
+    numInitialSyncConnectAttempts:
+        description: The number of attempts to connect to a sync source
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: numInitialSyncConnectAttempts
+        default: 10
+
+    numInitialSyncOplogFindAttempts:
+        description: The number of attempts to call find on the remote oplog
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: numInitialSyncOplogFindAttempts
+        default: 3
+
+    initialSyncOplogFetcherBatchSize:
+        description: The batchSize to use for the find/getMore queries called by the OplogFetcher
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: initialSyncOplogFetcherBatchSize
+        # 16MB max batch size / 12 byte min doc size * 10 (for good measure) =
+        #     defaultBatchSize to use.
+        default:
+            expr: (16 * 1024 * 1024) / 12 * 10
+
+    # From abstract_oplog_fetcher.cpp
+    oplogInitialFindMaxSeconds:
+        description: >-
+            Number of seconds for the `maxTimeMS` on the initial `find` command.
+            For the initial 'find' request, we provide a generous timeout, to account for
+            the potentially slow process of a sync source finding the lastApplied optime
+            provided in a node's query in its oplog.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: oplogInitialFindMaxSeconds
+        default: 60
+
+    oplogRetriedFindMaxSeconds:
+        description: Number of seconds for the `maxTimeMS` on any retried `find` commands
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: oplogRetriedFindMaxSeconds
+        default: 2
+
+    # From bgsync.cpp
+    bgSyncOplogFetcherBatchSize:
+        description: The batchSize to use for the find/getMore queries called by the OplogFetcher
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: bgSyncOplogFetcherBatchSize
+        # 16MB max batch size / 12 byte min doc size * 10 (for good measure) =
+        #     defaultBatchSize to use.
+        default:
+            expr: (16 * 1024 * 1024) / 12 * 10
+
+    rollbackRemoteOplogQueryBatchSize:
+        description: >-
+            The batchSize to use for the find/getMore queries called by the rollback
+            common point resolver. A batchSize of 0 means that the 'find' and 'getMore'
+            commands will be given no batchSize. We set the default to 2000 to prevent
+            the sync source from having to read too much data at once, and reduce the
+            chance of a socket timeout.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: rollbackRemoteOplogQueryBatchSize
+        # We choose 2000 for (10 minute timeout) * (60 sec / min) * (50 MB / second) /
+        #     (16 MB / document).
+        default: 2000
+
+    forceRollbackViaRefetch:
+        description: >-
+            If 'forceRollbackViaRefetch' is true, always perform rollbacks via the
+            refetch algorithm, even if the storage engine supports rollback via recover
+            to timestamp.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: forceRollbackViaRefetch
+        default: false
+
+    # From noop_writer.cpp
+    writePeriodicNoops:
+        description: Sets whether to write periodic noops or not
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: writePeriodicNoops
+        default: true
+
+    # From collection_cloner.cpp
+    numInitialSyncCollectionCountAttempts:
+        description: The number of attempts for the count command, which gets the document count.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: numInitialSyncCollectionCountAttempts
+        default: 3
+
+    numInitialSyncListIndexesAttempts:
+        description: The number of attempts for the listIndexes commands.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: numInitialSyncListIndexesAttempts
+        default: 3
+
+    numInitialSyncCollectionFindAttempts:
+        description: The number of attempts for the find command, which gets the data.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: numInitialSyncCollectionFindAttempts
+        default: 3
+
+    collectionClonerUsesExhaust:
+        description: Whether to use the "exhaust cursor" feature when retrieving collection data.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: collectionClonerUsesExhaust
+        default: true
+
+    # From database_cloner.cpp
+    collectionClonerBatchSize:
+        description: >-
+            The batch size (number of documents) to use for the queries in the
+            CollectionCloner. Default of '0' means the limit is the number of documents
+            that will fit in a single BSON object.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: collectionClonerBatchSize
+        default: 0
+        validator:
+            gte: 0
+
+    numInitialSyncListCollectionsAttempts:
+        description: The number of attempts for the listCollections commands.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: numInitialSyncListCollectionsAttempts
+        default: 3
+
+    # From replication_coordinator_external_state_impl.cpp
+    oplogFetcherSteadyStateMaxFetcherRestarts:
+        description: >-
+            Set this to specify the maximum number of times the oplog fetcher will
+            consecutively restart the oplog tailing query on non-cancellation errors
+            during steady state replication.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: oplogFetcherSteadyStateMaxFetcherRestarts
+        default: 1
+        validator:
+            gte: 0
+
+    oplogFetcherInitialSyncMaxFetcherRestarts:
+        description: >-
+            Set this to specify the maximum number of times the oplog fetcher will
+            consecutively restart the oplog tailing query on non-cancellation errors
+            during initial sync. By default we provide a generous amount of restarts
+            to avoid potentially restarting an entire initial sync from scratch.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: oplogFetcherInitialSyncMaxFetcherRestarts
+        default: 10
+        validator:
+            gte: 0
+
+    # From oplog_applier.cpp
+    replWriterThreadCount:
+        description: The number of threads in the thread pool used to apply the oplog
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: replWriterThreadCount
+        default: 16
+        validator:
+            gte: 1
+            lte: 256
+
+    replBatchLimitOperations:
+        description: The maximum number of operations to apply in a single batch
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: replBatchLimitOperations
+        default:
+            expr: 5 * 1000
+        validator:
+            gte: 1
+            lte:
+                expr: 1000 * 1000
+

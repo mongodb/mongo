@@ -37,7 +37,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -52,23 +52,12 @@ Counter64 readersCreatedStats;
 ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
                                                          &readersCreatedStats);
 
-// Number of seconds for the `maxTimeMS` on the initial `find` command.
-//
-// For the initial 'find' request, we provide a generous timeout, to account for the potentially
-// slow process of a sync source finding the lastApplied optime provided in a node's query in its
-// oplog.
-MONGO_EXPORT_SERVER_PARAMETER(oplogInitialFindMaxSeconds, int, 60);
-
-// Number of seconds for the `maxTimeMS` on any retried `find` commands.
-MONGO_EXPORT_SERVER_PARAMETER(oplogRetriedFindMaxSeconds, int, 2);
-
 // Number of milliseconds to add to the `find` and `getMore` timeouts to calculate the network
 // timeout for the requests.
 const Milliseconds kNetworkTimeoutBufferMS{5000};
 
 // Default `maxTimeMS` timeout for `getMore`s.
 const Milliseconds kDefaultOplogGetMoreMaxMS{5000};
-
 
 }  // namespace
 

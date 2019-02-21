@@ -47,7 +47,6 @@ class Environment;
 
 namespace moe = mongo::optionenvironment;
 
-extern bool skipShardingConfigurationChecks;
 
 Status addMongodOptions(moe::OptionSection* options);
 

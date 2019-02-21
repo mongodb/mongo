@@ -5,6 +5,16 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target='repl_server_parameters',
+    source=[
+        env.Idlc('repl_server_parameters.idl')[0]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ]
+)
+
+env.Library(
     target='oplog',
     source=[
         'apply_ops.cpp',
@@ -149,11 +159,11 @@ env.Library(
         '$BUILD_DIR/mongo/client/connection_pool',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
     LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],
@@ -163,11 +173,11 @@ env.Library(
     target='repl_settings',
     source=[
         'repl_settings.cpp',
-        'repl_settings_init.cpp',
+        env.Idlc('repl_settings.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
@@ -650,9 +660,11 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'oplog_entry',
+    ],
+    LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
     ],
 )
 
@@ -1023,6 +1035,7 @@ env.Library('replica_set_messages',
                 'repl_set_tag.cpp',
                 'update_position_args.cpp',
                 'last_vote.cpp',
+                env.Idlc('repl_set_config.idl')[0],
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base',
@@ -1035,6 +1048,9 @@ env.Library('replica_set_messages',
                 '$BUILD_DIR/mongo/rpc/command_status',
                 'optime',
                 'read_concern_args',
+            ],
+            LIBDEPS_PRIVATE=[
+                '$BUILD_DIR/mongo/idl/server_parameter',
             ])
 
 env.CppUnitTest('repl_set_config_test',
@@ -1128,6 +1144,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
     LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
     ],
 )
@@ -1271,6 +1288,9 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/async_results_merger',
         '$BUILD_DIR/mongo/util/progress_meter',
     ],
+    LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
+    ],
 )
 
 env.CppUnitTest(
@@ -1296,6 +1316,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
     LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
     ],
 )
@@ -1450,7 +1471,9 @@ env.Library(
         'repl_coordinator_interface',
         'storage_interface',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_parameters',
+    ],
+    LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
     ],
 )
 
@@ -1500,6 +1523,7 @@ env.Library(
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
     ]
 )
@@ -1641,6 +1665,7 @@ env.Library(
         'rollback_source_impl',
     ],
     LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],

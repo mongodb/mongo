@@ -43,9 +43,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
@@ -66,14 +66,6 @@ constexpr auto kCountResponseDocumentCountFieldName = "n"_sd;
 const int kProgressMeterSecondsBetween = 60;
 const int kProgressMeterCheckInterval = 128;
 
-// The number of attempts for the count command, which gets the document count.
-MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionCountAttempts, int, 3);
-// The number of attempts for the listIndexes commands.
-MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListIndexesAttempts, int, 3);
-// The number of attempts for the find command, which gets the data.
-MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionFindAttempts, int, 3);
-// Whether to use the "exhaust cursor" feature when retrieving collection data.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerUsesExhaust, bool, true);
 }  // namespace
 
 // Failpoint which causes initial sync to hang before establishing its cursor to clone the
