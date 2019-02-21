@@ -1,0 +1,92 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: mongo
+
+server_parameters:
+    rangeDeleterBatchSize:
+        description: >-
+          The maximum number of documents in each batch to delete during the cleanup stage of chunk
+          migration (or the cleanupOrphaned command). The default value of 0 indicates that the
+          system chooses an appropriate value, generally 128 documents.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: rangeDeleterBatchSize
+        validator:
+          gte: 0
+        default: 0
+
+    rangeDeleterBatchDelayMS:
+        description: >-
+          The amount of time in milliseconds to wait before the next batch of deletion during the
+          cleanup stage of chunk migration (or the cleanupOrphaned command).
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: rangeDeleterBatchDelayMS
+        validator:
+          gte: 0
+        default: 20
+
+    migrateCloneInsertionBatchSize:
+        description: >-
+          The maximum number of documents to insert in a single batch during the cloning step of
+          the migration process. The default value of 0 indicates no maximum number of documents
+          per batch. However, in practice, this results in batches that contain up to 16 MB of
+          documents. The value 1 corresponds to MongoDB 3.4.16 (and earlier) behavior.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: migrateCloneInsertionBatchSize
+        validator:
+          gte: 0
+        default: 0
+
+    migrateCloneInsertionBatchDelayMS:
+        description: >-
+          Time in milliseconds to wait between batches of insertions during cloning step of the
+          migration process. This wait is in addition to the secondaryThrottle. The default value
+          of 0 indicates no additional wait.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: migrateCloneInsertionBatchDelayMS
+        validator:
+          gte: 0
+        default: 0
+
+    migrationLockAcquisitionMaxWaitMS:
+        description: 'How long to wait to acquire collection lock for migration related operations.'
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: migrationLockAcquisitionMaxWaitMS
+        default: 500
+
+    orphanCleanupDelaySecs:
+        description: 'How long to wait before starting cleanup of an emigrated chunk range.'
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: orphanCleanupDelaySecs
+        default: 900

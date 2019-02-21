@@ -66,6 +66,7 @@ env.Library(
         'sharding_statistics.cpp',
         'split_chunk.cpp',
         'split_vector.cpp',
+        env.Idlc('sharding_runtime_d_params.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
@@ -89,6 +90,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

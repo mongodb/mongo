@@ -52,9 +52,9 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/write_concern.h"
@@ -64,22 +64,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-MONGO_EXPORT_SERVER_PARAMETER(rangeDeleterBatchSize, int, 0)
-    ->withValidator([](const int& newVal) {
-        if (newVal < 0) {
-            return Status(ErrorCodes::BadValue, "rangeDeleterBatchSize must not be negative");
-        }
-        return Status::OK();
-    });
-
-MONGO_EXPORT_SERVER_PARAMETER(rangeDeleterBatchDelayMS, int, 20)
-    ->withValidator([](const int& newVal) {
-        if (newVal < 0) {
-            return Status(ErrorCodes::BadValue, "rangeDeleterBatchDelayMS must not be negative");
-        }
-        return Status::OK();
-    });
 
 namespace {
 

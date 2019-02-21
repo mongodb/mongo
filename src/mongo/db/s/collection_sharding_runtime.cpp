@@ -35,18 +35,13 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-MONGO_EXPORT_SERVER_PARAMETER(migrationLockAcquisitionMaxWaitMS, int, 500);
-
 namespace {
-
-// How long to wait before starting cleanup of an emigrated chunk range
-MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
 
 /**
  * Returns whether the specified namespace is used for sharding-internal purposes only and can never
