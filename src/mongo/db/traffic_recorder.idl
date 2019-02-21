@@ -31,6 +31,7 @@
 
 global:
   cpp_namespace: "mongo"
+  cpp_includes: "mongo/db/traffic_recorder_validators.h"
 
 imports:
   - "mongo/idl/basic_types.idl"
@@ -75,3 +76,19 @@ commands:
     stopRecordingTraffic:
         description: "stop recording Command"
         namespace: ignored
+
+server_parameters:
+    trafficRecordingDirectory:
+        description: 'Path to directory where traffic recordings will be saved'
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gTrafficRecordingDirectory
+        validator:
+            callback: 'validateTrafficRecordDestination'
+
+    AlwaysRecordTraffic:
+        description: 'Start server with traffic recording enabled, and ensure all records are flushed. Test only.'
+        test_only: true
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: gAlwaysRecordTraffic

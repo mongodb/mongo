@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/traffic_recorder.h"
+#include "mongo/db/traffic_recorder_gen.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
@@ -39,8 +40,6 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/stdx/thread.h"
@@ -51,42 +50,20 @@ namespace mongo {
 
 namespace {
 
-constexpr auto kDefaultTrafficRecordingDirectory = ""_sd;
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(trafficRecordingDirectory,
-                                      std::string,
-                                      kDefaultTrafficRecordingDirectory.toString())
-    ->withValidator([](const std::string& newValue) {
-        if (!boost::filesystem::is_directory(newValue)) {
-            return Status(ErrorCodes::FileNotOpen,
-                          str::stream() << "traffic recording directory \"" << newValue
-                                        << "\" is not a directory.");
-        }
-
-        return Status::OK();
-    });
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(AlwaysRecordTraffic, std::string, "");
-
 bool shouldAlwaysRecordTraffic = false;
 
 MONGO_INITIALIZER(ShouldAlwaysRecordTraffic)(InitializerContext*) {
-    if (!AlwaysRecordTraffic.size()) {
+    if (!gAlwaysRecordTraffic.size()) {
         return Status::OK();
     }
 
-    if (!getTestCommandsEnabled()) {
-        return Status(ErrorCodes::BadValue,
-                      "invalid to set AlwaysRecordTraffic if test commands are not enabled");
-    }
-
-    if (trafficRecordingDirectory.empty()) {
+    if (gTrafficRecordingDirectory.empty()) {
         if (serverGlobalParams.logpath.empty()) {
             return Status(ErrorCodes::BadValue,
                           "invalid to set AlwaysRecordTraffic without a logpath or "
                           "trafficRecordingDirectory");
         } else {
-            trafficRecordingDirectory = serverGlobalParams.logpath;
+            gTrafficRecordingDirectory = serverGlobalParams.logpath;
         }
     }
 
@@ -255,10 +232,10 @@ private:
                 "Traffic recording filename must not be empty",
                 !filename.empty());
 
-        if (trafficRecordingDirectory.back() == '/') {
-            trafficRecordingDirectory.pop_back();
+        if (gTrafficRecordingDirectory.back() == '/') {
+            gTrafficRecordingDirectory.pop_back();
         }
-        auto parentPath = boost::filesystem::path(trafficRecordingDirectory);
+        auto parentPath = boost::filesystem::path(gTrafficRecordingDirectory);
         auto path = parentPath / filename;
 
         uassert(ErrorCodes::BadValue,
@@ -302,7 +279,7 @@ void TrafficRecorder::start(const StartRecordingTraffic& options) {
 
     uassert(ErrorCodes::BadValue,
             "Traffic recording directory not set",
-            !trafficRecordingDirectory.empty());
+            !gTrafficRecordingDirectory.empty());
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -341,7 +318,7 @@ void TrafficRecorder::observe(const transport::SessionHandle& ts,
 
             if (!_recording) {
                 StartRecordingTraffic options;
-                options.setFilename(AlwaysRecordTraffic);
+                options.setFilename(gAlwaysRecordTraffic);
                 options.setMaxFileSize(std::numeric_limits<int64_t>::max());
 
                 _recording = std::make_shared<Recording>(options);
