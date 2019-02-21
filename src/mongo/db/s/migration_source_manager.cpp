@@ -242,7 +242,6 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
     {
         const auto metadata = _getCurrentMetadataAndCheckEpoch(opCtx);
 
-        _state = kCloning;
         // Having the metadata manager registered on the collection sharding state is what indicates
         // that a chunk on that collection is being migrated. With an active migration, write
         // operations require the cloner to be present in order to track changes to the chunk which
@@ -272,6 +271,8 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         auto csr = CollectionShardingRuntime::get(opCtx, getNss());
         auto lockedCsr = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
         invariant(nullptr == std::exchange(msmForCsr(csr), this));
+
+        _state = kCloning;
     }
 
     if (replEnabled) {
@@ -710,17 +711,18 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
         auto* const csr = CollectionShardingRuntime::get(opCtx, getNss());
         auto csrLock = CollectionShardingState::CSRLock::lockExclusive(opCtx, csr);
 
-        // In the kCreated state there should be no state to clean up, but we can verify this
-        // just to be safe.
-        if (_state == kCreated) {
-            // Verify that we did not set the MSM on the CSR.
-            invariant(!msmForCsr(csr));
-            // Verify that the clone driver was not initialized.
-            invariant(!_cloneDriver);
-        } else {
+        if (_state != kCreated) {
+            invariant(msmForCsr(csr));
+            invariant(_cloneDriver);
+        }
+
+        // While we are in kCreated, the MigrationSourceManager may or may not be already be
+        // installed on the CollectionShardingRuntime.
+        if (_state != kCreated || (_state == kCreated && msmForCsr(csr))) {
             auto oldMsmOnCsr = std::exchange(msmForCsr(csr), nullptr);
             invariant(this == oldMsmOnCsr);
         }
+
         _critSec.reset();
         return std::move(_cloneDriver);
     }();
