@@ -49,6 +49,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -113,7 +114,9 @@ private:
 * Initializes the wire version of conn, and returns the isMaster reply.
 */
 executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
-                                                StringData applicationName) {
+                                                StringData applicationName,
+                                                const MongoURI& uri,
+                                                std::vector<std::string>* saslMechsForAuth) {
     try {
         // We need to force the usage of OP_QUERY on this command, even if we have previously
         // detected support for OP_COMMAND on a connection. This is necessary to handle the case
@@ -122,6 +125,12 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
 
         BSONObjBuilder bob;
         bob.append("isMaster", 1);
+
+        if (!uri.getUser().empty()) {
+            const auto authDatabase = uri.getAuthenticationDatabase();
+            UserName user(uri.getUser(), authDatabase);
+            bob.append("saslSupportedMechs", user.getUnambiguousName());
+        }
 
         if (getTestCommandsEnabled()) {
             // Only include the host:port of this process in the isMaster command request if test
@@ -156,6 +165,14 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
             int minWireVersion = isMasterObj["minWireVersion"].numberInt();
             int maxWireVersion = isMasterObj["maxWireVersion"].numberInt();
             conn->setWireVersions(minWireVersion, maxWireVersion);
+        }
+
+        if (isMasterObj.hasField("saslSupportedMechs") &&
+            isMasterObj["saslSupportedMechs"].type() == Array) {
+            auto array = isMasterObj["saslSupportedMechs"].Array();
+            for (const auto& elem : array) {
+                saslMechsForAuth->push_back(elem.checkAndGetStringData().toString());
+            }
         }
 
         conn->getCompressorManager().clientFinish(isMasterObj);
@@ -206,7 +223,7 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
     // access the application name, do it through the _applicationName member.
     _applicationName = applicationName.toString();
 
-    auto swIsMasterReply = initWireVersion(this, _applicationName);
+    auto swIsMasterReply = initWireVersion(this, _applicationName, _uri, &_saslMechsForAuth);
     if (!swIsMasterReply.isOK()) {
         _markFailed(kSetFlag);
         return swIsMasterReply.status;

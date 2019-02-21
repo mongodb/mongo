@@ -60,10 +60,12 @@ extern AuthMongoCRHandler authMongoCR;
  * Names for supported authentication mechanisms.
  */
 
+extern const char* const kMechanismMongoCR;
 extern const char* const kMechanismMongoX509;
 extern const char* const kMechanismSaslPlain;
 extern const char* const kMechanismGSSAPI;
 extern const char* const kMechanismScramSha1;
+extern const char* const kMechanismScramSha256;
 
 /**
  * Authenticate a user.

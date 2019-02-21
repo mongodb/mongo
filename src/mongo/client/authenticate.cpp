@@ -61,6 +61,7 @@ const char* const kMechanismMongoX509 = "MONGODB-X509";
 const char* const kMechanismSaslPlain = "PLAIN";
 const char* const kMechanismGSSAPI = "GSSAPI";
 const char* const kMechanismScramSha1 = "SCRAM-SHA-1";
+const char* const kMechanismScramSha256 = "SCRAM-SHA-256";
 
 namespace {
 

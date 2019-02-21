@@ -707,6 +707,10 @@ public:
     virtual int getMinWireVersion() = 0;
     virtual int getMaxWireVersion() = 0;
 
+    const std::vector<std::string>& getIsMasterSaslMechanisms() const {
+        return _saslMechsForAuth;
+    }
+
     /** send a query to the database.
      @param ns namespace to query, format is <dbname>.<collectname>[.<collectname>]*
      @param query query to perform on the collection.  this is a BSONObj (binary JSON)
@@ -837,6 +841,8 @@ protected:
 
     // should be set by subclasses during connection.
     void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
+
+    std::vector<std::string> _saslMechsForAuth;
 
     /** controls how chatty the client is about network errors & such.  See log.h */
     const logger::LogSeverity _logLevel;

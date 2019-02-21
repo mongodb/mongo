@@ -166,7 +166,7 @@ public:
         return _database;
     }
 
-    std::string getAuthenticationDatabase() {
+    std::string getAuthenticationDatabase() const {
         auto authDB = _options.find("authSource");
         if (authDB != _options.end()) {
             return authDB->second;
@@ -249,7 +249,8 @@ private:
           _sslMode(sslMode),
           _options(std::move(options)) {}
 
-    boost::optional<BSONObj> _makeAuthObjFromOptions(int maxWireVersion) const;
+    boost::optional<BSONObj> _makeAuthObjFromOptions(
+        int maxWireVersion, const std::vector<std::string>& saslMechsForAuth) const;
 
     static MongoURI parseImpl(const std::string& url);
 
