@@ -31,30 +31,21 @@
 
 #include "mongo/db/cursor_server_params.h"
 
+#include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {
-namespace {
-
-static constexpr Minutes kDefaultCursorTimeoutMinutes{10};
-
-MONGO_EXPORT_SERVER_PARAMETER(clientCursorMonitorFrequencySecs, int, 4);
-MONGO_EXPORT_SERVER_PARAMETER(cursorTimeoutMillis,
-                              long long,
-                              durationCount<Milliseconds>(kDefaultCursorTimeoutMinutes));
-
-}  // namespace
 
 int getClientCursorMonitorFrequencySecs() {
-    return clientCursorMonitorFrequencySecs.load();
+    return gClientCursorMonitorFrequencySecs.load();
 }
 
 long long getCursorTimeoutMillis() {
-    return cursorTimeoutMillis.load();
+    return gCursorTimeoutMillis.load();
 }
 
 Milliseconds getDefaultCursorTimeoutMillis() {
-    return kDefaultCursorTimeoutMinutes;
+    return Milliseconds(kCursorTimeoutMillisDefault);
 }
 
 }  // namespace mongo

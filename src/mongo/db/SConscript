@@ -1989,9 +1989,10 @@ env.Library(
     target='cursor_server_params',
     source=[
         'cursor_server_params.cpp',
+        env.Idlc('cursor_server_params.idl')[0],
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/server_parameters',
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/idl/server_parameter",
     ],
 )
 
