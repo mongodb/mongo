@@ -40,8 +40,7 @@ namespace mongo {
  */
 Status applyCommitTransaction(OperationContext* opCtx,
                               const repl::OplogEntry& entry,
-                              repl::OplogApplication::Mode mode,
-                              boost::optional<Timestamp> stableTimestampForRecovery);
+                              repl::OplogApplication::Mode mode);
 
 /**
  * Apply `abortTransaction` oplog entry.

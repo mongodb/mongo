@@ -1312,7 +1312,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OplogEntry& entry,
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
-         return applyCommitTransaction(opCtx, entry, mode, stableTimestampForRecovery);
+         return applyCommitTransaction(opCtx, entry, mode);
      }}},
     {"abortTransaction",
      {[](OperationContext* opCtx,

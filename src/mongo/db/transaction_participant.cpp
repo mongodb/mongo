@@ -1150,6 +1150,12 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
             invariant(commitOplogEntryOpTime);
         }
 
+        // If commitOplogEntryOpTime is a nullopt, then we grab the OpTime from the commitOplogSlot
+        // which will only be set if we are primary. Otherwise, the commitOplogEntryOpTime must have
+        // been passed in during secondary oplog application.
+        auto commitOplogSlotOpTime = commitOplogEntryOpTime.value_or(commitOplogSlot.opTime);
+        opCtx->recoveryUnit()->setDurableTimestamp(commitOplogSlotOpTime.getTimestamp());
+
         _commitStorageTransaction(opCtx);
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
@@ -1164,10 +1170,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // If we are committing a prepared transaction, then we must have already recorded this
         // transaction's oldest oplog entry optime.
         invariant(p().oldestOplogEntryOpTime);
-        // If commitOplogEntryOpTime is a nullopt, then we grab the OpTime from the commitOplogSlot
-        // which will only be set if we are primary. Otherwise, the commitOplogEntryOpTime must have
-        // been passed in during secondary oplog application.
-        p().finishOpTime = commitOplogEntryOpTime.value_or(commitOplogSlot.opTime);
+        p().finishOpTime = commitOplogSlotOpTime;
 
         _finishCommitTransaction(opCtx);
     } catch (...) {
