@@ -781,6 +781,7 @@ env.Library('topology_coordinator',
                 'heartbeat_response_action.cpp',
                 'member_data.cpp',
                 'topology_coordinator.cpp',
+                env.Idlc('topology_coordinator.idl')[0],
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/audit',
@@ -793,6 +794,7 @@ env.Library('topology_coordinator',
             ],
             LIBDEPS_PRIVATE=[
                 '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
+                '$BUILD_DIR/mongo/idl/server_parameter',
             ])
 
 env.CppUnitTest('repl_set_heartbeat_response_test',

@@ -36,6 +36,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/repl/topology_coordinator_gen.h"
 
 #include <limits>
 #include <string>
@@ -68,10 +69,6 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceCandidate);
-
-// Controls how caught up in replication a secondary with higher priority than the current primary
-// must be before it will call for a priority takeover election.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(priorityTakeoverFreshnessWindowSeconds, int, 2);
 
 // If this fail point is enabled, TopologyCoordinator::shouldChangeSyncSource() will ignore
 // the option TopologyCoordinator::Options::maxSyncSourceLagSecs. The sync source will not be
@@ -1223,7 +1220,8 @@ bool TopologyCoordinator::_amIFreshEnoughForPriorityTakeover() const {
     }
 
     if (ourLastOpApplied.getTimestamp().getSecs() != latestKnownOpTime.getTimestamp().getSecs()) {
-        return ourLastOpApplied.getTimestamp().getSecs() + priorityTakeoverFreshnessWindowSeconds >=
+        return ourLastOpApplied.getTimestamp().getSecs() +
+            gPriorityTakeoverFreshnessWindowSeconds >=
             latestKnownOpTime.getTimestamp().getSecs();
     } else {
         return ourLastOpApplied.getTimestamp().getInc() + 1000 >=
@@ -2033,7 +2031,7 @@ std::string TopologyCoordinator::_getUnelectableReasonString(const UnelectableRe
         hasWrittenToStream = true;
         ss << "member is not caught up enough to the most up-to-date member to call for priority "
               "takeover - must be within "
-           << priorityTakeoverFreshnessWindowSeconds << " seconds";
+           << gPriorityTakeoverFreshnessWindowSeconds << " seconds";
     }
     if (ur & NotFreshEnoughForCatchupTakeover) {
         if (hasWrittenToStream) {
