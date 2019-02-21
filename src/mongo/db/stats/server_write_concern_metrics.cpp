@@ -36,13 +36,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/server_write_concern_metrics_gen.h"
 
 namespace mongo {
-
-// opWriteConcernCounters are not tracked unless 'reportOpWriteConcernCountersInServerStatus' is
-// true. This is false by default because the mutex acquisition impacts performance when SSL is
-// disabled. (When SSL is enabled, other mutexes dominate.)
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(reportOpWriteConcernCountersInServerStatus, bool, false);
 
 namespace {
 const auto ServerWriteConcernMetricsDecoration =

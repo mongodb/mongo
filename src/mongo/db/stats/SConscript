@@ -73,6 +73,7 @@ env.Library(
         'server_read_concern_metrics.cpp',
         'server_write_concern_metrics.cpp',
         env.Idlc('read_concern_stats.idl')[0],
+        env.Idlc('server_write_concern_metrics.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -80,6 +81,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
