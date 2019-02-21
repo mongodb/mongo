@@ -487,6 +487,7 @@ env.Library(
     target="serverinit",
     source=[
         "initialize_server_global_state.cpp",
+        env.Idlc("initialize_server_global_state.idl")[0],
         "server_options_init.cpp",
     ],
     LIBDEPS_PRIVATE=[
