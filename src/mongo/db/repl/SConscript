@@ -825,6 +825,7 @@ env.Library(
         'replication_coordinator_impl_elect_v1.cpp',
         'replication_coordinator_impl_heartbeat.cpp',
         'vote_requester.cpp',
+        env.Idlc("replication_coordinator_impl.idl")[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/common',
@@ -853,6 +854,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

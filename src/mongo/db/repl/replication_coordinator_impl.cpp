@@ -66,6 +66,7 @@
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -122,27 +123,6 @@ const char kLocalDB[] = "local";
 // Overrides _canAcceptLocalWrites for the decorated OperationContext.
 const OperationContext::Decoration<bool> alwaysAllowNonLocalWrites =
     OperationContext::declareDecoration<bool>();
-
-MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncAttempts, int, 10);
-
-MONGO_EXPORT_SERVER_PARAMETER(enableElectionHandoff, bool, true);
-
-// Number of seconds between noop writer writes.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(periodicNoopIntervalSecs, int, 10);
-
-MONGO_INITIALIZER(periodicNoopIntervalSecs)(InitializerContext*) {
-    if (periodicNoopIntervalSecs <= 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Periodic noop interval must be greater than 0 seconds: "
-                                    << periodicNoopIntervalSecs);
-    } else if (periodicNoopIntervalSecs > 10) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Periodic noop interval must be less than or equal to 10 seconds: "
-                          << periodicNoopIntervalSecs);
-    }
-    return Status::OK();
-}
 
 /**
  * Allows non-local writes despite _canAcceptNonLocalWrites being false on a single OperationContext
