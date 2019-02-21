@@ -141,7 +141,7 @@ Status validateBaseOptions(const moe::Environment& params) {
                 return false;
             }
             const auto& val = etc->second;
-            return val.compare("1") || val.compare("true");
+            return (0 == val.compare("1")) || (0 == val.compare("true"));
         })();
 
         if (enableTestCommandsValue) {
