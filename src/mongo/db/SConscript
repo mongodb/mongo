@@ -1110,8 +1110,10 @@ env.Library(
     target="read_concern_d_impl",
     source=[
         "read_concern_mongod.cpp",
+        env.Idlc('read_concern_mongod.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/idl/server_parameter",
         "$BUILD_DIR/mongo/s/grid",
         "catalog_raii",
         "curop",

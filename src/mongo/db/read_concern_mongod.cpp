@@ -37,11 +37,11 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/notification.h"
@@ -54,8 +54,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeLinearizableReadConcern);
 
 /**
-*  Synchronize writeRequests
-*/
+ *  Synchronize writeRequests
+ */
 
 class WriteRequestSynchronizer;
 const auto getWriteRequestsSynchronizer =
@@ -66,10 +66,10 @@ public:
     WriteRequestSynchronizer() = default;
 
     /**
-    * Returns a tuple <false, existingWriteRequest> if it can  find the one that happened after or
-    * at clusterTime.
-    * Returns a tuple <true, newWriteRequest> otherwise.
-    */
+     * Returns a tuple <false, existingWriteRequest> if it can  find the one that happened after or
+     * at clusterTime.
+     * Returns a tuple <true, newWriteRequest> otherwise.
+     */
     std::tuple<bool, std::shared_ptr<Notification<Status>>> getOrCreateWriteRequest(
         LogicalTime clusterTime) {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
@@ -84,8 +84,8 @@ public:
     }
 
     /**
-    * Erases writeRequest that happened at clusterTime
-    */
+     * Erases writeRequest that happened at clusterTime
+     */
     void deleteWriteRequest(LogicalTime clusterTime) {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         auto el = _writeRequests.find(clusterTime.asTimestamp());
@@ -100,12 +100,9 @@ private:
     std::map<Timestamp, std::shared_ptr<Notification<Status>>> _writeRequests;
 };
 
-
-MONGO_EXPORT_SERVER_PARAMETER(waitForSecondaryBeforeNoopWriteMS, int, 10);
-
 /**
-*  Schedule a write via appendOplogNote command to the primary of this replica set.
-*/
+ *  Schedule a write via appendOplogNote command to the primary of this replica set.
+ */
 Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord->isReplEnabled());
