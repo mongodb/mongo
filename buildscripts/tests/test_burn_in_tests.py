@@ -1,16 +1,250 @@
-"""Unit tests for the buildscripts/burn_in_tests.py."""
+"""Unit tests for buildscripts/burn_in_tests.py."""
 
 from __future__ import absolute_import
 
 import collections
 import os
+import subprocess
 import unittest
 
-from mock import patch, Mock
+from mock import Mock, mock_open, patch
 
 import buildscripts.burn_in_tests as burn_in
 
 # pylint: disable=missing-docstring,protected-access
+
+BURN_IN = "buildscripts.burn_in_tests"
+EVG_CI = "buildscripts.ciconfig.evergreen"
+EVG_CLIENT = "buildscripts.client.evergreen"
+GIT = "buildscripts.git"
+RESMOKELIB = "buildscripts.resmokelib"
+
+
+class ValidateOptions(unittest.TestCase):
+    class ParserError(Exception):
+        pass
+
+    @staticmethod
+    def _raise_parser_error(err):
+        raise ValidateOptions.ParserError(err)
+
+    @staticmethod
+    def _mock_parser():
+        parser = Mock()
+        parser.error = ValidateOptions._raise_parser_error
+        return parser
+
+    @staticmethod
+    def _mock_values():
+        values = Mock()
+        values.repeat_tests_num = None
+        values.repeat_tests_max = None
+        values.repeat_tests_min = None
+        values.repeat_tests_secs = None
+        values.buildvariant = None
+        values.test_list_file = None
+        return values
+
+    def test_validate_options_listfile_buildvariant(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.test_list_file = "list_file.json"
+        values.buildvariant = "variant1"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            burn_in.validate_options(parser, values)
+
+    def test_validate_options_nolistfile_buildvariant(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.buildvariant = "variant1"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            burn_in.validate_options(parser, values)
+
+    def test_validate_options_listfile_nobuildvariant(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.test_list_file = "list_file.json"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            burn_in.validate_options(parser, values)
+
+    def test_validate_options_no_listfile_no_buildvariant(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            with self.assertRaises(self.ParserError):
+                burn_in.validate_options(parser, values)
+
+    def test_validate_options_buildvariant(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.buildvariant = "variant1"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            burn_in.validate_options(parser, values)
+
+    def test_validate_options_bad_buildvariant(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.buildvariant = "badvariant1"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            with self.assertRaises(self.ParserError):
+                burn_in.validate_options(parser, values)
+
+    def test_validate_options_tests_max_no_tests_secs(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.repeat_tests_max = 3
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            with self.assertRaises(self.ParserError):
+                burn_in.validate_options(parser, values)
+
+    def test_validate_options_tests_min_no_tests_secs(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.repeat_tests_min = 3
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            with self.assertRaises(self.ParserError):
+                burn_in.validate_options(parser, values)
+
+    def test_validate_options_tests_min_gt_tests_max(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.repeat_tests_min = 3
+        values.repeat_tests_max = 2
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            with self.assertRaises(self.ParserError):
+                burn_in.validate_options(parser, values)
+
+    def test_validate_options_tests_secs(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.buildvariant = "variant1"
+        values.repeat_tests_min = 1
+        values.repeat_tests_max = 3
+        values.repeat_tests_secs = 3
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            burn_in.validate_options(parser, values)
+
+    def test_validate_options_tests_secs_and_tests_num(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.buildvariant = "variant1"
+        values.repeat_tests_num = 1
+        values.repeat_tests_min = 1
+        values.repeat_tests_max = 3
+        values.repeat_tests_secs = 3
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            with self.assertRaises(self.ParserError):
+                burn_in.validate_options(parser, values)
+
+    def test_validate_options_tests_secs_no_buildvariant(self):
+        parser = self._mock_parser()
+        values = self._mock_values()
+        values.repeat_tests_min = 1
+        values.repeat_tests_max = 3
+        values.repeat_tests_secs = 3
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
+            with self.assertRaises(self.ParserError):
+                burn_in.validate_options(parser, values)
+
+
+class UpdateReportDataTests(unittest.TestCase):
+    def test_update_report_data_nofile(self):
+        data = {}
+        task = ""
+        pathname = "file_exists"
+        with patch("os.path.isfile", return_value=False) as mock_isfile,\
+             patch("json.load", return_value=data) as mock_json:
+            burn_in._update_report_data(data, pathname, task)
+            self.assertEqual(mock_isfile.call_count, 1)
+            self.assertEqual(mock_json.call_count, 0)
+
+    def test_update_report_data(self):
+        task1 = "task1"
+        task2 = "task2"
+        data = {
+            "failures": 1,
+            "results": [
+                {"test_file": "test1:" + task1},
+                {"test_file": "test2:" + task1}]
+        } # yapf: disable
+        new_data = {
+            "failures": 1,
+            "results": [
+                {"test_file": "test3"},
+                {"test_file": "test4"}]
+        } # yapf: disable
+
+        pathname = "file_exists"
+        with patch("os.path.isfile", return_value=True),\
+             patch("__builtin__.open", mock_open()),\
+             patch("json.load", return_value=new_data):
+            burn_in._update_report_data(data, pathname, task2)
+            self.assertEqual(len(data["results"]), 4)
+            self.assertEqual(data["failures"], 2)
+            self.assertIn({"test_file": "test1:" + task1}, data["results"])
+            self.assertIn({"test_file": "test3:" + task2}, data["results"])
+
+
+class RunTests(unittest.TestCase):
+    class SysExit(Exception):
+        pass
+
+    TESTS_BY_TASK = {
+        "task1": {
+            "resmoke_args": "--suites=suite1",
+            "tests": ["jstests/test1.js", "jstests/test2.js"]},
+        "task2": {
+            "resmoke_args": "--suites=suite1",
+            "tests": ["jstests/test1.js", "jstests/test3.js"]},
+        "task3": {
+            "resmoke_args": "--suites=suite3",
+            "tests": ["jstests/test4.js", "jstests/test5.js"]},
+        "task4": {
+            "resmoke_args": "--suites=suite4", "tests": []}
+    } # yapf: disable
+
+    def _test_run_tests(self, no_exec, tests_by_task, resmoke_cmd):
+        with patch("subprocess.check_call", return_value=None) as mock_subproc,\
+             patch(BURN_IN + "._update_report_data", return_value=None),\
+             patch(BURN_IN + "._write_json_file", return_value=None):
+            burn_in.run_tests(no_exec, tests_by_task, resmoke_cmd, None)
+            self.assertEqual(mock_subproc.call_count, len(tests_by_task.keys()))
+            for idx, task in enumerate(sorted(tests_by_task)):
+                for task_test in tests_by_task[task].get("tests", []):
+                    self.assertIn(task_test, mock_subproc.call_args_list[idx][0][0])
+
+    def test_run_tests_noexec(self):
+        no_exec = True
+        resmoke_cmd = None
+        with patch("subprocess.check_call", return_value=None) as mock_subproc,\
+             patch(BURN_IN + "._write_json_file", return_value=None) as mock_write_json:
+            burn_in.run_tests(no_exec, self.TESTS_BY_TASK, resmoke_cmd, None)
+            self.assertEqual(mock_subproc.call_count, 0)
+            self.assertEqual(mock_write_json.call_count, 0)
+
+    def test_run_tests_notests(self):
+        no_exec = False
+        tests_by_task = {}
+        resmoke_cmd = ["python", "buildscripts/resmoke.py", "--continueOnFailure"]
+        self._test_run_tests(no_exec, tests_by_task, resmoke_cmd)
+
+    def test_run_tests_tests(self):
+        no_exec = False
+        resmoke_cmd = ["python", "buildscripts/resmoke.py", "--continueOnFailure"]
+        self._test_run_tests(no_exec, self.TESTS_BY_TASK, resmoke_cmd)
+
+    def test_run_tests_tests_resmoke_failure(self):
+        no_exec = False
+        resmoke_cmd = ["python", "buildscripts/resmoke.py", "--continueOnFailure"]
+        error_code = -1
+        with patch("subprocess.check_call", return_value=None) as mock_subproc,\
+             patch("sys.exit", return_value=error_code) as mock_exit,\
+             patch(BURN_IN + "._update_report_data", return_value=None),\
+             patch(BURN_IN + "._write_json_file", return_value=None):
+            mock_subproc.side_effect = subprocess.CalledProcessError(error_code, "err1")
+            mock_exit.side_effect = self.SysExit(error_code)
+            with self.assertRaises(self.SysExit):
+                burn_in.run_tests(no_exec, self.TESTS_BY_TASK, resmoke_cmd, None)
 
 
 class FindLastActivated(unittest.TestCase):
@@ -47,13 +281,13 @@ class FindLastActivated(unittest.TestCase):
     @staticmethod
     def builds_url(build):
         """Return build URL."""
-        return "{}{}builds/{}".format(burn_in.API_SERVER_DEFAULT, burn_in.REST_PREFIX, build)
+        return "{}{}builds/{}".format(burn_in.API_SERVER_DEFAULT, burn_in.API_REST_PREFIX, build)
 
     @staticmethod
     def revisions_url(project, revision):
         """Return revisions URL."""
         return "{}{}projects/{}/revisions/{}".format(burn_in.API_SERVER_DEFAULT,
-                                                     burn_in.REST_PREFIX, project, revision)
+                                                     burn_in.API_REST_PREFIX, project, revision)
 
     @staticmethod
     def load_urls(request, project, revision_builds):
@@ -78,11 +312,9 @@ class FindLastActivated(unittest.TestCase):
 
     def _test_find_last_activated_task(self, branch, variant, revision,
                                        revisions=REVISION_BUILDS.keys()):
-        # revisions = self.REVISION_BUILDS.keys()
-        with patch("buildscripts.burn_in_tests.requests", MockRequests()), patch(
-                "buildscripts.client.evergreen.read_evg_config") as mock_read_evg:
+        with patch(BURN_IN + ".requests", MockRequests()),\
+             patch(EVG_CLIENT + ".read_evg_config", return_value=None):
             self.load_urls(burn_in.requests, "mongodb-mongo-master", self.REVISION_BUILDS)
-            mock_read_evg.return_value = None
             last_revision = burn_in.find_last_activated_task(revisions, variant, branch)
         self.assertEqual(last_revision, revision)
 
@@ -120,9 +352,7 @@ SUITE3.tests = ["test2.js", "test4.js"]
 
 
 def _create_executor_list(suites, exclude_suites):
-    with patch(
-            "buildscripts.resmokelib.suitesconfig.create_test_membership_map") as mock_member_map:
-        mock_member_map.return_value = MEMBERS_MAP
+    with patch(RESMOKELIB + ".suitesconfig.create_test_membership_map", return_value=MEMBERS_MAP):
         return burn_in.create_executor_list(suites, exclude_suites)
 
 
@@ -183,6 +413,7 @@ class CreateTaskList(unittest.TestCase):
 
     evergreen_conf = Mock()
     evergreen_conf.get_variant = VARIANTS.get
+    evergreen_conf.variant_names = VARIANTS.keys()
 
     def test_create_task_list(self):
         variant = "variantall"
@@ -311,14 +542,10 @@ class FindChangedTests(unittest.TestCase):
             self.expected_changed_tests += rev_diff.get(commit, [])
         self.expected_changed_tests += untracked_files
         # pylint: enable=attribute-defined-outside-init
-        with patch("buildscripts.client.evergreen.read_evg_config") as mock_read_evg, patch(
-                "buildscripts.git.Repository",
-                self._mock_git_repository), patch("os.path.isfile") as mock_isfile, patch(
-                    "buildscripts.burn_in_tests.find_last_activated_task"
-                ) as mock_find_last_activated_task:
-            mock_read_evg.return_value = None
-            mock_isfile.return_value = True
-            mock_find_last_activated_task.return_value = last_activated_task
+        with patch(EVG_CLIENT + ".read_evg_config", return_value=None),\
+             patch(GIT + ".Repository", self._mock_git_repository),\
+             patch("os.path.isfile", return_value=True),\
+             patch(BURN_IN + ".find_last_activated_task", return_value=last_activated_task):
             return burn_in.find_changed_tests(branch, commit, max_revisions, variant, check_evg)
 
     def test_find_changed_tests(self):
