@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/client/shard_remote.h"
+#include "mongo/s/client/shard_remote_gen.h"
 
 #include <algorithm>
 #include <string>
@@ -71,11 +72,6 @@ namespace {
 // response.
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
 
-constexpr bool internalProhibitShardOperationRetryByDefault = false;
-MONGO_EXPORT_SERVER_PARAMETER(internalProhibitShardOperationRetry,
-                              bool,
-                              internalProhibitShardOperationRetryByDefault);
-
 /**
  * Returns a new BSONObj describing the same command and arguments as 'cmdObj', but with maxTimeMS
  * replaced by maxTimeMSOverride (or removed if maxTimeMSOverride is Milliseconds::max()).
@@ -108,7 +104,7 @@ ShardRemote::ShardRemote(const ShardId& id,
 ShardRemote::~ShardRemote() = default;
 
 bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
-    if (internalProhibitShardOperationRetry.loadRelaxed()) {
+    if (gInternalProhibitShardOperationRetry.loadRelaxed()) {
         return false;
     }
 
