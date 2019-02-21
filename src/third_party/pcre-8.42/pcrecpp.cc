@@ -80,6 +80,24 @@ static const string empty_string;
 // If the user doesn't ask for any options, we just use this one
 static RE_Options default_options;
 
+// Specials for the start of patterns. See comments where start_options is used
+// below. (PH June 2018)
+static const char *start_options[] = {
+  "(*UTF8)",
+  "(*UTF)",
+  "(*UCP)",
+  "(*NO_START_OPT)",
+  "(*NO_AUTO_POSSESS)",
+  "(*LIMIT_RECURSION=",
+  "(*LIMIT_MATCH=",
+  "(*CRLF)",
+  "(*CR)",
+  "(*BSR_UNICODE)",
+  "(*BSR_ANYCRLF)",
+  "(*ANYCRLF)",
+  "(*ANY)",
+  "" };
+
 void RE::Init(const string& pat, const RE_Options* options) {
   pattern_ = pat;
   if (options == NULL) {
@@ -135,7 +153,49 @@ pcre* RE::Compile(Anchor anchor) {
   } else {
     // Tack a '\z' at the end of RE.  Parenthesize it first so that
     // the '\z' applies to all top-level alternatives in the regexp.
-    string wrapped = "(?:";  // A non-counting grouping operator
+
+    /* When this code was written (for PCRE 6.0) it was enough just to
+    parenthesize the entire pattern. Unfortunately, when the feature of
+    starting patterns with (*UTF8) or (*CR) etc. was added to PCRE patterns,
+    this code was never updated. This bug was not noticed till 2018, long after
+    PCRE became obsolescent and its maintainer no longer around. Since PCRE is
+    frozen, I have added a hack to check for all the existing "start of
+    pattern" specials - knowing that no new ones will ever be added. I am not a
+    C++ programmer, so the code style is no doubt crude. It is also
+    inefficient, but is only run when the pattern starts with "(*".
+    PH June 2018. */
+
+    string wrapped = "";
+
+    if (pattern_.c_str()[0] == '(' && pattern_.c_str()[1] == '*') {
+      int kk, klen, kmat;
+      for (;;) {   // Loop for any number of leading items
+
+        for (kk = 0; start_options[kk][0] != 0; kk++) {
+          klen = strlen(start_options[kk]);
+          kmat = strncmp(pattern_.c_str(), start_options[kk], klen);
+          if (kmat >= 0) break;
+        }
+        if (kmat != 0) break;  // Not found
+
+        // If the item ended in "=" we must copy digits up to ")".
+
+        if (start_options[kk][klen-1] == '=') {
+          while (isdigit(pattern_.c_str()[klen])) klen++;
+          if (pattern_.c_str()[klen] != ')') break;  // Syntax error
+          klen++;
+        }
+
+        // Move the item from the pattern to the start of the wrapped string.
+
+        wrapped += pattern_.substr(0, klen);
+        pattern_.erase(0, klen);
+      }
+    }
+
+    // Wrap the rest of the pattern.
+
+    wrapped += "(?:";  // A non-counting grouping operator
     wrapped += pattern_;
     wrapped += ")\\z";
     re = pcre_compile(wrapped.c_str(), pcre_options,
@@ -415,7 +475,7 @@ int RE::GlobalReplace(const StringPiece& rewrite,
           matchend++;
         }
         // We also need to advance more than one char if we're in utf8 mode.
-#ifdef SUPPORT_UTF8
+#ifdef SUPPORT_UTF
         if (options_.utf8()) {
           while (matchend < static_cast<int>(str->length()) &&
                  ((*str)[matchend] & 0xc0) == 0x80)

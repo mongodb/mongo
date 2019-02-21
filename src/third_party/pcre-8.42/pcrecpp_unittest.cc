@@ -309,7 +309,7 @@ static void TestReplace() {
       "@aa",
       "@@@",
       3 },
-#ifdef SUPPORT_UTF8
+#ifdef SUPPORT_UTF
     { "b*",
       "bb",
       "\xE3\x83\x9B\xE3\x83\xBC\xE3\x83\xA0\xE3\x81\xB8",   // utf8
@@ -327,7 +327,7 @@ static void TestReplace() {
     { "", NULL, NULL, NULL, NULL, 0 }
   };
 
-#ifdef SUPPORT_UTF8
+#ifdef SUPPORT_UTF
   const bool support_utf8 = true;
 #else
   const bool support_utf8 = false;
@@ -535,7 +535,7 @@ static void TestQuoteMetaLatin1() {
 }
 
 static void TestQuoteMetaUtf8() {
-#ifdef SUPPORT_UTF8
+#ifdef SUPPORT_UTF
   TestQuoteMeta("Pl\xc3\xa1\x63ido Domingo", pcrecpp::UTF8());
   TestQuoteMeta("xyz", pcrecpp::UTF8());            // No fancy utf8
   TestQuoteMeta("\xc2\xb0", pcrecpp::UTF8());       // 2-byte utf8 (degree symbol)
@@ -1178,7 +1178,7 @@ int main(int argc, char** argv) {
     CHECK(re.error().empty());  // Must have no error
   }
 
-#ifdef SUPPORT_UTF8
+#ifdef SUPPORT_UTF
   // Check UTF-8 handling
   {
     printf("Testing UTF-8 handling\n");
@@ -1202,6 +1202,24 @@ int main(int argc, char** argv) {
     CHECK(re_test1.FullMatch(utf8_string));
     RE re_test2("...", pcrecpp::UTF8());
     CHECK(re_test2.FullMatch(utf8_string));
+
+    // PH added these tests for leading option settings
+
+    RE re_testZ1("(*UTF8)...");
+    CHECK(re_testZ1.FullMatch(utf8_string));
+
+    RE re_testZ2("(*UTF)...");
+    CHECK(re_testZ2.FullMatch(utf8_string));
+
+    RE re_testZ3("(*UCP)(*UTF)...");
+    CHECK(re_testZ3.FullMatch(utf8_string));
+
+    RE re_testZ4("(*UCP)(*LIMIT_MATCH=1000)(*UTF)...");
+    CHECK(re_testZ4.FullMatch(utf8_string));
+
+    RE re_testZ5("(*UCP)(*LIMIT_MATCH=1000)(*ANY)(*UTF)...");
+    CHECK(re_testZ5.FullMatch(utf8_string));
+
 
     // Check that '.' matches one byte or UTF-8 character
     // according to the mode.
@@ -1248,7 +1266,7 @@ int main(int argc, char** argv) {
     CHECK(!match_sentence.FullMatch(target));
     CHECK(!match_sentence_re.FullMatch(target));
   }
-#endif  /* def SUPPORT_UTF8 */
+#endif  /* def SUPPORT_UTF */
 
   printf("Testing error reporting\n");
 
