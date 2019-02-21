@@ -1027,6 +1027,7 @@ env.Library(
     target="cloner",
     source=[
         "cloner.cpp",
+        env.Idlc("cloner.idl")[0],
     ],
     LIBDEPS=[
         'dbdirectclient',

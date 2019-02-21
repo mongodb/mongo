@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/cloner.h"
+#include "mongo/db/cloner_gen.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
@@ -78,7 +79,6 @@ using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-MONGO_EXPORT_SERVER_PARAMETER(skipCorruptDocumentsWhenCloning, bool, false);
 MONGO_FAIL_POINT_DEFINE(movePrimaryFailPoint);
 
 BSONElement getErrField(const BSONObj& o);
@@ -243,7 +243,7 @@ struct Cloner::Fun {
                 str::stream ss;
                 ss << "Cloner: found corrupt document in " << from_collection.toString() << ": "
                    << redact(status);
-                if (skipCorruptDocumentsWhenCloning.load()) {
+                if (gSkipCorruptDocumentsWhenCloning.load()) {
                     warning() << ss.ss.str() << "; skipping";
                     continue;
                 }
