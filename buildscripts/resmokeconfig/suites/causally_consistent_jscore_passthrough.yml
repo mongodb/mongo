@@ -38,7 +38,7 @@ selector:
   - jstests/core/index_id_options.js  # "local" database.
   - jstests/core/index9.js  # "local" database.
   - jstests/core/profile*.js  # profiling.
-  - jstests/core/queryoptimizera.js  # "local" database. 
+  - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/stages*.js  # stageDebug.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.
@@ -84,7 +84,7 @@ selector:
   - jstests/core/index_partial_read_ops.js
   - jstests/core/update_arrayFilters.js
   # TODO: SERVER-30488
-  - jstests/core/apitest_dbcollection.js 
+  - jstests/core/apitest_dbcollection.js
   - jstests/core/getmore_invalidated_cursors.js
   - jstests/core/system_profile.js
   - jstests/core/orf.js #explain.executionStats is not CC

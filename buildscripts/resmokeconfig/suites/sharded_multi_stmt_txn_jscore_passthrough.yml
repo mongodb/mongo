@@ -36,7 +36,7 @@ selector:
   - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
   - jstests/core/notablescan.js  # notablescan.
   - jstests/core/profile*.js  # profiling.
-  - jstests/core/queryoptimizera.js  # "local" database. 
+  - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
   - jstests/core/top.js  # top.
@@ -50,9 +50,9 @@ selector:
   # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
   - jstests/core/views/views_coll_stats.js
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
-  # The following tests fail because of divergent dropCollection behavior between standalones and 
+  # The following tests fail because of divergent dropCollection behavior between standalones and
   # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
-  # we expect a second drop to return status OK. 
+  # we expect a second drop to return status OK.
   - jstests/core/drop.js
   - jstests/core/explain_upsert.js
 
@@ -65,7 +65,7 @@ selector:
   ##
   ## Limitations with the way the runner file injects transactions.
   ##
-  
+
   # These tests expects some statements to error, which will cause txns to abort entirely.
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
@@ -101,7 +101,7 @@ selector:
   - jstests/core/ref4.js
   - jstests/core/regex_limit.js
   - jstests/core/remove_undefined.js
-  - jstests/core/set7.js 
+  - jstests/core/set7.js
   - jstests/core/sortb.js
   - jstests/core/sortf.js
   - jstests/core/sortg.js
@@ -323,7 +323,7 @@ selector:
 executor:
   config:
     shell_options:
-      eval:  >-
+      eval: >-
         var testingReplication = true;
         load('jstests/libs/override_methods/enable_sessions.js');
         load('jstests/libs/txns/txn_override.js');

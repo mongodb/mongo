@@ -7,7 +7,7 @@ selector:
   # Will always fail on last-stable. In order for the test to succeed, the setFCV
   # command has to reach the shards. Since the cluster will already be
   # running in fully downgraded version, the config server won't forward the
-  # command to the shards - it'll just return success immediately. 
+  # command to the shards - it'll just return success immediately.
   - jstests/sharding/max_time_ms_sharded_new_commands.js
   # Requires fix to SERVER-31689
   - jstests/sharding/aggregation_currentop.js

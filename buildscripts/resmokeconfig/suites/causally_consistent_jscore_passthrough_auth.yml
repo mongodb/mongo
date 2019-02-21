@@ -51,7 +51,7 @@ selector:
   - jstests/core/index_id_options.js  # "local" database.
   - jstests/core/index9.js  # "local" database.
   - jstests/core/profile*.js  # profiling.
-  - jstests/core/queryoptimizera.js  # "local" database. 
+  - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/stages*.js  # stageDebug.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.
@@ -97,7 +97,7 @@ selector:
   - jstests/core/index_partial_read_ops.js
   - jstests/core/update_arrayFilters.js
   # TODO: SERVER-30488
-  - jstests/core/apitest_dbcollection.js 
+  - jstests/core/apitest_dbcollection.js
   - jstests/core/getmore_invalidated_cursors.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
@@ -107,9 +107,9 @@ selector:
   # but this suite puts us in a multi-auth state.
   - jstests/core/list_all_sessions.js # Too many users authenticated
   - jstests/core/list_sessions.js # Too many users authenticated
-  # The following tests fail because of divergent dropCollection behavior between standalones and 
+  # The following tests fail because of divergent dropCollection behavior between standalones and
   # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
-  # we expect a second drop to return status OK. 
+  # we expect a second drop to return status OK.
   - jstests/core/drop.js
   - jstests/core/explain_upsert.js
   # The `dbstats` command builds in-memory structures that are not causally consistent.

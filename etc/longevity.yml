@@ -175,7 +175,7 @@ functions:
 
   "analyze":
     - command: shell.exec
-      type : test
+      type: test
       params:
         working_dir: work
         script: |
@@ -265,7 +265,6 @@ modules:
   repo: git@github.com:10gen/dsi.git
   prefix: dsi
   branch: master
-
 
 
 #######################################

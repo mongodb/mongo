@@ -6,7 +6,7 @@ selector:
   exclude_files:
   # These tests run in the jscore_txn passthrough suites.
   - jstests/core/txns/**/*.js
-  
+
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
@@ -36,7 +36,7 @@ selector:
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
   - jstests/core/notablescan.js  # notablescan.
   - jstests/core/profile*.js  # profiling.
-  - jstests/core/queryoptimizera.js  # "local" database. 
+  - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.

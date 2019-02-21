@@ -233,7 +233,7 @@ repos:
     repos:
       - yum/redhat/6/mongodb-enterprise
       - yum/redhat/6Server/mongodb-enterprise
-        
+
   - name: rhel70
     type: rpm
     edition: enterprise

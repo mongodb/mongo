@@ -172,7 +172,7 @@ variables:
 
 - &powercycle_test
   ec2_artifacts: ${log_path} ${db_path} ${backup_artifacts}
-  program_options:  --exitYamlFile=${exit_file} --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
+  program_options: --exitYamlFile=${exit_file} --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${private_ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
   crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
@@ -398,7 +398,7 @@ functions:
           fi
         done
 
-  "configure evergreen api credentials" : &configure_evergreen_api_credentials
+  "configure evergreen api credentials": &configure_evergreen_api_credentials
     command: shell.exec
     type: test
     params:
@@ -412,7 +412,7 @@ functions:
         user: "${evergreen_api_user}"
         END_OF_CREDS
 
-  "git get project" : &git_get_project
+  "git get project": &git_get_project
     command: git.get_project
     params:
       directory: ${git_project_directory|src}
@@ -420,7 +420,7 @@ functions:
         enterprise: ${enterprise_rev}
         wtdevelop: ${wtdevelop_rev}
 
-  "fetch artifacts" : &fetch_artifacts
+  "fetch artifacts": &fetch_artifacts
     command: s3.get
     params:
       aws_key: ${aws_key}
@@ -429,7 +429,7 @@ functions:
       bucket: mciuploads
       extract_to: src
 
-  "fetch binaries" : &fetch_binaries
+  "fetch binaries": &fetch_binaries
     command: s3.get
     params:
       aws_key: ${aws_key}
@@ -438,7 +438,7 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
-  "extract binaries" : &extract_binaries
+  "extract binaries": &extract_binaries
     command: shell.exec
     params:
       working_dir: src
@@ -447,7 +447,7 @@ functions:
         ${decompress} mongo-binaries.tgz
         cp mongodb*/bin/* .
 
-  "check binary version" : &check_binary_version
+  "check binary version": &check_binary_version
     command: shell.exec
     params:
       working_dir: src
@@ -477,7 +477,7 @@ functions:
           exit 1
         fi
 
-  "fetch benchmarks" : &fetch_benchmarks
+  "fetch benchmarks": &fetch_benchmarks
     command: s3.get
     params:
       aws_key: ${aws_key}
@@ -486,7 +486,7 @@ functions:
       bucket: mciuploads
       extract_to: src
 
-  "fetch benchrun embedded files" : &fetch_benchrun_embedded_files
+  "fetch benchrun embedded files": &fetch_benchrun_embedded_files
     command: s3.get
     params:
       aws_key: ${aws_key}
@@ -495,7 +495,7 @@ functions:
       bucket: mciuploads
       extract_to: src/benchrun_embedded/testcases
 
-  "get buildnumber" : &get_buildnumber
+  "get buildnumber": &get_buildnumber
     command: keyval.inc
     params:
       key: "${build_variant}_master"
@@ -594,7 +594,7 @@ functions:
           sleep 60
         done
 
-  "set up credentials" : &set_up_credentials
+  "set up credentials": &set_up_credentials
     command: shell.exec
     params:
       working_dir: src
@@ -608,7 +608,7 @@ functions:
         build_phase='${task_name}_${execution}'
         END_OF_CREDS
 
-  "set up notary client credentials" : &set_up_notary_client_credentials
+  "set up notary client credentials": &set_up_notary_client_credentials
     command: shell.exec
     params:
       working_dir: src
@@ -694,7 +694,7 @@ functions:
           echo "Request to BF Suggestion service status: $?"
         fi
 
-  "upload debugsymbols" : &upload_debugsymbols
+  "upload debugsymbols": &upload_debugsymbols
     command: s3.put
     params:
       optional: true
@@ -706,7 +706,7 @@ functions:
       permissions: public-read
       content_type: ${content_type|application/gzip}
 
-  "fetch debugsymbols archive" : &fetch_debugsymbols_archive
+  "fetch debugsymbols archive": &fetch_debugsymbols_archive
     command: s3.get
     params:
       aws_key: ${aws_key}
@@ -715,7 +715,7 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
 
-  "extract debugsymbols" : &extract_debugsymbols
+  "extract debugsymbols": &extract_debugsymbols
     command: shell.exec
     params:
       working_dir: src
@@ -739,10 +739,10 @@ functions:
         done
         rm mongo-debugsymbols.tgz 2>/dev/null || true
 
-  "fetch and build OpenSSL" :
+  "fetch and build OpenSSL":
     command: shell.exec
     params:
-        working_dir:  src
+        working_dir: src
         script: |
             set -o errexit
             set -o verbose
@@ -750,7 +750,7 @@ functions:
                 bash buildscripts/fetch_and_build_openssl.sh "${python|python}" "${openssl_make_flags|}" "${openssl_config_flags|}"
             fi
 
-  "use WiredTiger develop" :
+  "use WiredTiger develop":
     command: shell.exec
     params:
       working_dir: src
@@ -789,7 +789,7 @@ functions:
         export artifactory_mobile_pass=${artifactory_mobile_pass}
         EOF
 
-  "setup android toolchain" :
+  "setup android toolchain":
     command: shell.exec
     params:
       script: |
@@ -861,7 +861,7 @@ functions:
             cp -r embedded-android/build/repo/* ../../../../../build/mongo-embedded-sdk-$EMBEDDED_RELEASE_VERSION/android
         fi
 
-  "shared scons cache pruning" :
+  "shared scons cache pruning":
     command: shell.exec
     type: system
     params:
@@ -918,7 +918,7 @@ functions:
           echo "Not on master, shared SCons cache pruning skipped"
         fi
 
-  "scons cache pruning" :
+  "scons cache pruning":
     command: shell.exec
     params:
       working_dir: src
@@ -933,7 +933,7 @@ functions:
           $python buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
         fi
 
-  "umount shared scons directory" :
+  "umount shared scons directory":
     command: shell.exec
     params:
       working_dir: src
@@ -946,7 +946,7 @@ functions:
             $sudo umount /efs || true
         fi
 
-  "build new tools" :
+  "build new tools":
     command: shell.exec
     params:
       working_dir: src/src/mongo/gotools/src/github.com/mongodb/mongo-tools
@@ -976,7 +976,7 @@ functions:
             "../../../../../../mongo-tools/$i${exe|}" --version
         done
 
-  "get modified patch files" :
+  "get modified patch files":
     command: shell.exec
     params:
       working_dir: src
@@ -997,7 +997,7 @@ functions:
           fi
         fi
 
-  "install pip requirements" : &install_pip_requirements
+  "install pip requirements": &install_pip_requirements
     command: shell.exec
     params:
       working_dir: src
@@ -1009,7 +1009,7 @@ functions:
         ${activate_virtualenv}
         python2 -m pip install -r etc/pip/evgtest-requirements.txt
 
-  "determine resmoke jobs" : &determine_resmoke_jobs
+  "determine resmoke jobs": &determine_resmoke_jobs
     command: shell.exec
     params:
       working_dir: src
@@ -1026,13 +1026,13 @@ functions:
           --jobsMax ${resmoke_jobs_max|0}                   \
           --outFile resmoke_jobs_expansion.yml
 
-  "update resmoke jobs expansions" : &update_resmoke_jobs_expansions
+  "update resmoke jobs expansions": &update_resmoke_jobs_expansions
     command: expansions.update
     params:
       ignore_missing_file: true
       file: src/resmoke_jobs_expansion.yml
 
-  "determine task timeout" : &determine_task_timeout
+  "determine task timeout": &determine_task_timeout
     command: shell.exec
     params:
       working_dir: src
@@ -1048,24 +1048,24 @@ functions:
           --timeout ${timeout_secs|0}                  \
           --out-file task_timeout_expansions.yml
 
-  "update task timeout expansions" : &update_task_timeout_expansions
+  "update task timeout expansions": &update_task_timeout_expansions
     command: expansions.update
     params:
       ignore_missing_file: true
       file: src/task_timeout_expansions.yml
 
-  "update task timeout" : &update_task_timeout
+  "update task timeout": &update_task_timeout
     command: timeout.update
     params:
       timeout_secs: ${timeout_secs}
 
-  "update bypass expansions" : &update_bypass_expansions
+  "update bypass expansions": &update_bypass_expansions
     command: expansions.update
     params:
       ignore_missing_file: true
       file: src/bypass_compile_expansions.yml
 
-  "bypass compile and fetch binaries" :
+  "bypass compile and fetch binaries":
     command: shell.exec
     params:
       continue_on_err: true
@@ -1087,13 +1087,13 @@ functions:
             --jsonArtifact artifacts.json
         fi
 
-  "send benchmark results" :
+  "send benchmark results":
     command: json.send
     params:
       name: perf
       file: src/perf.json
 
-  "do setup" :
+  "do setup":
   - *fetch_artifacts
   - *update_bypass_expansions
   - *fetch_binaries
@@ -1105,21 +1105,21 @@ functions:
   - *monitor_process_threads
   - *collect_system_resource_info
 
-  "do benchmark setup" :
+  "do benchmark setup":
   - *git_get_project
   - *update_bypass_expansions
   - *get_buildnumber
   - *set_up_credentials
   - *fetch_benchmarks
 
-  "do benchmark embedded setup" :
+  "do benchmark embedded setup":
   - *git_get_project
   - *fetch_artifacts
   - *get_buildnumber
   - *set_up_credentials
   - *fetch_benchrun_embedded_files
 
-  "set up virtualenv" :
+  "set up virtualenv":
     command: shell.exec
     type: test
     params:
@@ -1156,7 +1156,7 @@ functions:
           if [[ ! -f $venv2_bin/python2 ]]; then ln -sfv "$py2_exe" "$venv2_bin/python2"; fi
           if [[ ! -f $venv2_bin/python3 ]]; then ln -sfv "$py3_exe" "$venv2_bin/python3"; fi
 
-  "execute resmoke tests" : &execute_resmoke_tests
+  "execute resmoke tests": &execute_resmoke_tests
     command: shell.exec
     type: test
     params:
@@ -1360,7 +1360,7 @@ functions:
         files:
           - src/generated_resmoke_config/${task}.json
 
-  "run generated tests" :
+  "run generated tests":
   - *install_pip_requirements
   - *retrieve_generated_test_configuration
   - *extract_generated_test_configuration
@@ -1390,7 +1390,7 @@ functions:
           exit $(cat run_tests_infrastructure_failure)
         fi
 
-  "run tests" :
+  "run tests":
     - *install_pip_requirements
     - *determine_task_timeout
     - *update_task_timeout_expansions
@@ -1421,7 +1421,7 @@ functions:
             exit $(cat run_tests_infrastructure_failure)
           fi
 
-  "scons compile" :
+  "scons compile":
     command: shell.exec
     type: test
     params:
@@ -1463,7 +1463,7 @@ functions:
         fi
         exit $exit_status
 
-  "generate compile expansions" :
+  "generate compile expansions":
     command: shell.exec
     params:
       working_dir: src
@@ -1522,12 +1522,12 @@ functions:
           MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
         fi
 
-  "apply compile expansions" :
+  "apply compile expansions":
     command: expansions.update
     params:
       file: src/compile_expansions.yml
 
-  "do jepsen setup" :
+  "do jepsen setup":
     - command: shell.exec
       params:
         working_dir: src
@@ -1564,7 +1564,7 @@ functions:
           ${activate_virtualenv}
           $python -c 'import socket; num_nodes = 5; print("\n".join(["%s:%d" % (socket.gethostname(), port) for port in range(20000, 20000 + num_nodes)]))' > nodes.txt
 
-  "run jepsen test" :
+  "run jepsen test":
     - command: shell.exec
       type: test
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
@@ -1755,7 +1755,7 @@ functions:
         content_type: ${content_type|application/gzip}
         display_name: Generated Tests - Execution ${execution}
 
-  "run idl tests" :
+  "run idl tests":
     - command: shell.exec
       type: test
       params:
@@ -1768,7 +1768,7 @@ functions:
           $python -m pip install -r etc/pip/evgtest-requirements.txt
           $python buildscripts/idl/run_tests.py
 
-  "run powercycle test" :
+  "run powercycle test":
     - command: shell.exec
       type: test
       params:
@@ -1891,7 +1891,7 @@ functions:
           exit $exit_code
 
 
-  "do multiversion setup" :
+  "do multiversion setup":
     command: shell.exec
     params:
       working_dir: src
@@ -1912,7 +1912,7 @@ functions:
           --architecture ${multiversion_architecture|x86_64} \
           --useLatest 3.2 3.4 3.6 4.0 4.0.1
 
-  "do snmp setup" :
+  "do snmp setup":
     command: shell.exec
     params:
       working_dir: src
@@ -1923,7 +1923,7 @@ functions:
         mkdir -p snmpconf
         cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
 
-  "do watchdog setup" :
+  "do watchdog setup":
     command: shell.exec
     params:
       working_dir: src
@@ -1933,7 +1933,7 @@ functions:
 
         bash src/mongo/db/modules/enterprise/jstests/watchdog/charybdefs_setup.sh
 
-  "cleanup environment" :
+  "cleanup environment":
     command: shell.exec
     params:
       script: |
@@ -1941,7 +1941,7 @@ functions:
 
         rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto venv
 
-  "kill processes" :
+  "kill processes":
     command: shell.exec
     params:
       silent: true
@@ -3503,7 +3503,7 @@ tasks:
         display_name: Source tarball
         # We only need to upload the source tarball from one of the build variants
         # because it should be the same everywhere, so just use rhel70/windows-64-2k8-ssl.
-        build_variants: [ rhel70, windows-64-2k8-ssl ]
+        build_variants: [rhel70, windows-64-2k8-ssl]
     - command: s3.put
       params:
         optional: true
@@ -4392,7 +4392,7 @@ tasks:
 
           if [ "${is_release|false}" != "true" ]; then
               echo "Not a release build"
-              exit 0 
+              exit 0
           fi
 
           sed s/@VERSION@/1.13.0/g src/src/mongo/embedded/mongoc_embedded/mongo-embedded-c-driver.podspec.in | tee mongo-embedded-c-driver.podspec
@@ -4531,6 +4531,23 @@ tasks:
           )"
           echo "Found mypy executable at '$MYPY'"
           ${compile_env|} python2 ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
+
+- name: lint_yaml
+  depends_on: []
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+        python -m pip install -I -r etc/pip/lint-requirements.txt
+        find buildscripts etc jstests -name '*.y*ml' -exec yamllint -c etc/yamllint_config.yml {} +
 
 - name: verify_pip
   depends_on: []
@@ -7059,7 +7076,7 @@ tasks:
         remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
-        build_variants: [ rhel70, windows-64-2k8-ssl ]
+        build_variants: [rhel70, windows-64-2k8-ssl]
     - func: "apply compile expansions"
     - func: "fetch debugsymbols archive"
     - func: "set up remote credentials"
@@ -7114,7 +7131,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
-        build_variants: [ rhel70, windows-64-2k8-ssl ]
+        build_variants: [rhel70, windows-64-2k8-ssl]
 
     # Put the debug symbols
     - command: s3.put
@@ -7160,7 +7177,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
-        build_variants: [ rhel70, windows-64-2k8-ssl ]
+        build_variants: [rhel70, windows-64-2k8-ssl]
 
     # Put the debug symbols signature
     - command: s3.put
@@ -7218,7 +7235,7 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1
-        build_variants: [ rhel70, windows-64-2k8-ssl ]
+        build_variants: [rhel70, windows-64-2k8-ssl]
 
     # Put the debug symbols sha1
     - command: s3.put
@@ -7276,7 +7293,7 @@ tasks:
         bucket: build-push-testing
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256
-        build_variants: [ rhel70, windows-64-2k8-ssl ]
+        build_variants: [rhel70, windows-64-2k8-ssl]
 
     # Put the debug symbols sha256
     - command: s3.put
@@ -7334,7 +7351,7 @@ tasks:
         permissions: public-read
         content_type: text/plain
         remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5
-        build_variants: [ rhel70, windows-64-2k8-ssl ]
+        build_variants: [rhel70, windows-64-2k8-ssl]
 
     # Put the debug symbols md5
     - command: s3.put
@@ -7376,12 +7393,12 @@ tasks:
             #Source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
+               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
 
             #MSI (Windows only)
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'enterprise-windows-64-2k8', 'windows-64-2k8-ssl' ]}
+               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl']}
 
             #Binaries Signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
@@ -7394,7 +7411,7 @@ tasks:
             #Source tarball signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
+               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
 
             #SHA1 for binaries
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
@@ -7407,7 +7424,7 @@ tasks:
             #SHA1 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
+               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
 
             #SHA1 for MSI
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
@@ -7425,7 +7442,7 @@ tasks:
             #SHA256 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
+               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
 
             #SHA256 for MSI files
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
@@ -7443,12 +7460,12 @@ tasks:
             #MD5 for source tarball
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5', 'bucket': '${push_bucket}'},
-               'build_variants': [ 'rhel70', 'windows-64-2k8-ssl' ]}
+               'build_variants': ['rhel70', 'windows-64-2k8-ssl']}
 
             #MD5 for MSIs
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
-               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl'], }
+               'build_variants': ['enterprise-windows-64-2k8', 'windows-64-2k8-ssl']}
 
     # Debug symbols are not created for all variants and the copy is optional.
     - command: s3Copy.copy
@@ -9459,8 +9476,8 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
-    # Some concurrency workloads require a lot of memory, so we use machines
-    # with more RAM for these suites.
+  # Some concurrency workloads require a lot of memory, so we use machines
+  # with more RAM for these suites.
   - name: concurrency
     distros:
     - windows-64-vs2017-compile
@@ -9476,18 +9493,18 @@ buildvariants:
   - name: concurrency_sharded_replication
     distros:
     - windows-64-vs2017-compile
-  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-    distros:
-    - windows-64-vs2017-compile
-  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
-    distros:
-    - windows-64-vs2017-compile
-  #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-    distros:
-    - windows-64-vs2017-compile
-  #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
-    distros:
-    - windows-64-vs2017-compile
+  # - name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #   distros:
+  #   - windows-64-vs2017-compile
+  # - name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #   distros:
+  #   - windows-64-vs2017-compile
+  # - name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #   distros:
+  #   - windows-64-vs2017-compile
+  # - name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #   distros:
+  #   - windows-64-vs2017-compile
   - name: concurrency_sharded_replication_with_balancer
     distros:
     - windows-64-vs2017-compile
@@ -9650,7 +9667,6 @@ buildvariants:
   modules:
   - enterprise
   - wtdevelop
-  expansions:
   expansions:
     <<: *enterprise-windows-64-2k8-nopush-expansions-template
     use_wt_develop: true
@@ -10671,6 +10687,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: lint
+  - name: lint_yaml
   - name: burn_in_tests
     distros:
     - rhel62-large
@@ -10881,9 +10898,9 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
-  # Ban tests that run prepareTransaction or multi-shard transactions (which use
-  # prepareTransaction). prepareTransaction is rejected on nodes with
-  # enableMajorityReadConcern:"false" (SERVER-37559).
+    # Ban tests that run prepareTransaction or multi-shard transactions (which use
+    # prepareTransaction). prepareTransaction is rejected on nodes with
+    # enableMajorityReadConcern:"false" (SERVER-37559).
     test_flags: >-
       --majorityReadConcern=off
       --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction
@@ -11551,18 +11568,18 @@ buildvariants:
   - name: concurrency_sharded_replication
     distros:
     - rhel70
-  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-    distros:
-    - rhel70
-  #- name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
-    distros:
-    - rhel70
-  #- name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
-    distros:
-    - rhel70
-  #- name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
-    distros:
-    - rhel70
+  # - name: concurrency_sharded_replication_local_read_write_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #   distros:
+  #   - rhel70
+  # - name: concurrency_sharded_replication_local_read_write_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #   distros:
+  #   - rhel70
+  # - name: concurrency_sharded_replication_multi_stmt_txn # Removed until SERVER-38499 is resolved.
+  #   distros:
+  #   - rhel70
+  # - name: concurrency_sharded_replication_multi_stmt_txn_with_balancer # Removed until SERVER-38499 is resolved.
+  #   distros:
+  #   - rhel70
   - name: concurrency_sharded_replication_with_balancer
     distros:
     - rhel70
@@ -14135,7 +14152,6 @@ buildvariants:
     scons_cache_mode: all
     tooltags: "ssl sasl"
     build_mongoreplay: true
-    build_mongoreplay: true
   display_tasks:
   - *dbtest
   - *unittests
@@ -14151,8 +14167,8 @@ buildvariants:
   batchtime: 1440 # 1 day
   stepback: false
   tasks:
-# Test lifecycle is temporarily disabled to reduce load on Evergreen API.
-# - name: update_test_lifecycle
+  # Test lifecycle is temporarily disabled to reduce load on Evergreen API.
+  # - name: update_test_lifecycle
   - name: fetch_test_lifecycle
     distros:
     - rhel62-small

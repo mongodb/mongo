@@ -103,7 +103,7 @@ functions:
           set -o verbose
           mkdir -p ./dbdata
           ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
-    - command : shell.exec
+    - command: shell.exec
       params:
         working_dir: src
         script: |
@@ -189,7 +189,7 @@ functions:
         file: "src/tags.json"
         name: "perf"
     - command: shell.exec
-      type : test
+      type: test
       params:
         working_dir: src
         script: |
@@ -216,7 +216,7 @@ functions:
           source ./venv/bin/activate
           pip install argparse
     - command: shell.exec
-      type : test
+      type: test
       params:
         working_dir: src
         script: |
@@ -315,9 +315,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "query"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -332,9 +332,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "query_identityview"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: true
     - func: "download analysis scripts"
     - func: "analyze"
@@ -349,9 +349,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "aggregation_identityview"
-        includeFilter2 : "regression"
+        includeFilter2: "regression"
         excludeFilter: "none"
-        threads : "1"
+        threads: "1"
         readCmd: true
     - func: "download analysis scripts"
     - func: "analyze"
@@ -366,9 +366,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "where"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -383,9 +383,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "update"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -400,9 +400,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "insert"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -417,9 +417,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "wildcard_read"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -434,9 +434,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "wildcard_write"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -451,9 +451,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "geo"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -468,9 +468,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "command multi remove mixed"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -485,9 +485,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "single_threaded"
-        includeFilter2 : "core regression"
-        excludeFilter : "none"
-        threads : "1"
+        includeFilter2: "core regression"
+        excludeFilter: "none"
+        threads: "1"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -504,7 +504,7 @@ tasks:
         includeFilter1: "aggregation"
         includeFilter2: "regression"
         excludeFilter: "none"
-        threads : "1"
+        threads: "1"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -519,9 +519,9 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "agg_query_comparison"
-        includeFilter2 : "core regression"
-        excludeFilter : "single_threaded"
-        threads : "1 2 4 8"
+        includeFilter2: "core regression"
+        excludeFilter: "single_threaded"
+        threads: "1 2 4 8"
         readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
@@ -531,7 +531,7 @@ tasks:
 buildvariants:
 - name: linux-wt-standalone
   display_name: Standalone Linux inMemory
-  batchtime: 90 # 1.5 hours
+  batchtime: 90  # 1.5 hours
   modules:
     - enterprise
   expansions:
@@ -577,7 +577,7 @@ buildvariants:
 
 - name: linux-wt-repl
   display_name: 1-Node ReplSet Linux inMemory
-  batchtime: 90 # 1.5 hours
+  batchtime: 90  # 1.5 hours
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper

@@ -1,5 +1,5 @@
 functions:
-  "fetch source" :
+  "fetch source":
     - command: git.get_project
       params:
         directory: src
@@ -11,7 +11,7 @@ functions:
           make timezonedb.zip CFLAGS=-DHAVE_SNPRINTF=1
           cp timezonedb.zip timezonedb-latest.zip
 
-  "publish" :
+  "publish":
     - command: s3.put
       params:
         aws_key: ${aws_key}

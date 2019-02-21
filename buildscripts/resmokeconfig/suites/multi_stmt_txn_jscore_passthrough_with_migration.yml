@@ -6,7 +6,7 @@ selector:
   exclude_files:
   # These tests run in the jscore_txn passthrough suites.
   - jstests/core/txns/**/*.js
-  
+
   # The following tests fail because a certain command or functionality is not supported by
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
@@ -36,7 +36,7 @@ selector:
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
   - jstests/core/notablescan.js  # notablescan.
   - jstests/core/profile*.js  # profiling.
-  - jstests/core/queryoptimizera.js  # "local" database. 
+  - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
@@ -101,7 +101,7 @@ selector:
   ##
   ## Limitations with the way the runner file injects transactions.
   ##
-  
+
   # These tests expects some statements to error, which will cause txns to abort entirely.
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
@@ -137,7 +137,7 @@ selector:
   - jstests/core/ref4.js
   - jstests/core/regex_limit.js
   - jstests/core/remove_undefined.js
-  - jstests/core/set7.js 
+  - jstests/core/set7.js
   - jstests/core/sortb.js
   - jstests/core/sortf.js
   - jstests/core/sortg.js
@@ -183,7 +183,7 @@ selector:
 
   # TODO: SERVER-38570 txn_override.js does not check writeError field.
   - jstests/core/update_setOnInsert.js
-  
+
   # TODO: SERVER-38588 Hybrid index builds races with prepare in replication.
   - jstests/core/background_index_multikey.js
 
@@ -415,7 +415,7 @@ executor:
         TestData:
           sessionOptions:
             # Tests in this suite only read from primaries and only one node is electable, so causal
-            # consistency is not required to read your own writes.   
+            # consistency is not required to read your own writes.
             causalConsistency: false
       readMode: commands
   hooks:

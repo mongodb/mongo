@@ -95,7 +95,7 @@ selector:
   # "Refusing to run a test that issues commands that may return different values after a failover"
   # "Refusing to run a test that issues an aggregation command with explain because it may return
   #   incomplete results"
-  # "Refusing to run a test that issues an aggregation command with 
+  # "Refusing to run a test that issues an aggregation command with
   #   $listLocalSessions because it relies on in-memory state that may not survive failovers"
   # "Refusing to run a test that issues a mapReduce command, because it calls std::terminate() if
   #   interrupted by a stepdown"

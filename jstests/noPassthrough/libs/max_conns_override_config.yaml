@@ -1,6 +1,5 @@
 # Used in the max_conns_override.js test to set the maxConnsOverride settings
 net:
-  maxIncomingConnectionsOverride: [ "127.0.0.1" ]
+  maxIncomingConnectionsOverride: ["127.0.0.1"]
   reservedAdminThreads: 3
   maxIncomingConnections: 5
-

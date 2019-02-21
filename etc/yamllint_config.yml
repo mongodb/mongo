@@ -1,0 +1,12 @@
+extends: default
+
+rules:
+  line-length: disable
+  indentation: disable
+  document-start: disable
+  comments: disable
+  comments-indentation: disable
+  truthy: disable
+
+ignore: |
+  buildscripts/packaging/msi/mongod.yaml

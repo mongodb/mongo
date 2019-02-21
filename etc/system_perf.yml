@@ -63,7 +63,7 @@ functions:
     command: git.get_project
     params:
       directory: src
-      revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+      revisions:  # for each module include revision as <module_name> : ${<module_name>_rev}
         dsi: ${dsi_rev}
         enterprise: ${enterprise_rev}
         linkbench: ${linkbench_rev}
@@ -178,7 +178,7 @@ functions:
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile-variant|}.tar.gz
 
-  "use WiredTiger develop" :
+  "use WiredTiger develop":
     command: shell.exec
     params:
       working_dir: src
@@ -322,7 +322,7 @@ functions:
         script: |
           ../src/dsi/dsi/run-dsi detect-outliers
     - command: shell.exec
-      type : test
+      type: test
       params:
         working_dir: work
         script: |
@@ -699,7 +699,7 @@ modules:
   repo: git@github.com:10gen/dsi.git
   prefix: dsi
   branch: master
- 
+
 - name: genny
   repo: git@github.com:10gen/genny.git
   prefix: genny

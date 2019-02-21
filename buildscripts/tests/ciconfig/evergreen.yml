@@ -1,5 +1,5 @@
 functions:
-  "fetch source" :
+  "fetch source":
     - command: git.get_project
       params:
         directory: src
@@ -16,7 +16,7 @@ functions:
       script: |
         echo "i am a debug function."
 
-  "run a task that fails" :
+  "run a task that fails":
     command: shell.exec
     params:
       working_dir: src
@@ -24,7 +24,7 @@ functions:
         echo "this is a function with only a single command to run!"
         ./run.py results fail
 
-  "run a task that passes" :
+  "run a task that passes":
     command: shell.exec
     params:
       working_dir: src

@@ -186,7 +186,7 @@ selector:
   # CSRS failovers are sufficiently slow.
   - jstests/sharding/transactions_reject_writes_for_moved_chunks.js
   - jstests/sharding/transactions_target_at_point_in_time.js
-  # Tests that rely on shards becoming aware of collection drops regardless of config stepdowns. 
+  # Tests that rely on shards becoming aware of collection drops regardless of config stepdowns.
   # (SERVER-34760)
   - jstests/sharding/out_fails_to_replace_sharded_collection.js
   - jstests/sharding/out_stale_unique_key.js

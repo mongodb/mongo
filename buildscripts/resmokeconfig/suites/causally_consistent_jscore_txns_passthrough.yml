@@ -20,7 +20,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        var testingReplication = true; 
+        var testingReplication = true;
         load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
       readMode: commands
   hooks:

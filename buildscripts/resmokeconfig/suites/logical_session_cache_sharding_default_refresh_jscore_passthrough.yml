@@ -35,7 +35,7 @@ selector:
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
   - jstests/core/notablescan.js  # notablescan.
   - jstests/core/profile*.js  # profiling.
-  - jstests/core/queryoptimizera.js  # "local" database. 
+  - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
