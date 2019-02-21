@@ -33,6 +33,7 @@
 
 #include "mongo/db/logical_session_cache_impl.h"
 
+#include "mongo/db/logical_session_cache_impl_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
@@ -57,15 +58,6 @@ void clearShardingOperationFailedStatus(OperationContext* opCtx) {
 }
 
 }  // namespace
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(
-    logicalSessionRefreshMillis,
-    int,
-    LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh.count());
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(disableLogicalSessionCacheRefresh, bool, false);
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxSessions, int, 1'000'000);
 
 constexpr Milliseconds LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
 
