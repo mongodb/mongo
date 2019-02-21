@@ -1,0 +1,93 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+  cpp_namespace: "mongo"
+
+server_parameters:
+  synchronousServiceExecutorRecursionLimit:
+    description: <-
+        Tasks may recurse further if their recursion depth is less than this value.
+    set_at: [ startup, runtime ]
+    cpp_vartype: "AtomicWord<int>"
+    cpp_varname: "synchronousServiceExecutorRecursionLimit"
+    default: 8
+  adaptiveServiceExecutorReservedThreads:
+    description: <-
+        The executor will always keep this many threads around.
+        If the value is -1, then it will be set to number of cores / 2.
+    set_at: [ startup, runtime ]
+    cpp_vartype: "AtomicWord<int>"
+    cpp_varname: "adaptiveServiceExecutorReservedThreads"
+    default: -1
+  adaptiveServiceExecutorRunTimeMillis:
+    description: <-
+        Each worker thread will allow ASIO to run for this many milliseconds
+        before checking whether it should exit.
+    set_at: [ startup, runtime ]
+    cpp_vartype: "AtomicWord<int>"
+    cpp_varname: "adaptiveServiceExecutorRunTimeMillis"
+    default: 5000
+  adaptiveServiceExecutorRunTimeJitterMillis:
+    description: <-
+        The period that a worker thread runs will be offset by at most this value
+        so that not all threads are scheduled at the same time.
+    set_at: [ startup, runtime ]
+    cpp_vartype: "AtomicWord<int>"
+    cpp_varname: "adaptiveServiceExecutorRunTimeJitterMillis"
+    default: 500
+  adaptiveServiceExecutorStuckThreadTimeoutMillis:
+    description: <-
+        The maximum amount of time the controller thread will sleep
+        before doing any stuck-thread detection.
+    set_at: [ startup, runtime ]
+    cpp_vartype: "AtomicWord<int>"
+    cpp_varname: "adaptiveServiceExecutorStuckThreadTimeoutMillis"
+    default: 250
+  adaptiveServiceExecutorMaxQueueLatencyMicros:
+    description: <-
+        The maximum allowed latency between when a task is scheduled
+        and a thread is started to service it.
+    set_at: [ startup, runtime ]
+    cpp_vartype: "AtomicWord<int>"
+    cpp_varname: "adaptiveServiceExecutorMaxQueueLatencyMicros"
+    default: 500
+  adaptiveServiceExecutorIdlePctThreshold:
+    description: <-
+        The percent boundary of work time over run time below which worker threads will exit.
+    set_at: [ startup, runtime ]
+    cpp_vartype: "AtomicWord<int>"
+    cpp_varname: "adaptiveServiceExecutorIdlePctThreshold"
+    default: 60
+  adaptiveServiceExecutorRecursionLimit:
+    description: <-
+        Tasks may recurse further if their recursion depth is less than this value.
+    set_at: [ startup, runtime ]
+    cpp_vartype: "AtomicWord<int>"
+    cpp_varname: "adaptiveServiceExecutorRecursionLimit"
+    default: 8

@@ -38,6 +38,7 @@
 
 #include "mongo/db/server_parameters.h"
 #include "mongo/transport/service_entry_point_utils.h"
+#include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
@@ -50,35 +51,8 @@
 
 namespace mongo {
 namespace transport {
+
 namespace {
-// The executor will always keep this many number of threads around. If the value is -1,
-// (the default) then it will be set to number of cores / 2.
-MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorReservedThreads, int, -1);
-
-// Each worker thread will allow ASIO to run for this many milliseconds before checking
-// whether it should exit
-MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorRunTimeMillis, int, 5000);
-
-// The above parameter will be offset of some random value between -runTimeJitters/
-// +runTimeJitters so that not all threads are starting/stopping execution at the same time
-MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorRunTimeJitterMillis, int, 500);
-
-// This is the maximum amount of time the controller thread will sleep before doing any
-// stuck detection
-MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorStuckThreadTimeoutMillis, int, 250);
-
-// The maximum allowed latency between when a task is scheduled and a thread is started to
-// service it.
-MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorMaxQueueLatencyMicros, int, 500);
-
-// Threads will exit themselves if they spent less than this percentage of the time they ran
-// doing actual work.
-MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorIdlePctThreshold, int, 60);
-
-// Tasks scheduled with MayRecurse may be called recursively if the recursion depth is below this
-// value.
-MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorRecursionLimit, int, 8);
-
 constexpr auto kTotalQueued = "totalQueued"_sd;
 constexpr auto kTotalExecuted = "totalExecuted"_sd;
 constexpr auto kTotalTimeExecutingUs = "totalTimeExecutingMicros"_sd;

@@ -116,11 +116,13 @@ tlEnv.Library(
         'service_executor_adaptive.cpp',
         'service_executor_reserved.cpp',
         'service_executor_synchronous.cpp',
+        env.Idlc('service_executor.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/idl/server_parameter",
         "$BUILD_DIR/mongo/util/processinfo",
         '$BUILD_DIR/third_party/shim_asio',
         'transport_layer_common',
