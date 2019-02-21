@@ -95,6 +95,7 @@ if wiredtiger:
             'wiredtiger_options_init.cpp',
             'wiredtiger_record_store_mongod.cpp',
             'wiredtiger_server_status.cpp',
+            env.Idlc('wiredtiger_global_options.idl')[0],
         ],
         LIBDEPS=[
             'storage_wiredtiger_core',

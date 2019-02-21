@@ -1,0 +1,107 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+    configs:
+        section: 'WiredTiger options'
+        source: [ cli, ini, yaml ]
+
+configs:
+    # WiredTiger storage engine options
+    "storage.wiredTiger.engineConfig.cacheSizeGB":
+        description: >-
+            Maximum amount of memory to allocate for cache;
+            Defaults to 1/2 of physical RAM
+        arg_vartype: Double
+        cpp_varname: 'wiredTigerGlobalOptions.cacheSizeGB'
+        short_name: wiredTigerCacheSizeGB
+    "storage.wiredTiger.engineConfig.statisticsLogDelaySecs":
+        # FTDC supercedes WiredTiger's statistics logging.
+        description: >-
+            Seconds to wait between each write to a statistics file in the dbpath;
+            0 means do not log statistics
+        arg_vartype: Int
+        cpp_varname: 'wiredTigerGlobalOptions.statisticsLogDelaySecs'
+        short_name: wiredTigerStatisticsLogDelaySecs
+        hidden: true
+        validator:
+            gte: 0
+            lte: 100000
+        default: 0
+    "storage.wiredTiger.engineConfig.journalCompressor":
+        description: 'Use a compressor for log records [none|snappy|zlib|zstd]'
+        arg_vartype: String
+        cpp_varname: 'wiredTigerGlobalOptions.journalCompressor'
+        short_name: wiredTigerJournalCompressor
+        default: 'snappy'
+        validator:
+            callback: 'WiredTigerGlobalOptions::validateWiredTigerCompressor'
+    "storage.wiredTiger.engineConfig.directoryForIndexes":
+        description: 'Put indexes and data in different directories'
+        arg_vartype: Switch
+        cpp_varname: 'wiredTigerGlobalOptions.directoryForIndexes'
+        short_name: wiredTigerDirectoryForIndexes
+    "storage.wiredTiger.engineConfig.configString":
+        description: 'WiredTiger storage engine custom configuration setting'
+        arg_vartype: String
+        cpp_varname: 'wiredTigerGlobalOptions.engineConfig'
+        short_name: wiredTigerEngineConfigString
+        hidden: true
+
+    # WiredTiger collection options
+    "storage.wiredTiger.collectionConfig.blockCompressor":
+        description: 'Block compression algorithm for collection data [none|snappy|zlib|zstd]'
+        arg_vartype: String
+        cpp_varname: 'wiredTigerGlobalOptions.collectionBlockCompressor'
+        short_name: wiredTigerCollectionBlockCompressor
+        validator:
+            callback: 'WiredTigerGlobalOptions::validateWiredTigerCompressor'
+        default: snappy
+    "storage.wiredTiger.collectionConfig.configString":
+        description: 'WiredTiger custom collection configuration settings'
+        arg_vartype: String
+        cpp_varname: 'wiredTigerGlobalOptions.collectionConfig'
+        short_name: wiredTigerCollectionConfigString
+        hidden: true
+
+    # WiredTiger index options
+    "storage.wiredTiger.indexConfig.prefixCompression":
+        description: 'Use prefix compression on row-store leaf pages'
+        arg_vartype: Bool
+        cpp_varname: 'wiredTigerGlobalOptions.useIndexPrefixCompression'
+        short_name: wiredTigerIndexPrefixCompression
+        default: true
+    "storage.wiredTiger.indexConfig.configString":
+        description: 'WiredTiger custom index configuration settings'
+        arg_vartype: String
+        cpp_varname: 'wiredTigerGlobalOptions.indexConfig'
+        short_name: wiredTigerIndexConfigString
+        hidden: true
