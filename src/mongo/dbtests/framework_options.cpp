@@ -49,72 +49,12 @@
 
 namespace mongo {
 
-namespace {
-
-// This specifies default dbpath for our testing framework
-const std::string default_test_dbpath = "/tmp/unittest";
-
-}  // namespace
-
 using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
 
 FrameworkGlobalParams frameworkGlobalParams;
-
-Status addTestFrameworkOptions(moe::OptionSection* options) {
-    options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information");
-
-    options
-        ->addOptionChaining(
-            "dbpath",
-            "dbpath",
-            moe::String,
-            "db data path for this test run. NOTE: the contents of this directory will "
-            "be overwritten if it already exists")
-        .setDefault(moe::Value(default_test_dbpath));
-
-    options->addOptionChaining("debug", "debug", moe::Switch, "run tests with verbose output");
-
-    options->addOptionChaining("list", "list,l", moe::Switch, "list available test suites");
-
-    options->addOptionChaining(
-        "filter", "filter,f", moe::String, "string substring filter on test name");
-
-    options->addOptionChaining("verbose", "verbose,v", moe::Switch, "verbose");
-
-    options->addOptionChaining(
-        "dur", "dur", moe::Switch, "enable journaling (currently the default)");
-
-    options->addOptionChaining("nodur", "nodur", moe::Switch, "disable journaling");
-
-    options->addOptionChaining("seed", "seed", moe::UnsignedLongLong, "random number seed");
-
-    options->addOptionChaining("runs", "runs", moe::Int, "number of times to run each test");
-
-    options->addOptionChaining(
-        "perfHist", "perfHist", moe::Unsigned, "number of back runs of perf stats to display");
-
-    // If set to true, storage engine maintains the data history. Else, it won't maintain the data
-    // history. This setting applies only to 'wiredTiger' storage engine.
-    options
-        ->addOptionChaining("replication.enableMajorityReadConcern",
-                            "enableMajorityReadConcern",
-                            moe::Bool,
-                            "enables majority readConcern")
-        .setDefault(moe::Value(true));
-    options
-        ->addOptionChaining(
-            "storage.engine", "storageEngine", moe::String, "what storage engine to use")
-        .setDefault(moe::Value(std::string("wiredTiger")));
-
-    options->addOptionChaining("suites", "suites", moe::StringVector, "test suites to run")
-        .hidden()
-        .positional(1, -1);
-
-    return Status::OK();
-}
 
 std::string getTestFrameworkHelp(StringData name, const moe::OptionSection& options) {
     StringBuilder sb;
@@ -147,19 +87,6 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     if (params.count("dbpath")) {
         frameworkGlobalParams.dbpathSpec = params["dbpath"].as<string>();
     }
-
-    if (params.count("seed")) {
-        frameworkGlobalParams.seed = params["seed"].as<unsigned long long>();
-    }
-
-    if (params.count("runs")) {
-        frameworkGlobalParams.runsPerTest = params["runs"].as<int>();
-    }
-
-    if (params.count("perfHist")) {
-        frameworkGlobalParams.perfHist = params["perfHist"].as<unsigned>();
-    }
-
 
     if (params.count("debug") || params.count("verbose")) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
@@ -201,15 +128,6 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
         params.count("replication.enableMajorityReadConcern")) {
         serverGlobalParams.enableMajorityReadConcern =
             params["replication.enableMajorityReadConcern"].as<bool>();
-    }
-
-    if (params.count("suites")) {
-        frameworkGlobalParams.suites = params["suites"].as<vector<string>>();
-    }
-
-    frameworkGlobalParams.filter = "";
-    if (params.count("filter")) {
-        frameworkGlobalParams.filter = params["filter"].as<string>();
     }
 
     return Status::OK();
