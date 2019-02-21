@@ -34,10 +34,6 @@
 
 namespace mongo {
 
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(localLogicalSessionTimeoutMinutes,
-                                      int,
-                                      kLogicalSessionDefaultTimeout.count());
-
 LogicalSessionId makeLogicalSessionIdForTest() {
     LogicalSessionId lsid;
 

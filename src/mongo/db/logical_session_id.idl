@@ -186,3 +186,11 @@ structs:
       batchSize: int
       singleBatch: bool
       limit: int
+
+server_parameters:
+  localLogicalSessionTimeoutMinutes:
+    description: 'The time in minutes that a session remains active after its most recent use'
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: localLogicalSessionTimeoutMinutes
+    default: 30

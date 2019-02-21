@@ -52,8 +52,10 @@ const TxnNumber kUninitializedTxnNumber = -1;
 class BSONObjBuilder;
 class OperationContext;
 
-const Minutes kLogicalSessionDefaultTimeout = Minutes(30);
-extern int localLogicalSessionTimeoutMinutes;
+// The constant kLocalLogicalSessionTimeoutMinutesDefault comes from the generated
+// header logical_session_id_gen.h.
+constexpr Minutes kLogicalSessionDefaultTimeout =
+    Minutes(kLocalLogicalSessionTimeoutMinutesDefault);
 
 inline bool operator==(const LogicalSessionId& lhs, const LogicalSessionId& rhs) {
     auto makeEqualityLens = [](const auto& lsid) { return std::tie(lsid.getId(), lsid.getUid()); };
