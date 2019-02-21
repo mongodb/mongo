@@ -55,8 +55,6 @@ const char kAuthMechanismPropertiesKey[] = "mechanism_properties";
 const char kAuthServiceName[] = "SERVICE_NAME";
 const char kAuthServiceRealm[] = "SERVICE_REALM";
 
-const char kAuthMechMongoCR[] = "MONGODB-CR";
-const char kAuthMechScramSha1[] = "SCRAM-SHA-1";
 const char kAuthMechDefault[] = "DEFAULT";
 
 const char* const kSupportedAuthMechanismProperties[] = {kAuthServiceName, kAuthServiceRealm};
@@ -83,7 +81,8 @@ BSONObj parseAuthMechanismProperties(const std::string& propStr) {
 
 }  // namespace
 
-boost::optional<BSONObj> MongoURI::_makeAuthObjFromOptions(int maxWireVersion) const {
+boost::optional<BSONObj> MongoURI::_makeAuthObjFromOptions(
+    int maxWireVersion, const std::vector<std::string>& saslMechsForAuth) const {
     // Usually, a username is required to authenticate.
     // However X509 based authentication may, and typically does,
     // omit the username, inferring it from the client certificate instead.
@@ -109,10 +108,18 @@ boost::optional<BSONObj> MongoURI::_makeAuthObjFromOptions(int maxWireVersion) c
         if (it->second == auth::kMechanismMongoX509) {
             usernameRequired = false;
         }
+    } else if (!saslMechsForAuth.empty()) {
+        if (std::find(saslMechsForAuth.begin(),
+                      saslMechsForAuth.end(),
+                      auth::kMechanismScramSha256) != saslMechsForAuth.end()) {
+            bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha256);
+        } else {
+            bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
+        }
     } else if (maxWireVersion >= 3) {
-        bob.append(saslCommandMechanismFieldName, kAuthMechScramSha1);
+        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
     } else {
-        bob.append(saslCommandMechanismFieldName, kAuthMechMongoCR);
+        bob.append(saslCommandMechanismFieldName, auth::kMechanismMongoCR);
     }
 
     if (usernameRequired && _user.empty()) {
@@ -181,7 +188,8 @@ DBClientBase* MongoURI::connect(StringData applicationName,
         return nullptr;
     }
 
-    auto optAuthObj = _makeAuthObjFromOptions(ret->getMaxWireVersion());
+    auto optAuthObj =
+        _makeAuthObjFromOptions(ret->getMaxWireVersion(), ret->getIsMasterSaslMechanisms());
     if (optAuthObj) {
         ret->auth(optAuthObj.get());
     }

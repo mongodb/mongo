@@ -559,6 +559,10 @@ public:
     virtual int getMinWireVersion() = 0;
     virtual int getMaxWireVersion() = 0;
 
+    const std::vector<std::string>& getIsMasterSaslMechanisms() const {
+        return _saslMechsForAuth;
+    }
+
     /** send a query to the database.
      @param ns namespace to query, format is <dbname>.<collectname>[.<collectname>]*
      @param query query to perform on the collection.  this is a BSONObj (binary JSON)
@@ -703,6 +707,8 @@ protected:
 
     static AtomicWord<long long> ConnectionIdSequence;
     long long _connectionId;  // unique connection id for this connection
+
+    std::vector<std::string> _saslMechsForAuth;
 
 private:
     auth::RunCommandHook _makeAuthRunCommandHook();
