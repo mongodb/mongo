@@ -119,7 +119,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
     auto resumeToken = event.getSortKeyMetaField();
     auto idField = eventBSON.getObjectField("_id");
     invariant(!resumeToken.isEmpty());
-    uassert(51060,
+    uassert(ErrorCodes::ChangeStreamFatalError,
             str::stream() << "Encountered an event whose _id field, which contains the resume "
                              "token, was modified by the pipeline. Modifying the _id field of an "
                              "event makes it impossible to resume the stream from that point. Only "

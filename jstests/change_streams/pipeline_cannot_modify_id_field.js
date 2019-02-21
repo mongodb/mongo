@@ -137,7 +137,8 @@
             const getMoreRes =
                 db.runCommand({getMore: cmdRes.cursor.id, collection: coll.getName()});
             return !getMoreRes.ok &&
-                assert.commandFailedWithCode(getMoreRes, [51059, 51060], transform);
+                assert.commandFailedWithCode(
+                    getMoreRes, ErrorCodes.ChangeStreamFatalError, transform);
         }, transform);
     }
 }());

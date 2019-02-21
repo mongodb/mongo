@@ -277,6 +277,7 @@ error_code("IndexBuildAborted", 276)
 error_code("AlarmAlreadyFulfilled", 277)
 error_code("UnsatisfiableCommitQuorum", 278)
 error_code("ClientDisconnect", 279)
+error_code("ChangeStreamFatalError", 280)
 # Error codes 4000-8999 are reserved.
 
 # Non-sequential error codes (for compatibility only)
