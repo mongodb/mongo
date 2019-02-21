@@ -490,12 +490,8 @@ void MigrationChunkClonerSourceLegacy::_drainAllOutstandingOperationTrackRequest
     stdx::unique_lock<stdx::mutex>& lk) {
     invariant(_state == kDone);
     _acceptingNewOperationTrackRequests = false;
-
-    if (_outstandingOperationTrackRequests == 0) {
-        return;
-    }
-
-    _allOutstandingOperationTrackRequestsDrained.wait(lk);
+    _allOutstandingOperationTrackRequestsDrained.wait(
+        lk, [&] { return _outstandingOperationTrackRequests == 0; });
 }
 
 
