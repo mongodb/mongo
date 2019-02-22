@@ -16,11 +16,12 @@ load('jstests/concurrency/fsm_workloads/kill_rooted_or.js');  // for $config
 var $config = extendWorkload($config, function($config, $super) {
 
     // Use the workload name as the collection name, since the workload name is assumed to be
-    // unique.
+    // unique. Note that we choose our own collection name instead of using the collection provided
+    // by the concurrency framework, because this workload drops its collection.
     $config.data.collName = 'kill_aggregation';
 
-    $config.states.query = function query(db, collName) {
-        var res = db.runCommand({
+    $config.states.query = function query(db, collNameUnused) {
+        const aggResult = db.runCommand({
             aggregate: this.collName,
             // We use a rooted $or query to cause plan selection to use the subplanner and thus
             // yield.
@@ -28,16 +29,24 @@ var $config = extendWorkload($config, function($config, $super) {
             cursor: {}
         });
 
-        if (!res.ok) {
+        if (!aggResult.ok) {
+            // We expect to see errors caused by the plan executor being killed, because of the
+            // collection getting dropped on another thread.
+            assertAlways.contains(aggResult.code,
+                                  [ErrorCodes.OperationFailed, ErrorCodes.QueryPlanKilled],
+                                  aggResult);
             return;
         }
 
-        var cursor = new DBCommandCursor(db, res);
+        var cursor = new DBCommandCursor(db, aggResult);
         try {
-            // No documents are ever inserted into the collection.
-            assertAlways.eq(0, cursor.itcount());
+            cursor.itcount();
         } catch (e) {
-            // Ignore errors due to the plan executor being killed.
+            // We expect to see errors caused by the plan executor being killed, because of the
+            // collection getting dropped on another thread.
+            if (ErrorCodes.QueryPlanKilled != e.code) {
+                throw e;
+            }
         }
     };
 

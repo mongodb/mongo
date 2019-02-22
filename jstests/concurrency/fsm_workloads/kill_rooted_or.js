@@ -12,7 +12,8 @@
 var $config = (function() {
 
     // Use the workload name as the collection name, since the workload name is assumed to be
-    // unique.
+    // unique. Note that we choose our own collection name instead of using the collection provided
+    // by the concurrency framework, because this workload drops its collection.
     var uniqueCollectionName = 'kill_rooted_or';
 
     var data = {
@@ -27,33 +28,40 @@ var $config = (function() {
     };
 
     var states = {
-        query: function query(db, collName) {
+        query: function query(db, collNameUnused) {
             var cursor = db[this.collName].find({$or: [{a: 0}, {b: 0}]});
             try {
-                assertAlways.eq(this.numDocs, cursor.itcount());
+                // We don't know exactly how many documents will be in the collection at the time of
+                // the query, so we can't verify this value.
+                cursor.itcount();
             } catch (e) {
-                // Ignore errors due to the plan executor being killed.
+                // We expect to see errors caused by the plan executor being killed, because of the
+                // collection getting dropped on another thread.
+                if (ErrorCodes.QueryPlanKilled != e.code) {
+                    throw e;
+                }
             }
         },
 
-        dropCollection: function dropCollection(db, collName) {
+        dropCollection: function dropCollection(db, collNameUnused) {
             db[this.collName].drop();
 
-            // Recreate all of the indexes on the collection.
-            this.indexSpecs.forEach(indexSpec => {
-                assertAlways.commandWorked(db[this.collName].createIndex(indexSpec));
-            });
+            // Restore the collection.
+            populateIndexes(db[this].collName, this.indexSpecs);
+            populateCollection(db[this.collName], this.numDocs);
         },
 
-        dropIndex: function dropIndex(db, collName) {
+        dropIndex: function dropIndex(db, collNameUnused) {
             var indexSpec = this.indexSpecs[Random.randInt(this.indexSpecs.length)];
 
             // We don't assert that the command succeeded when dropping an index because it's
             // possible another thread has already dropped this index.
             db[this.collName].dropIndex(indexSpec);
 
-            // Recreate the index that was dropped.
-            assertAlways.commandWorked(db[this.collName].createIndex(indexSpec));
+            // Recreate the index that was dropped. (See populateIndexes() for why we ignore the
+            // CannotImplicitlyCreateCollection error.)
+            assertAlways.commandWorkedOrFailedWithCode(db[this.collName].createIndex(indexSpec),
+                                                       ErrorCodes.CannotImplicitlyCreateCollection);
         }
     };
 
@@ -63,13 +71,34 @@ var $config = (function() {
         dropIndex: {query: 1}
     };
 
-    function setup(db, collName, cluster) {
-        this.indexSpecs.forEach(indexSpec => {
-            assertAlways.commandWorked(db[this.collName].createIndex(indexSpec));
+    function populateIndexes(coll, indexSpecs) {
+        indexSpecs.forEach(indexSpec => {
+            // In sharded configurations, there's a limit to how many times mongos can retry an
+            // operation that fails because it wants to implicitly create a collection that is
+            // concurrently dropped. Normally, that's fine, but if some jerk keeps dropping our
+            // collection (as in the 'dropCollection' state of this test), then we run out of
+            // retries and get a CannotImplicitlyCreateCollection error once in a while, which we
+            // have to ignore.
+            assertAlways.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec),
+                                                       ErrorCodes.CannotImplicitlyCreateCollection);
         });
-        for (let i = 0; i < this.numDocs; ++i) {
-            assertAlways.commandWorked(db[this.collName].insert({a: 0, b: 0, c: 0}));
-        }
+    }
+
+    function populateCollection(coll, numDocs) {
+        // See populateIndexes() for why we ignore CannotImplicitlyCreateCollection errors.
+        // Similarly, this bulk insert can also give up with a NoProgressMade error after repeated
+        // attempts in the sharded causal consistency configuration. We also ignore that error.
+        const bulkInsertResult = coll.insert(Array(numDocs).fill({a: 0, b: 0, c: 0}));
+        assertAlways(!bulkInsertResult.hasWriteConcernError(), bulkInsertResult);
+        bulkInsertResult.getWriteErrors().forEach(err => {
+            assertAlways.contains(
+                err.code, [ErrorCodes.CannotImplicitlyCreateCollection, ErrorCodes.NoProgressMade]);
+        }, bulkInsertResult);
+    }
+
+    function setup(db, collNameUnused, cluster) {
+        populateIndexes(db[this.collName], this.indexSpecs);
+        populateCollection(db[this.collName], this.numDocs);
     }
 
     return {
