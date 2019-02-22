@@ -95,10 +95,6 @@
 
     // Ensure the operation yields during the drain, then attempt some operations.
     checkLog.contains(conn, "Hanging index build during drain yield");
-    assert.commandFailedWithCode(testDB.runCommand({drop: 'hybrid'}),
-                                 ErrorCodes.BackgroundOperationInProgressForNamespace);
-    assert.commandFailedWithCode(testDB.runCommand({dropIndexes: "hybrid", indexes: "*"}),
-                                 ErrorCodes.BackgroundOperationInProgressForNamespace);
     assert.commandWorked(testDB.hybrid.insert({i: "during yield"}));
     assert.commandWorked(testDB.hybrid.remove({i: "during yield"}));
     turnFailPointOff("hangDuringIndexBuildDrainYield");

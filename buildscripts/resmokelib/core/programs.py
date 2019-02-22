@@ -275,6 +275,10 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     eval_sb.append(
         "load('jstests/libs/override_methods/check_uuids_consistent_across_cluster.js');")
 
+    # Load this file to retry operations that fail due to in-progress background operations.
+    eval_sb.append(
+        "load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');")
+
     eval_str = "; ".join(eval_sb)
     args.append("--eval")
     args.append(eval_str)

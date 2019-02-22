@@ -75,7 +75,9 @@
                 }
 
                 // The following logic only applies to sharded clusters.
-                if (!conn.isMongos()) {
+                if (!conn.isMongos() || !res.raw) {
+                    // We don't attempt to retry commands for which mongos doesn't expose the raw
+                    // responses from the shards.
                     return kNoRetry;
                 }
 
@@ -123,7 +125,7 @@
                 print(message + " on shards: " + tojson(shardsWithBackgroundOps));
                 return kRetry;
             },
-            "Timed out while retrying command '" + tojson(commandObj) + "', response: " +
+            () => "Timed out while retrying command '" + tojson(commandObj) + "', response: " +
                 tojson(res),
             kTimeout,
             kInterval);
