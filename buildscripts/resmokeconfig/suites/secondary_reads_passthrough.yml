@@ -57,6 +57,9 @@ selector:
   # session cannot be guaranteed to get executed after doTxn.
   - jstests/core/bypass_doc_validation.js
   - jstests/core/collation.js
+  # This test runs very slow operations which take a long time to replicate in a 5 node linear
+  # chain. This can lead to awaitReplication timeouts when doing consistency checks.
+  - jstests/core/text_index_limits.js
 
   exclude_with_any_tags:
   ##
