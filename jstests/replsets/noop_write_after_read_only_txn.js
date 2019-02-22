@@ -55,13 +55,13 @@
         }
 
         const entries = rst.findOplog(primary,
-                                    {
-                                      op: "n",
-                                      ts: {$gte: commitResult.operationTime},
-                                      "o.msg": /.*read-only transaction.*/
-                                    },
-                                    1)
-                          .toArray();
+                                      {
+                                        op: "n",
+                                        ts: {$gte: commitResult.operationTime},
+                                        "o.msg": /.*read-only transaction.*/
+                                      },
+                                      1)
+                            .toArray();
 
         // If the transaction had a write, it should not *also* do a noop.
         if (shouldWrite) {
