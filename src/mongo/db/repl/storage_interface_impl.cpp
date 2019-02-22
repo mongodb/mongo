@@ -58,7 +58,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update.h"
+#include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"

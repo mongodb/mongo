@@ -47,7 +47,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/exec/delete.h"
-#include "mongo/db/exec/update.h"
+#include "mongo/db/exec/update_stage.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/delete_request.h"

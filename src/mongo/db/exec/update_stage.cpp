@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/exec/update.h"
+#include "mongo/db/exec/update_stage.h"
 
 #include <algorithm>
 

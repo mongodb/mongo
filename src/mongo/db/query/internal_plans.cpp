@@ -39,7 +39,7 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/update.h"
+#include "mongo/db/exec/update_stage.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/stdx/memory.h"
 

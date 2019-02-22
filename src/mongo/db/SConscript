@@ -1208,7 +1208,7 @@ env.Library(
         'exec/text_match.cpp',
         'exec/text_or.cpp',
         'exec/trial_stage.cpp',
-        'exec/update.cpp',
+        'exec/update_stage.cpp',
         'exec/working_set_common.cpp',
         'exec/write_stage_common.cpp',
         'ops/parsed_delete.cpp',
