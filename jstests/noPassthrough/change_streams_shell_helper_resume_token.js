@@ -77,15 +77,20 @@
         assert.docEq(curResumeToken, currentDoc._id);
         assert.gt(bsonWoCompare(curResumeToken, prevResumeToken), 0);
     }
+    // When we reach here, 'currentDoc' is the final document in the batch, but we have not yet
+    // updated the resume token. Assert that this resume token sorts before currentDoc's.
+    prevResumeToken = curResumeToken;
+    assert.gt(bsonWoCompare(currentDoc._id, prevResumeToken), 0);
 
     // After we have pulled the final document out of the cursor, the resume token should be the
     // postBatchResumeToken rather than the document's _id. Because we inserted an item into the
     // unrelated collection to push the oplog past the final event returned by the change stream,
     // this will be strictly greater than the final document's _id.
-    prevResumeToken = curResumeToken;
-    curResumeToken = csCursor.getResumeToken();
-    assert.gt(bsonWoCompare(currentDoc._id, prevResumeToken), 0);
-    assert.gt(bsonWoCompare(curResumeToken, currentDoc._id), 0);
+    assert.soon(() => {
+        curResumeToken = csCursor.getResumeToken();
+        assert(!csCursor.hasNext(), () => tojson(csCursor.next()));
+        return bsonWoCompare(curResumeToken, currentDoc._id) > 0;
+    });
 
     rst.stopSet();
 }());

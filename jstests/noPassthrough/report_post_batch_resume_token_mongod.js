@@ -34,10 +34,14 @@
         assert.commandWorked(testCollection.insert({_id: docId++}));
     }
     const resumeTokenFromDoc = csCursor.next()._id;
+    csCursor.close();
 
-    // Test that postBatchResumeToken is present on non-empty initial aggregate batch.
-    csCursor = testCollection.watch([], {resumeAfter: resumeTokenFromDoc});
-    assert.gt(csCursor.objsLeftInBatch(), 0);
+    // Test that postBatchResumeToken is present on a non-empty initial aggregate batch.
+    assert.soon(() => {
+        csCursor = testCollection.watch([], {resumeAfter: resumeTokenFromDoc});
+        csCursor.close();  // We don't need any results after the initial batch.
+        return csCursor.objsLeftInBatch();
+    });
     while (csCursor.objsLeftInBatch()) {
         csCursor.next();
     }
