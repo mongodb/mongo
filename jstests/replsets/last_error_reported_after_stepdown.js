@@ -64,6 +64,9 @@
     }
 
     // Tests which should have no errors.
+    // Clear log messages to avoid picking up the log of the insertion of the 'deleteme'
+    // document.
+    assert.commandWorked(primaryAdmin.adminCommand({clearLog: 'global'}));
     runStepDownTest({
         description: "insert",
         logMsg: "insert " + coll.getFullName(),
