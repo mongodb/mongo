@@ -171,23 +171,24 @@ functions:
 
           cat > runtime.yml <<EOF
           # evergreen default expansions
-          is_patch: ${is_patch}
-          task_id: ${task_id}
-          task_name: ${task_name}
-          execution: ${execution}
+          branch_name: ${branch_name}
           build_id: ${build_id}
           build_variant: ${build_variant}
+          execution: ${execution}
+          is_patch: ${is_patch}
+          project: ${project}
+          project_dir: ${project_dir}
+          revision: ${revision}
+          task_id: ${task_id}
+          task_name: ${task_name}
           version_id: ${version_id}
           workdir: ${workdir}
-          revision: ${revision}
-          project_dir: ${project_dir}
-          branch_name: ${branch_name}
 
           # sys-perf expansions
-          # Shouldn't be needed: testList: ${testList}
+          dsi_rev: ${dsi_rev}
+          enterprise_rev: ${enterprise_rev}
           ext: ${ext}
           script_flags : ${script_flags}
-          dsi_rev: ${dsi_rev}
           workloads_rev: ${workloads_rev}
           EOF
 
