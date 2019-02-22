@@ -281,6 +281,7 @@ error_code("ChangeStreamFatalError", 280)
 # The two codes below are for internal use only and must never be returned in a network response
 error_code("TransactionCoordinatorSteppingDown", 281) # Gets converted to InterruptedDueToStepDown
 error_code("TransactionCoordinatorReachedAbortDecision", 282)
+error_code("WouldChangeOwningShard", 283, extra="WouldChangeOwningShardInfo")
 
 # Error codes 4000-8999 are reserved.
 

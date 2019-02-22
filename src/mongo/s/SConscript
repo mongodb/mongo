@@ -163,6 +163,7 @@ env.Library(
         'database_version_helpers.cpp',
         'shard_id.cpp',
         'stale_exception.cpp',
+        'would_change_owning_shard_exception.cpp',
         env.Idlc('catalog/type_chunk_base.idl')[0],
         env.Idlc('database_version.idl')[0],
         env.Idlc('request_types/clone_catalog_data.idl')[0],
