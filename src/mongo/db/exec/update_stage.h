@@ -36,6 +36,7 @@
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/update/update_driver.h"
 
 namespace mongo {
@@ -195,6 +196,14 @@ private:
      * doWork(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
      */
     StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
+
+    /**
+     * Checks if the updated doc still belongs to this node and throws if it does not. This means
+     * that one or more shard key field values have been updated causing this doc to belong to
+     * a chunk that is not owned by this shard. We cannot apply this update atomically.
+     */
+    void assertDocStillBelongsToNode(ScopedCollectionMetadata metadata,
+                                     const Snapshotted<BSONObj>& oldObj);
 
     UpdateStageParams _params;
 

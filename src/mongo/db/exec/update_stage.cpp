@@ -46,11 +46,12 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -296,15 +297,15 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     if (docWasModified) {
 
         // Prepare to write back the modified document
-        WriteUnitOfWork wunit(getOpCtx());
 
         RecordId newRecordId;
         CollectionUpdateArgs args;
+
+        auto* const css = CollectionShardingState::get(getOpCtx(), collection()->ns());
+        auto metadata = css->getCurrentMetadata();
         if (!request->isExplain()) {
             args.stmtId = request->getStmtId();
             args.update = logObj;
-            auto* const css = CollectionShardingState::get(getOpCtx(), collection()->ns());
-            auto metadata = css->getCurrentMetadata();
             args.criteria = metadata->extractDocumentKey(newObj);
             uassert(16980,
                     "Multi-update operations require all documents to have an '_id' field",
@@ -316,6 +317,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
             }
         }
 
+        const auto isFCV42 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
         if (inPlace) {
             if (!request->isExplain()) {
                 newObj = oldObj.value();
@@ -323,8 +327,15 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
+                if (isFCV42 && metadata->isSharded()) {
+                    assertDocStillBelongsToNode(metadata, oldObj);
+                }
+
+                WriteUnitOfWork wunit(getOpCtx());
                 StatusWith<RecordData> newRecStatus = collection()->updateDocumentWithDamages(
                     getOpCtx(), recordId, std::move(snap), source, _damages, &args);
+                invariant(oldObj.snapshotId() == getOpCtx()->recoveryUnit()->getSnapshotId());
+                wunit.commit();
 
                 newObj = uassertStatusOK(std::move(newRecStatus)).releaseToBson();
             }
@@ -339,7 +350,12 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                                   << BSONObjMaxUserSize,
                     newObj.objsize() <= BSONObjMaxUserSize);
 
+            if (isFCV42 && metadata->isSharded()) {
+                assertDocStillBelongsToNode(metadata, oldObj);
+            }
+
             if (!request->isExplain()) {
+                WriteUnitOfWork wunit(getOpCtx());
                 newRecordId = collection()->updateDocument(getOpCtx(),
                                                            recordId,
                                                            oldObj,
@@ -347,11 +363,11 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                                                            driver->modsAffectIndices(),
                                                            _params.opDebug,
                                                            &args);
+                invariant(oldObj.snapshotId() == getOpCtx()->recoveryUnit()->getSnapshotId());
+                wunit.commit();
             }
         }
 
-        invariant(oldObj.snapshotId() == getOpCtx()->recoveryUnit()->getSnapshotId());
-        wunit.commit();
 
         // If the document moved, we might see it again in a collection scan (maybe it's
         // a document after our current document).
@@ -865,6 +881,44 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     _idRetrying = idToRetry;
     *out = WorkingSet::INVALID_ID;
     return NEED_YIELD;
+}
+
+void UpdateStage::assertDocStillBelongsToNode(ScopedCollectionMetadata metadata,
+                                              const Snapshotted<BSONObj>& oldObj) {
+    auto oldShardKey = metadata->extractDocumentKey(oldObj.value());
+    auto newShardKey = metadata->extractDocumentKey(_doc.getObject());
+
+    // If this document is an orphan and so does not belong to this shard or if the shard key fields
+    // remain unchanged by this update, we can skip the rest of the checks.
+    if (!metadata->keyBelongsToMe(oldShardKey) || (newShardKey.woCompare(oldShardKey) == 0)) {
+        return;
+    }
+
+    // We do not allow updates to the shard key when 'multi' is true.
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Multi-update operations are not allowed when updating the"
+                          << " shard key field.",
+            !_params.request->isMulti());
+
+    // An update to a shard key value must either be a retryable write or run in a transaction.
+    const auto txnParticipant = TransactionParticipant::get(getOpCtx());
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Must run update to shard key field "
+                          << " in a multi-statement transaction or"
+                             " with retryWrites: true.",
+            txnParticipant);
+
+    if (!metadata->keyBelongsToMe(newShardKey)) {
+        // If this update is in a multi-stmt txn, attach the post image to the error. Otherwise,
+        // attach the original update field.
+        boost::optional<BSONObj> originalUpdate{!txnParticipant.inMultiDocumentTransaction(),
+                                                _params.request->getUpdates()};
+        boost::optional<BSONObj> postImg{txnParticipant.inMultiDocumentTransaction(),
+                                         _doc.getObject()};
+
+        uasserted(WouldChangeOwningShardInfo(_params.request->getQuery(), originalUpdate, postImg),
+                  str::stream() << "This update would cause the doc to change owning shards");
+    }
 }
 
 }  // namespace mongo
