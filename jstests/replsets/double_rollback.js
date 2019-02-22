@@ -109,6 +109,9 @@
     var node0RBID = nodes[0].adminCommand('replSetGetRBID').rbid;
     var node1RBID = nodes[1].adminCommand('replSetGetRBID').rbid;
 
+    // Clear logs on node 0 so that we can check for a new transition to SECONDARY.
+    assert.commandWorked(nodes[0].adminCommand({clearLog: "global"}));
+
     jsTestLog("Reconnect all nodes.");
     nodes[0].reconnect(nodes[1]);
     nodes[0].reconnect(nodes[3]);
@@ -117,7 +120,9 @@
     nodes[2].reconnect(nodes[3]);
     nodes[2].reconnect(nodes[4]);
 
-    jsTestLog("Wait for nodes 0 to roll back and both node 0 and 2 to catch up to node 1");
+    jsTestLog("Wait for node 0 to roll back and both node 0 and 2 to catch up to node 1");
+    checkLog.contains(nodes[0], "transition to ROLLBACK");
+    checkLog.contains(nodes[0], "transition to SECONDARY");
     waitForState(nodes[0], ReplSetTest.State.SECONDARY);
     waitForState(nodes[2], ReplSetTest.State.SECONDARY);
     rst.awaitReplication();
