@@ -30,6 +30,20 @@ Date.timeFunc = function(theFunc, numTimes) {
 };
 
 Date.prototype.tojson = function() {
+    try {
+        // If this === Date.prototype or this is a Date instance created from
+        // Object.create(Date.prototype), then the [[DateValue]] internal slot won't be set and will
+        // lead to a TypeError. We instead treat it as though the [[DateValue]] internal slot is NaN
+        // in order to be consistent with the ES5 behavior in MongoDB 3.2 and earlier.
+        this.getTime();
+    } catch (e) {
+        if (e instanceof TypeError &&
+            e.message.includes("getTime method called on incompatible Object")) {
+            return new Date(NaN).tojson();
+        }
+        throw e;
+    }
+
     var UTC = 'UTC';
     var year = this['get' + UTC + 'FullYear']().zeroPad(4);
     var month = (this['get' + UTC + 'Month']() + 1).zeroPad(2);
