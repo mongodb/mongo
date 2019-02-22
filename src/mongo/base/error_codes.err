@@ -282,6 +282,7 @@ error_code("ChangeStreamFatalError", 280)
 error_code("TransactionCoordinatorSteppingDown", 281) # Gets converted to InterruptedDueToStepDown
 error_code("TransactionCoordinatorReachedAbortDecision", 282)
 error_code("WouldChangeOwningShard", 283, extra="WouldChangeOwningShardInfo")
+error_code("ForTestingErrorExtraInfoWithExtraInfoInNamespace", 284, extra="nested::twice::NestedErrorExtraInfoExample")
 
 # Error codes 4000-8999 are reserved.
 

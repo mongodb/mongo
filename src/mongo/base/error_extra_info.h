@@ -137,4 +137,39 @@ public:
 private:
     static bool isParserEnabledForTest;
 };
+
+namespace nested::twice {
+
+/**
+ * This is an example ErrorExtraInfo subclass. It is used for testing the ErrorExtraInfoHandling.
+ *
+ * It is meant to be a duplicate of ErrorExtraInfoExample, except that it is within a namespace
+ * (and so exercises a different codepath in the parser).
+ */
+class NestedErrorExtraInfoExample final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::ForTestingErrorExtraInfoWithExtraInfoInNamespace;
+
+    void serialize(BSONObjBuilder*) const override;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
+
+    // Everything else in this class is just for testing and shouldn't by copied by users.
+
+    struct EnableParserForTest {
+        EnableParserForTest() {
+            isParserEnabledForTest = true;
+        }
+        ~EnableParserForTest() {
+            isParserEnabledForTest = false;
+        }
+    };
+
+    NestedErrorExtraInfoExample(int data) : data(data) {}
+    int data;  // This uses the fieldname "data".
+private:
+    static bool isParserEnabledForTest;
+};
+
+}  // namespace nested::twice
+
 }  // namespace mongo

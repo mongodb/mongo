@@ -66,6 +66,20 @@ class ErrorCode:
         self.name = name
         self.code = code
         self.extra = extra
+        if extra:
+            split = extra.split('::')
+            if not split[0]:
+                die("Error for %s with extra info %s: fully qualified namespaces aren't supported"
+                    % (name, extra))
+            if split[0] == "mongo":
+                die("Error for %s with extra info %s: don't include the mongo namespace"
+                    % (name, extra))
+            if len(split) > 1:
+                self.extra_class = split.pop()
+                self.extra_ns = "::".join(split)
+            else:
+                self.extra_class = extra
+                self.extra_ns = None
         self.categories = []
 
 class ErrorClass:

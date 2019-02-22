@@ -51,4 +51,24 @@ std::shared_ptr<const ErrorExtraInfo> ErrorExtraInfoExample::parse(const BSONObj
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ErrorExtraInfoExample);
 
+namespace nested::twice {
+
+bool NestedErrorExtraInfoExample::isParserEnabledForTest = false;
+
+void NestedErrorExtraInfoExample::serialize(BSONObjBuilder* builder) const {
+    builder->append("data", data);
+}
+
+std::shared_ptr<const ErrorExtraInfo> NestedErrorExtraInfoExample::parse(const BSONObj& obj) {
+    uassert(51100,
+            "ErrorCodes::ForTestingErrorExtraInfoWithExtraInfoInNamespace is only for testing",
+            isParserEnabledForTest);
+
+    return std::make_shared<NestedErrorExtraInfoExample>(obj["data"].Int());
+}
+
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(NestedErrorExtraInfoExample);
+
+}  // namespace nested::twice
+
 }  // namespace mongo
