@@ -229,7 +229,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
 Status applyCommand_inlock(OperationContext* opCtx,
                            const BSONObj& op,
                            const OplogEntry& entry,
-                           OplogApplication::Mode mode);
+                           OplogApplication::Mode mode,
+                           boost::optional<Timestamp> stableTimestampForRecovery);
 
 /**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.

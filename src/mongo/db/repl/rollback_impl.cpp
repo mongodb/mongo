@@ -1,3 +1,4 @@
+
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -55,6 +56,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/server_transactions_metrics.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/util/log.h"
@@ -259,6 +261,13 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
 
     // Clear the in memory state of prepared transactions in ServerTransactionsMetrics.
     ServerTransactionsMetrics::get(getGlobalServiceContext())->clearOpTimes();
+
+    // If there were rolled back operations on any session, invalidate all sessions.
+    // We invalidate sessions before we recover so that we avoid invalidating sessions that had
+    // just recovered prepared transactions.
+    if (_observerInfo.rollbackSessionIds.size() > 0) {
+        MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
+    }
 
     // Recover to the stable timestamp.
     auto stableTimestampSW = _recoverToStableTimestamp(opCtx);

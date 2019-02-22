@@ -71,7 +71,8 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
 
 Status applyCommitTransaction(OperationContext* opCtx,
                               const repl::OplogEntry& entry,
-                              repl::OplogApplication::Mode mode) {
+                              repl::OplogApplication::Mode mode,
+                              boost::optional<Timestamp> stableTimestampForRecovery) {
     // Return error if run via applyOps command.
     uassert(50987,
             "commitTransaction is only used internally by secondaries.",
@@ -81,14 +82,12 @@ Status applyCommitTransaction(OperationContext* opCtx,
     auto commitCommand = CommitTransactionOplogObject::parse(ctx, entry.getObject());
 
     if (mode == repl::OplogApplication::Mode::kRecovering) {
-        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        const auto recoveryTimestamp = replCoord->getRecoveryTimestamp();
-        invariant(recoveryTimestamp);
+        invariant(stableTimestampForRecovery);
 
-        // If the commitTimestamp is before the recoveryTimestamp, then the data already
-        // reflects the operations from the transaction.
+        // If the commitTimestamp is before the stableTimestampForRecovery, then the data
+        // already reflects the operations from the transaction.
         const auto& commitTimestamp = commitCommand.getCommitTimestamp();
-        if (recoveryTimestamp.get() > commitTimestamp) {
+        if (stableTimestampForRecovery.get() > commitTimestamp) {
             return Status::OK();
         }
 

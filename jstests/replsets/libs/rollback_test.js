@@ -37,8 +37,10 @@ load("jstests/hooks/validate_collections.js");
  *
  * @param {string} [optional] name the name of the test being run
  * @param {Object} [optional] replSet the ReplSetTest instance to adopt
+ * @param {bool} [optional] expectPreparedTxnsDuringRollback a flag for knowing if we expect to see
+ *                          transactions in prepare after a rollback
  */
-function RollbackTest(name = "RollbackTest", replSet) {
+function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRollback = false) {
     const State = {
         kStopped: "kStopped",
         kRollbackOps: "kRollbackOps",
@@ -61,6 +63,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
     const SIGTERM = 15;
     const kNumDataBearingNodes = 3;
     const kElectableNodes = 2;
+    const dontCheckCollCounts = expectPreparedTxnsDuringRollback;
 
     let rst;
     let curPrimary;
@@ -155,7 +158,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
         const name = rst.name;
         // We must check counts before we validate since validate fixes counts. We cannot check
         // counts if unclean shutdowns occur.
-        if (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns) {
+        // TODO SERVER-35872: Once we fix collection counts when aborting a prepared
+        // transaction that was recovered during rollback, re-enable this check.
+        if (!dontCheckCollCounts &&
+            (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns)) {
             rst.checkCollectionCounts(name);
         }
         rst.checkOplogs(name);
@@ -234,7 +240,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // After the previous rollback (if any) has completed and await replication has finished,
         // the replica set should be in a consistent and "fresh" state. We now prepare for the next
         // rollback.
-        checkDataConsistency();
+        if (!dontCheckCollCounts) {
+            checkDataConsistency();
+        }
 
         return curPrimary;
     };

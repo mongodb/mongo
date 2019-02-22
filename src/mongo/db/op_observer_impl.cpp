@@ -1190,12 +1190,6 @@ void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
 
 void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
                                            const RollbackObserverInfo& rbInfo) {
-    // If there were ops rolled back that were part of operations on a session, then invalidate
-    // the session cache.
-    if (rbInfo.rollbackSessionIds.size() > 0) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
-    }
-
     // Reset the key manager cache.
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator) {

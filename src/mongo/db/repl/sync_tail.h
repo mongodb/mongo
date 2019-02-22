@@ -79,7 +79,8 @@ public:
      */
     static Status syncApply(OperationContext* opCtx,
                             const BSONObj& o,
-                            OplogApplication::Mode oplogApplicationMode);
+                            OplogApplication::Mode oplogApplicationMode,
+                            boost::optional<Timestamp> stableTimestampForRecovery);
 
     /**
      *

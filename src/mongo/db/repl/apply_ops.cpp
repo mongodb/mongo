@@ -215,7 +215,7 @@ Status _applyOps(OperationContext* opCtx,
                         if (*opType == 'c') {
                             invariant(opCtx->lockState()->isW());
                             uassertStatusOK(repl::applyCommand_inlock(
-                                opCtx, opObj, entry, oplogApplicationMode));
+                                opCtx, opObj, entry, oplogApplicationMode, boost::none));
                             return Status::OK();
                         }
 

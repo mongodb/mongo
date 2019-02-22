@@ -356,12 +356,10 @@ TEST_F(TransactionParticipantRetryableWritesTest, TransactionTableUpdatesReplace
 
     const auto firstOpTime = writeTxnRecord(100, 0, {}, boost::none);
     assertTxnRecord(100, 0, firstOpTime, boost::none);
-    const auto secondOpTime = writeTxnRecord(200, 1, firstOpTime, DurableTxnStateEnum::kPrepared);
-    assertTxnRecord(200, 1, secondOpTime, DurableTxnStateEnum::kPrepared);
-    const auto thirdOpTime = writeTxnRecord(300, 2, secondOpTime, DurableTxnStateEnum::kCommitted);
-    assertTxnRecord(300, 2, thirdOpTime, DurableTxnStateEnum::kCommitted);
-    const auto fourthOpTime = writeTxnRecord(400, 3, thirdOpTime, boost::none);
-    assertTxnRecord(400, 3, fourthOpTime, boost::none);
+    const auto secondOpTime = writeTxnRecord(300, 2, firstOpTime, DurableTxnStateEnum::kCommitted);
+    assertTxnRecord(300, 2, secondOpTime, DurableTxnStateEnum::kCommitted);
+    const auto thirdOpTime = writeTxnRecord(400, 3, secondOpTime, boost::none);
+    assertTxnRecord(400, 3, thirdOpTime, boost::none);
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, StartingOldTxnShouldAssert) {

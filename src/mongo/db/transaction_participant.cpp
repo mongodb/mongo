@@ -53,6 +53,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/server_recovery.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_catalog.h"
@@ -123,7 +124,8 @@ void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
 struct ActiveTransactionHistory {
     boost::optional<SessionTxnRecord> lastTxnRecord;
     TransactionParticipant::CommittedStatementTimestampMap committedStatements;
-    bool transactionCommitted{false};
+    enum TxnRecordState { kNone, kCommitted, kAbortedWithPrepare, kPrepared };
+    TxnRecordState state = TxnRecordState::kNone;
     bool hasIncompleteHistory{false};
 };
 
@@ -159,9 +161,23 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     // 4.2 and upgrading to 4.2. Check when downgrading as well so sessions refreshed at the start
     // of downgrade enter the correct state.
     if ((serverGlobalParams.featureCompatibility.getVersion() >=
-         ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40) &&
-        result.lastTxnRecord->getState() == DurableTxnStateEnum::kCommitted) {
-        result.transactionCommitted = true;
+         ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo40)) {
+
+        // The state being kCommitted marks the commit of a transaction.
+        if (result.lastTxnRecord->getState() == DurableTxnStateEnum::kCommitted) {
+            result.state = result.TxnRecordState::kCommitted;
+        }
+
+        // The state being kAborted marks the abort of a prepared transaction since we do not write
+        // down abortTransaction oplog entries in 4.0.
+        if (result.lastTxnRecord->getState() == DurableTxnStateEnum::kAborted) {
+            result.state = result.TxnRecordState::kAbortedWithPrepare;
+        }
+
+        // The state being kPrepared marks a prepared transaction. We should never be refreshing
+        // a prepared transaction from storage since it should already be in a valid state after
+        // replication recovery.
+        invariant(result.lastTxnRecord->getState() != DurableTxnStateEnum::kPrepared);
     }
 
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
@@ -198,7 +214,7 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                  ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo42) &&
                 (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
                  !entry.shouldPrepare())) {
-                result.transactionCommitted = true;
+                result.state = result.TxnRecordState::kCommitted;
             }
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
@@ -395,7 +411,6 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(Oper
                 << txnNumber
                 << " has been aborted because an earlier command in this transaction failed.");
     }
-
     return;
 }
 
@@ -1749,10 +1764,24 @@ void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationCo
         p().activeTxnCommittedStatements = std::move(activeTxnHistory.committedStatements);
         p().hasIncompleteHistory = activeTxnHistory.hasIncompleteHistory;
 
-        if (activeTxnHistory.transactionCommitted) {
-            o(lg).txnState.transitionTo(
-                TransactionState::kCommitted,
-                TransactionState::TransitionValidation::kRelaxTransitionValidation);
+        switch (activeTxnHistory.state) {
+            case ActiveTransactionHistory::TxnRecordState::kCommitted:
+                o(lg).txnState.transitionTo(
+                    TransactionState::kCommitted,
+                    TransactionState::TransitionValidation::kRelaxTransitionValidation);
+                break;
+            case ActiveTransactionHistory::TxnRecordState::kAbortedWithPrepare:
+                o(lg).txnState.transitionTo(
+                    TransactionState::kAbortedWithPrepare,
+                    TransactionState::TransitionValidation::kRelaxTransitionValidation);
+                break;
+            case ActiveTransactionHistory::TxnRecordState::kNone:
+                o(lg).txnState.transitionTo(
+                    TransactionState::kNone,
+                    TransactionState::TransitionValidation::kRelaxTransitionValidation);
+                break;
+            case ActiveTransactionHistory::TxnRecordState::kPrepared:
+                MONGO_UNREACHABLE;
         }
     }
 

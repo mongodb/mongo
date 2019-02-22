@@ -506,7 +506,8 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                            BSONObj& cmd,
                            const repl::OpTime& optime,
                            const repl::OplogEntry& entry,
-                           OplogApplication::Mode mode) {
+                           OplogApplication::Mode mode,
+                           boost::optional<Timestamp> stableTimestampForRecovery) {
     auto type = OplogEntries_parse(IDLParserErrorContext("type"), cmd.getStringField("type"));
     IDLParserErrorContext ctx("o");
 

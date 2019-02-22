@@ -718,7 +718,7 @@ public:
 
         auto oplogEntry = oplogEntryBuilder.done();
         ASSERT_OK(repl::SyncTail::syncApply(
-            _opCtx, oplogEntry, repl::OplogApplication::Mode::kSecondary));
+            _opCtx, oplogEntry, repl::OplogApplication::Mode::kSecondary, boost::none));
 
         for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
             OneOffRead oor(_opCtx, firstInsertTime.addTicks(idx).asTimestamp());

@@ -274,7 +274,8 @@ LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMod
 // static
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const BSONObj& op,
-                           OplogApplication::Mode oplogApplicationMode) {
+                           OplogApplication::Mode oplogApplicationMode,
+                           boost::optional<Timestamp> stableTimestampForRecovery) {
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(opCtx);
 
@@ -375,8 +376,9 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                 globalWriteLock.emplace(opCtx);
             }
 
-            // special case apply for commands to avoid implicit database creation
-            Status status = applyCommand_inlock(opCtx, op, entry, oplogApplicationMode);
+            // A special case apply for commands to avoid implicit database creation.
+            Status status = applyCommand_inlock(
+                opCtx, op, entry, oplogApplicationMode, stableTimestampForRecovery);
             incrementOpsAppliedStats();
             return status;
         }));
@@ -1153,7 +1155,9 @@ Status multiSyncApply(OperationContext* opCtx,
 
             // If we didn't create a group, try to apply the op individually.
             try {
-                const Status status = SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode);
+                auto stableTimestampForRecovery = st->getOptions().stableTimestampForRecovery;
+                const Status status = SyncTail::syncApply(
+                    opCtx, entry.raw, oplogApplicationMode, stableTimestampForRecovery);
 
                 if (!status.isOK()) {
                     // In initial sync, update operations can cause documents to be missed during

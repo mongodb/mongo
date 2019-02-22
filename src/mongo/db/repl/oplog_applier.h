@@ -71,6 +71,10 @@ public:
         // Used to determine which operations should be applied. Only initial sync will set this to
         // be something other than the null optime.
         OpTime beginApplyingOpTime = OpTime();
+
+        // For replication recovery only. During replication rollback, this is used to keep track
+        // of the stable timestamp from which we replay the oplog.
+        boost::optional<Timestamp> stableTimestampForRecovery;
     };
 
     /**
