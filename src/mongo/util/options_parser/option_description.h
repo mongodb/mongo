@@ -76,7 +76,10 @@ enum OptionSources {
  * OptionSection instance and passed to an OptionsParser.
  */
 class OptionDescription {
-public:
+private:
+    friend class OptionSection;
+
+    OptionDescription() = delete;
     OptionDescription(const std::string& dottedName,
                       const std::string& singleName,
                       const OptionType type,
@@ -84,6 +87,7 @@ public:
                       const std::vector<std::string>& deprecatedDottedNames = {},
                       const std::vector<std::string>& deprecatedSingleNames = {});
 
+public:
     /*
      * The following functions are part of the chaining interface for option registration.  See
      * comments below for what each of these attributes mean, and the OptionSection class for

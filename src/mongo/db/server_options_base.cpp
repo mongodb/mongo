@@ -54,6 +54,10 @@ Status addBaseServerOptions(moe::OptionSection* options) {
 
     moe::OptionSection general_options("General options");
 
+    // DO NOT use this value elsewhere to call addOptionChaining directly.
+    // Create configuration options via IDL definition ONLY.
+    const auto hatch = moe::OptionSection::OptionParserUsageType::BaseServerOptionsException;
+
     // log component hierarchy verbosity levels
     for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
         logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
@@ -64,13 +68,17 @@ Status addBaseServerOptions(moe::OptionSection* options) {
             .addOptionChaining("systemLog.component." + component.getDottedName() + ".verbosity",
                                "",
                                moe::Int,
-                               "set component verbose level for " + component.getDottedName())
+                               "set component verbose level for " + component.getDottedName(),
+                               {},
+                               {},
+                               hatch)
             .setSources(moe::SourceYAMLConfig);
     }
 
     /* support for -vv -vvvv etc. */
     for (std::string s = "vv"; s.length() <= 12; s.append("v")) {
-        general_options.addOptionChaining(s.c_str(), s.c_str(), moe::Switch, "verbose")
+        general_options
+            .addOptionChaining(s.c_str(), s.c_str(), moe::Switch, "verbose", {}, {}, hatch)
             .hidden()
             .setSources(moe::SourceAllLegacy);
     }
