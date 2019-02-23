@@ -173,11 +173,6 @@ public:
      */
 
     /**
-     * Specifies the range allowed for this option.  Only allowed for options with numeric type.
-     */
-    OptionDescription& validRange(long min, long max);
-
-    /**
      * Specifies that this option is incompatible with another option.  The std::string provided
      * must be the dottedName, which is the name used to access the option in the result
      * Environment.
@@ -192,13 +187,6 @@ public:
      * result Environment.
      */
     OptionDescription& requires(const std::string& otherDottedName);
-
-    /**
-     * Specifies that this option is required to match the given format, specified as a regular
-     * expression.  The displayFormat argument is what gets printed to the user in the case
-     * where this constraint is not satisfied.  This is only allowed on std::string options.
-     */
-    OptionDescription& format(const std::string& regexFormat, const std::string& displayFormat);
 
     /**
      * Specifies that this option should be canonicalized immediately after initial parse.

@@ -51,7 +51,7 @@ public:
     Status operator()(const Environment& env) {
         return check(env);
     }
-    virtual ~Constraint() {}
+    virtual ~Constraint() = default;
 
 private:
     // Implementation
@@ -65,39 +65,9 @@ private:
 class KeyConstraint : public Constraint {
 public:
     KeyConstraint(const Key& key) : _key(key) {}
-    virtual ~KeyConstraint() {}
 
 protected:
     Key _key;
-};
-
-/** Implementation of a Constraint on the range of a numeric Value.  Fails if the Value is not a
- *  number, or if it is a number but outside the given range
- */
-class NumericKeyConstraint : public KeyConstraint {
-public:
-    NumericKeyConstraint(const Key& k, long min, long max)
-        : KeyConstraint(k), _min(min), _max(max) {}
-    virtual ~NumericKeyConstraint() {}
-
-private:
-    virtual Status check(const Environment& env);
-    long _min;
-    long _max;
-};
-
-/** Implementation of a Constraint that makes a Value immutable.  Fails if the Value has already
- *  been set and we are attempting to set it to a different Value.  Note that setting it to the
- *  same value is allowed in this implementation
- */
-class ImmutableKeyConstraint : public KeyConstraint {
-public:
-    ImmutableKeyConstraint(const Key& k) : KeyConstraint(k) {}
-    virtual ~ImmutableKeyConstraint() {}
-
-private:
-    virtual Status check(const Environment& env);
-    Value _value;
 };
 
 /** Implementation of a Constraint that makes two keys mutually exclusive.  Fails if both keys
@@ -107,10 +77,9 @@ class MutuallyExclusiveKeyConstraint : public KeyConstraint {
 public:
     MutuallyExclusiveKeyConstraint(const Key& key, const Key& otherKey)
         : KeyConstraint(key), _otherKey(otherKey) {}
-    virtual ~MutuallyExclusiveKeyConstraint() {}
 
 private:
-    virtual Status check(const Environment& env);
+    Status check(const Environment& env) override;
     Key _otherKey;
 };
 
@@ -121,60 +90,10 @@ class RequiresOtherKeyConstraint : public KeyConstraint {
 public:
     RequiresOtherKeyConstraint(const Key& key, const Key& otherKey)
         : KeyConstraint(key), _otherKey(otherKey) {}
-    virtual ~RequiresOtherKeyConstraint() {}
 
 private:
-    virtual Status check(const Environment& env);
+    Status check(const Environment& env) final;
     Key _otherKey;
-};
-
-/** Implementation of a Constraint that enforces a specific format on a std::string value.  Fails if
- *  the value of the key is not a std::string or does not match the given regex.
- */
-class StringFormatKeyConstraint : public KeyConstraint {
-public:
-    StringFormatKeyConstraint(const Key& key,
-                              const std::string& regexFormat,
-                              const std::string& displayFormat)
-        : KeyConstraint(key), _regexFormat(regexFormat), _displayFormat(displayFormat) {}
-    virtual ~StringFormatKeyConstraint() {}
-
-private:
-    virtual Status check(const Environment& env);
-    std::string _regexFormat;
-    std::string _displayFormat;
-};
-
-/** Implementation of a Constraint on the type of a Value.  Fails if we cannot extract the given
- *  type from our Value, which means the implementation of the access functions of Value
- *  controls which types are "compatible"
- */
-template <typename T>
-class TypeKeyConstraint : public KeyConstraint {
-public:
-    TypeKeyConstraint(const Key& k) : KeyConstraint(k) {}
-    virtual ~TypeKeyConstraint() {}
-
-private:
-    virtual Status check(const Environment& env) {
-        Value val;
-        Status s = env.get(_key, &val);
-        if (!s.isOK()) {
-            // Key not set, skipping type constraint check
-            return Status::OK();
-        }
-
-        // The code that controls whether a type is "compatible" is contained in the Value
-        // class, so if that handles compatibility between numeric types then this will too.
-        T typedVal;
-        if (!val.get(&typedVal).isOK()) {
-            StringBuilder sb;
-            sb << "Error: value for key: " << _key << " was found as type: " << val.typeToString()
-               << " but is required to be type: " << typeid(typedVal).name();
-            return Status(ErrorCodes::InternalError, sb.str());
-        }
-        return Status::OK();
-    }
 };
 
 /**

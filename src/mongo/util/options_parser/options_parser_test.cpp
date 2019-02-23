@@ -276,26 +276,6 @@ TEST(Registration, ComposableWithDefault) {
     }
 }
 
-TEST(Registration, NumericRangeConstraint) {
-    moe::OptionSection testOpts;
-    try {
-        std::vector<std::string> defaultVal;
-        defaultVal.push_back("default");
-        testOpts.addOptionChaining("port", "port", moe::String, "Port").validRange(1000, 65535);
-        FAIL("Was able to register non numeric option with constraint on range");
-    } catch (::mongo::DBException&) {
-    }
-}
-
-TEST(Registration, StringFormatConstraint) {
-    moe::OptionSection testOpts;
-    try {
-        testOpts.addOptionChaining("port", "port", moe::Int, "Port").format("[0-9]*", "[0-9]*");
-        FAIL("Was able to register non string option with constraint on format");
-    } catch (::mongo::DBException&) {
-    }
-}
-
 TEST(Registration, NestedSubSections) {
     moe::OptionSection root;
     moe::OptionSection childSection;
@@ -3179,64 +3159,6 @@ TEST(OptionSources, SourceAll) {
     ASSERT_EQUALS(parameter, "allowed");
 }
 
-TEST(Constraints, NumericRangeConstraint) {
-    OptionsParserTester parser;
-    moe::Environment environment;
-    moe::Value value;
-    std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
-    int port;
-
-    moe::OptionSection testOpts;
-    testOpts.addOptionChaining("port", "port", moe::Int, "Port").validRange(1000, 65535);
-
-    environment = moe::Environment();
-    argv.clear();
-    argv.push_back("binaryname");
-    argv.push_back("--port");
-    argv.push_back("999");
-
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-    ASSERT_NOT_OK(environment.validate());
-    ;
-
-    environment = moe::Environment();
-    argv.clear();
-    argv.push_back("binaryname");
-    argv.push_back("--port");
-    argv.push_back("65536");
-
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-    ASSERT_NOT_OK(environment.validate());
-    ;
-
-    environment = moe::Environment();
-    argv.clear();
-    argv.push_back("binaryname");
-    argv.push_back("--port");
-    argv.push_back("65535");
-
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-    ASSERT_OK(environment.validate());
-    ;
-    ASSERT_OK(environment.get(moe::Key("port"), &value));
-    ASSERT_OK(value.get(&port));
-    ASSERT_EQUALS(port, 65535);
-
-    environment = moe::Environment();
-    argv.clear();
-    argv.push_back("binaryname");
-    argv.push_back("--port");
-    argv.push_back("1000");
-
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-    ASSERT_OK(environment.validate());
-    ;
-    ASSERT_OK(environment.get(moe::Key("port"), &value));
-    ASSERT_OK(value.get(&port));
-    ASSERT_EQUALS(port, 1000);
-}
-
 TEST(Constraints, MutuallyExclusiveConstraint) {
     OptionsParserTester parser;
     moe::Environment environment;
@@ -3322,51 +3244,6 @@ TEST(Constraints, RequiresOtherConstraint) {
     ASSERT_OK(environment.validate());
     ;
     ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
-}
-
-TEST(Constraints, StringFormatConstraint) {
-    OptionsParserTester parser;
-    moe::Environment environment;
-    moe::Value value;
-    std::vector<std::string> argv;
-    std::map<std::string, std::string> env_map;
-
-    moe::OptionSection testOpts;
-    testOpts.addOptionChaining("option", "option", moe::String, "Option")
-        .format("[a-z][0-9]", "[character][number]");
-
-    environment = moe::Environment();
-    argv.clear();
-    argv.push_back("binaryname");
-    argv.push_back("--option");
-    argv.push_back("aa");
-
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-    ASSERT_NOT_OK(environment.validate());
-    ;
-
-    environment = moe::Environment();
-    argv.clear();
-    argv.push_back("binaryname");
-    argv.push_back("--option");
-    argv.push_back("11");
-
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-    ASSERT_NOT_OK(environment.validate());
-    ;
-
-    environment = moe::Environment();
-    argv.clear();
-    argv.push_back("binaryname");
-    argv.push_back("--option");
-    argv.push_back("a1");
-
-    ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-    ASSERT_OK(environment.validate());
-    ASSERT_OK(environment.get(moe::Key("option"), &value));
-    std::string option;
-    ASSERT_OK(value.get(&option));
-    ASSERT_EQUALS(option, "a1");
 }
 
 TEST(YAMLConfigFile, Basic) {
