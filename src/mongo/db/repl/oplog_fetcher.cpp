@@ -111,11 +111,8 @@ BSONObj makeMetadataObject() {
  * Checks the first batch of results from query.
  * 'documents' are the first batch of results returned from tailing the remote oplog.
  * 'lastFetched' optime should be consistent with the predicate in the query.
- * 'lastOpCommitted' is the OpTime of the most recently committed op of which this node is aware.
  * 'remoteLastOpApplied' is the last OpTime applied on the sync source. This is optional for
  * compatibility with 3.4 servers that do not send OplogQueryMetadata.
- * 'remoteLastOpCommitted' is the OpTime of the most recently committed op of which the sync source
- * is aware.
  * 'requiredRBID' is a RollbackID received when we chose the sync source that we use here to
  * guarantee we have not rolled back since we confirmed the sync source had our minValid.
  * 'remoteRBID' is a RollbackId for the sync source returned in this oplog query. This is optional
@@ -124,17 +121,14 @@ BSONObj makeMetadataObject() {
  * oplog to be ahead of ours. If false, the sync source's oplog is allowed to be at the same point
  * as ours, but still cannot be behind ours.
  *
- * TODO (SERVER-27668): Make remoteLastOpApplied, remoteLastOpCommitted, and remoteRBID
- * non-optional.
+ * TODO (SERVER-27668): Make remoteLastOpApplied, and remoteRBID non-optional.
  *
  * Returns OplogStartMissing if we cannot find the optime of the last fetched operation in
  * the remote oplog.
  */
 Status checkRemoteOplogStart(const Fetcher::Documents& documents,
                              OpTime lastFetched,
-                             OpTime lastOpCommitted,
                              boost::optional<OpTime> remoteLastOpApplied,
-                             boost::optional<OpTime> remoteLastOpCommitted,
                              int requiredRBID,
                              boost::optional<int> remoteRBID,
                              bool requireFresherSyncSource) {
@@ -172,7 +166,7 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
     }
 
     // If 'requireFresherSyncSource' is true, we must check that the sync source's
-    // lastApplied/lastOpCommitted is ahead of us to prevent forming a cycle. Although we check for
+    // lastApplied is ahead of us to prevent forming a cycle. Although we check for
     // this condition in sync source selection, if an undetected rollback occurred between sync
     // source selection and sync source resolution, this condition may no longer hold.
     // 'requireFresherSyncSource' is false for initial sync, since no other node can sync off an
@@ -180,27 +174,19 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents,
     // problematic to check this condition for initial sync, since the 'lastFetched' OpTime will
     // almost always equal the 'remoteLastApplied', since we fetch the sync source's last applied
     // OpTime to determine where to start our OplogFetcher.
-    if (requireFresherSyncSource && remoteLastOpApplied && remoteLastOpCommitted &&
-        std::tie(*remoteLastOpApplied, *remoteLastOpCommitted) <=
-            std::tie(lastFetched, lastOpCommitted)) {
+    if (requireFresherSyncSource && remoteLastOpApplied && *remoteLastOpApplied <= lastFetched) {
         return Status(ErrorCodes::InvalidSyncSource,
                       str::stream()
-                          << "Sync source cannot be behind me, and if I am up-to-date with the "
-                             "sync source, it must have a higher lastOpCommitted. "
-                          << "My last fetched oplog optime: "
+                          << "Sync source must be ahead of me. My last fetched oplog optime: "
                           << lastFetched.toString()
                           << ", latest oplog optime of sync source: "
-                          << remoteLastOpApplied->toString()
-                          << ", my lastOpCommitted: "
-                          << lastOpCommitted.toString()
-                          << ", lastOpCommitted of sync source: "
-                          << remoteLastOpCommitted->toString());
+                          << remoteLastOpApplied->toString());
     }
 
     // At this point we know that our sync source has our minValid and is not behind us, so if our
     // history diverges from our sync source's we should prefer its history and roll back ours.
 
-    // Since we checked for rollback and our sync source is not behind us, an empty batch means that
+    // Since we checked for rollback and our sync source is ahead of us, an empty batch means that
     // we have a higher timestamp on our last fetched OpTime than our sync source's last applied
     // OpTime, but a lower term. When this occurs, we must roll back our inconsistent oplog entry.
     if (documents.empty()) {
@@ -427,17 +413,12 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
         auto remoteRBID = oqMetadata ? boost::make_optional(oqMetadata->getRBID()) : boost::none;
         auto remoteLastApplied =
             oqMetadata ? boost::make_optional(oqMetadata->getLastOpApplied()) : boost::none;
-        auto remoteLastOpCommitted =
-            oqMetadata ? boost::make_optional(oqMetadata->getLastOpCommitted()) : boost::none;
-        auto status = checkRemoteOplogStart(
-            documents,
-            lastFetched,
-            _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime().opTime,
-            remoteLastApplied,
-            remoteLastOpCommitted,
-            _requiredRBID,
-            remoteRBID,
-            _requireFresherSyncSource);
+        auto status = checkRemoteOplogStart(documents,
+                                            lastFetched,
+                                            remoteLastApplied,
+                                            _requiredRBID,
+                                            remoteRBID,
+                                            _requireFresherSyncSource);
         if (!status.isOK()) {
             // Stop oplog fetcher and execute rollback if necessary.
             return status;

@@ -379,21 +379,13 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
                     continue;
                 }
             }
-            // Do not select a candidate that is behind me. If I am up to date with the candidate,
-            // only select them if they have a higher lastOpCommitted.
-            if (std::tuple<OpTime, OpTime>(it->getHeartbeatAppliedOpTime(),
-                                           it->getHeartbeatLastOpCommitted()) <=
-                std::tie(lastOpTimeFetched, _lastCommittedOpTime)) {
-                LOG(1) << "Cannot select this sync source. Sync source cannot be behind me, and if "
-                          "I am up-to-date with the sync source, it must have a higher "
-                          "lastOpCommitted. "
+            // Only select a candidate that is ahead of me.
+            if (it->getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
+                LOG(1) << "Cannot select this sync source. Sync source must be ahead of me. "
                        << "Sync candidate: " << itMemberConfig.getHostAndPort()
                        << ", my last fetched oplog optime: " << lastOpTimeFetched.toBSON()
                        << ", latest oplog optime of sync candidate: "
-                       << it->getHeartbeatAppliedOpTime().toBSON()
-                       << ", my lastOpCommitted: " << _lastCommittedOpTime
-                       << ", lastOpCommitted of sync candidate: "
-                       << it->getHeartbeatLastOpCommitted();
+                       << it->getHeartbeatAppliedOpTime().toBSON();
                 continue;
             }
             // Candidate cannot be more latent than anything we've already considered.
@@ -694,8 +686,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     Date_t now,
     Milliseconds networkRoundTripTime,
     const HostAndPort& target,
-    const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
-    OpTime lastOpCommitted) {
+    const StatusWith<ReplSetHeartbeatResponse>& hbResponse) {
     const MemberState originalState = getMemberState();
     PingStats& hbStats = _pings[target];
     invariant(hbStats.getLastHeartbeatStartDate() != Date_t());
@@ -811,7 +802,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     } else {
         ReplSetHeartbeatResponse hbr = std::move(hbResponse.getValue());
         LOG(3) << "setUpValues: heartbeat response good for member _id:" << member.getId();
-        advancedOpTime = hbData.setUpValues(now, std::move(hbr), lastOpCommitted);
+        advancedOpTime = hbData.setUpValues(now, std::move(hbr));
     }
 
     HeartbeatResponseAction nextAction;
@@ -1387,8 +1378,7 @@ void TopologyCoordinator::setCurrentPrimary_forTest(int primaryIndex,
             hbResponse.setSyncingTo(HostAndPort());
             _memberData.at(primaryIndex)
                 .setUpValues(_memberData.at(primaryIndex).getLastHeartbeat(),
-                             std::move(hbResponse),
-                             _memberData.at(primaryIndex).getHeartbeatLastOpCommitted());
+                             std::move(hbResponse));
         }
         _currentPrimaryIndex = primaryIndex;
     }
@@ -1673,9 +1663,6 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
 
             const auto heartbeatDurableOpTime = memberData.getHeartbeatDurableOpTime();
             entry.append("heartbeatDurableOpTime", heartbeatDurableOpTime.toBSON());
-
-            const auto lastOpCommitted = memberData.getHeartbeatLastOpCommitted();
-            entry.append("heartbeatLastOpCommitted", lastOpCommitted.toBSON());
 
             if (_selfIndex >= 0) {
                 const int memberId = memberData.getMemberId();
@@ -2405,9 +2392,17 @@ bool TopologyCoordinator::updateLastCommittedOpTime() {
 }
 
 bool TopologyCoordinator::advanceLastCommittedOpTime(const OpTime& committedOpTime) {
+    if (_selfIndex == -1) {
+        // The config hasn't been installed or we are not in the config. This could happen
+        // on heartbeats before installing a config.
+        return false;
+    }
+
     if (committedOpTime == _lastCommittedOpTime) {
         return false;  // Hasn't changed, so ignore it.
-    } else if (committedOpTime < _lastCommittedOpTime) {
+    }
+
+    if (committedOpTime < _lastCommittedOpTime) {
         LOG(1) << "Ignoring older committed snapshot optime: " << committedOpTime
                << ", currentCommittedOpTime: " << _lastCommittedOpTime;
         return false;  // This may have come from an out-of-order heartbeat. Ignore it.
@@ -2417,6 +2412,16 @@ bool TopologyCoordinator::advanceLastCommittedOpTime(const OpTime& committedOpTi
     if (_iAmPrimary() && committedOpTime < _firstOpTimeOfMyTerm) {
         LOG(1) << "Ignoring older committed snapshot from before I became primary, optime: "
                << committedOpTime << ", firstOpTimeOfMyTerm: " << _firstOpTimeOfMyTerm;
+        return false;
+    }
+
+    // Arbiters don't have data so they always advance their commit point via heartbeats.
+    // Otherwise, only update the commit point if it's on the same oplog branch as our last applied.
+    if (!_selfConfig().isArbiter() &&
+        getMyLastAppliedOpTime().getTerm() != committedOpTime.getTerm()) {
+        LOG(1) << "Ignoring commit point with different term than my lastApplied, since it may "
+                  "not be on the same oplog branch as mine. optime: "
+               << committedOpTime << ", my last applied: " << getMyLastAppliedOpTime();
         return false;
     }
 
@@ -2534,25 +2539,18 @@ bool TopologyCoordinator::shouldChangeSyncSource(
     // If OplogQueryMetadata was provided, use its values, otherwise use the ones in
     // ReplSetMetadata.
     OpTime currentSourceOpTime;
-    OpTime currentSourceLastOpCommitted;
     int syncSourceIndex = -1;
     int primaryIndex = -1;
     if (oqMetadata) {
         currentSourceOpTime =
             std::max(oqMetadata->getLastOpApplied(),
                      _memberData.at(currentSourceIndex).getHeartbeatAppliedOpTime());
-        currentSourceLastOpCommitted =
-            std::max(oqMetadata->getLastOpCommitted(),
-                     _memberData.at(currentSourceIndex).getHeartbeatLastOpCommitted());
         syncSourceIndex = oqMetadata->getSyncSourceIndex();
         primaryIndex = oqMetadata->getPrimaryIndex();
     } else {
         currentSourceOpTime =
             std::max(replMetadata.getLastOpVisible(),
                      _memberData.at(currentSourceIndex).getHeartbeatAppliedOpTime());
-        currentSourceLastOpCommitted =
-            std::max(replMetadata.getLastOpCommitted(),
-                     _memberData.at(currentSourceIndex).getHeartbeatLastOpCommitted());
         syncSourceIndex = replMetadata.getSyncSourceIndex();
         primaryIndex = replMetadata.getPrimaryIndex();
     }
@@ -2566,20 +2564,15 @@ bool TopologyCoordinator::shouldChangeSyncSource(
     // Change sync source if they are not ahead of us, and don't have a sync source,
     // unless they are primary.
     const OpTime myLastOpTime = getMyLastAppliedOpTime();
-    if (syncSourceIndex == -1 &&
-        std::tie(currentSourceOpTime, currentSourceLastOpCommitted) <=
-            std::tie(myLastOpTime, _lastCommittedOpTime) &&
+    if (syncSourceIndex == -1 && currentSourceOpTime <= myLastOpTime &&
         primaryIndex != currentSourceIndex) {
         std::stringstream logMessage;
 
         logMessage << "Choosing new sync source. Our current sync source is not primary and does "
-                      "not have a sync source, so we require that it is not behind us, and that if "
-                      "we are up-to-date with it, it has a higher lastOpCommitted. "
+                      "not have a sync source, so we require that it is ahead of us. "
                    << "Current sync source: " << currentSource.toString()
                    << ", my last fetched oplog optime: " << myLastOpTime
-                   << ", latest oplog optime of sync source: " << currentSourceOpTime
-                   << ", my lastOpCommitted: " << _lastCommittedOpTime
-                   << ", lastOpCommitted of sync source: " << currentSourceLastOpCommitted;
+                   << ", latest oplog optime of sync source: " << currentSourceOpTime;
 
         if (primaryIndex >= 0) {
             logMessage << " (" << _rsConfig.getMemberAt(primaryIndex).getHostAndPort() << " is)";

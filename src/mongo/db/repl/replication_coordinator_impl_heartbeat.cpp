@@ -148,7 +148,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     }
 
     ReplSetHeartbeatResponse hbResponse;
-    OpTime lastOpCommitted;
     BSONObj resp;
     if (responseStatus.isOK()) {
         resp = cbData.response.data;
@@ -177,12 +176,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             replMetadata = responseStatus;
         }
         if (replMetadata.isOK()) {
-            lastOpCommitted = replMetadata.getValue().getLastOpCommitted();
+            _advanceCommitPoint(lk, replMetadata.getValue().getLastOpCommitted());
 
-            // Arbiters are the only nodes allowed to advance their commit point via heartbeats.
-            if (_getMemberState_inlock().arbiter()) {
-                _advanceCommitPoint(lk, lastOpCommitted);
-            }
             // Asynchronous stepdown could happen, but it will wait for _mutex and execute
             // after this function, so we cannot and don't need to wait for it to finish.
             _processReplSetMetadata_inlock(replMetadata.getValue());
@@ -211,8 +206,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
     }
 
-    HeartbeatResponseAction action = _topCoord->processHeartbeatResponse(
-        now, networkTime, target, hbStatusResponse, lastOpCommitted);
+    HeartbeatResponseAction action =
+        _topCoord->processHeartbeatResponse(now, networkTime, target, hbStatusResponse);
 
     if (action.getAction() == HeartbeatResponseAction::NoAction && hbStatusResponse.isOK() &&
         hbStatusResponse.getValue().hasState() &&
