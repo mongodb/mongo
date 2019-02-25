@@ -116,6 +116,15 @@ public:
     bool isCommand() const;
 
     /**
+     * Returns if the oplog entry is part of a transaction that has not yet been prepared or
+     * committed.  The actual "prepare" or "commit" oplog entries do not have an inTxn field
+     * and so this method will always return false for them.
+     */
+    bool isInPendingTransaction() const {
+        return getInTxn() && *getInTxn();
+    }
+
+    /**
      * Returns if the oplog entry is for a CRUD operation.
      */
     static bool isCrudOpType(OpTypeEnum opType);

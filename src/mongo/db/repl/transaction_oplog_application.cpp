@@ -79,6 +79,9 @@ Status applyCommitTransaction(OperationContext* opCtx,
 
     IDLParserErrorContext ctx("commitTransaction");
     auto commitCommand = CommitTransactionOplogObject::parse(ctx, entry.getObject());
+    const bool prepared = !commitCommand.getPrepared() || *commitCommand.getPrepared();
+    if (!prepared)
+        return Status::OK();
 
     if (mode == repl::OplogApplication::Mode::kRecovering ||
         mode == repl::OplogApplication::Mode::kInitialSync) {
@@ -137,6 +140,58 @@ Status applyAbortTransaction(OperationContext* opCtx,
     transaction.unstashTransactionResources(opCtx, "abortTransaction");
     transaction.abortActiveTransaction(opCtx);
     return Status::OK();
+}
+
+repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
+    OperationContext* opCtx,
+    const repl::OplogEntry& commitOrPrepare,
+    const std::vector<repl::OplogEntry*> cachedOps) {
+    repl::MultiApplier::Operations ops;
+
+    // Get the previous oplog entry.
+    auto currentOpTime = commitOrPrepare.getOpTime();
+
+    // The cachedOps are the ops for this transaction that are from the same oplog application batch
+    // as the commit or prepare, those which have not necessarily been written to the oplog.  These
+    // ops are in order of increasing timestamp.
+
+    // The lastEntryOpTime is the OpTime of the last (latest OpTime) entry for this transaction
+    // which is expected to be present in the oplog.  It is the entry before the first cachedOp,
+    // unless there are no cachedOps in which case it is the entry before the commit or prepare.
+    const auto lastEntryOpTime = (cachedOps.empty() ? commitOrPrepare : *cachedOps.front())
+                                     .getPrevWriteOpTimeInTransaction();
+    invariant(lastEntryOpTime < currentOpTime);
+
+    TransactionHistoryIterator iter(lastEntryOpTime.get());
+    // Empty commits are not allowed, but empty prepares are.
+    invariant(commitOrPrepare.getCommandType() !=
+                  repl::OplogEntry::CommandType::kCommitTransaction ||
+              !cachedOps.empty() || iter.hasNext());
+    auto commitOrPrepareObj = commitOrPrepare.toBSON();
+
+    // First retrieve and transform the ops from the oplog, which will be retrieved in reverse
+    // order.
+    while (iter.hasNext()) {
+        const auto& operationEntry = iter.next(opCtx);
+        invariant(operationEntry.isInPendingTransaction());
+        // Now reconstruct the entry "as if" it were at the commit or prepare time.
+        BSONObjBuilder builder(operationEntry.getReplOperation().toBSON());
+        builder.appendElementsUnique(commitOrPrepareObj);
+        ops.emplace_back(builder.obj());
+    }
+    std::reverse(ops.begin(), ops.end());
+
+    // Next retrieve and transform the ops from the current batch, which are in increasing timestamp
+    // order.
+    for (auto* cachedOp : cachedOps) {
+        const auto& operationEntry = *cachedOp;
+        invariant(operationEntry.isInPendingTransaction());
+        // Now reconstruct the entry "as if" it were at the commit or prepare time.
+        BSONObjBuilder builder(operationEntry.getReplOperation().toBSON());
+        builder.appendElementsUnique(commitOrPrepareObj);
+        ops.emplace_back(builder.obj());
+    }
+    return ops;
 }
 
 }  // namespace mongo

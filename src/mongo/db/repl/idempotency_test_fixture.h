@@ -156,17 +156,28 @@ OplogEntry makeCommandOplogEntry(OpTime opTime,
                                  const BSONObj& command,
                                  boost::optional<UUID> uuid = boost::none);
 
+OplogEntry makeCommandOplogEntryWithSessionInfoAndStmtId(
+    OpTime opTime,
+    const NamespaceString& nss,
+    const BSONObj& command,
+    LogicalSessionId lsid,
+    TxnNumber txnNum,
+    StmtId stmtId,
+    boost::optional<OpTime> prevOpTime = boost::none);
+
 OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,
                                                        const NamespaceString& nss,
                                                        const BSONObj& documentToInsert,
                                                        OperationSessionInfo info);
 
-OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(OpTime opTime,
-                                                                const NamespaceString& nss,
-                                                                const BSONObj& documentToInsert,
-                                                                LogicalSessionId lsid,
-                                                                TxnNumber txnNum,
-                                                                StmtId stmtId);
-
+OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
+    OpTime opTime,
+    const NamespaceString& nss,
+    boost::optional<UUID> uuid,
+    const BSONObj& documentToInsert,
+    LogicalSessionId lsid,
+    TxnNumber txnNum,
+    StmtId stmtId,
+    boost::optional<OpTime> prevOpTime = boost::none);
 }  // namespace repl
 }  // namespace mongo

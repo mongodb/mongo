@@ -74,7 +74,8 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 OperationSessionInfo sessionInfo = {},
                                 boost::optional<Date_t> wallClockTime = boost::none,
                                 boost::optional<StmtId> stmtId = boost::none,
-                                boost::optional<UUID> uuid = boost::none) {
+                                boost::optional<UUID> uuid = boost::none,
+                                boost::optional<OpTime> prevOpTime = boost::none) {
     return repl::OplogEntry(opTime,                           // optime
                             boost::none,                      // hash
                             opType,                           // opType
@@ -88,7 +89,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             boost::none,                      // upsert
                             wallClockTime,                    // wall clock time
                             stmtId,                           // statement id
-                            boost::none,   // optime of previous write within same transaction
+                            prevOpTime,    // optime of previous write within same transaction
                             boost::none,   // pre-image optime
                             boost::none);  // post-image optime
 }
@@ -218,6 +219,31 @@ OplogEntry makeCommandOplogEntry(OpTime opTime,
 }
 
 /**
+ * Creates an oplog entry for 'command' with the given 'optime', 'namespace' and session information
+ */
+OplogEntry makeCommandOplogEntryWithSessionInfoAndStmtId(OpTime opTime,
+                                                         const NamespaceString& nss,
+                                                         const BSONObj& command,
+                                                         LogicalSessionId lsid,
+                                                         TxnNumber txnNum,
+                                                         StmtId stmtId,
+                                                         boost::optional<OpTime> prevOpTime) {
+    OperationSessionInfo info;
+    info.setSessionId(lsid);
+    info.setTxnNumber(txnNum);
+    return makeOplogEntry(opTime,
+                          OpTypeEnum::kCommand,
+                          nss.getCommandNS(),
+                          command,
+                          boost::none /* o2 */,
+                          info /* sessionInfo */,
+                          Date_t::min() /* wallClockTime -- required but not checked */,
+                          stmtId,
+                          boost::none /* uuid */,
+                          prevOpTime);
+}
+
+/**
  * Creates a create collection oplog entry with given optime.
  */
 OplogEntry makeCreateCollectionOplogEntry(OpTime opTime,
@@ -307,12 +333,15 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,
                           Date_t::now());       // wall clock time
 }
 
-OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(OpTime opTime,
-                                                                const NamespaceString& nss,
-                                                                const BSONObj& documentToInsert,
-                                                                LogicalSessionId lsid,
-                                                                TxnNumber txnNum,
-                                                                StmtId stmtId) {
+OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
+    OpTime opTime,
+    const NamespaceString& nss,
+    boost::optional<UUID> uuid,
+    const BSONObj& documentToInsert,
+    LogicalSessionId lsid,
+    TxnNumber txnNum,
+    StmtId stmtId,
+    boost::optional<OpTime> prevOpTime) {
     OperationSessionInfo info;
     info.setSessionId(lsid);
     info.setTxnNumber(txnNum);
@@ -323,7 +352,9 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(OpTime opTime,
                           boost::none,          // o2
                           info,                 // session info
                           Date_t::now(),        // wall clock time
-                          stmtId);              // statement id
+                          stmtId,
+                          uuid,
+                          prevOpTime);  // previous optime in same session
 }
 
 

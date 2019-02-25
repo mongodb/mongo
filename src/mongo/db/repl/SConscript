@@ -747,8 +747,11 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'idempotency_test_fixture',
         'oplog_buffer_blocking_queue',
