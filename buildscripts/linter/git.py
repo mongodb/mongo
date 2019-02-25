@@ -105,7 +105,7 @@ class Repo(_git.Repository):
         # 2. Cached/Staged files (--cached)
         # 3. Working Tree files git tracks
 
-        fork_point = self.get_merge_base(origin_branch)
+        fork_point = self.get_merge_base(["HEAD", origin_branch])
 
         diff_files = self.git_diff(["--name-only", "%s..HEAD" % (fork_point)])
         diff_files += self.git_diff(["--name-only", "--cached"])

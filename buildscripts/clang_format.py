@@ -403,7 +403,7 @@ def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-ma
             (commit_prior_to_reformat))
 
     # We assume the target branch is master, it could be a different branch if needed for testing
-    merge_base = repo.get_merge_base("master")
+    merge_base = repo.get_merge_base(["HEAD", "master"])
 
     if not merge_base == commit_prior_to_reformat:
         raise ValueError(
