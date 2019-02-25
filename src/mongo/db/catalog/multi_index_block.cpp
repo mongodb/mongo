@@ -78,6 +78,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
+MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
 
 MultiIndexBlock::~MultiIndexBlock() {
     invariant(_buildIsCleanedUp);
@@ -502,6 +503,14 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
     if (state != PlanExecutor::IS_EOF) {
         return exec->getMemberObjectStatus(objToIndex.value());
+    }
+
+    if (MONGO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
+        log() << "Index build interrupted due to 'leaveIndexBuildUnfinishedForShutdown' failpoint. "
+                 "Mimicing shutdown error code.";
+        return Status(
+            ErrorCodes::InterruptedAtShutdown,
+            "background index build interrupted due to failpoint. returning a shutdown error.");
     }
 
     if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {

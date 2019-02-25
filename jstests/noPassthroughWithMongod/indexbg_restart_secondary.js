@@ -47,19 +47,26 @@
     replTest.awaitReplication();
 
     assert.commandWorked(secondDB.adminCommand(
-        {configureFailPoint: 'hangAfterStartingIndexBuildUnlocked', mode: 'alwaysOn'}));
-    coll.createIndex({i: 1}, {background: true});
-    masterDB.getLastError(2);
-    assert.eq(2, coll.getIndexes().length);
+        {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'alwaysOn'}));
+    try {
+        coll.createIndex({i: 1}, {background: true});
+        masterDB.getLastError(2);
+        assert.eq(2, coll.getIndexes().length);
 
-    // Kill -9 and restart the secondary, after making sure all writes are durable.
-    // Waiting for durable is important for both (A) the record that we started the index build so
-    // it is rebuild on restart, and (B) the update to minvalid to show that we've already applied
-    // the oplog entry so it isn't replayed. If (A) is present without (B), then there are two ways
-    // that the index can be rebuilt on startup and this test is only for the one triggered by (A).
-    secondDB.adminCommand({fsync: 1});
+        // Make sure all writes are durable on the secondary so that we can restart it knowing that
+        // the index build will be found on startup.
+        // Waiting for durable is important for both (A) the record that we started the index build
+        // so it is rebuild on restart, and (B) the update to minvalid to show that we've already
+        // applied the oplog entry so it isn't replayed. If (A) is present without (B), then there
+        // are two ways that the index can be rebuilt on startup and this test is only for the one
+        // triggered by (A).
+        secondDB.adminCommand({fsync: 1});
+    } finally {
+        assert.commandWorked(secondDB.adminCommand(
+            {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'off'}));
+    }
 
-    MongoRunner.stopMongod(second, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+    MongoRunner.stopMongod(second);
     replTest.start(second, {}, /*restart=*/true, /*wait=*/true);
 
     // Make sure secondary comes back.
