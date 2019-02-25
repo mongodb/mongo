@@ -173,6 +173,15 @@ class SuiteTest(unittest.TestCase):
 
         self.assertEqual(suite.get_test_count(), 3)
         self.assertEqual(suite.get_runtime(), 29)
+        self.assertTrue(suite.should_overwrite_timeout())
+
+    def test_suites_without_full_runtime_history_should_not_be_overridden(self):
+        suite = grt.Suite()
+        suite.add_test("test1", 10)
+        suite.add_test("test2", 0)
+        suite.add_test("test3", 7)
+
+        self.assertFalse(suite.should_overwrite_timeout())
 
 
 def create_suite(count=3, start=0):
@@ -452,6 +461,18 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         self.assertEqual(expected_timeout, timeout_cmd["params"]["timeout_secs"])
         expected_exec_timeout = grt.calculate_timeout(suites[0].get_runtime(), 3) * 5
         self.assertEqual(expected_exec_timeout, timeout_cmd["params"]["exec_timeout_secs"])
+
+    def test_suites_without_enough_info_should_not_include_timeouts(self):
+        suite_without_timing_info = 1
+        options = self.generate_mock_options()
+        suites = self.generate_mock_suites(3)
+        suites[suite_without_timing_info].should_overwrite_timeout.return_value = False
+
+        config = grt.EvergreenConfigGenerator(suites, options, Mock()).generate_config().to_map()
+
+        timeout_cmd = config["tasks"][suite_without_timing_info]["commands"][0]
+        self.assertNotIn("command", timeout_cmd)
+        self.assertEqual("do setup", timeout_cmd["func"])
 
 
 class NormalizeTestNameTest(unittest.TestCase):
