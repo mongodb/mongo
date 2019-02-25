@@ -85,6 +85,7 @@ public:
         void set(JSContext* cx, JS::HandleObject o, JS::HandleValue value);
         bool has(JSContext* cx, JS::HandleObject o);
         bool hasOwn(JSContext* cx, JS::HandleObject o);
+        bool alreadyHasOwn(JSContext* cx, JS::HandleObject o);
         void define(
             JSContext* cx, JS::HandleObject o, unsigned attrs, JSNative getter, JSNative setter);
         void define(JSContext* cx, JS::HandleObject o, JS::HandleValue value, unsigned attrs);
@@ -138,8 +139,14 @@ public:
 
     void rename(Key key, const char* to);
 
+    // has field walks the prototype heirarchy
     bool hasField(Key key);
+
+    // has own field checks for the field directly on the object
     bool hasOwnField(Key key);
+
+    // already how own field checks for the field directly on the object, ignoring C++ hooks
+    bool alreadyHasOwnField(Key key);
 
     void callMethod(const char* name, const JS::HandleValueArray& args, JS::MutableHandleValue out);
     void callMethod(const char* name, JS::MutableHandleValue out);

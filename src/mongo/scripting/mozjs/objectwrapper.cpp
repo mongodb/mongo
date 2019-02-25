@@ -203,6 +203,41 @@ bool ObjectWrapper::Key::hasOwn(JSContext* cx, JS::HandleObject o) {
 
     switch (_type) {
         case Type::Field:
+            if (JS_HasOwnProperty(cx, o, _field, &has))
+                return has;
+            break;
+        case Type::Index: {
+            JS::RootedId id(cx);
+
+            // This is a little different because there is no JS_HasOwnElement
+            if (JS_IndexToId(cx, _idx, &id) && JS_HasOwnPropertyById(cx, o, id, &has))
+                return has;
+            break;
+        }
+        case Type::Id: {
+            JS::RootedId id(cx, _id);
+
+            if (JS_HasOwnPropertyById(cx, o, id, &has))
+                return has;
+            break;
+        }
+        case Type::InternedString: {
+            InternedStringId id(cx, _internedString);
+
+            if (JS_HasOwnPropertyById(cx, o, id, &has))
+                return has;
+            break;
+        }
+    }
+
+    throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to hasOwn value on a JSObject");
+}
+
+bool ObjectWrapper::Key::alreadyHasOwn(JSContext* cx, JS::HandleObject o) {
+    bool has;
+
+    switch (_type) {
+        case Type::Field:
             if (JS_AlreadyHasOwnProperty(cx, o, _field, &has))
                 return has;
             break;
@@ -226,7 +261,8 @@ bool ObjectWrapper::Key::hasOwn(JSContext* cx, JS::HandleObject o) {
         }
     }
 
-    throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to hasOwn value on a JSObject");
+    throwCurrentJSException(
+        cx, ErrorCodes::InternalError, "Failed to alreadyHasOwn value on a JSObject");
 }
 
 void ObjectWrapper::Key::del(JSContext* cx, JS::HandleObject o) {
@@ -454,6 +490,10 @@ bool ObjectWrapper::hasField(Key key) {
 
 bool ObjectWrapper::hasOwnField(Key key) {
     return key.hasOwn(_context, _object);
+}
+
+bool ObjectWrapper::alreadyHasOwnField(Key key) {
+    return key.alreadyHasOwn(_context, _object);
 }
 
 void ObjectWrapper::callMethod(const char* field,
