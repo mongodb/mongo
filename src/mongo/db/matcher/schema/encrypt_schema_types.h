@@ -126,12 +126,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    EncryptSchemaAnyType() = default;
+    EncryptSchemaAnyType(BSONElement element) : _element(element) {}
+
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
         builder->appendAs(_element, fieldName);
-    }
-
-    void setElement(const BSONElement& element) {
-        _element = element;
     }
 
 private:

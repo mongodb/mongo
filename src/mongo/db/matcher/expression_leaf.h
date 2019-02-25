@@ -119,6 +119,14 @@ public:
         return _rhs;
     }
 
+    /**
+     * Replaces the RHS element of this expression. The caller is responsible for ensuring that the
+     * BSONObj backing 'elem' outlives this MatchExpression.
+     */
+    void setData(BSONElement elem) {
+        _rhs = elem;
+    }
+
     const CollatorInterface* getCollator() const {
         return _collator;
     }

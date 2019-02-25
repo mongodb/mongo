@@ -45,9 +45,9 @@ using std::string;
 MatchExpression::MatchExpression(MatchType type) : _matchType(type) {}
 
 string MatchExpression::toString() const {
-    StringBuilder buf;
-    debugString(buf, 0);
-    return buf.str();
+    BSONObjBuilder bob;
+    serialize(&bob);
+    return bob.obj().toString();
 }
 
 void MatchExpression::_debugAddSpace(StringBuilder& debug, int level) const {
