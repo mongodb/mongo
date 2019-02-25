@@ -282,7 +282,6 @@ public:
 
 class RegexMatchExpression : public LeafMatchExpression {
 public:
-    static constexpr size_t kMaxPatternSize = 32764;
     static const std::set<char> kValidRegexFlags;
 
     RegexMatchExpression(StringData path, const BSONElement& e);

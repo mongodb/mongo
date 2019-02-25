@@ -7,7 +7,7 @@
     const coll = db.regex_limit;
     coll.drop();
 
-    const kMaxRegexPatternLen = 32764;
+    const kMaxRegexPatternLen = 32761;
 
     // Populate the collection with a document containing a very long string.
     assert.commandWorked(coll.insert({z: "c".repeat(100000)}));
@@ -20,8 +20,7 @@
     // Test that a regex pattern exceeding the limit fails.
     const patternTooLong = "c".repeat(kMaxRegexPatternLen + 1);
     assert.commandFailedWithCode(coll.runCommand("find", {filter: {z: {$regex: patternTooLong}}}),
-                                 ErrorCodes.BadValue);
+                                 51091);
     assert.commandFailedWithCode(
-        coll.runCommand("find", {filter: {z: {$in: [new RegExp(patternTooLong)]}}}),
-        ErrorCodes.BadValue);
+        coll.runCommand("find", {filter: {z: {$in: [new RegExp(patternTooLong)]}}}), 51091);
 }());

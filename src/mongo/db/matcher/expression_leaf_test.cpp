@@ -716,8 +716,7 @@ TEST(RegexMatchExpression, MatchesElementExact) {
 
 TEST(RegexMatchExpression, TooLargePattern) {
     string tooLargePattern(50 * 1000, 'z');
-    ASSERT_THROWS_CODE(
-        RegexMatchExpression("a", tooLargePattern, ""), AssertionException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(RegexMatchExpression("a", tooLargePattern, ""), AssertionException, 51091);
 }
 
 TEST(RegexMatchExpression, MatchesElementSimplePrefix) {
@@ -976,15 +975,20 @@ TEST(RegexMatchExpression, RegexOptionsStringCannotContainEmbeddedNullByte) {
     }
 }
 
-TEST(RegexMatchExpression, MalformedRegexAcceptedButMatchesNothing) {
-    RegexMatchExpression regex("a", "[(*ACCEPT)", "");
-    ASSERT_FALSE(regex.matchesBSON(BSON("a"
-                                        << "")));
-    ASSERT_FALSE(regex.matchesBSON(BSON("a"
-                                        << "[")));
+TEST(RegexMatchExpression, MalformedRegexNotAccepted) {
+    ASSERT_THROWS_CODE(RegexMatchExpression("a",  // path
+                                            "[",  // regex
+                                            ""    // options
+                                            ),
+                       AssertionException,
+                       51091);
 }
 
-TEST(RegexMatchExpression, RegexAcceptsUCPOption) {
+TEST(RegexMatchExpression, MalformedRegexWithStartOptionNotAccepted) {
+    ASSERT_THROWS_CODE(RegexMatchExpression("a", "[(*ACCEPT)", ""), AssertionException, 51091);
+}
+
+TEST(RegexMatchExpression, RegexAcceptsUCPStartOption) {
     RegexMatchExpression regex("a", "(*UCP)(\\w|\u304C)", "");
     ASSERT(regex.matchesBSON(BSON("a"
                                   << "k")));

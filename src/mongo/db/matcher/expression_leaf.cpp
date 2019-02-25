@@ -217,7 +217,6 @@ inline pcrecpp::RE_Options flags2options(const char* flags) {
 }
 
 const std::set<char> RegexMatchExpression::kValidRegexFlags = {'i', 'm', 's', 'x'};
-constexpr size_t RegexMatchExpression::kMaxPatternSize;
 
 RegexMatchExpression::RegexMatchExpression(StringData path, const BSONElement& e)
     : LeafMatchExpression(REGEX, path),
@@ -237,9 +236,6 @@ RegexMatchExpression::RegexMatchExpression(StringData path, StringData regex, St
 }
 
 void RegexMatchExpression::_init() {
-    uassert(
-        ErrorCodes::BadValue, "Regular expression is too long", _regex.size() <= kMaxPatternSize);
-
     uassert(ErrorCodes::BadValue,
             "Regular expression cannot contain an embedded null byte",
             _regex.find('\0') == std::string::npos);
@@ -247,6 +243,10 @@ void RegexMatchExpression::_init() {
     uassert(ErrorCodes::BadValue,
             "Regular expression options string cannot contain an embedded null byte",
             _flags.find('\0') == std::string::npos);
+
+    uassert(51091,
+            str::stream() << "Regular expression is invalid: " << _re->error(),
+            _re->error().empty());
 }
 
 RegexMatchExpression::~RegexMatchExpression() {}
