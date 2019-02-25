@@ -120,7 +120,7 @@ class EnterpriseDistro(packager.Distro):
         # pylint: disable=too-many-return-statements
         if arch == "ppc64le":
             if self.dname == 'ubuntu':
-                return ["ubuntu1604"]
+                return ["ubuntu1604", "ubuntu1804"]
             if self.dname == 'redhat':
                 return ["rhel71"]
             return []
