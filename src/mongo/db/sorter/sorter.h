@@ -205,10 +205,6 @@ public:
 
     virtual ~Sorter() {}
 
-    bool usedDisk() {
-        return _usedDisk;
-    }
-
 protected:
     Sorter() {}  // can only be constructed as a base
 };

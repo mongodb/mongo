@@ -546,7 +546,6 @@ private:
     void spill() {
         invariant(!_done);
 
-        this->_usedDisk = true;
         if (_data.empty())
             return;
 
@@ -833,7 +832,6 @@ private:
     void spill() {
         invariant(!_done);
 
-        this->_usedDisk = true;
         if (_data.empty())
             return;
 

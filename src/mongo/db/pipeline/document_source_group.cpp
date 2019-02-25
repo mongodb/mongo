@@ -894,7 +894,6 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceGroup::getMergeSources() 
 
     return {pMerger};
 }
-}
 
 }  // namespace mongo
 
