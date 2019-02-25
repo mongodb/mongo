@@ -481,9 +481,9 @@ Status NetworkInterfaceTL::setAlarm(Date_t when, unique_function<void()> action)
             if (nowVal < when) {
                 warning() << "Alarm returned early. Expected at: " << when
                           << ", fired at: " << nowVal;
-                const auto status = setAlarm(when, std::move(action));
-                if ((!status.isOK()) && (status != ErrorCodes::ShutdownInProgress)) {
-                    fassertFailedWithStatus(50785, status);
+                if (const auto alarmStatus = setAlarm(when, std::move(action));
+                    (!alarmStatus.isOK()) && (alarmStatus != ErrorCodes::ShutdownInProgress)) {
+                    fassertFailedWithStatus(50785, alarmStatus);
                 }
 
                 return;
