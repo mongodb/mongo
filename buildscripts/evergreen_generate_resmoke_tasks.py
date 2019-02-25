@@ -165,6 +165,7 @@ def divide_tests_into_suites(tests_runtimes, max_time_seconds, max_suites=None):
     last_test_processed = len(tests_runtimes)
     LOGGER.debug("Determines suites for runtime: %ds", max_time_seconds)
     for idx, (test_file, runtime) in enumerate(tests_runtimes):
+        LOGGER.debug("Adding test %s, runtime %d", test_file, runtime)
         if current_suite.get_runtime() + runtime > max_time_seconds:
             LOGGER.debug("Runtime(%d) + new test(%d) > max(%d)", current_suite.get_runtime(),
                          runtime, max_time_seconds)
@@ -348,6 +349,7 @@ class EvergreenConfigGenerator(object):
     def _generate_task(self, sub_suite_name, sub_task_name, max_test_runtime=None,
                        expected_suite_runtime=None):
         """Generate evergreen config for a resmoke task."""
+        LOGGER.debug("Generating task for: %s", sub_suite_name)
         spec = TaskSpec(sub_task_name)
         self._set_task_distro(spec)
         self.task_specs.append(spec)
@@ -371,7 +373,12 @@ class EvergreenConfigGenerator(object):
         for idx, suite in enumerate(self.suites):
             sub_task_name = taskname.name_generated_task(self.options.task, idx, len(self.suites),
                                                          self.options.variant)
-            self._generate_task(suite.name, sub_task_name, suite.max_runtime, suite.get_runtime())
+            max_runtime = None
+            total_runtime = None
+            if suite.should_overwrite_timeout():
+                max_runtime = suite.max_runtime
+                total_runtime = suite.get_runtime()
+            self._generate_task(suite.name, sub_task_name, max_runtime, total_runtime)
 
         # Add the misc suite
         misc_suite_name = "{0}_misc".format(self.options.suite)
@@ -473,6 +480,7 @@ class Suite(object):
         self.tests = []
         self.total_runtime = 0
         self.max_runtime = 0
+        self.tests_with_runtime_info = 0
 
     def add_test(self, test_file, runtime):
         """Add the given test to this suite."""
@@ -480,8 +488,19 @@ class Suite(object):
         self.tests.append(test_file)
         self.total_runtime += runtime
 
+        if runtime != 0:
+            self.tests_with_runtime_info += 1
+
         if runtime > self.max_runtime:
             self.max_runtime = runtime
+
+    def should_overwrite_timeout(self):
+        """
+        Whether the timeout for this suite should be overwritten.
+
+        We should only overwrite the timeout if we have runtime info for all tests.
+        """
+        return len(self.tests) == self.tests_with_runtime_info
 
     def get_runtime(self):
         """Get the current average runtime of all the tests currently in this suite."""
