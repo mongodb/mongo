@@ -18,6 +18,12 @@ import urlparse
 import requests
 import yaml
 
+from shrub.config import Configuration
+from shrub.command import CommandDefinition
+from shrub.task import TaskDependency
+from shrub.variant import DisplayTaskDefinition
+from shrub.variant import TaskSpec
+
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,7 +50,7 @@ def parse_command_line():
 
     parser = optparse.OptionParser(usage="Usage: %prog [options] [resmoke command]")
 
-    parser.add_option("--maxRevisions", dest="max_revisions", default=25,
+    parser.add_option("--maxRevisions", dest="max_revisions", type=int, default=25,
                       help=("Maximum number of revisions to check for changes. Default is"
                             " %default."))
 
@@ -59,10 +65,18 @@ def parse_command_line():
                       help=("The buildvariant the tasks will execute on. Required when"
                             " generating the JSON file with test executor information"))
 
+    parser.add_option("--distro", dest="distro", default=None,
+                      help=("The distro the tasks will execute on. Can only be specified"
+                            " with --generateTasksFile."))
+
     parser.add_option("--checkEvergreen", dest="check_evergreen", default=False,
                       action="store_true",
                       help=("Checks Evergreen for the last commit that was scheduled."
                             " This way all the tests that haven't been burned in will be run."))
+
+    parser.add_option("--generateTasksFile", dest="generate_tasks_file", default=None,
+                      help=("Write an Evergreen generate.tasks JSON file. If this option is"
+                            " specified then no tests will be executed."))
 
     parser.add_option("--noExec", dest="no_exec", default=False, action="store_true",
                       help="Do not run resmoke loop on new tests.")
@@ -76,19 +90,19 @@ def parse_command_line():
     parser.add_option("--testListOutfile", dest="test_list_outfile", default=None,
                       help="Write a JSON file with test executor information.")
 
-    parser.add_option("--repeatTests", dest="repeat_tests_num", default=None,
+    parser.add_option("--repeatTests", dest="repeat_tests_num", default=None, type=int,
                       help="The number of times to repeat each test. If --repeatTestsSecs is not"
                       " specified then this will be set to {}.".format(REPEAT_SUITES))
 
-    parser.add_option("--repeatTestsMin", dest="repeat_tests_min", default=None,
+    parser.add_option("--repeatTestsMin", dest="repeat_tests_min", default=None, type=int,
                       help="The minimum number of times to repeat each test when --repeatTestsSecs"
                       " is specified.")
 
-    parser.add_option("--repeatTestsMax", dest="repeat_tests_max", default=None,
+    parser.add_option("--repeatTestsMax", dest="repeat_tests_max", default=None, type=int,
                       help="The maximum number of times to repeat each test when --repeatTestsSecs"
                       " is specified.")
 
-    parser.add_option("--repeatTestsSecs", dest="repeat_tests_secs", default=None,
+    parser.add_option("--repeatTestsSecs", dest="repeat_tests_secs", default=None, type=float,
                       help="Time, in seconds, to repeat each test. Note that this option is"
                       " mutually exclusive with with --repeatTests.")
 
@@ -96,43 +110,43 @@ def parse_command_line():
     # a complete resmoke.py command line without accidentally parsing its options.
     parser.disable_interspersed_args()
 
-    values, args = parser.parse_args()
-    validate_options(parser, values)
+    options, args = parser.parse_args()
+    validate_options(parser, options)
 
-    return values, args
+    return options, args
 
 
-def validate_options(parser, values):
+def validate_options(parser, options):
     """Validate command line options."""
 
-    if values.repeat_tests_max:
-        if values.repeat_tests_secs is None:
+    if options.repeat_tests_max:
+        if options.repeat_tests_secs is None:
             parser.error("Must specify --repeatTestsSecs with --repeatTestsMax")
 
-        if values.repeat_tests_min and values.repeat_tests_min > values.repeat_tests_max:
+        if options.repeat_tests_min and options.repeat_tests_min > options.repeat_tests_max:
             parser.error("--repeatTestsSecsMin is greater than --repeatTestsMax")
 
-    if values.repeat_tests_min and values.repeat_tests_secs is None:
+    if options.repeat_tests_min and options.repeat_tests_secs is None:
         parser.error("Must specify --repeatTestsSecs with --repeatTestsMin")
 
-    if values.repeat_tests_num and values.repeat_tests_secs:
+    if options.repeat_tests_num and options.repeat_tests_secs:
         parser.error("Cannot specify --repeatTests and --repeatTestsSecs")
 
-    if values.test_list_file is None and values.buildvariant is None:
+    if options.test_list_file is None and options.buildvariant is None:
         parser.error("Must specify --buildVariant to find changed tests")
 
-    if values.buildvariant:
+    if options.buildvariant:
         evg_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
-        if not evg_conf.get_variant(values.buildvariant):
+        if not evg_conf.get_variant(options.buildvariant):
             parser.error("Buildvariant '{}' not found in {}, select from:\n\t{}".format(
-                values.buildvariant, EVERGREEN_FILE, "\n\t".join(sorted(evg_conf.variant_names))))
+                options.buildvariant, EVERGREEN_FILE, "\n\t".join(sorted(evg_conf.variant_names))))
 
 
 def find_last_activated_task(revisions, variant, branch_name):
     """Get the git hash of the most recently activated build before this one."""
 
     project = "mongodb-mongo-" + branch_name
-    build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
+    build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace("-", "_")
 
     evg_cfg = evergreen_client.read_evg_config()
     if evg_cfg is not None and "api_server_host" in evg_cfg:
@@ -234,7 +248,7 @@ def find_excludes(selector_file):
         yml = yaml.load(fstream)
 
     try:
-        js_test = yml['selector']['js_test']
+        js_test = yml["selector"]["js_test"]
     except KeyError:
         raise Exception(
             "The selector file " + selector_file + " is missing the 'selector.js_test' key")
@@ -280,13 +294,39 @@ def create_executor_list(suites, exclude_suites):
     return memberships
 
 
-def create_task_list(evergreen_conf, buildvariant, suites, exclude_tasks):
+def _get_task_name(task):
+    """Return the task var from a "generate resmoke task" instead of the task name."""
+
+    if task.is_generate_resmoke_task:
+        return task.get_vars_task_name(task.generate_resmoke_tasks_command["vars"])
+
+    return task.name
+
+
+def _set_resmoke_args(task):
+    """Set the resmoke args to include the --suites option.
+
+    The suite name from "generate resmoke tasks" can be specified as a var or directly in the
+    resmoke_args.
+    """
+
+    resmoke_args = task.combined_resmoke_args
+    suite_name = evergreen.ResmokeArgs.get_arg(resmoke_args, "suites")
+    if task.is_generate_resmoke_task:
+        suite_name = task.get_vars_suite_name(task.generate_resmoke_tasks_command["vars"])
+
+    return evergreen.ResmokeArgs.get_updated_arg(resmoke_args, "suites", suite_name)
+
+
+def create_task_list(  #pylint: disable=too-many-locals
+        evergreen_conf, buildvariant, suites, exclude_tasks):
     """Find associated tasks for the specified buildvariant and suites.
 
     Returns a dict keyed by task_name, with executor, resmoke_args & tests, i.e.,
     {'jsCore_small_oplog':
         {'resmoke_args': '--suites=core_small_oplog --storageEngine=inMemory',
-         'tests': ['jstests/core/all2.js', 'jstests/core/all3.js']}
+         'tests': ['jstests/core/all2.js', 'jstests/core/all3.js'],
+         'use_multiversion': '/data/multiversion'}
     }
     """
 
@@ -295,33 +335,29 @@ def create_task_list(evergreen_conf, buildvariant, suites, exclude_tasks):
         print("Buildvariant '{}' not found".format(buildvariant))
         sys.exit(1)
 
-    # Find all the buildvariant task's resmoke_args.
-    variant_task_args = {}
+    # Find all the buildvariant tasks.
     exclude_tasks_set = set(exclude_tasks)
-    for task in evg_buildvariant.tasks:
-        if task.name not in exclude_tasks_set:
-            # Using 'task.combined_resmoke_args' to include the variant's test_flags and
-            # allow the storage engine to be overridden.
-            resmoke_args = task.combined_resmoke_args
-            if resmoke_args:
-                variant_task_args[task.name] = resmoke_args
+    variant_task = {
+        _get_task_name(task): task
+        for task in evg_buildvariant.tasks
+        if task.name not in exclude_tasks_set and task.combined_resmoke_args
+    }
 
-    # Create the list of tasks to run for the specified suite.
-    tasks_to_run = {}
-    for suite in suites.keys():
-        for task_name, task_arg in variant_task_args.items():
-            # Find the resmoke_args for matching suite names.
-            if re.compile('--suites=' + suite + r'(?:\s+|$)').match(task_arg):
-                tasks_to_run[task_name] = {"resmoke_args": task_arg, "tests": suites[suite]}
-
-    return tasks_to_run
+    # Return the list of tasks to run for the specified suite.
+    return {
+        task_name: {
+            "resmoke_args": _set_resmoke_args(task), "tests": suites[task.resmoke_suite],
+            "use_multiversion": task.multiversion_path
+        }
+        for task_name, task in variant_task.items() if task.resmoke_suite in suites
+    }
 
 
 def _write_json_file(json_data, pathname):
     """Write out a JSON file."""
 
     with open(pathname, "w") as fstream:
-        json.dump(json_data, fstream)
+        json.dump(json_data, fstream, indent=4)
 
 
 def _load_tests_file(pathname):
@@ -355,24 +391,75 @@ def _update_report_data(data_to_update, pathname, task):
     data_to_update["results"] += report_data["results"]
 
 
-def _set_resmoke_cmd(values, args):
-    """Build the resmoke command, if a resmoke.py command wasn't passed in."""
+def get_resmoke_repeat_options(options):
+    """Build the resmoke repeat options."""
 
-    if values.repeat_tests_secs:
-        repeat_options = "--repeatTestsSecs={}".format(values.repeat_tests_secs)
-        if values.repeat_tests_min:
-            repeat_options += " --repeatTestsMin={}".format(values.repeat_tests_min)
-        if values.repeat_tests_max:
-            repeat_options += " --repeatTestsMax={}".format(values.repeat_tests_max)
+    if options.repeat_tests_secs:
+        repeat_options = "--repeatTestsSecs={}".format(options.repeat_tests_secs)
+        if options.repeat_tests_min:
+            repeat_options += " --repeatTestsMin={}".format(options.repeat_tests_min)
+        if options.repeat_tests_max:
+            repeat_options += " --repeatTestsMax={}".format(options.repeat_tests_max)
     else:
         # To maintain previous default behavior, we set repeat_suites to 2 if
-        # values.repeat_tests_secs and values.repeat_tests_num are both not specified.
-        repeat_suites = values.repeat_tests_num if values.repeat_tests_num else REPEAT_SUITES
+        # options.repeat_tests_secs and options.repeat_tests_num are both not specified.
+        repeat_suites = options.repeat_tests_num if options.repeat_tests_num else REPEAT_SUITES
         repeat_options = "--repeatSuites={}".format(repeat_suites)
+
+    return repeat_options
+
+
+def _set_resmoke_cmd(options, args):
+    """Build the resmoke command, if a resmoke.py command wasn't passed in."""
+
     new_args = copy.deepcopy(args) if args else ["python", "buildscripts/resmoke.py"]
-    new_args += repeat_options.split()
+    new_args += get_resmoke_repeat_options(options).split()
 
     return new_args
+
+
+def _sub_task_name(variant, task, task_num):
+    """Return the generated sub-task name."""
+    return "burn_in:{}_{}_{}".format(variant, task, task_num)
+
+
+def create_generate_tasks_file(options, tests_by_task):
+    """Create the Evergreen generate.tasks file."""
+
+    if not tests_by_task:
+        return
+
+    evg_config = Configuration()
+    task_specs = []
+    task_names = ["burn_in_tests_gen"]
+    for task in sorted(tests_by_task):
+        multiversion_path = tests_by_task[task].get("use_multiversion")
+        for test_num, test in enumerate(tests_by_task[task]["tests"]):
+            sub_task_name = _sub_task_name(options.buildvariant, task, test_num)
+            task_names.append(sub_task_name)
+            evg_sub_task = evg_config.task(sub_task_name)
+            evg_sub_task.dependency(TaskDependency("compile"))
+            task_spec = TaskSpec(sub_task_name)
+            if options.distro:
+                task_spec.distro(options.distro)
+            task_specs.append(task_spec)
+            run_tests_vars = {
+                "resmoke_args":
+                    "{} {} {}".format(tests_by_task[task]["resmoke_args"],
+                                      get_resmoke_repeat_options(options), test),
+            }
+            commands = []
+            commands.append(CommandDefinition().function("do setup"))
+            if multiversion_path:
+                run_tests_vars["task_path_suffix"] = multiversion_path
+                commands.append(CommandDefinition().function("do multiversion setup"))
+            commands.append(CommandDefinition().function("run tests").vars(run_tests_vars))
+            evg_sub_task.commands(commands)
+
+    display_task = DisplayTaskDefinition("burn_in_tests").execution_tasks(task_names)
+    evg_config.variant(options.buildvariant).tasks(task_specs).display_task(display_task)
+
+    _write_json_file(evg_config.to_map(), options.generate_tasks_file)
 
 
 def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):
@@ -405,17 +492,17 @@ def run_tests(no_exec, tests_by_task, resmoke_cmd, report_file):
 def main():
     """Execute Main program."""
 
-    values, args = parse_command_line()
+    options, args = parse_command_line()
 
-    resmoke_cmd = _set_resmoke_cmd(values, args)
+    resmoke_cmd = _set_resmoke_cmd(options, args)
 
     # Load the dict of tests to run.
-    if values.test_list_file:
-        tests_by_task = _load_tests_file(values.test_list_file)
+    if options.test_list_file:
+        tests_by_task = _load_tests_file(options.test_list_file)
         # If there are no tests to run, carry on.
         if tests_by_task is None:
             test_results = {"failures": 0, "results": []}
-            _write_json_file(test_results, values.report_file)
+            _write_json_file(test_results, options.report_file)
             sys.exit(0)
 
     # Run the executor finder.
@@ -423,8 +510,9 @@ def main():
         # Parse the Evergreen project configuration file.
         evergreen_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
 
-        changed_tests = find_changed_tests(values.branch, values.base_commit, values.max_revisions,
-                                           values.buildvariant, values.check_evergreen)
+        changed_tests = find_changed_tests(options.branch, options.base_commit,
+                                           options.max_revisions, options.buildvariant,
+                                           options.check_evergreen)
         exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
         changed_tests = filter_tests(changed_tests, exclude_tests)
 
@@ -432,15 +520,19 @@ def main():
             suites = resmokelib.suitesconfig.get_suites(suite_files=SUITE_FILES,
                                                         test_files=changed_tests)
             tests_by_executor = create_executor_list(suites, exclude_suites)
-            tests_by_task = create_task_list(evergreen_conf, values.buildvariant, tests_by_executor,
-                                             exclude_tasks)
+            tests_by_task = create_task_list(evergreen_conf, options.buildvariant,
+                                             tests_by_executor, exclude_tasks)
         else:
             print("No new or modified tests found.")
             tests_by_task = {}
-        if values.test_list_outfile:
-            _write_json_file(tests_by_task, values.test_list_outfile)
 
-    run_tests(values.no_exec, tests_by_task, resmoke_cmd, values.report_file)
+        if options.test_list_outfile:
+            _write_json_file(tests_by_task, options.test_list_outfile)
+
+    if options.generate_tasks_file:
+        create_generate_tasks_file(options, tests_by_task)
+    else:
+        run_tests(options.no_exec, tests_by_task, resmoke_cmd, options.report_file)
 
 
 if __name__ == "__main__":

@@ -4,8 +4,6 @@ The API also provides methods to access specific fields present in the mongodb/m
 configuration file.
 """
 
-from __future__ import print_function
-
 import datetime
 import distutils.spawn  # pylint: disable=no-name-in-module
 import fnmatch
@@ -118,26 +116,102 @@ class Task(object):
         """Get the list of task names this task depends on."""
         return self.raw.get("depends_on", [])
 
+    def _find_func_command(self, func_command):
+        """Return the 'func_command' if found, or None."""
+        for command in self.raw.get("commands", []):
+            if command.get("func") == func_command:
+                return command
+        return None
+
+    @property
+    def generate_resmoke_tasks_command(self):
+        """Return the 'generate resmoke tasks' command if found, or None."""
+        return self._find_func_command("generate resmoke tasks")
+
+    @property
+    def is_generate_resmoke_task(self):
+        """Return True if 'generate resmoke tasks' command is found."""
+        return self.generate_resmoke_tasks_command is not None
+
+    @property
+    def run_tests_command(self):
+        """Return the 'run tests' command if found, or None."""
+        return self._find_func_command("run tests")
+
+    @property
+    def is_run_tests_task(self):
+        """Return True if 'run_tests' command is found."""
+        return self.run_tests_command is not None
+
+    @property
+    def multiversion_setup_command(self):
+        """Return the 'do multiversion setup' command if found, or None."""
+        return self._find_func_command("do multiversion setup")
+
+    @property
+    def is_multiversion_task(self):
+        """Return True if a multiversion path is found."""
+        return self.multiversion_setup_command is not None or self.multiversion_path is not None
+
+    @staticmethod
+    def get_vars_task_name(command_vars):
+        """Return the command_vars task name."""
+        if not isinstance(command_vars, dict):
+            raise TypeError("Must specify a dict")
+        task_name = command_vars.get("task")
+        if task_name is None:
+            raise ValueError("Missing task key")
+        return task_name
+
+    @staticmethod
+    def get_vars_suite_name(command_vars):
+        """Return the command_vars task or suite value, suite value overrides the task value."""
+        if not isinstance(command_vars, dict):
+            raise TypeError("Must specify a dict")
+        suite = command_vars.get("task")
+        if "suite" in command_vars:
+            suite = command_vars["suite"]
+
+        if suite is None:
+            raise ValueError("Missing task key or suite key")
+
+        return suite
+
+    @property
+    def multiversion_path(self):
+        """Get the multiversion path if task uses multiversion setup, or None."""
+        if self.is_run_tests_task:
+            return self.run_tests_command.get("vars", {}).get("task_path_suffix")
+
+        if self.is_generate_resmoke_task:
+            return self.generate_resmoke_tasks_command.get("vars", {}).get("use_multiversion")
+
+        return None
+
     @property
     def resmoke_args(self):
         """Get the resmoke_args from 'run tests' function if defined, or None."""
-        for command in self.raw.get("commands", []):
-            if command.get("func") == "run tests":
-                return command.get("vars", {}).get("resmoke_args")
-            if command.get("func") == "generate resmoke tasks":
-                task_vars = command.get("vars", {})
-                suite = task_vars.get("task")
-                if "suite" in task_vars:
-                    suite = task_vars["suite"]
-                return "--suites={0} {1}".format(suite, task_vars.get("resmoke_args"))
+        if self.is_run_tests_task:
+            return self.run_tests_command.get("vars", {}).get("resmoke_args")
+
+        if self.is_generate_resmoke_task:
+            command_vars = self.generate_resmoke_tasks_command.get("vars", {})
+            return "--suites={0} {1}".format(
+                self.get_vars_suite_name(command_vars), command_vars.get("resmoke_args"))
         return None
 
     @property
     def resmoke_suite(self):
-        """Get the --suites option in the resmoke_args of 'run tests' if defined, or None."""
+        """Get the --suites option in the resmoke_args of 'run tests' if defined, or None.
+
+        Raise an exception if the --suites options contains more than one suite name.
+        """
         args = self.resmoke_args
         if args:
-            return ResmokeArgs.get_arg(args, "suites")
+            suites = ResmokeArgs.get_arg(args, "suites")
+            if suites and "," in suites:
+                raise RuntimeError("More than one resmoke suite discovered in {}".format(suites))
+            return suites
         return None
 
     @property
@@ -287,9 +361,37 @@ class ResmokeArgs(object):
     """ResmokeArgs class."""
 
     @staticmethod
+    def _arg_regex(name):
+        """Return the regex for a resmoke arg."""
+        return re.compile(r"(?P<name_value>--{}[=\s](?P<value>([(\w+,\w+)\w]+)))".format(name))
+
+    @staticmethod
+    def _get_first_match(resmoke_args, name, group_name=None):
+        """Return first matching occurrence and matching group_name, or None."""
+        matches = re.findall(ResmokeArgs._arg_regex(name), resmoke_args)
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise RuntimeError("More than one match for --{} discovered in {}".format(
+                name, resmoke_args))
+        return re.search(ResmokeArgs._arg_regex(name), resmoke_args).group(group_name)
+
+    @staticmethod
     def get_arg(resmoke_args, name):
-        """Return the value from --'name' in the 'resmoke_args' string or None if not found."""
-        match = re.search(r"--{}[=\s](?P<value>\w+)".format(name), resmoke_args)
-        if match:
-            return match.group("value")
-        return None
+        """Return the value from the first --'name' in the 'resmoke_args' string or None.
+
+        Raise an excpetion in the case there is more than one occurrence of '--name'.
+        """
+        return ResmokeArgs._get_first_match(resmoke_args, name, "value")
+
+    @staticmethod
+    def get_updated_arg(resmoke_args, name, value):
+        """Add or update the 'resmoke_args' string and set the 'value' from the first --'name'.
+
+        Raise an exception in the case there is more than one occurrence of '--name'.
+        """
+        name_value = ResmokeArgs._get_first_match(resmoke_args, name, "name_value")
+        if name_value:
+            new_name_value = "--{}={}".format(name, value)
+            return resmoke_args.replace(name_value, new_name_value)
+        return "{} --{}={}".format(resmoke_args, name, value)

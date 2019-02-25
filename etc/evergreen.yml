@@ -4616,6 +4616,7 @@ tasks:
         cp ../src/dbtest${exe} .
         pushd ../src
         ${activate_virtualenv}
+        $python -m pip install -r etc/pip/evgtest-requirements.txt
         popd
         # Capture a list of new and modified tests.
         build_variant=${build_variant}
