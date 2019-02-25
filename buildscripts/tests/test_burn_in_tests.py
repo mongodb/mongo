@@ -20,21 +20,118 @@ EVG_CLIENT = "buildscripts.client.evergreen"
 GIT = "buildscripts.git"
 RESMOKELIB = "buildscripts.resmokelib"
 
+GENERATE_RESMOKE_TASKS_NAME = "this_is_a_gen_task"
+GET_GENERATE_RESMOKE_TASKS_NAME = lambda _: GENERATE_RESMOKE_TASKS_NAME
+GENERATE_RESMOKE_TASKS_COMMAND = {
+    "func": "generate resmoke tasks", "vars": {
+        "task": GENERATE_RESMOKE_TASKS_NAME, "suite": "suite3",
+        "resmoke_args": "--shellWriteMode=commands"
+    }
+}
 
-class ValidateOptions(unittest.TestCase):
-    class ParserError(Exception):
-        pass
+GENERATE_RESMOKE_TASKS_COMMAND2 = {
+    "func": "generate resmoke tasks",
+    "vars": {"task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands"}
+}
 
-    @staticmethod
-    def _raise_parser_error(err):
-        raise ValidateOptions.ParserError(err)
+MULTIVERSION_PATH = "/data/multiversion"
+GENERATE_RESMOKE_TASKS_MULTIVERSION_COMMAND = {
+    "func": "generate resmoke tasks", "vars": {
+        "task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands",
+        "use_multiversion": MULTIVERSION_PATH
+    }
+}
 
-    @staticmethod
-    def _mock_parser():
-        parser = Mock()
-        parser.error = ValidateOptions._raise_parser_error
-        return parser
+MULTIVERSION_COMMAND = {"func": "do multiversion setup"}
+RUN_TESTS_MULTIVERSION_COMMAND = {
+    "func": "run tests", "vars": {
+        "task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands",
+        "task_path_suffix": MULTIVERSION_PATH
+    }
+}
 
+
+def tasks_mock(  #pylint: disable=too-many-arguments
+        tasks, generate_resmoke_tasks_command=None, get_vars_task_name=None, run_tests_command=None,
+        multiversion_path=None, multiversion_setup_command=None):
+    task_list = Mock()
+    task_list.tasks = []
+    for idx, task in enumerate(tasks):
+        task_list.tasks.append(Mock())
+        task_list.tasks[idx].is_generate_resmoke_task = generate_resmoke_tasks_command is not None
+        task_list.tasks[idx].is_run_tests_task = run_tests_command is not None
+        task_list.tasks[idx].is_multiversion_task = multiversion_path is not None
+        task_list.tasks[idx].generate_resmoke_tasks_command = generate_resmoke_tasks_command
+        task_list.tasks[idx].run_tests_command = run_tests_command
+        task_list.tasks[idx].get_vars_task_name = get_vars_task_name
+        task_list.tasks[idx].name = task["name"]
+        resmoke_args = task.get("combined_resmoke_args")
+        task_list.tasks[idx].combined_resmoke_args = resmoke_args
+        task_list.tasks[idx].resmoke_suite = evg.ResmokeArgs.get_arg(
+            resmoke_args, "suites") if resmoke_args else None
+        task_list.tasks[idx].multiversion_path = multiversion_path
+        task_list.tasks[idx].multiversion_setup_command = multiversion_setup_command
+
+    return task_list
+
+
+VARIANTS = {
+    "variantall":
+        tasks_mock([{"name": "task1", "combined_resmoke_args": "--suites=suite1 var1arg1"},
+                    {"name": "task2", "combined_resmoke_args": "--suites=suite1 var1arg2"},
+                    {"name": "task3", "combined_resmoke_args": "--suites=suite1 var1arg3"}]),
+    "variant1":
+        tasks_mock([{"name": "task1", "combined_resmoke_args": "--suites=suite1 var1arg1"},
+                    {"name": "task2"}]),
+    "variant2":
+        tasks_mock([{"name": "task2", "combined_resmoke_args": "var2arg1"},
+                    {"name": "task3", "combined_resmoke_args": "--suites=suite3 var2arg3"}]),
+    "variant3":
+        tasks_mock([{"name": "task2", "combined_resmoke_args": "var3arg1"}]),
+    "variant4":
+        tasks_mock([]),
+    "variant_multiversion":
+        tasks_mock(
+            [{"name": "multiversion_task", "combined_resmoke_args": "--suites=suite3 vararg"}],
+            run_tests_command=RUN_TESTS_MULTIVERSION_COMMAND,
+            multiversion_setup_command=RUN_TESTS_MULTIVERSION_COMMAND,
+            multiversion_path=MULTIVERSION_PATH),
+    "variant_generate_tasks":
+        tasks_mock([{
+            "name": GENERATE_RESMOKE_TASKS_NAME, "combined_resmoke_args": "--suites=suite3 vararg"
+        }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND,
+                   get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
+    "variant_generate_tasks_no_suite":
+        tasks_mock([{
+            "name": GENERATE_RESMOKE_TASKS_NAME, "combined_resmoke_args": "--suites=suite3 vararg"
+        }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND2,
+                   get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
+    "variant_generate_tasks_diff_names":
+        tasks_mock([{
+            "name": "gen_task_name_different_from_vars_task_name",
+            "combined_resmoke_args": "--suites=suite3 vararg"
+        }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND,
+                   get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
+    "variant_generate_tasks_multiversion":
+        tasks_mock([{
+            "name": GENERATE_RESMOKE_TASKS_NAME, "combined_resmoke_args": "--suites=suite3 vararg"
+        }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_MULTIVERSION_COMMAND,
+                   get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME,
+                   multiversion_path=MULTIVERSION_PATH),
+}
+
+EVERGREEN_CONF = Mock()
+EVERGREEN_CONF.get_variant = VARIANTS.get
+EVERGREEN_CONF.variant_names = VARIANTS.keys()
+
+
+def _mock_parser():
+    parser = Mock()
+    parser.error = Mock()
+    return parser
+
+
+class TestValidateOptions(unittest.TestCase):
     @staticmethod
     def _mock_options():
         options = Mock()
@@ -43,109 +140,132 @@ class ValidateOptions(unittest.TestCase):
         options.repeat_tests_min = None
         options.repeat_tests_secs = None
         options.buildvariant = None
+        options.run_buildvariant = None
         options.test_list_file = None
         return options
 
     def test_validate_options_listfile_buildvariant(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.test_list_file = "list_file.json"
         options.buildvariant = "variant1"
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_not_called()
 
     def test_validate_options_nolistfile_buildvariant(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.buildvariant = "variant1"
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_not_called()
 
     def test_validate_options_listfile_nobuildvariant(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.test_list_file = "list_file.json"
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_not_called()
 
     def test_validate_options_no_listfile_no_buildvariant(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            with self.assertRaises(self.ParserError):
-                burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_called()
 
     def test_validate_options_buildvariant(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.buildvariant = "variant1"
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_not_called()
+
+    def test_validate_options_run_buildvariant(self):
+        mock_parser = _mock_parser()
+        options = self._mock_options()
+        options.buildvariant = "variant1"
+        options.run_buildvariant = "variant1"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_not_called()
 
     def test_validate_options_bad_buildvariant(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.buildvariant = "badvariant1"
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            with self.assertRaises(self.ParserError):
-                burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_called()
+
+    def test_validate_options_bad_run_buildvariant(self):
+        mock_parser = _mock_parser()
+        options = self._mock_options()
+        options.run_buildvariant = "badvariant1"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_called()
 
     def test_validate_options_tests_max_no_tests_secs(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.repeat_tests_max = 3
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            with self.assertRaises(self.ParserError):
-                burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_called()
 
     def test_validate_options_tests_min_no_tests_secs(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.repeat_tests_min = 3
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            with self.assertRaises(self.ParserError):
-                burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_called()
 
     def test_validate_options_tests_min_gt_tests_max(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.repeat_tests_min = 3
         options.repeat_tests_max = 2
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            with self.assertRaises(self.ParserError):
-                burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_called()
 
     def test_validate_options_tests_secs(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.buildvariant = "variant1"
         options.repeat_tests_min = 2
         options.repeat_tests_max = 1000
         options.repeat_tests_secs = 3
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_not_called()
 
     def test_validate_options_tests_secs_and_tests_num(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.buildvariant = "variant1"
         options.repeat_tests_num = 1
         options.repeat_tests_min = 1
         options.repeat_tests_max = 3
         options.repeat_tests_secs = 3
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            with self.assertRaises(self.ParserError):
-                burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_called()
 
     def test_validate_options_tests_secs_no_buildvariant(self):
-        parser = self._mock_parser()
+        mock_parser = _mock_parser()
         options = self._mock_options()
         options.repeat_tests_min = 1
         options.repeat_tests_max = 3
         options.repeat_tests_secs = 3
-        with patch(EVG_CI + ".parse_evergreen_file", return_value=CreateTaskList.evergreen_conf):
-            with self.assertRaises(self.ParserError):
-                burn_in.validate_options(parser, options)
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.validate_options(mock_parser, options)
+            mock_parser.error.assert_called()
 
 
 class TestGetResmokeRepeatOptions(unittest.TestCase):
@@ -217,6 +337,41 @@ class TestGetResmokeRepeatOptions(unittest.TestCase):
         options.repeat_tests_max = 2
         repeat_options = burn_in.get_resmoke_repeat_options(options)
         self.assertEqual(repeat_options, "--repeatSuites={}".format(burn_in.REPEAT_SUITES))
+
+
+class TestCheckVariant(unittest.TestCase):
+    @staticmethod
+    def test_check_variant():
+        mock_parser = _mock_parser()
+        buildvariant = "variant1"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.check_variant(buildvariant, mock_parser)
+            mock_parser.error.assert_not_called()
+
+    @staticmethod
+    def test_check_variant_badvariant():
+        mock_parser = _mock_parser()
+        buildvariant = "badvariant"
+        with patch(EVG_CI + ".parse_evergreen_file", return_value=EVERGREEN_CONF):
+            burn_in.check_variant(buildvariant, mock_parser)
+            mock_parser.error.assert_called()
+
+
+class TestGetRunBuildvariant(unittest.TestCase):
+    def test__get_run_buildvariant_rb(self):
+        run_buildvariant = "variant1"
+        buildvariant = "variant2"
+        options = Mock()
+        options.run_buildvariant = run_buildvariant
+        options.buildvariant = buildvariant
+        self.assertEqual(run_buildvariant, burn_in._get_run_buildvariant(options))
+
+    def test__get_run_buildvariant_bv(self):
+        buildvariant = "variant2"
+        options = Mock()
+        options.run_buildvariant = None
+        options.buildvariant = buildvariant
+        self.assertEqual(buildvariant, burn_in._get_run_buildvariant(options))
 
 
 class TestGetTaskName(unittest.TestCase):
@@ -317,6 +472,7 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
     def _options_mock():
         options = Mock()
         options.buildvariant = None
+        options.run_buildvariant = None
         options.distro = None
         return options
 
@@ -657,122 +813,14 @@ class CreateExecutorList(unittest.TestCase):
         self.assertEqual(mock_suite_class.call_count, 0)
 
 
-def tasks_mock(  #pylint: disable=too-many-arguments
-        tasks, generate_resmoke_tasks_command=None, get_vars_task_name=None, run_tests_command=None,
-        multiversion_path=None, multiversion_setup_command=None):
-    task_list = Mock()
-    task_list.tasks = []
-    for idx, task in enumerate(tasks):
-        task_list.tasks.append(Mock())
-        task_list.tasks[idx].is_generate_resmoke_task = generate_resmoke_tasks_command is not None
-        task_list.tasks[idx].is_run_tests_task = run_tests_command is not None
-        task_list.tasks[idx].is_multiversion_task = multiversion_path is not None
-        task_list.tasks[idx].generate_resmoke_tasks_command = generate_resmoke_tasks_command
-        task_list.tasks[idx].run_tests_command = run_tests_command
-        task_list.tasks[idx].get_vars_task_name = get_vars_task_name
-        task_list.tasks[idx].name = task["name"]
-        resmoke_args = task.get("combined_resmoke_args")
-        task_list.tasks[idx].combined_resmoke_args = resmoke_args
-        task_list.tasks[idx].resmoke_suite = evg.ResmokeArgs.get_arg(
-            resmoke_args, "suites") if resmoke_args else None
-        task_list.tasks[idx].multiversion_path = multiversion_path
-        task_list.tasks[idx].multiversion_setup_command = multiversion_setup_command
-
-    return task_list
-
-
 class CreateTaskList(unittest.TestCase):
-
-    GENERATE_RESMOKE_TASKS_NAME = "this_is_a_gen_task"
-    GET_GENERATE_RESMOKE_TASKS_NAME = lambda _: CreateTaskList.GENERATE_RESMOKE_TASKS_NAME
-    GENERATE_RESMOKE_TASKS_COMMAND = {
-        "func": "generate resmoke tasks", "vars": {
-            "task": GENERATE_RESMOKE_TASKS_NAME, "suite": "suite3",
-            "resmoke_args": "--shellWriteMode=commands"
-        }
-    }
-
-    GENERATE_RESMOKE_TASKS_COMMAND2 = {
-        "func": "generate resmoke tasks",
-        "vars": {"task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands"}
-    }
-
-    MULTIVERSION_PATH = "/data/multiversion"
-    GENERATE_RESMOKE_TASKS_MULTIVERSION_COMMAND = {
-        "func": "generate resmoke tasks", "vars": {
-            "task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands",
-            "use_multiversion": MULTIVERSION_PATH
-        }
-    }
-
-    MULTIVERSION_COMMAND = {"func": "do multiversion setup"}
-    RUN_TESTS_MULTIVERSION_COMMAND = {
-        "func": "run tests", "vars": {
-            "task": GENERATE_RESMOKE_TASKS_NAME, "resmoke_args": "--shellWriteMode=commands",
-            "task_path_suffix": MULTIVERSION_PATH
-        }
-    }
-
-    VARIANTS = {
-        "variantall":
-            tasks_mock([{"name": "task1", "combined_resmoke_args": "--suites=suite1 var1arg1"},
-                        {"name": "task2", "combined_resmoke_args": "--suites=suite1 var1arg2"},
-                        {"name": "task3", "combined_resmoke_args": "--suites=suite1 var1arg3"}]),
-        "variant1":
-            tasks_mock([{"name": "task1", "combined_resmoke_args": "--suites=suite1 var1arg1"},
-                        {"name": "task2"}]),
-        "variant2":
-            tasks_mock([{"name": "task2", "combined_resmoke_args": "var2arg1"},
-                        {"name": "task3", "combined_resmoke_args": "--suites=suite3 var2arg3"}]),
-        "variant3":
-            tasks_mock([{"name": "task2", "combined_resmoke_args": "var3arg1"}]),
-        "variant4":
-            tasks_mock([]),
-        "variant_multiversion":
-            tasks_mock(
-                [{"name": "multiversion_task", "combined_resmoke_args": "--suites=suite3 vararg"}],
-                run_tests_command=RUN_TESTS_MULTIVERSION_COMMAND,
-                multiversion_setup_command=RUN_TESTS_MULTIVERSION_COMMAND,
-                multiversion_path=MULTIVERSION_PATH),
-        "variant_generate_tasks":
-            tasks_mock([{
-                "name": GENERATE_RESMOKE_TASKS_NAME,
-                "combined_resmoke_args": "--suites=suite3 vararg"
-            }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND,
-                       get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
-        "variant_generate_tasks_diff_names":
-            tasks_mock([{
-                "name": "gen_task_name_different_from_vars_task_name",
-                "combined_resmoke_args": "--suites=suite3 vararg"
-            }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND,
-                       get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
-        "variant_generate_tasks_no_suite":
-            tasks_mock([{
-                "name": GENERATE_RESMOKE_TASKS_NAME,
-                "combined_resmoke_args": "--suites=suite3 vararg"
-            }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_COMMAND2,
-                       get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME),
-        "variant_generate_tasks_multiversion":
-            tasks_mock([{
-                "name": GENERATE_RESMOKE_TASKS_NAME,
-                "combined_resmoke_args": "--suites=suite3 vararg"
-            }], generate_resmoke_tasks_command=GENERATE_RESMOKE_TASKS_MULTIVERSION_COMMAND,
-                       get_vars_task_name=GET_GENERATE_RESMOKE_TASKS_NAME,
-                       multiversion_path=MULTIVERSION_PATH),
-    }
-
-    evergreen_conf = Mock()
-    evergreen_conf.get_variant = VARIANTS.get
-    evergreen_conf.variant_names = VARIANTS.keys()
-
     def test_create_task_list(self):
         variant = "variantall"
         suites = [SUITE1, SUITE2, SUITE3]
         exclude_suites = []
         suite_list = _create_executor_list(suites, exclude_suites)
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
-        self.assertEqual(len(task_list), len(self.VARIANTS["variantall"].tasks))
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
+        self.assertEqual(len(task_list), len(VARIANTS["variantall"].tasks))
         self.assertIn("task1", task_list)
         self.assertEqual(task_list["task1"]["resmoke_args"], "--suites=suite1 var1arg1")
         self.assertEqual(task_list["task1"]["tests"], SUITE1.tests)
@@ -791,66 +839,58 @@ class CreateTaskList(unittest.TestCase):
         suites = [SUITE1, SUITE2, SUITE3]
         exclude_suites = []
         suite_list = _create_executor_list(suites, exclude_suites)
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
-        self.assertEqual(len(task_list), len(self.VARIANTS["variant_multiversion"].tasks))
-        self.assertEqual(task_list["multiversion_task"]["use_multiversion"], self.MULTIVERSION_PATH)
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
+        self.assertEqual(len(task_list), len(VARIANTS["variant_multiversion"].tasks))
+        self.assertEqual(task_list["multiversion_task"]["use_multiversion"], MULTIVERSION_PATH)
 
     def test_create_task_list_gen_tasks(self):
         variant = "variant_generate_tasks"
         suites = [SUITE3]
         exclude_suites = []
         suite_list = _create_executor_list(suites, exclude_suites)
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
-        self.assertEqual(len(task_list), len(self.VARIANTS["variant_generate_tasks"].tasks))
-        self.assertIn(self.GENERATE_RESMOKE_TASKS_NAME, task_list)
-        self.assertEqual(task_list[self.GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
-        self.assertIsNone(task_list[self.GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"])
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
+        self.assertEqual(len(task_list), len(VARIANTS["variant_generate_tasks"].tasks))
+        self.assertIn(GENERATE_RESMOKE_TASKS_NAME, task_list)
+        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
+        self.assertIsNone(task_list[GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"])
 
     def test_create_task_list_gen_tasks_diff_task_names(self):
         variant = "variant_generate_tasks_diff_names"
         suites = [SUITE3]
         exclude_suites = []
         suite_list = _create_executor_list(suites, exclude_suites)
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
-        self.assertEqual(len(task_list), len(self.VARIANTS["variant_generate_tasks"].tasks))
-        self.assertIn(self.GENERATE_RESMOKE_TASKS_NAME, task_list)
-        self.assertEqual(task_list[self.GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
-        self.assertIsNone(task_list[self.GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"])
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
+        self.assertEqual(len(task_list), len(VARIANTS["variant_generate_tasks"].tasks))
+        self.assertIn(GENERATE_RESMOKE_TASKS_NAME, task_list)
+        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
+        self.assertIsNone(task_list[GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"])
 
     def test_create_task_list_gen_tasks_multiversion(self):
         variant = "variant_generate_tasks_multiversion"
         suites = [SUITE3]
         exclude_suites = []
         suite_list = _create_executor_list(suites, exclude_suites)
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
-        self.assertEqual(
-            len(task_list), len(self.VARIANTS["variant_generate_tasks_multiversion"].tasks))
-        self.assertEqual(task_list[self.GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"],
-                         self.MULTIVERSION_PATH)
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
+        self.assertEqual(len(task_list), len(VARIANTS["variant_generate_tasks_multiversion"].tasks))
+        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_NAME]["use_multiversion"],
+                         MULTIVERSION_PATH)
 
     def test_create_task_list_gen_tasks_no_suite(self):
         variant = "variant_generate_tasks_no_suite"
         suites = [SUITE3]
         exclude_suites = []
         suite_list = _create_executor_list(suites, exclude_suites)
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
-        self.assertEqual(
-            len(task_list), len(self.VARIANTS["variant_generate_tasks_no_suite"].tasks))
-        self.assertIn(self.GENERATE_RESMOKE_TASKS_NAME, task_list)
-        self.assertEqual(task_list[self.GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
+        self.assertEqual(len(task_list), len(VARIANTS["variant_generate_tasks_no_suite"].tasks))
+        self.assertIn(GENERATE_RESMOKE_TASKS_NAME, task_list)
+        self.assertEqual(task_list[GENERATE_RESMOKE_TASKS_NAME]["tests"], SUITE3.tests)
 
     def test_create_task_list_no_excludes(self):
         variant = "variant1"
         suites = [SUITE1, SUITE2]
         exclude_suites = []
         suite_list = _create_executor_list(suites, exclude_suites)
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
         self.assertEqual(len(task_list), 1)
         self.assertIn("task1", task_list)
         self.assertEqual(task_list["task1"]["resmoke_args"], "--suites=suite1 var1arg1")
@@ -863,8 +903,7 @@ class CreateTaskList(unittest.TestCase):
         suites = [SUITE1, SUITE2, SUITE3]
         suite_list = _create_executor_list(suites, [])
         exclude_suites = ["suite2"]
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
         self.assertEqual(len(task_list), 1)
         self.assertIn("task3", task_list)
         self.assertEqual(task_list["task3"]["resmoke_args"], "--suites=suite3 var2arg3")
@@ -876,8 +915,7 @@ class CreateTaskList(unittest.TestCase):
         variant = "variant2"
         suite_list = {}
         exclude_suites = ["suite2"]
-        task_list = burn_in.create_task_list(self.evergreen_conf, variant, suite_list,
-                                             exclude_suites)
+        task_list = burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, exclude_suites)
         self.assertEqual(len(task_list), 0)
         self.assertEqual(task_list, {})
 
@@ -893,7 +931,7 @@ class CreateTaskList(unittest.TestCase):
         suite_list = _create_executor_list(suites, [])
         with patch("sys.exit", _raise_bad_variant):
             with self.assertRaises(BadVariant):
-                burn_in.create_task_list(self.evergreen_conf, variant, suite_list, [])
+                burn_in.create_task_list(EVERGREEN_CONF, variant, suite_list, [])
 
 
 class FindChangedTests(unittest.TestCase):
