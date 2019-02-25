@@ -47,6 +47,9 @@ SUITE_FILES = ["with_server"]
 SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
                         "multi_stmt_txn_passthrough", "parallel_fsm_workload_test")
 
+BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
+BURN_IN_TESTS_TASK = "burn_in_tests"
+
 
 def parse_command_line():
     """Parse command line options."""
@@ -65,8 +68,12 @@ def parse_command_line():
                       help="The base commit to compare to for determining changes.")
 
     parser.add_option("--buildVariant", dest="buildvariant", default=None,
-                      help=("The buildvariant the tasks will execute on. Required when"
+                      help=("The buildvariant to select the tasks. Required when"
                             " generating the JSON file with test executor information"))
+
+    parser.add_option("--runBuildVariant", dest="run_buildvariant", default=None,
+                      help=("The buildvariant the tasks will execute on. If not specied then tasks"
+                            " will execute on the the buildvariant specied in --buildVariant."))
 
     parser.add_option("--distro", dest="distro", default=None,
                       help=("The distro the tasks will execute on. Can only be specified"
@@ -119,6 +126,14 @@ def parse_command_line():
     return options, args
 
 
+def check_variant(buildvariant, parser):
+    """Check if the buildvariant is found in the evergreen file."""
+    evg_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
+    if not evg_conf.get_variant(buildvariant):
+        parser.error("Buildvariant '{}' not found in {}, select from:\n\t{}".format(
+            buildvariant, EVERGREEN_FILE, "\n\t".join(sorted(evg_conf.variant_names))))
+
+
 def validate_options(parser, options):
     """Validate command line options."""
 
@@ -139,10 +154,10 @@ def validate_options(parser, options):
         parser.error("Must specify --buildVariant to find changed tests")
 
     if options.buildvariant:
-        evg_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
-        if not evg_conf.get_variant(options.buildvariant):
-            parser.error("Buildvariant '{}' not found in {}, select from:\n\t{}".format(
-                options.buildvariant, EVERGREEN_FILE, "\n\t".join(sorted(evg_conf.variant_names))))
+        check_variant(options.buildvariant, parser)
+
+    if options.run_buildvariant:
+        check_variant(options.run_buildvariant, parser)
 
 
 def find_last_activated_task(revisions, variant, branch_name):
@@ -428,15 +443,19 @@ def _sub_task_name(variant, task, task_num):
     return "burn_in:{}_{}_{}".format(variant, task, task_num)
 
 
+def _get_run_buildvariant(options):
+    """Return the build variant to execute the tasks on."""
+    if options.run_buildvariant:
+        return options.run_buildvariant
+    return options.buildvariant
+
+
 def create_generate_tasks_file(options, tests_by_task):
     """Create the Evergreen generate.tasks file."""
 
-    if not tests_by_task:
-        return
-
     evg_config = Configuration()
     task_specs = []
-    task_names = ["burn_in_tests_gen"]
+    task_names = [BURN_IN_TESTS_GEN_TASK]
     for task in sorted(tests_by_task):
         multiversion_path = tests_by_task[task].get("use_multiversion")
         for test_num, test in enumerate(tests_by_task[task]["tests"]):
@@ -461,8 +480,8 @@ def create_generate_tasks_file(options, tests_by_task):
             commands.append(CommandDefinition().function("run tests").vars(run_tests_vars))
             evg_sub_task.commands(commands)
 
-    display_task = DisplayTaskDefinition("burn_in_tests").execution_tasks(task_names)
-    evg_config.variant(options.buildvariant).tasks(task_specs).display_task(display_task)
+    display_task = DisplayTaskDefinition(BURN_IN_TESTS_TASK).execution_tasks(task_names)
+    evg_config.variant(_get_run_buildvariant(options)).tasks(task_specs).display_task(display_task)
 
     _write_json_file(evg_config.to_map(), options.generate_tasks_file)
 
