@@ -236,7 +236,7 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
 
 ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Client* client) {
     auto opCtx = std::make_unique<OperationContext>(client, _nextOpId.fetchAndAdd(1));
-    if (client && client->session()) {
+    if (client->session()) {
         _numCurrentOps.addAndFetch(1);
     }
 
@@ -264,7 +264,7 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
     opCtx->getBaton()->detach();
 
     auto client = opCtx->getClient();
-    if (client && client->session()) {
+    if (client->session()) {
         _numCurrentOps.subtractAndFetch(1);
     }
     auto service = client->getServiceContext();
