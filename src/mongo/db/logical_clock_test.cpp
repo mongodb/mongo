@@ -121,8 +121,8 @@ TEST_F(LogicalClockTest, RateLimiterRejectsLogicalTimesTooFarAhead) {
 
 // Verify cluster time can be initialized to a very old time.
 TEST_F(LogicalClockTest, InitFromTrustedSourceCanAcceptVeryOldLogicalTime) {
-    setMockClockSourceTime(
-        Date_t::fromMillisSinceEpoch(kMaxAcceptableLogicalClockDriftSecsDefault * 10 * 1000));
+    setMockClockSourceTime(Date_t::fromMillisSinceEpoch(
+        durationCount<Seconds>(Seconds(kMaxAcceptableLogicalClockDriftSecsDefault)) * 10 * 1000));
 
     Timestamp veryOldTimestamp(
         durationCount<Seconds>(getMockClockSourceTime().toDurationSinceEpoch()) -
