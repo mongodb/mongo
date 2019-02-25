@@ -1220,6 +1220,18 @@ int main(int argc, char** argv) {
     RE re_testZ5("(*UCP)(*LIMIT_MATCH=1000)(*ANY)(*UTF)...");
     CHECK(re_testZ5.FullMatch(utf8_string));
 
+    // <Added by MongoDB>
+    {
+      // Test case where user specifies an option but doesn't close the parens.
+      RE re_test("(*LIMIT_MATCH=1000");
+      CHECK(!re_test.error().empty());
+    }
+
+    {
+      RE re_test("");
+      CHECK(!re_test.FullMatch(utf8_string));
+    }
+    // </Added by MongoDB>
 
     // Check that '.' matches one byte or UTF-8 character
     // according to the mode.
