@@ -42,17 +42,7 @@ class DocumentSourceOutReplaceColl final : public DocumentSourceOut {
 public:
     using DocumentSourceOut::DocumentSourceOut;
 
-    ~DocumentSourceOutReplaceColl() {
-        DESTRUCTOR_GUARD(
-            // Make sure we drop the temp collection if anything goes wrong. Errors are ignored
-            // here because nothing can be done about them. Additionally, if this fails and the
-            // collection is left behind, it will be cleaned up next time the server is started.
-            if (_tempNs.size()) {
-                LocalReadConcernBlock readLocal(pExpCtx->opCtx);
-
-                pExpCtx->mongoProcessInterface->directClient()->dropCollection(_tempNs.ns());
-            });
-    }
+    ~DocumentSourceOutReplaceColl();
 
     /**
      * Sets up a temp collection which contains the same indexes and options as the output

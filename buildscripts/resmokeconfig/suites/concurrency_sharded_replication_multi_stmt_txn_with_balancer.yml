@@ -105,6 +105,9 @@ selector:
   # TODO Unblacklist (SERVER-35538).
   - jstests/concurrency/fsm_workloads/database_versioning.js
 
+  # TODO Unblacklist (SERVER-38852).
+  - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+
   # serverStatus does not include transaction metrics on mongos.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 

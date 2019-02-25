@@ -68,6 +68,10 @@ var $config = (function() {
         assertWhenOwnColl.eq(this.numDocs / 2, db[collName].find({flag: true}).itcount());
     }
 
+    function teardown(db, collName, cluster) {
+        // By default, do nothing on teardown. Workload tests may implement this function.
+    }
+
     return {
         // Using few threads and iterations because each iteration is fairly expensive compared to
         // other workloads' iterations. (Each does a collection scan over a few thousand documents
@@ -79,5 +83,6 @@ var $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
+        teardown: teardown,
     };
 })();
