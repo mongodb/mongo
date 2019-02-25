@@ -1335,7 +1335,7 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
 
         const IDLParserErrorContext ctxt("encryptMetadata");
         try {
-            // Discard the result as we are only concerned with validation
+            // Discard the result as we are only concerned with validation.
             EncryptionMetadata::parse(ctxt, encryptMetadataElt.embeddedObject());
         } catch (const AssertionException&) {
             return exceptionToStatus();
