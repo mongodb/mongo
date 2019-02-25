@@ -617,13 +617,21 @@ public:
 
         // Check if this collection is currently being sharded and if so, join it
         if (!scopedShardCollection.mustExecute()) {
-            status = scopedShardCollection.waitForCompletion(opCtx);
+            auto swUUID = scopedShardCollection.getUUID().getNoThrow();
+            status = swUUID.getStatus();
+
             result << "collectionsharded" << nss.ns();
+            if (status.isOK() && swUUID.getValue()) {
+                result << "collectionUUID" << swUUID.getValue().get();
+            }
         } else {
+            boost::optional<UUID> uuid;
             try {
                 if (checkIfCollectionAlreadyShardedWithSameOptions(opCtx, nss, request, result)) {
                     status = Status::OK();
-                    scopedShardCollection.signalComplete(status);
+                    auto existingUUID =
+                        uassertStatusOK(UUID::parse(result.asTempObj()["collectionUUID"]));
+                    scopedShardCollection.emplaceUUID(existingUUID);
 
                     return true;
                 }
@@ -633,7 +641,9 @@ public:
 
                 if (checkIfCollectionAlreadyShardedWithSameOptions(opCtx, nss, request, result)) {
                     status = Status::OK();
-                    scopedShardCollection.signalComplete(status);
+                    auto existingUUID =
+                        uassertStatusOK(UUID::parse(result.asTempObj()["collectionUUID"]));
+                    scopedShardCollection.emplaceUUID(existingUUID);
 
                     return true;
                 }
@@ -652,7 +662,6 @@ public:
                     validateShardKeyAgainstExistingZones(opCtx, proposedKey, shardKeyPattern, tags);
                 }
 
-                boost::optional<UUID> uuid;
                 if (request.getGetUUIDfromPrimaryShard()) {
                     uuid = getUUIDFromPrimaryShard(opCtx, nss);
                 } else {
@@ -736,14 +745,19 @@ public:
             } catch (const DBException& e) {
                 status = e.toStatus();
             } catch (const std::exception& e) {
-                scopedShardCollection.signalComplete(
+                scopedShardCollection.emplaceUUID(
                     {ErrorCodes::InternalError,
                      str::stream()
                          << "Severe error occurred while running shardCollection command: "
                          << e.what()});
                 throw;
             }
-            scopedShardCollection.signalComplete(status);
+
+            if (!status.isOK()) {
+                scopedShardCollection.emplaceUUID(status);
+            } else {
+                scopedShardCollection.emplaceUUID(uuid);
+            }
         }
 
         uassertStatusOK(status);

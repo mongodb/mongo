@@ -96,19 +96,20 @@ StatusWith<ScopedShardCollection> ActiveShardCollectionRegistry::registerShardCo
 
     auto iter = _activeShardCollectionMap.find(nss);
     if (iter == _activeShardCollectionMap.end()) {
-        auto activeShardCollectionState = ActiveShardCollectionState(request);
+        auto activeShardCollectionState = std::make_shared<ActiveShardCollectionState>(request);
         _activeShardCollectionMap.try_emplace(nss, activeShardCollectionState);
 
-        return {ScopedShardCollection(nss, this, true, activeShardCollectionState.notification)};
+        return {ScopedShardCollection(
+            nss, this, true, activeShardCollectionState->_uuidPromise.getFuture())};
     } else {
         auto activeShardCollectionState = iter->second;
 
-        if (ActiveShardsvrShardCollectionEqualsNewRequest(activeShardCollectionState.activeRequest,
+        if (ActiveShardsvrShardCollectionEqualsNewRequest(activeShardCollectionState->activeRequest,
                                                           request)) {
             return {ScopedShardCollection(
-                nss, nullptr, false, activeShardCollectionState.notification)};
+                nss, nullptr, false, activeShardCollectionState->_uuidPromise.getFuture())};
         }
-        return activeShardCollectionState.constructErrorStatus(request);
+        return activeShardCollectionState->constructErrorStatus(request);
     }
 }
 
@@ -117,6 +118,15 @@ void ActiveShardCollectionRegistry::_clearShardCollection(std::string nss) {
     auto iter = _activeShardCollectionMap.find(nss);
     invariant(iter != _activeShardCollectionMap.end());
     _activeShardCollectionMap.erase(nss);
+}
+
+void ActiveShardCollectionRegistry::_setUUIDOrError(std::string nss,
+                                                    StatusWith<boost::optional<UUID>> swUUID) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    auto iter = _activeShardCollectionMap.find(nss);
+    invariant(iter != _activeShardCollectionMap.end());
+    auto activeShardCollectionState = iter->second;
+    activeShardCollectionState->_uuidPromise.setFromStatusWith(swUUID);
 }
 
 Status ActiveShardCollectionRegistry::ActiveShardCollectionState::constructErrorStatus(
@@ -131,20 +141,17 @@ Status ActiveShardCollectionRegistry::ActiveShardCollectionState::constructError
                           << activeRequest.toBSON()};
 }
 
-ScopedShardCollection::ScopedShardCollection(
-    std::string nss,
-    ActiveShardCollectionRegistry* registry,
-    bool shouldExecute,
-    std::shared_ptr<Notification<Status>> completionNotification)
+ScopedShardCollection::ScopedShardCollection(std::string nss,
+                                             ActiveShardCollectionRegistry* registry,
+                                             bool shouldExecute,
+                                             SharedSemiFuture<boost::optional<UUID>> uuidFuture)
     : _nss(nss),
       _registry(registry),
       _shouldExecute(shouldExecute),
-      _completionNotification(std::move(completionNotification)) {}
+      _uuidFuture(std::move(uuidFuture)) {}
 
 ScopedShardCollection::~ScopedShardCollection() {
     if (_registry && _shouldExecute) {
-        // If this is a newly started shard collection the caller must always signal on completion
-        invariant(*_completionNotification);
         _registry->_clearShardCollection(_nss);
     }
 }
@@ -158,21 +165,21 @@ ScopedShardCollection& ScopedShardCollection::operator=(ScopedShardCollection&& 
         _registry = other._registry;
         other._registry = nullptr;
         _shouldExecute = other._shouldExecute;
-        _completionNotification = std::move(other._completionNotification);
+        _uuidFuture = std::move(other._uuidFuture);
         _nss = std::move(other._nss);
     }
 
     return *this;
 }
 
-void ScopedShardCollection::signalComplete(Status status) {
+void ScopedShardCollection::emplaceUUID(StatusWith<boost::optional<UUID>> swUUID) {
     invariant(_shouldExecute);
-    _completionNotification->set(status);
+    _registry->_setUUIDOrError(_nss, swUUID);
 }
 
-Status ScopedShardCollection::waitForCompletion(OperationContext* opCtx) {
+SharedSemiFuture<boost::optional<UUID>> ScopedShardCollection::getUUID() {
     invariant(!_shouldExecute);
-    return _completionNotification->get(opCtx);
+    return _uuidFuture;
 }
 
 }  // namespace mongo

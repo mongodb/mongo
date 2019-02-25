@@ -89,7 +89,7 @@ TEST_F(ShardCollectionRegistrationTest, ScopedShardCollectionConstructorAndAssig
     ASSERT(originalScopedShardCollection.mustExecute());
 
     // Need to signal the registered shard collection so the destructor doesn't invariant
-    originalScopedShardCollection.signalComplete(Status::OK());
+    originalScopedShardCollection.emplaceUUID(UUID::gen());
 }
 
 TEST_F(ShardCollectionRegistrationTest,
@@ -118,10 +118,10 @@ TEST_F(ShardCollectionRegistrationTest,
         _registry.registerShardCollection(secondShardsvrShardCollectionRequest);
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, secondScopedShardCollection.getStatus());
 
-    originalScopedShardCollection.signalComplete(Status::OK());
+    originalScopedShardCollection.emplaceUUID(UUID::gen());
 }
 
-TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoinsFirst) {
+TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoinsFirstOnSuccess) {
     auto firstShardsvrShardCollectionRequest =
         createShardsvrShardCollectionRequest(NamespaceString("TestDB", "TestColl"),
                                              BSON("x"
@@ -148,10 +148,43 @@ TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoin
         assertGet(_registry.registerShardCollection(secondShardsvrShardCollectionRequest));
     ASSERT(!secondScopedShardCollection.mustExecute());
 
-    originalScopedShardCollection.signalComplete({ErrorCodes::InternalError, "Test error"});
-    auto opCtx = makeOperationContext();
-    ASSERT_EQ(Status(ErrorCodes::InternalError, "Test error"),
-              secondScopedShardCollection.waitForCompletion(opCtx.get()));
+    auto uuid = UUID::gen();
+
+    originalScopedShardCollection.emplaceUUID(uuid);
+    auto swUUID = secondScopedShardCollection.getUUID().getNoThrow();
+    ASSERT_EQ(uuid, swUUID.getValue().get());
+}
+
+TEST_F(ShardCollectionRegistrationTest, SecondShardCollectionWithSameOptionsJoinsFirstOnError) {
+    auto firstShardsvrShardCollectionRequest =
+        createShardsvrShardCollectionRequest(NamespaceString("TestDB", "TestColl"),
+                                             BSON("x"
+                                                  << "hashed"),
+                                             false,
+                                             1,
+                                             boost::none,
+                                             boost::none,
+                                             false);
+    auto originalScopedShardCollection =
+        assertGet(_registry.registerShardCollection(firstShardsvrShardCollectionRequest));
+    ASSERT(originalScopedShardCollection.mustExecute());
+
+    auto secondShardsvrShardCollectionRequest =
+        createShardsvrShardCollectionRequest(NamespaceString("TestDB", "TestColl"),
+                                             BSON("x"
+                                                  << "hashed"),
+                                             false,
+                                             1,
+                                             boost::none,
+                                             boost::none,
+                                             false);
+    auto secondScopedShardCollection =
+        assertGet(_registry.registerShardCollection(secondShardsvrShardCollectionRequest));
+    ASSERT(!secondScopedShardCollection.mustExecute());
+
+    originalScopedShardCollection.emplaceUUID({ErrorCodes::InternalError, "Test error"});
+    auto swUUID = secondScopedShardCollection.getUUID().getNoThrow();
+    ASSERT_EQ(Status(ErrorCodes::InternalError, "Test error"), swUUID.getStatus());
 }
 
 TEST_F(ShardCollectionRegistrationTest, TwoShardCollectionsOnDifferentCollectionsAllowed) {
@@ -181,8 +214,8 @@ TEST_F(ShardCollectionRegistrationTest, TwoShardCollectionsOnDifferentCollection
         assertGet(_registry.registerShardCollection(secondShardsvrShardCollectionRequest));
     ASSERT(secondScopedShardCollection.mustExecute());
 
-    originalScopedShardCollection.signalComplete(Status::OK());
-    secondScopedShardCollection.signalComplete(Status::OK());
+    originalScopedShardCollection.emplaceUUID(UUID::gen());
+    secondScopedShardCollection.emplaceUUID(UUID::gen());
 }
 
 }  // namespace

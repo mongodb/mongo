@@ -79,8 +79,7 @@ private:
     // Describes the state of a currently active shardCollection operation
     struct ActiveShardCollectionState {
         ActiveShardCollectionState(ShardsvrShardCollection inRequest)
-            : activeRequest(std::move(inRequest)),
-              notification(std::make_shared<Notification<Status>>()) {}
+            : activeRequest(std::move(inRequest)) {}
 
         /**
          * Constructs an error status to return in the case of conflicting operations.
@@ -90,8 +89,11 @@ private:
         // Exact arguments of the currently active operation
         ShardsvrShardCollection activeRequest;
 
-        // Notification event that will be signaled when the currently active operation completes
-        std::shared_ptr<Notification<Status>> notification;
+        /**
+         * Promise that contains the uuid for this collection so that a shardCollection object
+         * that is in 'join' mode has access to the collection uuid.
+         */
+        SharedPromise<boost::optional<UUID>> _uuidPromise;
     };
 
     /**
@@ -100,11 +102,15 @@ private:
      */
     void _clearShardCollection(std::string nss);
 
+    // Fulfills the promise and stores the uuid for the collection if the status is OK or sets an
+    // error on the promise if it is not.
+    void _setUUIDOrError(std::string nss, StatusWith<boost::optional<UUID>> swUUID);
+
     // Protects the state below
     stdx::mutex _mutex;
 
     // Map containing any collections currently being sharded
-    StringMap<ActiveShardCollectionState> _activeShardCollectionMap;
+    StringMap<std::shared_ptr<ActiveShardCollectionState>> _activeShardCollectionMap;
 };
 
 /**
@@ -119,7 +125,7 @@ public:
     ScopedShardCollection(std::string nss,
                           ActiveShardCollectionRegistry* registry,
                           bool shouldExecute,
-                          std::shared_ptr<Notification<Status>> completionNotification);
+                          SharedSemiFuture<boost::optional<UUID>> uuidFuture);
     ~ScopedShardCollection();
 
     ScopedShardCollection(ScopedShardCollection&&);
@@ -136,16 +142,17 @@ public:
 
     /**
      * Must only be called if the object is in the 'execute' mode when the shardCollection command
-     * was invoked (the command immediately executed). Signals any callers that might be blocked in
-     * waitForCompletion.
+     * was invoked (the command immediately executed). Will either emplace the uuid on the promise
+     * stored in the ActiveShardCollectionRegistry for this nss if status is OK or sets an error if
+     * it is not.
      */
-    void signalComplete(Status status);
+    void emplaceUUID(StatusWith<boost::optional<UUID>> swUUID);
 
     /**
-     * Must only be called if the object is in the 'join' mode. Blocks until the main executor of
-     * the shardCollection command calls signalComplete.
+     * Must only be called if the object is in the 'join' mode. Gets a future that contains the uuid
+     * for the collection.
      */
-    Status waitForCompletion(OperationContext* opCtx);
+    SharedSemiFuture<boost::optional<UUID>> getUUID();
 
 private:
     // Namespace of collection being sharded
@@ -161,8 +168,9 @@ private:
      */
     bool _shouldExecute;
 
-    // This is the future, which will be signaled at the end of shardCollection
-    std::shared_ptr<Notification<Status>> _completionNotification;
+    // Future that will be signaled at the end of shardCollection, contains the uuid for the
+    // collection
+    SharedSemiFuture<boost::optional<UUID>> _uuidFuture;
 };
 
 }  // namespace mongo
