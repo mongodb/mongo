@@ -870,25 +870,40 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
 
     if (_status.isOK()) {
         JS::RootedValue excn(_context);
-        if (JS_GetPendingException(_context, &excn) && excn.isObject()) {
-
-            auto ss = ValueWriter(_context, excn).toString();
-            auto stackStr = ObjectWrapper(_context, excn).getString(InternedString::stack);
-            auto status = jsExceptionToStatus(_context, excn, ErrorCodes::JSInterpreterFailure, ss);
-            auto fnameStr = ObjectWrapper(_context, excn).getString(InternedString::fileName);
-            auto lineNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::lineNumber);
-            auto colNum = ObjectWrapper(_context, excn).getNumberInt(InternedString::columnNumber);
-
-            if (stackStr.empty()) {
-                // The JavaScript Error objects resulting from C++ exceptions may not always have a
-                // non-empty "stack" property. We instead use the line and column numbers of where
-                // in the JavaScript code the C++ function was called from.
+        if (JS_GetPendingException(_context, &excn)) {
+            if (excn.isObject()) {
                 str::stream ss;
-                ss << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
-                stackStr = ss;
-            }
+                // exceptions originating from c++ don't get the "uncaught exception: " prefix
+                if (!JS_GetPrivate(excn.toObjectOrNull())) {
+                    ss << "uncaught exception: ";
+                }
+                ss << ValueWriter(_context, excn).toString();
+                auto stackStr = ObjectWrapper(_context, excn).getString(InternedString::stack);
+                auto status =
+                    jsExceptionToStatus(_context, excn, ErrorCodes::JSInterpreterFailure, ss);
+                auto fnameStr = ObjectWrapper(_context, excn).getString(InternedString::fileName);
+                auto lineNum =
+                    ObjectWrapper(_context, excn).getNumberInt(InternedString::lineNumber);
+                auto colNum =
+                    ObjectWrapper(_context, excn).getNumberInt(InternedString::columnNumber);
 
-            _status = Status(JSExceptionInfo(std::move(stackStr), status), ss);
+                if (stackStr.empty()) {
+                    // The JavaScript Error objects resulting from C++ exceptions may not always
+                    // have a
+                    // non-empty "stack" property. We instead use the line and column numbers of
+                    // where
+                    // in the JavaScript code the C++ function was called from.
+                    str::stream ss;
+                    ss << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
+                    stackStr = ss;
+                }
+                _status = Status(JSExceptionInfo(std::move(stackStr), status), ss);
+
+            } else {
+                str::stream ss;
+                ss << "uncaught exception: " << ValueWriter(_context, excn).toString();
+                _status = Status(ErrorCodes::UnknownError, ss);
+            }
         } else {
             _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
         }
