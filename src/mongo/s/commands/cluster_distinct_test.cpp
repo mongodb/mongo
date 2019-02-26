@@ -48,14 +48,22 @@ protected:
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
             cb(request);
-            return BSON("values" << BSON_ARRAY(shardIndex));
+
+            BSONObjBuilder bob;
+            bob.append("values", BSON_ARRAY(shardIndex));
+            appendTxnResponseMetadata(bob);
+            return bob.obj();
         });
     }
 
     void expectReturnsSuccess(int shardIndex) override {
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
-            return BSON("values" << BSON_ARRAY(shardIndex));
+
+            BSONObjBuilder bob;
+            bob.append("values", BSON_ARRAY(shardIndex));
+            appendTxnResponseMetadata(bob);
+            return bob.obj();
         });
     }
 };

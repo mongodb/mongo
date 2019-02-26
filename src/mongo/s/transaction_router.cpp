@@ -224,6 +224,50 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     return newCmd.obj();
 }
 
+void TransactionRouter::processParticipantResponse(const ShardId& shardId,
+                                                   const BSONObj& responseObj) {
+    auto participant = getParticipant(shardId);
+    invariant(participant, "Participant should exist if processing participant response");
+
+    auto commandStatus = getStatusFromCommandResult(responseObj);
+    if (!commandStatus.isOK()) {
+        return;
+    }
+
+    if (participant->stmtIdCreatedAt != _latestStmtId) {
+        uassert(
+            51112,
+            str::stream() << "readOnly field for participant " << shardId
+                          << " should have been set on the participant's first successful response",
+            participant->readOnly != Participant::ReadOnly::kUnset);
+    }
+
+    auto txnResponseMetadata =
+        TxnResponseMetadata::parse("processParticipantResponse"_sd, responseObj);
+
+    if (txnResponseMetadata.getReadOnly()) {
+        if (participant->readOnly == Participant::ReadOnly::kUnset) {
+            LOG(0) << txnIdToString() << " Marking " << shardId << " as read-only";
+            participant->readOnly = Participant::ReadOnly::kReadOnly;
+            return;
+        }
+
+        uassert(51113,
+                str::stream() << "Participant shard " << shardId
+                              << " claimed to be read-only for a transaction after previously "
+                                 "claiming to have done a write for the transaction",
+                participant->readOnly == Participant::ReadOnly::kReadOnly);
+        return;
+    }
+
+    // The shard reported readOnly:false on this statement.
+
+    if (participant->readOnly != Participant::ReadOnly::kNotReadOnly) {
+        LOG(0) << txnIdToString() << " Marking " << shardId << " as having done a write";
+        participant->readOnly = Participant::ReadOnly::kNotReadOnly;
+    }
+}
+
 LogicalTime TransactionRouter::AtClusterTime::getTime() const {
     invariant(_atClusterTime != LogicalTime::kUninitialized);
     invariant(_stmtIdSelectedAt != kUninitializedStmtId);

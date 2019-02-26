@@ -97,6 +97,12 @@ protected:
     void testSnapshotReadConcernWithAfterClusterTime(BSONObj targetedCmd,
                                                      BSONObj scatterGatherCmd = BSONObj());
 
+    /**
+     * Appends the metadata shards return on responses to transaction statements, such as the
+     * readOnly field.
+     */
+    void appendTxnResponseMetadata(BSONObjBuilder& bob);
+
 private:
     /**
      * Makes a new command object from the one given by apppending read concern

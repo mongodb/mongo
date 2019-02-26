@@ -53,6 +53,51 @@ const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 const std::string shardName = "FakeShard";
 const int kMaxRoundsWithoutProgress = 5;
 
+BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
+                                                  const std::vector<BSONObj>& expected,
+                                                  const executor::RemoteCommandRequest& request) {
+    ASSERT_EQUALS(nss.db(), request.dbname);
+
+    const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+    const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
+    ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+
+    const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
+    ASSERT_EQUALS(expected.size(), inserted.size());
+
+    auto itInserted = inserted.begin();
+    auto itExpected = expected.begin();
+
+    for (; itInserted != inserted.end(); itInserted++, itExpected++) {
+        ASSERT_BSONOBJ_EQ(*itExpected, *itInserted);
+    }
+
+    BatchedCommandResponse staleResponse;
+    staleResponse.setStatus(Status::OK());
+    staleResponse.setN(0);
+
+    auto epoch = OID::gen();
+
+    // Report a stale version error for each write in the batch.
+    int i = 0;
+    for (itInserted = inserted.begin(); itInserted != inserted.end(); ++itInserted) {
+        WriteErrorDetail* error = new WriteErrorDetail;
+        error->setStatus({ErrorCodes::StaleShardVersion, "mock stale error"});
+        error->setErrInfo([&] {
+            StaleConfigInfo sci(nss, ChunkVersion(1, 0, epoch), ChunkVersion(2, 0, epoch));
+            BSONObjBuilder builder;
+            sci.serialize(&builder);
+            return builder.obj();
+        }());
+        error->setIndex(i);
+
+        staleResponse.addToErrDetails(error);
+        ++i;
+    }
+
+    return staleResponse.toBSON();
+}
+
 /**
  * Mimics a single shard backend for a particular collection which can be initialized with a
  * set of write command results to return.
@@ -123,48 +168,9 @@ public:
         });
     }
 
-    void expectInsertsReturnStaleVersionErrors(const std::vector<BSONObj>& expected) {
+    virtual void expectInsertsReturnStaleVersionErrors(const std::vector<BSONObj>& expected) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-            ASSERT_EQUALS(nss.db(), request.dbname);
-
-            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-            const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
-            ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
-
-            const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
-            ASSERT_EQUALS(expected.size(), inserted.size());
-
-            auto itInserted = inserted.begin();
-            auto itExpected = expected.begin();
-
-            for (; itInserted != inserted.end(); itInserted++, itExpected++) {
-                ASSERT_BSONOBJ_EQ(*itExpected, *itInserted);
-            }
-
-            BatchedCommandResponse staleResponse;
-            staleResponse.setStatus(Status::OK());
-            staleResponse.setN(0);
-
-            auto epoch = OID::gen();
-
-            // Report a stale version error for each write in the batch.
-            int i = 0;
-            for (itInserted = inserted.begin(); itInserted != inserted.end(); ++itInserted) {
-                WriteErrorDetail* error = new WriteErrorDetail;
-                error->setStatus({ErrorCodes::StaleShardVersion, "mock stale error"});
-                error->setErrInfo([&] {
-                    StaleConfigInfo sci(nss, ChunkVersion(1, 0, epoch), ChunkVersion(2, 0, epoch));
-                    BSONObjBuilder builder;
-                    sci.serialize(&builder);
-                    return builder.obj();
-                }());
-                error->setIndex(i);
-
-                staleResponse.addToErrDetails(error);
-                ++i;
-            }
-
-            return staleResponse.toBSON();
+            return expectInsertsReturnStaleVersionErrorsBase(nss, expected, request);
         });
     }
 
@@ -646,6 +652,22 @@ public:
         BatchWriteExecTest::tearDown();
     }
 
+    void expectInsertsReturnStaleVersionErrors(const std::vector<BSONObj>& expected) override {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            BSONObjBuilder bob;
+
+            bob.appendElementsUnique(
+                expectInsertsReturnStaleVersionErrorsBase(nss, expected, request));
+
+            // Because this is the transaction-specific fixture, return transaction metadata in the
+            // response.
+            TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
+            txnResponseMetadata.serialize(&bob);
+
+            return bob.obj();
+        });
+    }
+
 private:
     boost::optional<RouterOperationContextSession> _scopedSession;
 };
@@ -775,7 +797,16 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteConcernError) {
         wcError->setErrInfo(BSON("wtimeout" << true));
         response.setWriteConcernError(wcError.release());
 
-        return response.toBSON();
+
+        BSONObjBuilder bob;
+        bob.appendElementsUnique(response.toBSON());
+
+        // Because this is the transaction-specific fixture, return transaction metadata in the
+        // response.
+        TxnResponseMetadata txnResponseMetadata(false);
+        txnResponseMetadata.serialize(&bob);
+
+        return bob.obj();
     });
 
     future.timed_get(kFutureTimeout);

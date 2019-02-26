@@ -72,6 +72,8 @@ public:
      * the transaction that created it.
      */
     struct Participant {
+        enum class ReadOnly { kUnset, kReadOnly, kNotReadOnly };
+
         Participant(bool isCoordinator,
                     StmtId stmtIdCreatedAt,
                     SharedTransactionOptions sharedOptions);
@@ -83,6 +85,10 @@ public:
 
         // True if the participant has been chosen as the coordinator for its transaction
         const bool isCoordinator{false};
+
+        // Is updated to kReadOnly or kNotReadOnly based on the readOnly field in the participant's
+        // responses to statements.
+        ReadOnly readOnly{ReadOnly::kUnset};
 
         // The highest statement id of the request during which this participant was created.
         const StmtId stmtIdCreatedAt{kUninitializedStmtId};
@@ -154,6 +160,12 @@ public:
      *    if the shard was newly added to the list of participants.
      */
     BSONObj attachTxnFieldsIfNeeded(const ShardId& shardId, const BSONObj& cmdObj);
+
+    /**
+     * Processes the transaction metadata in the response from the participant if the response
+     * indicates the operation succeeded.
+     */
+    void processParticipantResponse(const ShardId& shardId, const BSONObj& responseObj);
 
     /**
      * Returns true if the current transaction can retry on a stale version error from a contacted

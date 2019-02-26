@@ -58,7 +58,13 @@ protected:
 
             std::vector<BSONObj> batch = {BSON("_id" << shardIndex)};
             CursorResponse cursorResponse(kNss, CursorId(0), batch);
-            return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+
+            BSONObjBuilder bob;
+            const auto cursorResponseObj =
+                cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+            bob.appendElementsUnique(cursorResponseObj);
+            appendTxnResponseMetadata(bob);
+            return bob.obj();
         });
     }
 
@@ -70,7 +76,13 @@ protected:
 
             std::vector<BSONObj> batch = {BSON("_id" << shardIndex)};
             CursorResponse cursorResponse(kNss, CursorId(0), batch);
-            return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+
+            BSONObjBuilder bob;
+            const auto cursorResponseObj =
+                cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+            bob.appendElementsUnique(cursorResponseObj);
+            appendTxnResponseMetadata(bob);
+            return bob.obj();
         });
     }
 
