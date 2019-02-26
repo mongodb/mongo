@@ -1060,7 +1060,7 @@ void _genericRecordStoreValidate(OperationContext* opCtx,
     }
 
     output->append("nInvalidDocuments", nInvalid);
-    output->append("nrecords", nrecords);
+    output->appendNumber("nrecords", nrecords);
 }
 
 void _validateRecordStore(OperationContext* opCtx,
