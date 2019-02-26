@@ -9,6 +9,7 @@
 
     // These are all commands that can return BackgroundOperationInProgress error codes.
     const commandWhitelist = new Set([
+        "cloneCollectionAsCapped",
         "collMod",
         "compact",
         "convertToCapped",
