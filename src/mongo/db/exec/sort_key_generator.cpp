@@ -42,6 +42,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -120,15 +121,19 @@ StatusWith<BSONObj> SortKeyGeneratorStage::getSortKeyFromIndexKey(
     invariant(member.getState() == WorkingSetMember::RID_AND_IDX);
     invariant(!_sortKeyGen->sortHasMeta());
 
-    BSONObjBuilder sortKeyObj;
+    BSONObjBuilder objBuilder;
     for (BSONElement specElt : _sortSpec) {
         invariant(specElt.isNumber());
         BSONElement sortKeyElt;
         invariant(member.getFieldDotted(specElt.fieldName(), &sortKeyElt));
-        sortKeyObj.appendAs(sortKeyElt, "");
+        // If we were to call 'collationAwareIndexKeyAppend' with a non-simple collation and a
+        // 'sortKeyElt' representing a collated index key we would incorrectly encode for the
+        // collation twice. This is not currently possible as the query planner will ensure that
+        // the plan fetches the data before sort key generation in the case where the index has a
+        // non-simple collation.
+        CollationIndexKey::collationAwareIndexKeyAppend(sortKeyElt, _collator, &objBuilder);
     }
-
-    return sortKeyObj.obj();
+    return objBuilder.obj();
 }
 
 }  // namespace mongo

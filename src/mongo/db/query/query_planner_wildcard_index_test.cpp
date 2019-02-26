@@ -1824,8 +1824,8 @@ TEST_F(QueryPlannerWildcardTest, CanProduceSortMergePlanWithWildcardIndex) {
         "{ixscan: {pattern: {$_path: 1, b: 1}, bounds:"
         "{$_path: [['b','b',true,true]], b: [[2,2,true,true]]}}}]}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {b: -1}, limit: 0, node: {sortKeyGen: {node: "
-        "{fetch: {filter: null, node: {or: {nodes: ["
+        "{fetch: {filter: null, node: {sort: {pattern: {b: -1}, limit: 0, node: {sortKeyGen: "
+        "{node: {or: {nodes: ["
         "{fetch: {filter: {b: 1}, node: {ixscan: {pattern: {$_path: 1, a: 1}, bounds:"
         "{$_path: [['a','a',true,true]], a: [[1,1,true,true]]}}}}},"
         "{ixscan: {filter: null, pattern: {$_path: 1, b: 1}, bounds:"

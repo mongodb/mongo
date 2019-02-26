@@ -631,13 +631,21 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         return NULL;
     }
 
-    // Add a fetch stage so we have the full object when we hit the sort stage.  TODO: Can we
-    // pull the values that we sort by out of the key and if so in what cases?  Perhaps we can
-    // avoid a fetch.
     if (!solnRoot->fetched()) {
-        FetchNode* fetch = new FetchNode();
-        fetch->children.push_back(solnRoot);
-        solnRoot = fetch;
+        const bool sortIsCovered =
+            std::all_of(sortObj.begin(), sortObj.end(), [solnRoot](BSONElement e) {
+                // Note that hasField() will return 'false' in the case that this field is a string
+                // and there is a non-simple collation on the index. This will lead to encoding of
+                // the field from the document on fetch, despite having read the encoded value from
+                // the index.
+                return solnRoot->hasField(e.fieldName());
+            });
+
+        if (!sortIsCovered) {
+            FetchNode* fetch = new FetchNode();
+            fetch->children.push_back(solnRoot);
+            solnRoot = fetch;
+        }
     }
 
     // And build the full sort stage. The sort stage has to have a sort key generating stage

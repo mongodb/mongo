@@ -219,7 +219,7 @@ TEST(SortKeyGeneratorStageTest, CollatorHasNoEffectWhenExtractingNonStringSortKe
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 
-TEST(SortKeyGeneratorStageTest, CollatorHasNoAffectWhenExtractingCoveredSortKey) {
+TEST(SortKeyGeneratorStageTest, CollatorAppliesWhenExtractingCoveredSortKeyString) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj actualOut = extractSortKeyCovered("{b: 1}",
                                               IndexKeyDatum(BSON("a" << 1 << "b" << 1),
@@ -228,7 +228,7 @@ TEST(SortKeyGeneratorStageTest, CollatorHasNoAffectWhenExtractingCoveredSortKey)
                                                             nullptr),
                                               &collator);
     BSONObj expectedOut = BSON(""
-                               << "foo");
+                               << "oof");
     ASSERT_BSONOBJ_EQ(actualOut, expectedOut);
 }
 

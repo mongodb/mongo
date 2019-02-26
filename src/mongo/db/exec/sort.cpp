@@ -123,9 +123,6 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
         if (PlanStage::ADVANCED == code) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Planner must put a fetch before we get here.
-            verify(member->hasObj());
-
             SortableDataItem item;
             item.wsid = id;
 

@@ -536,7 +536,7 @@ TEST_F(QueryPlannerTest, SelectIndexWithMatchingSimpleCollationWhenMaxHasStringB
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}, name: 'noCollation'}}}}");
 }
 
-TEST_F(QueryPlannerTest, MustSortInMemoryWhenMinMaxIndexCollationDoesNotMatch) {
+TEST_F(QueryPlannerTest, MustSortInMemoryWhenMinMaxQueryHasCollationAndIndexDoesNot) {
     addIndex(fromjson("{a: 1, b: 1}"));
 
     runQueryAsCommand(
@@ -544,9 +544,87 @@ TEST_F(QueryPlannerTest, MustSortInMemoryWhenMinMaxIndexCollationDoesNotMatch) {
                  "'reverse'}, sort: {a: 1, b: 1}}"));
 
     assertNumSolutions(1U);
+
+    assertSolutionExists(
+        "{fetch: {node: {sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen:{node: {ixscan: "
+        "{pattern: {a: 1, b: 1}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, MustSortInMemoryWhenMinMaxIndexHasCollationAndQueryDoesNot) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1, b:1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', min: {a: 1, b: 1}, max: {a: 2, b: 1}, sort: {a: 1, b: 1}}"));
+
+    assertNumSolutions(1U);
+
     assertSolutionExists(
         "{sort: {pattern: {a: 1, b: 1}, limit: 0, node: {sortKeyGen:"
         "{node: {fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanProduceCoveredSortPlanWhenQueryHasCollationButIndexDoesNot) {
+    addIndex(fromjson("{a: 1, b: 1}"));
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', projection: {a: 1, b: 1, _id: 0}, min: {a: 1, b: 1}, max: {a: 2, "
+        "b: 1}, collation: {locale: 'reverse'}, sort: {a: 1, b: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {a: 1, b: 1}, limit: 0, node: "
+        "{sortKeyGen:{node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasNoCollationButIndexHasNonSimpleCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', projection: {a: 1, b:1, _id: 0}, sort: {a: 1, b: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {a: 1, b: 1}, limit: 0, node: "
+        "{sortKeyGen:{node: {cscan: {dir: 1}}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotUseIndexWhenQueryHasDifferentNonSimpleCollationThanIndex) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', projection: {a: 1, b:1, _id: 0}, collation: {locale: "
+                 "'reverse'}, sort: {a: 1, b: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {a: 1, b: 1}, limit: 0, node: "
+        "{sortKeyGen:{node: {cscan: {dir: 1}}}}}}}}");
+}
+
+/**
+ * This test confirms that we place a fetch stage before sortKeyGen in the case where both query
+ * and index have the same non-simple collation. To handle this scenario without this fetch would
+ * require a mechanism to ensure we don't attempt to encode for collation an already encoded index
+ * key entry when generating the sort key.
+ */
+TEST_F(QueryPlannerTest, MustFetchBeforeSortWhenQueryHasSameNonSimpleCollationAsIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: {$gt: 0}}, projection: {a: 1, b:1, _id: 0}, "
+                 "collation: {locale: "
+                 "'reverse'}, sort: {b: 1, a: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: 1, b:1, _id: 0}, node: {sort: {pattern: {b: 1, a: 1}, limit: 0, node: "
+        "{sortKeyGen:{node: {fetch: {filter: null, collation: {locale: 'reverse'}, node: {ixscan: "
+        "{pattern: {a: 1, b: 1}}}}}}}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NoSortStageWhenMinMaxIndexCollationDoesNotMatchButBoundsContainNoStrings) {
