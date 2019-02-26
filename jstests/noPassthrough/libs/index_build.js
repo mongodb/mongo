@@ -95,7 +95,11 @@ class IndexBuildTest {
         // A map of index specs keyed by index name.
         const indexMap = res.cursor.firstBatch.reduce(
             (m, spec) => {
-                m[spec.name] = spec;
+                if (spec.hasOwnProperty('buildUUID')) {
+                    m[spec.spec.name] = spec;
+                } else {
+                    m[spec.name] = spec;
+                }
                 return m;
             },
             {});
@@ -113,9 +117,17 @@ class IndexBuildTest {
         for (let name of notReadyIndexes) {
             assert(indexMap.hasOwnProperty(name),
                    'not-ready index ' + name + ' missing from listIndexes result: ' + tojson(res));
+
             const spec = indexMap[name];
-            assert(spec.hasOwnProperty('buildUUID'),
-                   'expected buildUUID field in ' + name + ' index spec: ' + tojson(spec));
+            if (options.includeBuildUUIDs) {
+                assert(spec.hasOwnProperty('spec'),
+                       'expected spec field in ' + name + ': ' + tojson(spec));
+                assert(spec.hasOwnProperty('buildUUID'),
+                       'expected buildUUID field in ' + name + ': ' + tojson(spec));
+            } else {
+                assert(!spec.hasOwnProperty('buildUUID'),
+                       'unexpected buildUUID field in ' + name + ' index spec: ' + tojson(spec));
+            }
         }
     }
 

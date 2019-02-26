@@ -1,7 +1,5 @@
 /**
- * Tests that the listIndexes command's default is to only show ready indexes; and that
- * the 'includeIndexBuilds' flag can be set to include indexes that are still building
- * along with the ready indexes.
+ * Tests that the listIndexes command shows ready and in-progress indexes.
  */
 (function() {
     "use strict";
@@ -26,11 +24,8 @@
         IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {b: 1}, {background: true});
     IndexBuildTest.waitForIndexBuildToStart(testDB);
 
-    // Verify there is no third index.
-    IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
-
     // The listIndexes command supports returning all indexes, including ones that are not ready.
-    IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeIndexBuilds: true});
+    IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1"], ["b_1"], {includeBuildUUIDs: true});
 
     IndexBuildTest.resumeIndexBuilds(conn);
 

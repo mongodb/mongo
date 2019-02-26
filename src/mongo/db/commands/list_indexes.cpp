@@ -65,21 +65,29 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeListIndexes);
 
 /**
  * Lists the indexes for a given collection.
- * If the optional 'includeIndexBuilds' field is set to true, returns indexes that are not
- * ready. Defaults to false.
- * These not-ready indexes are identified by a 'buildUUID' field in the index spec.
+ * If 'includeBuildUUIDs' is true, then the index build uuid is also returned alongside the index
+ * spec for in-progress index builds only.
  *
  * Format:
  * {
  *   listIndexes: <collection name>,
- *   includeIndexBuilds: <boolean>,
+ *   includeBuildUUIDs: <boolean>,
  * }
  *
  * Return format:
  * {
  *   indexes: [
+ *     <index>,
  *     ...
  *   ]
+ * }
+ *
+ * Where '<index>' is the index spec if either the index is ready or 'includeBuildUUIDs' is false.
+ * If the index is in-progress and 'includeBuildUUIDs' is true then '<index>' has the following
+ * format:
+ * {
+ *   spec: <index spec>,
+ *   buildUUID: <index build uuid>
  * }
  */
 class CmdListIndexes : public BasicCommand {
@@ -133,7 +141,7 @@ public:
         uassertStatusOK(
             CursorRequest::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
 
-        auto includeIndexBuilds = cmdObj["includeIndexBuilds"].trueValue();
+        auto includeBuildUUIDs = cmdObj["includeBuildUUIDs"].trueValue();
 
         NamespaceString nss;
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
@@ -157,11 +165,7 @@ public:
             vector<string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
                 indexNames.clear();
-                if (includeIndexBuilds) {
-                    cce->getAllIndexes(opCtx, &indexNames);
-                } else {
-                    cce->getReadyIndexes(opCtx, &indexNames);
-                }
+                cce->getAllIndexes(opCtx, &indexNames);
             });
 
             auto ws = make_unique<WorkingSet>();
@@ -169,9 +173,10 @@ public:
 
             for (size_t i = 0; i < indexNames.size(); i++) {
                 auto indexSpec = writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
-                    if (includeIndexBuilds && !cce->isIndexReady(opCtx, indexNames[i])) {
-                        auto spec = cce->getIndexSpec(opCtx, indexNames[i]);
-                        BSONObjBuilder builder(spec);
+                    if (includeBuildUUIDs && !cce->isIndexReady(opCtx, indexNames[i])) {
+                        BSONObjBuilder builder;
+                        builder.append("spec"_sd, cce->getIndexSpec(opCtx, indexNames[i]));
+
                         // TODO(SERVER-37980): Replace with index build UUID.
                         auto indexBuildUUID = UUID::gen();
                         indexBuildUUID.appendToBuilder(&builder, "buildUUID"_sd);
