@@ -39,7 +39,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
@@ -114,16 +113,8 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
             Value(static_cast<long long>(*opCtx->getTxnNumber()));
     }
 
-    auto aggCmd = cmdForShards.freeze().toBson();
-
-    if (shardId) {
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            aggCmd = txnRouter->attachTxnFieldsIfNeeded(*shardId, aggCmd);
-        }
-    }
-
     // agg creates temp collection and should handle implicit create separately.
-    return appendAllowImplicitCreate(aggCmd, true);
+    return appendAllowImplicitCreate(cmdForShards.freeze().toBson(), true);
 }
 
 StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,

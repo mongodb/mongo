@@ -70,25 +70,6 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 }
 
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
-                                        const NamespaceString& requestedNss,
-                                        const ShardId& shardId,
-                                        const Shard::CommandResponse& commandResponse,
-                                        PrivilegeVector privileges,
-                                        TailableModeEnum tailableMode) {
-    invariant(commandResponse.hostAndPort);
-    auto executorPool = Grid::get(opCtx)->getExecutorPool();
-    return storePossibleCursor(opCtx,
-                               shardId,
-                               *commandResponse.hostAndPort,
-                               commandResponse.response,
-                               requestedNss,
-                               executorPool->getArbitraryExecutor(),
-                               Grid::get(opCtx)->getCursorManager(),
-                               std::move(privileges),
-                               tailableMode);
-}
-
-StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,
                                         const HostAndPort& server,
                                         const BSONObj& cmdResult,

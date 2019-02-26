@@ -95,15 +95,4 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode);
 
-/**
- * Convenience function which extracts all necessary information from the passed CommandResponse,
- * and stores a ClusterClientCursor based on it. 'privileges' contains the required privileges for
- * the command, to be used by GetMore for auth checks.
- */
-StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
-                                        const NamespaceString& requestedNss,
-                                        const ShardId& shardId,
-                                        const Shard::CommandResponse& commandResponse,
-                                        PrivilegeVector privileges,
-                                        TailableModeEnum tailableMode);
 }  // namespace mongo

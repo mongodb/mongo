@@ -62,6 +62,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query/cluster_aggregation_planner.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
@@ -130,14 +131,8 @@ BSONObj createCommandForMergingShard(const AggregationRequest& request,
         mergeCmd.remove("readConcern");
     }
 
-    auto aggCmd = mergeCmd.freeze().toBson();
-
-    if (txnRouter) {
-        aggCmd = txnRouter->attachTxnFieldsIfNeeded(shardId, aggCmd);
-    }
-
     // agg creates temp collection and should handle implicit create separately.
-    return appendAllowImplicitCreate(aggCmd, true);
+    return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), true);
 }
 
 sharded_agg_helpers::DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
@@ -273,23 +268,27 @@ Status appendExplainResults(sharded_agg_helpers::DispatchShardPipelineResults&& 
     return Status::OK();
 }
 
-Shard::CommandResponse establishMergingShardCursor(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const AggregationRequest& request,
-                                                   const BSONObj mergeCmdObj,
-                                                   const ShardId& mergingShardId) {
+AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const AggregationRequest& request,
+                                                          const BSONObj mergeCmdObj,
+                                                          const ShardId& mergingShardId) {
     if (MONGO_FAIL_POINT(clusterAggregateFailToEstablishMergingShardCursor)) {
         log() << "clusterAggregateFailToEstablishMergingShardCursor fail point enabled.";
         uasserted(ErrorCodes::FailPointEnabled,
                   "Asserting on establishing merging shard cursor due to failpoint.");
     }
 
-    const auto mergingShard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, mergingShardId));
-
-    Shard::RetryPolicy retryPolicy = sharded_agg_helpers::getDesiredRetryPolicy(request);
-    return uassertStatusOK(mergingShard->runCommandWithFixedRetryAttempts(
-        opCtx, ReadPreferenceSetting::get(opCtx), nss.db().toString(), mergeCmdObj, retryPolicy));
+    MultiStatementTransactionRequestsSender ars(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+        nss.db().toString(),
+        {{mergingShardId, mergeCmdObj}},
+        ReadPreferenceSetting::get(opCtx),
+        sharded_agg_helpers::getDesiredRetryPolicy(request));
+    const auto response = ars.next();
+    invariant(ars.done());
+    return response;
 }
 
 BSONObj establishMergingMongosCursor(OperationContext* opCtx,
@@ -664,13 +663,18 @@ Status dispatchMergingPipeline(
     // Dispatch $mergeCursors to the chosen shard, store the resulting cursor, and return.
     auto mergeResponse = establishMergingShardCursor(
         opCtx, namespaces.executionNss, request, mergeCmdObj, mergingShardId);
+    uassertStatusOK(mergeResponse.swResponse);
 
-    auto mergeCursorResponse = uassertStatusOK(storePossibleCursor(opCtx,
-                                                                   namespaces.requestedNss,
-                                                                   mergingShardId,
-                                                                   mergeResponse,
-                                                                   privileges,
-                                                                   expCtx->tailableMode));
+    auto mergeCursorResponse = uassertStatusOK(
+        storePossibleCursor(opCtx,
+                            mergingShardId,
+                            *mergeResponse.shardHostAndPort,
+                            mergeResponse.swResponse.getValue().data,
+                            namespaces.requestedNss,
+                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                            Grid::get(opCtx)->getCursorManager(),
+                            privileges,
+                            expCtx->tailableMode));
 
     // Ownership for the shard cursors has been transferred to the merging shard. Dismiss the
     // ownership in the current merging pipeline such that when it goes out of scope it does not
@@ -862,51 +866,59 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const LiteParsedPipeline& liteParsedPipeline,
                                         const PrivilegeVector& privileges,
                                         BSONObjBuilder* out) {
-    // Temporary hack. See comment on declaration for details.
-    auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
-    if (!swShard.isOK()) {
-        return swShard.getStatus();
-    }
-    auto shard = std::move(swShard.getValue());
-
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     BSONObj cmdObj = CommandHelpers::filterCommandRequestForPassthrough(
         sharded_agg_helpers::createPassthroughCommandForShard(
             opCtx, aggRequest, shardId, nullptr, BSONObj()));
 
-    auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+    MultiStatementTransactionRequestsSender ars(
         opCtx,
-        ReadPreferenceSetting::get(opCtx),
+        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         namespaces.executionNss.db().toString(),
-        !shard->isConfig() ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
-                           : std::move(cmdObj),
-        Shard::RetryPolicy::kIdempotent));
+        {{shardId,
+          shardId != ShardRegistry::kConfigServerShardId
+              ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
+              : std::move(cmdObj)}},
+        ReadPreferenceSetting::get(opCtx),
+        Shard::RetryPolicy::kIdempotent);
+    auto response = ars.next();
+    invariant(ars.done());
 
-    if (ErrorCodes::isStaleShardVersionError(cmdResponse.commandStatus.code())) {
+    uassertStatusOK(response.swResponse);
+    auto commandStatus = getStatusFromCommandResult(response.swResponse.getValue().data);
+
+    if (ErrorCodes::isStaleShardVersionError(commandStatus.code())) {
+        uassertStatusOK(commandStatus.withContext("command failed because of stale config"));
+    } else if (ErrorCodes::isSnapshotError(commandStatus.code())) {
         uassertStatusOK(
-            cmdResponse.commandStatus.withContext("command failed because of stale config"));
-    } else if (ErrorCodes::isSnapshotError(cmdResponse.commandStatus.code())) {
-        uassertStatusOK(cmdResponse.commandStatus.withContext(
-            "command failed because can not establish a snapshot"));
+            commandStatus.withContext("command failed because can not establish a snapshot"));
     }
 
     BSONObj result;
     if (aggRequest.getExplain()) {
         // If this was an explain, then we get back an explain result object rather than a cursor.
-        result = cmdResponse.response;
+        result = response.swResponse.getValue().data;
     } else {
         auto tailMode = liteParsedPipeline.hasChangeStream()
             ? TailableModeEnum::kTailableAndAwaitData
             : TailableModeEnum::kNormal;
-        result = uassertStatusOK(storePossibleCursor(
-            opCtx, namespaces.requestedNss, shard->getId(), cmdResponse, privileges, tailMode));
+        result = uassertStatusOK(
+            storePossibleCursor(opCtx,
+                                shardId,
+                                *response.shardHostAndPort,
+                                response.swResponse.getValue().data,
+                                namespaces.requestedNss,
+                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                Grid::get(opCtx)->getCursorManager(),
+                                privileges,
+                                tailMode));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped
     // in appendElementsUnique.
     if (auto wcErrorElem = result["writeConcernError"]) {
-        appendWriteConcernErrorToCmdResponse(shard->getId(), wcErrorElem, *out);
+        appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *out);
     }
 
     out->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(result));
