@@ -34,6 +34,23 @@
     }
     assert.commandWorked(bulk.execute());
 
+    const collName = "createIndexes";
+
+    // Use createIndex(es) to build indexes and check the commit quorum.
+    let res = assert.commandWorked(testDB[collName].createIndex({x: 1}));
+    assert.eq(2, res.commitQuorum);
+
+    res = assert.commandWorked(testDB[collName].createIndex({y: 1}, {}, 1));
+    assert.eq(1, res.commitQuorum);
+
+    res = assert.commandWorked(testDB[collName].createIndexes([{i: 1}]));
+    assert.eq(2, res.commitQuorum);
+
+    res = assert.commandWorked(testDB[collName].createIndexes([{j: 1}], {}, 1));
+    assert.eq(1, res.commitQuorum);
+
+    replSet.waitForAllIndexBuildsToFinish(testDB.getName(), collName);
+
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: "hangIndexBuildBeforeBuilding", mode: "alwaysOn"}));
 
@@ -47,7 +64,7 @@
         }));
     }, testDB.getMongo().port);
 
-    checkLog.contains(replSet.getPrimary(), "Waiting for index build to complete");
+    checkLog.containsWithCount(replSet.getPrimary(), "Waiting for index build to complete", 5);
 
     // Test setting various commit quorums on the index build in our two node replica set.
     assert.commandFailed(testDB.runCommand(

@@ -654,6 +654,8 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         result.append(kNoteFieldName, "index already exists");
     }
 
+    commitQuorum->append("commitQuorum", &result);
+
     return true;
 }
 

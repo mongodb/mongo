@@ -624,11 +624,11 @@ DBCollection.prototype._indexSpec = function(keys, options) {
     return ret;
 };
 
-DBCollection.prototype.createIndex = function(keys, options) {
-    return this.createIndexes([keys], options);
+DBCollection.prototype.createIndex = function(keys, options, commitQuorum) {
+    return this.createIndexes([keys], options, commitQuorum);
 };
 
-DBCollection.prototype.createIndexes = function(keys, options) {
+DBCollection.prototype.createIndexes = function(keys, options, commitQuorum) {
     if (!Array.isArray(keys)) {
         throw new Error("createIndexes first argument should be an array");
     }
@@ -641,7 +641,12 @@ DBCollection.prototype.createIndexes = function(keys, options) {
     for (var i = 0; i < indexSpecs.length; i++) {
         delete (indexSpecs[i].ns);  // ns is passed to the first element in the command.
     }
-    return this._db.runCommand({createIndexes: this.getName(), indexes: indexSpecs});
+
+    if (commitQuorum === undefined) {
+        return this._db.runCommand({createIndexes: this.getName(), indexes: indexSpecs});
+    }
+    return this._db.runCommand(
+        {createIndexes: this.getName(), indexes: indexSpecs, commitQuorum: commitQuorum});
 };
 
 DBCollection.prototype.ensureIndex = function(keys, options) {
