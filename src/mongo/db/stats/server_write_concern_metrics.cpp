@@ -133,21 +133,21 @@ void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWrite
 
 void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::toBSON(
     BSONObjBuilder* builder) const {
-    builder->append("wmajority", wMajorityCount);
+    builder->append("wmajority", static_cast<long long>(wMajorityCount));
 
     BSONObjBuilder wNumBuilder(builder->subobjStart("wnum"));
     for (auto const& pair : wNumCounts) {
-        wNumBuilder.append(std::to_string(pair.first), pair.second);
+        wNumBuilder.append(std::to_string(pair.first), static_cast<long long>(pair.second));
     }
     wNumBuilder.done();
 
     BSONObjBuilder wTagBuilder(builder->subobjStart("wtag"));
     for (auto const& pair : wTagCounts) {
-        wTagBuilder.append(pair.first, pair.second);
+        wTagBuilder.append(pair.first, static_cast<long long>(pair.second));
     }
     wTagBuilder.done();
 
-    builder->append("none", noWCount);
+    builder->append("none", static_cast<long long>(noWCount));
 }
 
 namespace {
