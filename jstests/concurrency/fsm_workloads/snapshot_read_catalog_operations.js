@@ -34,6 +34,7 @@ var $config = (function() {
                 ErrorCodes.NoSuchTransaction,
                 ErrorCodes.SnapshotUnavailable,
                 ErrorCodes.SnapshotTooOld,
+                ErrorCodes.StaleChunkHistory,
                 ErrorCodes.LockTimeout,
                 ErrorCodes.ConflictingOperationInProgress
             ];
