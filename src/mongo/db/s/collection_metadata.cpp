@@ -46,6 +46,46 @@ namespace mongo {
 CollectionMetadata::CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
+BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
+    BSONObj key;
+
+    if (isSharded()) {
+        auto const& pattern = _cm->getShardKeyPattern();
+        key = dotted_path_support::extractElementsBasedOnTemplate(doc, pattern.toBSON());
+        if (pattern.hasId()) {
+            return key;
+        }
+        // else, try to append an _id field from the document.
+    }
+
+    if (auto id = doc["_id"]) {
+        return key.isEmpty() ? id.wrap() : BSONObjBuilder(std::move(key)).append(id).obj();
+    }
+
+    // For legacy documents that lack an _id, use the document itself as its key.
+    return doc;
+}
+
+void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
+    if (isSharded()) {
+        _cm->getVersion().appendLegacyWithField(&bb, "collVersion");
+        getShardVersion().appendLegacyWithField(&bb, "shardVersion");
+        bb.append("keyPattern", _cm->getShardKeyPattern().toBSON());
+    } else {
+        ChunkVersion::UNSHARDED().appendLegacyWithField(&bb, "collVersion");
+        ChunkVersion::UNSHARDED().appendLegacyWithField(&bb, "shardVersion");
+    }
+}
+
+std::string CollectionMetadata::toStringBasic() const {
+    if (isSharded()) {
+        return str::stream() << "collection version: " << _cm->getVersion().toString()
+                             << ", shard version: " << getShardVersion().toString();
+    } else {
+        return "collection version: <unsharded>";
+    }
+}
+
 RangeMap CollectionMetadata::getChunks() const {
     invariant(isSharded());
 
@@ -98,62 +138,8 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) const {
     return Status::OK();
 }
 
-BSONObj CollectionMetadata::extractDocumentKey(BSONObj const& doc) const {
-    BSONObj key;
-
-    if (isSharded()) {
-        auto const& pattern = getChunkManager()->getShardKeyPattern();
-        key = dotted_path_support::extractElementsBasedOnTemplate(doc, pattern.toBSON());
-        if (pattern.hasId()) {
-            return key;
-        }
-        // else, try to append an _id field from the document.
-    }
-
-    if (auto id = doc["_id"]) {
-        return key.isEmpty() ? id.wrap() : BSONObjBuilder(std::move(key)).append(id).obj();
-    }
-
-    // For legacy documents that lack an _id, use the document itself as its key.
-    return doc;
-}
-
-void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
-    if (isSharded()) {
-        _cm->getVersion().appendLegacyWithField(&bb, "collVersion");
-        getShardVersion().appendLegacyWithField(&bb, "shardVersion");
-        bb.append("keyPattern", _cm->getShardKeyPattern().toBSON());
-    } else {
-        ChunkVersion::UNSHARDED().appendLegacyWithField(&bb, "collVersion");
-        ChunkVersion::UNSHARDED().appendLegacyWithField(&bb, "shardVersion");
-    }
-}
-
-void CollectionMetadata::toBSONChunks(BSONArrayBuilder& bb) const {
-    if (!isSharded())
-        return;
-
-    for (const auto& chunk : _cm->chunks()) {
-        if (chunk.getShardId() == _thisShardId) {
-            BSONArrayBuilder chunkBB(bb.subarrayStart());
-            chunkBB.append(chunk.getMin());
-            chunkBB.append(chunk.getMax());
-            chunkBB.done();
-        }
-    }
-}
-
-std::string CollectionMetadata::toStringBasic() const {
-    if (isSharded()) {
-        return str::stream() << "collection version: " << _cm->getVersion().toString()
-                             << ", shard version: " << getShardVersion().toString();
-    } else {
-        return "collection version: <unsharded>";
-    }
-}
-
 boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
-    RangeMap const& receivingChunks, BSONObj const& origLookupKey) const {
+    const RangeMap& receivingChunks, const BSONObj& origLookupKey) const {
     invariant(isSharded());
 
     const BSONObj maxKey = getMaxKey();
@@ -219,6 +205,20 @@ boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
     }
 
     return boost::none;
+}
+
+void CollectionMetadata::toBSONChunks(BSONArrayBuilder* builder) const {
+    if (!isSharded())
+        return;
+
+    for (const auto& chunk : _cm->chunks()) {
+        if (chunk.getShardId() == _thisShardId) {
+            BSONArrayBuilder chunkBB(builder->subarrayStart());
+            chunkBB.append(chunk.getMin());
+            chunkBB.append(chunk.getMax());
+            chunkBB.done();
+        }
+    }
 }
 
 }  // namespace mongo

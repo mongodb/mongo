@@ -128,7 +128,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
     // collection, otherwise treat it as unsharded
     boost::optional<ScopedCollectionMetadata> shardMetadata =
         (OperationShardingState::isOperationVersioned(opCtx)
-             ? CollectionShardingState::get(opCtx, coll->ns())->getMetadataForOperation(opCtx)
+             ? CollectionShardingState::get(opCtx, coll->ns())->getOrphansFilter(opCtx)
              : boost::optional<ScopedCollectionMetadata>{});
 
     // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample

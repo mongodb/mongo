@@ -110,7 +110,8 @@ private:
 
 const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
 
-ChunkVersion getOperationReceivedVersion(OperationContext* opCtx, const NamespaceString& nss) {
+boost::optional<ChunkVersion> getOperationReceivedVersion(OperationContext* opCtx,
+                                                          const NamespaceString& nss) {
     auto& oss = OperationShardingState::get(opCtx);
 
     // If there is a version attached to the OperationContext, use it as the received version,
@@ -124,12 +125,12 @@ ChunkVersion getOperationReceivedVersion(OperationContext* opCtx, const Namespac
         // in a single call, the lack of version for a namespace on the collection must be treated
         // as UNSHARDED
         return connectionShardVersion.value_or(ChunkVersion::UNSHARDED());
-    } else {
-        // There is no shard version information on either 'opCtx' or 'client'. This means that the
-        // operation represented by 'opCtx' is unversioned, and the shard version is always OK for
-        // unversioned operations.
-        return ChunkVersion::IGNORED();
     }
+
+    // There is no shard version information on either 'opCtx' or 'client'. This means that the
+    // operation represented by 'opCtx' is unversioned, and the shard version is always OK for
+    // unversioned operations
+    return boost::none;
 }
 
 }  // namespace
@@ -151,12 +152,10 @@ void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* bu
     collectionsMap->report(opCtx, builder);
 }
 
-ScopedCollectionMetadata CollectionShardingState::getMetadataForOperation(OperationContext* opCtx) {
+ScopedCollectionMetadata CollectionShardingState::getOrphansFilter(OperationContext* opCtx) {
     const auto receivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
-
-    if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
+    if (!receivedShardVersion)
         return {kUnshardedCollection};
-    }
 
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     auto optMetadata = _getMetadata(atClusterTime);
@@ -193,8 +192,12 @@ boost::optional<ChunkVersion> CollectionShardingState::getCurrentShardVersionIfK
 }
 
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
-    const auto receivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
+    const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
 
+    if (!optReceivedShardVersion)
+        return;
+
+    const auto& receivedShardVersion = *optReceivedShardVersion;
     if (ChunkVersion::isIgnoredVersion(receivedShardVersion)) {
         return;
     }
@@ -203,7 +206,7 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
               repl::ReadConcernLevel::kAvailableReadConcern);
 
-    const auto metadata = getMetadataForOperation(opCtx);
+    const auto metadata = getCurrentMetadata();
     const auto wantedShardVersion =
         metadata->isSharded() ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 

@@ -140,7 +140,7 @@ bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
 
 const std::vector<std::unique_ptr<FieldRef>>* getImmutableFields(OperationContext* opCtx,
                                                                  const NamespaceString& ns) {
-    auto metadata = CollectionShardingState::get(opCtx, ns)->getMetadataForOperation(opCtx);
+    auto metadata = CollectionShardingState::get(opCtx, ns)->getCurrentMetadata();
     if (metadata->isSharded()) {
         const std::vector<std::unique_ptr<FieldRef>>& fields = metadata->getKeyPatternFields();
         // Return shard-keys as immutable for the update system.
@@ -304,7 +304,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
             args.stmtId = request->getStmtId();
             args.update = logObj;
             auto* const css = CollectionShardingState::get(getOpCtx(), collection()->ns());
-            auto metadata = css->getMetadataForOperation(getOpCtx());
+            auto metadata = css->getCurrentMetadata();
             args.criteria = metadata->extractDocumentKey(newObj);
             uassert(16980,
                     "Multi-update operations require all documents to have an '_id' field",

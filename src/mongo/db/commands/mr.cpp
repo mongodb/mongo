@@ -1421,7 +1421,7 @@ public:
 
         const auto metadata = [&] {
             AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
-            return CollectionShardingState::get(opCtx, config.nss)->getMetadataForOperation(opCtx);
+            return CollectionShardingState::get(opCtx, config.nss)->getCurrentMetadata();
         }();
 
         bool shouldHaveData = false;

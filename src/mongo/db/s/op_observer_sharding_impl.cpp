@@ -37,15 +37,25 @@
 
 namespace mongo {
 namespace {
+
 const auto getIsMigrating = OperationContext::declareDecoration<bool>();
 
+/**
+ * Write operations do shard version checking, but do not perform orphan document filtering. Because
+ * of this, if an update operation runs as part of a 'readConcern:snapshot' transaction, it might
+ * get routed to a shard which no longer owns the chunk being written to. In such cases, throw a
+ * MigrationConflict exception to indicate that the transaction needs to be rolled-back and
+ * restarted.
+ */
 void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
                                         CollectionShardingRuntime* csr,
                                         const BSONObj& doc) {
-    auto metadata = csr->getMetadataForOperation(opCtx);
-    if (!metadata->isSharded()) {
+    if (!repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime())
         return;
-    }
+
+    const auto metadata = csr->getOrphansFilter(opCtx);
+    if (!metadata->isSharded())
+        return;
 
     // We can assume the simple collation because shard keys do not support non-simple collations.
     auto chunk = metadata->getChunkManager()->findIntersectingChunkWithSimpleCollation(
@@ -62,7 +72,8 @@ bool isMigratingWithCSRLock(CollectionShardingRuntime* csr,
     auto msm = MigrationSourceManager::get(csr, csrLock);
     return msm && msm->getCloner()->isDocumentInMigratingChunk(docToDelete);
 }
-}
+
+}  // namespace
 
 bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
                                          NamespaceString const& nss,
@@ -95,9 +106,7 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
     csr->checkShardVersionOrThrow(opCtx);
 
     if (inMultiDocumentTransaction) {
-        if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
-            assertIntersectingChunkHasNotMoved(opCtx, csr, insertedDoc);
-        }
+        assertIntersectingChunkHasNotMoved(opCtx, csr, insertedDoc);
         return;
     }
 
@@ -118,9 +127,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     csr->checkShardVersionOrThrow(opCtx);
 
     if (inMultiDocumentTransaction) {
-        if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
-            assertIntersectingChunkHasNotMoved(opCtx, csr, updatedDoc);
-        }
+        assertIntersectingChunkHasNotMoved(opCtx, csr, updatedDoc);
         return;
     }
 
@@ -141,9 +148,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
     csr->checkShardVersionOrThrow(opCtx);
 
     if (inMultiDocumentTransaction) {
-        if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
-            assertIntersectingChunkHasNotMoved(opCtx, csr, documentKey);
-        }
+        assertIntersectingChunkHasNotMoved(opCtx, csr, documentKey);
         return;
     }
 
