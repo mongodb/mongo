@@ -188,7 +188,7 @@ bool enableECDHE(SSL_CTX* const ctx) {
     if (SSL_CTX_ctrl(ctx, 94, 1, NULL) != 1) {
         // If manually setting the configuration option failed, use a hard coded curve
         if (!useDefaultECKey(ctx)) {
-            error() << "Failed to enable ECDHE.";
+            warning() << "Failed to enable ECDHE due to a lack of support from system libraries.";
             return false;
         }
     }
@@ -997,7 +997,8 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
             UniqueDHParams dhparams = makeDefaultDHParameters();
 
             if (!dhparams || SSL_CTX_set_tmp_dh(context, dhparams.get()) != 1) {
-                error() << "Failed to enable DHE";
+                error() << "Failed to set default DH parameters: "
+                        << getSSLErrorMessage(ERR_get_error());
             }
         }
     }
