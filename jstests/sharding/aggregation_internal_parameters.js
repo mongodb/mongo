@@ -5,15 +5,7 @@
 (function() {
     "use strict";
 
-    const st = new ShardingTest({
-        shards: 2,
-        rs: {
-            nodes: 1,
-            enableMajorityReadConcern: '',
-            // Use a higher frequency for periodic noops to speed up the test.
-            setParameter: {periodicNoopIntervalSecs: 1}
-        }
-    });
+    const st = new ShardingTest({shards: 2, rs: {nodes: 1, enableMajorityReadConcern: ''}});
 
     const mongosDB = st.s0.getDB(jsTestName());
     const mongosColl = mongosDB[jsTestName()];
