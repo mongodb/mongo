@@ -678,7 +678,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
         const IndexDescriptor* desc =
             findIndexByKeyPatternAndCollationSpec(opCtx, key, collation, findInProgressIndexes);
         if (desc) {
-            LOG(2) << "index already exists with diff name " << name << " pattern: " << key
+            LOG(2) << "Index already exists with a different name: " << name << " pattern: " << key
                    << " collation: " << collation;
 
             IndexDescriptor temp(_collection, _getAccessMethodName(key), spec);
@@ -688,8 +688,9 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                             << " already exists with different options: "
                                             << desc->infoObj());
 
-            return Status(ErrorCodes::IndexAlreadyExists,
-                          str::stream() << "index already exists with different name: " << name);
+            return Status(ErrorCodes::IndexOptionsConflict,
+                          str::stream() << "Index with name: " << name
+                                        << " already exists with a different name");
         }
     }
 

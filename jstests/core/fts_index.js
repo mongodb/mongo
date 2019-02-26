@@ -123,7 +123,11 @@ assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}, {background: true}));
 assert.eq(2, coll.getIndexes().length);
-assert.commandWorked(coll.ensureIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {b: 1}}));
+assert.commandFailedWithCode(coll.ensureIndex({a: 1, b: 1, c: "text"}),
+                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.ensureIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {b: 1}}),
+    ErrorCodes.IndexOptionsConflict);
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}, {default_language: "english"}));
 assert.eq(2, coll.getIndexes().length);

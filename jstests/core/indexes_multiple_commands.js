@@ -28,6 +28,11 @@
 
         if (usingWriteCommands) {
             cmdResult = cmd();
+            if (numIndexes == 0) {
+                assert.commandFailedWithCode(cmdResult, ErrorCodes.IndexOptionsConflict);
+                return;
+            }
+
             assert.commandWorked(cmdResult);
             var isShardedNS = cmdResult.hasOwnProperty('raw');
             if (isShardedNS) {
@@ -39,6 +44,11 @@
         } else {
             var nIndexesBefore = coll.getIndexes().length;
             cmdResult = cmd();
+            if (numIndexes == 0) {
+                assert.commandFailedWithCode(cmdResult, ErrorCodes.IndexOptionsConflict);
+                return;
+            }
+
             assert.commandWorked(cmdResult);
             var nIndexesAfter = coll.getIndexes().length;
             assert.eq(nIndexesAfter - nIndexesBefore, numIndexes, tojson(coll.getIndexes()));

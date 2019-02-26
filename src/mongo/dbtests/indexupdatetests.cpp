@@ -414,14 +414,40 @@ public:
     }
 };
 
-class SameSpecSameOptionDifferentOrder : public ComplexIndex {
+class SameSpecDifferentNameDifferentOrder : public ComplexIndex {
 public:
     void run() {
-        // Exactly the same specs with the existing one, only
-        // specified in a different order than the original.
+        // Exactly the same specs with the existing one, only specified in a different order than
+        // the original. This will throw an IndexOptionsConflict as the index already exists under
+        // another name.
+        ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
+                      createIndex("unittests",
+                                  BSON("name"
+                                       << "super2"
+                                       << "ns"
+                                       << _ns
+                                       << "expireAfterSeconds"
+                                       << 3600
+                                       << "sparse"
+                                       << true
+                                       << "unique"
+                                       << 1
+                                       << "key"
+                                       << BSON("superIdx"
+                                               << "2d")
+                                       << "v"
+                                       << static_cast<int>(kIndexVersion))));
+    }
+};
+
+class SameSpecSameNameDifferentOrder : public ComplexIndex {
+public:
+    void run() {
+        // Exactly the same specs with the existing one, only specified in a different order than
+        // the original, but with the same name.
         ASSERT_OK(createIndex("unittests",
                               BSON("name"
-                                   << "super2"
+                                   << "super"
                                    << "ns"
                                    << _ns
                                    << "expireAfterSeconds"
@@ -705,7 +731,8 @@ public:
         add<SameSpecDifferentOption>();
         add<SameSpecSameOptions>();
         add<DifferentSpecSameName>();
-        add<SameSpecSameOptionDifferentOrder>();
+        add<SameSpecDifferentNameDifferentOrder>();
+        add<SameSpecSameNameDifferentOrder>();
         add<SameSpecDifferentUnique>();
         add<SameSpecDifferentSparse>();
         add<SameSpecDifferentTTL>();
