@@ -3748,5 +3748,75 @@ TEST_F(TxnParticipantTest, AbortTransactionOnSessionCheckoutWithoutRefresh) {
     ASSERT_TRUE(txnParticipant.transactionIsAborted());
 }
 
+TEST_F(TxnParticipantTest, ResponseMetadataHasHasReadOnlyFalseIfNothingInProgress) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
+}
+
+TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfInRetryableWrite) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    // Start a retryable write.
+    txnParticipant.beginOrContinue(opCtx(),
+                                   *opCtx()->getTxnNumber(),
+                                   boost::none /* autocommit */,
+                                   boost::none /* startTransaction */);
+    ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
+}
+
+TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyTrueIfInProgressAndOperationsVectorEmpty) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    // Start a transaction.
+    txnParticipant.beginOrContinue(
+        opCtx(), *opCtx()->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+    ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "find");
+    ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
+}
+
+TEST_F(TxnParticipantTest,
+       ResponseMetadataHasReadOnlyFalseIfInProgressAndOperationsVectorNotEmpty) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    // Start a transaction.
+    txnParticipant.beginOrContinue(
+        opCtx(), *opCtx()->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+    ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    // Simulate an insert.
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    txnParticipant.addTransactionOperation(opCtx(), operation);
+    ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
+}
+
+TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfAborted) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    // Start a transaction.
+    txnParticipant.beginOrContinue(
+        opCtx(), *opCtx()->getTxnNumber(), false /* autocommit */, true /* startTransaction */);
+    ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "find");
+    ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
+
+    txnParticipant.abortActiveTransaction(opCtx());
+    ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
+}
+
 }  // namespace
 }  // namespace mongo

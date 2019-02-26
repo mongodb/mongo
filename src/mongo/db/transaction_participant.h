@@ -34,6 +34,7 @@
 #include <map>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/multi_key_path_tracker.h"
@@ -481,6 +482,11 @@ public:
          */
         std::vector<repl::ReplOperation>& retrieveCompletedTransactionOperations(
             OperationContext* opCtx);
+
+        /**
+         * Returns an object containing transaction-related metadata to append on responses.
+         */
+        TxnResponseMetadata getResponseMetadata();
 
         /**
          * Clears the stored operations for an multi-document (non-autocommit) transaction, marking

@@ -43,6 +43,7 @@
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -436,6 +437,13 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     // Stash or commit the transaction when the command succeeds.
     txnParticipant.stashTransactionResources(opCtx);
     guard.dismiss();
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+        serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        auto txnResponseMetadata = txnParticipant.getResponseMetadata();
+        auto bodyBuilder = replyBuilder->getBodyBuilder();
+        txnResponseMetadata.serialize(&bodyBuilder);
+    }
 }
 
 bool runCommandImpl(OperationContext* opCtx,

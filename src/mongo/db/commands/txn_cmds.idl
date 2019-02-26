@@ -34,6 +34,17 @@ imports:
     - "mongo/s/sharding_types.idl"
 
 structs:
+    TxnResponseMetadata:
+        description: "Contains fields a participant attaches in responses to successful transaction
+                      statements"
+        strict: false
+        fields:
+            readOnly:
+                description: "True if the shard has the transaction in progress but has not done a
+                              write for it"
+                type: bool
+
+
     TxnRecoveryToken:
         description: "Contains info for retrying the commit of a sharded transaction"
         fields:

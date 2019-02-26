@@ -1049,6 +1049,13 @@ TransactionParticipant::Participant::retrieveCompletedTransactionOperations(
     return p().transactionOperations;
 }
 
+TxnResponseMetadata TransactionParticipant::Participant::getResponseMetadata() {
+    // Currently the response metadata only contains a single field, which is whether or not the
+    // transaction is read-only so far.
+    return {o().txnState.isInSet(TransactionState::kInProgress) &&
+            p().transactionOperations.empty()};
+}
+
 void TransactionParticipant::Participant::clearOperationsInMemory(OperationContext* opCtx) {
     // Ensure that we only ever end a transaction when committing with prepare or in progress.
     invariant(o().txnState.isInSet(TransactionState::kCommittingWithPrepare |
