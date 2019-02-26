@@ -84,11 +84,6 @@ const char* DocumentSourceGeoNearCursor::getSourceName() const {
     return kStageName;
 }
 
-BSONObjSet DocumentSourceGeoNearCursor::getOutputSorts() {
-    return SimpleBSONObjComparator::kInstance.makeBSONObjSet(
-        {BSON(_distanceField.fullPath() << 1)});
-}
-
 Document DocumentSourceGeoNearCursor::transformBSONObjToDocument(const BSONObj& obj) const {
     MutableDocument output(Document::fromBsonWithMetaData(obj));
 

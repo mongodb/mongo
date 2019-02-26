@@ -51,10 +51,6 @@ public:
 
     const char* getSourceName() const override;
 
-    BSONObjSet getOutputSorts() override {
-        return _outputSorts;
-    }
-
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -225,7 +221,6 @@ private:
     // the default.
     Status _execStatus = Status::OK();
 
-    BSONObjSet _outputSorts;
     std::string _planSummary;
     PlanSummaryStats _planSummaryStats;
 

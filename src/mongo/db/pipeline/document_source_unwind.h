@@ -38,9 +38,10 @@ class DocumentSourceUnwind final : public DocumentSource {
 public:
     // virtuals from DocumentSource
     GetNextResult getNext() final;
+
     const char* getSourceName() const final;
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    BSONObjSet getOutputSorts() final;
 
     /**
      * Returns the unwound path, and the 'includeArrayIndex' path, if specified.

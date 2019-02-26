@@ -207,31 +207,6 @@ DocumentSource::GetNextResult DocumentSourceUnwind::getNext() {
     return nextOut;
 }
 
-BSONObjSet DocumentSourceUnwind::getOutputSorts() {
-    BSONObjSet out = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    std::string unwoundPath = getUnwindPath();
-    BSONObjSet inputSort = pSource->getOutputSorts();
-
-    for (auto&& sortObj : inputSort) {
-        // Truncate each sortObj at the unwindPath.
-        BSONObjBuilder outputSort;
-
-        for (BSONElement fieldSort : sortObj) {
-            if (fieldSort.fieldNameStringData() == unwoundPath) {
-                break;
-            }
-            outputSort.append(fieldSort);
-        }
-
-        BSONObj outSortObj = outputSort.obj();
-        if (!outSortObj.isEmpty()) {
-            out.insert(outSortObj);
-        }
-    }
-
-    return out;
-}
-
 DocumentSource::GetModPathsReturn DocumentSourceUnwind::getModifiedPaths() const {
     std::set<std::string> modifiedFields{_unwindPath.fullPath()};
     if (_indexPath) {

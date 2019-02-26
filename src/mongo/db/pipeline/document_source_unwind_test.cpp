@@ -684,18 +684,6 @@ TEST_F(UnwindStageTest, AddsUnwoundPathToDependencies) {
     ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
 }
 
-TEST_F(UnwindStageTest, TruncatesOutputSortAtUnwoundPath) {
-    auto unwind = DocumentSourceUnwind::create(getExpCtx(), "x.y", false, boost::none);
-    auto source = DocumentSourceMock::create();
-    source->sorts = {BSON("a" << 1 << "x.y" << 1 << "b" << 1)};
-
-    unwind->setSource(source.get());
-
-    BSONObjSet outputSort = unwind->getOutputSorts();
-    ASSERT_EQUALS(1U, outputSort.size());
-    ASSERT_EQUALS(1U, outputSort.count(BSON("a" << 1)));
-}
-
 TEST_F(UnwindStageTest, ShouldPropagatePauses) {
     const bool includeNullIfEmptyOrMissing = false;
     const boost::optional<std::string> includeArrayIndex = boost::none;

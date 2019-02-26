@@ -376,18 +376,6 @@ Pipeline::SourceContainer::iterator DocumentSourceGraphLookUp::doOptimizeAt(
     return std::next(itr);
 }
 
-BSONObjSet DocumentSourceGraphLookUp::getOutputSorts() {
-    std::set<std::string> fields{_as.fullPath()};
-    if (_depthField) {
-        fields.insert(_depthField->fullPath());
-    }
-    if (_unwind && (*_unwind)->indexPath()) {
-        fields.insert((*_unwind)->indexPath()->fullPath());
-    }
-
-    return DocumentSource::truncateSortSet(pSource->getOutputSorts(), fields);
-}
-
 void DocumentSourceGraphLookUp::checkMemoryUsage() {
     // TODO SERVER-23980: Implement spilling to disk if allowDiskUse is specified.
     uassert(40099,

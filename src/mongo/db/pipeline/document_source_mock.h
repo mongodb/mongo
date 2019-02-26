@@ -62,10 +62,6 @@ public:
         return constraints;
     }
 
-    BSONObjSet getOutputSorts() override {
-        return sorts;
-    }
-
     static boost::intrusive_ptr<DocumentSourceMock> create();
 
     static boost::intrusive_ptr<DocumentSourceMock> create(Document doc);

@@ -107,52 +107,6 @@ TEST_F(DocumentSourceLookUpTest, PreservesParentPipelineLetVariables) {
     ASSERT_VALUE_EQ(Value(123), lookupStage->getVariables_forTest().getValue(varId, Document()));
 }
 
-TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnAsField) {
-    auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "a");
-    expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-
-    intrusive_ptr<DocumentSourceMock> source = DocumentSourceMock::create();
-    source->sorts = {BSON("a" << 1 << "d.e" << 1 << "c" << 1)};
-    auto lookup = DocumentSourceLookUp::createFromBson(Document{{"$lookup",
-                                                                 Document{{"from", "a"_sd},
-                                                                          {"localField", "b"_sd},
-                                                                          {"foreignField", "c"_sd},
-                                                                          {"as", "d.e"_sd}}}}
-                                                           .toBson()
-                                                           .firstElement(),
-                                                       expCtx);
-    lookup->setSource(source.get());
-
-    BSONObjSet outputSort = lookup->getOutputSorts();
-
-    ASSERT_EQUALS(outputSort.count(BSON("a" << 1)), 1U);
-    ASSERT_EQUALS(outputSort.size(), 1U);
-}
-
-TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnSuffixOfAsField) {
-    auto expCtx = getExpCtx();
-    NamespaceString fromNs("test", "a");
-    expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-
-    intrusive_ptr<DocumentSourceMock> source = DocumentSourceMock::create();
-    source->sorts = {BSON("a" << 1 << "d.e" << 1 << "c" << 1)};
-    auto lookup = DocumentSourceLookUp::createFromBson(Document{{"$lookup",
-                                                                 Document{{"from", "a"_sd},
-                                                                          {"localField", "b"_sd},
-                                                                          {"foreignField", "c"_sd},
-                                                                          {"as", "d"_sd}}}}
-                                                           .toBson()
-                                                           .firstElement(),
-                                                       expCtx);
-    lookup->setSource(source.get());
-
-    BSONObjSet outputSort = lookup->getOutputSorts();
-
-    ASSERT_EQUALS(outputSort.count(BSON("a" << 1)), 1U);
-    ASSERT_EQUALS(outputSort.size(), 1U);
-}
-
 TEST_F(DocumentSourceLookUpTest, AcceptsPipelineSyntax) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");

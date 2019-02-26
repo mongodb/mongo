@@ -251,43 +251,6 @@ TEST_F(DocumentSourceCursorTest, LimitCoalesce) {
     ASSERT(source()->getNext().isEOF());
 }
 
-//
-// Test cursor output sort.
-//
-TEST_F(DocumentSourceCursorTest, CollectionScanProvidesNoSort) {
-    createSource(BSON("$natural" << 1));
-    ASSERT_EQ(source()->getOutputSorts().size(), 0U);
-    source()->dispose();
-}
-
-TEST_F(DocumentSourceCursorTest, IndexScanProvidesSortOnKeys) {
-    client.createIndex(nss.ns(), BSON("a" << 1));
-    createSource(BSON("a" << 1));
-
-    ASSERT_EQ(source()->getOutputSorts().size(), 1U);
-    ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1)), 1U);
-    source()->dispose();
-}
-
-TEST_F(DocumentSourceCursorTest, ReverseIndexScanProvidesSort) {
-    client.createIndex(nss.ns(), BSON("a" << -1));
-    createSource(BSON("a" << -1));
-
-    ASSERT_EQ(source()->getOutputSorts().size(), 1U);
-    ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << -1)), 1U);
-    source()->dispose();
-}
-
-TEST_F(DocumentSourceCursorTest, CompoundIndexScanProvidesMultipleSorts) {
-    client.createIndex(nss.ns(), BSON("a" << 1 << "b" << -1));
-    createSource(BSON("a" << 1 << "b" << -1));
-
-    ASSERT_EQ(source()->getOutputSorts().size(), 2U);
-    ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1)), 1U);
-    ASSERT_EQ(source()->getOutputSorts().count(BSON("a" << 1 << "b" << -1)), 1U);
-    source()->dispose();
-}
-
 TEST_F(DocumentSourceCursorTest, SerializationNoExplainLevel) {
     // Nothing serialized when no explain mode specified.
     createSource();

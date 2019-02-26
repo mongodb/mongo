@@ -328,26 +328,6 @@ public:
      */
     static void registerParser(std::string name, Parser parser);
 
-    /**
-     * Given a BSONObj, construct a BSONObjSet consisting of all prefixes of that object. For
-     * example, given {a: 1, b: 1, c: 1}, this will return a set: {{a: 1}, {a: 1, b: 1}, {a: 1, b:
-     * 1, c: 1}}.
-     */
-    static BSONObjSet allPrefixes(BSONObj obj);
-
-    /**
-     * Given a BSONObjSet, where each BSONObj represents a sort key, return the BSONObjSet that
-     * results from truncating each sort key before the first path that is a member of 'fields', or
-     * is a child of a member of 'fields'.
-     */
-    static BSONObjSet truncateSortSet(const BSONObjSet& sorts, const std::set<std::string>& fields);
-
-    //
-    // Optimization API - These methods give each DocumentSource an opportunity to apply any local
-    // optimizations, and to provide any rule-based optimizations to swap with or absorb subsequent
-    // stages.
-    //
-
 private:
     /**
      * Attempt to push a match stage from directly ahead of the current stage given by itr to before
@@ -396,13 +376,6 @@ public:
     // Property analysis can be useful during optimization (e.g. analysis of sort orders determines
     // whether or not a blocking group can be upgraded to a streaming group).
     //
-
-    /**
-     * Gets a BSONObjSet representing the sort order(s) of the output of the stage.
-     */
-    virtual BSONObjSet getOutputSorts() {
-        return SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    }
 
     struct GetModPathsReturn {
         enum class Type {

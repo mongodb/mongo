@@ -43,11 +43,8 @@ public:
     virtual ~DocumentSourceMatch() = default;
 
     GetNextResult getNext() override;
+
     boost::intrusive_ptr<DocumentSource> optimize() final;
-    BSONObjSet getOutputSorts() final {
-        return pSource ? pSource->getOutputSorts()
-                       : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    }
 
     const char* getSourceName() const override;
 

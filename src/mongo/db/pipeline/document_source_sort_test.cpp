@@ -176,14 +176,6 @@ TEST_F(DocumentSourceSortTest, Dependencies) {
     ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DepsTracker::MetadataType::TEXT_SCORE));
 }
 
-TEST_F(DocumentSourceSortTest, OutputSort) {
-    createSort(BSON("a" << 1 << "b.c" << -1));
-    BSONObjSet outputSort = sort()->getOutputSorts();
-    ASSERT_EQUALS(outputSort.count(BSON("a" << 1)), 1U);
-    ASSERT_EQUALS(outputSort.count(BSON("a" << 1 << "b.c" << -1)), 1U);
-    ASSERT_EQUALS(outputSort.size(), 2U);
-}
-
 TEST_F(DocumentSourceSortTest, ReportsNoPathsModified) {
     createSort(BSON("a" << 1 << "b.c" << -1));
     auto modifiedPaths = sort()->getModifiedPaths();

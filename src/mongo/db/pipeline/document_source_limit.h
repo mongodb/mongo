@@ -63,11 +63,6 @@ public:
         return kStageName.rawData();
     }
 
-    BSONObjSet getOutputSorts() final {
-        return pSource ? pSource->getOutputSorts()
-                       : SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    }
-
     /**
      * Attempts to combine with a subsequent $limit stage, setting 'limit' appropriately.
      */

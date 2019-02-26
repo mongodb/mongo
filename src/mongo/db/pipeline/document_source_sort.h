@@ -76,10 +76,6 @@ public:
         return constraints;
     }
 
-    BSONObjSet getOutputSorts() final {
-        return allPrefixes(_rawSort);
-    }
-
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     boost::optional<MergingLogic> mergingLogic() final;

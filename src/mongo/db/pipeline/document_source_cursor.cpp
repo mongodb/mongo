@@ -303,7 +303,6 @@ DocumentSourceCursor::DocumentSourceCursor(
     : DocumentSource(pCtx),
       _docsAddedToBatches(0),
       _exec(std::move(exec)),
-      _outputSorts(_exec->getOutputSorts()),
       _trackOplogTS(trackOplogTimestamp) {
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _exec->saveState();

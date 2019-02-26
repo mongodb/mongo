@@ -43,8 +43,9 @@ public:
         const AggregationRequest& request, const BSONElement& spec);
 
     GetNextResult getNext() final;
+
     const char* getSourceName() const final;
-    BSONObjSet getOutputSorts() final;
+
     void serializeToArray(
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;

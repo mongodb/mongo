@@ -117,10 +117,6 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
-    BSONObjSet getOutputSorts() final {
-        return DocumentSource::truncateSortSet(pSource->getOutputSorts(), {_as.fullPath()});
-    }
-
     boost::optional<MergingLogic> mergingLogic() final {
         // {shardsStage, mergingStage, sortPattern}
         return MergingLogic{nullptr, this, boost::none};
