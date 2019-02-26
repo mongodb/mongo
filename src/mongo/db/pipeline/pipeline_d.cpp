@@ -157,7 +157,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
     if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, collection->ns().ns())) {
         auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
             opCtx,
-            CollectionShardingState::get(opCtx, collection->ns())->getMetadataForOperation(opCtx),
+            CollectionShardingState::get(opCtx, collection->ns())->getOrphansFilter(opCtx),
             ws.get(),
             stage.release());
         return PlanExecutor::make(opCtx,

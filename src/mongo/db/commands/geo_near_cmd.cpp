@@ -230,9 +230,9 @@ public:
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
-        // version on initial entry into geoNear.
-        auto rangePreserver =
-            CollectionShardingState::get(opCtx, nss)->getMetadataForOperation(opCtx);
+        // version on initial entry into geoNear (which happens as part of
+        // AutoGetCollectionForReadCommand).
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
 
         const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         const PlanExecutor::YieldPolicy yieldPolicy =

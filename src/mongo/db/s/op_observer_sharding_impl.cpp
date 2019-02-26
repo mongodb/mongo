@@ -63,6 +63,7 @@
 
 namespace mongo {
 namespace {
+
 const auto getIsMigrating = OperationContext::declareDecoration<bool>();
 }
 
