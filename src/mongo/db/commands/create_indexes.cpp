@@ -355,6 +355,15 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     // The 'indexer' can throw, so ensure the build cleanup occurs.
     ON_BLOCK_EXIT([&] {
+        if (MONGO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
+            // Set a flag to leave the persisted index build state intact when cleanUpAfterBuild()
+            // is called below. The index build will be found on server startup.
+            //
+            // Note: this failpoint has two parts, the first to make the index build error and the
+            // second to catch it here: the index build must error before commit(), otherwise
+            // commit() clears the state.
+            indexer.abortWithoutCleanup(opCtx);
+        }
         invariant(opCtx->lockState()->isDbLockedForMode(dbname, MODE_X));
         indexer.cleanUpAfterBuild(opCtx, collection);
     });

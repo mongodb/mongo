@@ -47,8 +47,12 @@
 #include "mongo/db/record_id.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DECLARE(leaveIndexBuildUnfinishedForShutdown);
+
 class Collection;
 class MatchExpression;
 class OperationContext;

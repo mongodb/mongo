@@ -33,6 +33,7 @@
 
     function restartStandalone(old) {
         jsTest.log("Restarting mongod");
+        MongoRunner.stopMongod(old);
         return MongoRunner.runMongod({restart: true, dbpath: old.dbpath, cleanData: false});
     }
 
@@ -170,13 +171,17 @@
 
         addTestDocuments(collDB);
 
-        jsTest.log("Starting and hanging index builds.");
+        jsTest.log("Starting an index build on a standalone and leaving it unfinished.");
         assert.commandWorked(collDB.adminCommand(
-            {configureFailPoint: "crashAfterStartingIndexBuild", mode: "alwaysOn"}));
-
-        assert.throws(() => {
-            collDB.runCommand({createIndexes: collName, indexes: indexesToBuild});
-        });
+            {configureFailPoint: "leaveIndexBuildUnfinishedForShutdown", mode: "alwaysOn"}));
+        try {
+            assert.commandFailedWithCode(
+                collDB.runCommand({createIndexes: collName, indexes: indexesToBuild}),
+                ErrorCodes.InterruptedAtShutdown);
+        } finally {
+            assert.commandWorked(collDB.adminCommand(
+                {configureFailPoint: "leaveIndexBuildUnfinishedForShutdown", mode: "off"}));
+        }
 
         mongod = restartStandalone(mongod);
 
