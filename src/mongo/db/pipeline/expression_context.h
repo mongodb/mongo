@@ -196,6 +196,9 @@ public:
         _resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
     }
 
+    auto getRuntimeConstants() const {
+        return variables.getRuntimeConstants();
+    }
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 

@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
+#include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/write_concern_options.h"
 
@@ -63,6 +64,7 @@ public:
     static constexpr StringData kHintName = "hint"_sd;
     static constexpr StringData kCommentName = "comment"_sd;
     static constexpr StringData kExchangeName = "exchange"_sd;
+    static constexpr StringData kRuntimeConstants = "runtimeConstants"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -216,6 +218,10 @@ public:
         return _writeConcern;
     }
 
+    const auto& getRuntimeConstants() const {
+        return _runtimeConstants;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -284,6 +290,10 @@ public:
         _writeConcern = writeConcern;
     }
 
+    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
+        _runtimeConstants = std::move(runtimeConstants);
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -333,5 +343,9 @@ private:
 
     // The explicit writeConcern for the operation or boost::none if the user did not specifiy one.
     boost::optional<WriteConcernOptions> _writeConcern;
+
+    // A document containing runtime constants; i.e. values that do not change once computed (e.g.
+    // $$NOW).
+    boost::optional<RuntimeConstants> _runtimeConstants;
 };
 }  // namespace mongo

@@ -595,6 +595,7 @@ env.Library(
         env.Idlc('document_source_list_sessions.idl')[0],
         env.Idlc('document_source_out.idl')[0],
         env.Idlc('exchange_spec.idl')[0],
+        env.Idlc('runtime_constants.idl')[0],
         'resume_token.cpp',
     ],
     LIBDEPS=[

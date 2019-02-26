@@ -60,6 +60,8 @@ public:
         // initialize with a nullptr and set post-construction.
         timeZoneDatabase = TimeZoneDatabase::get(_serviceContext.getServiceContext());
         opCtx = _testOpCtx.get();
+        RuntimeConstants constants(Date_t::now(), Timestamp());
+        variables.setRuntimeConstants(constants);
     }
 
     ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)

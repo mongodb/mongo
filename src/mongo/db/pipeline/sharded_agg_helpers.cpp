@@ -75,7 +75,7 @@ Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity v
 
 BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
                                          const AggregationRequest& request,
-                                         const boost::optional<ShardId>& shardId,
+                                         const boost::optional<RuntimeConstants>& constants,
                                          Pipeline* pipeline,
                                          BSONObj collationObj) {
     // Create the command for the shards.
@@ -84,14 +84,19 @@ BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
         targetedCmd[AggregationRequest::kPipelineName] = Value(pipeline->serialize());
     }
 
-    return genericTransformForShards(std::move(targetedCmd), opCtx, shardId, request, collationObj);
+    return genericTransformForShards(
+        std::move(targetedCmd), opCtx, request, constants, collationObj);
 }
 
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   OperationContext* opCtx,
-                                  const boost::optional<ShardId>& shardId,
                                   const AggregationRequest& request,
+                                  const boost::optional<RuntimeConstants>& constants,
                                   BSONObj collationObj) {
+    if (constants) {
+        cmdForShards[AggregationRequest::kRuntimeConstants] = Value(constants.get().toBSON());
+    }
+
     cmdForShards[AggregationRequest::kFromMongosName] = Value(true);
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
@@ -158,8 +163,8 @@ BSONObj createCommandForTargetedShards(
     const cluster_aggregation_planner::SplitPipeline& splitPipeline,
     const BSONObj collationObj,
     const boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec,
+    const boost::optional<RuntimeConstants>& constants,
     bool needsMerge) {
-
     // Create the command for the shards.
     MutableDocument targetedCmd(request.serializeToCommandObj());
     // If we've parsed a pipeline on mongos, always override the pipeline, in case parsing it
@@ -196,7 +201,7 @@ BSONObj createCommandForTargetedShards(
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
     return genericTransformForShards(
-        std::move(targetedCmd), opCtx, boost::none, request, collationObj);
+        std::move(targetedCmd), opCtx, request, constants, collationObj);
 }
 
 /**
@@ -270,10 +275,16 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
     // Generate the command object for the targeted shards.
     BSONObj targetedCommand = splitPipeline
-        ? createCommandForTargetedShards(
-              opCtx, aggRequest, litePipe, *splitPipeline, collationObj, exchangeSpec, true)
+        ? createCommandForTargetedShards(opCtx,
+                                         aggRequest,
+                                         litePipe,
+                                         *splitPipeline,
+                                         collationObj,
+                                         exchangeSpec,
+                                         expCtx->getRuntimeConstants(),
+                                         true)
         : createPassthroughCommandForShard(
-              opCtx, aggRequest, boost::none, pipeline.get(), collationObj);
+              opCtx, aggRequest, expCtx->getRuntimeConstants(), pipeline.get(), collationObj);
 
     // Refresh the shard registry if we're targeting all shards.  We need the shard registry
     // to be at least as current as the logical time used when creating the command for

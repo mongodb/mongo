@@ -6268,4 +6268,42 @@ public:
 
 SuiteInstance<All> myall;
 
+namespace NowAndClusterTime {
+TEST(NowAndClusterTime, BasicTest) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    // $$NOW is the Date type.
+    {
+        auto expression = ExpressionFieldPath::parse(expCtx, "$$NOW", expCtx->variablesParseState);
+        Value result = expression->evaluate(Document());
+        ASSERT_EQ(result.getType(), Date);
+    }
+    // $$CLUSTER_TIME is the timestamp type.
+    {
+        auto expression =
+            ExpressionFieldPath::parse(expCtx, "$$CLUSTER_TIME", expCtx->variablesParseState);
+        Value result = expression->evaluate(Document());
+        ASSERT_EQ(result.getType(), bsonTimestamp);
+    }
+
+    // Multiple references to $$NOW must return the same value.
+    {
+        auto expression = Expression::parseExpression(
+            expCtx, fromjson("{$eq: [\"$$NOW\", \"$$NOW\"]}"), expCtx->variablesParseState);
+        Value result = expression->evaluate(Document());
+
+        ASSERT_VALUE_EQ(result, Value{true});
+    }
+    // Same is true for the $$CLUSTER_TIME.
+    {
+        auto expression =
+            Expression::parseExpression(expCtx,
+                                        fromjson("{$eq: [\"$$CLUSTER_TIME\", \"$$CLUSTER_TIME\"]}"),
+                                        expCtx->variablesParseState);
+        Value result = expression->evaluate(Document());
+
+        ASSERT_VALUE_EQ(result, Value{true});
+    }
+}
+}
 }  // namespace ExpressionTests

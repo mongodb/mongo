@@ -110,18 +110,19 @@ BSONObj createCommandForTargetedShards(
     const cluster_aggregation_planner::SplitPipeline& splitPipeline,
     const BSONObj collationObj,
     const boost::optional<cluster_aggregation_planner::ShardedExchangePolicy> exchangeSpec,
+    const boost::optional<RuntimeConstants>& constants,
     bool needsMerge);
 
 BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
                                          const AggregationRequest& request,
-                                         const boost::optional<ShardId>& shardId,
+                                         const boost::optional<RuntimeConstants>& constants,
                                          Pipeline* pipeline,
                                          BSONObj collationObj);
 
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   OperationContext* opCtx,
-                                  const boost::optional<ShardId>& shardId,
                                   const AggregationRequest& request,
+                                  const boost::optional<RuntimeConstants>& constants,
                                   BSONObj collationObj);
 
 /**

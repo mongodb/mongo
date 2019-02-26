@@ -62,6 +62,11 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     _ownedCollator = std::move(collator);
     _resolvedNamespaces = std::move(resolvedNamespaces);
     uuid = std::move(collUUID);
+    if (request.getRuntimeConstants()) {
+        variables.setRuntimeConstants(request.getRuntimeConstants().get());
+    } else {
+        variables.generateRuntimeConstants(opCtx);
+    }
 }
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator)
@@ -169,6 +174,9 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     }
 
     expCtx->_resolvedNamespaces = _resolvedNamespaces;
+
+    expCtx->variables = variables;
+    expCtx->variablesParseState = variablesParseState.copyWith(expCtx->variables.useIdGenerator());
 
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.

@@ -239,6 +239,13 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             WriteConcernOptions writeConcern;
             uassertStatusOK(writeConcern.parse(elem.embeddedObject()));
             request.setWriteConcern(writeConcern);
+        } else if (kRuntimeConstants == fieldName) {
+            try {
+                IDLParserErrorContext ctx("internalRuntimeConstants");
+                request.setRuntimeConstants(RuntimeConstants::parse(ctx, elem.Obj()));
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
         } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
@@ -342,6 +349,8 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kExchangeName, _exchangeSpec ? Value(_exchangeSpec->toBSON()) : Value()},
         {WriteConcernOptions::kWriteConcernField,
          _writeConcern ? Value(_writeConcern->toBSON()) : Value()},
+        // Only serialize runtime constants if any were specified.
+        {kRuntimeConstants, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
     };
 }
 }  // namespace mongo

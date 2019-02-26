@@ -27,18 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/client.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/platform/basic.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 constexpr Variables::Id Variables::kRootId;
 constexpr Variables::Id Variables::kRemoveId;
 
-const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {{"ROOT", kRootId},
-                                                                 {"REMOVE", kRemoveId}};
+const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {
+    {"ROOT", kRootId}, {"REMOVE", kRemoveId}, {"NOW", kNowId}, {"CLUSTER_TIME", kClusterTimeId}};
 
 void Variables::uassertValidNameForUserWrite(StringData varName) {
     // System variables users allowed to write to (currently just one)
@@ -141,6 +144,16 @@ Value Variables::getValue(Id id, const Document& root) const {
                 return Value(root);
             case Variables::kRemoveId:
                 return Value();
+            case Variables::kNowId:
+            case Variables::kClusterTimeId:
+                if (auto it = _runtimeConstants.find(id); it != _runtimeConstants.end()) {
+                    return it->second;
+                }
+
+                uasserted(51144,
+                          str::stream() << "Buildin variable $$" << getBuiltinVariableName(id)
+                                        << " is not available.");
+                MONGO_UNREACHABLE;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -160,6 +173,40 @@ Document Variables::getDocument(Id id, const Document& root) const {
         return var.getDocument();
 
     return Document();
+}
+
+RuntimeConstants Variables::getRuntimeConstants() const {
+    RuntimeConstants constants;
+
+    if (auto it = _runtimeConstants.find(kNowId); it != _runtimeConstants.end()) {
+        constants.setLocalNow(it->second.getDate());
+    }
+    if (auto it = _runtimeConstants.find(kClusterTimeId); it != _runtimeConstants.end()) {
+        constants.setClusterTime(it->second.getTimestamp());
+    }
+
+    return constants;
+}
+
+void Variables::setRuntimeConstants(const RuntimeConstants& constants) {
+    _runtimeConstants[kNowId] = Value(constants.getLocalNow());
+    _runtimeConstants[kClusterTimeId] = Value(constants.getClusterTime());
+}
+
+void Variables::generateRuntimeConstants(OperationContext* opCtx) {
+    _runtimeConstants[kNowId] = Value(Date_t::now());
+
+    if (opCtx->getClient()) {
+        if (auto logicalClock = LogicalClock::get(opCtx); logicalClock) {
+            auto clusterTime = logicalClock->getClusterTime();
+
+            // On a standalone mongod the logical clock may not be running and $$CLUSTER_TIME is not
+            // available.
+            if (clusterTime != LogicalTime::kUninitialized) {
+                _runtimeConstants[kClusterTimeId] = Value(clusterTime.asTimestamp());
+            }
+        }
+    }
 }
 
 Variables::Id VariablesParseState::defineVariable(StringData name) {

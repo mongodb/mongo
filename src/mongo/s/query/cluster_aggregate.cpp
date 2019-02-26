@@ -113,6 +113,9 @@ BSONObj createCommandForMergingShard(const AggregationRequest& request,
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
     mergeCmd[AggregationRequest::kFromMongosName] = Value(true);
 
+    mergeCmd[AggregationRequest::kRuntimeConstants] =
+        Value(mergeCtx->getRuntimeConstants().toBSON());
+
     // If the user didn't specify a collation already, make sure there's a collation attached to
     // the merge command, since the merging shard may not have the collection metadata.
     if (mergeCmd.peek()["collation"].missing()) {
@@ -178,8 +181,15 @@ sharded_agg_helpers::DispatchShardPipelineResults dispatchExchangeConsumerPipeli
 
         consumerPipelines.emplace_back(std::move(consumerPipeline), nullptr, boost::none);
 
-        auto consumerCmdObj = sharded_agg_helpers::createCommandForTargetedShards(
-            opCtx, request, litePipe, consumerPipelines.back(), collationObj, boost::none, false);
+        auto consumerCmdObj =
+            sharded_agg_helpers::createCommandForTargetedShards(opCtx,
+                                                                request,
+                                                                litePipe,
+                                                                consumerPipelines.back(),
+                                                                collationObj,
+                                                                boost::none,
+                                                                expCtx->getRuntimeConstants(),
+                                                                false);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
                               consumerCmdObj);
@@ -704,6 +714,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
     uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchangeSpec());
+    uassert(51143,
+            "Cannot specify runtime constants option to a mongos",
+            !request.getRuntimeConstants());
     uassert(51089,
             str::stream() << "Internal parameter(s) [" << AggregationRequest::kNeedsMergeName
                           << ", "
@@ -870,7 +883,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     BSONObj cmdObj = CommandHelpers::filterCommandRequestForPassthrough(
         sharded_agg_helpers::createPassthroughCommandForShard(
-            opCtx, aggRequest, shardId, nullptr, BSONObj()));
+            opCtx, aggRequest, boost::none, nullptr, BSONObj()));
 
     MultiStatementTransactionRequestsSender ars(
         opCtx,
