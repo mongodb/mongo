@@ -48,6 +48,7 @@
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -202,7 +203,9 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-// When this class is in scope, makes the system behave as if we're in a DBDirectClient
+/**
+ * When this class is in scope, makes the system behave as if we're in a DBDirectClient.
+ */
 class DirectClientSetter {
 public:
     explicit DirectClientSetter(OperationContext* opCtx)
@@ -231,9 +234,6 @@ protected:
         auto mockObserver = stdx::make_unique<OpObserverMock>();
         _opObserver = mockObserver.get();
         opObserverRegistry->addObserver(std::move(mockObserver));
-
-        _sessionId = makeLogicalSessionIdForTest();
-        _txnNumber = 20;
 
         opCtx()->setLogicalSessionId(_sessionId);
         opCtx()->setTxnNumber(_txnNumber);
@@ -269,9 +269,10 @@ protected:
         return opCtxSession;
     }
 
+    const LogicalSessionId _sessionId{makeLogicalSessionIdForTest()};
+    const TxnNumber _txnNumber{20};
+
     OpObserverMock* _opObserver = nullptr;
-    LogicalSessionId _sessionId;
-    TxnNumber _txnNumber;
 };
 
 // Test that transaction lock acquisition times out in `maxTransactionLockRequestTimeoutMillis`
@@ -1325,6 +1326,33 @@ TEST_F(TxnParticipantTest, ThrowDuringPreparedOnTransactionAbortIsFatal) {
     ASSERT_THROWS_CODE(txnParticipant.abortActiveTransaction(opCtx()),
                        AssertionException,
                        ErrorCodes::OperationFailed);
+}
+
+TEST_F(TxnParticipantTest, InterruptedSessionsCannotBePrepared) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    unittest::Barrier barrier(2);
+
+    auto future = stdx::async(stdx::launch::async, [this, &barrier] {
+        ThreadClient tc(getServiceContext());
+        auto sideOpCtx = tc->makeOperationContext();
+        auto killToken = catalog()->killSession(_sessionId);
+        barrier.countDownAndWait();
+
+        auto scopedSession =
+            catalog()->checkOutSessionForKill(sideOpCtx.get(), std::move(killToken));
+    });
+
+    barrier.countDownAndWait();
+
+    ASSERT_THROWS_CODE(txnParticipant.prepareTransaction(opCtx(), {}),
+                       AssertionException,
+                       ErrorCodes::Interrupted);
+
+    sessionCheckout.reset();
+    future.get();
 }
 
 TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
@@ -2381,7 +2409,6 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldIncreaseUntilCommit) {
               Microseconds{100});
 }
 
-
 TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     auto tickSource = initMockTickSource();
     auto clockSource = initMockPreciseClockSource();
@@ -2446,7 +2473,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
               getHostNameCachedAndPort());
     ASSERT_EQ(stashedState.getField("desc").valueStringData().toString(), "inactive transaction");
     ASSERT_BSONOBJ_EQ(stashedState.getField("lsid").Obj(), _sessionId.toBSON());
-    ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), *opCtx()->getTxnNumber());
+    ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), _txnNumber);
     ASSERT_EQ(parametersDocument.getField("autocommit").boolean(), autocommit);
     ASSERT_BSONELT_EQ(parametersDocument.getField("readConcern"),
                       readConcernArgs.toBSON().getField("readConcern"));

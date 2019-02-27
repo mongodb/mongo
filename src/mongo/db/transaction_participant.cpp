@@ -931,6 +931,9 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     OplogSlot prepareOplogSlot;
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
+        // This check is necessary in order to avoid a race where a session with an active (but not
+        // prepared) transaction is killed, but it still ends up in the prepared state
+        opCtx->checkForInterrupt();
         o(lk).txnState.transitionTo(TransactionState::kPrepared);
     }
 

@@ -86,16 +86,17 @@ void killSessionsAction(
 void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                                              const SessionKiller::Matcher& matcher,
                                              ErrorCodes::Error reason) {
-    killSessionsAction(opCtx,
-                       matcher,
-                       [](const ObservableSession& session) {
-                           return !TransactionParticipant::get(session).transactionIsPrepared();
-                       },
-                       [](OperationContext* opCtx, const SessionToKill& session) {
-                           TransactionParticipant::get(session).abortTransactionIfNotPrepared(
-                               opCtx);
-                       },
-                       reason);
+    killSessionsAction(
+        opCtx,
+        matcher,
+        [](const ObservableSession& session) {
+            auto participant = TransactionParticipant::get(session);
+            return participant.inMultiDocumentTransaction() && !participant.transactionIsPrepared();
+        },
+        [](OperationContext* opCtx, const SessionToKill& session) {
+            TransactionParticipant::get(session).abortTransactionIfNotPrepared(opCtx);
+        },
+        reason);
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
@@ -118,7 +119,6 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
         matcherAllSessions,
         [when = opCtx->getServiceContext()->getPreciseClockSource()->now()](
             const ObservableSession& session) {
-
             return TransactionParticipant::get(session).expiredAsOf(when);
         },
         [](OperationContext* opCtx, const SessionToKill& session) {
@@ -137,7 +137,9 @@ void killSessionsLocalShutdownAllTransactions(OperationContext* opCtx) {
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
     killSessionsAction(opCtx,
                        matcherAllSessions,
-                       [](const ObservableSession&) { return true; },
+                       [](const ObservableSession& session) {
+                           return TransactionParticipant::get(session).inMultiDocumentTransaction();
+                       },
                        [](OperationContext* opCtx, const SessionToKill& session) {
                            TransactionParticipant::get(session).shutdown(opCtx);
                        },

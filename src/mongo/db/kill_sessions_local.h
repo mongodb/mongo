@@ -44,7 +44,8 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         SessionKiller::UniformRandomBitGenerator* urbg);
 
 /**
- * Kills all transactions on mongod for sessions matching 'matcher'.
+ * Matches only sessions which have unprepared multi-statement transactions, kills the sessions and
+ * aborts the transactions.
  */
 void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                                              const SessionKiller::Matcher& matcher,
