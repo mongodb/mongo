@@ -1249,23 +1249,35 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
         return;
     }
 
-    // We write the oplog entry in a side transaction so that we do not commit the now-prepared
-    // transaction.
-    // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp
-    // and allow this transaction to be continued on failover.
-    {
-        TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+    if (!useMultipleOplogEntryFormatForTransactions) {
+        // We write the oplog entry in a side transaction so that we do not commit the now-prepared
+        // transaction.
+        // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp
+        // and allow this transaction to be continued on failover.
+        {
+            TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
-        writeConflictRetry(
-            opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            writeConflictRetry(
+                opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
 
-                // Writes to the oplog only require a Global intent lock.
-                Lock::GlobalLock globalLock(opCtx, MODE_IX);
+                    // Writes to the oplog only require a Global intent lock.
+                    Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
-                WriteUnitOfWork wuow(opCtx);
-                logApplyOpsForTransaction(opCtx, statements, prepareOpTime);
-                wuow.commit();
-            });
+                    WriteUnitOfWork wuow(opCtx);
+                    logApplyOpsForTransaction(opCtx, statements, prepareOpTime);
+                    wuow.commit();
+                });
+        }
+    } else {
+        // It is possible that the transaction resulted in no changes.  In that case, we should
+        // not write any operations other than the prepare oplog entry.
+        if (!statements.empty()) {
+            // Reserve all the optimes in advance, so we only need to get the opTime mutex once.
+            // TODO (SERVER-39441): Reserve an extra slot here for the prepare oplog entry.
+            TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+            auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size());
+            logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
+        }
     }
 }
 
