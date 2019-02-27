@@ -672,17 +672,16 @@ Collection* DatabaseImpl::getCollection(OperationContext* opCtx, StringData ns) 
 
 Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const NamespaceString& nss) const {
     dassert(!cc().getOperationContext() || opCtx == cc().getOperationContext());
-    CollectionMap::const_iterator it = _collections.find(nss.ns());
-
-    if (it != _collections.end() && it->second) {
-        Collection* found = it->second;
-        NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
-        if (auto uuid = found->uuid())
-            cache.ensureNamespaceInCache(nss, uuid.get());
-        return found;
+    auto coll = UUIDCatalog::get(opCtx).lookupCollectionByNamespace(nss);
+    if (!coll) {
+        return nullptr;
     }
 
-    return NULL;
+    NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+    auto uuid = coll->uuid();
+    invariant(uuid);
+    cache.ensureNamespaceInCache(nss, uuid.get());
+    return coll;
 }
 
 Status DatabaseImpl::renameCollection(OperationContext* opCtx,

@@ -259,6 +259,15 @@ public:
     Collection* lookupCollectionByUUID(CollectionUUID uuid) const;
 
     /**
+     * This function gets the Collection pointer that corresponds to the NamespaceString. The
+     * required locks should be obtained prior to calling this function, or else the found
+     * Collection pointer may no longer be valid when the call returns.
+     *
+     * Returns nullptr if the namespace is unknown.
+     */
+    Collection* lookupCollectionByNamespace(const NamespaceString& nss) const;
+
+    /**
      * This function gets the NamespaceString from the Collection* pointer that
      * corresponds to CollectionUUID uuid. If there is no such pointer, an empty
      * NamespaceString is returned. See onCloseCatalog/onOpenCatalog for more info.
@@ -324,6 +333,7 @@ private:
      */
     mongo::stdx::unordered_map<CollectionUUID, Collection*, CollectionUUID::Hash> _catalog;
 
+    mongo::stdx::unordered_map<NamespaceString, Collection*> _collections;
     /**
      * Generation number to track changes to the catalog that could invalidate iterators.
      */

@@ -233,9 +233,16 @@ void UUIDCatalog::setCollectionNamespace(OperationContext* opCtx,
     invariant(coll);
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     coll->setNs(toCollection);
-    opCtx->recoveryUnit()->onRollback([this, coll, fromCollection] {
+    invariant(_collections.erase(fromCollection) > 0);
+    auto collEntry = std::make_pair(toCollection, coll);
+    invariant(_collections.insert(collEntry).second == true);
+
+    opCtx->recoveryUnit()->onRollback([this, coll, fromCollection, toCollection] {
         stdx::lock_guard<stdx::mutex> lock(_catalogLock);
         coll->setNs(std::move(fromCollection));
+        _collections.erase(toCollection);
+        auto collEntry = std::make_pair(fromCollection, coll);
+        _collections.insert(collEntry);
     });
 }
 
@@ -269,6 +276,12 @@ Collection* UUIDCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
     return foundIt == _catalog.end() ? nullptr : foundIt->second;
+}
+
+Collection* UUIDCatalog::lookupCollectionByNamespace(const NamespaceString& nss) const {
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    auto it = _collections.find(nss);
+    return it == _collections.end() ? nullptr : it->second;
 }
 
 NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
@@ -356,6 +369,9 @@ void UUIDCatalog::_registerUUIDCatalogEntry_inlock(CollectionUUID uuid, Collecti
     auto dbIdPair = std::make_pair(coll->ns().db().toString(), uuid);
     auto orderedEntry = std::make_pair(dbIdPair, coll);
     invariant(_orderedCollections.insert(orderedEntry).second == true);
+
+    std::pair<NamespaceString, Collection*> collNameEntry = std::make_pair(coll->ns(), coll);
+    invariant(_collections.insert(collNameEntry).second == true);
 }
 Collection* UUIDCatalog::_removeUUIDCatalogEntry_inlock(CollectionUUID uuid) {
     auto foundIt = _catalog.find(uuid);
@@ -368,6 +384,7 @@ Collection* UUIDCatalog::_removeUUIDCatalogEntry_inlock(CollectionUUID uuid) {
     auto dbName = foundColl->ns().db().toString();
     _catalog.erase(foundIt);
     _orderedCollections.erase(std::make_pair(dbName, uuid));
+    _collections.erase(foundColl->ns());
 
     // Removal from an ordered map will invalidate iterators and potentially references to the
     // references to the erased element.
