@@ -46,25 +46,6 @@ commands:
         strict: true
         namespace: ignored
 
-    voteCommitTransaction:
-        description: "Parser for the 'voteCommitTransaction' command."
-        namespace: ignored
-        fields:
-            shardId:
-                description: "The shard name of the sender"
-                type: shard_id
-            prepareTimestamp:
-                description: "Timestamp at which the sender prepared the transaction"
-                type: timestamp
-
-    voteAbortTransaction:
-        description: "Parser for the 'voteAbortTransaction' command."
-        namespace: ignored
-        fields:
-            shardId:
-                description: "The shard name of the sender"
-                type: shard_id
-
     coordinateCommitTransaction:
         description: "Parser for the 'coordinateCommitTransaction' command."
         strict: false

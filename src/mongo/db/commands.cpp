@@ -124,19 +124,14 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"insert", 1},
                                         {"killCursors", 1},
                                         {"prepareTransaction", 1},
-                                        {"update", 1},
-                                        {"voteAbortTransaction", 1},
-                                        {"voteCommitTransaction", 1}};
-
+                                        {"update", 1}};
 
 // The commands that can be run on the 'admin' database in multi-document transactions.
 const StringMap<int> txnAdminCommands = {{"abortTransaction", 1},
                                          {"commitTransaction", 1},
                                          {"coordinateCommitTransaction", 1},
                                          {"doTxn", 1},
-                                         {"prepareTransaction", 1},
-                                         {"voteAbortTransaction", 1},
-                                         {"voteCommitTransaction", 1}};
+                                         {"prepareTransaction", 1}};
 
 }  // namespace
 

@@ -68,8 +68,7 @@ const StringMap<int> sessionCheckOutList = {{"abortTransaction", 1},
                                             {"update", 1}};
 
 // Commands that can be sent with session info but should not check out a session.
-const StringMap<int> skipSessionCheckoutList = {
-    {"coordinateCommitTransaction", 1}, {"voteAbortTransaction", 1}, {"voteCommitTransaction", 1}};
+const StringMap<int> skipSessionCheckoutList = {{"coordinateCommitTransaction", 1}};
 
 bool commandCanCheckOutSession(StringData cmdName) {
     return sessionCheckOutList.find(cmdName) != sessionCheckOutList.cend();
