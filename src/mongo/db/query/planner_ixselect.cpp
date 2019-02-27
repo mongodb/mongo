@@ -55,7 +55,9 @@ namespace {
 
 namespace wcp = ::mongo::wildcard_planning;
 
-bool isNotEqualsArrayOrNotInArray(const MatchExpression* me) {
+// Can't index negations of {$eq: <Array>} or {$in: [<Array>, ...]}. Note that we could
+// use the index in principle, though we would need to generate special bounds.
+bool isEqualsArrayOrNotInArray(const MatchExpression* me) {
     const auto type = me->matchType();
     if (type == MatchExpression::EQ) {
         return static_cast<const ComparisonMatchExpression*>(me)->getData().type() ==
@@ -433,9 +435,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                 return false;
             }
 
-            // Can't index negations of {$eq: <Array>} or {$in: [<Array>, ...]}. Note that we could
-            // use the index in principle, though we would need to generate special bounds.
-            if (isNotEqualsArrayOrNotInArray(child)) {
+            if (isEqualsArrayOrNotInArray(child)) {
                 return false;
             }
 
@@ -608,6 +608,11 @@ bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* q
     }
 
     return true;
+}
+
+bool QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex(const MatchExpression* queryExpr) {
+    return !(queryExpr->matchType() == MatchExpression::NOT &&
+             isEqualsArrayOrNotInArray(queryExpr->getChild(0)));
 }
 
 bool QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(const MatchExpression* queryExpr) {

@@ -47,6 +47,7 @@
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/util/assert_util.h"
@@ -85,6 +86,12 @@ void encodeIndexability(const MatchExpression* tree,
 
             *keyBuilder << kEncodeDiscriminatorsEnd;
         }
+    } else if (tree->matchType() == MatchExpression::MatchType::NOT) {
+        // If the node is not compatible with any type of index, add a single '0' discriminator
+        // here. Otherwise add a '1'.
+        *keyBuilder << kEncodeDiscriminatorsBegin;
+        *keyBuilder << QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex(tree);
+        *keyBuilder << kEncodeDiscriminatorsEnd;
     }
 
     for (size_t i = 0; i < tree->numChildren(); ++i) {

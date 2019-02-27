@@ -2028,4 +2028,104 @@ TEST(PlanCacheTest, StableKeyDoesNotChangeAcrossIndexCreation) {
     ASSERT_EQ(postIndexKey.getUnstablePart(), "<1>");
 }
 
+TEST(PlanCacheTest, ComputeKeyNotEqualsArray) {
+    PlanCache planCache;
+    unique_ptr<CanonicalQuery> cqNeArray(canonicalize("{a: {$ne: [1]}}"));
+    unique_ptr<CanonicalQuery> cqNeScalar(canonicalize("{a: {$ne: 123}}"));
+
+    const PlanCacheKey noIndexNeArrayKey = planCache.computeKey(*cqNeArray);
+    const PlanCacheKey noIndexNeScalarKey = planCache.computeKey(*cqNeScalar);
+    ASSERT_EQ(noIndexNeArrayKey.getUnstablePart(), "<0>");
+    ASSERT_EQ(noIndexNeScalarKey.getUnstablePart(), "<1>");
+    ASSERT_EQ(noIndexNeScalarKey.getStableKey(), noIndexNeArrayKey.getStableKey());
+
+    const auto keyPattern = BSON("a" << 1);
+    // Create a normal btree index. It will have a discriminator.
+    planCache.notifyOfIndexUpdates(
+        {CoreIndexInfo(keyPattern,
+                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       false,                          // sparse
+                       IndexEntry::Identifier{""})});  // name
+
+    const PlanCacheKey withIndexNeArrayKey = planCache.computeKey(*cqNeArray);
+    const PlanCacheKey withIndexNeScalarKey = planCache.computeKey(*cqNeScalar);
+
+    ASSERT_NE(noIndexNeArrayKey, withIndexNeArrayKey);
+    ASSERT_EQ(noIndexNeArrayKey.getStableKey(), withIndexNeArrayKey.getStableKey());
+
+    ASSERT_EQ(noIndexNeScalarKey.getStableKey(), withIndexNeScalarKey.getStableKey());
+    // There will be one discriminator for the $not and another for the leaf node ({$eq: 123}).
+    ASSERT_EQ(withIndexNeScalarKey.getUnstablePart(), "<1><1>");
+    // There will be one discriminator for the $not and another for the leaf node ({$eq: [1]}).
+    // Since the index can support equality to an array, the second discriminator will have a value
+    // of '1'.
+    ASSERT_EQ(withIndexNeArrayKey.getUnstablePart(), "<0><1>");
+}
+
+TEST(PlanCacheTest, ComputeKeyNinArray) {
+    PlanCache planCache;
+    unique_ptr<CanonicalQuery> cqNinArray(canonicalize("{a: {$nin: [123, [1]]}}"));
+    unique_ptr<CanonicalQuery> cqNinScalar(canonicalize("{a: {$nin: [123, 456]}}"));
+
+    const PlanCacheKey noIndexNinArrayKey = planCache.computeKey(*cqNinArray);
+    const PlanCacheKey noIndexNinScalarKey = planCache.computeKey(*cqNinScalar);
+    ASSERT_EQ(noIndexNinArrayKey.getUnstablePart(), "<0>");
+    ASSERT_EQ(noIndexNinScalarKey.getUnstablePart(), "<1>");
+    ASSERT_EQ(noIndexNinScalarKey.getStableKey(), noIndexNinArrayKey.getStableKey());
+
+    const auto keyPattern = BSON("a" << 1);
+    // Create a normal btree index. It will have a discriminator.
+    planCache.notifyOfIndexUpdates(
+        {CoreIndexInfo(keyPattern,
+                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       false,                          // sparse
+                       IndexEntry::Identifier{""})});  // name
+
+    const PlanCacheKey withIndexNinArrayKey = planCache.computeKey(*cqNinArray);
+    const PlanCacheKey withIndexNinScalarKey = planCache.computeKey(*cqNinScalar);
+
+    // The unstable part of the key for $nin: [<array>] should have changed. The stable part,
+    // however, should not.
+    ASSERT_EQ(noIndexNinArrayKey.getStableKey(), withIndexNinArrayKey.getStableKey());
+    ASSERT_NE(noIndexNinArrayKey.getUnstablePart(), withIndexNinArrayKey.getUnstablePart());
+
+    ASSERT_EQ(noIndexNinScalarKey.getStableKey(), withIndexNinScalarKey.getStableKey());
+    ASSERT_EQ(withIndexNinArrayKey.getUnstablePart(), "<0><1>");
+    ASSERT_EQ(withIndexNinScalarKey.getUnstablePart(), "<1><1>");
+}
+
+// Test for a bug which would be easy to introduce. If we only inserted discriminators for some
+// nodes, we would have a problem. For example if our "stable" key was:
+// (or[nt[eqa],nt[eqa]])
+// And there was just one discriminator:
+// <0>
+
+// Whether the discriminator referred to the first not-eq node or the second would be
+// ambiguous. This would make it possible for two queries with different shapes (and different
+// plans) to get the same plan cache key. We test that this does not happen for a simple example.
+TEST(PlanCacheTest, PlanCacheKeyCollision) {
+    PlanCache planCache;
+    unique_ptr<CanonicalQuery> cqNeA(canonicalize("{$or: [{a: {$ne: 5}}, {a: {$ne: [12]}}]}"));
+    unique_ptr<CanonicalQuery> cqNeB(canonicalize("{$or: [{a: {$ne: [12]}}, {a: {$ne: 5}}]}"));
+
+    const PlanCacheKey keyA = planCache.computeKey(*cqNeA);
+    const PlanCacheKey keyB = planCache.computeKey(*cqNeB);
+    ASSERT_EQ(keyA.getStableKey(), keyB.getStableKey());
+    ASSERT_NE(keyA.getUnstablePart(), keyB.getUnstablePart());
+
+    const auto keyPattern = BSON("a" << 1);
+    // Create a normal btree index. It will have a discriminator.
+    planCache.notifyOfIndexUpdates(
+        {CoreIndexInfo(keyPattern,
+                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       false,                          // sparse
+                       IndexEntry::Identifier{""})});  // name
+
+    const PlanCacheKey keyAWithIndex = planCache.computeKey(*cqNeA);
+    const PlanCacheKey keyBWithIndex = planCache.computeKey(*cqNeB);
+
+    ASSERT_EQ(keyAWithIndex.getStableKey(), keyBWithIndex.getStableKey());
+    ASSERT_NE(keyAWithIndex.getUnstablePart(), keyBWithIndex.getUnstablePart());
+}
+
 }  // namespace

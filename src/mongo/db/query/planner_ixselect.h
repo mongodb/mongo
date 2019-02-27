@@ -146,6 +146,13 @@ public:
      */
     static bool nodeIsSupportedBySparseIndex(const MatchExpression* queryExpr, bool isInElemMatch);
 
+    /**
+     * Some types of matches are not supported by any type of index. If this function returns
+     * false, then 'queryExpr' is definitely not supported for any type of index. If the function
+     * returns true then 'queryExpr' may (or may not) be supported by some index.
+     */
+    static bool logicalNodeMayBeSupportedByAnIndex(const MatchExpression* queryExpr);
+
 private:
     /**
      * Used to keep track of if any $elemMatch predicates were encountered when walking a
