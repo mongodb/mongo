@@ -37,6 +37,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/scripting/mozjs/engine_gen.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/proxyscope.h"
 #include "mongo/util/log.h"
@@ -46,14 +47,6 @@ void DisableExtraThreads();
 }
 
 namespace mongo {
-
-namespace {
-
-MONGO_EXPORT_SERVER_PARAMETER(disableJavaScriptJIT, bool, true);
-MONGO_EXPORT_SERVER_PARAMETER(javascriptProtection, bool, false);
-MONGO_EXPORT_SERVER_PARAMETER(jsHeapLimitMB, int, 1100);
-
-}  // namespace
 
 void ScriptEngine::setup() {
     if (getGlobalScriptEngine())
@@ -125,27 +118,27 @@ void MozJSScriptEngine::interruptAll() {
 }
 
 void MozJSScriptEngine::enableJIT(bool value) {
-    disableJavaScriptJIT.store(!value);
+    gDisableJavaScriptJIT.store(!value);
 }
 
 bool MozJSScriptEngine::isJITEnabled() const {
-    return !disableJavaScriptJIT.load();
+    return !gDisableJavaScriptJIT.load();
 }
 
 void MozJSScriptEngine::enableJavaScriptProtection(bool value) {
-    javascriptProtection.store(value);
+    gJavascriptProtection.store(value);
 }
 
 bool MozJSScriptEngine::isJavaScriptProtectionEnabled() const {
-    return javascriptProtection.load();
+    return gJavascriptProtection.load();
 }
 
 int MozJSScriptEngine::getJSHeapLimitMB() const {
-    return jsHeapLimitMB.load();
+    return gJSHeapLimitMB.load();
 }
 
 void MozJSScriptEngine::setJSHeapLimitMB(int limit) {
-    jsHeapLimitMB.store(limit);
+    gJSHeapLimitMB.store(limit);
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScope* scope) {

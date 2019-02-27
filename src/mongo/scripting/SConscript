@@ -25,6 +25,9 @@ env.Library(
         '$BUILD_DIR/mongo/shell/mongojs',
         '$BUILD_DIR/mongo/util/md5',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ],
 )
 
 env.Library(
@@ -152,6 +155,7 @@ if usemozjs:
             'mozjs/uri.cpp',
             'mozjs/valuereader.cpp',
             'mozjs/valuewriter.cpp',
+            env.Idlc('mozjs/engine.idl')[0],
             env.Idlc('mozjs/end_sessions.idl')[0],
         ],
         LIBDEPS=[
@@ -163,6 +167,7 @@ if usemozjs:
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/client/clientdriver_network',
             '$BUILD_DIR/third_party/shim_mozjs',
+            '$BUILD_DIR/mongo/idl/server_parameter',
         ],
     )
 else:
