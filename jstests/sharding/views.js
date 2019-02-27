@@ -10,26 +10,33 @@
 
     // Given sharded explain output in 'shardedExplain', verifies that the explain mode 'verbosity'
     // affected the output verbosity appropriately, and that the response has the expected format.
-    function verifyExplainResult(shardedExplain, verbosity) {
+    // Set 'optimizedAwayPipeline' to true if the pipeline is expected to be optimized away.
+    function verifyExplainResult(
+        {shardedExplain = null, verbosity = "", optimizedAwayPipeline = false} = {}) {
         assert.commandWorked(shardedExplain);
         assert(shardedExplain.hasOwnProperty("shards"), tojson(shardedExplain));
         for (let elem in shardedExplain.shards) {
             let shard = shardedExplain.shards[elem];
-            assert(shard.stages[0].hasOwnProperty("$cursor"), tojson(shardedExplain));
-            assert(shard.stages[0].$cursor.hasOwnProperty("queryPlanner"), tojson(shardedExplain));
+            let root;
+            if (optimizedAwayPipeline) {
+                assert(shard.hasOwnProperty("queryPlanner"), tojson(shardedExplain));
+                root = shard;
+            } else {
+                assert(shard.stages[0].hasOwnProperty("$cursor"), tojson(shardedExplain));
+                assert(shard.stages[0].$cursor.hasOwnProperty("queryPlanner"),
+                       tojson(shardedExplain));
+                root = shard.stages[0].$cursor;
+            }
             if (verbosity === "queryPlanner") {
-                assert(!shard.stages[0].$cursor.hasOwnProperty("executionStats"),
-                       tojson(shardedExplain));
+                assert(!root.hasOwnProperty("executionStats"), tojson(shardedExplain));
             } else if (verbosity === "executionStats") {
-                assert(shard.stages[0].$cursor.hasOwnProperty("executionStats"),
-                       tojson(shardedExplain));
-                assert(!shard.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
+                assert(root.hasOwnProperty("executionStats"), tojson(shardedExplain));
+                assert(!root.executionStats.hasOwnProperty("allPlansExecution"),
                        tojson("shardedExplain"));
             } else {
                 assert.eq(verbosity, "allPlansExecution", tojson(shardedExplain));
-                assert(shard.stages[0].$cursor.hasOwnProperty("executionStats"),
-                       tojson(shardedExplain));
-                assert(shard.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"),
+                assert(root.hasOwnProperty("executionStats"), tojson(shardedExplain));
+                assert(root.executionStats.hasOwnProperty("allPlansExecution"),
                        tojson(shardedExplain));
             }
         }
@@ -67,11 +74,13 @@
     assert.eq(5, view.find({a: {$lte: 8}}).itcount());
 
     let result = db.runCommand({explain: {find: "view", filter: {a: {$lte: 7}}}});
-    verifyExplainResult(result, "allPlansExecution");
+    verifyExplainResult(
+        {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: true});
     for (let verbosity of explainVerbosities) {
         result =
             db.runCommand({explain: {find: "view", filter: {a: {$lte: 7}}}, verbosity: verbosity});
-        verifyExplainResult(result, verbosity);
+        verifyExplainResult(
+            {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: true});
     }
 
     //
@@ -82,17 +91,20 @@
     // Test that the explain:true flag for the aggregate command results in queryPlanner verbosity.
     result =
         db.runCommand({aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], explain: true});
-    verifyExplainResult(result, "queryPlanner");
+    verifyExplainResult(
+        {shardedExplain: result, verbosity: "queryPlanner", optimizedAwayPipeline: true});
 
     result = db.runCommand(
         {explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}}});
-    verifyExplainResult(result, "allPlansExecution");
+    verifyExplainResult(
+        {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: true});
     for (let verbosity of explainVerbosities) {
         result = db.runCommand({
             explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}},
             verbosity: verbosity
         });
-        verifyExplainResult(result, verbosity);
+        verifyExplainResult(
+            {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: true});
     }
 
     //
@@ -101,11 +113,11 @@
     assert.eq(5, view.count({a: {$lte: 8}}));
 
     result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}});
-    verifyExplainResult(result, "allPlansExecution");
+    verifyExplainResult({shardedExplain: result, verbosity: "allPlansExecution"});
     for (let verbosity of explainVerbosities) {
         result =
             db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}, verbosity: verbosity});
-        verifyExplainResult(result, verbosity);
+        verifyExplainResult({shardedExplain: result, verbosity: verbosity});
     }
 
     //
@@ -116,11 +128,11 @@
     assert.eq([4, 5, 6, 7, 8], result.values.sort());
 
     result = db.runCommand({explain: {distinct: "view", key: "a", query: {a: {$lte: 8}}}});
-    verifyExplainResult(result, "allPlansExecution");
+    verifyExplainResult({shardedExplain: result, verbosity: "allPlansExecution"});
     for (let verbosity of explainVerbosities) {
         result = db.runCommand(
             {explain: {distinct: "view", key: "a", query: {a: {$lte: 8}}}, verbosity: verbosity});
-        verifyExplainResult(result, verbosity);
+        verifyExplainResult({shardedExplain: result, verbosity: verbosity});
     }
 
     //

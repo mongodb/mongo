@@ -174,7 +174,7 @@ public:
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         auto bodyBuilder = result->getBodyBuilder();
-        Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
+        Explain::explainStages(exec.get(), collection, verbosity, BSONObj(), &bodyBuilder);
         return Status::OK();
     }
 

@@ -105,9 +105,6 @@ public:
                                    unsigned numberRetries = 0);
 
 private:
-    static void uassertAllShardsSupportExplain(
-        const std::vector<AsyncRequestsSender::Response>& shardResults);
-
     static Status aggPassthrough(OperationContext*,
                                  const Namespaces&,
                                  const ShardId&,

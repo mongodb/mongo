@@ -29,15 +29,14 @@
     for (let shardId in explain.shards) {
         const shardExplain = explain.shards[shardId];
         assert(shardExplain.hasOwnProperty("host"), shardExplain);
-        assert(shardExplain.hasOwnProperty("stages"), shardExplain);
+        assert(shardExplain.hasOwnProperty("stages") || shardExplain.hasOwnProperty("queryPlanner"),
+               shardExplain);
     }
 
     // Do a sharded explain from a mongod, not mongos, to ensure that it does not have a
     // SHARDING_FILTER stage.");
     const shardDB = st.shard0.getDB(mongosDB.getName());
     explain = shardDB[coll.getName()].explain().aggregate([{$match: {}}]);
-    assert(!planHasStage(
-               shardDB, explain.stages[0].$cursor.queryPlanner.winningPlan, "SHARDING_FILTER"),
-           explain);
+    assert(!planHasStage(shardDB, explain.queryPlanner.winningPlan, "SHARDING_FILTER"), explain);
     st.stop();
 }());

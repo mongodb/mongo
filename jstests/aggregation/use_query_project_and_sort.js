@@ -21,19 +21,16 @@
 
     function assertQueryCoversProjectionAndSort(pipeline) {
         const explainOutput = coll.explain().aggregate(pipeline);
-        assert(!aggPlanHasStage(explainOutput, "FETCH"),
+        assert(isQueryPlan(explainOutput));
+        assert(!planHasStage(db, explainOutput, "FETCH"),
                "Expected pipeline " + tojsononeline(pipeline) +
                    " *not* to include a FETCH stage in the explain output: " +
                    tojson(explainOutput));
-        assert(!aggPlanHasStage(explainOutput, "SORT"),
+        assert(!planHasStage(db, explainOutput, "SORT"),
                "Expected pipeline " + tojsononeline(pipeline) +
                    " *not* to include a SORT stage in the explain output: " +
                    tojson(explainOutput));
-        assert(!aggPlanHasStage(explainOutput, "$sort"),
-               "Expected pipeline " + tojsononeline(pipeline) +
-                   " *not* to include a SORT stage in the explain output: " +
-                   tojson(explainOutput));
-        assert(aggPlanHasStage(explainOutput, "IXSCAN"),
+        assert(planHasStage(db, explainOutput, "IXSCAN"),
                "Expected pipeline " + tojsononeline(pipeline) +
                    " to include an index scan in the explain output: " + tojson(explainOutput));
         assert(!hasRejectedPlans(explainOutput),

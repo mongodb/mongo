@@ -384,7 +384,8 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::attachCursorSour
                      Date_t::max(),
                      AutoStatsTracker::LogMode::kUpdateTop);
 
-    PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline.get());
+    PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
+        autoColl->getCollection(), expCtx->ns, nullptr, pipeline.get());
 
     // Optimize again, since there may be additional optimizations that can be done after adding
     // the initial cursor stage.

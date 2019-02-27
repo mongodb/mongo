@@ -110,16 +110,14 @@
 
         explain =
             assert.commandWorked(coll.explain("executionStats").aggregate(pipeline, aggOptions));
-        verifyExplainOutput(explain, getAggPlanStage);
+        verifyExplainOutput(explain, getPlanStage);
 
         cursor = coll.explain("executionStats").find({$expr: expr});
         if (collation) {
             cursor = cursor.collation(collation);
         }
         explain = assert.commandWorked(cursor.finish());
-        verifyExplainOutput(
-            explain,
-            (explain, stage) => getPlanStage(explain.executionStats.executionStages, stage));
+        verifyExplainOutput(explain, getPlanStage);
     }
 
     // Comparison of field and constant.

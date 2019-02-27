@@ -637,6 +637,7 @@ void Explain::getWinningPlanStats(const PlanExecutor* exec, BSONObjBuilder* bob)
 // static
 void Explain::generatePlannerInfo(PlanExecutor* exec,
                                   const Collection* collection,
+                                  BSONObj extraInfo,
                                   BSONObjBuilder* out) {
     CanonicalQuery* query = exec->getCanonicalQuery();
 
@@ -685,6 +686,10 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
 
     if (planCacheKeyHash) {
         plannerBob.append("planCacheKey", unsignedIntToFixedLengthHex(*planCacheKeyHash));
+    }
+
+    if (!extraInfo.isEmpty()) {
+        plannerBob.appendElements(extraInfo);
     }
 
     BSONObjBuilder winningPlanBob(plannerBob.subobjStart("winningPlan"));
@@ -830,13 +835,14 @@ void Explain::explainStages(PlanExecutor* exec,
                             ExplainOptions::Verbosity verbosity,
                             Status executePlanStatus,
                             PlanStageStats* winningPlanTrialStats,
+                            BSONObj extraInfo,
                             BSONObjBuilder* out) {
     //
     // Use the stats trees to produce explain BSON.
     //
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(exec, collection, out);
+        generatePlannerInfo(exec, collection, extraInfo, out);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -867,6 +873,7 @@ void Explain::explainPipelineExecutor(PlanExecutor* exec,
 void Explain::explainStages(PlanExecutor* exec,
                             const Collection* collection,
                             ExplainOptions::Verbosity verbosity,
+                            BSONObj extraInfo,
                             BSONObjBuilder* out) {
     auto winningPlanTrialStats = Explain::getWinningPlanTrialStats(exec);
 
@@ -883,7 +890,13 @@ void Explain::explainStages(PlanExecutor* exec,
         }
     }
 
-    explainStages(exec, collection, verbosity, executePlanStatus, winningPlanTrialStats.get(), out);
+    explainStages(exec,
+                  collection,
+                  verbosity,
+                  executePlanStatus,
+                  winningPlanTrialStats.get(),
+                  extraInfo,
+                  out);
 
     generateServerInfo(out);
 }

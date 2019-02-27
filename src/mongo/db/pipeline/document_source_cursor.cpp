@@ -240,6 +240,7 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
                                verbosity.get(),
                                _execStatus,
                                _winningPlanTrialStats.get(),
+                               BSONObj(),
                                &explainStatsBuilder);
     }
 

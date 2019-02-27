@@ -379,7 +379,8 @@ private:
             auto exec = uassertStatusOK(getExecutorUpdate(
                 opCtx, &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedUpdate));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(), collection.getCollection(), verbosity, &bodyBuilder);
+            Explain::explainStages(
+                exec.get(), collection.getCollection(), verbosity, BSONObj(), &bodyBuilder);
         }
 
         write_ops::Update _batch;
@@ -452,7 +453,8 @@ private:
             auto exec = uassertStatusOK(getExecutorDelete(
                 opCtx, &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedDelete));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(), collection.getCollection(), verbosity, &bodyBuilder);
+            Explain::explainStages(
+                exec.get(), collection.getCollection(), verbosity, BSONObj(), &bodyBuilder);
         }
 
         write_ops::Delete _batch;

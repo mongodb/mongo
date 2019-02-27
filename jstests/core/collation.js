@@ -332,7 +332,7 @@
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
     assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
-    var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]).stages[0].$cursor;
+    var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]);
     assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
     // Aggregation should not use index when no collation specified and collection default
@@ -340,7 +340,7 @@
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
     assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
-    var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]).stages[0].$cursor;
+    var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]);
     assert(isCollscan(db, explain.queryPlanner.winningPlan));
 
     // Explain of aggregation with collation should succeed.

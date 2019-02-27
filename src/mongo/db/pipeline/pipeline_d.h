@@ -61,10 +61,14 @@ struct PlanSummaryStats;
 class PipelineD {
 public:
     /**
-     * If the first stage in the pipeline does not generate its own output documents, attaches a
-     * cursor document source to the front of the pipeline which will output documents from the
-     * collection to feed into the pipeline.
-     *
+     * This callback function is called to attach a query PlanExecutor to the given Pipeline by
+     * creating a specific DocumentSourceCursor stage using the provided PlanExecutor, and adding
+     * the new stage to the pipeline.
+     */
+    using AttachExecutorCallback = std::function<void(
+        Collection*, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>, Pipeline*)>;
+
+    /**
      * This method looks for early pipeline stages that can be folded into the underlying
      * PlanExecutor, and removes those stages from the pipeline when they can be absorbed by the
      * PlanExecutor. For example, an early $match can be removed and replaced with a
@@ -73,29 +77,45 @@ public:
      * Callers must take care to ensure that 'nss' is locked in at least IS-mode.
      *
      * When not null, 'aggRequest' provides access to pipeline command options such as hint.
+     *
+     * The 'collection' parameter is optional and can be passed as 'nullptr'.
+     *
+     * This method will not add a $cursor stage to the pipeline, but will create a PlanExecutor and
+     * a callback function. The executor and the callback can later be used to create the $cursor
+     * stage and add it to the pipeline by calling 'attachInnerQueryExecutorToPipeline()' method.
+     * If the pipeline doesn't require a $cursor stage, the plan executor will be returned as
+     * 'nullptr'.
      */
-    static void prepareCursorSource(Collection* collection,
-                                    const NamespaceString& nss,
-                                    const AggregationRequest* aggRequest,
-                                    Pipeline* pipeline);
+    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+    buildInnerQueryExecutor(Collection* collection,
+                            const NamespaceString& nss,
+                            const AggregationRequest* aggRequest,
+                            Pipeline* pipeline);
 
     /**
-     * Prepare a generic DocumentSourceCursor for 'pipeline'.
+     * Completes creation of the $cursor stage using the given callback pair obtained by calling
+     * 'buildInnerQueryExecutor()' method. If the callback doesn't hold a valid PlanExecutor, the
+     * method does nothing. Otherwise, a new $cursor stage is created using the given PlanExecutor,
+     * and added to the pipeline. The 'collection' parameter is optional and can be passed as
+     * 'nullptr'.
      */
-    static void prepareGenericCursorSource(Collection* collection,
-                                           const NamespaceString& nss,
-                                           const AggregationRequest* aggRequest,
-                                           Pipeline* pipeline);
+    static void attachInnerQueryExecutorToPipeline(
+        Collection* collection,
+        AttachExecutorCallback attachExecutorCallback,
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+        Pipeline* pipeline);
 
     /**
-     * Prepare a special DocumentSourceGeoNearCursor for 'pipeline'. Unlike
-     * 'prepareGenericCursorSource()', throws if 'collection' does not exist, as the $geoNearCursor
-     * requires a 2d or 2dsphere index.
+     * This method combines 'buildInnerQueryExecutor()' and 'attachInnerQueryExecutorToPipeline()'
+     * into a single call to support auto completion of the cursor stage creation process. Can be
+     * used when the executor attachment phase doesn't need to be deferred and the $cursor stage
+     * can be created right after buiding the executor.
      */
-    static void prepareGeoNearCursorSource(Collection* collection,
-                                           const NamespaceString& nss,
-                                           const AggregationRequest* aggRequest,
-                                           Pipeline* pipeline);
+    static void buildAndAttachInnerQueryExecutorToPipeline(Collection* collection,
+                                                           const NamespaceString& nss,
+                                                           const AggregationRequest* aggRequest,
+                                                           Pipeline* pipeline);
+
 
     static std::string getPlanSummaryStr(const Pipeline* pipeline);
 
@@ -105,6 +125,27 @@ public:
 
 private:
     PipelineD();  // does not exist:  prevent instantiation
+
+    /**
+     * Build a PlanExecutor and prepare callback to create a generic DocumentSourceCursor for
+     * the 'pipeline'.
+     */
+    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+    buildInnerQueryExecutorGeneric(Collection* collection,
+                                   const NamespaceString& nss,
+                                   const AggregationRequest* aggRequest,
+                                   Pipeline* pipeline);
+
+    /**
+     * Build a PlanExecutor and prepare a callback to create a special DocumentSourceGeoNearCursor
+     * for the 'pipeline'. Unlike 'buildInnerQueryExecutorGeneric()', throws if 'collection' does
+     * not exist, as the $geoNearCursor requires a 2d or 2dsphere index.
+     */
+    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+    buildInnerQueryExecutorGeoNear(Collection* collection,
+                                   const NamespaceString& nss,
+                                   const AggregationRequest* aggRequest,
+                                   Pipeline* pipeline);
 
     /**
      * Creates a PlanExecutor to be used in the initial cursor source. If the query system can use

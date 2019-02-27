@@ -57,11 +57,11 @@ load("jstests/libs/analyze_plan.js");
     //
 
     // Aggregate operation that should use index.
-    explain = coll.aggregate([{$match: {x: {$gt: 1}, a: 1}}], {explain: true}).stages[0].$cursor;
+    explain = coll.aggregate([{$match: {x: {$gt: 1}, a: 1}}], {explain: true});
     assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
     // Aggregate operation that should not use index.
-    explain = coll.aggregate([{$match: {x: {$gt: 1}, a: 2}}], {explain: true}).stages[0].$cursor;
+    explain = coll.aggregate([{$match: {x: {$gt: 1}, a: 2}}], {explain: true});
     assert(isCollscan(db, explain.queryPlanner.winningPlan));
 
     //

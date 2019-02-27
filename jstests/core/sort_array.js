@@ -24,7 +24,7 @@
             assert.eq(cursor.toArray(), expected);
         }
         let explain = coll.find(filter, project).sort(sort).explain();
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, "SORT"));
+        assert(planHasStage(db, explain, "SORT"));
 
         let pipeline = [
             {$_internalInhibitOptimization: {}},
@@ -139,17 +139,14 @@
     assert.commandWorked(coll.createIndex({a: 1, "b.c": 1}));
     assert.writeOK(coll.insert({a: [1, 2, 3], b: {c: 9}}));
     explain = coll.find({a: 2}).sort({"b.c": -1}).explain();
-    assert(planHasStage(db, explain.queryPlanner.winningPlan, "IXSCAN"));
-    assert(!planHasStage(db, explain.queryPlanner.winningPlan, "SORT"));
+    assert(planHasStage(db, explain, "IXSCAN"));
+    assert(!planHasStage(db, explain, "SORT"));
 
-    const pipeline = [
-        {$match: {a: 2}},
-        {$sort: {"b.c": -1}},
-    ];
+    const pipeline = [{$match: {a: 2}}, {$sort: {"b.c": -1}}];
     explain = coll.explain().aggregate(pipeline);
-    assert(aggPlanHasStage(explain, "IXSCAN"));
-    assert(!aggPlanHasStage(explain, "SORT"));
-    assert(!aggPlanHasStage(explain, "$sort"));
+    assert(isQueryPlan(explain));
+    assert(planHasStage(db, explain, "IXSCAN"));
+    assert(!planHasStage(db, explain, "SORT"));
 
     // Test that we can correctly sort by an array field in agg when there are additional fields not
     // involved in the sort pattern.
@@ -228,5 +225,4 @@
         hint: {"a.x": 1},
         expected: [{_id: 1}, {_id: 0}, {_id: 2}]
     });
-
 }());

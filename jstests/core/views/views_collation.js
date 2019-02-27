@@ -494,12 +494,13 @@
     let explain, cursorStage;
 
     // Test that aggregate against a view with a default collation correctly uses the collation.
+    // We expect the pipeline to be optimized away, so there should be no pipeline stages in
+    // the explain.
     assert.eq(1, viewsDB.case_sensitive_coll.aggregate([{$match: {f: "case"}}]).itcount());
     assert.eq(3, viewsDB.case_insensitive_view.aggregate([{$match: {f: "case"}}]).itcount());
     explain = viewsDB.case_insensitive_view.explain().aggregate([{$match: {f: "case"}}]);
-    cursorStage = getAggPlanStage(explain, "$cursor");
-    assert.neq(null, cursorStage, tojson(explain));
-    assert.eq(1, cursorStage.$cursor.queryPlanner.collation.strength, tojson(cursorStage));
+    assert.neq(null, explain.queryPlanner, tojson(explain));
+    assert.eq(1, explain.queryPlanner.collation.strength, tojson(explain));
 
     // Test that count against a view with a default collation correctly uses the collation.
     assert.eq(1, viewsDB.case_sensitive_coll.count({f: "case"}));
@@ -518,6 +519,8 @@
     assert.eq(1, cursorStage.$cursor.queryPlanner.collation.strength, tojson(cursorStage));
 
     // Test that find against a view with a default collation correctly uses the collation.
+    // We expect the pipeline to be optimized away, so there should be no pipeline stages in
+    // the explain output.
     let findRes = viewsDB.runCommand({find: "case_sensitive_coll", filter: {f: "case"}});
     assert.commandWorked(findRes);
     assert.eq(1, findRes.cursor.firstBatch.length);
@@ -525,7 +528,6 @@
     assert.commandWorked(findRes);
     assert.eq(3, findRes.cursor.firstBatch.length);
     explain = viewsDB.runCommand({explain: {find: "case_insensitive_view", filter: {f: "case"}}});
-    cursorStage = getAggPlanStage(explain, "$cursor");
-    assert.neq(null, cursorStage, tojson(explain));
-    assert.eq(1, cursorStage.$cursor.queryPlanner.collation.strength, tojson(cursorStage));
+    assert.neq(null, explain.queryPlanner, tojson(explain));
+    assert.eq(1, explain.queryPlanner.collation.strength, tojson(explain));
 }());

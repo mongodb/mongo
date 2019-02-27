@@ -199,26 +199,26 @@ assert.commandWorked(results[0]);
 // .aggregate()
 //
 
-explain = t.explain().aggregate([{$match: {a: 3}}]);
-assert.commandWorked(explain);
-assert.eq(1, explain.stages.length);
-assert("queryPlanner" in explain.stages[0].$cursor);
-
-// Legacy varargs format.
-explain = t.explain().aggregate({$match: {a: 3}});
-assert.commandWorked(explain);
-assert.eq(1, explain.stages.length);
-assert("queryPlanner" in explain.stages[0].$cursor);
-
-explain = t.explain().aggregate({$match: {a: 3}}, {$project: {a: 1}});
+explain = t.explain().aggregate([{$match: {a: 3}}, {$group: {_id: null}}]);
 assert.commandWorked(explain);
 assert.eq(2, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
-// Options already provided.
-explain = t.explain().aggregate([{$match: {a: 3}}], {allowDiskUse: true});
+// Legacy varargs format.
+explain = t.explain().aggregate({$group: {_id: null}});
 assert.commandWorked(explain);
-assert.eq(1, explain.stages.length);
+assert.eq(2, explain.stages.length);
+assert("queryPlanner" in explain.stages[0].$cursor);
+
+explain = t.explain().aggregate({$project: {a: 3}}, {$group: {_id: null}});
+assert.commandWorked(explain);
+assert.eq(3, explain.stages.length);
+assert("queryPlanner" in explain.stages[0].$cursor);
+
+// Options already provided.
+explain = t.explain().aggregate([{$match: {a: 3}}, {$group: {_id: null}}], {allowDiskUse: true});
+assert.commandWorked(explain);
+assert.eq(2, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
 //

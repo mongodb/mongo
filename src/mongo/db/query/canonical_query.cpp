@@ -156,6 +156,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         newExpCtx = expCtx;
         invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
     }
+
     StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
         qr->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);
     if (!statusWithMatcher.isOK()) {
@@ -168,6 +169,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
     Status initStatus =
         cq->init(opCtx,
+                 std::move(newExpCtx),
                  std::move(qr),
                  parsingCanProduceNoopMatchNodes(extensionsCallback, allowedFeatures),
                  std::move(me),
@@ -203,6 +205,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
     Status initStatus = cq->init(opCtx,
+                                 nullptr,  // no expression context
                                  std::move(qr),
                                  baseQuery.canHaveNoopMatchNodes(),
                                  root->shallowClone(),
@@ -215,10 +218,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 }
 
 Status CanonicalQuery::init(OperationContext* opCtx,
+                            boost::intrusive_ptr<ExpressionContext> expCtx,
                             std::unique_ptr<QueryRequest> qr,
                             bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
                             std::unique_ptr<CollatorInterface> collator) {
+    _expCtx = expCtx;
     _qr = std::move(qr);
     _collator = std::move(collator);
 

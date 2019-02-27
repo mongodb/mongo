@@ -619,8 +619,11 @@ std::string runQuery(OperationContext* opCtx,
         bb.skip(sizeof(QueryResult::Value));
 
         BSONObjBuilder explainBob;
-        Explain::explainStages(
-            exec.get(), collection, ExplainOptions::Verbosity::kExecAllPlans, &explainBob);
+        Explain::explainStages(exec.get(),
+                               collection,
+                               ExplainOptions::Verbosity::kExecAllPlans,
+                               BSONObj(),
+                               &explainBob);
 
         // Add the resulting object to the return buffer.
         BSONObj explainObj = explainBob.obj();

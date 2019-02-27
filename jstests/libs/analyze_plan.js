@@ -26,13 +26,21 @@ function getPlanStages(root, stage) {
         }
     }
 
+    if ("queryPlanner" in root) {
+        results = results.concat(getPlanStages(root.queryPlanner.winningPlan, stage));
+    }
+
     if ("shards" in root) {
-        for (var i = 0; i < root.shards.length; i++) {
-            if ("winningPlan" in root.shards[i]) {
-                results = results.concat(getPlanStages(root.shards[i].winningPlan, stage));
-            } else {
-                results = results.concat(getPlanStages(root.shards[i].executionStages, stage));
-            }
+        if (Array.isArray(root.shards)) {
+            results = root.shards.reduce(
+                (res, shard) => res.concat(getPlanStages(
+                    shard.hasOwnProperty("winningPlan") ? shard.winningPlan : shard.executionStages,
+                    stage)),
+                results);
+        } else {
+            const shards = Object.keys(root.shards);
+            results = shards.reduce(
+                (res, shard) => res.concat(getPlanStages(root.shards[shard], stage)), results);
         }
     }
 
@@ -92,7 +100,6 @@ function hasRejectedPlans(root) {
     if (root.hasOwnProperty("shards")) {
         // This is a sharded agg explain.
         const cursorStages = getAggPlanStages(root, "$cursor");
-        assert(cursorStages.length !== 0, "Did not find any $cursor stages in sharded agg explain");
         return cursorStages.find((cursorStage) => cursorStageHasRejectedPlans(cursorStage)) !==
             undefined;
     } else if (root.hasOwnProperty("stages")) {
@@ -180,11 +187,17 @@ function getAggPlanStages(root, stage) {
 
         if (root.stages[0].hasOwnProperty("$cursor")) {
             results = results.concat(getStagesFromInsideCursorStage(root.stages[0].$cursor));
+        } else if (root.stages[0].hasOwnProperty("$geoNearCursor")) {
+            results = results.concat(getStagesFromInsideCursorStage(root.stages[0].$geoNearCursor));
         }
     }
 
     if (root.hasOwnProperty("shards")) {
         for (let elem in root.shards) {
+            if (!root.shards[elem].hasOwnProperty("stages")) {
+                continue;
+            }
+
             assert(root.shards[elem].stages.constructor === Array);
 
             results = results.concat(getDocumentSources(root.shards[elem].stages));
@@ -192,6 +205,8 @@ function getAggPlanStages(root, stage) {
             const firstStage = root.shards[elem].stages[0];
             if (firstStage.hasOwnProperty("$cursor")) {
                 results = results.concat(getStagesFromInsideCursorStage(firstStage.$cursor));
+            } else if (firstStage.hasOwnProperty("$geoNearCursor")) {
+                results = results.concat(getStagesFromInsideCursorStage(firstStage.$geoNearCursor));
             }
         }
     }
@@ -276,6 +291,34 @@ function isIdhack(db, root) {
  */
 function isCollscan(db, root) {
     return planHasStage(db, root, "COLLSCAN");
+}
+
+/**
+ * Returns true if the BSON representation of a plan rooted at 'root' is using the aggregation
+ * framework, and false otherwise.
+ */
+function isAggregationPlan(root) {
+    if (root.hasOwnProperty("shards")) {
+        const shards = Object.keys(root.shards);
+        return shards.reduce(
+                   (res, shard) => res + root.shards[shard].hasOwnProperty("stages") ? 1 : 0, 0) >
+            0;
+    }
+    return root.hasOwnProperty("stages");
+}
+
+/**
+ * Returns true if the BSON representation of a plan rooted at 'root' is using just the query layer,
+ * and false otherwise.
+ */
+function isQueryPlan(root) {
+    if (root.hasOwnProperty("shards")) {
+        const shards = Object.keys(root.shards);
+        return shards.reduce(
+                   (res, shard) => res + root.shards[shard].hasOwnProperty("queryPlanner") ? 1 : 0,
+                   0) > 0;
+    }
+    return root.hasOwnProperty("queryPlanner");
 }
 
 /**

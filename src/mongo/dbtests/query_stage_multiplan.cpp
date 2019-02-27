@@ -505,7 +505,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 
     BSONObjBuilder bob;
     Explain::explainStages(
-        exec.get(), ctx.getCollection(), ExplainOptions::Verbosity::kExecAllPlans, &bob);
+        exec.get(), ctx.getCollection(), ExplainOptions::Verbosity::kExecAllPlans, BSONObj(), &bob);
     BSONObj explained = bob.done();
 
     ASSERT_EQ(explained["executionStats"]["nReturned"].Int(), nDocs);

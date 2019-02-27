@@ -186,10 +186,13 @@ private:
     CanonicalQuery() {}
 
     Status init(OperationContext* opCtx,
+                boost::intrusive_ptr<ExpressionContext> expCtx,
                 std::unique_ptr<QueryRequest> qr,
                 bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
                 std::unique_ptr<CollatorInterface> collator);
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     std::unique_ptr<QueryRequest> _qr;
 

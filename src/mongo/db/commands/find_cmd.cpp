@@ -220,7 +220,7 @@ public:
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
-            Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
+            Explain::explainStages(exec.get(), collection, verbosity, BSONObj(), &bodyBuilder);
         }
 
         /**

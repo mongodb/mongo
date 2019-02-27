@@ -21,8 +21,7 @@
 
     const enabledPlan = coll.explain().aggregate(pipeline);
     // Test that a single equality condition $in was optimized to an $eq.
-    assert.eq(getAggPlanStage(enabledPlan, "$cursor").$cursor.queryPlanner.parsedQuery._id.$eq,
-              kTestZip);
+    assert.eq(enabledPlan.queryPlanner.parsedQuery._id.$eq, kTestZip);
 
     const enabledResult = coll.aggregate(pipeline).toArray();
 
@@ -32,8 +31,7 @@
 
     const disabledPlan = coll.explain().aggregate(pipeline);
     // Test that the $in query still exists and hasn't been optimized to an $eq.
-    assert.eq(getAggPlanStage(disabledPlan, "$cursor").$cursor.queryPlanner.parsedQuery._id.$in,
-              [kTestZip]);
+    assert.eq(disabledPlan.queryPlanner.parsedQuery._id.$in, [kTestZip]);
 
     const disabledResult = coll.aggregate(pipeline).toArray();
 

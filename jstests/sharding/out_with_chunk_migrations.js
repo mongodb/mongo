@@ -21,10 +21,13 @@
         setAggHang("alwaysOn");
 
         let comment = outMode + "_" + shardedColl.getName() + "_1";
+        // The $_internalInhibitOptimization stage is added to the pipeline to prevent the pipeline
+        // from being optimized away after it's been split. Otherwise, we won't hit the failpoint.
         let outFn = `
             const sourceDB = db.getSiblingDB(jsTestName());
             const sourceColl = sourceDB["${sourceColl.getName()}"];
-            sourceColl.aggregate([{$out: {to: "${targetColl.getName()}", mode: "${outMode}"}}], 
+            sourceColl.aggregate([{$_internalInhibitOptimization: {}},
+                {$out: {to: "${targetColl.getName()}", mode: "${outMode}"}}],
                 {comment: "${comment}"});
         `;
 
@@ -53,10 +56,13 @@
         assert.commandWorked(targetColl.remove({}));
         setAggHang("alwaysOn");
         comment = outMode + "_" + shardedColl.getName() + "_2";
+        // The $_internalInhibitOptimization stage is added to the pipeline to prevent the pipeline
+        // from being optimized away after it's been split. Otherwise, we won't hit the failpoint.
         outFn = `
             const sourceDB = db.getSiblingDB(jsTestName());
             const sourceColl = sourceDB["${sourceColl.getName()}"];
-            sourceColl.aggregate([{$out: {to: "${targetColl.getName()}", mode: "${outMode}"}}], 
+            sourceColl.aggregate([{$_internalInhibitOptimization: {}},
+                {$out: {to: "${targetColl.getName()}", mode: "${outMode}"}}],
                 {comment: "${comment}"});
         `;
         outShell = startParallelShell(outFn, st.s.port);

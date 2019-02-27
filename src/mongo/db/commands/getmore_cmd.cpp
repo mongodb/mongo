@@ -347,13 +347,26 @@ public:
             } else {
                 invariant(cursorPin->lockPolicy() ==
                           ClientCursorParams::LockPolicy::kLockExternally);
+
                 if (MONGO_FAIL_POINT(GetMoreHangBeforeReadLock)) {
                     log() << "GetMoreHangBeforeReadLock fail point enabled. Blocking until fail "
                              "point is disabled.";
                     MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                                     GetMoreHangBeforeReadLock);
                 }
-                readLock.emplace(opCtx, _request.nss);
+
+                // Lock the backing collection by using the executor's namespace. Note that it may
+                // be different from the cursor's namespace. One such possible scenario is when
+                // getMore() is executed against a view. Technically, views are pipelines and under
+                // normal circumstances use 'kLocksInternally' policy, so we shouldn't be getting
+                // into here in the first place. However, if the pipeline was optimized away and
+                // replaced with a query plan, its lock policy would have also been changed to
+                // 'kLockExternally'. So, we'll use the executor's namespace to take the lock (which
+                // is always the backing collection namespace), but will use the namespace provided
+                // in the user request for profiling.
+                // Otherwise, these two namespaces will match.
+                readLock.emplace(opCtx, cursorPin->getExecutor()->nss());
+
                 const int doNotChangeProfilingLevel = 0;
                 statsTracker.emplace(opCtx,
                                      _request.nss,

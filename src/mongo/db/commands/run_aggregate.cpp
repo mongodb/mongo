@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -59,6 +60,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -85,6 +87,36 @@ using std::unique_ptr;
 using stdx::make_unique;
 
 namespace {
+/**
+ * Returns true if this PlanExecutor is for a Pipeline.
+ */
+bool isPipelineExecutor(const PlanExecutor* exec) {
+    invariant(exec);
+    auto rootStage = exec->getRootStage();
+    return rootStage->stageType() == StageType::STAGE_PIPELINE_PROXY ||
+        rootStage->stageType() == StageType::STAGE_CHANGE_STREAM_PROXY;
+}
+
+/**
+ * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
+ * that we were able to absorb all pipeline stages and pull them into a single PlanExecutor. So,
+ * instead of creating a whole pipeline to do nothing more than forward the results of its cursor
+ * document source, we can optimize away the entire pipeline and answer the request using the query
+ * engine only. This function checks if such optimization is possible.
+ */
+bool canOptimizeAwayPipeline(const Pipeline* pipeline,
+                             const PlanExecutor* exec,
+                             const AggregationRequest& request,
+                             bool hasGeoNearStage,
+                             bool hasChangeStreamStage) {
+    return pipeline && exec && !hasGeoNearStage && !hasChangeStreamStage &&
+        pipeline->getSources().empty() &&
+        // For exchange we will create a number of pipelines consisting of a single
+        // DocumentSourceExchange stage, so cannot not optimize it away.
+        !request.getExchangeSpec() &&
+        !QueryPlannerCommon::hasNode(exec->getCanonicalQuery()->root(), MatchExpression::TEXT);
+}
+
 /**
  * Returns true if we need to keep a ClientCursor saved for this pipeline (for future getMore
  * requests). Otherwise, returns false. The passed 'nsForCursor' is only used to determine the
@@ -135,8 +167,11 @@ bool handleCursorCommand(OperationContext* opCtx,
     options.isInitialResponse = true;
     CursorResponseBuilder responseBuilder(result, options);
 
-    ClientCursor* cursor = cursors[0];
+    auto curOp = CurOp::get(opCtx);
+    auto cursor = cursors[0];
     invariant(cursor);
+    auto exec = cursor->getExecutor();
+    invariant(exec);
 
     BSONObj next;
     bool stashedResult = false;
@@ -146,12 +181,13 @@ bool handleCursorCommand(OperationContext* opCtx,
         PlanExecutor::ExecState state;
 
         try {
-            state = cursor->getExecutor()->getNext(&next, nullptr);
+            state = exec->getNext(&next, nullptr);
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event
             // that invalidates the cursor. We should close the cursor and return without
             // error.
             cursor = nullptr;
+            exec = nullptr;
             break;
         }
 
@@ -159,6 +195,7 @@ bool handleCursorCommand(OperationContext* opCtx,
             if (!cursor->isTailable()) {
                 // make it an obvious error to use cursor or executor after this point
                 cursor = nullptr;
+                exec = nullptr;
             }
             break;
         }
@@ -171,22 +208,23 @@ bool handleCursorCommand(OperationContext* opCtx,
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
         if (!FindCommon::haveSpaceForNext(next, objCount, responseBuilder.bytesUsed())) {
-            cursor->getExecutor()->enqueue(next);
+            exec->enqueue(next);
             stashedResult = true;
             break;
         }
 
         // TODO SERVER-38539: We need to set both the latestOplogTimestamp and the PBRT until the
         // former is removed in a future release.
-        responseBuilder.setLatestOplogTimestamp(cursor->getExecutor()->getLatestOplogTimestamp());
-        responseBuilder.setPostBatchResumeToken(cursor->getExecutor()->getPostBatchResumeToken());
+        responseBuilder.setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+        responseBuilder.setPostBatchResumeToken(exec->getPostBatchResumeToken());
         responseBuilder.append(next);
     }
 
     if (cursor) {
+        invariant(cursor->getExecutor() == exec);
+
         // For empty batches, or in the case where the final result was added to the batch rather
         // than being stashed, we update the PBRT to ensure that it is the most recent available.
-        const auto* exec = cursor->getExecutor();
         if (!stashedResult) {
             // TODO SERVER-38539: We need to set both the latestOplogTimestamp and the PBRT until
             // the former is removed in a future release.
@@ -197,14 +235,14 @@ bool handleCursorCommand(OperationContext* opCtx,
         // cursor (for use by future getmore ops).
         cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
 
-        CurOp::get(opCtx)->debug().cursorid = cursor->cursorid();
+        curOp->debug().cursorid = cursor->cursorid();
 
         // Cursor needs to be in a saved state while we yield locks for getmore. State
         // will be restored in getMore().
-        cursor->getExecutor()->saveState();
-        cursor->getExecutor()->detachFromOperationContext();
+        exec->saveState();
+        exec->detachFromOperationContext();
     } else {
-        CurOp::get(opCtx)->debug().cursorExhausted = true;
+        curOp->debug().cursorExhausted = true;
     }
 
     const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
@@ -387,6 +425,69 @@ void _adjustChangeStreamReadConcern(OperationContext* opCtx) {
         waitForReadConcern(opCtx, readConcernArgs, true, PrepareConflictBehavior::kIgnore));
 }
 
+/**
+ * If the aggregation 'request' contains an exchange specification, create a new pipeline for each
+ * consumer and put it into the resulting vector. Otherwise, return the original 'pipeline' as a
+ * single vector element.
+ */
+std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesIfNeeded(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const AggregationRequest& request,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    boost::optional<UUID> uuid) {
+    std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
+
+    if (request.getExchangeSpec() && !expCtx->explain) {
+        boost::intrusive_ptr<Exchange> exchange =
+            new Exchange(request.getExchangeSpec().get(), std::move(pipeline));
+
+        for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
+            // For every new pipeline we have create a new ExpressionContext as the context
+            // cannot be shared between threads. There is no synchronization for pieces of
+            // the execution machinery above the Exchange, so nothing above the Exchange can be
+            // shared between different exchange-producer cursors.
+            expCtx = makeExpressionContext(opCtx,
+                                           request,
+                                           expCtx->getCollator() ? expCtx->getCollator()->clone()
+                                                                 : nullptr,
+                                           uuid);
+
+            // Create a new pipeline for the consumer consisting of a single
+            // DocumentSourceExchange.
+            boost::intrusive_ptr<DocumentSource> consumer = new DocumentSourceExchange(
+                expCtx, exchange, idx, expCtx->mongoProcessInterface->getResourceYielder());
+            pipelines.emplace_back(uassertStatusOK(Pipeline::create({consumer}, expCtx)));
+        }
+    } else {
+        pipelines.emplace_back(std::move(pipeline));
+    }
+
+    return pipelines;
+}
+
+/**
+ * Create a PlanExecutor to execute the given 'pipeline'.
+ */
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createOuterPipelineProxyExecutor(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    bool hasChangeStream) {
+    // Transfer ownership of the Pipeline to the PipelineProxyStage.
+    auto ws = make_unique<WorkingSet>();
+    auto proxy = hasChangeStream
+        ? make_unique<ChangeStreamProxyStage>(opCtx, std::move(pipeline), ws.get())
+        : make_unique<PipelineProxyStage>(opCtx, std::move(pipeline), ws.get());
+
+    // This PlanExecutor will simply forward requests to the Pipeline, so does not need
+    // to yield or to be registered with any collection's CursorManager to receive
+    // invalidations. The Pipeline may contain PlanExecutors which *are* yielding
+    // PlanExecutors and which *are* registered with their respective collection's
+    // CursorManager
+    return uassertStatusOK(
+        PlanExecutor::make(opCtx, std::move(ws), std::move(proxy), nss, PlanExecutor::NO_YIELD));
+}
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
@@ -404,6 +505,11 @@ Status runAggregate(OperationContext* opCtx,
 
     // The UUID of the collection for the execution namespace of this aggregation.
     boost::optional<UUID> uuid;
+
+    // If emplaced, AutoGetCollectionForReadCommand will throw if the sharding version for this
+    // connection is out of date. If the namespace is a view, the lock will be released before
+    // re-running the expanded aggregation.
+    boost::optional<AutoGetCollectionForReadCommand> ctx;
 
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -427,11 +533,6 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
-
-        // If emplaced, AutoGetCollectionForReadCommand will throw if the sharding version for this
-        // connection is out of date. If the namespace is a view, the lock will be released before
-        // re-running the expanded aggregation.
-        boost::optional<AutoGetCollectionForReadCommand> ctx;
 
         // If this is a collectionless aggregation, we won't create 'ctx' but will still need an
         // AutoStatsTracker to record CurOp and Top entries.
@@ -538,65 +639,63 @@ Status runAggregate(OperationContext* opCtx,
 
         pipeline->optimizePipeline();
 
+        // Check if the pipeline has a $geoNear stage, as it will be ripped away during the build
+        // query executor phase below (to be replaced with a $geoNearCursorStage later during the
+        // executor attach phase).
+        auto hasGeoNearStage = !pipeline->getSources().empty() &&
+            dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
+
         // Prepare a PlanExecutor to provide input into the pipeline, if needed.
+        std::pair<PipelineD::AttachExecutorCallback,
+                  std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
+            attachExecutorCallback;
         if (liteParsedPipeline.hasChangeStream()) {
             // If we are using a change stream, the cursor stage should have a simple collation,
             // regardless of what the user's collation was.
             std::unique_ptr<CollatorInterface> collatorForCursor = nullptr;
             auto collatorStash = expCtx->temporarilyChangeCollator(std::move(collatorForCursor));
-            PipelineD::prepareCursorSource(collection, nss, &request, pipeline.get());
+            attachExecutorCallback =
+                PipelineD::buildInnerQueryExecutor(collection, nss, &request, pipeline.get());
         } else {
-            PipelineD::prepareCursorSource(collection, nss, &request, pipeline.get());
+            attachExecutorCallback =
+                PipelineD::buildInnerQueryExecutor(collection, nss, &request, pipeline.get());
         }
-        // Optimize again, since there may be additional optimizations that can be done after adding
-        // the initial cursor stage. Note this has to be done outside the above blocks to ensure
-        // this process uses the correct collation if it does any string comparisons.
-        pipeline->optimizePipeline();
 
-        std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
+        if (canOptimizeAwayPipeline(pipeline.get(),
+                                    attachExecutorCallback.second.get(),
+                                    request,
+                                    hasGeoNearStage,
+                                    liteParsedPipeline.hasChangeStream())) {
+            // This pipeline is currently empty, but once completed it will have only one source,
+            // which is a DocumentSourceCursor. Instead of creating a whole pipeline to do nothing
+            // more than forward the results of its cursor document source, we can use the
+            // PlanExecutor by itself. The resulting cursor will look like what the client would
+            // have gotten from find command.
+            execs.emplace_back(std::move(attachExecutorCallback.second));
+        } else {
+            // Complete creation of the initial $cursor stage, if needed.
+            PipelineD::attachInnerQueryExecutorToPipeline(collection,
+                                                          attachExecutorCallback.first,
+                                                          std::move(attachExecutorCallback.second),
+                                                          pipeline.get());
 
-        if (request.getExchangeSpec() && !expCtx->explain) {
-            boost::intrusive_ptr<Exchange> exchange =
-                new Exchange(request.getExchangeSpec().get(), std::move(pipeline));
+            // Optimize again, since there may be additional optimizations that can be done after
+            // adding the initial cursor stage.
+            pipeline->optimizePipeline();
 
-            for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
-                // For every new pipeline we have create a new ExpressionContext as the context
-                // cannot be shared between threads. There is no synchronization for pieces of the
-                // execution machinery above the Exchange, so nothing above the Exchange can be
-                // shared between different exchange-producer cursors.
-                expCtx = makeExpressionContext(
-                    opCtx,
-                    request,
-                    expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr,
-                    uuid);
-
-                // Create a new pipeline for the consumer consisting of a single
-                // DocumentSourceExchange.
-                boost::intrusive_ptr<DocumentSource> consumer = new DocumentSourceExchange(
-                    expCtx, exchange, idx, expCtx->mongoProcessInterface->getResourceYielder());
-                pipelines.emplace_back(uassertStatusOK(Pipeline::create({consumer}, expCtx)));
+            auto pipelines =
+                createExchangePipelinesIfNeeded(opCtx, expCtx, request, std::move(pipeline), uuid);
+            for (auto&& pipelineIt : pipelines) {
+                execs.emplace_back(createOuterPipelineProxyExecutor(
+                    opCtx, nss, std::move(pipelineIt), liteParsedPipeline.hasChangeStream()));
             }
-        } else {
-            pipelines.emplace_back(std::move(pipeline));
-        }
 
-        for (size_t idx = 0; idx < pipelines.size(); ++idx) {
-            // Transfer ownership of the Pipeline to the PipelineProxyStage.
-            auto ws = make_unique<WorkingSet>();
-            auto proxy = liteParsedPipeline.hasChangeStream()
-                ? make_unique<ChangeStreamProxyStage>(opCtx, std::move(pipelines[idx]), ws.get())
-                : make_unique<PipelineProxyStage>(opCtx, std::move(pipelines[idx]), ws.get());
-
-            // This PlanExecutor will simply forward requests to the Pipeline, so does not need to
-            // yield or to be registered with any collection's CursorManager to receive
-            // invalidations. The Pipeline may contain PlanExecutors which *are* yielding
-            // PlanExecutors and which *are* registered with their respective collection's
-            // CursorManager
-
-            auto statusWithPlanExecutor = PlanExecutor::make(
-                opCtx, std::move(ws), std::move(proxy), nss, PlanExecutor::NO_YIELD);
-            invariant(statusWithPlanExecutor.isOK());
-            execs.emplace_back(std::move(statusWithPlanExecutor.getValue()));
+            // With the pipelines created, we can relinquish locks as they will manage the locks
+            // internally further on. We still need to keep the lock for an optimized away pipeline
+            // though, as we will be changing its lock policy to 'kLockExternally' (see details
+            // below), and in order to execute the initial getNext() call in 'handleCursorCommand',
+            // we need to hold the collection lock.
+            ctx.reset();
         }
 
         {
@@ -620,14 +719,22 @@ Status runAggregate(OperationContext* opCtx,
             p.deleteUnderlying();
         }
     });
-    for (size_t idx = 0; idx < execs.size(); ++idx) {
+    for (auto&& exec : execs) {
+        // PlanExecutors for pipelines always have a 'kLocksInternally' policy. If this executor is
+        // not for a pipeline, though, that means the pipeline was optimized away and the
+        // PlanExecutor will answer the query using the query engine only. Without the
+        // DocumentSourceCursor to do its locking, an executor needs a 'kLockExternally' policy.
+        auto lockPolicy = isPipelineExecutor(exec.get())
+            ? ClientCursorParams::LockPolicy::kLocksInternally
+            : ClientCursorParams::LockPolicy::kLockExternally;
+
         ClientCursorParams cursorParams(
-            std::move(execs[idx]),
+            std::move(exec),
             origNss,
             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
             repl::ReadConcernArgs::get(opCtx),
             cmdObj,
-            ClientCursorParams::LockPolicy::kLocksInternally,
+            lockPolicy,
             privileges);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
             cursorParams.setTailable(true);
@@ -637,15 +744,32 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         auto pin = CursorManager::get(opCtx)->registerCursor(opCtx, std::move(cursorParams));
+        invariant(!exec);
+
         cursors.emplace_back(pin.getCursor());
         pins.emplace_back(std::move(pin));
     }
 
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {
+        auto explainExecutor = pins[0].getCursor()->getExecutor();
         auto bodyBuilder = result->getBodyBuilder();
-        Explain::explainPipelineExecutor(
-            pins[0].getCursor()->getExecutor(), *(expCtx->explain), &bodyBuilder);
+        if (isPipelineExecutor(explainExecutor)) {
+            Explain::explainPipelineExecutor(explainExecutor, *(expCtx->explain), &bodyBuilder);
+        } else {
+            invariant(pins[0].getCursor()->lockPolicy() ==
+                      ClientCursorParams::LockPolicy::kLockExternally);
+            invariant(!explainExecutor->isDetached());
+            invariant(explainExecutor->getOpCtx() == opCtx);
+            // The explainStages() function for a non-pipeline executor expects to be called with
+            // the appropriate collection lock already held. Make sure it has not been released yet.
+            invariant(ctx);
+            Explain::explainStages(explainExecutor,
+                                   ctx->getCollection(),
+                                   *(expCtx->explain),
+                                   BSON("optimizedPipeline" << true),
+                                   &bodyBuilder);
+        }
     } else {
         // Cursor must be specified, if explain is not.
         const bool keepCursor =
@@ -653,13 +777,16 @@ Status runAggregate(OperationContext* opCtx,
         if (keepCursor) {
             cursorFreer.dismiss();
         }
-    }
 
-    if (!expCtx->explain) {
         PlanSummaryStats stats;
         Explain::getSummaryStats(*(pins[0].getCursor()->getExecutor()), &stats);
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
+        // For an optimized away pipeline, signal the cache that a query operation has completed.
+        // For normal pipelines this is done in DocumentSourceCursor.
+        if (ctx && ctx->getCollection()) {
+            ctx->getCollection()->infoCache()->notifyOfQuery(opCtx, stats.indexesUsed);
+        }
     }
 
     // Any code that needs the cursor pinned must be inside the try block, above.

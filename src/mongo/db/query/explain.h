@@ -58,6 +58,8 @@ public:
      *
      * The explain information is generated with the level of detail specified by 'verbosity'.
      *
+     * The 'extraInfo' parameter specifies additional information to include into the output.
+     *
      * Does not take ownership of its arguments.
      *
      * The caller should hold at least an IS lock on the collection the that the query runs on,
@@ -69,6 +71,7 @@ public:
     static void explainStages(PlanExecutor* exec,
                               const Collection* collection,
                               ExplainOptions::Verbosity verbosity,
+                              BSONObj extraInfo,
                               BSONObjBuilder* out);
     /**
      * Adds "queryPlanner" and "executionStats" (if requested in verbosity) fields to 'out'. Unlike
@@ -78,6 +81,7 @@ public:
      * - 'collection' is the relevant collection. The caller should hold at least an IS lock on the
      * collection which the query ran on, even 'collection' is nullptr.
      * - 'verbosity' is the verbosity level of the explain.
+     * - 'extraInfo' specifies additional information to include into the output.
      * - 'executePlanStatus' is the status returned after executing the query (Status::OK if the
      * query wasn't executed).
      * - 'winningPlanTrialStats' is the stats of the winning plan during the trial period. May be
@@ -89,6 +93,7 @@ public:
                               ExplainOptions::Verbosity verbosity,
                               Status executePlanStatus,
                               PlanStageStats* winningPlanTrialStats,
+                              BSONObj extraInfo,
                               BSONObjBuilder* out);
 
     /**
@@ -198,10 +203,12 @@ private:
      * - 'exec' is the stage tree for the operation being explained.
      * - 'collection' is the collection used in the operation. The caller should hold an IS lock on
      * the collection which the query is for, even if 'collection' is nullptr.
+     * - 'extraInfo' specifies additional information to include into the output.
      * - 'out' is a builder for the explain output.
      */
     static void generatePlannerInfo(PlanExecutor* exec,
                                     const Collection* collection,
+                                    BSONObj extraInfo,
                                     BSONObjBuilder* out);
 
     /**

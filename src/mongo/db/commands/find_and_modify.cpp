@@ -262,7 +262,7 @@ public:
                 uassertStatusOK(getExecutorDelete(opCtx, opDebug, collection, &parsedDelete));
 
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
+            Explain::explainStages(exec.get(), collection, verbosity, BSONObj(), &bodyBuilder);
         } else {
             UpdateRequest request(nsString);
             const bool isExplain = true;
@@ -286,7 +286,7 @@ public:
                 uassertStatusOK(getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate));
 
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(exec.get(), collection, verbosity, &bodyBuilder);
+            Explain::explainStages(exec.get(), collection, verbosity, BSONObj(), &bodyBuilder);
         }
 
         return Status::OK();

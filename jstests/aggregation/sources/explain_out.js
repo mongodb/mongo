@@ -12,9 +12,6 @@
     load("jstests/libs/analyze_plan.js");               // For getAggPlanStage().
     load("jstests/aggregation/extras/out_helpers.js");  // For withEachOutMode().
 
-    // Mongos currently uses its own error code if any shard's explain fails.
-    const kErrorCode = FixtureHelpers.isMongos(db) ? 17403 : 51029;
-
     let sourceColl = db.explain_out_source;
     let targetColl = db.explain_out_target;
     sourceColl.drop();
@@ -47,7 +44,7 @@
             explain: {aggregate: sourceColl.getName(), pipeline: [outStage], cursor: {}},
             verbosity: verbosity
         }),
-                                     kErrorCode);
+                                     51029);
         assert.eq(targetColl.find().itcount(), 0);
     }
 

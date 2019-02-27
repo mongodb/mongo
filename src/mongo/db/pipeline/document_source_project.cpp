@@ -57,7 +57,7 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
             projectSpec,
             {ProjectionPolicies::DefaultIdPolicy::kIncludeId,
              ProjectionPolicies::ArrayRecursionPolicy::kRecurseNestedArrays}),
-        "$project",
+        DocumentSourceProject::kStageName.rawData(),
         isIndependentOfAnyCollection));
     return project;
 }

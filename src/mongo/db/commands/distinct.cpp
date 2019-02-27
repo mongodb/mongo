@@ -163,7 +163,7 @@ public:
             getExecutorDistinct(opCtx, collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
 
         auto bodyBuilder = result->getBodyBuilder();
-        Explain::explainStages(executor.get(), collection, verbosity, &bodyBuilder);
+        Explain::explainStages(executor.get(), collection, verbosity, BSONObj(), &bodyBuilder);
         return Status::OK();
     }
 
