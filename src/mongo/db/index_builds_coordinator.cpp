@@ -61,7 +61,6 @@ using namespace indexbuildentryhelpers;
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
-MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeBuilding);
 
 namespace {
 
@@ -753,7 +752,6 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     // background.
     {
         Lock::CollectionLock colLock(opCtx->lockState(), nss.ns(), MODE_IX);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangIndexBuildBeforeBuilding);
         uassertStatusOK(
             _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
     }

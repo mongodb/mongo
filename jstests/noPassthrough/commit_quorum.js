@@ -52,7 +52,7 @@
     replSet.waitForAllIndexBuildsToFinish(testDB.getName(), collName);
 
     assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: "hangIndexBuildBeforeBuilding", mode: "alwaysOn"}));
+        {configureFailPoint: "hangAfterIndexBuildSecondDrain", mode: "alwaysOn"}));
 
     // Starts parallel shell to run the command that will hang.
     const awaitShell = startParallelShell(function() {
@@ -86,7 +86,7 @@
     }));
 
     assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangIndexBuildBeforeBuilding", mode: "off"}));
+        testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildSecondDrain", mode: "off"}));
 
     // Wait for the parallel shell to complete.
     awaitShell();
