@@ -72,7 +72,9 @@ void failsWithLockTimeout(stdx::function<void()> func, Milliseconds timeoutMilli
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
         log() << ex;
         Date_t t2 = Date_t::now();
-        ASSERT_GTE(t2 - t1, timeoutMillis);
+        // Adding a "grace period" of 1 ms here to avoid infrequent test failures due to
+        // anomalies in the clock on old versions of Windows.
+        ASSERT_GTE(t2 - t1 + Milliseconds(1), timeoutMillis);
     }
 }
 
