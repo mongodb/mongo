@@ -5607,6 +5607,14 @@ tasks:
       resmoke_args: --suites=core_txns --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: jsCore_txns_multi_oplog_entries
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_txns_multi_oplog_entries --storageEngine=wiredTiger
+
+- <<: *task_template
   name: sharded_jscore_txns
   commands:
   - func: "do setup"
@@ -7592,6 +7600,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
@@ -7805,6 +7814,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation_wildcard_fuzzer_gen
@@ -9259,6 +9269,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
@@ -9429,6 +9440,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation_expression_multiversion_fuzzer_gen
@@ -9455,6 +9467,7 @@ buildvariants:
   - name: snmp
   - name: ssl_gen
   - name: sslSpecial_gen
+  - name: jsCore_txns_multi_oplog_entries
   - name: push
     distros:
     - rhel70-small
@@ -9910,6 +9923,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: replica_sets
@@ -10569,6 +10583,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: aggregation_multiversion_fuzzer_gen
@@ -10991,6 +11006,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
@@ -11091,6 +11107,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation_expression_multiversion_fuzzer_gen
@@ -13831,6 +13848,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: jsCore
   - name: jsCore_txns
+  - name: jsCore_txns_multi_oplog_entries
   - name: causally_consistent_jscore_txns_passthrough
   - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen

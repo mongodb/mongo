@@ -1,0 +1,38 @@
+# This test suite exercises core, generic transactions behavior using the multiple transactions
+# oplog entry format. The tests in this suite, pulled from 'jstests/core/txns', should be "topology
+# agnostic". They ideally generalize to single replica sets and sharded clusters. Since transactions
+# aren't supported on MongoDB standalones in 4.0, we run this set of tests in their own suite,
+# against a 1-node replica set, to provide the most basic layer of test coverage. This allows us to
+# verify basic transaction behavior against a local node, without the need to exercise data
+# replication machinery.
+
+test_kind: js_test
+selector:
+  roots:
+  - jstests/core/txns/**/*.js
+  exclude_with_any_tags:
+  # Exclude prepared transactions until they are supported with the new multiple transactions oplog
+  # entry format.
+  - uses_prepare_transaction
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: "testingReplication = true;"
+      readMode: commands
+  hooks:
+  # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+  # node.
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        useMultipleOplogEntryFormatForTransactions: true
+    # Use a 1-node replica set.
+    num_nodes: 1
