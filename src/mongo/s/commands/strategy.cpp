@@ -587,6 +587,12 @@ void runCommand(OperationContext* opCtx,
     } catch (const DBException& e) {
         command->incrementCommandsFailed();
         LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
+        // hasWriteConcernError is set to false because:
+        // 1. TransientTransaction error label handling for commitTransaction command in mongos is
+        //    delegated to the shards. Mongos simply propagates the shard's response up to the
+        //    client.
+        // 2. For other commands in a transaction, they shouldn't get a writeConcern error so
+        //    this setting doesn't apply.
         auto errorLabels = getErrorLabels(osi, command->getName(), e.code(), false);
         errorBuilder->appendElements(errorLabels);
         throw;
