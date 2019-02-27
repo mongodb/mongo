@@ -1411,11 +1411,10 @@ protected:
     /**
      * Sets up a test for the CollectionCloner that simulates the collection being dropped while
      * copying the documents.
-     * The ARM returns CursorNotFound error to indicate a collection drop. Subsequently, the
-     * CollectionCloner should run a find command on the collection by UUID. This should be the next
-     * ready request on in the network interface.
+     *
+     * The mock network returns 'code' to indicate a collection drop.
      */
-    void setUpVerifyCollectionWasDroppedTest() {
+    void setUpVerifyCollectionWasDroppedTest(ErrorCodes::Error code) {
         startupWithUUID();
 
         {
@@ -1440,8 +1439,7 @@ protected:
         // Return error response to getMore command.
         {
             executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-            processNetworkResponse(ErrorCodes::CursorNotFound,
-                                   "collection dropped while copying documents");
+            processNetworkResponse(code, "collection dropped while copying documents");
         }
     }
 
@@ -1460,6 +1458,38 @@ protected:
         ASSERT_EQUALS("find"_sd, firstElement.fieldNameStringData());
         ASSERT_EQUALS(*options.uuid, unittest::assertGet(UUID::parse(firstElement)));
         return noi;
+    }
+
+    /**
+     * Start cloning. While copying collection, simulate a collection drop by having the mock
+     * network return code 'collectionDropErrCode'.
+     *
+     * The CollectionCloner should run a find command on the collection by UUID. Simulate successful
+     * find command with a drop-pending namespace in the response.  The CollectionCloner should
+     * complete with a successful final status.
+     */
+    void runCloningSuccessfulWithCollectionDropTest(ErrorCodes::Error collectionDropErrCode) {
+        setUpVerifyCollectionWasDroppedTest(collectionDropErrCode);
+
+        // CollectionCloner should send a find command with the collection's UUID.
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+            auto noi = getVerifyCollectionDroppedRequest(getNet());
+
+            // Return a drop-pending namespace in the find response instead of the original
+            // collection name passed to CollectionCloner at construction.
+            repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+            auto dpns = nss.makeDropPendingNamespace(dropOpTime);
+            scheduleNetworkResponse(noi,
+                                    createCursorResponse(0, dpns.ns(), BSONArray(), "firstBatch"));
+            finishProcessingNetworkResponse();
+        }
+
+        // CollectionCloner treats a in collection state to drop-pending during cloning as a
+        // successful clone operation.
+        collectionCloner->join();
+        ASSERT_OK(getStatus());
+        ASSERT_FALSE(collectionCloner->isActive());
     }
 };
 
@@ -1563,49 +1593,33 @@ TEST_F(CollectionClonerUUIDTest, ThreeCloningCursorsWithUUIDUsesParallelCollecti
     testWithMaxNumCloningCursors(3, "parallelCollectionScan");
 }
 
-/**
- * Start cloning.
- * While copying collection, simulate a collection drop by having the ARM return a CursorNotFound
- * error.
- * The CollectionCloner should run a find command on the collection by UUID.
- * Simulate successful find command with a drop-pending namespace in the response.
- * The CollectionCloner should complete with a successful final status.
- */
-TEST_F(CollectionClonerUUIDTest, CloningIsSuccessfulIfCollectionWasDroppedWhileCopyingDocuments) {
-    setUpVerifyCollectionWasDroppedTest();
+TEST_F(CollectionClonerUUIDTest,
+       CloningIsSuccessfulIfCollectionWasDroppedWithCursorNotFoundWhileCopyingDocuments) {
+    runCloningSuccessfulWithCollectionDropTest(ErrorCodes::CursorNotFound);
+}
 
-    // CollectionCloner should send a find command with the collection's UUID.
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        auto noi = getVerifyCollectionDroppedRequest(getNet());
 
-        // Return a drop-pending namespace in the find response instead of the original collection
-        // name passed to CollectionCloner at construction.
-        repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-        auto dpns = nss.makeDropPendingNamespace(dropOpTime);
-        scheduleNetworkResponse(noi, createCursorResponse(0, dpns.ns(), BSONArray(), "firstBatch"));
-        finishProcessingNetworkResponse();
-    }
+TEST_F(CollectionClonerUUIDTest,
+       CloningIsSuccessfulIfCollectionWasDroppedWithOperationFailedWhileCopyingDocuments) {
+    runCloningSuccessfulWithCollectionDropTest(ErrorCodes::OperationFailed);
+}
 
-    // CollectionCloner treats a in collection state to drop-pending during cloning as a successful
-    // clone operation.
-    collectionCloner->join();
-    ASSERT_OK(getStatus());
-    ASSERT_FALSE(collectionCloner->isActive());
+TEST_F(CollectionClonerUUIDTest,
+       CloningIsSuccessfulIfCollectionWasDroppedWithQueryPlanKilledWhileCopyingDocuments) {
+    runCloningSuccessfulWithCollectionDropTest(ErrorCodes::QueryPlanKilled);
 }
 
 /**
- * Start cloning.
- * While copying collection, simulate a collection drop by having the ARM return a CursorNotFound
- * error.
- * The CollectionCloner should run a find command on the collection by UUID.
- * Shut the CollectionCloner down.
- * The CollectionCloner should return a CursorNotFound final status which is the last error from the
- * ARM.
+ * Start cloning. While copying collection, simulate a collection drop by having the ARM return a
+ * CursorNotFound error.
+ *
+ * The CollectionCloner should run a find commnd on the collection by UUID. Shut the
+ * CollectionCloner down. The CollectionCloner should return a CursorNotFound final status which is
+ * the last error from the ARM.
  */
 TEST_F(CollectionClonerUUIDTest,
        ShuttingDownCollectionClonerDuringCollectionDropVerificationReturnsCallbackCanceled) {
-    setUpVerifyCollectionWasDroppedTest();
+    setUpVerifyCollectionWasDroppedTest(ErrorCodes::CursorNotFound);
 
     // CollectionCloner should send a find command with the collection's UUID.
     {

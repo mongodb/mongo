@@ -745,7 +745,8 @@ void CollectionCloner::_handleARMResultsCallback(
         auto nextBatchStatus = _bufferNextBatchFromArm(lk);
         if (!nextBatchStatus.isOK()) {
             if (_options.uuid && (nextBatchStatus.code() == ErrorCodes::OperationFailed ||
-                                  nextBatchStatus.code() == ErrorCodes::CursorNotFound)) {
+                                  nextBatchStatus.code() == ErrorCodes::CursorNotFound ||
+                                  nextBatchStatus.code() == ErrorCodes::QueryPlanKilled)) {
                 // With these errors, it's possible the collection was dropped while we were
                 // cloning.  If so, we'll execute the drop during oplog application, so it's OK to
                 // just stop cloning.  This is only safe if cloning by UUID; if we are cloning by
