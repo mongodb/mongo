@@ -90,6 +90,7 @@ static const char *start_options[] = {
   "(*NO_AUTO_POSSESS)",
   "(*LIMIT_RECURSION=",
   "(*LIMIT_MATCH=",
+  "(*LF)",
   "(*CRLF)",
   "(*CR)",
   "(*BSR_UNICODE)",

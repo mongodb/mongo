@@ -1231,6 +1231,13 @@ int main(int argc, char** argv) {
       RE re_test("");
       CHECK(!re_test.FullMatch(utf8_string));
     }
+
+    {
+      // Test where only a \n indicates newline.
+      RE re_test("(*LF)a.b");
+      CHECK(!re_test.FullMatch("a\nb"));
+      CHECK(re_test.FullMatch("a\rb"));
+    }
     // </Added by MongoDB>
 
     // Check that '.' matches one byte or UTF-8 character

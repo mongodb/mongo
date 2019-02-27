@@ -994,6 +994,22 @@ TEST(RegexMatchExpression, RegexAcceptsUCPOption) {
                                   << "\u304C")));
 }
 
+TEST(RegexMatchExpression, RegexAcceptsLFOption) {
+    // The LF option tells the regex to only treat \n as a newline. "." will not match newlines (by
+    // default) so a\nb will not match, but a\rb will.
+    RegexMatchExpression regexLF("a", "(*LF)a.b", "");
+    ASSERT(!regexLF.matchesBSON(BSON("a"
+                                     << "a\nb")));
+    ASSERT(regexLF.matchesBSON(BSON("a"
+                                    << "a\rb")));
+
+    RegexMatchExpression regexCR("a", "(*CR)a.b", "");
+    ASSERT(regexCR.matchesBSON(BSON("a"
+                                    << "a\nb")));
+    ASSERT(!regexCR.matchesBSON(BSON("a"
+                                     << "a\rb")));
+}
+
 TEST(ModMatchExpression, MatchesElement) {
     BSONObj match = BSON("a" << 1);
     BSONObj largerMatch = BSON("a" << 4.0);
