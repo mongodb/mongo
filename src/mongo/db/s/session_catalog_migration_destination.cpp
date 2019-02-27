@@ -254,18 +254,17 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
             return lastResult;
         }
     } catch (const DBException& ex) {
-        // If the transaction chain was truncated on the recipient shard, then we are most likely
-        // copying from a session that hasn't been touched on the recipient shard for a very long
-        // time but could be recent on the donor.
-        //
-        // We continue copying regardless to get the entire transaction from the donor.
-        if (ex.code() != ErrorCodes::IncompleteTransactionHistory) {
-            throw;
+        // If the transaction chain is incomplete because oplog was truncated, just ignore the
+        // incoming oplog and don't attempt to 'patch up' the missing pieces.
+        if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
+            return lastResult;
         }
 
         if (stmtId == kIncompleteHistoryStmtId) {
             return lastResult;
         }
+
+        throw;
     }
 
     BSONObj object(result.isPrePostImage
