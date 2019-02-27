@@ -95,8 +95,9 @@ if get_option('link-model') != 'dynamic-sdk':
         target='mongo_embedded_test',
         source=[
             'mongo_embedded_test.cpp',
+            env.Idlc('mongo_embedded_test.idl')[0],
         ],
-        LIBDEPS=[
+        LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
             '$BUILD_DIR/mongo/db/server_options_core',

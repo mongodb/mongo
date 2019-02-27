@@ -38,9 +38,9 @@
 #include <mongoc/mongoc.h>
 #include <yaml-cpp/yaml.h>
 
-#include "mongo_embedded/mongo_embedded.h"
-
 #include "mongo/db/server_options.h"
+#include "mongo/embedded/mongo_embedded/mongo_embedded.h"
+#include "mongo/embedded/mongoc_embedded/mongoc_embedded_test_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -263,10 +263,14 @@ int main(int argc, char** argv, char** envp) {
     moe::OptionSection options;
     std::map<std::string, std::string> env;
 
-    options.addOptionChaining(
-        "tempPath", "tempPath", moe::String, "directory to place mongo::TempDir subdirectories");
+    auto ret = mongo::embedded::addMongocEmbeddedTestOptions(&options);
+    if (!ret.isOK()) {
+        std::cerr << ret << std::endl;
+        return EXIT_FAILURE;
+    }
+
     std::vector<std::string> argVector(argv, argv + argc);
-    mongo::Status ret = parser.run(options, argVector, env, &environment);
+    ret = parser.run(options, argVector, env, &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
         return EXIT_FAILURE;

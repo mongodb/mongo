@@ -38,6 +38,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/json.h"
 #include "mongo/db/server_options.h"
+#include "mongo/embedded/mongo_embedded/mongo_embedded_test_gen.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
@@ -673,11 +674,14 @@ int main(const int argc, const char* const* const argv) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    options.addOptionChaining(
-        "tempPath", "tempPath", moe::String, "directory to place mongo::TempDir subdirectories");
+    auto ret = mongo::embedded::addMongoEmbeddedTestOptions(&options);
+    if (!ret.isOK()) {
+        std::cerr << ret << std::endl;
+        return EXIT_FAILURE;
+    }
 
     std::map<std::string, std::string> env;
-    mongo::Status ret = moe::OptionsParser().run(
+    ret = moe::OptionsParser().run(
         options, std::vector<std::string>(argv, argv + argc), env, &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
