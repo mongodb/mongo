@@ -1365,16 +1365,21 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
     opObserver().onInserts(opCtx(), nss2, uuid2, inserts2.begin(), inserts2.end(), false);
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 4);
+    auto oplogEntryObjs = getNOplogEntries(opCtx(), 5);
     StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId++);
+        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        ASSERT_EQ("i", oplogEntryObj["op"].String());
-        ASSERT(oplogEntry.getInTxn());
+        if (expectedStmtId++ < 4) {
+            ASSERT_EQ("i", oplogEntryObj["op"].String());
+            ASSERT(oplogEntry.getInTxn());
+        } else {
+            ASSERT_EQ("admin.$cmd"_sd, oplogEntryObj["ns"].String());
+            ASSERT_EQ("c", oplogEntryObj["op"].String());
+        }
         ASSERT(!oplogEntry.getPrepare());
         ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
@@ -1409,6 +1414,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
                                  << "w"),
                       oplogEntries[3].getObject());
     ASSERT_FALSE(oplogEntries[3].getObject2());
+    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepare" << false),
+                      oplogEntries[4].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
@@ -1444,16 +1451,21 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     opObserver().onUpdate(opCtx(), update2);
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
+    auto oplogEntryObjs = getNOplogEntries(opCtx(), 3);
     StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId++);
+        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        ASSERT_EQ("u", oplogEntryObj["op"].String());
-        ASSERT(oplogEntry.getInTxn());
+        if (expectedStmtId++ < 2) {
+            ASSERT_EQ("u", oplogEntryObj["op"].String());
+            ASSERT(oplogEntry.getInTxn());
+        } else {
+            ASSERT_EQ("admin.$cmd"_sd, oplogEntryObj["ns"].String());
+            ASSERT_EQ("c", oplogEntryObj["op"].String());
+        }
         ASSERT(!oplogEntry.getPrepare());
         ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
@@ -1476,6 +1488,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
                       oplogEntries[1].getObject());
     ASSERT_TRUE(oplogEntries[1].getObject2());
     ASSERT_BSONOBJ_EQ(*oplogEntries[1].getObject2(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepare" << false),
+                      oplogEntries[2].getObject());
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
@@ -1502,16 +1516,21 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, false, boost::none);
     opObserver().onUnpreparedTransactionCommit(
         opCtx(), txnParticipant.retrieveCompletedTransactionOperations(opCtx()));
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 2);
+    auto oplogEntryObjs = getNOplogEntries(opCtx(), 3);
     StmtId expectedStmtId = 0;
     std::vector<OplogEntry> oplogEntries;
     mongo::repl::OpTime expectedPrevWriteOpTime;
     for (const auto& oplogEntryObj : oplogEntryObjs) {
-        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId++);
+        checkSessionAndTransactionFields(oplogEntryObj, expectedStmtId);
         oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
         const auto& oplogEntry = oplogEntries.back();
-        ASSERT_EQ("d", oplogEntryObj["op"].String());
-        ASSERT(oplogEntry.getInTxn());
+        if (expectedStmtId++ < 2) {
+            ASSERT_EQ("d", oplogEntryObj["op"].String());
+            ASSERT(oplogEntry.getInTxn());
+        } else {
+            ASSERT_EQ("admin.$cmd"_sd, oplogEntryObj["ns"].String());
+            ASSERT_EQ("c", oplogEntryObj["op"].String());
+        }
         ASSERT(!oplogEntry.getPrepare());
         ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
         ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
@@ -1528,6 +1547,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
     ASSERT_EQ(uuid2, *oplogEntries[1].getUuid());
     ASSERT_BSONOBJ_EQ(oplogEntries[1].getObject(), BSON("_id" << 1));
     ASSERT_FALSE(oplogEntries[1].getObject2());
+    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepare" << false),
+                      oplogEntries[2].getObject());
 }
 
 

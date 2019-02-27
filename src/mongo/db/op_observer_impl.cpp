@@ -1183,6 +1183,46 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
         });
 }
 
+// This is used only for multi-oplog-entry unprepared transactions
+repl::OpTime logCommitForUnpreparedTransaction(OperationContext* opCtx,
+                                               StmtId stmtId,
+                                               const repl::OpTime& prevOpTime,
+                                               const OplogSlot oplogSlot) {
+    const NamespaceString cmdNss{"admin", "$cmd"};
+
+    const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
+
+    OperationSessionInfo sessionInfo;
+    repl::OplogLink oplogLink;
+    CommitTransactionOplogObject cmdObj;
+    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+    oplogLink.prevOpTime = prevOpTime;
+    cmdObj.setPrepare(false);
+
+    const auto oplogOpTime = logOperation(opCtx,
+                                          "c",
+                                          cmdNss,
+                                          {} /* uuid */,
+                                          cmdObj.toBSON(),
+                                          nullptr /* o2 */,
+                                          false /* fromMigrate */,
+                                          wallClockTime,
+                                          sessionInfo,
+                                          stmtId,
+                                          oplogLink,
+                                          false /* prepare */,
+                                          false /* inTxn */,
+                                          oplogSlot);
+    // In the present implementation, a reserved oplog slot is always provided.  However that
+    // is not enforced at this level.
+    invariant(oplogSlot.opTime.isNull() || oplogSlot.opTime == oplogOpTime);
+
+    onWriteOpCompleted(
+        opCtx, cmdNss, {stmtId}, oplogOpTime, wallClockTime, DurableTxnStateEnum::kCommitted);
+
+    return oplogSlot.opTime;
+}
 }  //  namespace
 
 void OpObserverImpl::onUnpreparedTransactionCommit(
@@ -1198,23 +1238,22 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     if (statements.empty())
         return;
 
+    repl::OpTime commitOpTime;
     if (!useMultipleOplogEntryFormatForTransactions) {
-        const auto commitOpTime =
-            logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
-        invariant(!commitOpTime.isNull());
-
-        shardObserveTransactionCommit(opCtx, statements, commitOpTime, false);
+        commitOpTime = logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
     } else {
-        // It is possible that the transaction resulted in no changes.  In that case, we should
-        // not write any operations.
-        if (statements.empty())
-            return;
-
-        // Reserve all the optimes in advance, so we only need to get the optime mutex once.
-        // TODO(SERVER-39432): Also reserve a slot for the commit, and run the shard observer.
-        auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size());
+        // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
+        // reserve enough entries for all statements in the transaction, plus one for the commit
+        // oplog entry.
+        auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size() + 1);
+        auto commitSlot = oplogSlots.back();
+        oplogSlots.pop_back();
         logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
+        commitOpTime = logCommitForUnpreparedTransaction(
+            opCtx, statements.size() /* stmtId */, oplogSlots.back().opTime, commitSlot);
     }
+    invariant(!commitOpTime.isNull());
+    shardObserveTransactionCommit(opCtx, statements, commitOpTime, false);
 }
 
 void OpObserverImpl::onPreparedTransactionCommit(

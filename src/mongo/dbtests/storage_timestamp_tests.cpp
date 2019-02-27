@@ -83,6 +83,9 @@
 
 namespace mongo {
 
+// This is a startup server parameter defined in transaction_participant.cpp.
+extern bool useMultipleOplogEntryFormatForTransactions;
+
 namespace {
 /**
  * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
@@ -378,6 +381,23 @@ public:
             auto doc = findOne(coll);
             ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, expectedDoc))
                 << "Doc: " << doc.toString() << " Expected: " << expectedDoc.toString();
+        }
+    }
+
+    void assertFilteredDocumentAtTimestamp(Collection* coll,
+                                           const BSONObj& query,
+                                           const Timestamp& ts,
+                                           boost::optional<const BSONObj&> expectedDoc) {
+        OneOffRead oor(_opCtx, ts);
+        BSONObj doc;
+        bool found = Helpers::findOne(_opCtx, coll, query, doc);
+        if (!expectedDoc) {
+            ASSERT_FALSE(found) << "Should not find any documents in " << coll->ns() << " matching "
+                                << query << " at ts: " << ts;
+        } else {
+            ASSERT(found) << "Should find document in " << coll->ns() << " matching " << query
+                          << " at ts: " << ts;
+            ASSERT_BSONOBJ_EQ(doc, *expectedDoc);
         }
     }
 
@@ -2725,6 +2745,132 @@ public:
     }
 };
 
+class MultiOplogEntryTransaction : public MultiDocumentTransactionTest {
+public:
+    MultiOplogEntryTransaction() : MultiDocumentTransactionTest("multiOplogEntryTransaction") {
+        useMultipleOplogEntryFormatForTransactions = true;
+        const auto currentTime = _clock->getClusterTime();
+        firstOplogEntryTs = currentTime.addTicks(1).asTimestamp();
+        secondOplogEntryTs = currentTime.addTicks(2).asTimestamp();
+        commitEntryTs = currentTime.addTicks(3).asTimestamp();
+    }
+
+    ~MultiOplogEntryTransaction() {
+        useMultipleOplogEntryFormatForTransactions = false;
+    }
+
+    void run() {
+        auto txnParticipant = TransactionParticipant::get(_opCtx);
+        ASSERT(txnParticipant);
+        logTimestamps();
+
+        txnParticipant.unstashTransactionResources(_opCtx, "insert");
+
+        const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);
+            insertDocument(autoColl.getCollection(), InsertStatement(doc2));
+        }
+        txnParticipant.commitUnpreparedTransaction(_opCtx);
+
+        txnParticipant.stashTransactionResources(_opCtx);
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            const BSONObj query1 = BSON("_id" << 1);
+            const BSONObj query2 = BSON("_id" << 2);
+            auto coll = autoColl.getCollection();
+
+            // Collection should be empty until commit, at which point both documents
+            // should show up.
+            assertDocumentAtTimestamp(coll, presentTs, BSONObj());
+            assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
+            assertDocumentAtTimestamp(coll, firstOplogEntryTs, BSONObj());
+            assertDocumentAtTimestamp(coll, secondOplogEntryTs, BSONObj());
+            assertFilteredDocumentAtTimestamp(coll, query1, commitEntryTs, doc);
+            assertFilteredDocumentAtTimestamp(coll, query2, commitEntryTs, doc2);
+            assertFilteredDocumentAtTimestamp(coll, query1, nullTs, doc);
+            assertFilteredDocumentAtTimestamp(coll, query2, nullTs, doc2);
+
+            // Commit oplog entry should exist at commitEntryTs.
+            const auto commitFilter = BSON("ts" << commitEntryTs << "op"
+                                                << "c");
+            assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, firstOplogEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, secondOplogEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, true);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, true);
+
+            // first oplog entry should exist at firstOplogEntryTs and after it.
+            const auto firstOplogEntryFilter = BSON("ts" << firstOplogEntryTs << "op"
+                                                         << "i"
+                                                         << "o"
+                                                         << doc);
+            assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
+            assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
+            assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, firstOplogEntryTs, true);
+            assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, secondOplogEntryTs, true);
+            assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, commitEntryTs, true);
+            assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, nullTs, true);
+
+            // second oplog entry should exist at secondOplogEntryTs and after it.
+            const auto secondOplogEntryFilter = BSON("ts" << secondOplogEntryTs << "op"
+                                                          << "i"
+                                                          << "o"
+                                                          << doc2);
+            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, presentTs, false);
+            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, beforeTxnTs, false);
+            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, firstOplogEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, secondOplogEntryTs, true);
+            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, commitEntryTs, true);
+            assertOplogDocumentExistsAtTimestamp(secondOplogEntryFilter, nullTs, true);
+
+            // Session state should go to inProgress at firstOplogEntryTs, then to committed
+            // at commitEntryTs
+            getSessionTxnInfoAtTimestamp(presentTs, false);
+            getSessionTxnInfoAtTimestamp(beforeTxnTs, false);
+            auto sessionInfo = getSessionTxnInfoAtTimestamp(firstOplogEntryTs, true);
+            ASSERT_EQ(sessionInfo["state"].String(), "inProgress");
+            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), firstOplogEntryTs);
+
+            sessionInfo = getSessionTxnInfoAtTimestamp(secondOplogEntryTs, true);
+            ASSERT_EQ(sessionInfo["state"].String(), "inProgress");
+            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), secondOplogEntryTs);
+
+            sessionInfo = getSessionTxnInfoAtTimestamp(commitEntryTs, true);
+            ASSERT_EQ(sessionInfo["state"].String(), "committed");
+            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), commitEntryTs);
+
+            sessionInfo = getSessionTxnInfoAtTimestamp(nullTs, true);
+            ASSERT_EQ(sessionInfo["state"].String(), "committed");
+            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), commitEntryTs);
+        }
+    }
+
+    BSONObj getSessionTxnInfoAtTimestamp(const Timestamp& ts, bool expected) {
+        AutoGetCollection autoColl(
+            _opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IX);
+        const auto sessionId = *_opCtx->getLogicalSessionId();
+        const auto txnNum = *_opCtx->getTxnNumber();
+        BSONObj doc;
+        OneOffRead oor(_opCtx, ts);
+        bool found = Helpers::findOne(_opCtx,
+                                      autoColl.getCollection(),
+                                      BSON("_id" << sessionId.toBSON() << "txnNum" << txnNum),
+                                      doc);
+        if (expected) {
+            ASSERT(found) << "Missing session transaction info at " << ts;
+        } else {
+            ASSERT_FALSE(found) << "Session transaction info at " << ts
+                                << " is unexpectedly present " << doc;
+        }
+        return doc;
+    }
+
+protected:
+    Timestamp firstOplogEntryTs, secondOplogEntryTs;
+};
+
 class PreparedMultiDocumentTransaction : public MultiDocumentTransactionTest {
 public:
     PreparedMultiDocumentTransaction()
@@ -2866,6 +3012,7 @@ public:
         add<ViewCreationSeparateTransaction>();
         add<CreateCollectionWithSystemIndex>();
         add<MultiDocumentTransaction>();
+        add<MultiOplogEntryTransaction>();
         add<PreparedMultiDocumentTransaction>();
     }
 };

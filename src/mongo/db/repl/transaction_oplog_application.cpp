@@ -100,8 +100,9 @@ Status applyCommitTransaction(OperationContext* opCtx,
     auto transaction = TransactionParticipant::get(opCtx);
     invariant(transaction);
     transaction.unstashTransactionResources(opCtx, "commitTransaction");
+    invariant(commitCommand.getCommitTimestamp());
     transaction.commitPreparedTransaction(
-        opCtx, commitCommand.getCommitTimestamp(), entry.getOpTime());
+        opCtx, *commitCommand.getCommitTimestamp(), entry.getOpTime());
     return Status::OK();
 }
 

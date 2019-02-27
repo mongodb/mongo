@@ -49,8 +49,15 @@ structs:
                 default: 1
             commitTimestamp:
                 type: timestamp
+                optional: true
                 description: "Specifies the timestamp at which the multi-document transaction should
-                              be committed."
+                              be committed.  Required for prepared transactions, not permitted for
+                              unprepared ones."
+            prepare:
+                type: bool
+                optional: true
+                description: "Set to false for a commit for an unprepared transaction.  Implicit
+                              default is true, do not set explicitly to true"
 
     AbortTransactionOplogObject:
         description: A document representing the 'o' field of an 'abortTransaction' oplog entry.
