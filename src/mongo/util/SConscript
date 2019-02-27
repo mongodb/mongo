@@ -52,6 +52,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='regex_util',
+    source= [
+        'regex_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 debuggerEnv = env.Clone()
 if has_option("gdbserver"):
     debuggerEnv.Append(CPPDEFINES=["USE_GDBSERVER"])

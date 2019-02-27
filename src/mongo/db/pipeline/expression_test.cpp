@@ -5950,6 +5950,41 @@ TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithDottedInputPath) 
 
 }  // namespace GetComputedPathsTest
 
+namespace ExpressionRegexFindTest {
+
+TEST(ExpressionRegexFindTest, BasicTest) {
+    Value input(fromjson("{input: 'asdf', regex: '^as' }"));
+    BSONObj expectedOut(fromjson("{match: 'as', idx:0, captures:[]}"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexFind regexF(expCtx);
+    regexF.addOperand(ExpressionConstant::create(expCtx, input));
+    Value output = regexF.evaluate(Document());
+    ASSERT_BSONOBJ_EQ(toBson(output.getDocument()), expectedOut);
+}
+
+TEST(ExpressionRegexFindTest, ExtendedRegexOptions) {
+    Value input(fromjson("{input: 'FirstLine\\nSecondLine', regex: '^second' , options: 'mi'}"));
+    BSONObj expectedOut(fromjson("{match: 'Second', idx:10, captures:[]}"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexFind regexF(expCtx);
+    regexF.addOperand(ExpressionConstant::create(expCtx, input));
+    Value output = regexF.evaluate(Document());
+    ASSERT_BSONOBJ_EQ(toBson(output.getDocument()), expectedOut);
+}
+
+TEST(ExpressionRegexFindTest, FailureCase) {
+    Value input(
+        fromjson("{input: 'FirstLine\\nSecondLine', regex: {invalid : 'regex'} , options: 'mi'}"));
+    BSONObj expectedOut(fromjson("{match: 'Second', idx:10, captures:[]}"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexFind regexF(expCtx);
+    regexF.addOperand(ExpressionConstant::create(expCtx, input));
+    ASSERT_THROWS(regexF.evaluate(Document()), DBException);
+}
+
+
+}  // namespace ExpressionRegexFindTest
+
 class All : public Suite {
 public:
     All() : Suite("expression") {}

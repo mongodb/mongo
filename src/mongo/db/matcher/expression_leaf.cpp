@@ -45,6 +45,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/regex_util.h"
 
 namespace mongo {
 
@@ -196,33 +197,13 @@ constexpr StringData LTEMatchExpression::kName;
 constexpr StringData GTMatchExpression::kName;
 constexpr StringData GTEMatchExpression::kName;
 
-// ---------------
-
-// TODO: move
-inline pcrecpp::RE_Options flags2options(const char* flags) {
-    pcrecpp::RE_Options options;
-    options.set_utf8(true);
-    while (flags && *flags) {
-        if (*flags == 'i')
-            options.set_caseless(true);
-        else if (*flags == 'm')
-            options.set_multiline(true);
-        else if (*flags == 'x')
-            options.set_extended(true);
-        else if (*flags == 's')
-            options.set_dotall(true);
-        flags++;
-    }
-    return options;
-}
-
 const std::set<char> RegexMatchExpression::kValidRegexFlags = {'i', 'm', 's', 'x'};
 
 RegexMatchExpression::RegexMatchExpression(StringData path, const BSONElement& e)
     : LeafMatchExpression(REGEX, path),
       _regex(e.regex()),
       _flags(e.regexFlags()),
-      _re(new pcrecpp::RE(_regex.c_str(), flags2options(_flags.c_str()))) {
+      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flags2PcreOptions(_flags, true))) {
     uassert(ErrorCodes::BadValue, "regex not a regex", e.type() == RegEx);
     _init();
 }
@@ -231,7 +212,7 @@ RegexMatchExpression::RegexMatchExpression(StringData path, StringData regex, St
     : LeafMatchExpression(REGEX, path),
       _regex(regex.toString()),
       _flags(options.toString()),
-      _re(new pcrecpp::RE(_regex.c_str(), flags2options(_flags.c_str()))) {
+      _re(new pcrecpp::RE(_regex.c_str(), regex_util::flags2PcreOptions(_flags, true))) {
     _init();
 }
 

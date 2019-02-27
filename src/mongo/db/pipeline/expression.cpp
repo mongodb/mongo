@@ -35,6 +35,8 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <cstdio>
+#include <pcre.h>
+#include <pcrecpp.h>
 #include <vector>
 
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
@@ -46,6 +48,7 @@
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/regex_util.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/summation.h"
 
@@ -5654,6 +5657,142 @@ Value ExpressionConvert::performConversion(BSONType targetType, Value inputValue
     static const ConversionTable table;
     BSONType inputType = inputValue.getType();
     return table.findConversionFunc(inputType, targetType)(getExpressionContext(), inputValue);
+}
+
+namespace {
+
+Value generateRegexCapturesAndMatches(StringData pattern,
+                                      const int numCaptures,
+                                      const pcrecpp::RE_Options& options,
+                                      StringData input,
+                                      int startBytePos,
+                                      int startCodePointPos) {
+
+    const auto pcreOptions = options.all_options();
+    // The first two-thirds of the vector is used to pass back captured substrings' start and limit
+    // indexes. The remaining third of the vector is used as workspace by pcre_exec() while matching
+    // capturing subpatterns, and is not available for passing back information.
+    const size_t sizeOfOVector = (1 + numCaptures) * 3;
+    const char* compile_error;
+    int eoffset;
+
+    // The C++ interface pcreccp.h doesn't have a way to capture the matched string (or the index of
+    // the match). So we are using the C interface. First we compile all the regex options to
+    // generate pcre object, which will later be used to match against the input string.
+    pcre* pcre = pcre_compile(pattern.rawData(), pcreOptions, &compile_error, &eoffset, nullptr);
+    if (pcre == nullptr) {
+        uasserted(51111, str::stream() << "Invalid Regex: " << compile_error);
+    }
+
+    // TODO: Evaluate the upper bound for this array and fail the request if numCaptures are higher
+    // than the limit (SERVER-37848).
+    std::vector<int> outVector(sizeOfOVector);
+    const int out = pcre_exec(pcre,
+                              0,
+                              input.rawData(),
+                              input.size(),
+                              startBytePos,
+                              0,  // No need to overwrite the options set during pcre_compile.
+                              &outVector.front(),
+                              sizeOfOVector);
+    (*pcre_free)(pcre);
+    // The 'out' parameter will be zero if outVector's size is not big enough to hold all the
+    // captures, which should never be the case.
+    invariant(out != 0);
+
+    // No match.
+    if (out < 0) {
+        return Value(BSONNULL);
+    }
+
+    // The first and second entires of the outVector have the start and limit indices of the matched
+    // string. as byte offsets.
+    const int matchStartByteIndex = outVector[0];
+    // We iterate through the input string's contents preceding the match index, in order to convert
+    // the byte offset to a code point offset.
+    for (int byteIx = startBytePos; byteIx < matchStartByteIndex; ++startCodePointPos) {
+        byteIx += getCodePointLength(input[byteIx]);
+    }
+    StringData matchedStr = input.substr(outVector[0], outVector[1] - outVector[0]);
+
+    std::vector<Value> captures;
+    // The next 2 * numCaptures entries hold the start index and limit pairs, for each of the
+    // capture groups. We skip the first two elements and start iteration from 3rd element so that
+    // we only construct the strings for capture groups.
+    for (int i = 0; i < numCaptures; i++) {
+        const int start = outVector[2 * (i + 1)];
+        const int limit = outVector[2 * (i + 1) + 1];
+        captures.push_back(Value(input.substr(start, limit - start)));
+    }
+
+    MutableDocument match;
+    match.addField("match", Value(matchedStr));
+    match.addField("idx", Value(startCodePointPos));
+    match.addField("captures", Value(captures));
+    return match.freezeToValue();
+}
+
+}  // namespace
+
+Value ExpressionRegexFind::evaluate(const Document& root) const {
+
+    const Value expr = vpOperand[0]->evaluate(root);
+    uassert(51103,
+            str::stream() << "$regexFind expects an object of named arguments, but found type "
+                          << expr.getType(),
+            !expr.nullish() && expr.getType() == BSONType::Object);
+    Value textInput = expr.getDocument().getField("input");
+    Value regexPattern = expr.getDocument().getField("regex");
+    Value regexOptions = expr.getDocument().getField("options");
+
+    uassert(51104,
+            "input field should be of type string",
+            textInput.nullish() || textInput.getType() == BSONType::String);
+    uassert(51105,
+            "regex field should be of type string or regex",
+            regexPattern.nullish() || regexPattern.getType() == BSONType::String ||
+                regexPattern.getType() == BSONType::RegEx);
+    uassert(51106,
+            "options should be of type string",
+            regexOptions.nullish() || regexOptions.getType() == BSONType::String);
+    if (textInput.nullish() || regexPattern.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    StringData pattern, optionFlags;
+    // The 'regex' field can be a RegEx object with its own options/options specified separately...
+    if (regexPattern.getType() == BSONType::RegEx) {
+        StringData regexFlags = regexPattern.getRegexFlags();
+        pattern = regexPattern.getRegex();
+        uassert(
+            51107,
+            str::stream() << "Found regex option(s) specified in both 'regex' and 'option' fields",
+            regexOptions.nullish() || regexFlags.empty());
+        optionFlags = regexOptions.nullish() ? regexFlags : regexOptions.getStringData();
+    } else {
+        // ... or it can be a string field with options specified separately.
+        pattern = regexPattern.getStringData();
+        if (!regexOptions.nullish()) {
+            optionFlags = regexOptions.getStringData();
+        }
+    }
+    uassert(51109,
+            "Regular expression cannot contain an embedded null byte",
+            pattern.find('\0', 0) == string::npos);
+    uassert(51110,
+            "Regular expression options string cannot contain an embedded null byte",
+            optionFlags.find('\0', 0) == string::npos);
+
+    pcrecpp::RE_Options opt = regex_util::flags2PcreOptions(optionFlags, false);
+    pcrecpp::RE regex(pattern.rawData(), opt);
+    return generateRegexCapturesAndMatches(
+        pattern, regex.NumberOfCapturingGroups(), opt, textInput.getStringData(), 0, 0);
+}
+
+
+REGISTER_EXPRESSION(regexFind, ExpressionRegexFind::parse);
+const char* ExpressionRegexFind::getOpName() const {
+    return "$regexFind";
 }
 
 }  // namespace mongo
