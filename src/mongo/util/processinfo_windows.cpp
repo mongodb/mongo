@@ -40,9 +40,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 
-using namespace std;
-using std::unique_ptr;
-
 namespace mongo {
 
 // dynamically link to psapi.dll (in case this version of Windows
@@ -215,7 +212,7 @@ bool getFileVersion(const char* filePath, DWORD& fileVersionMS, DWORD& fileVersi
 
 void ProcessInfo::SystemInfo::collectSystemInfo() {
     BSONObjBuilder bExtra;
-    stringstream verstr;
+    std::stringstream verstr;
     OSVERSIONINFOEX osvi;   // os version
     MEMORYSTATUSEX mse;     // memory stats
     SYSTEM_INFO ntsysinfo;  // system stats
@@ -320,7 +317,7 @@ bool ProcessInfo::checkNumaEnabled() {
 
     DWORD returnLength = 0;
     DWORD numaNodeCount = 0;
-    unique_ptr<SYSTEM_LOGICAL_PROCESSOR_INFORMATION[]> buffer;
+    std::unique_ptr<SYSTEM_LOGICAL_PROCESSOR_INFORMATION[]> buffer;
 
     LPFN_GLPI glpi(reinterpret_cast<LPFN_GLPI>(
         GetProcAddress(GetModuleHandleW(L"kernel32"), "GetLogicalProcessorInformation")));
@@ -394,9 +391,9 @@ bool ProcessInfo::blockInMemory(const void* start) {
     return false;
 }
 
-bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<char>* out) {
     out->resize(numPages);
-    unique_ptr<PSAPI_WORKING_SET_EX_INFORMATION[]> wsinfo(
+    std::unique_ptr<PSAPI_WORKING_SET_EX_INFORMATION[]> wsinfo(
         new PSAPI_WORKING_SET_EX_INFORMATION[numPages]);
 
     const void* startOfFirstPage = alignToStartOfPage(start);

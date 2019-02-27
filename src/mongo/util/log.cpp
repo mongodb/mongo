@@ -42,8 +42,6 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/time_support.h"
 
-using namespace std;
-
 // TODO: Win32 unicode console writing (in logger/console_appender?).
 // TODO: Extra log context appending, and re-enable log_user_*.js
 // TODO: Eliminate cout/cerr.
@@ -79,7 +77,7 @@ bool rotateLogs(bool renameFiles) {
 
 void logContext(const char* errmsg) {
     if (errmsg) {
-        log() << errmsg << endl;
+        log() << errmsg << std::endl;
     }
     // NOTE: We disable long-line truncation for the stack trace, because the JSON representation of
     // the stack trace can sometimes exceed the long line limit.

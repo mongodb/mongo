@@ -41,13 +41,11 @@
 
 #include "mongo/util/log.h"
 
-using namespace std;
-
 namespace mongo {
 
-string askPassword() {
+std::string askPassword() {
     std::string password;
-    cerr << "Enter password: ";
+    std::cerr << "Enter password: ";
 #ifndef _WIN32
     const int stdinfd = 0;
     termios termio;
@@ -55,55 +53,55 @@ string askPassword() {
     if (isatty(stdinfd)) {
         int i = tcgetattr(stdinfd, &termio);
         if (i == -1) {
-            cerr << "Cannot get terminal attributes " << errnoWithDescription() << endl;
-            return string();
+            std::cerr << "Cannot get terminal attributes " << errnoWithDescription() << std::endl;
+            return std::string();
         }
         old = termio.c_lflag;
         termio.c_lflag &= ~ECHO;
         i = tcsetattr(stdinfd, TCSANOW, &termio);
         if (i == -1) {
-            cerr << "Cannot set terminal attributes " << errnoWithDescription() << endl;
-            return string();
+            std::cerr << "Cannot set terminal attributes " << errnoWithDescription() << std::endl;
+            return std::string();
         }
     }
 
-    getline(cin, password);
+    getline(std::cin, password);
 
     if (isatty(stdinfd)) {
         termio.c_lflag = old;
         int i = tcsetattr(stdinfd, TCSANOW, &termio);
         if (i == -1) {
-            cerr << "Cannot set terminal attributes " << errnoWithDescription() << endl;
-            return string();
+            std::cerr << "Cannot set terminal attributes " << errnoWithDescription() << std::endl;
+            return std::string();
         }
     }
 #else
     HANDLE stdinh = GetStdHandle(STD_INPUT_HANDLE);
     if (stdinh == INVALID_HANDLE_VALUE) {
-        cerr << "Cannot get stdin handle " << GetLastError() << "\n";
-        return string();
+        std::cerr << "Cannot get stdin handle " << GetLastError() << "\n";
+        return std::string();
     }
 
     DWORD old;
     if (!GetConsoleMode(stdinh, &old)) {
-        cerr << "Cannot get console mode " << GetLastError() << "\n";
-        return string();
+        std::cerr << "Cannot get console mode " << GetLastError() << "\n";
+        return std::string();
     }
 
     DWORD noecho = ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT;
     if (!SetConsoleMode(stdinh, noecho)) {
-        cerr << "Cannot set console mode " << GetLastError() << "\n";
-        return string();
+        std::cerr << "Cannot set console mode " << GetLastError() << "\n";
+        return std::string();
     }
 
-    getline(cin, password);
+    getline(std::cin, password);
 
     if (!SetConsoleMode(stdinh, old)) {
-        cerr << "Cannot set console mode " << GetLastError() << "\n";
-        return string();
+        std::cerr << "Cannot set console mode " << GetLastError() << "\n";
+        return std::string();
     }
 #endif
-    cerr << "\n";
+    std::cerr << "\n";
     return password;
 }
-}
+}  // namespace mongo

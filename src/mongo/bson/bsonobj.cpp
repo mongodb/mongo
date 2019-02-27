@@ -83,8 +83,6 @@ int compareObjects(const BSONObj& firstObj,
 
 }  // namespace
 
-using namespace std;
-
 /* BSONObj ------------------------------------------------------------*/
 
 void BSONObj::_assertInvalid(int maxSize) const {
@@ -113,7 +111,7 @@ BSONObj BSONObj::getOwned() const {
     return copy();
 }
 
-string BSONObj::jsonString(JsonStringFormat format, int pretty, bool isArray) const {
+std::string BSONObj::jsonString(JsonStringFormat format, int pretty, bool isArray) const {
     std::stringstream s;
     BSONObj::jsonStringStream(format, pretty, isArray, s);
     return s.str();
@@ -282,7 +280,7 @@ BSONElement BSONObj::getFieldUsingIndexNames(StringData fieldName, const BSONObj
 /* note: addFields always adds _id even if not specified
    returns n added not counting _id unless requested.
 */
-int BSONObj::addFields(BSONObj& from, set<string>& fields) {
+int BSONObj::addFields(BSONObj& from, std::set<std::string>& fields) {
     verify(isEmpty() && !isOwned()); /* partial implementation for now... */
 
     BSONObjBuilder b;
@@ -324,7 +322,7 @@ bool BSONObj::couldBeArray() const {
             break;
 
         // TODO:  If actually important, may be able to do int->char* much faster
-        if (strcmp(e.fieldName(), ((string)(str::stream() << index)).c_str()) != 0)
+        if (strcmp(e.fieldName(), static_cast<std::string>(str::stream() << index).c_str()) != 0)
             return false;
         index++;
     }
@@ -442,7 +440,7 @@ Status BSONObj::storageValidEmbedded() const {
 
 void BSONObj::dump() const {
     LogstreamBuilder builder = log();
-    builder << hex;
+    builder << std::hex;
     const char* p = objdata();
     for (int i = 0; i < objsize(); i++) {
         builder << i << '\t' << (0xff & ((unsigned)*p));

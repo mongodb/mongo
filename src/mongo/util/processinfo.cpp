@@ -41,8 +41,6 @@
 
 #include "mongo/util/log.h"
 
-using namespace std;
-
 namespace mongo {
 
 class PidFileWiper {
@@ -52,14 +50,14 @@ public:
             return;
         }
 
-        ofstream out(path.c_str(), ios_base::out);
+        std::ofstream out(path.c_str(), std::ios_base::out);
         out.close();
     }
 
     bool write(const boost::filesystem::path& p) {
         path = p;
-        ofstream out(path.c_str(), ios_base::out);
-        out << ProcessId::getCurrent() << endl;
+        std::ofstream out(path.c_str(), std::ios_base::out);
+        out << ProcessId::getCurrent() << std::endl;
         if (!out.good()) {
             auto errAndStr = errnoAndDescription();
             if (errAndStr.first == 0) {
@@ -89,7 +87,7 @@ private:
     boost::filesystem::path path;
 } pidFileWiper;
 
-bool writePidFile(const string& path) {
+bool writePidFile(const std::string& path) {
     return pidFileWiper.write(path);
 }
 }  // namespace mongo

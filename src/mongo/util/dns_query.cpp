@@ -58,8 +58,6 @@
 #endif
 #undef MONGO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
 
-using std::begin;
-using std::end;
 using namespace std::literals::string_literals;
 
 namespace mongo {
@@ -132,6 +130,8 @@ std::vector<std::string> dns::lookupTXTRecords(const std::string& service) {
     for (auto& entry : response) {
         try {
             auto txtEntry = entry.txtEntry();
+            using std::begin;
+            using std::end;
             rv.insert(end(rv),
                       std::make_move_iterator(begin(txtEntry)),
                       std::make_move_iterator(end(txtEntry)));

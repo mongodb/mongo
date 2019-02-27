@@ -52,14 +52,12 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stringutils.h"
 
-using namespace std;
-
 namespace mongo {
 
 /**
  * Read the first line from a file; return empty string on failure
  */
-static string readLineFromFile(const char* fname) {
+static std::string readLineFromFile(const char* fname) {
     std::string fstr;
     std::ifstream f(fname);
     if (f.is_open()) {

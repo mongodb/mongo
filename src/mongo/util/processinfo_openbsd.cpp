@@ -46,8 +46,6 @@
 #include "mongo/util/scopeguard.h"
 #include "processinfo.h"
 
-using namespace std;
-
 namespace mongo {
 
 ProcessInfo::ProcessInfo(ProcessId pid) : _pid(pid) {}
@@ -84,10 +82,10 @@ int getSysctlByIDWithDefault<uintptr_t>(const int* sysctlID,
 }
 
 template <>
-int getSysctlByIDWithDefault<string>(const int* sysctlID,
-                                     const int idLen,
-                                     const string& defaultValue,
-                                     string* result) {
+int getSysctlByIDWithDefault<std::string>(const int* sysctlID,
+                                          const int idLen,
+                                          const std::string& defaultValue,
+                                          string* result) {
     char value[256] = {0};
     size_t len = sizeof(value);
     if (sysctl(sysctlID, idLen, &value, &len, NULL, 0) == -1) {
@@ -143,14 +141,14 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
     mib[0] = CTL_KERN;
     mib[1] = KERN_VERSION;
-    int status = getSysctlByIDWithDefault(mib, 2, string("unknown"), &osVersion);
+    int status = getSysctlByIDWithDefault(mib, 2, std::string("unknown"), &osVersion);
     if (status != 0)
         log() << "Unable to collect OS Version. (errno: " << status << " msg: " << strerror(status)
               << ")";
 
     mib[0] = CTL_HW;
     mib[1] = HW_MACHINE;
-    status = getSysctlByIDWithDefault(mib, 2, string("unknown"), &cpuArch);
+    status = getSysctlByIDWithDefault(mib, 2, std::string("unknown"), &cpuArch);
     if (status != 0)
         log() << "Unable to collect Machine Architecture. (errno: " << status
               << " msg: " << strerror(status) << ")";
@@ -198,7 +196,7 @@ bool ProcessInfo::blockInMemory(const void* start) {
     return x & 0x1;
 }
 
-bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<char>* out) {
     out->resize(numPages);
     // int mincore(const void *addr, size_t len, char *vec);
     if (mincore((void*)alignToStartOfPage(start), numPages * getPageSize(), &(out->front()))) {

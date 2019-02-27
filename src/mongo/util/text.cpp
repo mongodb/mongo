@@ -45,43 +45,41 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
 
-using namespace std;
-
 namespace mongo {
 
 // --- StringSplitter ----
 
 /** get next split string fragment */
-string StringSplitter::next() {
+std::string StringSplitter::next() {
     const char* foo = strstr(_big, _splitter);
     if (foo) {
-        string s(_big, foo - _big);
+        std::string s(_big, foo - _big);
         _big = foo + strlen(_splitter);
         while (*_big && strstr(_big, _splitter) == _big)
             _big++;
         return s;
     }
 
-    string s = _big;
+    std::string s = _big;
     _big += strlen(_big);
     return s;
 }
 
 
-void StringSplitter::split(vector<string>& l) {
+void StringSplitter::split(std::vector<std::string>& l) {
     while (more()) {
         l.push_back(next());
     }
 }
 
-vector<string> StringSplitter::split() {
-    vector<string> l;
+std::vector<std::string> StringSplitter::split() {
+    std::vector<std::string> l;
     split(l);
     return l;
 }
 
-string StringSplitter::join(const vector<string>& l, const string& split) {
-    stringstream ss;
+std::string StringSplitter::join(const std::vector<std::string>& l, const std::string& split) {
+    std::stringstream ss;
     for (unsigned i = 0; i < l.size(); i++) {
         if (i > 0)
             ss << split;
@@ -90,7 +88,8 @@ string StringSplitter::join(const vector<string>& l, const string& split) {
     return ss.str();
 }
 
-vector<string> StringSplitter::split(const string& big, const string& splitter) {
+std::vector<std::string> StringSplitter::split(const std::string& big,
+                                               const std::string& splitter) {
     StringSplitter ss(big.c_str(), splitter.c_str());
     return ss.split();
 }
@@ -268,8 +267,8 @@ bool writeUtf8ToWindowsConsole(const char* utf8String, unsigned int utf8StringSi
 WindowsCommandLine::WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envpW[])
     : _argv(NULL), _envp(NULL) {
     // Construct UTF-8 copy of arguments
-    vector<string> utf8args;
-    vector<size_t> utf8argLength;
+    std::vector<std::string> utf8args;
+    std::vector<size_t> utf8argLength;
     size_t blockSize = argc * sizeof(char*);
     size_t blockPtr = blockSize;
     for (int i = 0; i < argc; ++i) {
@@ -291,8 +290,8 @@ WindowsCommandLine::WindowsCommandLine(int argc, wchar_t* argvW[], wchar_t* envp
     while (*envpWptr++) {
         ++envCount;
     }
-    vector<string> utf8envs;
-    vector<size_t> utf8envLength;
+    std::vector<std::string> utf8envs;
+    std::vector<size_t> utf8envLength;
     blockSize = (envCount + 1) * sizeof(char*);
     blockPtr = blockSize;
     for (size_t i = 0; i < envCount; ++i) {
@@ -353,8 +352,8 @@ std::string constructUtf8WindowsCommandLine(const std::vector<std::string>& argv
         return "";
 
     std::ostringstream commandLine;
-    std::vector<std::string>::const_iterator iter = argv.begin();
-    std::vector<std::string>::const_iterator end = argv.end();
+    auto iter = argv.begin();
+    const auto end = argv.end();
     quoteForWindowsCommandLine(*iter, commandLine);
     ++iter;
     for (; iter != end; ++iter) {
@@ -363,4 +362,4 @@ std::string constructUtf8WindowsCommandLine(const std::vector<std::string>& argv
     }
     return commandLine.str();
 }
-}
+}  // namespace mongo

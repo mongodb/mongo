@@ -47,7 +47,6 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 
-using namespace std;
 namespace mongo {
 
 namespace {
@@ -139,7 +138,7 @@ BackgroundJob::BackgroundJob(bool selfDelete) : _selfDelete(selfDelete), _status
 BackgroundJob::~BackgroundJob() {}
 
 void BackgroundJob::jobBody() {
-    const string threadName = name();
+    const std::string threadName = name();
     if (!threadName.empty()) {
         setThreadName(threadName);
     }

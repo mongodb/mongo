@@ -57,8 +57,6 @@
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 
-using namespace std;
-
 #define KLONG long
 #define KLF "l"
 
@@ -72,9 +70,9 @@ public:
 
         FILE* f = fopen(name, "r");
         if (!f) {
-            stringstream ss;
+            std::stringstream ss;
             ss << "couldn't open [" << name << "] " << errnoWithDescription();
-            string s = ss.str();
+            std::string s = ss.str();
             msgasserted(13538, s.c_str());
         }
         int found = fscanf(f,
@@ -136,7 +134,7 @@ public:
                            */
                            );
         if (found == 0) {
-            cout << "system error: reading proc info" << endl;
+            std::cout << "system error: reading proc info" << std::endl;
         }
         fclose(f);
     }
@@ -252,7 +250,7 @@ public:
     /**
     * Read the first 1023 bytes from a file
     */
-    static string readLineFromFile(const char* fname) {
+    static std::string readLineFromFile(const char* fname) {
         FILE* f;
         char fstr[1024] = {0};
 
@@ -268,7 +266,7 @@ public:
     /**
     * Get some details about the CPU
     */
-    static void getCpuInfo(int& procCount, string& freq, string& features) {
+    static void getCpuInfo(int& procCount, std::string& freq, std::string& features) {
         FILE* f;
         char fstr[1024] = {0};
         procCount = 0;
@@ -294,7 +292,7 @@ public:
     /**
     * Determine linux distro and version
     */
-    static void getLinuxDistro(string& name, string& version) {
+    static void getLinuxDistro(std::string& name, std::string& version) {
         char buf[4096] = {0};
 
         // try lsb file first
@@ -307,20 +305,21 @@ public:
 
             // find the distribution name and version in the contents.
             // format:  KEY=VAL\n
-            string contents = buf;
+            std::string contents = buf;
             unsigned lineCnt = 0;
             try {
                 while (lineCnt < contents.length() - 1 &&
-                       contents.substr(lineCnt).find('\n') != string::npos) {
+                       contents.substr(lineCnt).find('\n') != std::string::npos) {
                     // until we hit the last newline or eof
-                    string line = contents.substr(lineCnt, contents.substr(lineCnt).find('\n'));
+                    std::string line =
+                        contents.substr(lineCnt, contents.substr(lineCnt).find('\n'));
                     lineCnt += contents.substr(lineCnt).find('\n') + 1;
                     size_t delim = line.find('=');
-                    string key = line.substr(0, delim);
-                    string val = line.substr(delim + 1);  // 0-based offset of delim
+                    std::string key = line.substr(0, delim);
+                    std::string val = line.substr(delim + 1);  // 0-based offset of delim
                     if (key.compare("DISTRIB_ID") == 0)
                         name = val;
-                    if (string(key).compare("DISTRIB_RELEASE") == 0)
+                    if (std::string(key).compare("DISTRIB_RELEASE") == 0)
                         version = val;
                 }
             } catch (const std::out_of_range& e) {
@@ -335,7 +334,7 @@ public:
         // try known flat-text file locations
         // format: Slackware-x86_64 13.0, Red Hat Enterprise Linux Server release 5.6 (Tikanga),
         // etc.
-        typedef vector<string> pathvec;
+        typedef std::vector<std::string> pathvec;
         pathvec paths;
         pathvec::const_iterator i;
         bool found = false;
@@ -375,7 +374,7 @@ public:
             buf[len] = '\0';
             name = buf;
             size_t nl = 0;
-            if ((nl = name.find('\n', nl)) != string::npos)
+            if ((nl = name.find('\n', nl)) != std::string::npos)
                 // stop at first newline
                 name.erase(nl);
         } else {
@@ -391,9 +390,9 @@ public:
     * Get system memory total
     */
     static unsigned long long getSystemMemorySize() {
-        string meminfo = readLineFromFile("/proc/meminfo");
+        std::string meminfo = readLineFromFile("/proc/meminfo");
         size_t lineOff = 0;
-        if (!meminfo.empty() && (lineOff = meminfo.find("MemTotal")) != string::npos) {
+        if (!meminfo.empty() && (lineOff = meminfo.find("MemTotal")) != std::string::npos) {
             // found MemTotal line.  capture everything between 'MemTotal:' and ' kB'.
             lineOff = meminfo.substr(lineOff).find(':') + 1;
             meminfo = meminfo.substr(lineOff, meminfo.substr(lineOff).find("kB") - 1);
@@ -497,11 +496,11 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 */
 void ProcessInfo::SystemInfo::collectSystemInfo() {
     utsname unameData;
-    string distroName, distroVersion;
-    string cpuFreq, cpuFeatures;
+    std::string distroName, distroVersion;
+    std::string cpuFreq, cpuFeatures;
     int cpuCount;
 
-    string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
+    std::string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
     LinuxSysHelper::getCpuInfo(cpuCount, cpuFreq, cpuFeatures);
     LinuxSysHelper::getLinuxDistro(distroName, distroVersion);
 
@@ -522,11 +521,11 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     BSONObjBuilder bExtra;
     bExtra.append("versionString", LinuxSysHelper::readLineFromFile("/proc/version"));
 #ifdef __BIONIC__
-    stringstream ss;
+    std::stringstream ss;
     ss << "bionic (android api " << __ANDROID_API__ << ")";
     bExtra.append("libcVersion", ss.str());
 #elif __UCLIBC__
-    stringstream ss;
+    std::stringstream ss;
     ss << "uClibc-" << __UCLIBC_MAJOR__ << "." << __UCLIBC_MINOR__ << "." << __UCLIBC_SUBLEVEL__;
     bExtra.append("libcVersion", ss.str());
 #else
@@ -567,9 +566,10 @@ bool ProcessInfo::checkNumaEnabled() {
 
         // read the second column of first line to determine numa state
         // ('default' = enabled, 'interleave' = disabled).  Logic from version.cpp's warnings.
-        string line = LinuxSysHelper::readLineFromFile("/proc/self/numa_maps").append(" \0");
+        std::string line = LinuxSysHelper::readLineFromFile("/proc/self/numa_maps").append(" \0");
         size_t pos = line.find(' ');
-        if (pos != string::npos && line.substr(pos + 1, 10).find("interleave") == string::npos)
+        if (pos != std::string::npos &&
+            line.substr(pos + 1, 10).find("interleave") == std::string::npos)
             // interleave not found;
             return true;
     }
@@ -589,7 +589,7 @@ bool ProcessInfo::blockInMemory(const void* start) {
     return x & 0x1;
 }
 
-bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<char>* out) {
     out->resize(numPages);
     if (mincore(const_cast<void*>(alignToStartOfPage(start)),
                 numPages * getPageSize(),

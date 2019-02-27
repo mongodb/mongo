@@ -33,8 +33,6 @@
 
 #include "mongo/util/processinfo.h"
 
-using namespace std;
-
 namespace mongo {
 
 ProcessInfo::ProcessInfo(ProcessId pid) {}
@@ -73,7 +71,7 @@ bool ProcessInfo::blockInMemory(const void* start) {
     verify(0);
 }
 
-bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<char>* out) {
     verify(0);
 }
 
