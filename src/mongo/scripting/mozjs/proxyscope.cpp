@@ -83,7 +83,7 @@ void MozJSProxyScope::init(const BSONObj* data) {
 
 void MozJSProxyScope::reset() {
     unregisterOperation();
-    runWithoutInterruption([&] { _implScope->reset(); });
+    runWithoutInterruptionExceptAtGlobalShutdown([&] { _implScope->reset(); });
 }
 
 bool MozJSProxyScope::isKillPending() const {
@@ -104,13 +104,14 @@ void MozJSProxyScope::externalSetup() {
 
 std::string MozJSProxyScope::getError() {
     std::string out;
-    runWithoutInterruption([&] { out = _implScope->getError(); });
+    runWithoutInterruptionExceptAtGlobalShutdown([&] { out = _implScope->getError(); });
     return out;
 }
 
 bool MozJSProxyScope::hasOutOfMemoryException() {
     bool out;
-    runWithoutInterruption([&] { out = _implScope->hasOutOfMemoryException(); });
+    runWithoutInterruptionExceptAtGlobalShutdown(
+        [&] { out = _implScope->hasOutOfMemoryException(); });
     return out;
 }
 
@@ -119,11 +120,11 @@ void MozJSProxyScope::gc() {
 }
 
 void MozJSProxyScope::advanceGeneration() {
-    runWithoutInterruption([&] { _implScope->advanceGeneration(); });
+    runWithoutInterruptionExceptAtGlobalShutdown([&] { _implScope->advanceGeneration(); });
 }
 
 void MozJSProxyScope::requireOwnedObjects() {
-    runWithoutInterruption([&] { _implScope->requireOwnedObjects(); });
+    runWithoutInterruptionExceptAtGlobalShutdown([&] { _implScope->requireOwnedObjects(); });
 }
 
 double MozJSProxyScope::getNumber(const char* field) {
@@ -274,11 +275,11 @@ void MozJSProxyScope::run(Closure&& closure) {
 }
 
 template <typename Closure>
-void MozJSProxyScope::runWithoutInterruption(Closure&& closure) {
+void MozJSProxyScope::runWithoutInterruptionExceptAtGlobalShutdown(Closure&& closure) {
     auto toRun = [&] { run(std::forward<Closure>(closure)); };
 
     if (_opCtx) {
-        return _opCtx->runWithoutInterruption(toRun);
+        return _opCtx->runWithoutInterruptionExceptAtGlobalShutdown(toRun);
     } else {
         return toRun();
     }

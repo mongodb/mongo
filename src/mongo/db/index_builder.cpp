@@ -123,14 +123,14 @@ void IndexBuilder::run() {
     auto databaseHolder = DatabaseHolder::get(opCtx.get());
     auto db = databaseHolder->getDb(opCtx.get(), ns.db().toString());
 
-    // This background index build can only be interrupted at shutdown.
-    // For the duration of the OperationContext::runWithoutInterruption() invocation, any kill
-    // status set by the killOp command will be ignored.
-    // After OperationContext::runWithoutInterruption() returns, any call to
+    // This background index build can only be interrupted at shutdown.  For the duration of the
+    // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown() invocation, any kill status
+    // set by the killOp command will be ignored.  After
+    // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown() returns, any call to
     // OperationContext::checkForInterrupt() will see the kill status and respond accordingly
-    // (checkForInterrupt() will throw an exception while checkForInterruptNoAssert() returns
-    // an error Status).
-    Status status = opCtx->runWithoutInterruption([&, this] {
+    // (checkForInterrupt() will throw an exception while checkForInterruptNoAssert() returns an
+    // error Status).
+    Status status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&, this] {
         return _buildAndHandleErrors(opCtx.get(), db, true /* buildInBackground */, &dlk);
     });
     if (!status.isOK()) {

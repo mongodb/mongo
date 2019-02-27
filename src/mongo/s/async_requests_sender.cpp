@@ -88,8 +88,6 @@ AsyncRequestsSender::~AsyncRequestsSender() {
     } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
         // Ignore interrupted at shutdown.  No need to cleanup if we're going into process-wide
         // shutdown.
-        //
-        // TODO: Figure out how to do actual NonInterruptibility in SERVER-39427
     }
 }
 
@@ -112,7 +110,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
                 continue;
             }
         } else {
-            _opCtx->runWithoutInterruption([&] { _makeProgress(); });
+            _opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { _makeProgress(); });
         }
     }
     return *readyResponse;

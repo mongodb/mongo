@@ -199,6 +199,8 @@ void cleanupTask(ServiceContext* serviceContext) {
             opCtx = uniqueTxn.get();
         }
 
+        opCtx->setIsExecutingShutdown();
+
         if (serviceContext) {
             serviceContext->setKillAllOperations();
 

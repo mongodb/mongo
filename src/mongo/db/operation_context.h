@@ -239,6 +239,17 @@ public:
     void markKillOnClientDisconnect();
 
     /**
+     * Identifies the opCtx as an operation which is executing global shutdown.  This has the effect
+     * of masking any existing time limits, removing markKill-ability and is slightly stronger than
+     * code run under runWithoutInterruptionExceptAtGlobalShutdown, because it is also immune to
+     * global shutdown.
+     *
+     * This should only be called from the registered task of global shutdown and is not
+     * recoverable.
+     */
+    void setIsExecutingShutdown();
+
+    /**
      * Marks this operation as killed so that subsequent calls to checkForInterrupt and
      * checkForInterruptNoAssert by the thread executing the operation will start returning the
      * specified error code.
@@ -466,6 +477,7 @@ private:
     bool _hasArtificialDeadline = false;
     bool _markKillOnClientDisconnect = false;
     Date_t _lastClientCheck;
+    bool _isExecutingShutdown = false;
 
     // Max operation time requested by the user or by the cursor in the case of a getMore with no
     // user-specified maxTime. This is tracked with microsecond granularity for the purpose of

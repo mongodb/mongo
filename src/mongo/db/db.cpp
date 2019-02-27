@@ -892,6 +892,7 @@ void shutdownTask() {
             uniqueOpCtx = client->makeOperationContext();
             opCtx = uniqueOpCtx.get();
         }
+        opCtx->setIsExecutingShutdown();
 
         // This can wait a long time while we drain the secondary's apply queue, especially if
         // it is building an index.
@@ -909,17 +910,10 @@ void shutdownTask() {
         // not be usable other than to kill all transactions directly below.
         serviceContext->setKillAllOperations();
 
-        {
-            // Make this scope uninterruptible so that we can still abort all transactions even
-            // though the opCtx has been killed. While we don't currently check for an interrupt
-            // before checking out a session, we want to make sure that this completes.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        // Destroy all stashed transaction resources, in order to release locks.
+        killSessionsLocalShutdownAllTransactions(opCtx);
 
-            // Destroy all stashed transaction resources, in order to release locks.
-            killSessionsLocalShutdownAllTransactions(opCtx);
-
-            rstl.waitForLockUntil(Date_t::max());
-        }
+        rstl.waitForLockUntil(Date_t::max());
     }
 
     // Shuts down the thread pool and waits for index builds to finish.

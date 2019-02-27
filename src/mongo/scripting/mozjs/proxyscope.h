@@ -180,7 +180,7 @@ private:
     void run(Closure&& closure);
 
     template <typename Closure>
-    void runWithoutInterruption(Closure&& closure);
+    void runWithoutInterruptionExceptAtGlobalShutdown(Closure&& closure);
 
     void runOnImplThread(unique_function<void()> f);
 
