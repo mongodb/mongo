@@ -158,7 +158,7 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         const name = rst.name;
         // We must check counts before we validate since validate fixes counts. We cannot check
         // counts if unclean shutdowns occur.
-        // TODO SERVER-35872: Once we fix collection counts when aborting a prepared
+        // TODO SERVER-39762: Once we fix collection counts when aborting a prepared
         // transaction that was recovered during rollback, re-enable this check.
         if (!dontCheckCollCounts &&
             (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns)) {

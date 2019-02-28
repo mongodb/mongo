@@ -256,11 +256,7 @@
         checkConfigTransactionEntry(rst, txnIds.commit, {hasEntry: false});
         checkConfigTransactionEntry(rst, txnIds.commitPrepare, {hasEntry: false});
         checkConfigTransactionEntry(rst, txnIds.abort, {hasEntry: false});
-        if (!shouldRestart) {
-            // TODO SERVER-35872: Transactions aborted after prepare don't transition to the correct
-            // state after refreshing from storage.
-            checkConfigTransactionEntry(rst, txnIds.abortPrepare, {hasEntry: false});
-        }
+        checkConfigTransactionEntry(rst, txnIds.abortPrepare, {hasEntry: false});
 
         // The retryable write can be retried.
         assertRetryableWriteCanBeRetried(txnIds.write);
