@@ -479,7 +479,7 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
 
     if (getGlobalAuthorizationManager()->isAuthEnabled()) {
         ShardedConnectionInfo::addHook();
-        AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+        AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(&cc());
     }
 
     try {

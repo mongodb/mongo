@@ -85,7 +85,7 @@ public:
 
     virtual void run() {
         Client::initThread(name().c_str());
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
+        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
         while (!inShutdown()) {
             {

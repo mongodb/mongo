@@ -65,7 +65,7 @@ void RSDataSync::join() {
 
 void RSDataSync::_run() {
     Client::initThread("rsSync");
-    AuthorizationSession::get(cc())->grantInternalAuthorization();
+    AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
     // Overwrite prefetch index mode in BackgroundSync if ReplSettings has a mode set.
     auto&& replSettings = _replCoord->getSettings();

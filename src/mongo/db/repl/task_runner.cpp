@@ -136,7 +136,7 @@ void TaskRunner::_runTasks() {
     Client::initThreadIfNotAlready();
     Client* client = &cc();
     if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
-        AuthorizationSession::get(client)->grantInternalAuthorization();
+        AuthorizationSession::get(client)->grantInternalAuthorization(client);
     }
     ServiceContext::UniqueOperationContext txn;
 

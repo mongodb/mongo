@@ -86,7 +86,7 @@ void IndexBuilder::run() {
     OperationContext& txn = *txnPtr;
     txn.lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-    AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
+    AuthorizationSession::get(txn.getClient())->grantInternalAuthorization(txnPtr.get());
 
     {
         stdx::lock_guard<Client> lk(*txn.getClient());

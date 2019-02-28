@@ -183,7 +183,7 @@ bool BackgroundSync::_inShutdown_inlock() const {
 
 void BackgroundSync::_run() {
     Client::initThread("rsBackgroundSync");
-    AuthorizationSession::get(cc())->grantInternalAuthorization();
+    AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
     while (!inShutdown()) {
         try {

@@ -40,6 +40,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
@@ -76,8 +77,10 @@ private:
 
 class AuthorizationSessionTest : public ::mongo::unittest::Test {
 public:
+    std::unique_ptr<ServiceContextNoop> _service = stdx::make_unique<ServiceContextNoop>();
+    ServiceContext::UniqueClient _client = _service.get()->makeClient("test");
     FailureCapableAuthzManagerExternalStateMock* managerState;
-    OperationContextNoop _txn;
+    OperationContextNoop _txn{_client.get(), 0};
     AuthzSessionExternalStateMock* sessionState;
     std::unique_ptr<AuthorizationManager> authzManager;
     std::unique_ptr<AuthorizationSessionForTest> authzSession;
@@ -203,7 +206,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 
-    authzSession->logoutDatabase("test");
+    authzSession->logoutDatabase(&_txn, "test");
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
     ASSERT_TRUE(
@@ -211,7 +214,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::collMod));
 
-    authzSession->logoutDatabase("admin");
+    authzSession->logoutDatabase(&_txn, "admin");
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
     ASSERT_FALSE(

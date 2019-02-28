@@ -48,6 +48,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -125,7 +126,8 @@ User* AuthorizationSession::lookupUser(const UserName& name) {
     return _authenticatedUsers.lookup(name);
 }
 
-void AuthorizationSession::logoutDatabase(const std::string& dbname) {
+void AuthorizationSession::logoutDatabase(OperationContext* opCtx, const std::string& dbname) {
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     User* removedUser = _authenticatedUsers.removeByDBName(dbname);
     if (removedUser) {
         getAuthorizationManager().releaseUser(removedUser);
@@ -153,9 +155,18 @@ std::string AuthorizationSession::getAuthenticatedUserNamesToken() {
     return ret;
 }
 
-void AuthorizationSession::grantInternalAuthorization() {
+void AuthorizationSession::grantInternalAuthorization(Client* client) {
+    stdx::lock_guard<Client> lk(*client);
     _authenticatedUsers.add(internalSecurity.user);
     _buildAuthenticatedRolesVector();
+}
+
+/**
+ * Overloaded function - takes in the opCtx of the current AuthSession
+ * and calls the function above.
+ */
+void AuthorizationSession::grantInternalAuthorization(OperationContext* opCtx) {
+    grantInternalAuthorization(opCtx->getClient());
 }
 
 PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
@@ -748,6 +759,8 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
             User* updatedUser;
 
             Status status = authMan.acquireUser(txn, name, &updatedUser);
+            stdx::lock_guard<Client> lk(*txn->getClient());
+
             switch (status.code()) {
                 case ErrorCodes::OK: {
                     // Success! Replace the old User object with the updated one.
@@ -835,7 +848,7 @@ void AuthorizationSession::setImpersonatedUserData(std::vector<UserName> usernam
     _impersonationFlag = true;
 }
 
-bool AuthorizationSession::isCoauthorizedWithClient(Client* opClient) {
+bool AuthorizationSession::isCoauthorizedWithClient(Client* opClient, WithLock opClientLock) {
     auto getUserNames = [](AuthorizationSession* authSession) {
         if (authSession->isImpersonating()) {
             return authSession->getImpersonatedUserNames();

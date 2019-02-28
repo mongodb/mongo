@@ -124,7 +124,8 @@ public:
             stdx::lock_guard<Client> lk(*client);
 
             if (ownOpsOnly &&
-                !AuthorizationSession::get(txn->getClient())->isCoauthorizedWithClient(client)) {
+                !AuthorizationSession::get(txn->getClient())
+                     ->isCoauthorizedWithClient(client, lk)) {
                 continue;
             }
 

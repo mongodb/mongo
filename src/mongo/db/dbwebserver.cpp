@@ -495,7 +495,7 @@ bool DbWebServer::_allowed(OperationContext* txn,
     }
 
     if (from.isLocalHost() && !_webUsers->haveAdminUsers(txn)) {
-        authSess->grantInternalAuthorization();
+        authSess->grantInternalAuthorization(txn);
         return true;
     }
 
