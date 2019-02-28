@@ -39,6 +39,5 @@
 
     runTest("snappy", ["snappy"]);
     runTest("disabled", undefined);
-    runTest("", undefined);
 
 }());

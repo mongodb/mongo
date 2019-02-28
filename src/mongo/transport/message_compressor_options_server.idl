@@ -35,5 +35,4 @@ configs:
         source: [ cli, ini, yaml ]
         arg_vartype: String
         short_name: networkMessageCompressors
-        implicit: disabled
         default: 'snappy,zstd,zlib'

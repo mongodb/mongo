@@ -152,10 +152,8 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
 
     if (params.count("net.compression.compressors")) {
-        auto compressors = params["net.compression.compressors"].as<string>();
-        if (compressors != "disabled") {
-            shellGlobalParams.networkMessageCompressors = std::move(compressors);
-        }
+        shellGlobalParams.networkMessageCompressors =
+            params["net.compression.compressors"].as<string>();
     }
 
     if (params.count("nodb")) {
