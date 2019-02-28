@@ -1300,7 +1300,7 @@ static void replMasterThread() {
         // when things are idle.
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
+        AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization(opCtxPtr.get());
 
         Lock::GlobalWrite globalWrite(&opCtx, 1);
         if (globalWrite.isLocked()) {
@@ -1326,7 +1326,7 @@ static void replSlaveThread() {
 
     const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
     OperationContext& opCtx = *opCtxPtr;
-    AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
+    AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization(opCtxPtr.get());
     DisableDocumentValidation validationDisabler(&opCtx);
 
     while (1) {
@@ -1353,7 +1353,7 @@ void startMasterSlave(OperationContext* opCtx) {
     if (!replSettings.isSlave() && !replSettings.isMaster())
         return;
 
-    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
 
     {
         ReplSource temp(opCtx);  // Ensures local.me is populated

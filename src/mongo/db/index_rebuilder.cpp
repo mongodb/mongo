@@ -150,7 +150,7 @@ void forceRestartInProgressIndexesOnCollection(OperationContext* opCtx, const Na
 }
 
 void restartInProgressIndexesFromLastShutdown(OperationContext* opCtx) {
-    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
 
     std::vector<std::string> dbNames;
 

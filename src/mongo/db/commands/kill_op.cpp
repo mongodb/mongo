@@ -95,7 +95,7 @@ public:
             if (opCtx && opCtx->getOpID() == opId) {
                 if (authzSession->isAuthorizedForActionsOnResource(
                         ResourcePattern::forClusterResource(), ActionType::killop) ||
-                    authzSession->isCoauthorizedWithClient(opClient)) {
+                    authzSession->isCoauthorizedWithClient(opClient, lk)) {
                     return {std::make_tuple(std::move(lk), opCtx)};
                 }
                 break;

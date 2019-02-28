@@ -346,7 +346,7 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* opCtx,
                               "authentication. The current configuration does not allow "
                               "x.509 cluster authentication, check the --clusterAuthMode flag");
             }
-            authorizationSession->grantInternalAuthorization();
+            authorizationSession->grantInternalAuthorization(client);
         }
         // Handle normal client authentication, only applies to client-server connections
         else {
@@ -384,14 +384,14 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
-        authSession->logoutDatabase(dbname);
+        authSession->logoutDatabase(opCtx, dbname);
         if (Command::testCommandsEnabled && dbname == "admin") {
             // Allows logging out as the internal user against the admin database, however
             // this actually logs out of the local database as well. This is to
             // support the auth passthrough test framework on mongos (since you can't use the
             // local database on a mongos, so you can't logout as the internal user
             // without this).
-            authSession->logoutDatabase("local");
+            authSession->logoutDatabase(opCtx, "local");
         }
         return true;
     }

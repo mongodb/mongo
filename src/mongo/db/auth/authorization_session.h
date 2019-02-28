@@ -44,6 +44,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_set.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 
@@ -160,12 +161,15 @@ public:
     std::string getAuthenticatedUserNamesToken();
 
     // Removes any authenticated principals whose authorization credentials came from the given
-    // database, and revokes any privileges that were granted via that principal.
-    void logoutDatabase(const std::string& dbname);
+    // database, and revokes any privileges that were granted via that principal. This function
+    // modifies state. Synchronizes with the Client lock.
+    void logoutDatabase(OperationContext* opCtx, const std::string& dbname);
 
     // Adds the internalSecurity user to the set of authenticated users.
-    // Used to grant internal threads full access.
-    void grantInternalAuthorization();
+    // Used to grant internal threads full access. Takes in the Client
+    // as a parameter so it can take out a lock on the client.
+    void grantInternalAuthorization(Client* client);
+    void grantInternalAuthorization(OperationContext* opCtx);
 
     // Generates a vector of default privileges that are granted to any user,
     // regardless of which roles that user does or does not possess.
@@ -309,8 +313,12 @@ public:
     // authenticated user. If either object has impersonated users,
     // those users will be considered as 'authenticated' for the purpose of this check.
     //
-    // The existence of 'opClient' must be guaranteed through locks taken by the caller.
-    bool isCoauthorizedWithClient(Client* opClient);
+    // The existence of 'opClient' must be guaranteed through locks taken by the caller,
+    // as demonstrated by opClientLock which must be a lock taken on opClient.
+    //
+    // Returns true if the current auth session and the opClient's auth session have users
+    // in common.
+    bool isCoauthorizedWithClient(Client* opClient, WithLock opClientLock);
 
     // Returns true if the session and 'userNameIter' share an authenticated user, or if both have
     // no authenticated users. Impersonated users are not considered as 'authenticated' for the

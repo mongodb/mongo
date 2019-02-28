@@ -504,7 +504,7 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
 
 
     if (getGlobalAuthorizationManager()->isAuthEnabled()) {
-        AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+        AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx.get());
     }
 
     try {

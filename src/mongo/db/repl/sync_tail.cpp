@@ -166,7 +166,7 @@ ServerStatusMetricField<TimerStats> displayOpBatchesApplied("repl.apply.batches"
 void initializePrefetchThread() {
     if (!Client::getCurrent()) {
         Client::initThreadIfNotAlready();
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
+        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
     }
 }
 
@@ -540,7 +540,7 @@ void initializeWriterThread() {
     // Only do this once per thread
     if (!Client::getCurrent()) {
         Client::initThreadIfNotAlready();
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
+        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
     }
 }
 

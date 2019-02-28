@@ -51,6 +51,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/util/assert_util.h"
@@ -180,6 +181,7 @@ Status AuthorizationSession::addAndAuthorizeUser(OperationContext* opCtx,
         return AuthorizationManager::authenticationFailedStatus;
     }
 
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     // Calling add() on the UserSet may return a user that was replaced because it was from the
     // same database.
     userHolder.reset(_authenticatedUsers.add(userHolder.release()));
@@ -215,7 +217,8 @@ bool AuthorizationSession::isAuthenticated() {
     return _authenticatedUsers.begin() != _authenticatedUsers.end();
 }
 
-void AuthorizationSession::logoutDatabase(const std::string& dbname) {
+void AuthorizationSession::logoutDatabase(OperationContext* opCtx, const std::string& dbname) {
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
     User* removedUser = _authenticatedUsers.removeByDBName(dbname);
     if (removedUser) {
         getAuthorizationManager().releaseUser(removedUser);
@@ -243,9 +246,18 @@ std::string AuthorizationSession::getAuthenticatedUserNamesToken() {
     return ret;
 }
 
-void AuthorizationSession::grantInternalAuthorization() {
+void AuthorizationSession::grantInternalAuthorization(Client* client) {
+    stdx::lock_guard<Client> lk(*client);
     _authenticatedUsers.add(internalSecurity.user);
     _buildAuthenticatedRolesVector();
+}
+
+/**
+ * Overloaded function - takes in the opCtx of the current AuthSession
+ * and calls the function above.
+ */
+void AuthorizationSession::grantInternalAuthorization(OperationContext* opCtx) {
+    grantInternalAuthorization(opCtx->getClient());
 }
 
 PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
@@ -835,6 +847,7 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
             User* updatedUser;
 
             Status status = authMan.acquireUser(opCtx, name, &updatedUser);
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
             switch (status.code()) {
                 case ErrorCodes::OK: {
 
@@ -957,7 +970,7 @@ void AuthorizationSession::setImpersonatedUserData(std::vector<UserName> usernam
     _impersonationFlag = true;
 }
 
-bool AuthorizationSession::isCoauthorizedWithClient(Client* opClient) {
+bool AuthorizationSession::isCoauthorizedWithClient(Client* opClient, WithLock opClientLock) {
     auto getUserNames = [](AuthorizationSession* authSession) {
         if (authSession->isImpersonating()) {
             return authSession->getImpersonatedUserNames();
