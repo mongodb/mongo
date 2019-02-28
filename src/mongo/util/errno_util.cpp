@@ -38,13 +38,14 @@
 #include <errno.h>  // For errno
 #endif
 
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
 
 namespace {
-const char kUnknownMsg[] = "Unknown error";
+const char kUnknownMsg[] = "Unknown error ";
 const int kBuflen = 256;  // strerror strings in non-English locales can be large.
 }  // namespace
 
@@ -99,7 +100,7 @@ std::string errnoWithDescription(int errNumber) {
 #endif
 
     if (!msg) {
-        return {kUnknownMsg};
+        return str::stream() << kUnknownMsg << errNumber;
     }
 
     return {msg};
