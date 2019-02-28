@@ -177,7 +177,7 @@ bool ProcessInfo::blockInMemory(const void* start) {
     return x & 0x1;
 }
 
-bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<char>* out) {
     out->resize(numPages);
     // int mincore(const void *addr, size_t len, char *vec);
     if (mincore(alignToStartOfPage(start), numPages * getPageSize(), &(out->front()))) {

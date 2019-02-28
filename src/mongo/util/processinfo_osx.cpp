@@ -75,7 +75,7 @@ int ProcessInfo::getVirtualMemorySize() {
     mach_port_t task;
 
     if ((result = task_for_pid(mach_task_self(), _pid.toNative(), &task)) != KERN_SUCCESS) {
-        cout << "error getting task\n";
+        std::cout << "error getting task\n";
         return 0;
     }
 
@@ -86,7 +86,7 @@ int ProcessInfo::getVirtualMemorySize() {
 #endif
     mach_msg_type_number_t count = TASK_BASIC_INFO_COUNT;
     if ((result = task_info(task, TASK_BASIC_INFO, (task_info_t)&ti, &count)) != KERN_SUCCESS) {
-        cout << "error getting task_info: " << result << endl;
+        std::cout << "error getting task_info: " << result << std::endl;
         return 0;
     }
     return (int)((double)ti.virtual_size / (1024.0 * 1024));
@@ -98,7 +98,7 @@ int ProcessInfo::getResidentSize() {
     mach_port_t task;
 
     if ((result = task_for_pid(mach_task_self(), _pid.toNative(), &task)) != KERN_SUCCESS) {
-        cout << "error getting task\n";
+        std::cout << "error getting task\n";
         return 0;
     }
 
@@ -110,7 +110,7 @@ int ProcessInfo::getResidentSize() {
 #endif
     mach_msg_type_number_t count = TASK_BASIC_INFO_COUNT;
     if ((result = task_info(task, TASK_BASIC_INFO, (task_info_t)&ti, &count)) != KERN_SUCCESS) {
-        cout << "error getting task_info: " << result << endl;
+        std::cout << "error getting task_info: " << result << std::endl;
         return 0;
     }
     return (int)(ti.resident_size / (1024 * 1024));
@@ -126,7 +126,7 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 
     if (KERN_SUCCESS !=
         task_info(mach_task_self(), TASK_EVENTS_INFO, (integer_t*)&taskInfo, &taskInfoCount)) {
-        cout << "error getting extra task_info" << endl;
+        std::cout << "error getting extra task_info" << std::endl;
         return;
     }
 
