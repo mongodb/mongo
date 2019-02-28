@@ -44,7 +44,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_query_knobs.h"
+#include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/document_source_update_on_add_shard.h"
 #include "mongo/s/query/owned_remote_cursor.h"

@@ -8,7 +8,7 @@ env.Library(
     target="cluster_query",
     source=[
         "cluster_find.cpp",
-        "cluster_query_knobs.cpp",
+        env.Idlc('cluster_query_knobs.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
@@ -19,6 +19,9 @@ env.Library(
         "cluster_client_cursor",
         "cluster_cursor_cleanup_job",
         "store_possible_cursor",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
