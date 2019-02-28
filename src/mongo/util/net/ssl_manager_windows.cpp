@@ -1134,17 +1134,26 @@ StatusWith<UniqueCertificate> loadAndValidateCertificateSelector(
     DWORD dwKeySpec;
     BOOL freeProvider;
     HCRYPTPROV hCryptProv;
-    BOOL ret = CryptAcquireCertificatePrivateKey(
-        swCert.getValue().get(), 0, NULL, &hCryptProv, &dwKeySpec, &freeProvider);
+    BOOL ret = CryptAcquireCertificatePrivateKey(swCert.getValue().get(),
+                                                 CRYPT_ACQUIRE_ALLOW_NCRYPT_KEY_FLAG,
+                                                 NULL,
+                                                 &hCryptProv,
+                                                 &dwKeySpec,
+                                                 &freeProvider);
     if (!ret) {
         DWORD gle = GetLastError();
         if (gle == CRYPT_E_NO_KEY_PROPERTY) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream()
                               << "Could not find private key attached to the selected certificate");
+        } else if (gle == NTE_BAD_KEYSET) {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "Could not read private key attached to the selected "
+                                           "certificate, ensure it exists and check the private "
+                                           "key permissions");
         } else {
             return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "CertGetCertificateContextProperty failed  "
+                          str::stream() << "CryptAcquireCertificatePrivateKey failed  "
                                         << errnoWithDescription(gle));
         }
     }
