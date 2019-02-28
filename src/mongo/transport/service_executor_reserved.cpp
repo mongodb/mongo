@@ -36,6 +36,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point_utils.h"
+#include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -43,10 +44,6 @@
 namespace mongo {
 namespace transport {
 namespace {
-
-// Tasks scheduled with MayRecurse may be called recursively if the recursion depth is below this
-// value.
-MONGO_EXPORT_SERVER_PARAMETER(reservedServiceExecutorRecursionLimit, int, 8);
 
 constexpr auto kThreadsRunning = "threadsRunning"_sd;
 constexpr auto kExecutorLabel = "executor"_sd;
