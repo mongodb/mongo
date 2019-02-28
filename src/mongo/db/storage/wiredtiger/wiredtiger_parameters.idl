@@ -31,6 +31,7 @@ global:
     cpp_includes:
         - "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
         - "mongo/util/concurrency/ticketholder.h"
+        - "mongo/util/debug_util.h"
 
 server_parameters:
     wiredTigerConcurrentWriteTransactions:
@@ -59,3 +60,20 @@ server_parameters:
         # Defer the initialization with condition: false
         # and allow those places to manually set themselves up.
         condition: { expr: false }
+
+    wiredTigerSessionCloseIdleTimeSecs:
+        description: 'Close idle wiredtiger sessions in the session cache after this many seconds'
+        cpp_vartype: 'AtomicWord<std::int32_t>'
+        cpp_varname: gWiredTigerSessionCloseIdleTimeSecs
+        set_at: [ startup, runtime ]
+        default:
+            # The default is 5 mins with a shorter default in the debug build to aid testing.
+            expr: 'kDebugBuild ? 5 : 300'
+        validator:
+            gte: 0
+    takeUnstableCheckpointOnShutdown:
+        description: 'Take unstable checkpoint on shutdown'
+        cpp_vartype: bool
+        cpp_varname: gTakeUnstableCheckpointOnShutdown
+        set_at: startup
+        default: false
