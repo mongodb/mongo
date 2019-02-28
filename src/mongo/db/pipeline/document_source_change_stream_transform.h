@@ -116,12 +116,6 @@ private:
     void initializeTransactionContext(const Document& input);
 
     /**
-     * Switches the format used to encode the resume token. This must happen if the stream sees an
-     * update to the admin.system.version collection.
-     */
-    void switchResumeTokenFormat(const Document& fcvUpdateOplogEntry);
-
-    /**
      * Gets the next relevant applyOps entry that should be returned. If there is none, returns
      * empty document.
      */

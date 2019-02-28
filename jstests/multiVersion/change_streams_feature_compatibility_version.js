@@ -40,7 +40,6 @@
 
     // We can't open a change stream on a non-existent database on last-stable, so we insert a dummy
     // document to create the database.
-    // TODO BACKPORT-34138 Remove this check once the change has been backported.
     assert.writeOK(testDB.dummy.insert({_id: "dummy"}));
 
     // Open a change stream against a 3.6 binary. We will use the resume token from this stream to
@@ -95,8 +94,9 @@
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 1);
 
-    // Test that the stream is still using the old resume token format using BinData.
-    assertResumeTokenUsesBinDataFormat(change._id);
+    // From 4.0.7 onwards, we always produce the newer string-format tokens even while in FCV 3.6.
+    // The stream which was resumed from the 3.6 BinData token should now be producing 4.0 tokens.
+    assertResumeTokenUsesStringFormat(change._id);
 
     // Explicitly set feature compatibility version 4.0. Remember the cluster time from that
     // response to use later.
@@ -116,7 +116,7 @@
 
     assert.writeOK(coll.insert({_id: 2}));
 
-    // Test that the stream opened in FCV 3.6 continues to work.
+    // Test that the stream opened in FCV 3.6 continues to generate tokens in the new format.
     change = cst.getOneChange(streamOnOldVersion);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 2);
@@ -168,23 +168,22 @@
     // Set the feature compatibility version to 3.6.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
 
-    // Test that existing streams continue, but switch back to the BinData format after observing
-    // the change to FCV.
+    // Test that existing streams continue, but still generate resume tokens in the new format.
     assert.writeOK(coll.insert({_id: 3}));
     change = cst.getOneChange(wholeDbCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 3);
-    assertResumeTokenUsesBinDataFormat(change._id);
+    assertResumeTokenUsesStringFormat(change._id);
 
     change = adminCST.getOneChange(wholeClusterCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 3);
-    assertResumeTokenUsesBinDataFormat(change._id);
+    assertResumeTokenUsesStringFormat(change._id);
 
     change = cst.getOneChange(cursorStartedWithTime);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 3);
-    assertResumeTokenUsesBinDataFormat(change._id);
+    assertResumeTokenUsesStringFormat(change._id);
 
     // Creating a new change stream with a 4.0 feature should fail.
     assert.commandFailedWithCode(
@@ -220,7 +219,7 @@
     });
     assert.soon(() => resumedOnFCV36With40BinaryResumeToken.hasNext());
     change = resumedOnFCV36With40BinaryResumeToken.next();
-    assertResumeTokenUsesBinDataFormat(change._id);
+    assertResumeTokenUsesStringFormat(change._id);
 
     // Test that resuming a change stream with the original resume token still works.
     let resumedWith36Token;
@@ -229,7 +228,7 @@
     });
     assert.soon(() => resumedWith36Token.hasNext());
     change = resumedWith36Token.next();
-    assertResumeTokenUsesBinDataFormat(change._id);
+    assertResumeTokenUsesStringFormat(change._id);
 
     rst.stopSet();
 }());

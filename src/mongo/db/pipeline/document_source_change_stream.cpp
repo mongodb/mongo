@@ -274,21 +274,11 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
     // 3) Look for 'applyOps' which were created as part of a transaction.
     BSONObj applyOps = getTxnApplyOpsFilter(nsMatch["ns"], nss);
 
-    // 4) Look for changes to the feature compatibility version. These show up as updates to the
-    // admin.system.version collection.
-    BSONObj fcvChange = BSON(
-        "$and" << BSON_ARRAY(
-            BSON("ns" << NamespaceString::kServerConfigurationNamespace.ns())
-            // Ignore entries which correspond to the beginning of a transition. We only need to
-            // care about those which actually commit a change to the feature compatibility version.
-            << BSON("o.targetVersion" << BSON("$exists" << false))
-            << BSON("o.version" << BSON("$exists" << true))));
-
     // Match oplog entries after "start" and are either supported (1) commands or (2) operations,
     // excepting those tagged "fromMigrate". Include the resume token, if resuming, so we can verify
     // it was still present in the oplog.
     return BSON("$and" << BSON_ARRAY(BSON("ts" << (startFromInclusive ? GTE : GT) << startFrom)
-                                     << BSON(OR(opMatch, commandMatch, applyOps, fcvChange))
+                                     << BSON(OR(opMatch, commandMatch, applyOps))
                                      << BSON("fromMigrate" << NE << true)));
 }
 
