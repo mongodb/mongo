@@ -335,13 +335,17 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IgnoresInfoIfNoCache
 
     LogicalSessionCache::set(_opCtx->getServiceContext(), nullptr);
 
-    ASSERT_FALSE(initializeOperationSessionInfo(
+    auto sessionInfo = initializeOperationSessionInfo(
         _opCtx.get(),
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
         true,
         true,
-        true));
+        true);
+    ASSERT(sessionInfo.getSessionId() == boost::none);
+    ASSERT(sessionInfo.getTxnNumber() == boost::none);
+    ASSERT(sessionInfo.getStartTransaction() == boost::none);
+    ASSERT(sessionInfo.getAutocommit() == boost::none);
 }
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SendingInfoFailsInDirectClient) {

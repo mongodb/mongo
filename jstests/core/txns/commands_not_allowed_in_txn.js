@@ -151,7 +151,7 @@
         stmtId: NumberInt(1),
         autocommit: false
     }),
-                                 ErrorCodes.ConflictingOperationInProgress);
+                                 ErrorCodes.OperationNotSupportedInTransaction);
 
     // It is still possible to commit the transaction. The rejected command does not abort the
     // transaction.

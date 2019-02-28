@@ -1183,5 +1183,11 @@ Timestamp StorageInterfaceImpl::getOldestOpenReadTimestamp(ServiceContext* servi
     return serviceCtx->getStorageEngine()->getOldestOpenReadTimestamp();
 }
 
+Timestamp StorageInterfaceImpl::getPointInTimeReadTimestamp(OperationContext* opCtx) const {
+    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+    invariant(readTimestamp);
+    return *readTimestamp;
+}
+
 }  // namespace repl
 }  // namespace mongo

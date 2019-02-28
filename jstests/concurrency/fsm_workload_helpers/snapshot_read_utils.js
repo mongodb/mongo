@@ -61,7 +61,13 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
             autocommit: false
         };
         res = data.sessionDb.adminCommand(abortCmd);
-        assertWorkedOrFailed(abortCmd, res, [ErrorCodes.NoSuchTransaction]);
+        const abortErrorCodes = [
+            ErrorCodes.NoSuchTransaction,
+            ErrorCodes.TransactionCommitted,
+            ErrorCodes.TransactionTooOld,
+            ErrorCodes.Interrupted
+        ];
+        assertWorkedOrFailed(abortCmd, res, abortErrorCodes);
         data.cursorId = 0;
     } else {
         assert(cursor.hasOwnProperty("firstBatch"), tojson(res));

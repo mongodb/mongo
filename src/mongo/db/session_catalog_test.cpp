@@ -92,7 +92,7 @@ TEST_F(SessionCatalogTest, OperationContextCheckedOutSession) {
     const TxnNumber txnNum = 20;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSession ocs(opCtx(), true, boost::none, boost::none, "testDB", "insert");
+    OperationContextSession ocs(opCtx(), true);
     auto session = OperationContextSession::get(opCtx());
     ASSERT(session);
     ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
@@ -101,7 +101,7 @@ TEST_F(SessionCatalogTest, OperationContextCheckedOutSession) {
 TEST_F(SessionCatalogTest, OperationContextNonCheckedOutSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
-    OperationContextSession ocs(opCtx(), false, boost::none, boost::none, "testDB", "insert");
+    OperationContextSession ocs(opCtx(), false);
     auto session = OperationContextSession::get(opCtx());
 
     ASSERT(!session);
@@ -120,7 +120,8 @@ TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
     opCtx()->setLogicalSessionId(lsid);
 
     boost::optional<OperationContextSession> ocs;
-    ocs.emplace(opCtx(), true, boost::none, false, "testDB", "insert");
+    ocs.emplace(opCtx(), true);
+    // We don't have to start the transaction for this test.
 
     stdx::async(stdx::launch::async, [&] {
         ON_BLOCK_EXIT([&] { Client::destroy(); });
@@ -151,13 +152,11 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession outerScopedSession(
-            opCtx(), true, boost::none, boost::none, "testDB", "insert");
+        OperationContextSession outerScopedSession(opCtx(), true);
 
         {
             DirectClientSetter inDirectClient(opCtx());
-            OperationContextSession innerScopedSession(
-                opCtx(), true, boost::none, boost::none, "testDB", "insert");
+            OperationContextSession innerScopedSession(opCtx(), true);
 
             auto session = OperationContextSession::get(opCtx());
             ASSERT(session);
@@ -180,8 +179,13 @@ TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
     opCtx()->setTxnNumber(1);
 
     {
-        OperationContextSession outerScopedSession(
-            opCtx(), true, /* autocommit */ false, /* startTransaction */ true, "testDB", "find");
+        OperationContextSession outerScopedSession(opCtx(), true);
+        OperationContextSession::get(opCtx())->beginOrContinueTxn(opCtx(),
+                                                                  *opCtx()->getTxnNumber(),
+                                                                  /* autocommit */ false,
+                                                                  /* startTransaction */ true,
+                                                                  "testDB",
+                                                                  "find");
 
         Locker* originalLocker = opCtx()->lockState();
         RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
@@ -206,9 +210,8 @@ TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
         {
             // Make it look like we're in a DBDirectClient running a nested operation.
             DirectClientSetter inDirectClient(opCtx());
-            OperationContextSession innerScopedSession(
-                opCtx(), true, boost::none, boost::none, "testDB", "find");
-
+            OperationContextSession innerScopedSession(opCtx(), true);
+            // Don't start transaction again if we're nested in invokeInTransaction().
             OperationContextSession::get(opCtx())->stashTransactionResources(opCtx());
 
             // The stash was a noop, so the locker, RecoveryUnit, and WriteUnitOfWork on the
@@ -225,8 +228,13 @@ TEST_F(SessionCatalogTest, UnstashInNestedSessionIsANoop) {
     opCtx()->setTxnNumber(1);
 
     {
-        OperationContextSession outerScopedSession(
-            opCtx(), true, /* autocommit */ false, /* startTransaction */ true, "testDB", "find");
+        OperationContextSession outerScopedSession(opCtx(), true);
+        OperationContextSession::get(opCtx())->beginOrContinueTxn(opCtx(),
+                                                                  *opCtx()->getTxnNumber(),
+                                                                  /* autocommit */ false,
+                                                                  /* startTransaction */ true,
+                                                                  "testDB",
+                                                                  "find");
 
         Locker* originalLocker = opCtx()->lockState();
         RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
@@ -245,8 +253,7 @@ TEST_F(SessionCatalogTest, UnstashInNestedSessionIsANoop) {
         {
             // Make it look like we're in a DBDirectClient running a nested operation.
             DirectClientSetter inDirectClient(opCtx());
-            OperationContextSession innerScopedSession(
-                opCtx(), true, boost::none, boost::none, "testDB", "find");
+            OperationContextSession innerScopedSession(opCtx(), true);
 
             OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "find");
 

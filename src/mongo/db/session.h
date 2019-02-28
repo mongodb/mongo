@@ -174,12 +174,6 @@ public:
     void beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber txnNumber);
 
     /**
-     * Called for speculative transactions to fix the optime of the snapshot to read from.
-     */
-    void setSpeculativeTransactionOpTime(OperationContext* opCtx,
-                                         SpeculativeTransactionOpTime opTimeChoice);
-
-    /**
      * Called after a write under the specified transaction completes while the node is a primary
      * and specifies the statement ids which were written. Must be called while the caller is still
      * in the write's WUOW. Updates the on-disk state of the session to match the specified
@@ -454,6 +448,12 @@ private:
                                       TxnNumber newTxnNumber,
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
+
+    // Called for speculative transactions to fix the optime of the snapshot to read from.
+    void _setSpeculativeTransactionOpTime(WithLock,
+                                          OperationContext* opCtx,
+                                          SpeculativeTransactionOpTime opTimeChoice);
+
 
     // Releases stashed transaction resources to abort the transaction.
     void _abortTransaction(WithLock);

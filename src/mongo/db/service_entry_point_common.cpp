@@ -219,11 +219,11 @@ void generateErrorResponse(OperationContext* opCtx,
     replyBuilder->setMetadata(replyMetadata);
 }
 
-BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& sessionOptions,
+BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
                        const std::string& commandName,
                        ErrorCodes::Error code) {
     // By specifying "autocommit", the user indicates they want to run a transaction.
-    if (!sessionOptions || !sessionOptions->getAutocommit()) {
+    if (!sessionOptions.getAutocommit()) {
         return {};
     }
 
@@ -347,8 +347,9 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* i
         // We must be in a transaction if the readConcern level was upconverted to snapshot and the
         // command must support readConcern level snapshot in order to be supported in transactions.
         if (upconvertToSnapshot) {
-            return {ErrorCodes::OperationNotSupportedInTransaction,
-                    str::stream() << "Command is not supported in a transaction"};
+            return {
+                ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Command is not supported as the first command in a transaction"};
         }
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Command does not support read concern "
@@ -464,10 +465,20 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
 
 void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
+                         const OpMsgRequest& request,
+                         const OperationSessionInfoFromClient& sessionOptions,
                          CommandReplyBuilder* replyBuilder) {
     auto session = OperationContextSession::get(opCtx);
     invariant(session);
     invariant(opCtx->getTxnNumber() || opCtx->getClient()->isInDirectClient());
+    if (!opCtx->getClient()->isInDirectClient()) {
+        session->beginOrContinueTxn(opCtx,
+                                    *sessionOptions.getTxnNumber(),
+                                    sessionOptions.getAutocommit(),
+                                    sessionOptions.getStartTransaction(),
+                                    request.getDatabase(),
+                                    request.getCommandName());
+    }
 
     session->unstashTransactionResources(opCtx, invocation->definition()->getName());
     ScopeGuard guard = MakeGuard([session, opCtx]() { session->abortActiveTransaction(opCtx); });
@@ -493,7 +504,7 @@ bool runCommandImpl(OperationContext* opCtx,
                     LogicalTime startOperationTime,
                     const ServiceEntryPointCommon::Hooks& behaviors,
                     BSONObjBuilder* extraFieldsBuilder,
-                    const boost::optional<OperationSessionInfoFromClient>& sessionOptions) {
+                    const OperationSessionInfoFromClient& sessionOptions) {
     const Command* command = invocation->definition();
     auto bytesToReserve = command->reserveBytesForReply();
 
@@ -510,19 +521,21 @@ bool runCommandImpl(OperationContext* opCtx,
     if (!invocation->supportsWriteConcern()) {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
         if (session) {
-            invokeInTransaction(opCtx, invocation, &crb);
+            invokeInTransaction(opCtx, invocation, request, sessionOptions, &crb);
         } else {
             invocation->run(opCtx, &crb);
         }
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
-        uassert(ErrorCodes::InvalidOptions,
-                "writeConcern is not allowed within a multi-statement transaction",
-                wcResult.usedDefault || !session ||
-                    !session->inActiveOrKilledMultiDocumentTransaction() ||
-                    invocation->definition()->getName() == "commitTransaction" ||
-                    invocation->definition()->getName() == "abortTransaction" ||
-                    invocation->definition()->getName() == "doTxn");
+        if (sessionOptions.getAutocommit()) {
+            // If "autoCommit" is set, it must be "false".
+            uassert(ErrorCodes::InvalidOptions,
+                    "writeConcern is not allowed within a multi-statement transaction",
+                    wcResult.usedDefault ||
+                        invocation->definition()->getName() == "commitTransaction" ||
+                        invocation->definition()->getName() == "abortTransaction" ||
+                        invocation->definition()->getName() == "doTxn");
+        }
 
         auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
@@ -546,7 +559,7 @@ bool runCommandImpl(OperationContext* opCtx,
 
         try {
             if (session) {
-                invokeInTransaction(opCtx, invocation, &crb);
+                invokeInTransaction(opCtx, invocation, request, sessionOptions, &crb);
             } else {
                 invocation->run(opCtx, &crb);
             }
@@ -638,7 +651,7 @@ void execCommandDatabase(OperationContext* opCtx,
     BSONObjBuilder extraFieldsBuilder;
     auto startOperationTime = getClientOperationTime(opCtx);
     auto invocation = command->parse(opCtx, request);
-    boost::optional<OperationSessionInfoFromClient> sessionOptions = boost::none;
+    OperationSessionInfoFromClient sessionOptions;
 
     try {
         {
@@ -674,36 +687,23 @@ void execCommandDatabase(OperationContext* opCtx,
         const bool shouldCheckoutSession = static_cast<bool>(opCtx->getTxnNumber()) &&
             sessionCheckoutWhitelist.find(command->getName()) != sessionCheckoutWhitelist.cend();
 
-        // Parse the arguments specific to multi-statement transactions.
-        boost::optional<bool> startMultiDocTxn = boost::none;
-        boost::optional<bool> autocommitVal = boost::none;
-        if (sessionOptions) {
-            startMultiDocTxn = sessionOptions->getStartTransaction();
-            autocommitVal = sessionOptions->getAutocommit();
-            if (command->getName() == "doTxn") {
-                // Autocommit and 'startMultiDocTxn' are overridden for 'doTxn' to get the oplog
-                // entry generation behavior used for multi-document transactions. The 'doTxn'
-                // command still logically behaves as a commit.
-                autocommitVal = false;
-                startMultiDocTxn = true;
-            }
-        }
+        const auto shouldNotCheckOutSession =
+            !shouldCheckoutSession && !opCtx->getClient()->isInDirectClient();
 
         // Reject commands with 'txnNumber' that do not check out the Session, since no retryable
         // writes or transaction machinery will be used to execute commands that do not check out
         // the Session. Do not check this if we are in DBDirectClient because the outer command is
         // responsible for checking out the Session.
-        if (!opCtx->getClient()->isInDirectClient()) {
+        if (shouldNotCheckOutSession) {
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     str::stream() << "It is illegal to run command " << command->getName()
                                   << " in a multi-document transaction.",
-                    shouldCheckoutSession || !autocommitVal || command->getName() == "doTxn");
+                    !sessionOptions.getAutocommit());
             uassert(50768,
                     str::stream() << "It is illegal to provide a txnNumber for command "
                                   << command->getName(),
-                    shouldCheckoutSession || !opCtx->getTxnNumber());
+                    !opCtx->getTxnNumber());
         }
-
         std::unique_ptr<MaintenanceModeSetter> mmSetter;
 
         BSONElement cmdOptionMaxTimeMSField;
@@ -747,7 +747,7 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (!opCtx->getClient()->isInDirectClient() &&
             !MONGO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
-            const bool inMultiDocumentTransaction = (autocommitVal == false);
+            auto inMultiDocumentTransaction = static_cast<bool>(sessionOptions.getAutocommit());
             auto allowed = command->secondaryAllowed(opCtx->getServiceContext());
             bool alwaysAllowed = allowed == Command::AllowedOnSecondary::kAlways;
             bool couldHaveOptedIn =
@@ -812,23 +812,17 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
         }
 
-        // This constructor will check out the session and start a transaction, if necessary. It
-        // handles the appropriate state management for both multi-statement transactions and
-        // retryable writes.
-        OperationContextSession sessionTxnState(opCtx,
-                                                shouldCheckoutSession,
-                                                autocommitVal,
-                                                startMultiDocTxn,
-                                                dbname,
-                                                command->getName());
+        // This constructor will check out the session, if necessary, for both multi-statement
+        // transactions and retryable writes.
+        OperationContextSession sessionTxnState(opCtx, shouldCheckoutSession);
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        auto session = OperationContextSession::get(opCtx);
-        if (!opCtx->getClient()->isInDirectClient() || !session ||
-            !session->inActiveOrKilledMultiDocumentTransaction()) {
-            const bool upconvertToSnapshot = session &&
-                session->inActiveOrKilledMultiDocumentTransaction() && sessionOptions &&
-                (sessionOptions->getStartTransaction() == boost::optional<bool>(true));
+        // If the parent operation runs in snapshot isolation, we don't override the read concern.
+        auto skipReadConcern = opCtx->getClient()->isInDirectClient() &&
+            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern;
+        if (!skipReadConcern) {
+            // If "startTransaction" is present, it must be true due to the parsing above.
+            const bool upconvertToSnapshot(sessionOptions.getStartTransaction());
             readConcernArgs = uassertStatusOK(
                 _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
         }
@@ -840,10 +834,9 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-            auto session = OperationContextSession::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
-                    "readConcern level snapshot is only valid in multi-statement transactions",
-                    session && session->inActiveOrKilledMultiDocumentTransaction());
+                    "readConcern level snapshot is only valid for the first transaction operation",
+                    opCtx->getClient()->isInDirectClient() || sessionOptions.getStartTransaction());
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot requires a session ID",
                     opCtx->getLogicalSessionId());

@@ -147,13 +147,10 @@ void DoTxnTest::setUp() {
     // Set up the transaction and session.
     _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     _opCtx->setTxnNumber(0);  // TxnNumber can always be 0 because we have a new session.
-    _ocs.emplace(_opCtx.get(),
-                 true /* checkOutSession */,
-                 false /* autocommit */,
-                 true /* startTransaction */,
-                 "admin" /* dbName */,
-                 "doTxn" /* cmdName */);
-    OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "doTxn");
+    _ocs.emplace(_opCtx.get(), true /* checkOutSession */);
+    auto session = OperationContextSession::get(opCtx());
+    session->beginOrContinueTxn(opCtx(), *opCtx()->getTxnNumber(), false, true, "admin", "doTxn");
+    session->unstashTransactionResources(opCtx(), "doTxn");
 }
 
 void DoTxnTest::tearDown() {

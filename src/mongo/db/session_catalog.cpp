@@ -241,12 +241,7 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
     sri->availableCondVar.notify_one();
 }
 
-OperationContextSession::OperationContextSession(OperationContext* opCtx,
-                                                 bool checkOutSession,
-                                                 boost::optional<bool> autocommit,
-                                                 boost::optional<bool> startTransaction,
-                                                 StringData dbName,
-                                                 StringData cmdName)
+OperationContextSession::OperationContextSession(OperationContext* opCtx, bool checkOutSession)
     : _opCtx(opCtx) {
 
     if (!opCtx->getLogicalSessionId()) {
@@ -277,10 +272,6 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx,
 
     checkedOutSession->get()->refreshFromStorageIfNeeded(opCtx);
 
-    if (opCtx->getTxnNumber()) {
-        checkedOutSession->get()->beginOrContinueTxn(
-            opCtx, *opCtx->getTxnNumber(), autocommit, startTransaction, dbName, cmdName);
-    }
     session->setCurrentOperation(opCtx);
 }
 

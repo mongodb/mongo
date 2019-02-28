@@ -279,8 +279,6 @@ Status doTxn(OperationContext* opCtx,
              const std::string& dbName,
              const BSONObj& doTxnCmd,
              BSONObjBuilder* result) {
-    auto txnNumber = opCtx->getTxnNumber();
-    uassert(ErrorCodes::InvalidOptions, "doTxn can only be run with a transaction ID.", txnNumber);
     auto* session = OperationContextSession::get(opCtx);
     uassert(ErrorCodes::InvalidOptions, "doTxn must be run within a session", session);
     invariant(session->inActiveOrKilledMultiDocumentTransaction());

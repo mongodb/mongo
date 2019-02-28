@@ -209,9 +209,8 @@ Status waitForReadConcern(OperationContext* opCtx,
     // If we are in a direct client within a transaction, then we may be holding locks, so it is
     // illegal to wait for read concern. This is fine, since the outer operation should have handled
     // waiting for read concern.
-    auto session = OperationContextSession::get(opCtx);
-    if (opCtx->getClient()->isInDirectClient() && session &&
-        session->inActiveOrKilledMultiDocumentTransaction()) {
+    if (opCtx->getClient()->isInDirectClient() &&
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         return Status::OK();
     }
 
@@ -310,13 +309,6 @@ Status waitForReadConcern(OperationContext* opCtx,
         if (!replCoord->isV1ElectionProtocol()) {
             return {ErrorCodes::IncompatibleElectionProtocol,
                     "Replica sets running protocol version 0 do not support readConcern: snapshot"};
-        }
-        if (speculative) {
-            session->setSpeculativeTransactionOpTime(
-                opCtx,
-                readConcernArgs.getOriginalLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
-                    ? SpeculativeTransactionOpTime::kAllCommitted
-                    : SpeculativeTransactionOpTime::kLastApplied);
         }
     }
 

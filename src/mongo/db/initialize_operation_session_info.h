@@ -51,11 +51,10 @@ namespace mongo {
  * On success, returns the parsed request information. Returning boost::none implies that the
  * proper command or session requirements were not met.
  */
-boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
-    OperationContext* opCtx,
-    const BSONObj& requestBody,
-    bool requiresAuth,
-    bool isReplSetMemberOrMongos,
-    bool supportsDocLocking);
+OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
+                                                              const BSONObj& requestBody,
+                                                              bool requiresAuth,
+                                                              bool isReplSetMemberOrMongos,
+                                                              bool supportsDocLocking);
 
 }  // namespace mongo

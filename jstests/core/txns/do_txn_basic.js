@@ -86,7 +86,10 @@
 
     jsTestLog("Valid 'ns' field value in unknown operation type 'x'.");
     assert.commandFailedWithCode(
-        db.adminCommand({doTxn: [{op: 'x', ns: t.getFullName(), o: {_id: 0}}]}),
+        db.adminCommand({
+            doTxn: [{op: 'x', ns: t.getFullName(), o: {_id: 0}}],
+            txnNumber: NumberLong(txnNumber++)
+        }),
         ErrorCodes.FailedToParse,
         'doTxn should fail on unknown operation type "x" with valid "ns" value');
 
@@ -159,10 +162,12 @@
         'doTxn should fail when inner transaction contains statement id.');
 
     jsTestLog("Malformed operation with unexpected field 'x'.");
-    assert.commandFailedWithCode(
-        db.adminCommand({doTxn: [{op: 'i', ns: t.getFullName(), o: {_id: 0}, x: 1}]}),
-        ErrorCodes.FailedToParse,
-        'doTxn should fail on malformed operations.');
+    assert.commandFailedWithCode(db.adminCommand({
+        doTxn: [{op: 'i', ns: t.getFullName(), o: {_id: 0}, x: 1}],
+        txnNumber: NumberLong(txnNumber++)
+    }),
+                                 ErrorCodes.FailedToParse,
+                                 'doTxn should fail on malformed operations.');
 
     assert.eq(0, t.find().count(), "Non-zero amount of documents in collection to start");
 

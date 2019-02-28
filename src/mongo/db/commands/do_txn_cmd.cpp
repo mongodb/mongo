@@ -120,6 +120,14 @@ public:
         return true;
     }
 
+    bool supportsReadConcern(const std::string& dbName,
+                             const BSONObj& cmdObj,
+                             repl::ReadConcernLevel level) const override {
+        // Support the read concerns before and after upconversion.
+        return level == repl::ReadConcernLevel::kLocalReadConcern ||
+            level == repl::ReadConcernLevel::kSnapshotReadConcern;
+    }
+
     std::string help() const override {
         return "internal (sharding)\n{ doTxn : [ ] , preCondition : [ { ns : ... , q : ... , "
                "res : ... } ] }";

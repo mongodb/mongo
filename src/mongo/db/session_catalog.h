@@ -245,12 +245,7 @@ class OperationContextSession {
     MONGO_DISALLOW_COPYING(OperationContextSession);
 
 public:
-    OperationContextSession(OperationContext* opCtx,
-                            bool checkOutSession,
-                            boost::optional<bool> autocommit,
-                            boost::optional<bool> startTransaction,
-                            StringData dbName,
-                            StringData cmdName);
+    OperationContextSession(OperationContext* opCtx, bool checkOutSession);
 
     ~OperationContextSession();
 

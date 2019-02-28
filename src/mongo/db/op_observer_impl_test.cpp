@@ -406,12 +406,14 @@ TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
     const TxnNumber txnNum = 0;
     opCtx->setLogicalSessionId(sessionId);
     opCtx->setTxnNumber(txnNum);
-    OperationContextSession opSession(opCtx.get(),
-                                      true /* checkOutSession */,
-                                      false /* autocommit */,
-                                      true /* startTransaction */,
-                                      "testDB" /* dbName */,
-                                      "insert" /* cmdName */);
+    OperationContextSession opSession(opCtx.get(), true /* checkOutSession */);
+    OperationContextSession::get(opCtx.get())
+        ->beginOrContinueTxn(opCtx.get(),
+                             txnNum,
+                             /* autocommit */ false,
+                             /* startTransaction */ true,
+                             "testDB",
+                             "insert");
 
     session->unstashTransactionResources(opCtx.get(), "insert");
 
@@ -550,12 +552,13 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     auto uuid2 = CollectionUUID::gen();
     const TxnNumber txnNum = 2;
     opCtx()->setTxnNumber(txnNum);
-    OperationContextSession opSession(opCtx(),
-                                      true /* checkOutSession */,
-                                      false /* autocommit */,
-                                      true /* startTransaction*/,
-                                      "testDB",
-                                      "insert");
+    OperationContextSession opSession(opCtx(), true /* checkOutSession */);
+    OperationContextSession::get(opCtx())->beginOrContinueTxn(opCtx(),
+                                                              txnNum,
+                                                              /* autocommit */ false,
+                                                              /* startTransaction */ true,
+                                                              "testDB",
+                                                              "insert");
 
     session()->unstashTransactionResources(opCtx(), "insert");
 
@@ -628,12 +631,13 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     auto uuid2 = CollectionUUID::gen();
     const TxnNumber txnNum = 3;
     opCtx()->setTxnNumber(txnNum);
-    OperationContextSession opSession(opCtx(),
-                                      true /* checkOutSession */,
-                                      false /* autocommit */,
-                                      true /* startTransaction*/,
-                                      "testDB",
-                                      "update");
+    OperationContextSession opSession(opCtx(), true /* checkOutSession */);
+    OperationContextSession::get(opCtx())->beginOrContinueTxn(opCtx(),
+                                                              txnNum,
+                                                              /* autocommit */ false,
+                                                              /* startTransaction */ true,
+                                                              "testDB",
+                                                              "insert");
 
     session()->unstashTransactionResources(opCtx(), "update");
 
@@ -698,12 +702,13 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
     auto uuid2 = CollectionUUID::gen();
     const TxnNumber txnNum = 3;
     opCtx()->setTxnNumber(txnNum);
-    OperationContextSession opSession(opCtx(),
-                                      true /* checkOutSession */,
-                                      false /* autocommit */,
-                                      true /* startTransaction*/,
-                                      "testDB",
-                                      "delete");
+    OperationContextSession opSession(opCtx(), true /* checkOutSession */);
+    OperationContextSession::get(opCtx())->beginOrContinueTxn(opCtx(),
+                                                              txnNum,
+                                                              /* autocommit */ false,
+                                                              /* startTransaction */ true,
+                                                              "testDB",
+                                                              "insert");
 
     session()->unstashTransactionResources(opCtx(), "delete");
 
