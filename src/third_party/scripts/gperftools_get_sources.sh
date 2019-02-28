@@ -79,9 +79,14 @@ else
     MAX_SIZE_KB=16
 fi
 
+TARGET_TRANSFER_KB=8
+
 env PATH=/opt/mongodbtoolchain/v3/bin:$PATH \
     ./configure \
     --enable-tcmalloc-aggressive-merge \
+    --enable-tcmalloc-mallinfo=no \
+    --enable-tcmalloc-unclamped-transfer-sizes=yes \
+    --enable-tcmalloc-target-transfer-kb=$TARGET_TRANSFER_KB \
     --with-tcmalloc-pagesize=$PAGE_SIZE_KB \
     --with-tcmalloc-maxsize=$MAX_SIZE_KB
 
@@ -96,6 +101,8 @@ if [ ! -d $DEST_DIR ]; then
     $(set_define TCMALLOC_AGGRESSIVE_MERGE 1)
     $(set_define TCMALLOC_PAGE_SIZE_SHIFT $(log2floor $((PAGE_SIZE_KB*1024))))
     $(set_define TCMALLOC_MAX_SIZE_KB ${MAX_SIZE_KB})
+    $(set_define TCMALLOC_TARGET_TRANSFER_KB ${TARGET_TRANSFER_KB})
+    $(set_define TCMALLOC_USE_UNCLAMPED_TRANSFER_SIZES 1)
     " \
     < $TEMP_DIR/src/windows/config.h \
     > $DEST_CONFIG_DIR/config.h
@@ -112,12 +119,6 @@ if [ ! -d $DEST_DIR/src/gperftools/tcmalloc.h ]; then
     TCMALLOC_H_IN=src/gperftools/tcmalloc.h.in
     TCMALLOC_H_TMP=tcmalloc.h.bak
     cp src/gperftools/tcmalloc.h $TCMALLOC_H
-
-    # Change the autotools subsitution into an ifdef instead
-    for line_number in $(grep -n "@ac_cv_have_struct_mallinfo@" $TCMALLOC_H_IN | cut -d: -f1) ; do
-        sed "${line_number}s/.*/#ifdef HAVE_STRUCT_MALLINFO/" < $TCMALLOC_H > $TCMALLOC_H_TMP
-        cp $TCMALLOC_H_TMP $TCMALLOC_H
-    done
 fi
 
 popd
