@@ -177,7 +177,7 @@ protected:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const override {
-        (*operatorOrientedUpdates)[operatorName().rawData()].emplace_back(
+        (*operatorOrientedUpdates)[operatorName().toString()].emplace_back(
             currentPath->dottedField(), operatorValue());
     }
 

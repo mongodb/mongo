@@ -69,7 +69,7 @@ private:
             BSONObjBuilder subBuilder(bob.subobjStart(""));
             for (const auto[bitOperator, operand] : _opList) {
                 operand.toBSON(
-                    [](const char* bitOperator) {
+                    [](SafeNum (SafeNum::*bitOperator)(const SafeNum&) const) {
                         if (bitOperator == &SafeNum::bitAnd)
                             return "and";
                         if (bitOperator == &SafeNum::bitOr)
