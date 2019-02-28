@@ -66,3 +66,7 @@ server_parameters:
     condition:
       preprocessor: defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 
+  tcmallocEnableMarkThreadTemporarilyIdle:
+    description: 'REMOVED: Setting this parameter has no effect and it will be removed in a future version of MongoDB.'
+    set_at: [ startup, runtime ]
+    cpp_class: TCMallocEnableMarkThreadTemporarilyIdle

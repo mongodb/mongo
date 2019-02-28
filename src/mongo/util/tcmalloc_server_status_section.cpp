@@ -44,18 +44,23 @@
 #include "mongo/db/service_context.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
+#include "mongo/util/tcmalloc_parameters_gen.h"
 
 namespace mongo {
 
-namespace {
+// TODO: Remove these implementations and the associated IDL definition in 4.3.
+void TCMallocEnableMarkThreadTemporarilyIdle::append(OperationContext*,
+                                                     BSONObjBuilder&,
+                                                     const std::string&) {}
 
-MONGO_EXPORT_SERVER_PARAMETER(tcmallocEnableMarkThreadTemporarilyIdle, bool, false)
-    ->withValidator([](const bool& potentialNewValue) {
-        return Status(ErrorCodes::BadValue,
-                      "tcmallocEnableMarkThreadTemporarilyIdle has been removed. Setting this "
-                      "parameter has no effect and it will be removed in a future version of "
-                      "MongoDB.");
-    });
+Status TCMallocEnableMarkThreadTemporarilyIdle::setFromString(const std::string&) {
+    return Status(ErrorCodes::BadValue,
+                  "tcmallocEnableMarkThreadTemporarilyIdle has been removed. Setting this "
+                  "parameter has no effect and it will be removed in a future version of "
+                  "MongoDB.");
+}
+
+namespace {
 
 class TCMallocServerStatusSection : public ServerStatusSection {
 public:
