@@ -60,6 +60,7 @@ IGNORED_SIGNAL(SIGHUP)
 IGNORED_SIGNAL(SIGPIPE)
 FATAL_SIGNAL(SIGQUIT)
 FATAL_SIGNAL(SIGILL)
+FATAL_SIGNAL(SIGABRT)
 
 #if not defined(__has_feature)
 #define __has_feature(X) 0
@@ -67,7 +68,6 @@ FATAL_SIGNAL(SIGILL)
 
 #if !__has_feature(address_sanitizer)
 // These signals trip the leak sanitizer
-FATAL_SIGNAL(SIGABRT)
 FATAL_SIGNAL(SIGSEGV)
 FATAL_SIGNAL(SIGBUS)
 FATAL_SIGNAL(SIGFPE)
