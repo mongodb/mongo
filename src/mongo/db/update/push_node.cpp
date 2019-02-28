@@ -299,7 +299,8 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
     if (_slice) {
         // std::abs(LLONG_MIN) results in undefined behavior on 2's complement systems because the
         // absolute value of LLONG_MIN cannot be represented in a 'long long'.
-        const auto sliceAbs = _slice.get() == std::numeric_limits<decltype(_slice)>::min()
+        const auto sliceAbs =
+            _slice.get() == std::numeric_limits<decltype(_slice)::value_type>::min()
             ? std::abs(_slice.get() + 1)
             : std::abs(_slice.get());
 
