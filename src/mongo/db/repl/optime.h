@@ -91,6 +91,8 @@ public:
     void append(BSONObjBuilder* builder, const std::string& subObjName) const;
     BSONObj toBSON() const;
 
+    static StatusWith<Date_t> parseWallTimeFromOplogEntry(const BSONObj& obj);
+
     static StatusWith<OpTime> parseFromOplogEntry(const BSONObj& obj);
 
     /**
@@ -157,6 +159,7 @@ private:
     Timestamp _timestamp;
     long long _term = kInitialTerm;
 };
+using OpTimeAndWallTime = std::tuple<OpTime, Date_t>;
 
 }  // namespace repl
 

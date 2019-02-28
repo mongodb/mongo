@@ -89,7 +89,8 @@ public:
     virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
     virtual Timestamp getGlobalTimestamp(ServiceContext* service);
     bool oplogExists(OperationContext* opCtx) final;
-    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx);
+    virtual StatusWith<std::tuple<OpTime, Date_t>> loadLastOpTimeAndWallTime(
+        OperationContext* opCtx);
     virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
     virtual void closeConnections();
     virtual void shardingOnStepDownHook();

@@ -40,7 +40,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -388,8 +387,8 @@ void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) {
 }
 
 void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
-    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(1, 1), 0));
-    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(1, 1), 0));
+    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(1, 1), 0));
+    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(1, 1), 0));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->waitForElectionFinish_forTest();
 

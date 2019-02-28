@@ -957,9 +957,15 @@ OpTime TopologyCoordinator::getMyLastAppliedOpTime() const {
     return _selfMemberData().getLastAppliedOpTime();
 }
 
-void TopologyCoordinator::setMyLastAppliedOpTime(OpTime opTime,
-                                                 Date_t now,
-                                                 bool isRollbackAllowed) {
+OpTimeAndWallTime TopologyCoordinator::getMyLastAppliedOpTimeAndWallTime() const {
+    return std::make_tuple(_selfMemberData().getLastAppliedOpTime(),
+                           _selfMemberData().getLastAppliedWallTime());
+}
+
+void TopologyCoordinator::setMyLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                                            Date_t now,
+                                                            bool isRollbackAllowed) {
+    auto opTime = std::get<0>(opTimeAndWallTime);
     auto& myMemberData = _selfMemberData();
     auto myLastAppliedOpTime = myMemberData.getLastAppliedOpTime();
 
@@ -972,19 +978,25 @@ void TopologyCoordinator::setMyLastAppliedOpTime(OpTime opTime,
                   myLastAppliedOpTime.getTerm() == OpTime::kUninitializedTerm ||
                   opTime.getTimestamp() > myLastAppliedOpTime.getTimestamp());
     }
-    myMemberData.setLastAppliedOpTime(opTime, now);
+    myMemberData.setLastAppliedOpTimeAndWallTime(opTimeAndWallTime, now);
 }
 
 OpTime TopologyCoordinator::getMyLastDurableOpTime() const {
     return _selfMemberData().getLastDurableOpTime();
 }
 
-void TopologyCoordinator::setMyLastDurableOpTime(OpTime opTime,
-                                                 Date_t now,
-                                                 bool isRollbackAllowed) {
+OpTimeAndWallTime TopologyCoordinator::getMyLastDurableOpTimeAndWallTime() const {
+    return std::tuple(_selfMemberData().getLastDurableOpTime(),
+                      _selfMemberData().getLastDurableWallTime());
+}
+
+void TopologyCoordinator::setMyLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                                            Date_t now,
+                                                            bool isRollbackAllowed) {
+    auto opTime = std::get<0>(opTimeAndWallTime);
     auto& myMemberData = _selfMemberData();
     invariant(isRollbackAllowed || opTime >= myMemberData.getLastDurableOpTime());
-    myMemberData.setLastDurableOpTime(opTime, now);
+    myMemberData.setLastDurableOpTimeAndWallTime(opTimeAndWallTime, now);
 }
 
 StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::UpdateInfo& args,
@@ -1411,7 +1423,9 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const MemberState myState = getMemberState();
     const Date_t now = rsStatusArgs.now;
     const OpTime lastOpApplied = getMyLastAppliedOpTime();
+    const Date_t lastOpAppliedWall = std::get<1>(getMyLastAppliedOpTimeAndWallTime());
     const OpTime lastOpDurable = getMyLastDurableOpTime();
+    const Date_t lastOpDurableWall = std::get<1>(getMyLastDurableOpTimeAndWallTime());
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
     const boost::optional<Timestamp>& lastStableRecoveryTimestamp =
         rsStatusArgs.lastStableRecoveryTimestamp;
@@ -1585,8 +1599,12 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
         rsStatusArgs.readConcernMajorityOpTime.append(&optimes, "readConcernMajorityOpTime");
     }
 
+
     appendOpTime(&optimes, "appliedOpTime", lastOpApplied);
     appendOpTime(&optimes, "durableOpTime", lastOpDurable);
+    optimes.appendDate("lastAppliedWallTime", lastOpAppliedWall);
+    optimes.appendDate("lastDurableWallTime", lastOpDurableWall);
+
     response->append("optimes", optimes.obj());
     if (lastStableRecoveryTimestamp) {
         // Only include this field if the storage engine supports RTT.

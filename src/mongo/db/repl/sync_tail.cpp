@@ -113,23 +113,23 @@ public:
     ApplyBatchFinalizer(ReplicationCoordinator* replCoord) : _replCoord(replCoord) {}
     virtual ~ApplyBatchFinalizer(){};
 
-    virtual void record(const OpTime& newOpTime,
+    virtual void record(const OpTimeAndWallTime& newOpTimeAndWallTime,
                         ReplicationCoordinator::DataConsistency consistency) {
-        _recordApplied(newOpTime, consistency);
+        _recordApplied(newOpTimeAndWallTime, consistency);
     };
 
 protected:
-    void _recordApplied(const OpTime& newOpTime,
+    void _recordApplied(const OpTimeAndWallTime& newOpTimeAndWallTime,
                         ReplicationCoordinator::DataConsistency consistency) {
-        // We have to use setMyLastAppliedOpTimeForward since this thread races with
+        // We have to use setMyLastAppliedOpTimeAndWallTimeForward since this thread races with
         // ReplicationExternalStateImpl::onTransitionToPrimary.
-        _replCoord->setMyLastAppliedOpTimeForward(newOpTime, consistency);
+        _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(newOpTimeAndWallTime, consistency);
     }
 
-    void _recordDurable(const OpTime& newOpTime) {
+    void _recordDurable(const OpTimeAndWallTime& newOpTimeAndWallTime) {
         // We have to use setMyLastDurableOpTimeForward since this thread races with
         // ReplicationExternalStateImpl::onTransitionToPrimary.
-        _replCoord->setMyLastDurableOpTimeForward(newOpTime);
+        _replCoord->setMyLastDurableOpTimeAndWallTimeForward(newOpTimeAndWallTime);
     }
 
 private:
@@ -144,7 +144,7 @@ public:
           _waiterThread{&ApplyBatchFinalizerForJournal::_run, this} {};
     ~ApplyBatchFinalizerForJournal();
 
-    void record(const OpTime& newOpTime,
+    void record(const OpTimeAndWallTime& newOpTimeAndWallTime,
                 ReplicationCoordinator::DataConsistency consistency) override;
 
 private:
@@ -160,7 +160,7 @@ private:
     // Used to alert our thread of a new OpTime.
     stdx::condition_variable _cond;
     // The next OpTime to set as the ReplicationCoordinator's lastOpTime after flushing.
-    OpTime _latestOpTime;
+    OpTimeAndWallTime _latestOpTimeAndWallTime;
     // Once this is set to true the _run method will terminate.
     bool _shutdownSignaled = false;
     // Thread that will _run(). Must be initialized last as it depends on the other variables.
@@ -176,12 +176,12 @@ ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
     _waiterThread.join();
 }
 
-void ApplyBatchFinalizerForJournal::record(const OpTime& newOpTime,
+void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAndWallTime,
                                            ReplicationCoordinator::DataConsistency consistency) {
-    _recordApplied(newOpTime, consistency);
+    _recordApplied(newOpTimeAndWallTime, consistency);
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _latestOpTime = newOpTime;
+    _latestOpTimeAndWallTime = newOpTimeAndWallTime;
     _cond.notify_all();
 }
 
@@ -189,11 +189,11 @@ void ApplyBatchFinalizerForJournal::_run() {
     Client::initThread("ApplyBatchFinalizerForJournal");
 
     while (true) {
-        OpTime latestOpTime;
+        OpTimeAndWallTime latestOpTimeAndWallTime = std::make_tuple(OpTime(), Date_t::min());
 
         {
             stdx::unique_lock<stdx::mutex> lock(_mutex);
-            while (_latestOpTime.isNull() && !_shutdownSignaled) {
+            while (std::get<0>(_latestOpTimeAndWallTime).isNull() && !_shutdownSignaled) {
                 _cond.wait(lock);
             }
 
@@ -201,13 +201,13 @@ void ApplyBatchFinalizerForJournal::_run() {
                 return;
             }
 
-            latestOpTime = _latestOpTime;
-            _latestOpTime = OpTime();
+            latestOpTimeAndWallTime = _latestOpTimeAndWallTime;
+            _latestOpTimeAndWallTime = std::make_tuple(OpTime(), Date_t::min());
         }
 
         auto opCtx = cc().makeOperationContext();
         opCtx->recoveryUnit()->waitUntilDurable();
-        _recordDurable(latestOpTime);
+        _recordDurable(latestOpTimeAndWallTime);
     }
 }
 
@@ -744,7 +744,9 @@ void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
 
         // Extract some info from ops that we'll need after releasing the batch below.
         const auto firstOpTimeInBatch = ops.front().getOpTime();
-        const auto lastOpTimeInBatch = ops.back().getOpTime();
+        const auto lastOpInBatch = ops.back();
+        const auto lastOpTimeInBatch = lastOpInBatch.getOpTime();
+        const auto lastWallTimeInBatch = lastOpInBatch.getWallClockTime();
         const auto lastAppliedOpTimeAtStartOfBatch = replCoord->getMyLastAppliedOpTime();
 
         // Make sure the oplog doesn't go back in time or repeat an entry.
@@ -801,7 +803,10 @@ void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
         auto consistency = (lastOpTimeInBatch >= minValid)
             ? ReplicationCoordinator::DataConsistency::Consistent
             : ReplicationCoordinator::DataConsistency::Inconsistent;
-        finalizer->record(lastOpTimeInBatch, consistency);
+        // Wall clock time is non-optional post 3.6.
+        invariant(lastWallTimeInBatch);
+        finalizer->record(std::make_tuple(lastOpTimeInBatch, lastWallTimeInBatch.get()),
+                          consistency);
     }
 }
 

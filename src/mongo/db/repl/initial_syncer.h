@@ -85,8 +85,8 @@ struct InitialSyncerOptions {
     using GetMyLastOptimeFn = stdx::function<OpTime()>;
 
     /** Function to update optime of last operation applied on this node */
-    using SetMyLastOptimeFn =
-        stdx::function<void(const OpTime&, ReplicationCoordinator::DataConsistency consistency)>;
+    using SetMyLastOptimeFn = stdx::function<void(
+        const OpTimeAndWallTime&, ReplicationCoordinator::DataConsistency consistency)>;
 
     /** Function to reset all optimes on this node (e.g. applied & durable). */
     using ResetOptimesFn = stdx::function<void()>;
@@ -145,12 +145,13 @@ public:
     /**
      * Callback function to report last applied optime of initial sync.
      */
-    typedef stdx::function<void(const StatusWith<OpTime>& lastApplied)> OnCompletionFn;
+    typedef stdx::function<void(const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied)>
+        OnCompletionFn;
 
     /**
      * Callback completion guard for initial syncer.
      */
-    using OnCompletionGuard = CallbackCompletionGuard<StatusWith<OpTime>>;
+    using OnCompletionGuard = CallbackCompletionGuard<StatusWith<std::tuple<OpTime, Date_t>>>;
 
     using StartCollectionClonerFn = DatabaseCloner::StartCollectionClonerFn;
 
@@ -241,6 +242,12 @@ public:
      * For testing only.
      */
     State getState_forTest() const;
+
+    /**
+     * Returns the wall clock time component of _lastApplied.
+     * For testing only.
+     */
+    Date_t getWallClockTime_forTest() const;
 
 private:
     /**
@@ -363,7 +370,8 @@ private:
     /**
      * Tears down internal state before reporting final status to caller.
      */
-    void _tearDown_inlock(OperationContext* opCtx, const StatusWith<OpTime>& lastApplied);
+    void _tearDown_inlock(OperationContext* opCtx,
+                          const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied);
 
     /**
      * Callback to start a single initial sync attempt.
@@ -464,7 +472,7 @@ private:
      * Callback for MultiApplier completion.
      */
     void _multiApplierCallback(const Status& status,
-                               OpTime lastApplied,
+                               std::tuple<OpTime, Date_t> lastApplied,
                                std::uint32_t numApplied,
                                std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
@@ -490,12 +498,12 @@ private:
      * Reports result of current initial sync attempt. May schedule another initial sync attempt
      * depending on shutdown state and whether we've exhausted all initial sync retries.
      */
-    void _finishInitialSyncAttempt(const StatusWith<OpTime>& lastApplied);
+    void _finishInitialSyncAttempt(const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied);
 
     /**
      * Invokes completion callback and transitions state to State::kComplete.
      */
-    void _finishCallback(StatusWith<OpTime> lastApplied);
+    void _finishCallback(StatusWith<std::tuple<OpTime, Date_t>> lastApplied);
 
     // Obtains a valid sync source from the sync source selector.
     // Returns error if a sync source cannot be found.
@@ -642,7 +650,7 @@ private:
     std::unique_ptr<MultiApplier> _applier;               // (M)
     HostAndPort _syncSource;                              // (M)
     OpTime _lastFetched;                                  // (MX)
-    OpTime _lastApplied;                                  // (MX)
+    std::tuple<OpTime, Date_t> _lastApplied;              // (MX)
     std::unique_ptr<OplogBuffer> _oplogBuffer;            // (M)
     std::unique_ptr<OplogApplier::Observer> _observer;    // (S)
     std::unique_ptr<OplogApplier> _oplogApplier;          // (M)

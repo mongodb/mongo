@@ -149,14 +149,27 @@ StatusWith<Timestamp> parseTimestampStatus(const QueryResponseStatus& fetchResul
     }
 }
 
-StatusWith<OpTime> parseOpTime(const QueryResponseStatus& fetchResult) {
+StatusWith<std::tuple<OpTime, Date_t>> parseOpTimeAndWallTime(
+    const QueryResponseStatus& fetchResult) {
     if (!fetchResult.isOK()) {
         return fetchResult.getStatus();
     }
     const auto docs = fetchResult.getValue().documents;
     const auto hasDoc = docs.begin() != docs.end();
-    return hasDoc ? OpTime::parseFromOplogEntry(docs.front())
-                  : StatusWith<OpTime>{ErrorCodes::NoMatchingDocument, "no oplog entry found"};
+    if (!hasDoc) {
+        return StatusWith<std::tuple<OpTime, Date_t>>{ErrorCodes::NoMatchingDocument,
+                                                      "no oplog entry found"};
+    }
+
+    auto opTimeStatus = OpTime::parseFromOplogEntry(docs.front());
+    if (!opTimeStatus.getStatus().isOK()) {
+        return opTimeStatus.getStatus();
+    }
+    auto wallTimeStatus = OpTime::parseWallTimeFromOplogEntry(docs.front());
+    if (!wallTimeStatus.getStatus().isOK()) {
+        return wallTimeStatus.getStatus();
+    }
+    return std::make_tuple(opTimeStatus.getValue(), wallTimeStatus.getValue());
 }
 
 /**
@@ -305,6 +318,11 @@ InitialSyncer::State InitialSyncer::getState_forTest() const {
     return _state;
 }
 
+Date_t InitialSyncer::getWallClockTime_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return std::get<1>(_lastApplied);
+}
+
 bool InitialSyncer::_isShuttingDown() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _isShuttingDown_inlock();
@@ -402,7 +420,7 @@ void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initial
 }
 
 void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
-                                     const StatusWith<OpTime>& lastApplied) {
+                                     const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied) {
     _stats.initialSyncEnd = _exec->now();
 
     // This might not be necessary if we failed initial sync.
@@ -412,27 +430,27 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     if (!lastApplied.isOK()) {
         return;
     }
+    const auto lastAppliedOpTime = std::get<0>(lastApplied.getValue());
 
     // A node coming out of initial sync must guarantee at least one oplog document is visible
     // such that others can sync from this node. Oplog visibility is not rigorously advanced
     // during initial sync. Correct the visibility to match the initial sync time before
     // transitioning to steady state replication.
     const bool orderedCommit = true;
-    _storage->oplogDiskLocRegister(opCtx, lastApplied.getValue().getTimestamp(), orderedCommit);
+    _storage->oplogDiskLocRegister(opCtx, lastAppliedOpTime.getTimestamp(), orderedCommit);
 
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
 
     // All updates that represent initial sync must be completed before setting the initial data
     // timestamp.
-    _storage->setInitialDataTimestamp(opCtx->getServiceContext(),
-                                      lastApplied.getValue().getTimestamp());
+    _storage->setInitialDataTimestamp(opCtx->getServiceContext(), lastAppliedOpTime.getTimestamp());
 
     auto currentLastAppliedOpTime = _opts.getMyLastOptime();
     if (currentLastAppliedOpTime.isNull()) {
         _opts.setMyLastOptime(lastApplied.getValue(),
                               ReplicationCoordinator::DataConsistency::Consistent);
     } else {
-        invariant(currentLastAppliedOpTime == lastApplied.getValue());
+        invariant(currentLastAppliedOpTime == lastAppliedOpTime);
     }
 
     log() << "initial sync done; took "
@@ -459,9 +477,10 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
 
     // This completion guard invokes _finishInitialSyncAttempt on destruction.
     auto cancelRemainingWorkInLock = [this]() { _cancelRemainingWork_inlock(); };
-    auto finishInitialSyncAttemptFn = [this](const StatusWith<OpTime>& lastApplied) {
-        _finishInitialSyncAttempt(lastApplied);
-    };
+    auto finishInitialSyncAttemptFn =
+        [this](const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied) {
+            _finishInitialSyncAttempt(lastApplied);
+        };
     auto onCompletionGuard =
         std::make_shared<OnCompletionGuard>(cancelRemainingWorkInLock, finishInitialSyncAttemptFn);
 
@@ -476,7 +495,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
 
     LOG(2) << "Resetting all optimes before starting this initial sync attempt.";
     _opts.resetOptimes();
-    _lastApplied = {};
+    _lastApplied = std::make_tuple(OpTime(), Date_t::min());
     _lastFetched = {};
 
     LOG(2) << "Resetting feature compatibility version to last-stable. If the sync source is in "
@@ -706,14 +725,14 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
         return;
     }
 
-    const auto opTimeResult = parseOpTime(result);
+    const auto opTimeResult = parseOpTimeAndWallTime(result);
     status = opTimeResult.getStatus();
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
         return;
     }
 
-    const auto& lastOpTime = opTimeResult.getValue();
+    const auto& lastOpTime = std::get<0>(opTimeResult.getValue());
 
     BSONObjBuilder queryBob;
     queryBob.append("find", NamespaceString::kServerConfigurationNamespace.coll());
@@ -1006,7 +1025,7 @@ void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishS
 void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
     const StatusWith<Fetcher::QueryResponse>& result,
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
-    OpTime optime;
+    auto resultOpTimeAndWallTime = std::make_tuple(OpTime(), Date_t::min());
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         auto status = _checkForShutdownAndConvertStatus_inlock(
@@ -1016,20 +1035,21 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
             return;
         }
 
-        auto&& optimeStatus = parseOpTime(result);
+        auto&& optimeStatus = parseOpTimeAndWallTime(result);
         if (!optimeStatus.isOK()) {
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock,
                                                                       optimeStatus.getStatus());
             return;
         }
-        optime = optimeStatus.getValue();
-        _initialSyncState->stopTimestamp = optime.getTimestamp();
+        resultOpTimeAndWallTime = optimeStatus.getValue();
+
+        _initialSyncState->stopTimestamp = std::get<0>(resultOpTimeAndWallTime).getTimestamp();
 
         // If the beginFetchingTimestamp is different from the stopTimestamp, it indicates that
         // there are oplog entries fetched by the oplog fetcher that need to be written to the oplog
         // and/or there are operations that need to be applied.
         if (_initialSyncState->beginFetchingTimestamp != _initialSyncState->stopTimestamp) {
-            invariant(_lastApplied.isNull());
+            invariant(std::get<0>(_lastApplied).isNull());
             _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(lock, onCompletionGuard);
             return;
         }
@@ -1048,22 +1068,23 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         // override its behavior in tests. See InitialSyncerReturnsCallbackCanceledAndDoesNot-
         // ScheduleRollbackCheckerIfShutdownAfterInsertingInsertOplogSeedDocument in
         // initial_syncer_test.cpp
-        auto status =
-            _storage->insertDocument(opCtx.get(),
-                                     _opts.localOplogNS,
-                                     TimestampedBSONObj{oplogSeedDoc, optime.getTimestamp()},
-                                     optime.getTerm());
+        auto status = _storage->insertDocument(
+            opCtx.get(),
+            _opts.localOplogNS,
+            TimestampedBSONObj{oplogSeedDoc, std::get<0>(resultOpTimeAndWallTime).getTimestamp()},
+            std::get<0>(resultOpTimeAndWallTime).getTerm());
         if (!status.isOK()) {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
             return;
         }
         const bool orderedCommit = true;
-        _storage->oplogDiskLocRegister(opCtx.get(), optime.getTimestamp(), orderedCommit);
+        _storage->oplogDiskLocRegister(
+            opCtx.get(), std::get<0>(resultOpTimeAndWallTime).getTimestamp(), orderedCommit);
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _lastApplied = optime;
+    _lastApplied = resultOpTimeAndWallTime;
     log() << "No need to apply operations. (currently at "
           << _initialSyncState->stopTimestamp.toBSON() << ")";
 
@@ -1112,9 +1133,13 @@ void InitialSyncer::_getNextApplierBatchCallback(
             return _oplogApplier->multiApply(opCtx, std::move(ops));
         };
         OpTime lastApplied = ops.back().getOpTime();
+        invariant(ops.back().getWallClockTime());
+        Date_t lastAppliedWall = ops.back().getWallClockTime().get();
+
         auto numApplied = ops.size();
         MultiApplier::CallbackFn onCompletionFn = [=](const Status& s) {
-            return _multiApplierCallback(s, lastApplied, numApplied, onCompletionGuard);
+            return _multiApplierCallback(
+                s, std::make_tuple(lastApplied, lastAppliedWall), numApplied, onCompletionGuard);
         };
 
         _applier = stdx::make_unique<MultiApplier>(
@@ -1134,7 +1159,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
         std::string msg = str::stream()
             << "The oplog fetcher is no longer running and we have applied all the oplog entries "
                "in the oplog buffer. Aborting this initial sync attempt. Last applied: "
-            << _lastApplied.toString() << ". Last fetched: " << _lastFetched.toString()
+            << std::get<0>(_lastApplied).toString() << ". Last fetched: " << _lastFetched.toString()
             << ". Number of operations applied: " << _initialSyncState->appliedOps;
         log() << msg;
         status = Status(ErrorCodes::RemoteResultsUnavailable, msg);
@@ -1158,7 +1183,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
 }
 
 void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
-                                          OpTime lastApplied,
+                                          std::tuple<OpTime, Date_t> lastApplied,
                                           std::uint32_t numApplied,
                                           std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -1172,6 +1197,7 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
 
     _initialSyncState->appliedOps += numApplied;
     _lastApplied = lastApplied;
+    const auto lastAppliedOpTime = std::get<0>(_lastApplied);
     _opts.setMyLastOptime(_lastApplied, ReplicationCoordinator::DataConsistency::Inconsistent);
 
     // Update oplog visibility after applying a batch so that while applying transaction oplog
@@ -1183,7 +1209,7 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
     // oplog visibility timestamp.
     auto opCtx = makeOpCtx();
     const bool orderedCommit = true;
-    _storage->oplogDiskLocRegister(opCtx.get(), lastApplied.getTimestamp(), orderedCommit);
+    _storage->oplogDiskLocRegister(opCtx.get(), lastAppliedOpTime.getTimestamp(), orderedCommit);
 
     auto fetchCount = _fetchCount.load();
     if (fetchCount > 0) {
@@ -1219,14 +1245,14 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackAfterFetchingMissingDocuments(
         return;
     }
 
-    auto&& optimeStatus = parseOpTime(result);
+    auto&& optimeStatus = parseOpTimeAndWallTime(result);
     if (!optimeStatus.isOK()) {
         error() << "Failed to parse new minValid from source " << _syncSource << " due to '"
                 << redact(optimeStatus.getStatus()) << "'";
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, optimeStatus.getStatus());
         return;
     }
-    auto&& optime = optimeStatus.getValue();
+    auto&& optime = std::get<0>(optimeStatus.getValue());
 
     const auto newOplogEnd = optime.getTimestamp();
     LOG(2) << "Pushing back minValid from " << _initialSyncState->stopTimestamp << " to "
@@ -1275,7 +1301,8 @@ void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
     onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, _lastApplied);
 }
 
-void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTime>& lastApplied) {
+void InitialSyncer::_finishInitialSyncAttempt(
+    const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied) {
     // Since _finishInitialSyncAttempt can be called from any component's callback function or
     // scheduled task, it is possible that we may not be in a TaskExecutor-managed thread when this
     // function is invoked.
@@ -1362,7 +1389,7 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTime>& lastAppl
     finishCallbackGuard.dismiss();
 }
 
-void InitialSyncer::_finishCallback(StatusWith<OpTime> lastApplied) {
+void InitialSyncer::_finishCallback(StatusWith<std::tuple<OpTime, Date_t>> lastApplied) {
     // After running callback function, clear '_onCompletion' to release any resources that might be
     // held by this function object.
     // '_onCompletion' must be moved to a temporary copy and destroyed outside the lock in case
@@ -1458,7 +1485,7 @@ void InitialSyncer::_checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
         return;
     }
 
-    if (_lastApplied.isNull()) {
+    if (std::get<0>(_lastApplied).isNull()) {
         // Check if any ops occurred while cloning or any ops need to be fetched.
         invariant(_initialSyncState->beginFetchingTimestamp < _initialSyncState->stopTimestamp);
         log() << "Writing to the oplog and applying operations until "
@@ -1467,9 +1494,9 @@ void InitialSyncer::_checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
               << _initialSyncState->beginFetchingTimestamp.toBSON() << " and applying at "
               << _initialSyncState->beginApplyingTimestamp.toBSON() << ")";
         // Fall through to scheduling _getNextApplierBatchCallback().
-    } else if (_lastApplied.getTimestamp() >= _initialSyncState->stopTimestamp) {
+    } else if (std::get<0>(_lastApplied).getTimestamp() >= _initialSyncState->stopTimestamp) {
         // Check for rollback if we have applied far enough to be consistent.
-        invariant(!_lastApplied.getTimestamp().isNull());
+        invariant(!std::get<0>(_lastApplied).getTimestamp().isNull());
         _scheduleRollbackCheckerCheckForRollback_inlock(lock, onCompletionGuard);
         return;
     }

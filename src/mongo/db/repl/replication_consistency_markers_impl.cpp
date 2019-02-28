@@ -144,7 +144,8 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
     LOG(3) << "clearing initial sync flag";
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    OpTime time = replCoord->getMyLastAppliedOpTime();
+    OpTimeAndWallTime opTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
+    const auto time = std::get<0>(opTimeAndWallTime);
     TimestampedBSONObj update;
     update.obj = BSON("$unset" << kInitialSyncFlag << "$set"
                                << BSON(MinValidDocument::kMinValidTimestampFieldName
@@ -170,7 +171,7 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
 
     if (getGlobalServiceContext()->getStorageEngine()->isDurable()) {
         opCtx->recoveryUnit()->waitUntilDurable();
-        replCoord->setMyLastDurableOpTime(time);
+        replCoord->setMyLastDurableOpTimeAndWallTime(opTimeAndWallTime);
     }
 }
 

@@ -185,10 +185,11 @@ public:
     virtual bool oplogExists(OperationContext* opCtx) = 0;
 
     /**
-     * Gets the last optime of an operation performed on this host, from stable
-     * storage.
+     * Gets the last optime, and corresponding wall clock time, of an operation performed on this
+     * host, from stable storage.
      */
-    virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx) = 0;
+    virtual StatusWith<std::tuple<OpTime, Date_t>> loadLastOpTimeAndWallTime(
+        OperationContext* opCtx) = 0;
 
     /**
      * Returns the HostAndPort of the remote client connected to us that initiated the operation

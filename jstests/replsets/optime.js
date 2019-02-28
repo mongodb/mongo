@@ -1,4 +1,5 @@
 // Tests tracking of latestOptime and earliestOptime in serverStatus.oplog
+// Also tests tracking of wall clock times in replSetGetStatus
 
 function timestampCompare(o1, o2) {
     if (o1.t < o2.t) {
@@ -16,18 +17,40 @@ function timestampCompare(o1, o2) {
     }
 }
 
-function optimesAreEqual(replTest) {
-    var prevStatus = replTest.nodes[0].getDB('admin').serverStatus({oplog: true}).oplog;
+function wallTimeCompare(d1, d2) {
+    if (d1 < d2) {
+        return -1;
+    } else if (d1 > d2) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+function optimesAndWallTimesAreEqual(replTest) {
+    let prevReplStatus = replTest.nodes[0].getDB('admin').runCommand({replSetGetStatus: 1});
+    let prevOptime = prevReplStatus.optimes.appliedOpTime.ts;
+    let prevAppliedWallTime = prevReplStatus.optimes.lastAppliedWallTime;
+    let prevDurableWallTime = prevReplStatus.optimes.lastDurableWallTime;
     for (var i = 1; i < replTest.nodes.length; i++) {
-        var status = replTest.nodes[i].getDB('admin').serverStatus({oplog: true}).oplog;
-        if (timestampCompare(prevStatus.latestOptime, status.latestOptime) != 0) {
-            jsTest.log("optimesAreEqual returning false match, prevOptime: " +
-                       prevStatus.latestOptime + " latestOptime: " + status.latestOptime);
+        let currentReplStatus = replTest.nodes[i].getDB('admin').runCommand({replSetGetStatus: 1});
+        let currOptime = currentReplStatus.optimes.appliedOpTime.ts;
+        let currAppliedWallTime = currentReplStatus.optimes.lastAppliedWallTime;
+        let currDurableWallTime = currentReplStatus.optimes.lastDurableWallTime;
+        if (timestampCompare(prevOptime, currOptime) != 0 ||
+            wallTimeCompare(prevAppliedWallTime, currAppliedWallTime) != 0 ||
+            (jsTest.options().storageEngine !== "inMemory") &&
+                wallTimeCompare(prevDurableWallTime, currDurableWallTime) != 0) {
+            jsTest.log("optimesAndWallTimesAreEqual returning false match, prevOptime: " +
+                       prevOptime + " latestOptime: " + currOptime + " prevAppliedWallTime: " +
+                       prevAppliedWallTime + " latestWallTime: " + currAppliedWallTime +
+                       " prevDurableWallTime: " + prevDurableWallTime + " latestDurableWallTime: " +
+                       currDurableWallTime);
             replTest.dumpOplog(replTest.nodes[i], {}, 20);
             replTest.dumpOplog(replTest.nodes[i - 1], {}, 20);
             return false;
         }
-        prevStatus = status;
+        prevReplStatus = currentReplStatus;
     }
     return true;
 }
@@ -44,17 +67,27 @@ replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
 
 // Check initial optimes
-assert(optimesAreEqual(replTest));
+assert(optimesAndWallTimesAreEqual(replTest));
 var initialInfo = master.getDB('admin').serverStatus({oplog: true}).oplog;
+let initialReplStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 1});
 
 // Do an insert to increment optime, but without rolling the oplog
 // latestOptime should be updated, but earliestOptime should be unchanged
 var options = {writeConcern: {w: replTest.nodes.length}};
 assert.writeOK(master.getDB('test').foo.insert({a: 1}, options));
-assert(optimesAreEqual(replTest));
+assert(optimesAndWallTimesAreEqual(replTest));
 
 var info = master.getDB('admin').serverStatus({oplog: true}).oplog;
+let replStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 1});
 assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0);
+assert.gt(wallTimeCompare(replStatusInfo.optimes.lastAppliedWallTime,
+                          initialReplStatusInfo.optimes.lastAppliedWallTime),
+          0);
+if (jsTest.options().storageEngine !== "inMemory") {
+    assert.gt(wallTimeCompare(replStatusInfo.optimes.lastDurableWallTime,
+                              initialReplStatusInfo.optimes.lastDurableWallTime),
+              0);
+}
 assert.eq(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0);
 
 // Insert some large documents to force the oplog to roll over
@@ -63,14 +96,20 @@ for (var i = 0; i < 2000; i++) {
     master.getDB('test').foo.insert({largeString: largeString}, options);
 }
 assert.soon(function() {
-    return optimesAreEqual(replTest);
+    return optimesAndWallTimesAreEqual(replTest);
 });
 
 // This block requires a fresh stable checkpoint.
 assert.soon(function() {
     // Test that earliestOptime was updated
     info = master.getDB('admin').serverStatus({oplog: true}).oplog;
+    replStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 1});
     return timestampCompare(info.latestOptime, initialInfo.latestOptime) > 0 &&
+        wallTimeCompare(replStatusInfo.optimes.lastAppliedWallTime,
+                        initialReplStatusInfo.optimes.lastAppliedWallTime) > 0 &&
+        ((jsTest.options().storageEngine == "inMemory") ||
+         wallTimeCompare(replStatusInfo.optimes.lastDurableWallTime,
+                         initialReplStatusInfo.optimes.lastDurableWallTime) > 0) &&
         timestampCompare(info.earliestOptime, initialInfo.earliestOptime) > 0;
 });
 

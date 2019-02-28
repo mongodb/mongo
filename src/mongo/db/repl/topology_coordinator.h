@@ -447,6 +447,7 @@ public:
      * Returns the last optime that this node has applied, whether or not it has been journaled.
      */
     OpTime getMyLastAppliedOpTime() const;
+    OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const;
 
     /*
      * Sets the last optime that this node has applied, whether or not it has been journaled. Fails
@@ -454,12 +455,15 @@ public:
      * backwards. The Date_t 'now' is used to track liveness; setting a node's applied optime
      * updates its liveness information.
      */
-    void setMyLastAppliedOpTime(OpTime opTime, Date_t now, bool isRollbackAllowed);
+    void setMyLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                           Date_t now,
+                                           bool isRollbackAllowed);
 
     /*
      * Returns the last optime that this node has applied and journaled.
      */
     OpTime getMyLastDurableOpTime() const;
+    OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const;
 
     /*
      * Sets the last optime that this node has applied and journaled. Fails with an invariant if
@@ -467,7 +471,9 @@ public:
      * 'now' is used to track liveness; setting a node's durable optime updates its liveness
      * information.
      */
-    void setMyLastDurableOpTime(OpTime opTime, Date_t now, bool isRollbackAllowed);
+    void setMyLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
+                                           Date_t now,
+                                           bool isRollbackAllowed);
 
     /*
      * Sets the last optimes for a node, other than this node, based on the data from a

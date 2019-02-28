@@ -114,18 +114,25 @@ public:
         const CommitQuorumOptions& commitQuorum,
         const std::vector<HostAndPort>& commitReadyMembers) const override;
 
-    void setMyLastAppliedOpTime(const repl::OpTime&) override;
-    void setMyLastDurableOpTime(const repl::OpTime&) override;
+    void setMyLastAppliedOpTimeAndWallTime(
+        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
+    void setMyLastDurableOpTimeAndWallTime(
+        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
+    void setMyLastAppliedOpTimeAndWallTimeForward(const repl::OpTimeAndWallTime& opTimeAndWallTime,
+                                                  DataConsistency consistency) override;
+    void setMyLastDurableOpTimeAndWallTimeForward(
+        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
 
-    void setMyLastAppliedOpTimeForward(const repl::OpTime&, DataConsistency) override;
-    void setMyLastDurableOpTimeForward(const repl::OpTime&) override;
 
     void resetMyLastOpTimes() override;
 
     void setMyHeartbeatMessage(const std::string&) override;
 
     repl::OpTime getMyLastAppliedOpTime() const override;
+    repl::OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const override;
+
     repl::OpTime getMyLastDurableOpTime() const override;
+    repl::OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;
 
     Status waitUntilOpTimeForReadUntil(OperationContext*,
                                        const repl::ReadConcernArgs&,

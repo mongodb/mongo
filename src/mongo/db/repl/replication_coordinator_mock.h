@@ -125,17 +125,22 @@ public:
 
     virtual bool shouldRelaxIndexConstraints(OperationContext* opCtx, const NamespaceString& ns);
 
-    virtual void setMyLastAppliedOpTime(const OpTime& opTime);
-    virtual void setMyLastDurableOpTime(const OpTime& opTime);
+    virtual void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
+    virtual void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime);
 
-    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime, DataConsistency consistency);
-    virtual void setMyLastDurableOpTimeForward(const OpTime& opTime);
+    virtual void setMyLastAppliedOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime, DataConsistency consistency);
+    virtual void setMyLastDurableOpTimeAndWallTimeForward(
+        const OpTimeAndWallTime& opTimeAndWallTime);
 
     virtual void resetMyLastOpTimes();
 
     virtual void setMyHeartbeatMessage(const std::string& msg);
 
+    virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const;
     virtual OpTime getMyLastAppliedOpTime() const;
+
+    virtual OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const;
     virtual OpTime getMyLastDurableOpTime() const;
 
     virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
@@ -306,7 +311,9 @@ private:
     StorageInterface* _storage = nullptr;
     MemberState _memberState;
     OpTime _myLastDurableOpTime;
+    Date_t _myLastDurableWallTime;
     OpTime _myLastAppliedOpTime;
+    Date_t _myLastAppliedWallTime;
     ReplSetConfig _getConfigReturnValue;
     AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [](const OpTime&) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));

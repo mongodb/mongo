@@ -308,10 +308,11 @@ InitialSyncerOptions createInitialSyncerOptions(
     ReplicationCoordinator* replCoord, ReplicationCoordinatorExternalState* externalState) {
     InitialSyncerOptions options;
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
-    options.setMyLastOptime = [replCoord, externalState](
-        const OpTime& opTime, ReplicationCoordinator::DataConsistency consistency) {
+    options.setMyLastOptime = [replCoord,
+                               externalState](const OpTimeAndWallTime& opTimeAndWallTime,
+                                              ReplicationCoordinator::DataConsistency consistency) {
         // Note that setting the last applied opTime forward also advances the global timestamp.
-        replCoord->setMyLastAppliedOpTimeForward(opTime, consistency);
+        replCoord->setMyLastAppliedOpTimeAndWallTimeForward(opTimeAndWallTime, consistency);
     };
     options.resetOptimes = [replCoord]() { replCoord->resetMyLastOpTimes(); };
     options.syncSourceSelector = replCoord;
@@ -504,14 +505,14 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     // Read the last op from the oplog after cleaning up any partially applied batches.
     const auto stableTimestamp = boost::none;
     _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
-    auto lastOpTimeStatus = _externalState->loadLastOpTime(opCtx);
+    const auto lastOpTimeAndWallTimeResult = _externalState->loadLastOpTimeAndWallTime(opCtx);
 
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
     auto handle =
         _replExecutor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& args) {
-            _finishLoadLocalConfig(args, localConfig, lastOpTimeStatus, lastVote);
+            _finishLoadLocalConfig(args, localConfig, lastOpTimeAndWallTimeResult, lastVote);
         });
     if (handle == ErrorCodes::ShutdownInProgress) {
         handle = CallbackHandle{};
@@ -526,7 +527,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
 void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& localConfig,
-    const StatusWith<OpTime>& lastOpTimeStatus,
+    const StatusWith<std::tuple<OpTime, Date_t>>& lastOpTimeAndWallTimeStatus,
     const StatusWith<LastVote>& lastVoteStatus) {
     if (!cbData.status.isOK()) {
         LOG(1) << "Loading local replica set configuration failed due to " << cbData.status;
@@ -572,13 +573,14 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     // Do not check optime, if this node is an arbiter.
     bool isArbiter =
         myIndex.getValue() != -1 && localConfig.getMemberAt(myIndex.getValue()).isArbiter();
-    OpTime lastOpTime;
+    OpTimeAndWallTime lastOpTimeAndWallTime = std::make_tuple(OpTime(), Date_t::min());
     if (!isArbiter) {
-        if (!lastOpTimeStatus.isOK()) {
-            warning() << "Failed to load timestamp of most recently applied operation: "
-                      << lastOpTimeStatus.getStatus();
+        if (!lastOpTimeAndWallTimeStatus.isOK()) {
+            warning() << "Failed to load timestamp and/or wall clock time of most recently applied "
+                         "operation: "
+                      << lastOpTimeAndWallTimeStatus.getStatus();
         } else {
-            lastOpTime = lastOpTimeStatus.getValue();
+            lastOpTimeAndWallTime = lastOpTimeAndWallTimeStatus.getValue();
         }
     } else {
         // The node is an arbiter hence will not need logical clock for external operations.
@@ -588,6 +590,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     }
 
+    const auto lastOpTime = std::get<0>(lastOpTimeAndWallTime);
     // Restore the current term according to the terms of last oplog entry and last vote.
     // The initial term of OpTime() is 0.
     long long term = lastOpTime.getTerm();
@@ -623,8 +626,9 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     // Set our last applied and durable optimes to the top of the oplog, if we have one.
     if (!lastOpTime.isNull()) {
         bool isRollbackAllowed = false;
-        _setMyLastAppliedOpTime(lock, lastOpTime, isRollbackAllowed, consistency);
-        _setMyLastDurableOpTime(lock, lastOpTime, isRollbackAllowed);
+        _setMyLastAppliedOpTimeAndWallTime(
+            lock, lastOpTimeAndWallTime, isRollbackAllowed, consistency);
+        _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
         _reportUpstream_inlock(std::move(lock));  // unlocks _mutex.
     } else {
         lock.unlock();
@@ -687,42 +691,45 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         return;
     }
 
-    auto onCompletion = [this, startCompleted](const StatusWith<OpTime>& status) {
-        {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
-            if (status == ErrorCodes::CallbackCanceled) {
-                log() << "Initial Sync has been cancelled: " << status.getStatus();
-                return;
-            } else if (!status.isOK()) {
-                if (_inShutdown) {
-                    log() << "Initial Sync failed during shutdown due to " << status.getStatus();
+    auto onCompletion =
+        [this, startCompleted](const StatusWith<std::tuple<OpTime, Date_t>>& opTimeStatus) {
+            {
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                if (opTimeStatus == ErrorCodes::CallbackCanceled) {
+                    log() << "Initial Sync has been cancelled: " << opTimeStatus.getStatus();
                     return;
-                } else {
-                    error() << "Initial sync failed, shutting down now. Restart the server "
-                               "to attempt a new initial sync.";
-                    fassertFailedWithStatusNoTrace(40088, status.getStatus());
+                } else if (!opTimeStatus.isOK()) {
+                    if (_inShutdown) {
+                        log() << "Initial Sync failed during shutdown due to "
+                              << opTimeStatus.getStatus();
+                        return;
+                    } else {
+                        error() << "Initial sync failed, shutting down now. Restart the server "
+                                   "to attempt a new initial sync.";
+                        fassertFailedWithStatusNoTrace(40088, opTimeStatus.getStatus());
+                    }
                 }
+
+                const auto lastApplied = opTimeStatus.getValue();
+                _setMyLastAppliedOpTimeAndWallTime(
+                    lock, lastApplied, false, DataConsistency::Consistent);
             }
 
-            const auto lastApplied = status.getValue();
-            _setMyLastAppliedOpTime(lock, lastApplied, false, DataConsistency::Consistent);
-        }
+            // Clear maint. mode.
+            while (getMaintenanceMode()) {
+                setMaintenanceMode(false).transitional_ignore();
+            }
 
-        // Clear maint. mode.
-        while (getMaintenanceMode()) {
-            setMaintenanceMode(false).transitional_ignore();
-        }
-
-        if (startCompleted) {
-            startCompleted();
-        }
-        // Because initial sync completed, we can only be in STARTUP2, not REMOVED.
-        // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
-        invariant(getMemberState().startup2());
-        invariant(setFollowerMode(MemberState::RS_RECOVERING));
-        auto opCtxHolder = cc().makeOperationContext();
-        _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
-    };
+            if (startCompleted) {
+                startCompleted();
+            }
+            // Because initial sync completed, we can only be in STARTUP2, not REMOVED.
+            // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
+            invariant(getMemberState().startup2());
+            invariant(setFollowerMode(MemberState::RS_RECOVERING));
+            auto opCtxHolder = cc().makeOperationContext();
+            _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
+        };
 
     std::shared_ptr<InitialSyncer> initialSyncerCopy;
     try {
@@ -1069,16 +1076,17 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
     _topCoord->setMyHeartbeatMessage(_replExecutor->now(), msg);
 }
 
-void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opTime,
-                                                               DataConsistency consistency) {
+void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime& opTimeAndWallTime, DataConsistency consistency) {
     // Update the global timestamp before setting the last applied opTime forward so the last
     // applied optime is never greater than the latest cluster time in the logical clock.
+    const auto opTime = std::get<0>(opTimeAndWallTime);
     _externalState->setGlobalTimestamp(getServiceContext(), opTime.getTimestamp());
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     auto myLastAppliedOpTime = _getMyLastAppliedOpTime_inlock();
     if (opTime > myLastAppliedOpTime) {
-        _setMyLastAppliedOpTime(lock, opTime, false, consistency);
+        _setMyLastAppliedOpTimeAndWallTime(lock, opTimeAndWallTime, false, consistency);
         _reportUpstream_inlock(std::move(lock));
     } else {
         if (opTime != myLastAppliedOpTime) {
@@ -1099,28 +1107,32 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opT
     }
 }
 
-void ReplicationCoordinatorImpl::setMyLastDurableOpTimeForward(const OpTime& opTime) {
+void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    if (opTime > _getMyLastDurableOpTime_inlock()) {
-        _setMyLastDurableOpTime(lock, opTime, false);
+    if (std::get<0>(opTimeAndWallTime) > _getMyLastDurableOpTime_inlock()) {
+        _setMyLastDurableOpTimeAndWallTime(lock, opTimeAndWallTime, false);
         _reportUpstream_inlock(std::move(lock));
     }
 }
 
-void ReplicationCoordinatorImpl::setMyLastAppliedOpTime(const OpTime& opTime) {
+void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTime(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
+    const auto opTime = std::get<0>(opTimeAndWallTime);
     // Update the global timestamp before setting the last applied opTime forward so the last
     // applied optime is never greater than the latest cluster time in the logical clock.
     _externalState->setGlobalTimestamp(getServiceContext(), opTime.getTimestamp());
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     // The optime passed to this function is required to represent a consistent database state.
-    _setMyLastAppliedOpTime(lock, opTime, false, DataConsistency::Consistent);
+    _setMyLastAppliedOpTimeAndWallTime(lock, opTimeAndWallTime, false, DataConsistency::Consistent);
     _reportUpstream_inlock(std::move(lock));
 }
 
-void ReplicationCoordinatorImpl::setMyLastDurableOpTime(const OpTime& opTime) {
+void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTime(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _setMyLastDurableOpTime(lock, opTime, false);
+    _setMyLastDurableOpTimeAndWallTime(lock, opTimeAndWallTime, false);
     _reportUpstream_inlock(std::move(lock));
 }
 
@@ -1134,8 +1146,12 @@ void ReplicationCoordinatorImpl::_resetMyLastOpTimes(WithLock lk) {
     LOG(1) << "resetting durable/applied optimes.";
     // Reset to uninitialized OpTime
     bool isRollbackAllowed = true;
-    _setMyLastAppliedOpTime(lk, OpTime(), isRollbackAllowed, DataConsistency::Inconsistent);
-    _setMyLastDurableOpTime(lk, OpTime(), isRollbackAllowed);
+    _setMyLastAppliedOpTimeAndWallTime(lk,
+                                       std::make_tuple(OpTime(), Date_t::min()),
+                                       isRollbackAllowed,
+                                       DataConsistency::Inconsistent);
+    _setMyLastDurableOpTimeAndWallTime(
+        lk, std::make_tuple(OpTime(), Date_t::min()), isRollbackAllowed);
     _stableOpTimeCandidates.clear();
 }
 
@@ -1155,16 +1171,20 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::
     _externalState->forwardSlaveProgress();  // Must do this outside _mutex
 }
 
-void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime(WithLock lk,
-                                                         const OpTime& opTime,
-                                                         bool isRollbackAllowed,
-                                                         DataConsistency consistency) {
+void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
+    WithLock lk,
+    const OpTimeAndWallTime& opTimeAndWallTime,
+    bool isRollbackAllowed,
+    DataConsistency consistency) {
+    const auto opTime = std::get<0>(opTimeAndWallTime);
+
     // The last applied opTime should never advance beyond the global timestamp (i.e. the latest
     // cluster time). Not enforced if the logical clock is disabled, e.g. for arbiters.
     dassert(!LogicalClock::get(getServiceContext())->isEnabled() ||
             _externalState->getGlobalTimestamp(getServiceContext()) >= opTime.getTimestamp());
 
-    _topCoord->setMyLastAppliedOpTime(opTime, _replExecutor->now(), isRollbackAllowed);
+    _topCoord->setMyLastAppliedOpTimeAndWallTime(
+        opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
     // If we are using applied times to calculate the commit level, update it now.
     if (!_rsConfig.getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTime(lk);
@@ -1211,10 +1231,10 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime(WithLock lk,
     }
 }
 
-void ReplicationCoordinatorImpl::_setMyLastDurableOpTime(WithLock lk,
-                                                         const OpTime& opTime,
-                                                         bool isRollbackAllowed) {
-    _topCoord->setMyLastDurableOpTime(opTime, _replExecutor->now(), isRollbackAllowed);
+void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
+    WithLock lk, const OpTimeAndWallTime& opTimeAndWallTime, bool isRollbackAllowed) {
+    _topCoord->setMyLastDurableOpTimeAndWallTime(
+        opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
     // If we are using durable times to calculate the commit level, update it now.
     if (_rsConfig.getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTime(lk);
@@ -1224,6 +1244,16 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTime(WithLock lk,
 OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _getMyLastAppliedOpTime_inlock();
+}
+
+OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastAppliedOpTimeAndWallTime() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _getMyLastAppliedOpTimeAndWallTime_inlock();
+}
+
+OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastDurableOpTimeAndWallTime() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _getMyLastDurableOpTimeAndWallTime_inlock();
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastDurableOpTime() const {
@@ -1461,8 +1491,16 @@ Status ReplicationCoordinatorImpl::awaitTimestampCommitted(OperationContext* opC
     return _waitUntilOpTime(opCtx, isMajorityCommittedRead, waitOpTime);
 }
 
+OpTimeAndWallTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTimeAndWallTime_inlock() const {
+    return _topCoord->getMyLastAppliedOpTimeAndWallTime();
+}
+
 OpTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTime_inlock() const {
     return _topCoord->getMyLastAppliedOpTime();
+}
+
+OpTimeAndWallTime ReplicationCoordinatorImpl::_getMyLastDurableOpTimeAndWallTime_inlock() const {
+    return _topCoord->getMyLastDurableOpTimeAndWallTime();
 }
 
 OpTime ReplicationCoordinatorImpl::_getMyLastDurableOpTime_inlock() const {
@@ -2649,15 +2687,16 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
 
     _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx);
 
-    auto lastAppliedOpTime = getMyLastAppliedOpTime();
+    auto lastAppliedOpTimeAndWallTime = getMyLastAppliedOpTimeAndWallTime();
 
     // Since the JournalListener has not yet been set up, we must manually set our
     // durableOpTime.
-    setMyLastDurableOpTime(lastAppliedOpTime);
+    setMyLastDurableOpTimeAndWallTime(lastAppliedOpTimeAndWallTime);
 
     // Sets the initial data timestamp on the storage engine so it can assign a timestamp
     // to data on disk. We do this after writing the "initiating set" oplog entry.
-    _storage->setInitialDataTimestamp(getServiceContext(), lastAppliedOpTime.getTimestamp());
+    _storage->setInitialDataTimestamp(getServiceContext(),
+                                      std::get<0>(lastAppliedOpTimeAndWallTime).getTimestamp());
 
     _finishReplSetInitiate(opCtx, newConfig, myIndex.getValue());
 
@@ -3255,23 +3294,25 @@ void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Da
 
 void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opCtx,
                                                            DataConsistency consistency) {
-    StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(opCtx);
-    OpTime lastOpTime;
-    if (!lastOpTimeStatus.isOK()) {
-        warning() << "Failed to load timestamp of most recently applied operation; "
-                  << lastOpTimeStatus.getStatus();
+    auto lastOpTimeAndWallTimeStatus = _externalState->loadLastOpTimeAndWallTime(opCtx);
+    OpTimeAndWallTime lastOpTimeAndWallTime = std::make_tuple(OpTime(), Date_t::min());
+    if (!lastOpTimeAndWallTimeStatus.getStatus().isOK()) {
+        warning() << "Failed to load timestamp and/or wall clock time of most recently applied "
+                     "operation; "
+                  << lastOpTimeAndWallTimeStatus.getStatus();
     } else {
-        lastOpTime = lastOpTimeStatus.getValue();
+        lastOpTimeAndWallTime = lastOpTimeAndWallTimeStatus.getValue();
     }
 
     // Update the global timestamp before setting last applied opTime forward so the last applied
     // optime is never greater than the latest in-memory cluster time.
-    _externalState->setGlobalTimestamp(opCtx->getServiceContext(), lastOpTime.getTimestamp());
+    _externalState->setGlobalTimestamp(opCtx->getServiceContext(),
+                                       std::get<0>(lastOpTimeAndWallTime).getTimestamp());
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     bool isRollbackAllowed = true;
-    _setMyLastAppliedOpTime(lock, lastOpTime, isRollbackAllowed, consistency);
-    _setMyLastDurableOpTime(lock, lastOpTime, isRollbackAllowed);
+    _setMyLastAppliedOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed, consistency);
+    _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
     _reportUpstream_inlock(std::move(lock));
 }
 
@@ -3490,7 +3531,10 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(WithLock lk, const OpTime& 
         if (_getMemberState_inlock().arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.
-            _setMyLastAppliedOpTime(lk, committedOpTime, false, DataConsistency::Consistent);
+            _setMyLastAppliedOpTimeAndWallTime(lk,
+                                               std::make_tuple(committedOpTime, Date_t::min()),
+                                               false,
+                                               DataConsistency::Consistent);
         }
 
         _setStableTimestampForStorage(lk);

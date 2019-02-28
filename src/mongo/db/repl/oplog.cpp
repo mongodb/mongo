@@ -474,7 +474,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
         b.append("o2", *o2);
 
     invariant(wallTime != Date_t{});
-    b.appendDate("wall", wallTime);
+    b.appendDate(OplogEntryBase::kWallClockTimeFieldName, wallTime);
 
     appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
 
@@ -509,6 +509,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
  * timestamps - an array with size nDocs of respective Timestamp objects for each DocWriter.
  * oplogCollection - collection to be written to.
   * finalOpTime - the OpTime of the last DocWriter object.
+  * wallTime - the wall clock time of the corresponding oplog entry.
  */
 void _logOpsInner(OperationContext* opCtx,
                   const NamespaceString& nss,
@@ -516,7 +517,8 @@ void _logOpsInner(OperationContext* opCtx,
                   Timestamp* timestamps,
                   size_t nDocs,
                   Collection* oplogCollection,
-                  OpTime finalOpTime) {
+                  OpTime finalOpTime,
+                  Date_t wallTime) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (nss.size() && replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
@@ -530,7 +532,7 @@ void _logOpsInner(OperationContext* opCtx,
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     opCtx->recoveryUnit()->onCommit(
-        [opCtx, replCoord, finalOpTime](boost::optional<Timestamp> commitTime) {
+        [opCtx, replCoord, finalOpTime, wallTime](boost::optional<Timestamp> commitTime) {
             if (commitTime) {
                 // The `finalOpTime` may be less than the `commitTime` if multiple oplog entries
                 // are logging within one WriteUnitOfWork.
@@ -548,8 +550,9 @@ void _logOpsInner(OperationContext* opCtx,
             }
 
             // Optimes on the primary should always represent consistent database states.
-            replCoord->setMyLastAppliedOpTimeForward(
-                finalOpTime, ReplicationCoordinator::DataConsistency::Consistent);
+            replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
+                std::make_tuple(finalOpTime, wallTime),
+                ReplicationCoordinator::DataConsistency::Consistent);
 
             // We set the last op on the client to 'finalOpTime', because that contains the
             // timestamp of the operation that the client actually performed.
@@ -628,7 +631,7 @@ OpTime logOp(OperationContext* opCtx,
                                inTxn);
     const DocWriter* basePtr = &writer;
     auto timestamp = slot.opTime.getTimestamp();
-    _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot.opTime);
+    _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot.opTime, wallClockTime);
     wuow.commit();
     return slot.opTime;
 }
@@ -724,7 +727,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     invariant(!opTimes.empty());
     auto lastOpTime = opTimes.back();
     invariant(!lastOpTime.isNull());
-    _logOpsInner(opCtx, nss, basePtrs.get(), timestamps.get(), count, oplog, lastOpTime);
+    _logOpsInner(
+        opCtx, nss, basePtrs.get(), timestamps.get(), count, oplog, lastOpTime, wallClockTime);
     wuow.commit();
     return opTimes;
 }

@@ -197,33 +197,49 @@ void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
     // TODO
 }
 
-void ReplicationCoordinatorMock::setMyLastAppliedOpTime(const OpTime& opTime) {
-    _myLastAppliedOpTime = opTime;
+void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTime(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
+    _myLastAppliedOpTime = std::get<0>(opTimeAndWallTime);
+    _myLastAppliedWallTime = std::get<1>(opTimeAndWallTime);
 }
 
-void ReplicationCoordinatorMock::setMyLastDurableOpTime(const OpTime& opTime) {
-    _myLastDurableOpTime = opTime;
+void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTime(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
+    _myLastDurableOpTime = std::get<0>(opTimeAndWallTime);
+    _myLastDurableWallTime = std::get<1>(opTimeAndWallTime);
 }
 
-void ReplicationCoordinatorMock::setMyLastAppliedOpTimeForward(const OpTime& opTime,
-                                                               DataConsistency consistency) {
-    if (opTime > _myLastAppliedOpTime) {
-        _myLastAppliedOpTime = opTime;
+void ReplicationCoordinatorMock::setMyLastAppliedOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime& opTimeAndWallTime, DataConsistency consistency) {
+    if (std::get<0>(opTimeAndWallTime) > _myLastAppliedOpTime) {
+        _myLastAppliedOpTime = std::get<0>(opTimeAndWallTime);
+        _myLastAppliedWallTime = std::get<1>(opTimeAndWallTime);
     }
 }
 
-void ReplicationCoordinatorMock::setMyLastDurableOpTimeForward(const OpTime& opTime) {
-    if (opTime > _myLastDurableOpTime) {
-        _myLastDurableOpTime = opTime;
+void ReplicationCoordinatorMock::setMyLastDurableOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime& opTimeAndWallTime) {
+    if (std::get<0>(opTimeAndWallTime) > _myLastDurableOpTime) {
+        _myLastDurableOpTime = std::get<0>(opTimeAndWallTime);
+        _myLastDurableWallTime = std::get<1>(opTimeAndWallTime);
     }
 }
 
 void ReplicationCoordinatorMock::resetMyLastOpTimes() {
     _myLastDurableOpTime = OpTime();
+    _myLastDurableWallTime = Date_t::min();
+}
+
+OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastAppliedOpTimeAndWallTime() const {
+    return std::make_tuple(_myLastAppliedOpTime, _myLastAppliedWallTime);
 }
 
 OpTime ReplicationCoordinatorMock::getMyLastAppliedOpTime() const {
     return _myLastAppliedOpTime;
+}
+
+OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastDurableOpTimeAndWallTime() const {
+    return std::make_tuple(_myLastDurableOpTime, _myLastDurableWallTime);
 }
 
 OpTime ReplicationCoordinatorMock::getMyLastDurableOpTime() const {

@@ -198,9 +198,9 @@ Status waitForWriteConcern(OperationContext* opCtx,
             if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::Mode::modeNone) {
                 // Wait for ops to become durable then update replication system's
                 // knowledge of this.
-                OpTime appliedOpTime = replCoord->getMyLastAppliedOpTime();
+                auto appliedOpTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
                 opCtx->recoveryUnit()->waitUntilDurable();
-                replCoord->setMyLastDurableOpTimeForward(appliedOpTime);
+                replCoord->setMyLastDurableOpTimeAndWallTimeForward(appliedOpTimeAndWallTime);
             } else {
                 opCtx->recoveryUnit()->waitUntilDurable();
             }

@@ -196,19 +196,21 @@ void ReplicationCoordinatorEmbedded::setMyHeartbeatMessage(const std::string&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTimeForward(const OpTime&, DataConsistency) {
+void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&, DataConsistency) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::setMyLastDurableOpTimeForward(const OpTime&) {
+void ReplicationCoordinatorEmbedded::setMyLastDurableOpTimeAndWallTimeForward(
+    const OpTimeAndWallTime&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTime(const OpTime&) {
+void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::setMyLastDurableOpTime(const OpTime&) {
+void ReplicationCoordinatorEmbedded::setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
@@ -216,7 +218,15 @@ void ReplicationCoordinatorEmbedded::resetMyLastOpTimes() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+OpTimeAndWallTime ReplicationCoordinatorEmbedded::getMyLastAppliedOpTimeAndWallTime() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 OpTime ReplicationCoordinatorEmbedded::getMyLastAppliedOpTime() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+OpTimeAndWallTime ReplicationCoordinatorEmbedded::getMyLastDurableOpTimeAndWallTime() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 

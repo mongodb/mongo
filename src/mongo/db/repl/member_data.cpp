@@ -122,46 +122,66 @@ void MemberData::setAuthIssue(Date_t now) {
     _lastResponse.setSyncingTo(HostAndPort());
 }
 
-void MemberData::setLastAppliedOpTime(OpTime opTime, Date_t now) {
+void MemberData::setLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
     _lastUpdate = now;
     _lastUpdateStale = false;
-    _lastAppliedOpTime = opTime;
+    _lastAppliedOpTime = std::get<0>(opTime);
+    _lastAppliedWallTime = std::get<1>(opTime);
 }
 
-void MemberData::setLastDurableOpTime(OpTime opTime, Date_t now) {
+void MemberData::setLastAppliedOpTime(OpTime opTime, Date_t now) {
+    setLastAppliedOpTimeAndWallTime(std::make_tuple(opTime, Date_t::min()), now);
+}
+
+void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
     _lastUpdate = now;
     _lastUpdateStale = false;
-    if (_lastAppliedOpTime < opTime) {
+    if (_lastAppliedOpTime < std::get<0>(opTime)) {
         // TODO(russotto): We think this should never happen, rollback or no rollback.  Make this an
         // invariant and see what happens.
-        log() << "Durable progress (" << opTime << ") is ahead of the applied progress ("
-              << _lastAppliedOpTime << ". This is likely due to a "
-                                       "rollback."
+        log() << "Durable progress (" << std::get<0>(opTime)
+              << ") is ahead of the applied progress (" << _lastAppliedOpTime
+              << ". This is likely due to a "
+                 "rollback."
               << " memberid: " << _memberId << _hostAndPort.toString()
               << " previous durable progress: " << _lastDurableOpTime;
     } else {
-        _lastDurableOpTime = opTime;
+        _lastDurableOpTime = std::get<0>(opTime);
+        _lastDurableWallTime = std::get<1>(opTime);
     }
 }
 
-bool MemberData::advanceLastAppliedOpTime(OpTime opTime, Date_t now) {
+void MemberData::setLastDurableOpTime(OpTime opTime, Date_t now) {
+    setLastDurableOpTimeAndWallTime(std::make_tuple(opTime, Date_t::min()), now);
+}
+
+bool MemberData::advanceLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
     _lastUpdate = now;
     _lastUpdateStale = false;
-    if (_lastAppliedOpTime < opTime) {
-        setLastAppliedOpTime(opTime, now);
+    if (_lastAppliedOpTime < std::get<0>(opTime)) {
+        setLastAppliedOpTimeAndWallTime(opTime, now);
+        return true;
+    }
+    return false;
+}
+
+bool MemberData::advanceLastAppliedOpTime(OpTime opTime, Date_t now) {
+    return advanceLastAppliedOpTimeAndWallTime(std::make_tuple(opTime, Date_t::min()), now);
+}
+
+bool MemberData::advanceLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    if (_lastDurableOpTime < std::get<0>(opTime)) {
+        _lastDurableOpTime = std::get<0>(opTime);
+        _lastDurableWallTime = std::get<1>(opTime);
         return true;
     }
     return false;
 }
 
 bool MemberData::advanceLastDurableOpTime(OpTime opTime, Date_t now) {
-    _lastUpdate = now;
-    _lastUpdateStale = false;
-    if (_lastDurableOpTime < opTime) {
-        setLastDurableOpTime(opTime, now);
-        return true;
-    }
-    return false;
+    return advanceLastDurableOpTimeAndWallTime(std::make_tuple(opTime, Date_t::min()), now);
 }
 
 }  // namespace repl

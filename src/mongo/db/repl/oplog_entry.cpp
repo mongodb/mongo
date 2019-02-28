@@ -35,6 +35,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {

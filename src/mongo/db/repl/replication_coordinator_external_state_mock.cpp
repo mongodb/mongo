@@ -50,6 +50,7 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
     : _localRsConfigDocument(ErrorCodes::NoMatchingDocument, "No local config document"),
       _localRsLastVoteDocument(ErrorCodes::NoMatchingDocument, "No local lastVote document"),
       _lastOpTime(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
+      _lastWallTime(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
       _canAcquireGlobalSharedLock(true),
       _storeLocalConfigDocumentStatus(Status::OK()),
       _storeLocalLastVoteDocumentStatus(Status::OK()),
@@ -168,13 +169,23 @@ bool ReplicationCoordinatorExternalStateMock::oplogExists(OperationContext* opCt
     return true;
 }
 
-StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::loadLastOpTime(
-    OperationContext* opCtx) {
-    return _lastOpTime;
+StatusWith<std::tuple<OpTime, Date_t>>
+ReplicationCoordinatorExternalStateMock::loadLastOpTimeAndWallTime(OperationContext* opCtx) {
+    if (_lastOpTime.getStatus().isOK()) {
+        if (_lastWallTime.getStatus().isOK()) {
+            return std::make_tuple(_lastOpTime.getValue(), _lastWallTime.getValue());
+        } else {
+            return _lastWallTime.getStatus();
+        }
+    } else {
+        return _lastOpTime.getStatus();
+    }
 }
 
-void ReplicationCoordinatorExternalStateMock::setLastOpTime(const StatusWith<OpTime>& lastApplied) {
+void ReplicationCoordinatorExternalStateMock::setLastOpTimeAndWallTime(
+    const StatusWith<OpTime>& lastApplied, Date_t lastAppliedWall) {
     _lastOpTime = lastApplied;
+    _lastWallTime = lastAppliedWall;
 }
 
 void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentStatus(Status status) {

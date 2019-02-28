@@ -48,7 +48,7 @@ namespace mongo {
  */
 class JournalListener {
 public:
-    using Token = repl::OpTime;
+    using Token = repl::OpTimeAndWallTime;
     virtual ~JournalListener() = default;
     virtual Token getToken() = 0;
     virtual void onDurable(const Token& token) = 0;

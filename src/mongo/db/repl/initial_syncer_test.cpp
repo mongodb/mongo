@@ -126,11 +126,13 @@ public:
      * clear/reset state
      */
     void reset() {
-        _setMyLastOptime = [this](const OpTime& opTime,
+        _setMyLastOptime = [this](const OpTimeAndWallTime& opTimeAndWallTime,
                                   ReplicationCoordinator::DataConsistency consistency) {
-            _myLastOpTime = opTime;
+            _myLastOpTime = std::get<0>(opTimeAndWallTime);
+            _myLastWallTime = std::get<1>(opTimeAndWallTime);
         };
         _myLastOpTime = OpTime();
+        _myLastWallTime = Date_t::min();
         _syncSourceSelector = stdx::make_unique<SyncSourceSelectorMock>();
     }
 
@@ -347,9 +349,9 @@ protected:
         InitialSyncerOptions options;
         options.initialSyncRetryWait = Milliseconds(1);
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
-        options.setMyLastOptime = [this](const OpTime& opTime,
+        options.setMyLastOptime = [this](const OpTimeAndWallTime& opTimeAndWallTime,
                                          ReplicationCoordinator::DataConsistency consistency) {
-            _setMyLastOptime(opTime, consistency);
+            _setMyLastOptime(opTimeAndWallTime, consistency);
         };
         options.resetOptimes = [this]() { _myLastOpTime = OpTime(); };
         options.syncSourceSelector = this;
@@ -386,7 +388,7 @@ protected:
         _externalState = dataReplicatorExternalState.get();
 
         _lastApplied = getDetectableErrorStatus();
-        _onCompletion = [this](const StatusWith<OpTime>& lastApplied) {
+        _onCompletion = [this](const StatusWith<OpTimeAndWallTime>& lastApplied) {
             _lastApplied = lastApplied;
         };
 
@@ -400,7 +402,9 @@ protected:
                 _dbWorkThreadPool.get(),
                 _storageInterface.get(),
                 _replicationProcess.get(),
-                [this](const StatusWith<OpTime>& lastApplied) { _onCompletion(lastApplied); });
+                [this](const StatusWith<OpTimeAndWallTime>& lastApplied) {
+                    _onCompletion(lastApplied);
+                });
             _initialSyncer->setScheduleDbWorkFn_forTest(
                 [this](executor::TaskExecutor::CallbackFn work) {
                     return getExecutor().scheduleWork(std::move(work));
@@ -461,6 +465,7 @@ protected:
     InitialSyncerOptions _options;
     InitialSyncerOptions::SetMyLastOptimeFn _setMyLastOptime;
     OpTime _myLastOpTime;
+    Date_t _myLastWallTime;
     std::unique_ptr<SyncSourceSelectorMock> _syncSourceSelector;
     std::unique_ptr<StorageInterfaceMock> _storageInterface;
     HostAndPort _target;
@@ -471,7 +476,7 @@ protected:
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
     std::map<NamespaceString, CollectionCloneInfo> _collections;
 
-    StatusWith<OpTime> _lastApplied = Status(ErrorCodes::NotYetInitialized, "");
+    StatusWith<OpTimeAndWallTime> _lastApplied = Status(ErrorCodes::NotYetInitialized, "");
     InitialSyncer::OnCompletionFn _onCompletion;
 
 private:
@@ -580,7 +585,7 @@ OplogEntry makeOplogEntry(int t,
                       boost::none,                 // o2
                       {},                          // sessionInfo
                       boost::none,                 // upsert
-                      boost::none,                 // wall clock time
+                      Date_t::min() + Seconds(t),  // wall clock time
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
@@ -633,11 +638,11 @@ void InitialSyncerTest::processSuccessfulFCVFetcherResponse(std::vector<BSONObj>
 TEST_F(InitialSyncerTest, InvalidConstruction) {
     InitialSyncerOptions options;
     options.getMyLastOptime = []() { return OpTime(); };
-    options.setMyLastOptime = [](const OpTime&,
+    options.setMyLastOptime = [](const OpTimeAndWallTime&,
                                  ReplicationCoordinator::DataConsistency consistency) {};
     options.resetOptimes = []() {};
     options.syncSourceSelector = this;
-    auto callback = [](const StatusWith<OpTime>&) {};
+    auto callback = [](const StatusWith<OpTimeAndWallTime>&) {};
 
     // Null task executor in external state.
     {
@@ -764,7 +769,7 @@ TEST_F(InitialSyncerTest, InitialSyncerReturnsCallbackCanceledIfShutdownImmediat
 
     initialSyncer->join();
 
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -824,7 +829,7 @@ TEST_F(
 
     initialSyncer->join();
 
-    ASSERT_EQUALS(ErrorCodes::InitialSyncOplogSourceMissing, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::InitialSyncOplogSourceMissing, _lastApplied.getStatus());
 }
 
 // Confirms that InitialSyncer keeps retrying initial sync.
@@ -848,7 +853,7 @@ TEST_F(InitialSyncerTest,
 
     initialSyncer->join();
 
-    ASSERT_EQUALS(ErrorCodes::InitialSyncOplogSourceMissing, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::InitialSyncOplogSourceMissing, _lastApplied.getStatus());
 
     // Check number of failed attempts in stats.
     auto progress = initialSyncer->getInitialSyncProgress();
@@ -867,9 +872,10 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOptimesOnNewAttempt) {
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
 
     // Set the last optime to an arbitrary nonzero value. The value of the 'consistency' argument
-    // doesn't matter.
+    // doesn't matter. Also set last wall time to an arbitrary non-minimum value.
     auto origOptime = OpTime(Timestamp(1000, 1), 1);
-    _setMyLastOptime(origOptime, ReplicationCoordinator::DataConsistency::Inconsistent);
+    _setMyLastOptime(std::make_tuple(origOptime, Date_t::max()),
+                     ReplicationCoordinator::DataConsistency::Inconsistent);
 
     // Start initial sync.
     const std::uint32_t initialSyncMaxAttempts = 1U;
@@ -885,6 +891,7 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOptimesOnNewAttempt) {
 
     // Make sure the initial sync attempt reset optimes.
     ASSERT_EQUALS(OpTime(), _options.getMyLastOptime());
+    ASSERT_EQUALS(Date_t::min(), initialSyncer->getWallClockTime_forTest());
 }
 
 TEST_F(InitialSyncerTest,
@@ -909,7 +916,7 @@ TEST_F(InitialSyncerTest,
 
     initialSyncer->join();
 
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -923,7 +930,7 @@ TEST_F(InitialSyncerTest,
 
     initialSyncer->join();
 
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -950,7 +957,7 @@ TEST_F(InitialSyncerTest,
     initialSyncer->join();
 
     ASSERT_EQUALS(InitialSyncer::State::kComplete, initialSyncer->getState_forTest());
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 // This test verifies that the initial syncer will still transition to a complete state even if
@@ -959,7 +966,7 @@ TEST_F(InitialSyncerTest, InitialSyncerTransitionsToCompleteWhenFinishCallbackTh
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
-    _onCompletion = [this](const StatusWith<OpTime>& lastApplied) {
+    _onCompletion = [this](const StatusWith<OpTimeAndWallTime>& lastApplied) {
         _lastApplied = lastApplied;
         uassert(ErrorCodes::InternalError, "", false);
     };
@@ -970,7 +977,7 @@ TEST_F(InitialSyncerTest, InitialSyncerTransitionsToCompleteWhenFinishCallbackTh
     ASSERT_OK(initialSyncer->shutdown());
     initialSyncer->join();
 
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 class SharedCallbackState {
@@ -1000,7 +1007,7 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOnCompletionCallbackFunctionPointer
         _dbWorkThreadPool.get(),
         _storageInterface.get(),
         _replicationProcess.get(),
-        [&lastApplied, sharedCallbackData](const StatusWith<OpTime>& result) {
+        [&lastApplied, sharedCallbackData](const StatusWith<OpTimeAndWallTime>& result) {
             lastApplied = result;
         });
     ON_BLOCK_EXIT([this]() { getExecutor().shutdown(); });
@@ -1022,7 +1029,7 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOnCompletionCallbackFunctionPointer
 
     initialSyncer->join();
 
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, lastApplied.getStatus());
 
     // InitialSyncer should reset 'InitialSyncer::_onCompletion' after running callback function
     // for the last time before becoming inactive.
@@ -1046,7 +1053,7 @@ TEST_F(InitialSyncerTest, InitialSyncerTruncatesOplogAndDropsReplicatedDatabases
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 
     LockGuard lock(_storageInterfaceWorkDoneMutex);
     ASSERT_TRUE(_storageInterfaceWorkDone.truncateCalled);
@@ -1071,7 +1078,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetRollbackIdScheduleError) 
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 
     ASSERT_EQUALS("admin", request.dbname);
     assertRemoteCommandNameEquals("replSetGetRBID", request);
@@ -1099,7 +1106,7 @@ TEST_F(
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _lastApplied.getStatus());
 
     LockGuard lock(_storageInterfaceWorkDoneMutex);
     ASSERT_TRUE(_storageInterfaceWorkDone.truncateCalled);
@@ -1138,7 +1145,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsRollbackCheckerOnShutdown) {
     initialSyncer->join();
     ASSERT_EQUALS(InitialSyncer::State::kComplete, initialSyncer->getState_forTest());
 
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughRollbackCheckerCallbackError) {
@@ -1159,7 +1166,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughRollbackCheckerCallbackError
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampScheduleError) {
@@ -1190,7 +1197,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampSch
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 
     ASSERT_EQUALS(syncSource, request.target);
     ASSERT_EQUALS(NamespaceString::kAdminDb, request.dbname);
@@ -1220,7 +1227,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampCal
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherScheduleError) {
@@ -1255,7 +1262,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 
     ASSERT_EQUALS(syncSource, request.target);
     ASSERT_EQUALS(_options.localOplogNS.db(), request.dbname);
@@ -1292,7 +1299,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherCallbac
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerCancelsLastOplogEntryFetcherOnShutdown) {
@@ -1322,7 +1329,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastOplogEntryFetcherOnShutdown) {
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -1351,7 +1358,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -1412,7 +1419,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -1446,7 +1453,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
@@ -1485,7 +1492,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 
     ASSERT_EQUALS(syncSource, request.target);
     assertFCVRequest(request);
@@ -1523,7 +1530,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError) {
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerCancelsFCVFetcherOnShutdown) {
@@ -1556,7 +1563,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsFCVFetcherOnShutdown) {
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerResendsFindCommandIfFCVFetcherReturnsRetriableError) {
@@ -1621,7 +1628,7 @@ void InitialSyncerTest::runInitialSyncWithBadFCVResponse(std::vector<BSONObj> do
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(expectedError, _lastApplied);
+    ASSERT_EQUALS(expectedError, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -1697,7 +1704,7 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
@@ -1746,7 +1753,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
         net->runReadyNetworkOperations();
     }
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 
     ASSERT_EQUALS(syncSource, request.target);
     ASSERT_EQUALS(_options.localOplogNS.db(), request.dbname);
@@ -1801,7 +1808,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -1859,7 +1866,10 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(makeOplogEntry(1).getOpTime(), unittest::assertGet(_lastApplied));
+    ASSERT_OK(_lastApplied.getStatus());
+    auto dummyEntry = makeOplogEntry(1);
+    ASSERT_EQUALS(dummyEntry.getOpTime(), std::get<0>(_lastApplied.getValue()));
+    ASSERT_EQUALS(dummyEntry.getWallClockTime().get(), std::get<1>(_lastApplied.getValue()));
 }
 
 TEST_F(
@@ -1916,7 +1926,10 @@ TEST_F(
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(makeOplogEntry(3).getOpTime(), unittest::assertGet(_lastApplied));
+    ASSERT_OK(_lastApplied.getStatus());
+    auto dummyEntry = makeOplogEntry(3);
+    ASSERT_EQUALS(dummyEntry.getOpTime(), std::get<0>(_lastApplied.getValue()));
+    ASSERT_EQUALS(dummyEntry.getWallClockTime().get(), std::get<1>(_lastApplied.getValue()));
 }
 
 TEST_F(
@@ -1970,7 +1983,7 @@ TEST_F(
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::RemoteResultsUnavailable, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::RemoteResultsUnavailable, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -2023,7 +2036,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 
     ASSERT_EQUALS(syncSource, request.target);
     ASSERT_EQUALS("admin", request.dbname);
@@ -2070,7 +2083,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerIgnoresLocalDatabasesWhenCloningDatabases) {
@@ -2137,7 +2150,7 @@ TEST_F(InitialSyncerTest, InitialSyncerIgnoresLocalDatabasesWhenCloningDatabases
     getExecutor().shutdown();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -2212,7 +2225,7 @@ TEST_F(InitialSyncerTest,
     getExecutor().shutdown();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerCancelsBothOplogFetcherAndDatabasesClonerOnShutdown) {
@@ -2246,7 +2259,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBothOplogFetcherAndDatabasesCloner
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -2309,7 +2322,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -2369,7 +2382,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -2424,7 +2437,7 @@ TEST_F(InitialSyncerTest,
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -2488,7 +2501,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(
@@ -2548,7 +2561,7 @@ TEST_F(
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -2602,7 +2615,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OplogOutOfOrder, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OplogOutOfOrder, _lastApplied.getStatus());
 }
 
 TEST_F(
@@ -2673,7 +2686,7 @@ TEST_F(
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
     ASSERT_EQUALS(_options.localOplogNS, insertDocumentNss);
     ASSERT_BSONOBJ_EQ(oplogEntry, insertDocumentDoc.obj);
 }
@@ -2747,7 +2760,7 @@ TEST_F(
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
     ASSERT_EQUALS(_options.localOplogNS, insertDocumentNss);
     ASSERT_BSONOBJ_EQ(oplogEntry, insertDocumentDoc.obj);
 }
@@ -2821,7 +2834,7 @@ TEST_F(
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(
@@ -2884,7 +2897,7 @@ TEST_F(
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
@@ -2946,7 +2959,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherCallbackError) {
@@ -3011,7 +3024,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherC
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest,
@@ -3068,7 +3081,7 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfterCloning) {
@@ -3159,7 +3172,9 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(oplogEntry.getOpTime(), unittest::assertGet(_lastApplied));
+    ASSERT_OK(_lastApplied.getStatus());
+    ASSERT_EQUALS(oplogEntry.getOpTime(), std::get<0>(_lastApplied.getValue()));
+    ASSERT_EQUALS(oplogEntry.getWallClockTime().get(), std::get<1>(_lastApplied.getValue()));
     ASSERT_FALSE(_replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx.get()));
 }
 
@@ -3222,7 +3237,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchScheduleError) {
@@ -3284,7 +3299,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
@@ -3342,7 +3357,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockError) {
@@ -3406,7 +3421,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::BadValue, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::BadValue, _lastApplied.getStatus());
 }
 
 TEST_F(
@@ -3483,7 +3498,7 @@ TEST_F(
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
@@ -3560,7 +3575,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
@@ -3618,7 +3633,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplogFetcherError) {
@@ -3676,7 +3691,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied.getStatus());
 }
 
 OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
@@ -3755,7 +3770,9 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
 void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch(bool shouldSetFCV) {
     auto lastOp = doInitialSyncWithOneBatch(shouldSetFCV);
     serverGlobalParams.featureCompatibility.reset();
-    ASSERT_EQUALS(lastOp.getOpTime(), unittest::assertGet(_lastApplied));
+    ASSERT_OK(_lastApplied.getStatus());
+    ASSERT_EQUALS(lastOp.getOpTime(), std::get<0>(_lastApplied.getValue()));
+    ASSERT_EQUALS(lastOp.getWallClockTime().get(), std::get<1>(_lastApplied.getValue()));
 
     ASSERT_EQUALS(lastOp.getOpTime().getTimestamp(), _storageInterface->getInitialDataTimestamp());
 }
@@ -3872,7 +3889,9 @@ TEST_F(InitialSyncerTest,
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(lastOp.getOpTime(), unittest::assertGet(_lastApplied));
+    ASSERT_OK(_lastApplied.getStatus());
+    ASSERT_EQUALS(lastOp.getOpTime(), std::get<0>(_lastApplied.getValue()));
+    ASSERT_EQUALS(lastOp.getWallClockTime().get(), std::get<1>(_lastApplied.getValue()));
 }
 
 TEST_F(
@@ -3966,7 +3985,9 @@ TEST_F(
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(lastOp.getOpTime(), unittest::assertGet(_lastApplied));
+    ASSERT_OK(_lastApplied.getStatus());
+    ASSERT_EQUALS(lastOp.getOpTime(), std::get<0>(_lastApplied.getValue()));
+    ASSERT_EQUALS(lastOp.getWallClockTime().get(), std::get<1>(_lastApplied.getValue()));
 
     ASSERT_TRUE(fetchCountIncremented);
 
@@ -3989,7 +4010,7 @@ TEST_F(InitialSyncerTest,
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
@@ -4046,7 +4067,7 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
     }
 
     initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::OplogOutOfOrder, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::OplogOutOfOrder, _lastApplied.getStatus());
 }
 
 TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
@@ -4285,7 +4306,10 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     log() << "waiting for initial sync to verify it completed OK";
     initialSyncer->join();
-    ASSERT_EQUALS(makeOplogEntry(7).getOpTime(), unittest::assertGet(_lastApplied));
+    ASSERT_OK(_lastApplied.getStatus());
+    auto dummyEntry = makeOplogEntry(7);
+    ASSERT_EQUALS(dummyEntry.getOpTime(), std::get<0>(_lastApplied.getValue()));
+    ASSERT_EQUALS(dummyEntry.getWallClockTime().get(), std::get<1>(_lastApplied.getValue()));
 
     progress = initialSyncer->getInitialSyncProgress();
     log() << "Progress at end: " << progress;
@@ -4412,7 +4436,7 @@ TEST_F(InitialSyncerTest, InitialSyncerUpgradeNonReplicatedUniqueIndexesError) {
     doInitialSyncWithOneBatch(true);
 
     // Ensure the upgradeNonReplicatedUniqueIndexes status was captured.
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, _lastApplied);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, _lastApplied.getStatus());
 }
 
 }  // namespace

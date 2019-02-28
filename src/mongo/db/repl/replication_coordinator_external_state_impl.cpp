@@ -183,7 +183,6 @@ void scheduleWork(executor::TaskExecutor* executor, executor::TaskExecutor::Call
     }
     fassert(40460, cbh);
 }
-
 }  // namespace
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
@@ -370,8 +369,10 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     // _taskExecutor pointer never changes.
     _taskExecutor->join();
 
+    auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
     if (_replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull() &&
-        loadLastOpTime(opCtx) ==
+        loadLastOpTimeAndWallTimeResult.isOK() &&
+        std::get<0>(loadLastOpTimeAndWallTimeResult.getValue()) ==
             _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
         // Clear the appliedThrough marker to indicate we are consistent with the top of the
         // oplog. We record this update at the 'lastAppliedOpTime'. If there are any outstanding
@@ -482,7 +483,10 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
                  << "new primary"));
         wuow.commit();
     });
-    const auto opTimeToReturn = fassert(28665, loadLastOpTime(opCtx));
+    const auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
+    fassert(28665, loadLastOpTimeAndWallTimeResult);
+    auto opTimeToReturn = std::get<0>(loadLastOpTimeAndWallTimeResult.getValue());
+
 
     _shardingOnTransitionToPrimaryHook(opCtx);
 
@@ -623,8 +627,8 @@ bool ReplicationCoordinatorExternalStateImpl::oplogExists(OperationContext* opCt
     return oplog.getCollection() != nullptr;
 }
 
-StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
-    OperationContext* opCtx) {
+StatusWith<std::tuple<OpTime, Date_t>>
+ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(OperationContext* opCtx) {
     // TODO: handle WriteConflictExceptions below
     try {
         // If we are doing an initial sync do not read from the oplog.
@@ -639,30 +643,40 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
                     return Helpers::getLast(
                         opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
                 })) {
-            return StatusWith<OpTime>(ErrorCodes::NoMatchingDocument,
-                                      str::stream() << "Did not find any entries in "
-                                                    << NamespaceString::kRsOplogNamespace.ns());
+            return StatusWith<std::tuple<OpTime, Date_t>>(
+                ErrorCodes::NoMatchingDocument,
+                str::stream() << "Did not find any entries in "
+                              << NamespaceString::kRsOplogNamespace.ns());
         }
         BSONElement tsElement = oplogEntry[tsFieldName];
         if (tsElement.eoo()) {
-            return StatusWith<OpTime>(ErrorCodes::NoSuchKey,
-                                      str::stream() << "Most recent entry in "
-                                                    << NamespaceString::kRsOplogNamespace.ns()
-                                                    << " missing \""
-                                                    << tsFieldName
-                                                    << "\" field");
+            return StatusWith<std::tuple<OpTime, Date_t>>(
+                ErrorCodes::NoSuchKey,
+                str::stream() << "Most recent entry in " << NamespaceString::kRsOplogNamespace.ns()
+                              << " missing \""
+                              << tsFieldName
+                              << "\" field");
         }
         if (tsElement.type() != bsonTimestamp) {
-            return StatusWith<OpTime>(ErrorCodes::TypeMismatch,
-                                      str::stream() << "Expected type of \"" << tsFieldName
-                                                    << "\" in most recent "
-                                                    << NamespaceString::kRsOplogNamespace.ns()
-                                                    << " entry to have type Timestamp, but found "
-                                                    << typeName(tsElement.type()));
+            return StatusWith<std::tuple<OpTime, Date_t>>(
+                ErrorCodes::TypeMismatch,
+                str::stream() << "Expected type of \"" << tsFieldName << "\" in most recent "
+                              << NamespaceString::kRsOplogNamespace.ns()
+                              << " entry to have type Timestamp, but found "
+                              << typeName(tsElement.type()));
         }
-        return OpTime::parseFromOplogEntry(oplogEntry);
+
+        auto opTimeStatus = OpTime::parseFromOplogEntry(oplogEntry);
+        if (!opTimeStatus.isOK()) {
+            return opTimeStatus.getStatus();
+        }
+        auto wallTimeStatus = OpTime::parseWallTimeFromOplogEntry(oplogEntry);
+        if (!wallTimeStatus.isOK()) {
+            return wallTimeStatus.getStatus();
+        }
+        return std::make_tuple(opTimeStatus.getValue(), wallTimeStatus.getValue());
     } catch (const DBException& ex) {
-        return StatusWith<OpTime>(ex.toStatus());
+        return StatusWith<std::tuple<OpTime, Date_t>>(ex.toStatus());
     }
 }
 
@@ -913,11 +927,11 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncM
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {
-    return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTime();
+    return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime();
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& token) {
-    repl::ReplicationCoordinator::get(_service)->setMyLastDurableOpTimeForward(token);
+    repl::ReplicationCoordinator::get(_service)->setMyLastDurableOpTimeAndWallTimeForward(token);
 }
 
 void ReplicationCoordinatorExternalStateImpl::startNoopWriter(OpTime opTime) {
