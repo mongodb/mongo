@@ -49,7 +49,7 @@
     assert.commandWorked(sessionColl1.insert({_id: 1}));
     assert.commandWorked(sessionColl1.insert({_id: 2}));
 
-    rollbackTest.getTestFixture().awaitLastOpCommitted();
+    rollbackTest.awaitLastOpCommitted();
     // Prevent the stable timestamp from moving beyond the following prepared transactions so
     // that when we replay the oplog from the stable timestamp, we correctly recover them.
     assert.commandWorked(
@@ -96,11 +96,9 @@
     // prepared transactions or the write that was rolled back.
     arrayEq(testColl.find().toArray(), [{_id: 1}, {_id: 2}]);
 
-    // Get the correct members after the topology changes.
+    // Get the correct primary after the topology changes.
     primary = rollbackTest.getPrimary();
-    const rst = rollbackTest.getTestFixture();
-    const secondaries = rst.getSecondaries();
-    rst.awaitReplication();
+    rollbackTest.awaitReplication();
 
     // Make sure we can successfully commit the first rolled back prepared transaction.
     session1 =
@@ -173,7 +171,7 @@
         autocommit: false,
     }));
 
-    rst.awaitReplication();
+    rollbackTest.awaitReplication();
 
     // Make sure we can see the result of the committed prepared transaction and cannot see the
     // write from the aborted transaction.

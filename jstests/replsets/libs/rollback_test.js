@@ -77,6 +77,12 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
     replSet = (replSet === undefined) ? performStandardSetup() : replSet;
     validateAndUseSetup(replSet);
 
+    // Majority writes in the initial phase, before transitionToRollbackOperations(), should be
+    // replicated to the syncSource node so they aren't lost when syncSource steps up. Ensure that
+    // majority writes can be acknowledged only by syncSource, not by tiebreakerNode.
+    jsTestLog(`Stopping replication on ${tiebreakerNode.host}`);
+    stopServerReplication(tiebreakerNode);
+
     /**
      * Validate and use the provided replica set.
      *
@@ -225,6 +231,8 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         // Ensure that the tiebreaker node is connected to the other nodes. We must do this after
         // we are sure that rollback has completed on the rollback node.
         tiebreakerNode.reconnect([curPrimary, curSecondary]);
+
+        // Allow replication temporarily so the following checks succeed.
         restartServerReplication(tiebreakerNode);
 
         rst.awaitSecondaryNodes();
@@ -244,27 +252,30 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
             checkDataConsistency();
         }
 
+        // Now that awaitReplication and checkDataConsistency are done, stop replication again so
+        // tiebreakerNode is never part of w: majority writes, see comment at top.
+        stopServerReplication(tiebreakerNode);
+
         return curPrimary;
     };
 
     /**
-     * Transition to the first stage of rollback testing, where we isolate the current primary and
-     * stop replication on the tiebreaker node. This ensures that subsequent operations on the
-     * primary will eventually be rolled back.
+     * Transition to the first stage of rollback testing, where we isolate the current primary so
+     * that subsequent operations on it will eventually be rolled back.
      */
     this.transitionToRollbackOperations = function() {
-        // Ensure previous operations are replicated. The current secondary will be used as the sync
-        // source later on, so it must be up-to-date to prevent any previous operations from being
+        // Ensure previous operations are replicated to the secondary that will be used as the sync
+        // source later on. It must be up-to-date to prevent any previous operations from being
         // rolled back.
         rst.awaitSecondaryNodes();
-        rst.awaitReplication();
+        rst.awaitReplication(null, null, [curSecondary]);
 
         transitionIfAllowed(State.kRollbackOps);
 
         // Disconnect the secondary from the tiebreaker node before we disconnect the secondary from
         // the primary to ensure that the secondary will be ineligible to win an election after it
         // loses contact with the primary.
-        log(`Isolating the secondary ${curSecondary.host} from the tiebreaker 
+        log(`Isolating the secondary ${curSecondary.host} from the tiebreaker
             ${tiebreakerNode.host}`);
         curSecondary.disconnect([tiebreakerNode]);
 
@@ -273,10 +284,6 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         // We do not disconnect the primary from the tiebreaker node so that it remains primary.
         log(`Isolating the primary ${curPrimary.host} from the secondary ${curSecondary.host}`);
         curPrimary.disconnect([curSecondary]);
-
-        // Stop replication on the tiebreaker node so that writes made on the primary will not be
-        // committed and the tiebreaker will vote for either node.
-        stopServerReplication(tiebreakerNode);
 
         return curPrimary;
     };
@@ -312,7 +319,7 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
 
         waitForState(curPrimary, ReplSetTest.State.SECONDARY);
 
-        log(`Reconnecting the secondary ${curSecondary.host} to the tiebreaker node so it can be 
+        log(`Reconnecting the secondary ${curSecondary.host} to the tiebreaker node so it can be
             elected`);
         curSecondary.reconnect([tiebreakerNode]);
 
@@ -362,6 +369,8 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
     };
 
     this.stop = function() {
+        restartServerReplication(tiebreakerNode);
+        rst.awaitReplication();
         checkDataConsistency();
         transitionIfAllowed(State.kStopped);
         return rst.stopSet();
@@ -413,6 +422,23 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         curPrimary = rst.getPrimary();
         curSecondary = rst.getSecondary();
         assert.neq(curPrimary, curSecondary);
+    };
+
+    /**
+     * Waits for the last oplog entry to be visible on all nodes except the tiebreaker, which has
+     * replication stopped throughout the test.
+     */
+    this.awaitLastOpCommitted = function(timeout) {
+        return rst.awaitLastOpCommitted(timeout, [curPrimary, curSecondary]);
+    };
+
+    /**
+     * Waits until the optime of the specified type reaches the primary's last applied optime.
+     * Ignores the tiebreaker node, on which replication is stopped throughout the test.
+     * See ReplSetTest for definition of secondaryOpTimeType.
+     */
+    this.awaitReplication = function(timeout, secondaryOpTimeType) {
+        return rst.awaitReplication(timeout, secondaryOpTimeType, [curPrimary, curSecondary]);
     };
 
     /**

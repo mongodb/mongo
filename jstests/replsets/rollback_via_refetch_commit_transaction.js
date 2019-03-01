@@ -35,7 +35,7 @@ TestData.skipCheckDBHashes = true;
 
     // Create collection that exists on the sync source and rollback node.
     assert.commandWorked(rollbackTest.getPrimary().getDB(dbName).runCommand(
-        {create: collName, writeConcern: {w: 3}}));
+        {create: collName, writeConcern: {w: 2}}));
 
     // Stop replication from the current primary ("rollbackNode").
     const rollbackNode = rollbackTest.transitionToRollbackOperations();

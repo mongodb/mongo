@@ -24,7 +24,7 @@
     assert.commandWorked(sessionColl1.insert({b: 1}));
     session1.commitTransaction();
 
-    rollbackTest.getTestFixture().awaitLastOpCommitted();
+    rollbackTest.awaitLastOpCommitted();
     assert.commandWorked(
         primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
 

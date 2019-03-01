@@ -36,7 +36,7 @@
 
     assert.commandWorked(sessionColl1.insert({id: 1}));
 
-    rollbackTest.getTestFixture().awaitLastOpCommitted();
+    rollbackTest.awaitLastOpCommitted();
     // Prevent the stable timestamp from moving beyond the following prepared transactions so
     // that when we replay the oplog from the stable timestamp, we correctly recover them.
     assert.commandWorked(

@@ -19,7 +19,7 @@
     let coll1 = testDb.getCollection(fromCollName1);
     assert.commandWorked(coll1.insert({a: 1}));
 
-    rollbackTest.getTestFixture().awaitLastOpCommitted();
+    rollbackTest.awaitLastOpCommitted();
     assert.commandWorked(
         primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
 
