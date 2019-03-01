@@ -1,4 +1,5 @@
-/* This test checks that currentOp correctly reports the lockStats for sub-operations. Before
+/**
+ * This test checks that currentOp correctly reports the lockStats for sub-operations. Before
  * SERVER-26854, the currentOp entry for each sub-operation reports the aggregate lock wait time of
  * all preceding sub-operations.
  *
@@ -15,7 +16,7 @@
  *  6. Run 'currentOp' to check the entry for createIndex. The lock wait time should be 0 rather
  *     than ~2.
  *
- * @tags: [requires_fsync]
+ * @tags: [requires_fsync, requires_document_locking]
  */
 (function() {
     'use strict';
@@ -70,7 +71,8 @@
     });
     jsTestLog(tojson(res.inprog[0]));
     // Assert that sub-operation 'createIndex' has 0 lock wait time. Before SERVER-26854, it
-    // erroneously reported ~2s as it counted the lock wait time for the previous sub-operation.
+    // erroneously reported `blockedMillis` as it counted the lock wait time for the previous
+    // sub-operation.
     assert(!('timeAcquiringMicros' in res.inprog[0].lockStats.Global));
 
     assert.commandWorked(

@@ -1,4 +1,5 @@
-/* This test checks that mongod correctly logs report the lockStats for sub-operations. Before
+/**
+ * This test checks that mongod correctly logs report the lockStats for sub-operations. Before
  * SERVER-26854, the log for each sub-operation reported the aggregate lock wait time of all
  * preceding sub-operations.
  *
@@ -69,11 +70,10 @@
     let lines = mongodLogs.split('\n');
     const lockWaitTimeRegex = /timeAcquiringMicros: { [wW]: ([0-9]+)/;
     let match;
-    let supposedLockWaitTime;
+    let firstOpWaitTime;
+    let parentOpWaitTime;
     let numWaitedForLocks = 0;
 
-    // Only the logs of 'parent command' (aggregation with $out) and the first
-    // sub-operation(createCollection) have the information about the long wait for the lock.
     for (let line of lines) {
         if ((match = lockWaitTimeRegex.exec(line)) !== null) {
             let lockWaitTime = match[1];
@@ -81,14 +81,21 @@
             // validation stage.
             if (lockWaitTime < blockedMillis * 1000)
                 continue;
-            if (supposedLockWaitTime === undefined)
-                supposedLockWaitTime = lockWaitTime;
+            if (firstOpWaitTime === undefined)
+                firstOpWaitTime = lockWaitTime;
             else
-                assert.eq(lockWaitTime, supposedLockWaitTime);  // Should be the same.
+                parentOpWaitTime = lockWaitTime;
             numWaitedForLocks++;
             jsTestLog('Operation/Sub-operation log: ');
             jsTestLog(line);
         }
     }
+
+    // Only the logs of 'parent command' (aggregation with $out) and the first
+    // sub-operation(createCollection) have the information about the long wait for the lock.
     assert.eq(numWaitedForLocks, 2);
+
+    // Total waiting time should be greater than or equal to the waiting time of the
+    // first sub-operation.
+    assert(parentOpWaitTime >= firstOpWaitTime);
 })();
