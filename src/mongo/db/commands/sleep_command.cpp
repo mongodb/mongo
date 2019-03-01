@@ -74,17 +74,17 @@ public:
                       LockMode mode,
                       const StringData& ns) {
         if (ns.empty()) {
-            Lock::GlobalLock lk(opCtx, mode, opCtx->getDeadline(), Lock::InterruptBehavior::kThrow);
+            Lock::GlobalLock lk(opCtx, mode, Date_t::max(), Lock::InterruptBehavior::kThrow);
             opCtx->sleepFor(Milliseconds(millis));
         } else if (nsIsDbOnly(ns)) {
             uassert(50961, "lockTarget is not a valid namespace", NamespaceString::validDBName(ns));
-            Lock::DBLock lk(opCtx, ns, mode, opCtx->getDeadline());
+            Lock::DBLock lk(opCtx, ns, mode, Date_t::max());
             opCtx->sleepFor(Milliseconds(millis));
         } else {
             uassert(50962,
                     "lockTarget is not a valid namespace",
                     NamespaceString::validCollectionComponent(ns));
-            Lock::CollectionLock lk(opCtx->lockState(), ns, mode, opCtx->getDeadline());
+            Lock::CollectionLock lk(opCtx->lockState(), ns, mode, Date_t::max());
             opCtx->sleepFor(Milliseconds(millis));
         }
     }
