@@ -42,6 +42,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection.h"
+#include "mongo/db/transaction_reaper_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
@@ -52,28 +53,6 @@
 
 namespace mongo {
 namespace {
-
-constexpr Minutes kTransactionRecordMinimumLifetime(30);
-
-/**
- * The minimum lifetime for a transaction record is how long it has to have lived on the server
- * before we'll consider it for cleanup.  This is effectively the window for how long it is
- * permissible for a mongos to hang before we're willing to accept a failure of the retryable write
- * subsystem.
- *
- * Specifically, we imagine that a client connects to one mongos on a session and performs a
- * retryable write.  That mongos hangs.  Then the client connects to a new mongos on the same
- * session and successfully executes its write.  After a day passes, the session will time out,
- * cleaning up the retryable write.  Then the original mongos wakes up, vivifies the session and
- * executes the write (because all records of the session + transaction have been deleted).
- *
- * So the write is performed twice, which is unavoidable without losing session vivification and/or
- * requiring synchronized clocks all the way out to the client.  In lieu of that we provide a weaker
- * guarantee after the minimum transaction lifetime.
- */
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(TransactionRecordMinimumLifetimeMinutes,
-                                      int,
-                                      kTransactionRecordMinimumLifetime.count());
 
 const auto kIdProjection = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
 const auto kSortById = BSON(SessionTxnRecord::kSessionIdFieldName << 1);
@@ -86,7 +65,7 @@ const auto kLastWriteDateFieldName = SessionTxnRecord::kLastWriteDateFieldName;
  * to pull records likely to be on the same chunks (because they sort near each other).
  */
 Query makeQuery(Date_t now) {
-    const Date_t possiblyExpired(now - Minutes(TransactionRecordMinimumLifetimeMinutes));
+    const Date_t possiblyExpired(now - Minutes(gTransactionRecordMinimumLifetimeMinutes));
     Query query(BSON(kLastWriteDateFieldName << LT << possiblyExpired));
     query.sort(kSortById);
     return query;

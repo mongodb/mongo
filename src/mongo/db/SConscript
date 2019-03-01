@@ -1553,9 +1553,11 @@ env.Library(
     target='transaction_reaper',
     source=[
         'transaction_reaper.cpp',
+        env.Idlc('transaction_reaper.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/s/client/shard_interface',
         '$BUILD_DIR/mongo/s/coreshard',
         'dbdirectclient',
