@@ -77,7 +77,7 @@ struct StorageGlobalParams {
     bool dur;  // --dur durability (now --journal)
 
     // --journalCommitInterval
-    static const int kMaxJournalCommitIntervalMs;
+    static constexpr int kMaxJournalCommitIntervalMs = 500;
     AtomicWord<int> journalCommitIntervalMs;
 
     // --notablescan

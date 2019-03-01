@@ -1,0 +1,59 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/bson/bson_depth.h"
+
+server_parameters:
+    notablescan:
+        # NOT recommended for production use.
+        description: >-
+            Whether all queries must use indexes.
+            If true, MongoDB will not execute queries that require a table scan and will return an error.
+        set_at: [ startup, runtime ]
+        cpp_varname: 'storageGlobalParams.noTableScan'
+    syncdelay:
+        # In almost every situation you should not set this value and use the default setting.
+        description: >-
+            Interval in seconds between fsync operations where mongod flushes its
+            working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
+        set_at: [ startup, runtime ]
+        cpp_varname: 'storageGlobalParams.syncdelay'
+        validator:
+            gte: 0.0
+            lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
+    journalCommitInterval:
+        description: 'Number of milliseconds between journal commits'
+        set_at: runtime
+        cpp_varname: 'storageGlobalParams.journalCommitIntervalMs'
+        validator:
+            gte: 1
+            lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
+
