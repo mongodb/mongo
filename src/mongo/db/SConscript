@@ -733,6 +733,7 @@ env.Library(
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',
         env.Idlc('session_txn_record.idl')[0],
+        env.Idlc('transaction_participant.idl')[0],
         env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
@@ -758,6 +759,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/idl/server_parameter',
         'commands/server_status',
         'update/update_driver',
     ]

@@ -76,16 +76,13 @@
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_participant_gen.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
-
-// This is a startup server parameter defined in transaction_participant.cpp.
-extern bool useMultipleOplogEntryFormatForTransactions;
-
 namespace {
 /**
  * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
@@ -2748,7 +2745,7 @@ public:
 class MultiOplogEntryTransaction : public MultiDocumentTransactionTest {
 public:
     MultiOplogEntryTransaction() : MultiDocumentTransactionTest("multiOplogEntryTransaction") {
-        useMultipleOplogEntryFormatForTransactions = true;
+        gUseMultipleOplogEntryFormatForTransactions = true;
         const auto currentTime = _clock->getClusterTime();
         firstOplogEntryTs = currentTime.addTicks(1).asTimestamp();
         secondOplogEntryTs = currentTime.addTicks(2).asTimestamp();
@@ -2756,7 +2753,7 @@ public:
     }
 
     ~MultiOplogEntryTransaction() {
-        useMultipleOplogEntryFormatForTransactions = false;
+        gUseMultipleOplogEntryFormatForTransactions = false;
     }
 
     void run() {

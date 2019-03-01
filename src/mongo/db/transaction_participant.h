@@ -56,8 +56,6 @@ namespace mongo {
 
 class OperationContext;
 
-extern AtomicWord<int> transactionLifetimeLimitSeconds;
-
 /**
  * Read timestamp to be used for a speculative transaction.  For transactions with read
  * concern level specified as 'snapshot', we will use 'kAllCommitted' which ensures a snapshot

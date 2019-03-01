@@ -45,6 +45,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_participant_gen.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
@@ -2411,7 +2412,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
         startTime);
     ASSERT_EQ(
         dateFromISOString(transactionDocument.getField("expiryTime").valueStringData()).getValue(),
-        startTime + Seconds(transactionLifetimeLimitSeconds.load()));
+        startTime + Seconds(gTransactionLifetimeLimitSeconds.load()));
     ASSERT_EQ(transactionDocument.getField("timePreparedMicros").numberLong(), preparedDuration);
 
     ASSERT_EQ(stashedState.getField("client").valueStringData().toString(), "");
@@ -2492,7 +2493,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
         startTime);
     ASSERT_EQ(
         dateFromISOString(transactionDocument.getField("expiryTime").valueStringData()).getValue(),
-        startTime + Seconds(transactionLifetimeLimitSeconds.load()));
+        startTime + Seconds(gTransactionLifetimeLimitSeconds.load()));
     ASSERT_EQ(transactionDocument.getField("timePreparedMicros").numberLong(), prepareDuration);
 
     // For the following time metrics, we are only verifying that the transaction sub-document is

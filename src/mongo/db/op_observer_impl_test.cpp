@@ -47,12 +47,12 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_participant_gen.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
-extern bool useMultipleOplogEntryFormatForTransactions;
 namespace {
 
 using repl::OplogEntry;
@@ -1308,13 +1308,13 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
 
 class OpObserverMultiEntryTransactionTest : public OpObserverTransactionTest {
     void setUp() override {
-        useMultipleOplogEntryFormatForTransactions = true;
+        gUseMultipleOplogEntryFormatForTransactions = true;
         OpObserverTransactionTest::setUp();
     }
 
     void tearDown() override {
         OpObserverTransactionTest::tearDown();
-        useMultipleOplogEntryFormatForTransactions = false;
+        gUseMultipleOplogEntryFormatForTransactions = false;
     }
 };
 

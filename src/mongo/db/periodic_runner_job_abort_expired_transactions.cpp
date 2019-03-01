@@ -37,6 +37,7 @@
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_participant_gen.h"
 #include "mongo/util/log.h"
 #include "mongo/util/periodic_runner.h"
 
@@ -62,7 +63,7 @@ void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContex
     PeriodicRunner::PeriodicJob job("startPeriodicThreadToAbortExpiredTransactions",
                                     [](Client* client) {
                                         static int seconds = 0;
-                                        int lifetime = transactionLifetimeLimitSeconds.load();
+                                        int lifetime = gTransactionLifetimeLimitSeconds.load();
 
                                         invariant(lifetime >= 1);
                                         int period = lifetime / 2;

@@ -56,6 +56,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_participant_gen.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -65,9 +66,6 @@
 
 namespace mongo {
 using repl::OplogEntry;
-
-// This is a startup server parameter defined in transaction_participant.cpp.
-extern bool useMultipleOplogEntryFormatForTransactions;
 
 namespace {
 
@@ -1239,7 +1237,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         return;
 
     repl::OpTime commitOpTime;
-    if (!useMultipleOplogEntryFormatForTransactions) {
+    if (!gUseMultipleOplogEntryFormatForTransactions) {
         commitOpTime = logApplyOpsForTransaction(opCtx, statements, OplogSlot()).writeOpTime;
     } else {
         // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
@@ -1288,7 +1286,7 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
         return;
     }
 
-    if (!useMultipleOplogEntryFormatForTransactions) {
+    if (!gUseMultipleOplogEntryFormatForTransactions) {
         // We write the oplog entry in a side transaction so that we do not commit the now-prepared
         // transaction.
         // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp

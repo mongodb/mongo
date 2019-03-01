@@ -59,37 +59,12 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/transaction_participant_gen.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
-
-// Server parameter that dictates the max number of milliseconds that any transaction lock request
-// will wait for lock acquisition. If an operation provides a greater timeout in a lock request,
-// maxTransactionLockRequestTimeoutMillis will override it. If this is set to a negative value, it
-// is inactive and nothing will be overridden.
-//
-// 5 milliseconds will help avoid deadlocks, but will still allow fast-running metadata operations
-// to run without aborting transactions.
-MONGO_EXPORT_SERVER_PARAMETER(maxTransactionLockRequestTimeoutMillis, int, 5);
-
-// Server parameter that dictates the lifetime given to each transaction.
-// Transactions must eventually expire to preempt storage cache pressure immobilizing the system.
-MONGO_EXPORT_SERVER_PARAMETER(transactionLifetimeLimitSeconds, std::int32_t, 60)
-    ->withValidator([](const auto& potentialNewValue) {
-        if (potentialNewValue < 1) {
-            return Status(ErrorCodes::BadValue,
-                          "transactionLifetimeLimitSeconds must be greater than or equal to 1s");
-        }
-
-        return Status::OK();
-    });
-
-// The useMultipleOplogEntryFormatForTransactions is for gating the new oplog format for
-// transactions, to allow transactions > 16MB, while in development.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(useMultipleOplogEntryFormatForTransactions, bool, false);
-
 namespace {
 
 // Failpoint which will pause an operation just after allocating a point-in-time storage engine
@@ -431,7 +406,7 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(Operati
     auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
     auto tickSource = opCtx->getServiceContext()->getTickSource();
 
-    o(lk).transactionExpireDate = now + Seconds(transactionLifetimeLimitSeconds.load());
+    o(lk).transactionExpireDate = now + Seconds(gTransactionLifetimeLimitSeconds.load());
 
     o(lk).transactionMetricsObserver.onStart(
         ServerTransactionsMetrics::get(opCtx->getServiceContext()),
@@ -580,7 +555,7 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
     invariant(opCtx->writesAreReplicated());
     // This thread must still respect the transaction lock timeout, since it can prevent the
     // transaction from making progress.
-    auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
+    auto maxTransactionLockMillis = gMaxTransactionLockRequestTimeoutMillis.load();
     if (maxTransactionLockMillis >= 0) {
         opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
     }
@@ -646,7 +621,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
 
     // This thread must still respect the transaction lock timeout, since it can prevent the
     // transaction from making progress.
-    auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
+    auto maxTransactionLockMillis = gMaxTransactionLockRequestTimeoutMillis.load();
     if (stashStyle != StashStyle::kSecondary && maxTransactionLockMillis >= 0) {
         opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
     }
@@ -822,7 +797,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
     // to acquire a lock. This is to avoid deadlocks and minimize non-transaction
     // operation performance degradations.
-    auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
+    auto maxTransactionLockMillis = gMaxTransactionLockRequestTimeoutMillis.load();
     if (opCtx->writesAreReplicated() && maxTransactionLockMillis >= 0) {
         opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
     }
@@ -1026,7 +1001,7 @@ void TransactionParticipant::Participant::addTransactionOperation(
                           << BSONObjMaxInternalSize
                           << ". Actual size is "
                           << p().transactionOperationBytes,
-            useMultipleOplogEntryFormatForTransactions ||
+            gUseMultipleOplogEntryFormatForTransactions ||
                 p().transactionOperationBytes <= BSONObjMaxInternalSize);
 }
 

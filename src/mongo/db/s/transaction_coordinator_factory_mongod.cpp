@@ -32,6 +32,7 @@
 #include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction_participant_gen.h"
 
 namespace mongo {
 
@@ -46,7 +47,7 @@ MONGO_REGISTER_SHIM(createTransactionCoordinator)
         opCtx,
         clientLsid,
         clientTxnNumber,
-        clockSource->now() + Seconds(transactionLifetimeLimitSeconds.load()));
+        clockSource->now() + Seconds(gTransactionLifetimeLimitSeconds.load()));
 }
 
 }  // namespace mongo
