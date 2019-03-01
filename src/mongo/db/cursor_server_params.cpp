@@ -32,7 +32,6 @@
 #include "mongo/db/cursor_server_params.h"
 
 #include "mongo/db/cursor_server_params_gen.h"
-#include "mongo/db/server_parameters.h"
 
 namespace mongo {
 

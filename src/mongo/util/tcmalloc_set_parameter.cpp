@@ -43,7 +43,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"

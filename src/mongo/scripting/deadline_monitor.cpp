@@ -32,7 +32,6 @@
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/deadline_monitor_gen.h"
 
-#include "mongo/db/server_parameters.h"
 
 namespace mongo {
 

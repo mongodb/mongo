@@ -38,7 +38,6 @@
 
 #include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"

@@ -37,7 +37,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/task_executor_pool.h"

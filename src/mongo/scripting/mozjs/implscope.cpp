@@ -39,7 +39,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/stack_locator.h"
 #include "mongo/scripting/jsexception.h"

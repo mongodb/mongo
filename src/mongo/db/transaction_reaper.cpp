@@ -39,7 +39,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection.h"
 #include "mongo/db/transaction_reaper_gen.h"

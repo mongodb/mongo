@@ -30,7 +30,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/stacktrace.h"

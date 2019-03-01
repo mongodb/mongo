@@ -38,7 +38,6 @@
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"

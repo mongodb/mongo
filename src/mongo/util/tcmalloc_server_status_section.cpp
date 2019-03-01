@@ -40,7 +40,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"

@@ -52,7 +52,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"

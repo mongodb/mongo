@@ -52,7 +52,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/retryable_writes_stats.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/session.h"

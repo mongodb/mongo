@@ -42,7 +42,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/executor/connection_pool.h"

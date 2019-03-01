@@ -34,7 +34,6 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_tl.h"

@@ -46,7 +46,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/mutex.h"

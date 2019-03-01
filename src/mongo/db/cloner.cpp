@@ -60,7 +60,6 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"

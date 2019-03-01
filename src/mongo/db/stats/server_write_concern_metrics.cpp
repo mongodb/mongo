@@ -34,7 +34,6 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/server_write_concern_metrics_gen.h"
 

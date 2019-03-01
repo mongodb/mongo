@@ -25,7 +25,6 @@ env.Library(
     LIBDEPS=[
         'resolved_view',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/db/pipeline/aggregation',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',

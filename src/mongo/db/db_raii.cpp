@@ -39,7 +39,6 @@
 #include "mongo/db/db_raii_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/util/log.h"
 

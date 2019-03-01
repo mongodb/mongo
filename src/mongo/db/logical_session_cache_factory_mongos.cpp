@@ -34,7 +34,6 @@
 #include "mongo/db/logical_session_cache_factory_mongos.h"
 
 #include "mongo/db/logical_session_cache_impl.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_liaison_mongos.h"
 #include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/stdx/memory.h"

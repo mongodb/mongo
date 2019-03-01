@@ -61,7 +61,6 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongod_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"

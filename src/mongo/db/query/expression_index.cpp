@@ -37,7 +37,6 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/query/expression_index_knobs_gen.h"
-#include "mongo/db/server_parameters.h"
 #include "third_party/s2/s2cellid.h"
 #include "third_party/s2/s2region.h"
 #include "third_party/s2/s2regioncoverer.h"

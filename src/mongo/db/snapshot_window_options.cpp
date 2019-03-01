@@ -31,7 +31,6 @@
 
 #include "mongo/db/snapshot_window_options.h"
 
-#include "mongo/db/server_parameters.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 

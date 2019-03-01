@@ -52,7 +52,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/util/processinfo',
         'ftdc'
     ] + platform_libs,

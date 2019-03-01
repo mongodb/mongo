@@ -49,7 +49,6 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"

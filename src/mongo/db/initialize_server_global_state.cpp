@@ -48,7 +48,6 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event.h"

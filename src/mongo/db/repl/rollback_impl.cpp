@@ -54,7 +54,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/type_shard_identity.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/session_catalog_mongod.h"

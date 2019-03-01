@@ -42,7 +42,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/idl/server_parameter.h"
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/stringutils.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {

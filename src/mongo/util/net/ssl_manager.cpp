@@ -42,7 +42,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/hex.h"

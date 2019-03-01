@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/server_parameters.h"
 
 namespace mongo {
 

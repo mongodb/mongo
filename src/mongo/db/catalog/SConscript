@@ -22,7 +22,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/command_generic_argument',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
-        '$BUILD_DIR/mongo/db/server_parameters',
     ],
 )
 

@@ -31,7 +31,6 @@
 
 #include "mongo/db/storage/storage_options.h"
 
-#include "mongo/db/server_parameters.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/mongoutils/str.h"
 

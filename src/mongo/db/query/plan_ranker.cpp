@@ -44,7 +44,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 
 namespace {

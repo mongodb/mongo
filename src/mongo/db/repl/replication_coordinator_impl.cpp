@@ -74,7 +74,6 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"

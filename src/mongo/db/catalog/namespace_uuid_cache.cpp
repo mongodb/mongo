@@ -37,7 +37,6 @@
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/namespace_uuid_cache_gen.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

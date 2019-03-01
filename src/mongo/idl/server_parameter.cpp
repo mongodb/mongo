@@ -43,6 +43,51 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
                         ("BeginServerParameterRegistration"),
                         ("BeginStartupOptionHandling"))
 
+ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
+    : ServerParameter(ServerParameterSet::getGlobal(),
+                      name,
+                      spt != SPT::kRuntimeOnly,
+                      spt != SPT::kStartupOnly) {}
+
+ServerParameter::ServerParameter(ServerParameterSet* sps,
+                                 StringData name,
+                                 bool allowedToChangeAtStartup,
+                                 bool allowedToChangeAtRuntime)
+    : _name(name.toString()),
+      _allowedToChangeAtStartup(allowedToChangeAtStartup),
+      _allowedToChangeAtRuntime(allowedToChangeAtRuntime) {
+    if (sps) {
+        sps->add(this);
+    }
+}
+
+ServerParameter::ServerParameter(ServerParameterSet* sps, StringData name)
+    : _name(name.toString()), _allowedToChangeAtStartup(true), _allowedToChangeAtRuntime(true) {
+    if (sps) {
+        sps->add(this);
+    }
+}
+
+namespace {
+ServerParameterSet* gGlobalServerParameterSet = nullptr;
+}  // namespace
+
+ServerParameterSet* ServerParameterSet::getGlobal() {
+    if (!gGlobalServerParameterSet) {
+        gGlobalServerParameterSet = new ServerParameterSet();
+    }
+    return gGlobalServerParameterSet;
+}
+
+void ServerParameterSet::add(ServerParameter* sp) {
+    ServerParameter*& x = _map[sp->name()];
+    if (x) {
+        severe() << "'" << x->name() << "' already exists in the server parameter set.";
+        abort();
+    }
+    x = sp;
+}
+
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,
                                                                      ServerParameter* sp)
     : ServerParameter(ServerParameterSet::getGlobal(),
@@ -73,6 +118,45 @@ Status IDLServerParameterDeprecatedAlias::setFromString(const std::string& str) 
     warning() << "Use of deprecared server parameter '" << name() << "', please use '"
               << _sp->name() << "' instead.";
     return _sp->setFromString(str);
+}
+
+namespace {
+class DisabledTestParameter : public ServerParameter {
+public:
+    DisabledTestParameter() = delete;
+
+    DisabledTestParameter(ServerParameter* sp)
+        : ServerParameter(
+              nullptr, sp->name(), sp->allowedToChangeAtStartup(), sp->allowedToChangeAtRuntime()),
+          _sp(sp) {
+        setTestOnly();
+    }
+
+    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final {}
+
+    Status setFromString(const std::string&) final {
+        return {ErrorCodes::BadValue,
+                str::stream() << "setParameter: '" << name()
+                              << "' is only supported with 'enableTestCommands=true'"};
+    }
+
+    Status set(const BSONElement& newValueElement) final {
+        return setFromString("");
+    }
+
+private:
+    // Retain the original pointer to avoid ASAN complaining.
+    ServerParameter* _sp;
+};
+}  // namespace
+
+void ServerParameterSet::disableTestParameters() {
+    for (auto& spit : _map) {
+        auto*& sp = spit.second;
+        if (sp->isTestOnly()) {
+            sp = new DisabledTestParameter(sp);
+        }
+    }
 }
 
 }  // namespace mongo

@@ -46,7 +46,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/transport/message_compressor_registry.h"

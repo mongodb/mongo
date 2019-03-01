@@ -36,7 +36,6 @@
 #include <array>
 #include <random>
 
-#include "mongo/db/server_parameters.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_task_names.h"

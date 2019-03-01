@@ -35,20 +35,126 @@
  * rather parameters should be defined in .idl files.
  */
 
-#include <functional>
 #include <string>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/server_parameters.h"
 
 #define MONGO_SERVER_PARAMETER_REGISTER(name) \
     MONGO_INITIALIZER_GENERAL(                \
         name, ("BeginServerParameterRegistration"), ("EndServerParameterRegistration"))
 
 namespace mongo {
+
+/**
+ * Server Parameters can be set startup up and/or runtime.
+ *
+ * At startup, --setParameter ... or config file is used.
+ * At runtime, { setParameter : 1, ...} is used.
+ */
+enum class ServerParameterType {
+
+    /**
+     * Parameter can only be set via runCommand.
+     */
+    kRuntimeOnly,
+
+    /**
+     * Parameter can only be set via --setParameter, and is only read at startup after command-line
+     * parameters, and the config file are processed.
+     */
+    kStartupOnly,
+
+    /**
+     * Parameter can be set at both startup and runtime.
+     */
+    kStartupAndRuntime,
+};
+
+class ServerParameterSet;
+class OperationContext;
+
+class ServerParameter {
+public:
+    using Map = std::map<std::string, ServerParameter*>;
+
+    ServerParameter(StringData name, ServerParameterType spt);
+    ServerParameter(ServerParameterSet* sps,
+                    StringData name,
+                    bool allowedToChangeAtStartup,
+                    bool allowedToChangeAtRuntime);
+    ServerParameter(ServerParameterSet* sps, StringData name);
+    virtual ~ServerParameter() = default;
+
+    std::string name() const {
+        return _name;
+    }
+
+    /**
+     * @return if you can set on command line or config file
+     */
+    bool allowedToChangeAtStartup() const {
+        return _allowedToChangeAtStartup;
+    }
+
+    /**
+     * @param if you can use (get|set)Parameter
+     */
+    bool allowedToChangeAtRuntime() const {
+        return _allowedToChangeAtRuntime;
+    }
+
+
+    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) = 0;
+
+    virtual Status set(const BSONElement& newValueElement) = 0;
+
+    virtual Status setFromString(const std::string& str) = 0;
+
+    bool isTestOnly() const {
+        return _testOnly;
+    }
+
+    void setTestOnly() {
+        _testOnly = true;
+    }
+
+private:
+    std::string _name;
+    bool _allowedToChangeAtStartup;
+    bool _allowedToChangeAtRuntime;
+    bool _testOnly = false;
+};
+
+class ServerParameterSet {
+public:
+    using Map = ServerParameter::Map;
+
+    void add(ServerParameter* sp);
+
+    const Map& getMap() const {
+        return _map;
+    }
+
+    static ServerParameterSet* getGlobal();
+
+    void disableTestParameters();
+
+    template <typename T = ServerParameter>
+    T* get(StringData name) {
+        const auto& it = _map.find(name.toString());
+        uassert(ErrorCodes::NoSuchKey,
+                str::stream() << "Unknown server parameter: " << name,
+                it != _map.end());
+        return checked_cast<T*>(it->second);
+    }
+
+private:
+    Map _map;
+};
 
 /**
  * Proxy instance for deprecated aliases of set parameters.
