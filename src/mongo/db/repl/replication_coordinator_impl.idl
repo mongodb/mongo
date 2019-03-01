@@ -56,3 +56,12 @@ server_parameters:
         validator:
             gt: 0
             lte: 10
+
+    testingSnapshotBehaviorInIsolation:
+        # SERVER-31304 rename this parameter to something more appropriate.
+        description: >-
+            Allows for testing of snapshot behavior by skipping the replication
+            related checks and isolating the storage/query side of snapshotting.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gTestingSnapshotBehaviorInIsolation

@@ -175,15 +175,6 @@ BSONObj incrementConfigVersionByRandom(BSONObj config) {
     return builder.obj();
 }
 
-// This is a special flag that allows for testing of snapshot behavior by skipping the replication
-// related checks and isolating the storage/query side of snapshotting.
-// SERVER-31304 rename this parameter to something more appropriate.
-bool testingSnapshotBehaviorInIsolation = false;
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshotBehaviorInIsolation(
-    ServerParameterSet::getGlobal(),
-    "testingSnapshotBehaviorInIsolation",
-    &testingSnapshotBehaviorInIsolation);
-
 }  // namespace
 
 ReplicationCoordinatorImpl::Waiter::Waiter(OpTime _opTime, const WriteConcernOptions* _writeConcern)
@@ -1547,7 +1538,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
             }
 
             // Fall through to wait for "majority" write concern.
-        } else if (_externalState->snapshotsEnabled() && !testingSnapshotBehaviorInIsolation) {
+        } else if (_externalState->snapshotsEnabled() && !gTestingSnapshotBehaviorInIsolation) {
             // Make sure we have a valid "committed" snapshot up to the needed optime.
             if (!_currentCommittedSnapshot) {
                 return false;
@@ -3453,7 +3444,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     if (stableOpTime) {
         LOG(2) << "Setting replication's stable optime to " << stableOpTime.value();
 
-        if (!testingSnapshotBehaviorInIsolation) {
+        if (!gTestingSnapshotBehaviorInIsolation) {
             // Update committed snapshot and wake up any threads waiting on read concern or
             // write concern.
             if (serverGlobalParams.enableMajorityReadConcern) {
@@ -3709,7 +3700,7 @@ MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
 
 bool ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
     const OpTime& newCommittedSnapshot) {
-    if (testingSnapshotBehaviorInIsolation) {
+    if (gTestingSnapshotBehaviorInIsolation) {
         return false;
     }
 
