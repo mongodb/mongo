@@ -140,6 +140,11 @@ class Task(object):
             return ResmokeArgs.get_arg(args, "suites")
         return None
 
+    @property
+    def tags(self):
+        """Get a set of tags this task has been marked with."""
+        return set(self.raw.get("tags", []))
+
     def __str__(self):
         return self.name
 

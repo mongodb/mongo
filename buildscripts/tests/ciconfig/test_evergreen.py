@@ -76,12 +76,12 @@ class TestTask(unittest.TestCase):
 
     def test_from_dict(self):
         task_dict = {
-            "name":
-                "compile", "depends_on": [],
+            "name": "compile",
+            "depends_on": [],
             "commands": [{"func": "fetch source"}, {"func": "run a task that passes"},
                          {"func": "run a function with an arg", "vars": {"foobar": "TESTING: ONE"}},
                          {"func": "run a function with an arg", "vars": {"foobar": "TESTING: TWO"}}]
-        }
+        }  # yapf: disable
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("compile", task.name)
@@ -90,12 +90,12 @@ class TestTask(unittest.TestCase):
 
     def test_resmoke_args(self):
         task_dict = {
-            "name":
-                "jsCore", "commands": [{
-                    "func": "run tests",
-                    "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
-                }]
-        }
+            "name": "jsCore",
+            "commands": [{
+                "func": "run tests",
+                "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
+            }]
+        }  # yapf: disable
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
@@ -103,12 +103,12 @@ class TestTask(unittest.TestCase):
 
     def test_resmoke_args_gen(self):
         task_dict = {
-            "name":
-                "jsCore", "commands": [{
-                    "func": "generate resmoke tasks",
-                    "vars": {"task": "core", "resmoke_args": "--shellWriteMode=commands"}
-                }]
-        }
+            "name": "jsCore",
+            "commands": [{
+                "func": "generate resmoke tasks",
+                "vars": {"task": "core", "resmoke_args": "--shellWriteMode=commands"}
+            }]
+        }  # yapf: disable
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
@@ -116,18 +116,46 @@ class TestTask(unittest.TestCase):
 
     def test_resmoke_args_gen_with_suite(self):
         task_dict = {
-            "name":
-                "jsCore", "commands": [{
-                    "func": "generate resmoke tasks", "vars": {
-                        "task": "jsCore", "suite": "core",
-                        "resmoke_args": "--shellWriteMode=commands"
-                    }
-                }]
-        }
+            "name": "jsCore",
+            "commands": [{
+                "func": "generate resmoke tasks", "vars": {
+                    "task": "jsCore", "suite": "core",
+                    "resmoke_args": "--shellWriteMode=commands"
+                }
+            }]
+        }  # yapf: disable
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
         self.assertEqual("core", task.resmoke_suite)
+
+    def test_tags_with_no_tags(self):
+        task_dict = {
+            "name": "jsCore",
+            "commands": [{
+                "func": "run tests",
+                "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
+            }]
+        }  # yapf: disable
+        task = _evergreen.Task(task_dict)
+
+        self.assertEqual(0, len(task.tags))
+
+    def test_tags_with_tags(self):
+        task_dict = {
+            "name": "jsCore",
+            "tags": ["tag 0", "tag 1", "tag 2"],
+            "commands": [{
+                "func": "run tests",
+                "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
+            }]
+        }  # yapf: disable
+        task = _evergreen.Task(task_dict)
+
+        tag_set = task.tags
+        for tag in task_dict["tags"]:
+            self.assertIn(tag, tag_set)
+        self.assertEqual(len(task_dict["tags"]), len(tag_set))
 
 
 class TestTaskGroup(unittest.TestCase):
