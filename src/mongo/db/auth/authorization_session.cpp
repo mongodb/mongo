@@ -779,7 +779,9 @@ static int buildResourceSearchList(const ResourcePattern& target,
         }
         resourceSearchList[size++] = ResourcePattern::forCollectionName(target.ns().coll());
     } else if (target.isDatabasePattern()) {
-        resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
+        if (target.ns().db() != "local" && target.ns().db() != "config") {
+            resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
+        }
     }
     resourceSearchList[size++] = target;
     dassert(size <= resourceSearchListCapacity);
