@@ -30,25 +30,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
-
-#include "mongo/db/server_parameters.h"
+#include "mongo/db/commands/test_commands_enabled_gen.h"
 
 namespace mongo {
-namespace {
-
-bool enabled = false;
-
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsParameter(
-    ServerParameterSet::getGlobal(), "enableTestCommands", &enabled);
-
-}  // namespace
 
 bool getTestCommandsEnabled() {
-    return enabled;
+    return gEnableTestCommands;
 }
 
 void setTestCommandsEnabled(bool b) {
-    enabled = b;
+    gEnableTestCommands = b;
 }
 
 }  // namespace mongo

@@ -1954,7 +1954,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if param.redact:
             self._writer.write_line('ret->setRedact();')
 
-        if param.default is not None:
+        if param.default and not (param.cpp_vartype and param.cpp_varname):
+            # Only need to call setValue() if we haven't in-place initialized the declared var.
             self._writer.write_line('uassertStatusOK(ret->setValue(%s));' %
                                     (_get_expression(param.default)))
 

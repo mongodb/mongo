@@ -9,9 +9,10 @@ env.Library(
     target="test_commands_enabled",
     source=[
         "test_commands_enabled.cpp",
+        env.Idlc('test_commands_enabled.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/idl/server_parameter',
         "server_status_core",
     ]
 )
