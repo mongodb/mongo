@@ -31,32 +31,9 @@
 #include "mongo/rpc/object_check.h"
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bson_depth.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/util/stringutils.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
-namespace {
-
-MONGO_COMPILER_VARIABLE_UNUSED auto _exportedMaxBSONDepth =
-    (new ExportedServerParameter<std::int32_t, ServerParameterType::kStartupOnly>(
-        ServerParameterSet::getGlobal(), "maxBSONDepth", &BSONDepth::maxAllowableDepth))
-        -> withValidator([](const std::int32_t& potentialNewValue) {
-            if (potentialNewValue < BSONDepth::kBSONDepthParameterFloor ||
-                potentialNewValue > BSONDepth::kBSONDepthParameterCeiling) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "maxBSONDepth must be between "
-                                            << BSONDepth::kBSONDepthParameterFloor
-                                            << " and "
-                                            << BSONDepth::kBSONDepthParameterCeiling
-                                            << ", inclusive");
-            }
-            return Status::OK();
-        });
-
-}  // namespace
-
 Status Validator<BSONObj>::validateStore(const BSONObj& toStore) {
     return Status::OK();
 }

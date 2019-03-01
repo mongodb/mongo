@@ -51,6 +51,7 @@ env.Library(
         'legacy_reply.cpp',
         'legacy_reply_builder.cpp',
         'reply_builder_interface.cpp',
+        env.Idlc('object_check.idl')[0],
     ],
     LIBDEPS=[
         'metadata',
@@ -58,9 +59,11 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/db/server_parameters',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/s/common_s',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
