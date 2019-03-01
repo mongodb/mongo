@@ -350,7 +350,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "linkbench"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -361,7 +360,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "tpcc"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -372,7 +370,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "insert_remove"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -383,7 +380,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "service_architecture_workloads"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -394,7 +390,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "big_update"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -441,7 +436,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "crud_workloads"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -452,7 +446,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "mixed_workloads"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -463,7 +456,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "misc_workloads"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -474,7 +466,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "map_reduce_workloads"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -485,7 +476,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "short"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -496,7 +486,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "retryable_writes"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -507,7 +496,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "snapshot_reads"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -518,7 +506,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "secondary_reads"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -529,7 +516,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "bestbuy_agg"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -540,7 +526,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "bestbuy_agg_out"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -551,7 +536,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "bestbuy_query"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -562,7 +546,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "non_sharded"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -573,7 +556,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "mongos"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -584,7 +566,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "mongos_large_catalog"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -595,7 +576,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "move_chunk"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -606,7 +586,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "move_chunk_waiting"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -619,7 +598,6 @@ tasks:
         # Unfortunately the dash/underscore style is different for mongodb_setup and test_control
         test: "secondary_performance"
         setup: "secondary-performance"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -662,7 +640,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "change_streams_throughput"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -673,7 +650,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "change_streams_latency"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -684,7 +660,6 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "change_streams_multi_mongos"
-        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -915,7 +890,7 @@ buildvariants:
     cluster: shard-lite
     platform: linux
     project_dir: *project_dir
-    authentication: disabled
+    authentication: enabled
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-shard-lite"
