@@ -2365,6 +2365,24 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "dbstats_on_local",
+          command: {dbStats: 1},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: "local",
+                roles: {
+                    "readLocal": 1,
+                    "readWriteLocal": 1,
+                    "clusterAdmin": 1,
+                    "clusterMonitor": 1,
+                    "root": 1,
+                    "__system": 1,
+                },
+              },
+          ]
+        },
+        {
           testname: "find_config_changelog",
           command: {find: "changelog"},
           testcases: [
