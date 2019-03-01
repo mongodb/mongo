@@ -76,18 +76,14 @@ class KVCollectionCatalogEntry::RemoveIndexChange : public RecoveryUnit::Change 
 public:
     RemoveIndexChange(OperationContext* opCtx,
                       KVCollectionCatalogEntry* cce,
-                      OptionalCollectionUUID uuid,
                       const NamespaceString& indexNss,
                       StringData indexName,
                       StringData ident)
         : _opCtx(opCtx),
           _cce(cce),
-          _uuid(uuid),
           _indexNss(indexNss),
           _indexName(indexName),
-          _ident(ident.toString()) {
-        invariant(uuid);
-    }
+          _ident(ident.toString()) {}
 
     virtual void rollback() {}
     virtual void commit(boost::optional<Timestamp> commitTimestamp) {
@@ -96,9 +92,8 @@ public:
         auto engine = _cce->_engine;
         auto storageEngine = engine->getStorageEngine();
         if (storageEngine->supportsPendingDrops() && commitTimestamp) {
-            log() << "Deferring table drop for index '" << _indexName << "' on collection '"
-                  << _indexNss << " (" << _uuid << ")'. Ident: '" << _ident
-                  << "', commit timestamp: '" << commitTimestamp << "'";
+            log() << "Deferring ident drop for " << _ident << " (" << _indexNss
+                  << ") with commit timestamp: " << commitTimestamp;
             engine->addDropPendingIdent(*commitTimestamp, _indexNss, _ident);
         } else {
             auto kvEngine = engine->getEngine();
@@ -108,7 +103,6 @@ public:
 
     OperationContext* const _opCtx;
     KVCollectionCatalogEntry* const _cce;
-    OptionalCollectionUUID _uuid;
     const NamespaceString _indexNss;
     const std::string _indexName;
     const std::string _ident;
@@ -213,8 +207,8 @@ Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData
     _catalog->putMetaData(opCtx, ns().toString(), md);
 
     // Lazily remove to isolate underlying engine from rollback.
-    opCtx->recoveryUnit()->registerChange(new RemoveIndexChange(
-        opCtx, this, md.options.uuid, ns().makeIndexNamespace(indexName), indexName, ident));
+    opCtx->recoveryUnit()->registerChange(
+        new RemoveIndexChange(opCtx, this, ns().makeIndexNamespace(indexName), indexName, ident));
     return Status::OK();
 }
 

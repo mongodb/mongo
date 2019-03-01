@@ -80,18 +80,14 @@ class KVDatabaseCatalogEntryBase::RemoveCollectionChange : public RecoveryUnit::
 public:
     RemoveCollectionChange(OperationContext* opCtx,
                            KVDatabaseCatalogEntryBase* dce,
-                           OptionalCollectionUUID uuid,
                            StringData collection,
                            StringData ident,
                            KVCollectionCatalogEntry* entry)
         : _opCtx(opCtx),
           _dce(dce),
-          _uuid(uuid),
           _collection(collection.toString()),
           _ident(ident.toString()),
-          _entry(entry) {
-        invariant(uuid);
-    }
+          _entry(entry) {}
 
     virtual void commit(boost::optional<Timestamp> commitTimestamp) {
         delete _entry;
@@ -101,8 +97,8 @@ public:
         auto engine = _dce->_engine;
         auto storageEngine = engine->getStorageEngine();
         if (storageEngine->supportsPendingDrops() && commitTimestamp) {
-            log() << "Deferring table drop for collection '" << _collection << " (" << _uuid
-                  << ")'. Ident: " << _ident << ", commit timestamp: " << commitTimestamp;
+            log() << "Deferring ident drop for " << _ident << " (" << _collection
+                  << ") with commit timestamp: " << commitTimestamp;
             engine->addDropPendingIdent(*commitTimestamp, NamespaceString(_collection), _ident);
         } else {
             auto kvEngine = engine->getEngine();
@@ -116,7 +112,6 @@ public:
 
     OperationContext* const _opCtx;
     KVDatabaseCatalogEntryBase* const _dce;
-    OptionalCollectionUUID _uuid;
     const std::string _collection;
     const std::string _ident;
     KVCollectionCatalogEntry* const _entry;
@@ -387,8 +382,6 @@ Status KVDatabaseCatalogEntryBase::dropCollection(OperationContext* opCtx, Strin
 
     invariant(entry->getTotalIndexCount(opCtx) == 0);
 
-    BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, ns);
-    OptionalCollectionUUID uuid = md.options.uuid;
     const std::string ident = _engine->getCatalog()->getCollectionIdent(ns);
 
     Status status = _engine->getCatalog()->dropCollection(opCtx, ns);
@@ -399,7 +392,7 @@ Status KVDatabaseCatalogEntryBase::dropCollection(OperationContext* opCtx, Strin
     // This will lazily delete the KVCollectionCatalogEntry and notify the storageEngine to
     // drop the collection only on WUOW::commit().
     opCtx->recoveryUnit()->registerChange(
-        new RemoveCollectionChange(opCtx, this, uuid, ns, ident, it->second));
+        new RemoveCollectionChange(opCtx, this, ns, ident, it->second));
 
     _collections.erase(ns.toString());
 
