@@ -113,7 +113,7 @@ public:
 
     /**
      * Release a cursor into the cursor cache and close old cursors if the number of cursors in the
-     * cache exceeds kWiredTigerCursorCacheSize.
+     * cache exceeds wiredTigerCursorCacheSize.
      */
     void releaseCursor(uint64_t id, WT_CURSOR* cursor);
 
