@@ -27,19 +27,24 @@
     // Open a change stream cursor to listen for subsequent events.
     let csCursor = mongosColl.watch([], {cursor: {batchSize: 1}});
 
-    // Update both documents in the collection, such that the events will have the same clusterTime.
-    // We update twice to ensure that the PBRT for both shards moves past the first two updates.
+    // Update both documents in the collection, such that the events are likely to have the same
+    // clusterTime. We update twice to ensure that the PBRT for both shards moves past the first two
+    // updates.
     assert.commandWorked(mongosColl.update({}, {$set: {updated: 1}}, {multi: true}));
     assert.commandWorked(mongosColl.update({}, {$set: {updatedAgain: 1}}, {multi: true}));
 
-    // Retrieve the first two events, confirm that they are in order with the same clusterTime.
+    // Retrieve the first two events and confirm that they are in order with non-descending
+    // clusterTime. Unfortunately we cannot guarantee that clusterTime will be identical, since it
+    // is based on each shard's local value and there are operations beyond noop write that can
+    // bump the oplog timestamp. We expect however that they will be identical for most test runs,
+    // so there is value in testing.
     let clusterTime = null, updateEvent = null;
     for (let id of[-10, 10]) {
         assert.soon(() => csCursor.hasNext());
         updateEvent = csCursor.next();
         assert.eq(updateEvent.documentKey._id, id);
         clusterTime = (clusterTime || updateEvent.clusterTime);
-        assert.eq(updateEvent.clusterTime, clusterTime);
+        assert.gte(updateEvent.clusterTime, clusterTime);
         assert.eq(updateEvent.updateDescription.updatedFields.updated, 1);
     }
 
@@ -56,7 +61,7 @@
         updateEvent = csCursor.next();
         assert.eq(updateEvent.documentKey._id, id);
         clusterTime = (clusterTime || updateEvent.clusterTime);
-        assert.eq(updateEvent.clusterTime, clusterTime);
+        assert.gte(updateEvent.clusterTime, clusterTime);
         assert.eq(updateEvent.updateDescription.updatedFields.updatedAgain, 1);
     }
 
