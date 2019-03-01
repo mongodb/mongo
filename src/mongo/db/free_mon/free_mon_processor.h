@@ -342,13 +342,21 @@ public:
 private:
     /**
      * Read the state from the database.
+     *
+     * Checks if the storage document has been delete locally or does not exist. If it is missing,
+     * generates a default disable state.
+     *
+     * If updateInMemory is true, update the state in memory with the state from disk. If false, do
+     * not update the state in memory from disk but instead treat the state in memory as
+     * authoritative. The is important for secondaries which may be in a different state for
+     * regsistration then there primary.
      */
-    void readState(OperationContext* opCtx);
+    void readState(OperationContext* opCtx, bool updateInMemory = true);
 
     /**
      * Create a short-lived opCtx and read the state from the database.
      */
-    void readState(Client* client);
+    void readState(Client* client, bool updateInMemory = true);
 
     /**
      * Write the state to disk if there are any changes.

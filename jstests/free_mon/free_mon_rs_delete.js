@@ -24,8 +24,8 @@ load("jstests/free_mon/libs/free_mon.js");
 
     mock_web.waitRegisters(2);
 
-    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
-    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
+    WaitForRegistration(rst.getPrimary());
+    WaitForRegistration(rst.getSecondary());
 
     const qs1 = mock_web.queryStats();
 
@@ -52,8 +52,8 @@ load("jstests/free_mon/libs/free_mon.js");
 
     sleep(20 * 1000);
 
-    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
-    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
+    WaitForRegistration(rst.getPrimary());
+    WaitForRegistration(rst.getSecondary());
 
     rst.stopSet();
 

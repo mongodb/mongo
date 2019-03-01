@@ -266,7 +266,7 @@ void FreeMonProcessor::run() {
     }
 }
 
-void FreeMonProcessor::readState(OperationContext* opCtx) {
+void FreeMonProcessor::readState(OperationContext* opCtx, bool updateInMemory) {
     auto state = FreeMonStorage::read(opCtx);
 
     _lastReadState = state;
@@ -274,7 +274,9 @@ void FreeMonProcessor::readState(OperationContext* opCtx) {
     if (state.is_initialized()) {
         invariant(state.get().getVersion() == kStorageVersion);
 
-        _state = state.get();
+        if (updateInMemory) {
+            _state = state.get();
+        }
     } else if (!state.is_initialized()) {
         // Default the state
         auto state = _state.synchronize();
@@ -287,9 +289,9 @@ void FreeMonProcessor::readState(OperationContext* opCtx) {
     }
 }
 
-void FreeMonProcessor::readState(Client* client) {
+void FreeMonProcessor::readState(Client* client, bool updateInMemory) {
     auto opCtx = client->makeOperationContext();
-    readState(opCtx.get());
+    readState(opCtx.get(), updateInMemory);
 }
 
 void FreeMonProcessor::writeState(Client* client) {
@@ -743,7 +745,10 @@ std::string compressMetrics(MetricsBuffer& buffer) {
 }
 
 void FreeMonProcessor::doMetricsSend(Client* client) {
-    readState(client);
+    // We want to read state from disk in case we asked to stop but otherwise
+    // use the in-memory state. It is important not to treat disk state as authoritative
+    // on secondaries.
+    readState(client, false);
 
     // Only continue metrics send if the local disk state (in-case user deleted local document)
     // and in-memory status both say to continue.
