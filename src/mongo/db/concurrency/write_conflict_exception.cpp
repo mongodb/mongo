@@ -53,11 +53,4 @@ void WriteConflictException::logAndBackoff(int attempt, StringData operation, St
         static_cast<size_t>(attempt),
         str::stream() << "Caught WriteConflictException doing " << operation << " on " << ns);
 }
-namespace {
-// for WriteConflictException
-ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> TraceWCExceptionsSetting(
-    ServerParameterSet::getGlobal(),
-    "traceWriteConflictExceptions",
-    &WriteConflictException::trace);
-}
 }
