@@ -361,20 +361,9 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         }));
     } else if (opType == OpTypeEnum::kCommand) {
         return finishApply(writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
-            // A command may need a global write lock. so we will conservatively go
-            // ahead and grab one for non-transaction commands.
-            // Transactions have to acquire the same locks on secondaries as on primary.
-            boost::optional<Lock::GlobalWrite> globalWriteLock;
-
             // TODO SERVER-37180 Remove this double-parsing.
             // The command entry has been parsed before, so it must be valid.
             auto entry = uassertStatusOK(OplogEntry::parse(op));
-            const StringData commandName(op["o"].embeddedObject().firstElementFieldName());
-            // SERVER-37313: createIndex does not need to take the Global X lock.
-            if (!op.getBoolField("prepare") && commandName != "abortTransaction" &&
-                commandName != "createIndexes" && commandName != "commitTransaction") {
-                globalWriteLock.emplace(opCtx);
-            }
 
             // A special case apply for commands to avoid implicit database creation.
             Status status = applyCommand_inlock(

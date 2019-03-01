@@ -927,6 +927,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          OplogApplication::Mode mode,
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
           const NamespaceString nss(parseNs(ns, cmd));
+          Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
               auto cmdWithoutIdIndex = cmd.removeField("idIndex");

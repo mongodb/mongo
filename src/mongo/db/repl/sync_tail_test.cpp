@@ -368,7 +368,7 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
                                             const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isW());
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(documentValidationDisabled(opCtx));
         ASSERT_EQUALS(nss, collNss);
