@@ -2,14 +2,12 @@
 (function() {
     'use strict';
 
-    var t = db.server9444;
+    load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
+
+    const t = db.server9444;
     t.drop();
 
-    var sharded = (typeof(RUNNING_IN_SHARDED_AGG_TEST) != 'undefined');  // see end of testshard1.js
-    if (sharded) {
-        assert.commandWorked(
-            db.adminCommand({shardcollection: t.getFullName(), key: {"_id": 'hashed'}}));
-    }
+    const sharded = FixtureHelpers.isSharded(t);
 
     var memoryLimitMB = sharded ? 200 : 100;
 
@@ -61,19 +59,6 @@
     test([{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {random: 1}}], groupCode);
     test([{$sort: {random: 1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}], sortCode);
 
-    var origDB = db;
-    if (sharded) {
-        // Stop balancer first before dropping so there will be no contention on the ns lock.
-        // It's alright to modify the global db variable since sharding tests never run in parallel.
-        db = db.getSiblingDB('config');
-        sh.stopBalancer();
-    }
-
     // don't leave large collection laying around
     t.drop();
-
-    if (sharded) {
-        sh.startBalancer();
-        db = origDB;
-    }
 })();

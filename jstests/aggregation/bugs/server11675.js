@@ -1,14 +1,10 @@
 // SERVER-11675 Text search integration with aggregation
-load('jstests/aggregation/extras/utils.js');
+(function() {
+    load('jstests/aggregation/extras/utils.js');  // For 'assertErrorCode'.
+    load('jstests/libs/fixture_helpers.js');      // For 'FixtureHelpers'
 
-const server11675 = function() {
     const coll = db.server11675;
     coll.drop();
-
-    if (typeof(RUNNING_IN_SHARDED_AGG_TEST) != 'undefined') {  // see end of testshard1.js
-        assert.commandWorked(
-            db.adminCommand({shardcollection: coll.getFullName(), key: {"_id": 1}}));
-    }
 
     assert.writeOK(coll.insert({_id: 1, text: "apple", words: 1}));
     assert.writeOK(coll.insert({_id: 2, text: "banana", words: 1}));
@@ -228,5 +224,4 @@ const server11675 = function() {
                     [{$project: {searchValue: {$text: {$search: 'apple banana'}}}}],
                     ErrorCodes.InvalidPipelineOperator);
     assertErrorCode(coll, [{$sort: {$text: {$search: 'apple banana'}}}], 17312);
-};
-server11675();
+})();
