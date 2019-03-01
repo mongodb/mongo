@@ -28,8 +28,8 @@ load("jstests/free_mon/libs/free_mon.js");
 
     mock_web.waitRegisters(2);
 
-    assert.eq(FreeMonGetServerStatus(rst.getPrimary()).state, 'enabled');
-    assert.eq(FreeMonGetServerStatus(rst.getSecondary()).state, 'enabled');
+    WaitForRegistration(rst.getPrimary());
+    WaitForRegistration(rst.getSecondary());
 
     const last_register = mock_web.query("last_register");
     print(tojson(last_register));

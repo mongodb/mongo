@@ -1487,7 +1487,7 @@ TEST_F(FreeMonControllerRSTest, StepdownDuringRegistration) {
     ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::pending);
 
     ASSERT_EQ(controller.registerCollector->count(), 1UL);
-    ASSERT_EQ(controller.metricsCollector->count(), 3UL);
+    ASSERT_EQ(controller.metricsCollector->count(), 2UL);
 }
 
 // Negative: Tricky: Primary becomes secondary during metrics send
