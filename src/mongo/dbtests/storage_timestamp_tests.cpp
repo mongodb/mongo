@@ -2909,27 +2909,22 @@ public:
         unittest::log() << "Prepare TS: " << prepareTs;
         logTimestamps();
 
-        auto commitTimestamp = commitEntryTs;
-
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
             auto coll = autoColl.getCollection();
             assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
             assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
-            assertDocumentAtTimestamp(coll, commitTimestamp, BSONObj());
 
             const auto prepareFilter = BSON("ts" << prepareTs);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, prepareTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, commitEntryTs, false);
-            assertOplogDocumentExistsAtTimestamp(prepareFilter, commitTimestamp, false);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, nullTs, false);
 
             const auto commitFilter = BSON("ts" << commitEntryTs);
             assertOplogDocumentExistsAtTimestamp(commitFilter, prepareTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, false);
-            assertOplogDocumentExistsAtTimestamp(commitFilter, commitTimestamp, false);
         }
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
 
@@ -2943,7 +2938,6 @@ public:
             assertOplogDocumentExistsAtTimestamp(prepareFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, prepareTs, true);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, commitEntryTs, true);
-            assertOplogDocumentExistsAtTimestamp(prepareFilter, commitTimestamp, true);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, nullTs, true);
 
             const auto commitFilter = BSON("ts" << commitEntryTs);
@@ -2951,7 +2945,6 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, prepareTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, false);
-            assertOplogDocumentExistsAtTimestamp(commitFilter, commitTimestamp, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, false);
 
             assertOldestActiveTxnTimestampEquals(boost::none, presentTs);
@@ -2959,11 +2952,10 @@ public:
             assertOldestActiveTxnTimestampEquals(prepareTs, prepareTs);
             assertOldestActiveTxnTimestampEquals(prepareTs, nullTs);
             assertOldestActiveTxnTimestampEquals(prepareTs, commitEntryTs);
-            assertOldestActiveTxnTimestampEquals(prepareTs, commitTimestamp);
         }
         txnParticipant.unstashTransactionResources(_opCtx, "commitTransaction");
 
-        txnParticipant.commitPreparedTransaction(_opCtx, commitTimestamp, {});
+        txnParticipant.commitPreparedTransaction(_opCtx, commitEntryTs, {});
         assertNoStartTimestamp();
 
         txnParticipant.stashTransactionResources(_opCtx);
@@ -2974,7 +2966,6 @@ public:
             assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
             assertDocumentAtTimestamp(coll, prepareTs, BSONObj());
             assertDocumentAtTimestamp(coll, commitEntryTs, doc);
-            assertDocumentAtTimestamp(coll, commitTimestamp, doc);
             assertDocumentAtTimestamp(coll, nullTs, doc);
 
             const auto prepareFilter = BSON("ts" << prepareTs);
@@ -2982,7 +2973,6 @@ public:
             assertOplogDocumentExistsAtTimestamp(prepareFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, prepareTs, true);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, commitEntryTs, true);
-            assertOplogDocumentExistsAtTimestamp(prepareFilter, commitTimestamp, true);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, nullTs, true);
 
             const auto commitFilter = BSON("ts" << commitEntryTs);
@@ -2990,14 +2980,12 @@ public:
             assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, prepareTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, true);
-            assertOplogDocumentExistsAtTimestamp(commitFilter, commitTimestamp, true);
             assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, true);
 
             assertOldestActiveTxnTimestampEquals(boost::none, presentTs);
             assertOldestActiveTxnTimestampEquals(boost::none, beforeTxnTs);
             assertOldestActiveTxnTimestampEquals(prepareTs, prepareTs);
             assertOldestActiveTxnTimestampEquals(boost::none, commitEntryTs);
-            assertOldestActiveTxnTimestampEquals(boost::none, commitTimestamp);
             assertOldestActiveTxnTimestampEquals(boost::none, nullTs);
         }
     }
