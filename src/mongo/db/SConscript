@@ -397,14 +397,17 @@ env.Library(
     target="server_options",
     source=[
         "server_options_helpers.cpp",
+        env.Idlc('server_options_helpers.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+        'server_options_core',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        'server_options_core',
-        'server_parameters',
     ],
 )
 

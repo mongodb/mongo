@@ -433,9 +433,4 @@ Status storeBaseOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-ExportedServerParameter<std::vector<std::string>, ServerParameterType::kStartupOnly>
-    SecureAllocatorDomains(ServerParameterSet::getGlobal(),
-                           "disabledSecureAllocatorDomains",
-                           &serverGlobalParams.disabledSecureAllocatorDomains);
-
 }  // namespace mongo
