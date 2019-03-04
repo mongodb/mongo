@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/filesystem/path.hpp>
 #include <boost/optional.hpp>
 #include <memory>
 #include <string>
@@ -119,5 +120,8 @@ private:
     std::string _storageEngine;
     BSONObj _storageEngineOptions;
 };
+
+bool fsyncFile(boost::filesystem::path path);
+void flushMyDirectory(const boost::filesystem::path& file);
 
 }  // namespace mongo

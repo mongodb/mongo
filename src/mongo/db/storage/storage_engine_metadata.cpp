@@ -65,6 +65,8 @@ namespace {
 
 const std::string kMetadataBasename = "storage.bson";
 
+}  // namespace
+
 bool fsyncFile(boost::filesystem::path path) {
     invariant(path.has_filename());
     File file;
@@ -75,8 +77,6 @@ bool fsyncFile(boost::filesystem::path path) {
     file.fsync();
     return true;
 }
-
-}  // namespace
 
 // static
 std::unique_ptr<StorageEngineMetadata> StorageEngineMetadata::forPath(const std::string& dbpath) {
