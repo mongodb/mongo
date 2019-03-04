@@ -48,6 +48,7 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -626,6 +627,13 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     // If the UUID we're targeting already exists, rename from there no matter what.
     if (!uiNss.isEmpty()) {
         sourceNss = uiNss;
+    }
+
+    // Check that the target namespace is in the correct form, "database.collection".
+    auto targetStatus = userAllowedWriteNS(targetNss);
+    if (!targetStatus.isOK()) {
+        return Status(targetStatus.code(),
+                      str::stream() << "error with target namespace: " << targetStatus.reason());
     }
 
     OptionalCollectionUUID targetUUID;
