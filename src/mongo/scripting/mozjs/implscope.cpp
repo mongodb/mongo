@@ -710,7 +710,6 @@ int MozJSImplScope::invoke(ScriptingFunction func,
                 // Run all of the async JS functions
                 js::RunJobs(_context);
             }
-
         }
 
         if (!ignoreReturn) {

@@ -1517,16 +1517,15 @@ public:
          * evaluated the function within the then() will be executed,
          * setting x to 28. */
         scope->invoke(
-                "let f = async function() {  return 28; };"
-                "f().then(function(y){ x = y; });"
-                "return x;"
-                , 0, 0);
+            "let f = async function() {  return 28; };"
+            "f().then(function(y){ x = y; });"
+            "return x;",
+            0,
+            0);
         ASSERT(0 == scope->getNumber("__returnValue"));
         /* When we return x the second time the value has been updated
          * by the async function */
-        scope->invoke(
-                "return x;"
-                , 0, 0);
+        scope->invoke("return x;", 0, 0);
         ASSERT(28 == scope->getNumber("__returnValue"));
     }
 };
