@@ -2139,5 +2139,41 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardEnqueueAndWait) {
               MODE_X);
 }
 
+TEST_F(DConcurrencyTestFixture, RSTLLockGuardResilientToExceptionThrownBeforeWaitForRSTLComplete) {
+    auto clients = makeKClientsWithLockers(2);
+    auto firstOpCtx = clients[0].second.get();
+    auto secondOpCtx = clients[1].second.get();
+
+    // The first opCtx holds the RSTL.
+    repl::ReplicationStateTransitionLockGuard firstRSTL(firstOpCtx, MODE_X);
+    ASSERT_TRUE(firstRSTL.isLocked());
+    ASSERT_TRUE(firstOpCtx->lockState()->isRSTLExclusive());
+
+    {
+        // The second opCtx enqueues the lock request but cannot acquire it.
+        repl::ReplicationStateTransitionLockGuard secondRSTL(
+            secondOpCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
+        ASSERT_FALSE(secondRSTL.isLocked());
+
+        // secondRSTL is going to go out of scope with the lock result as LOCK_WAITING. As a result,
+        // ReplicationStateTransitionLockGuard destructor will be called and we should expect
+        // the RSTL lock state cleaned from both locker and lock manager.
+    }
+
+    // Verify that the RSTL lock state is cleaned from secondOpCtx's locker.
+    ASSERT_FALSE(secondOpCtx->lockState()->isRSTLLocked());
+
+    // Now, make first opCtx to release the lock to test if we can reacquire the lock again.
+    ASSERT_TRUE(firstOpCtx->lockState()->isRSTLExclusive());
+    firstRSTL.release();
+    ASSERT_FALSE(firstRSTL.isLocked());
+
+    // If we haven't cleaned the RSTL lock state from the conflict queue in the lock manager after
+    // the destruction of secondRSTL, first opCtx won't be able to reacquire the RSTL in X mode.
+    firstRSTL.reacquire();
+    ASSERT_TRUE(firstRSTL.isLocked());
+    ASSERT_TRUE(firstOpCtx->lockState()->isRSTLExclusive());
+}
+
 }  // namespace
 }  // namespace mongo

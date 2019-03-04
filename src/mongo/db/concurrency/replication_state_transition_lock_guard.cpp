@@ -87,15 +87,11 @@ void ReplicationStateTransitionLockGuard::_enqueueLock() {
 }
 
 void ReplicationStateTransitionLockGuard::_unlock() {
-    // waitForLockUntil() must be called after enqueue. It either times out or succeeds,
-    // so we should never see LOCK_WAITING here. This also means between the enqueue and
-    // waitForLockUntil(), no exception is accepted. We could call lockRSTLComplete() with
-    // timeout 0 here for pending locks to clean up the lock's state, but it's clearer to enforce
-    // the exception-free pattern.
-    invariant(_result != LOCK_WAITING);
-    if (isLocked()) {
-        _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
-    }
+    // If ReplicationStateTransitionLockGuard is called in a WriteUnitOfWork, we won't accept
+    // any exceptions to be thrown between _enqueueLock and waitForLockUntil because that would
+    // delay cleaning up any failed RSTL lock attempt state from lock manager.
+    invariant(!(_result == LOCK_WAITING && _opCtx->lockState()->inAWriteUnitOfWork()));
+    _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
     _result = LOCK_INVALID;
 }
 
