@@ -550,6 +550,27 @@ class MainTest(unittest.TestCase):
 
         self.assertEqual(n_tests, len(main.test_list))
 
+    def test_calculate_suites_uses_fallback_if_only_results_are_filtered(self):
+        n_tests = 100
+        evg = Mock()
+        evg.test_stats.return_value = [{
+            "test_file": "test{}.js".format(i), "avg_duration_pass": 60, "num_pass": 1
+        } for i in range(100)]
+
+        main = grt.Main(evg)
+        main.options = Mock()
+        main.config_options = self.get_mock_options()
+        main.list_tests = Mock(return_value=["test{}.js".format(i) for i in range(n_tests)])
+        with patch("os.path.exists") as exists_mock:
+            exists_mock.return_value = False
+            suites = main.calculate_suites(_DATE, _DATE)
+
+            self.assertEqual(main.config_options.fallback_num_sub_suites, len(suites))
+            for suite in suites:
+                self.assertEqual(50, len(suite.tests))
+
+            self.assertEqual(n_tests, len(main.test_list))
+
     def test_calculate_suites_error(self):
         response = Mock()
         response.status_code = requests.codes.INTERNAL_SERVER_ERROR

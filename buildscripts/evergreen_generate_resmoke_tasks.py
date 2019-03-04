@@ -604,6 +604,8 @@ class Main(object):
         """Divide tests into suites that can be run in less than the specified execution time."""
         test_stats = TestStats(data)
         tests_runtimes = self.filter_existing_tests(test_stats.get_tests_runtimes())
+        if not tests_runtimes:
+            return self.calculate_fallback_suites()
         self.test_list = [info[0] for info in tests_runtimes]
         return divide_tests_into_suites(tests_runtimes, execution_time_secs,
                                         self.options.max_sub_suites)
