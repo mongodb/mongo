@@ -145,7 +145,9 @@ void MongoStatusInfo::Functions::stack::call(JSContext* cx, JS::CallArgs args) {
 void MongoStatusInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
     auto scope = getScope(cx);
 
-    JS_SetPrivate(proto, scope->trackedNew<Status>(Status(ErrorCodes::UnknownError, "Mongo Status Prototype")));
+    JS_SetPrivate(
+        proto,
+        scope->trackedNew<Status>(Status(ErrorCodes::UnknownError, "Mongo Status Prototype")));
 }
 
 }  // namespace mozjs
