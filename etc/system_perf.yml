@@ -964,6 +964,7 @@ buildvariants:
     setup: replica-2node
     cluster: replica
     platform: linux
+    authentication: enabled
     storageEngine: wiredTiger
     project_dir: *project_dir
   depends_on:
@@ -983,6 +984,7 @@ buildvariants:
     setup: initialsync-logkeeper
     cluster: initialsync-logkeeper
     platform: linux
+    authentication: enabled
     storageEngine: wiredTiger
     project_dir: *project_dir
   run_on:
