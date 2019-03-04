@@ -6,6 +6,7 @@ const ChangeStreamHWMHelpers = (function() {
      * Specifies the exact version to be used in tests which require pre-backport 4.0 binaries.
      */
     const preBackport40Version = "4.0.5";
+    const postBackport40Version = "4.0";
     const latest42Version = "latest";
 
     /**
@@ -101,6 +102,7 @@ const ChangeStreamHWMHelpers = (function() {
     return {
         testPostBatchAndHighWaterMarkTokens: testPostBatchAndHighWaterMarkTokens,
         preBackport40Version: preBackport40Version,
+        postBackport40Version: postBackport40Version,
         latest42Version: latest42Version,
     };
 })();

@@ -1,6 +1,6 @@
 /**
  * Tests that high water mark and postBatchResumeTokens are handled correctly during upgrade from
- * and downgrade to a pre-backport version of 4.0 on a sharded cluster.
+ * and downgrade to both pre- and post-backport versions of 4.0 on a sharded cluster.
  */
 (function() {
     "use strict";
@@ -19,6 +19,7 @@
     }
 
     const preBackport40Version = ChangeStreamHWMHelpers.preBackport40Version;
+    const postBackport40Version = ChangeStreamHWMHelpers.postBackport40Version;
     const latest42Version = ChangeStreamHWMHelpers.latest42Version;
 
     const st = new ShardingTest({
@@ -80,146 +81,165 @@
     const collToShard = assertCreateCollection(mongosDB, shardedCollName);
     st.shardColl(collToShard, {_id: 1}, {_id: 0}, {_id: 1});
 
-    // Maps used to associate collection names with collection objects and HWM tokens.
-    const collMap = {
-        [unshardedCollName]: () => st.s.getDB(jsTestName()).mongosUnshardedColl,
-        [shardedCollName]: () => st.s.getDB(jsTestName()).mongosShardedColl
-    };
-    const hwmTokenMap = {};
+    // We perform these tests once for pre-backport 4.0, and once for post-backport 4.0.
+    for (let oldVersion of[preBackport40Version, postBackport40Version]) {
+        // Maps used to associate collection names with collection objects and HWM tokens.
+        const collMap = {
+            [unshardedCollName]: () => st.s.getDB(jsTestName()).mongosUnshardedColl,
+            [shardedCollName]: () => st.s.getDB(jsTestName()).mongosShardedColl
+        };
+        const hwmTokenMap = {};
 
-    // We start with the cluster running on 'preBackport40Version'. No streams should produce PBRTs.
-    jsTestLog("Testing binary 4.0 mongoS and shards");
-    for (let collName in collMap) {
-        const hwmToken = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens(
-            {coll: collMap[collName](), expectPBRT: false});
-        assert.eq(hwmToken, undefined);
-    }
+        // Determine whether we are running a pre- or post-backport version of 4.0.
+        const isPostBackport = (oldVersion === postBackport40Version);
 
-    // Upgrade a single shard to 4.2 but leave the mongoS on 4.0. No streams produce PBRTs, but the
-    // new shard should continue to produce resumable v0 tokens and the old-style $sortKey while the
-    // cluster is mid-upgrade.
-    jsTestLog("Upgrading shard1 to binary 4.2 FCV 4.0");
-    refreshCluster(latest42Version, null, st.rs1);
-    for (let collName in collMap) {
-        const hwmToken = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens(
-            {coll: collMap[collName](), expectPBRT: false});
-        assert.eq(hwmToken, undefined);
-    }
+        // We start with the cluster running on 'oldVersion'. We should only produce PBRTs if we are
+        // running a post-backport version of 4.0.
+        jsTestLog(`Testing binary ${oldVersion} mongoS and shards`);
+        refreshCluster(oldVersion);
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens(
+                {coll: collMap[collName](), expectPBRT: isPostBackport});
+            assert.eq(hwmTokenMap[collName] != undefined, isPostBackport);
+        }
 
-    // Upgrade the remaining shard to 4.2 but leave the mongoS on 4.0.
-    jsTestLog("Upgrading to binary 4.0 mongoS and binary 4.2 shards with FCV 4.0");
-    refreshCluster(latest42Version,
-                   {upgradeMongos: false, upgradeShards: true, upgradeConfigs: true});
+        // Upgrade a single shard to 4.2 but leave the mongoS on 'oldVersion'. We should produce
+        // PBRTs only if running a post-backport version of 4.0. Regardless of the exact version of
+        // 4.0, the new shard should continue to produce resumable tokens and use the appropriate
+        // $sortKey format while the cluster is mid-upgrade.
+        jsTestLog("Upgrading shard1 to binary 4.2 FCV 4.0");
+        refreshCluster(latest42Version, null, st.rs1);
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
+                coll: collMap[collName](),
+                expectPBRT: isPostBackport,
+                hwmToResume: hwmTokenMap[collName],
+                expectResume: isPostBackport
+            });
+            assert.eq(hwmTokenMap[collName] != undefined, isPostBackport);
+        }
 
-    // The shards have been upgraded to 4.2 but the mongoS is running 4.0. The mongoS should be able
-    // to merge the output from the shards, but neither of the mongoS streams will generate a PBRT.
-    jsTestLog("Testing binary 4.0 mongoS and binary 4.2 shards with FCV 4.0");
-    for (let collName in collMap) {
-        const hwmToken = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens(
-            {coll: collMap[collName](), expectPBRT: false});
-        assert.eq(hwmToken, undefined);
-    }
+        // Upgrade the remaining shard to 4.2 but leave the mongoS on 'oldVersion'.
+        jsTestLog(`Upgrading to binary ${oldVersion} mongoS and binary 4.2 shards with FCV 4.0`);
+        refreshCluster(latest42Version,
+                       {upgradeMongos: false, upgradeShards: true, upgradeConfigs: true});
 
-    // Upgrade the mongoS to 4.2 but leave the cluster in FCV 4.0
-    jsTestLog("Upgrading to binary 4.2 mongoS and shards with FCV 4.0");
-    refreshCluster(latest42Version,
-                   {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
+        // The shards have been upgraded to 4.2 but the mongoS is running 4.0. The mongoS should be
+        // able to merge the output from the shards, but the mongoS streams will only generate a
+        // PBRT if we are upgrading from a post-backport version of 4.0.
+        jsTestLog(`Testing binary ${oldVersion} mongoS and binary 4.2 shards with FCV 4.0`);
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
+                coll: collMap[collName](),
+                expectPBRT: isPostBackport,
+                hwmToResume: hwmTokenMap[collName],
+                expectResume: isPostBackport
+            });
+            assert.eq(hwmTokenMap[collName] != undefined, isPostBackport);
+        }
 
-    // All streams should now return PBRTs, and we should obtain a valid HWM from the test.
-    jsTestLog("Testing binary 4.2 mongoS and shards with FCV 4.0");
-    for (let collName in collMap) {
-        hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
-            coll: collMap[collName](),
-            expectPBRT: true,
-            hwmToResume: hwmTokenMap[collName],
-            expectResume: true
-        });
-        assert.neq(hwmTokenMap[collName], undefined);
-    }
+        // Upgrade the mongoS to 4.2 but leave the cluster in FCV 4.0
+        jsTestLog("Upgrading to binary 4.2 mongoS and shards with FCV 4.0");
+        refreshCluster(latest42Version,
+                       {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
 
-    // Set the cluster's FCV to 4.2.
-    assert.commandWorked(mongosDB.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
+        // All streams should now return PBRTs, and we should obtain a valid HWM from the test.
+        jsTestLog("Testing binary 4.2 mongoS and shards with FCV 4.0");
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
+                coll: collMap[collName](),
+                expectPBRT: true,
+                hwmToResume: hwmTokenMap[collName],
+                expectResume: true
+            });
+            assert.neq(hwmTokenMap[collName], undefined);
+        }
 
-    // All streams should now return PBRTs; we can resume from all HWMs tokens in the previous test.
-    jsTestLog("Testing binary 4.2 mongoS and shards with FCV 4.2");
-    for (let collName in collMap) {
-        hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
-            coll: collMap[collName](),
-            expectPBRT: true,
-            hwmToResume: hwmTokenMap[collName],
-            expectResume: true
-        });
-        assert.neq(hwmTokenMap[collName], undefined);
-    }
+        // Set the cluster's FCV to 4.2.
+        assert.commandWorked(mongosDB.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
-    // Downgrade the cluster to FCV 4.0. We should continue to produce PBRTs and can resume from the
-    // tokens that we generated previously.
-    jsTestLog("Downgrading to FCV 4.0 shards");
-    assert.commandWorked(mongosDB.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+        // Streams should return PBRTs; we can resume from all HWMs tokens in the previous test.
+        jsTestLog("Testing binary 4.2 mongoS and shards with FCV 4.2");
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
+                coll: collMap[collName](),
+                expectPBRT: true,
+                hwmToResume: hwmTokenMap[collName],
+                expectResume: true
+            });
+            assert.neq(hwmTokenMap[collName], undefined);
+        }
 
-    jsTestLog("Testing binary 4.2 mongoS and shards with FCV 4.0");
-    for (let collName in collMap) {
-        hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
-            coll: collMap[collName](),
-            expectPBRT: true,
-            hwmToResume: hwmTokenMap[collName],
-            expectResume: true
-        });
-        assert.neq(hwmTokenMap[collName], undefined);
-    }
+        // Downgrade the cluster to FCV 4.0. We should continue to produce PBRTs and can resume from
+        // the tokens that we generated previously.
+        jsTestLog("Downgrading to FCV 4.0 shards");
+        assert.commandWorked(mongosDB.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
 
-    // Downgrade the mongoS to 'preBackport40Version'. We should be able to create new streams and
-    // resume from their tokens, but cannot resume from the previously-generated v1 tokens.
-    jsTestLog("Downgrading to binary 4.0 mongoS with FCV 4.0 shards");
-    refreshCluster(preBackport40Version,
-                   {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
+        jsTestLog("Testing binary 4.2 mongoS and shards with downgraded FCV 4.0");
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
+                coll: collMap[collName](),
+                expectPBRT: true,
+                hwmToResume: hwmTokenMap[collName],
+                expectResume: true
+            });
+            assert.neq(hwmTokenMap[collName], undefined);
+        }
 
-    // We should no longer receive any PBRTs via mongoS, and we cannot resume from the HWM tokens.
-    jsTestLog("Testing downgraded binary 4.0 mongoS and shards");
-    for (let collName in collMap) {
-        const hwmToken = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
-            coll: collMap[collName](),
-            expectPBRT: false,
-            hwmToResume: hwmTokenMap[collName],
-            expectResume: false
-        });
-        assert.eq(hwmToken, undefined);
-    }
+        // Downgrade the mongoS to 'oldVersion'. We should be able to create new streams and resume
+        // from their tokens, but can only resume from the previously-generated v1 tokens if we are
+        // running a post-backport version of 4.0.
+        jsTestLog(`Downgrading to binary ${oldVersion} mongoS with FCV 4.0 shards`);
+        refreshCluster(oldVersion,
+                       {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
 
-    // Downgrade a single shard to binary 4.0, after rebuilding all unique indexes so that their
-    // format is compatible. We should continue to observe the same behaviour as we did in the
-    // previous test.
-    jsTestLog("Downgrading shard1 to binary 4.0");
-    downgradeUniqueIndexes(mongosDB);
-    refreshCluster(preBackport40Version, null, st.rs1);
-    jsTestLog("Testing downgraded shard1 with binary 4.0");
-    for (let collName in collMap) {
-        const hwmToken = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
-            coll: collMap[collName](),
-            expectPBRT: false,
-            hwmToResume: hwmTokenMap[collName],
-            expectResume: false
-        });
-        assert.eq(hwmToken, undefined);
-    }
+        // Should only receive PBRTs and be able to resume via mongoS if running post-backport 4.0.
+        jsTestLog(`Testing downgraded binary ${oldVersion} mongoS with binary 4.2 FCV 4.0 shards`);
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
+                coll: collMap[collName](),
+                expectPBRT: isPostBackport,
+                hwmToResume: hwmTokenMap[collName],
+                expectResume: isPostBackport
+            });
+            assert.eq(hwmTokenMap[collName] != undefined, isPostBackport);
+        }
 
-    // Downgrade the remainder of the cluster to binary 4.0.
-    jsTestLog("Downgrading to binary 4.0 shards");
-    refreshCluster(preBackport40Version,
-                   {upgradeShards: true, upgradeConfigs: false, upgradeMongos: false});
-    refreshCluster(preBackport40Version,
-                   {upgradeConfigs: true, upgradeShards: false, upgradeMongos: false});
+        // Downgrade a single shard to 'oldVersion', after rebuilding all unique indexes so that
+        // their format is compatible. We should continue to observe the same behaviour as we did in
+        // the previous test.
+        jsTestLog(`Downgrading shard1 to binary ${oldVersion}`);
+        downgradeUniqueIndexes(mongosDB);
+        refreshCluster(oldVersion, null, st.rs1);
+        jsTestLog(`Testing binary ${oldVersion} shard1 and mongoS with binary 4.2 FCV 4.0 shard0`);
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
+                coll: collMap[collName](),
+                expectPBRT: isPostBackport,
+                hwmToResume: hwmTokenMap[collName],
+                expectResume: isPostBackport
+            });
+            assert.eq(hwmTokenMap[collName] != undefined, isPostBackport);
+        }
 
-    // We should no longer receive any PBRTs, and we cannot resume from the HWM tokens we generated.
-    jsTestLog("Testing downgraded binary 4.0 mongoS and shards");
-    for (let collName in collMap) {
-        const hwmToken = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
-            coll: collMap[collName](),
-            expectPBRT: false,
-            hwmToResume: hwmTokenMap[collName],
-            expectResume: false
-        });
-        assert.eq(hwmToken, undefined);
+        // Downgrade the remainder of the cluster to 'oldVersion'.
+        jsTestLog(`Downgrading to binary ${oldVersion} shards`);
+        refreshCluster(oldVersion,
+                       {upgradeShards: true, upgradeConfigs: false, upgradeMongos: false});
+        refreshCluster(oldVersion,
+                       {upgradeConfigs: true, upgradeShards: false, upgradeMongos: false});
+
+        // We should only receive PBRTs and be able to resume if running a post-backport 4.0.
+        jsTestLog(`Testing downgraded binary ${oldVersion} mongoS and shards`);
+        for (let collName in collMap) {
+            hwmTokenMap[collName] = ChangeStreamHWMHelpers.testPostBatchAndHighWaterMarkTokens({
+                coll: collMap[collName](),
+                expectPBRT: isPostBackport,
+                hwmToResume: hwmTokenMap[collName],
+                expectResume: isPostBackport
+            });
+            assert.eq(hwmTokenMap[collName] != undefined, isPostBackport);
+        }
     }
 
     st.stop();
