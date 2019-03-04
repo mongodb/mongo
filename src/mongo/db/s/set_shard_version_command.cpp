@@ -46,6 +46,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
@@ -223,7 +224,7 @@ public:
 
             // Views do not require a shard version check.
             if (autoDb->getDb() && !autoDb->getDb()->getCollection(opCtx, nss) &&
-                autoDb->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
+                ViewCatalog::get(autoDb->getDb())->lookup(opCtx, nss.ns())) {
                 return true;
             }
 

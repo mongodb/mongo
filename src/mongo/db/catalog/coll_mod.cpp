@@ -309,7 +309,7 @@ Status _collModInternal(OperationContext* opCtx,
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;
     if (db && !coll) {
-        const auto sharedView = db->getViewCatalog()->lookup(opCtx, nss.ns());
+        const auto sharedView = ViewCatalog::get(db)->lookup(opCtx, nss.ns());
         if (sharedView) {
             // We copy the ViewDefinition as it is modified below to represent the requested state.
             view = {*sharedView};
@@ -355,7 +355,7 @@ Status _collModInternal(OperationContext* opCtx,
         if (!cmr.viewOn.empty())
             view->setViewOn(NamespaceString(dbName, cmr.viewOn));
 
-        ViewCatalog* catalog = db->getViewCatalog();
+        ViewCatalog* catalog = ViewCatalog::get(db);
 
         BSONArrayBuilder pipeline;
         for (auto& item : view->pipeline()) {

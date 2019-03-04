@@ -230,7 +230,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
     // 'resolvedNamespaces' because we won't re-resolve a view namespace we've already encountered.
     AutoGetDb autoDb(opCtx, request.getNamespaceString().db(), MODE_IS);
     Database* const db = autoDb.getDb();
-    ViewCatalog* viewCatalog = db ? db->getViewCatalog() : nullptr;
+    ViewCatalog* viewCatalog = db ? ViewCatalog::get(db) : nullptr;
 
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
@@ -304,7 +304,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
             continue;
         }
 
-        auto view = db->getViewCatalog()->lookup(opCtx, potentialViewNs.ns());
+        auto view = ViewCatalog::get(db)->lookup(opCtx, potentialViewNs.ns());
         if (!view) {
             continue;
         }
@@ -504,7 +504,7 @@ Status runAggregate(OperationContext* opCtx,
             }
 
             auto resolvedView =
-                uassertStatusOK(ctx->getDb()->getViewCatalog()->resolveView(opCtx, nss));
+                uassertStatusOK(ViewCatalog::get(ctx->getDb())->resolveView(opCtx, nss));
             uassert(std::move(resolvedView),
                     "On sharded systems, resolved views must be executed by mongos",
                     !ShardingState::get(opCtx)->enabled());

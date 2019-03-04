@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -147,7 +148,7 @@ Status _doTxn(OperationContext* opCtx,
         // implicitly created on upserts. We detect both cases here and fail early with
         // NamespaceNotFound.
         // Additionally for inserts, we fail early on non-existent collections.
-        if (!collection && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
+        if (!collection && ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
             uasserted(ErrorCodes::CommandNotSupportedOnView,
                       str::stream() << "doTxn not supported on a view: " << redact(opObj));
         }

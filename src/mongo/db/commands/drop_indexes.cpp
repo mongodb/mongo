@@ -52,6 +52,7 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -134,7 +135,7 @@ public:
 
         Collection* collection = autoDb.getDb()->getCollection(opCtx, toReIndexNss);
         if (!collection) {
-            if (autoDb.getDb()->getViewCatalog()->lookup(opCtx, toReIndexNss.ns()))
+            if (ViewCatalog::get(autoDb.getDb())->lookup(opCtx, toReIndexNss.ns()))
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "can't re-index a view");
             else
                 uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");

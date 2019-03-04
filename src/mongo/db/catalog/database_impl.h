@@ -116,14 +116,6 @@ public:
 
     Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const;
 
-    /**
-     * Get the view catalog, which holds the definition for all views created on this database. You
-     * must be holding a database lock to use this accessor.
-     */
-    ViewCatalog* getViewCatalog() final {
-        return &_views;
-    }
-
     Collection* getOrCreateCollection(OperationContext* opCtx, const NamespaceString& nss) final;
 
     /**
@@ -223,9 +215,6 @@ private:
     std::unique_ptr<PseudoRandom> _uniqueCollectionNamespacePseudoRandom;
 
     CollectionMap _collections;
-
-    DurableViewCatalogImpl _durableViews;  // interface for system.views operations
-    ViewCatalog _views;                    // in-memory representation of _durableViews
 };
 
 }  // namespace mongo

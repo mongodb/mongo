@@ -55,6 +55,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -165,7 +166,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
     }
     Collection* const sourceColl = sourceDB ? sourceDB->getCollection(opCtx, source) : nullptr;
     if (!sourceColl) {
-        if (sourceDB && sourceDB->getViewCatalog()->lookup(opCtx, source.ns()))
+        if (sourceDB && ViewCatalog::get(sourceDB)->lookup(opCtx, source.ns()))
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "cannot rename view: " << source);
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
@@ -239,7 +240,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 return status;
             targetColl = nullptr;
         }
-    } else if (targetDB->getViewCatalog()->lookup(opCtx, target.ns())) {
+    } else if (ViewCatalog::get(targetDB)->lookup(opCtx, target.ns())) {
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "a view already exists with that name: " << target);
     }

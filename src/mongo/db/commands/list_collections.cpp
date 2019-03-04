@@ -342,7 +342,7 @@ public:
                     SimpleBSONObjComparator::kInstance.evaluate(
                         filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
                 if (!skipViews) {
-                    db->getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) {
+                    ViewCatalog::get(db)->iterate(opCtx, [&](const ViewDefinition& view) {
                         BSONObj viewBson = buildViewBson(view, nameOnly);
                         if (!viewBson.isEmpty()) {
                             _addWorkingSetMember(

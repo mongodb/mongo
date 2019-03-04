@@ -305,7 +305,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     if (collection) {
         result.appendBool("createdCollectionAutomatically", false);
     } else {
-        if (db->getViewCatalog()->lookup(opCtx, ns.ns())) {
+        if (ViewCatalog::get(db)->lookup(opCtx, ns.ns())) {
             errmsg = "Cannot create indexes on a view";
             uasserted(ErrorCodes::CommandNotSupportedOnView, errmsg);
         }
@@ -562,7 +562,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // We would not reach this point if we were able to check existing indexes on the
             // collection.
             invariant(!collection);
-            if (db->getViewCatalog()->lookup(opCtx, ns.ns())) {
+            if (ViewCatalog::get(db)->lookup(opCtx, ns.ns())) {
                 errmsg = str::stream() << "Cannot create indexes on a view: " << ns.ns();
                 uasserted(ErrorCodes::CommandNotSupportedOnView, errmsg);
             }

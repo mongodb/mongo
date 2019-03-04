@@ -51,6 +51,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -73,7 +74,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     Collection* collection = db->getCollection(opCtx, collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
-            collection || !db->getViewCatalog()->lookup(opCtx, collectionName.ns()));
+            collection || !ViewCatalog::get(db)->lookup(opCtx, collectionName.ns()));
     uassert(ErrorCodes::NamespaceNotFound, "no such collection", collection);
 
     if (collectionName.isSystem() && !collectionName.isSystemDotProfile()) {
@@ -124,7 +125,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
-                !db->getViewCatalog()->lookup(opCtx, fromNss.ns()));
+                !ViewCatalog::get(db)->lookup(opCtx, fromNss.ns()));
 
         uasserted(ErrorCodes::NamespaceNotFound,
                   str::stream() << "source collection " << fromNss << " does not exist");

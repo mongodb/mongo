@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -57,7 +58,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
 namespace {
+auto getViewCatalog = Database::declareDecoration<std::unique_ptr<ViewCatalog>>();
 
 StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* opCtx,
                                                              BSONObj collationSpec) {
@@ -69,6 +72,14 @@ StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* o
     return CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationSpec);
 }
 }  // namespace
+
+ViewCatalog* ViewCatalog::get(Database* db) {
+    return getViewCatalog(db).get();
+}
+
+void ViewCatalog::set(Database* db, std::unique_ptr<ViewCatalog> catalog) {
+    getViewCatalog(db) = std::move(catalog);
+}
 
 Status ViewCatalog::reloadIfNeeded(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);

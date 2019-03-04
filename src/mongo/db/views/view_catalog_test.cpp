@@ -111,7 +111,7 @@ public:
     ViewCatalogFixture()
         : _queryServiceContext(stdx::make_unique<QueryTestServiceContext>()),
           opCtx(_queryServiceContext->makeOperationContext()),
-          viewCatalog(&durableViewCatalog) {}
+          viewCatalog(std::move(durableViewCatalogUnique)) {}
 
 private:
     std::unique_ptr<QueryTestServiceContext> _queryServiceContext;
@@ -121,7 +121,9 @@ protected:
         return _queryServiceContext->getServiceContext();
     }
 
-    DurableViewCatalogDummy durableViewCatalog;
+    std::unique_ptr<DurableViewCatalogDummy> durableViewCatalogUnique =
+        std::make_unique<DurableViewCatalogDummy>();
+    DurableViewCatalogDummy* durableViewCatalog = durableViewCatalogUnique.get();
     ServiceContext::UniqueOperationContext opCtx;
     ViewCatalog viewCatalog;
     const BSONArray emptyPipeline;
@@ -469,7 +471,7 @@ TEST_F(ViewCatalogFixture, ModifyTenTimes) {
         ASSERT_OK(viewCatalog.modifyView(opCtx.get(), viewName, viewOn, emptyPipeline));
     }
 
-    ASSERT_EQ(10, durableViewCatalog.getUpsertCount());
+    ASSERT_EQ(10, durableViewCatalog->getUpsertCount());
 }
 
 TEST_F(ViewCatalogFixture, Iterate) {
@@ -567,14 +569,14 @@ TEST_F(ViewCatalogFixture, InvalidateThenReload) {
     const NamespaceString viewOn("db.coll");
 
     ASSERT_OK(viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
-    ASSERT_EQ(1, durableViewCatalog.getIterateCount());
+    ASSERT_EQ(1, durableViewCatalog->getIterateCount());
 
     ASSERT(viewCatalog.lookup(opCtx.get(), "db.view"_sd));
-    ASSERT_EQ(1, durableViewCatalog.getIterateCount());
+    ASSERT_EQ(1, durableViewCatalog->getIterateCount());
 
     viewCatalog.invalidate();
     ASSERT_OK(viewCatalog.reloadIfNeeded(opCtx.get()));
-    ASSERT_EQ(2, durableViewCatalog.getIterateCount());
+    ASSERT_EQ(2, durableViewCatalog->getIterateCount());
 }
 }  // namespace
 }  // namespace mongo

@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
@@ -131,7 +132,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         return;
     }
 
-    _view = db->getViewCatalog()->lookup(opCtx, _resolvedNss.ns());
+    _view = ViewCatalog::get(db)->lookup(opCtx, _resolvedNss.ns());
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
             !_view || viewMode == kViewsPermitted);

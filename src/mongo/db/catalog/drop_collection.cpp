@@ -65,7 +65,7 @@ Status dropCollection(OperationContext* opCtx,
         Database* const db = autoDb.getDb();
         Collection* coll = db ? db->getCollection(opCtx, collectionName) : nullptr;
         auto view =
-            db && !coll ? db->getViewCatalog()->lookup(opCtx, collectionName.ns()) : nullptr;
+            db && !coll ? ViewCatalog::get(db)->lookup(opCtx, collectionName.ns()) : nullptr;
 
         if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
             log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "
