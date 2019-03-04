@@ -110,13 +110,12 @@
     assert.eq(next.operationType, "invalidate");
     assert(changeStream.isExhausted());
 
-    // Test that we cannot resume the change stream without specifying an explicit collation.
-    assert.commandFailedWithCode(mongosDB.runCommand({
+    // Test that we can resume the change stream without specifying an explicit collation.
+    assert.commandWorked(mongosDB.runCommand({
         aggregate: mongosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
         cursor: {}
-    }),
-                                 ErrorCodes.InvalidResumeToken);
+    }));
 
     // Recreate and shard the collection.
     assert.commandWorked(mongosDB.createCollection(mongosColl.getName()));
@@ -125,14 +124,13 @@
     assert.commandWorked(
         mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
 
-    // Test that resuming the change stream on the recreated collection fails since the UUID has
-    // changed.
-    assert.commandFailedWithCode(mongosDB.runCommand({
+    // Test that resuming the change stream on the recreated collection succeeds, since we will not
+    // attempt to inherit the collection's default collation and can therefore ignore the new UUID.
+    assert.commandWorked(mongosDB.runCommand({
         aggregate: mongosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
         cursor: {}
-    }),
-                                 ErrorCodes.InvalidResumeToken);
+    }));
 
     // Recreate the collection as unsharded and open a change stream on it.
     assertDropAndRecreateCollection(mongosDB, mongosColl.getName());

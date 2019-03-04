@@ -37,23 +37,33 @@
     for (let resumeType of["startAfter", "resumeAfter"]) {
         cmdResBeforeCollExists = assert.commandWorked(runExactCommand(db, {
             aggregate: collName,
-            pipeline: [{$changeStream: {[resumeType]: pbrtBeforeCollExists}}],
+            pipeline: [
+                {$changeStream: {[resumeType]: pbrtBeforeCollExists}},
+                {
+                  $match: {
+                      $or: [
+                          {"fullDocument._id": "INSERT_ONE"},
+                          {"fullDocument._id": "INSERT_TWO"}
+                      ]
+                  }
+                }
+            ],
             cursor: {}
         }));
     }
     csCursor = new DBCommandCursor(db, cmdResBeforeCollExists);
 
-    // But if the collection is created with a non-simple collation, the resumed stream invalidates.
+    // If the collection is then created with a case-insensitive collation, the resumed stream
+    // continues to use the simple collation. We see 'INSERT_TWO' but not 'insert_one'.
     const testCollationCollection =
         assertCreateCollection(db, collName, {collation: {locale: "en_US", strength: 2}});
     assert.commandWorked(testCollationCollection.insert({_id: "insert_one"}));
     assert.commandWorked(testCollationCollection.insert({_id: "INSERT_TWO"}));
     assert.soon(() => csCursor.hasNext());
-    const invalidate = csCursor.next();
-    assert.eq(invalidate.operationType, "invalidate");  // We don't see either insert.
+    assert.docEq(csCursor.next().fullDocument, {_id: "INSERT_TWO"});
     csCursor.close();
 
-    // We can resume from the pre-creation high water mark if we specify an explicit collation...
+    // We can resume from the pre-creation high water mark if we do not specify a collation...
     let cmdResResumeFromBeforeCollCreated = assert.commandWorked(runExactCommand(db, {
         aggregate: collName,
         pipeline: [
@@ -63,13 +73,34 @@
                   {$or: [{"fullDocument._id": "INSERT_ONE"}, {"fullDocument._id": "INSERT_TWO"}]}
             }
         ],
-        collation: {locale: "simple"},
         cursor: {}
     }));
 
-    // This time the stream does not invalidate. We override the default case-insensitive collation
-    // with the explicit simple collation we specified, so we match INSERT_TWO but not INSERT_ONE.
+    // ... but we will not inherit the collection's case-insensitive collation, instead defaulting
+    // to the simple collation. We will therefore match 'INSERT_TWO' but not 'insert_one'.
     csCursor = new DBCommandCursor(db, cmdResResumeFromBeforeCollCreated);
+    assert.soon(() => csCursor.hasNext());
+    assert.docEq(csCursor.next().fullDocument, {_id: "INSERT_TWO"});
+    csCursor.close();
+
+    // If we do specify a non-simple collation, it will be adopted by the pipeline.
+    cmdResResumeFromBeforeCollCreated = assert.commandWorked(runExactCommand(db, {
+        aggregate: collName,
+        pipeline: [
+            {$changeStream: {resumeAfter: pbrtBeforeCollExists}},
+            {
+              $match:
+                  {$or: [{"fullDocument._id": "INSERT_ONE"}, {"fullDocument._id": "INSERT_TWO"}]}
+            }
+        ],
+        collation: {locale: "en_US", strength: 2},
+        cursor: {}
+    }));
+
+    // Now we match both 'insert_one' and 'INSERT_TWO'.
+    csCursor = new DBCommandCursor(db, cmdResResumeFromBeforeCollCreated);
+    assert.soon(() => csCursor.hasNext());
+    assert.docEq(csCursor.next().fullDocument, {_id: "insert_one"});
     assert.soon(() => csCursor.hasNext());
     assert.docEq(csCursor.next().fullDocument, {_id: "INSERT_TWO"});
     csCursor.close();
@@ -96,13 +127,21 @@
         aggregate: collName,
         pipeline: [
             {$changeStream: {resumeAfter: hwmFromCollWithCollation}},
-            {$match: {"fullDocument._id": "insert_four"}}
+            {
+              $match: {
+                  $or: [
+                      {"fullDocument._id": "INSERT_THREE"},
+                      {"fullDocument._id": "INSERT_FOUR"}
+                  ]
+              }
+            }
         ],
         cursor: {}
     }));
     csCursor = new DBCommandCursor(db, cmdResResumeWithCollation);
 
-    // ... and we inherit the collection's case-insensitive collation, matching {_id:"insert_four"}.
+    // ... but we do not inherit the collection's case-insensitive collation, matching 'INSERT_FOUR'
+    // but not the preceding 'insert_three'.
     assert.soon(() => csCursor.hasNext());
     assert.docEq(csCursor.next().fullDocument, {_id: "INSERT_FOUR"});
     csCursor.close();
@@ -194,23 +233,21 @@
     hwmPostCreation = csCursor.getResumeToken();
     csCursor.close();
 
-    // Because this HWM has a UUID, we cannot resume from the token if the collection is dropped...
+    // We can resume from the token if the collection is dropped...
     assertDropCollection(db, collName);
-    assert.commandFailedWithCode(runExactCommand(db, {
-                                     aggregate: collName,
-                                     pipeline: [{$changeStream: {resumeAfter: hwmPostCreation}}],
-                                     cursor: {}
-                                 }),
-                                 ErrorCodes.InvalidResumeToken);
+    assert.commandWorked(runExactCommand(db, {
+        aggregate: collName,
+        pipeline: [{$changeStream: {resumeAfter: hwmPostCreation}}],
+        cursor: {}
+    }));
     // ... or if the collection is recreated with a different UUID...
     assertCreateCollection(db, collName);
-    assert.commandFailedWithCode(runExactCommand(db, {
-                                     aggregate: collName,
-                                     pipeline: [{$changeStream: {resumeAfter: hwmPostCreation}}],
-                                     cursor: {}
-                                 }),
-                                 ErrorCodes.InvalidResumeToken);
-    // ... unless we specify an explicit collation.
+    assert.commandWorked(runExactCommand(db, {
+        aggregate: collName,
+        pipeline: [{$changeStream: {resumeAfter: hwmPostCreation}}],
+        cursor: {}
+    }));
+    // ... or if we specify an explicit collation.
     assert.commandWorked(runExactCommand(db, {
         aggregate: collName,
         pipeline: [{$changeStream: {resumeAfter: hwmPostCreation}}],
@@ -218,13 +255,13 @@
         cursor: {}
     }));
 
-    // But even after the collection is recreated, we can still resume from the pre-creation HWM...
+    // Even after the collection is recreated, we can still resume from the pre-creation HWM...
     cmdResResumeFromBeforeCollCreated = assert.commandWorked(runExactCommand(db, {
         aggregate: collName,
         pipeline: [{$changeStream: {resumeAfter: pbrtBeforeCollExists}}],
         cursor: {}
     }));
-    // ...and can still see all the events from the collection's original incarnation...
+    // ...and we can still see all the events from the collection's original incarnation...
     csCursor = new DBCommandCursor(db, cmdResResumeFromBeforeCollCreated);
     docCount = 0;
     assert.soon(() => {

@@ -465,12 +465,12 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
     const bool collectionIsSharded = (routingInfo && routingInfo->cm());
     const bool collectionIsNotSharded = (routingInfo && !routingInfo->cm());
 
-    // If the LiteParsedPipeline reports that we should not attempt to resolve the namespace's UUID
-    // and collation, we immediately return the user-defined collation if one exists, or an empty
-    // BSONObj otherwise. For instance, because collectionless aggregations generally run against
+    // If this is a change stream or a collectionless aggregation, we immediately return the user-
+    // defined collation if one exists, or an empty BSONObj otherwise. Change streams never inherit
+    // the collection's default collation, and since collectionless aggregations generally run on
     // the 'admin' database, the standard logic would attempt to resolve its non-existent UUID and
     // collation by sending a specious 'listCollections' command to the config servers.
-    if (!litePipe.shouldResolveUUIDAndCollation()) {
+    if (litePipe.hasChangeStream() || nss.isCollectionlessAggregateNS()) {
         return {request.getCollation(), boost::none};
     }
 

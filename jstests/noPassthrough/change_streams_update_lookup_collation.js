@@ -39,7 +39,8 @@
     assert.writeOK(coll.insert({_id: "åbC", x: "AbÇ"}));
 
     const changeStreamDefaultCollation = coll.aggregate(
-        [{$changeStream: {fullDocument: "updateLookup"}}, {$match: {"fullDocument.x": "abc"}}]);
+        [{$changeStream: {fullDocument: "updateLookup"}}, {$match: {"fullDocument.x": "abc"}}],
+        {collation: caseInsensitive});
 
     // Strength one will consider "ç" equal to "c" and "C".
     const strengthOneCollation = {locale: "en_US", strength: 1};

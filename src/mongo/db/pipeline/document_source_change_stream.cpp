@@ -222,14 +222,6 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
         // Generate 'rename' entries if the change stream is open on the source or target namespace.
         relevantCommands.append(BSON("o.renameCollection" << nss.ns()));
         relevantCommands.append(BSON("o.to" << nss.ns()));
-        if (expCtx->collation.isEmpty()) {
-            // If the user did not specify a collation, they should be using the collection's
-            // default collation. So a "create" command which has any collation present would
-            // invalidate the change stream, since that must mean the stream was created before the
-            // collection existed and used the simple collation, which is no longer the default.
-            relevantCommands.append(
-                BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
-        }
     } else {
         // For change streams on an entire database, include notifications for drops and renames of
         // non-system collections which will not invalidate the stream. Also include the
@@ -287,52 +279,6 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
 
 namespace {
 
-/**
- * Throws an assertion if this pipeline might need to use a collation but it can't figure out what
- * the collation should be. Specifically, it is only safe to resume if at least one of the following
- * is true:
- *      * The request has an explicit collation set, so we don't need to know if there was a default
- *        collation on the collection.
- *      * The request is 'collectionless', meaning it's a change stream on a whole database or a
- *        whole cluster. Unlike individual collections, there is no concept of a default collation
- *        at the level of an entire database or cluster.
- *      * The resume token contains a UUID and a collection with that UUID still exists, thus we can
- *        figure out its default collation.
- */
-void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx,
-                         const ResumeTokenData& tokenData) {
-    if (!expCtx->collation.isEmpty()) {
-        // Explicit collation has been set, it's okay to resume.
-        return;
-    }
-
-    if (!expCtx->isSingleNamespaceAggregation()) {
-        // Change stream on a whole database or cluster, do not need to worry about collation.
-        return;
-    }
-
-    if (!tokenData.uuid && ResumeToken::isHighWaterMarkToken(tokenData)) {
-        // The only time we see a single-collection high water mark with no UUID is when the stream
-        // was opened on a non-existent collection. We allow this to proceed, as the resumed stream
-        // will immediately invalidate itself if it observes a createCollection event in the oplog
-        // with a non-simple collation.
-        return;
-    }
-
-    const auto cannotResumeErrMsg =
-        "Attempted to resume a stream on a collection which has been dropped. The change stream's "
-        "pipeline may need to make comparisons which should respect the collection's default "
-        "collation, which can no longer be determined. If you wish to resume this change stream "
-        "you must specify a collation with the request.";
-    // Verify that the UUID on the expression context matches the UUID in the resume token.
-    // TODO SERVER-35254: If we're on a stale mongos, this check may incorrectly reject a valid
-    // resume token since the UUID on the expression context could be for a previous version of the
-    // collection.
-    uassert(ErrorCodes::InvalidResumeToken,
-            cannotResumeErrMsg,
-            expCtx->uuid && tokenData.uuid && expCtx->uuid.get() == tokenData.uuid.get());
-}
-
 list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<ExpressionContext>& expCtx,
                                                   const DocumentSourceChangeStreamSpec spec,
                                                   BSONElement elem) {
@@ -359,9 +305,14 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
                 "Attempting to resume a change stream using 'resumeAfter' is not allowed from an "
                 "invalidate notification.",
                 !resumeAfter || !tokenData.fromInvalidate);
-        // Verify that the requested resume attempt is possible based on the stream type, resume
-        // token UUID, and collation.
-        assertResumeAllowed(expCtx, tokenData);
+
+        // If we are resuming a single-collection stream, the resume token should always contain a
+        // UUID unless the token is a high water mark.
+        uassert(ErrorCodes::InvalidResumeToken,
+                "Attempted to resume a single-collection stream, but the resume token does not "
+                "include a UUID.",
+                tokenData.uuid || !expCtx->isSingleNamespaceAggregation() ||
+                    ResumeToken::isHighWaterMarkToken(tokenData));
 
         // Store the resume token as the initial postBatchResumeToken for this stream.
         expCtx->initialPostBatchResumeToken = token.toDocument().toBson();

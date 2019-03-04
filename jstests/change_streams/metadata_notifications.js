@@ -77,22 +77,20 @@
     const resumeTokenDrop = changes[3]._id;
     const resumeTokenInvalidate = changes[4]._id;
 
-    // It should not be possible to resume a change stream after a collection drop without an
-    // explicit collation, even if the invalidate has not been received.
-    assert.commandFailedWithCode(db.runCommand({
+    // Verify that we can resume a stream after a collection drop without an explicit collation.
+    assert.commandWorked(db.runCommand({
         aggregate: coll.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
         cursor: {}
-    }),
-                                 ErrorCodes.InvalidResumeToken);
+    }));
 
     // Recreate the collection.
     coll = assertCreateCollection(db, collName);
     assert.writeOK(coll.insert({_id: "after recreate"}));
 
-    // Test resuming the change stream from the collection drop using 'resumeAfter'.
-    // If running in a sharded passthrough suite, resuming from the drop will first return the drop
-    // from the other shard before returning an invalidate.
+    // Test resuming the change stream from the collection drop using 'resumeAfter'. If running in a
+    // sharded passthrough suite, resuming from the drop will first return the drop from the other
+    // shard before returning an invalidate.
     cursor = cst.startWatchingChanges({
         collection: coll,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenDrop}}],

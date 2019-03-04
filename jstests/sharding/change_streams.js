@@ -238,14 +238,12 @@
         assert.soon(() => changeStream.hasNext());
         assert.eq(changeStream.next().operationType, "invalidate");
 
-        // Without an explicit collation, test that we *cannot* resume from before the collection
-        // drop
-        assert.commandFailedWithCode(mongosDB.runCommand({
+        // Test that we can resume from before the collection drop without an explicit collation.
+        assert.commandWorked(mongosDB.runCommand({
             aggregate: mongosColl.getName(),
             pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
             cursor: {}
-        }),
-                                     ErrorCodes.InvalidResumeToken);
+        }));
 
         st.stop();
     }

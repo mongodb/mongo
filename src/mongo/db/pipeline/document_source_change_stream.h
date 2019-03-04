@@ -48,44 +48,13 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
                                                  const BSONElement& spec) {
-            return stdx::make_unique<LiteParsed>(request.getNamespaceString(), spec);
+            return stdx::make_unique<LiteParsed>(request.getNamespaceString());
         }
 
-        explicit LiteParsed(NamespaceString nss, BSONElement spec) : _nss(std::move(nss)) {
-            // We don't do any validation here, just a minimal check for the resume token. We also
-            // do not need to extract the token unless the stream is running on a single namespace.
-            if (_nss.isCollectionlessAggregateNS() || spec.type() != BSONType::Object) {
-                return;
-            }
-            // Check the 'resumeAfter' field first; if empty, check the 'startAfter' field.
-            auto specObj = spec.embeddedObject();
-            _resumeToken =
-                specObj.getObjectField(DocumentSourceChangeStreamSpec::kResumeAfterFieldName);
-            if (_resumeToken.isEmpty()) {
-                _resumeToken =
-                    specObj.getObjectField(DocumentSourceChangeStreamSpec::kStartAfterFieldName);
-            }
-        }
+        explicit LiteParsed(NamespaceString nss) : _nss(std::move(nss)) {}
 
         bool isChangeStream() const final {
             return true;
-        }
-
-        bool shouldResolveUUIDAndCollation() const final {
-            // If this is a whole-db or whole-cluster stream, never resolve the UUID and collation.
-            if (_nss.isCollectionlessAggregateNS()) {
-                return false;
-            }
-            // If we are not resuming, always resolve the UUID and collation.
-            if (_resumeToken.isEmpty()) {
-                return true;
-            }
-            // If we are resuming a single-collection stream from a high water mark that does not
-            // have a UUID, then the token was generated before the collection was created. Do not
-            // attempt to resolve the collection's current UUID or collation, so that the stream
-            // resumes in exactly the same condition as it was in when the token was generated.
-            auto tokenData = ResumeToken::parse(_resumeToken).getData();
-            return !(ResumeToken::isHighWaterMarkToken(tokenData) && !tokenData.uuid);
         }
 
         bool allowedToForwardFromMongos() const final {
@@ -128,7 +97,6 @@ public:
 
     private:
         const NamespaceString _nss;
-        BSONObj _resumeToken;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
