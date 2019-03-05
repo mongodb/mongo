@@ -525,12 +525,12 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 				*tablep = table;
 			else
 				WT_RET(
-				    __wt_schema_release_table(session, table));
+				    __wt_schema_release_table(session, &table));
 			return (0);
 		}
 	}
 
-	WT_RET(__wt_schema_release_table(session, table));
+	WT_RET(__wt_schema_release_table(session, &table));
 	if (quiet)
 		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
@@ -576,7 +576,7 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 done:	if (invalidate)
 		table->idx_complete = false;
 
-err:	WT_TRET(__wt_schema_release_table(session, table));
+err:	WT_TRET(__wt_schema_release_table(session, &table));
 	WT_RET(ret);
 
 	if (*indexp != NULL)

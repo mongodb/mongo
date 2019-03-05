@@ -101,6 +101,8 @@ struct ThreadRunner {
     Throttle *_throttle;
     uint64_t _throttle_ops;
     uint64_t _throttle_limit;
+    uint64_t _start_time_us;
+    uint64_t _op_time_us;   // time that current operation starts
     bool _in_transaction;
     uint32_t _number;
     Stats _stats;
@@ -188,6 +190,7 @@ struct OperationInternal {
     virtual void parse_config(const std::string &config) { (void)config; }
     virtual int run(ThreadRunner *runner, WT_SESSION *session) {
 	(void)runner; (void)session; return (0); }
+    virtual uint64_t sync_time_us() const { return (0); }
 };
 
 struct CheckpointOperationInternal : OperationInternal {
@@ -227,6 +230,7 @@ struct SleepOperationInternal : OperationInternal {
 	OperationInternal(other),_sleepvalue(other._sleepvalue) {}
     virtual void parse_config(const std::string &config);
     virtual int run(ThreadRunner *runner, WT_SESSION *session);
+    virtual uint64_t sync_time_us() const;
 };
 
 struct TableInternal {

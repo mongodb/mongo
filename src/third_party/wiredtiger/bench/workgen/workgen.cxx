@@ -450,7 +450,8 @@ ThreadRunner::ThreadRunner() :
     _errno(0), _exception(), _thread(NULL), _context(NULL), _icontext(NULL),
     _workload(NULL), _wrunner(NULL), _rand_state(NULL),
     _throttle(NULL), _throttle_ops(0), _throttle_limit(0),
-    _in_transaction(false), _number(0), _stats(false), _table_usage(),
+    _in_transaction(false), _start_time_us(0), _op_time_us(0),
+    _number(0), _stats(false), _table_usage(),
     _cursors(NULL), _stop(false), _session(NULL), _keybuf(NULL),
     _valuebuf(NULL), _repeat(false) {
 }
@@ -464,6 +465,8 @@ int ThreadRunner::create_all(WT_CONNECTION *conn) {
 
     WT_RET(close_all());
     ASSERT(_session == NULL);
+    if (_thread->options.synchronized)
+        _thread->_op.synchronized_check();
     WT_RET(conn->open_session(conn, NULL, NULL, &_session));
     _table_usage.clear();
     _stats.track_latency(_workload->options.sample_interval_ms > 0);
@@ -561,6 +564,11 @@ int ThreadRunner::run() {
     WT_DECL_RET;
     ThreadOptions *options = &_thread->options;
     std::string name = options->name;
+
+    timespec start_time;
+    workgen_epoch(&start_time);
+    _start_time_us = ts_us(start_time);
+    _op_time_us = _start_time_us;
 
     VERBOSE(*this, "thread " << name << " running");
     if (options->throttle != 0) {
@@ -855,6 +863,7 @@ int ThreadRunner::op_run(Operation *op) {
             // Never retry on an internal op.
             retry_op = false;
             WT_ERR(op->_internal->run(this, _session));
+            _op_time_us += op->_internal->sync_time_us();
         }
     }
 
@@ -865,12 +874,28 @@ int ThreadRunner::op_run(Operation *op) {
     } else if (track != NULL)
         track->complete();
 
-    if (op->_group != NULL)
-        VERBOSE(*this, "GROUP operation " << op->_repeatgroup << " times");
-        for (int count = 0; !_stop && count < op->_repeatgroup; count++)
-            for (std::vector<Operation>::iterator i = op->_group->begin();
-              i != op->_group->end(); i++)
-                WT_ERR(op_run(&*i));
+    if (op->_group != NULL) {
+        uint64_t endtime = 0;
+        timespec now;
+
+        if (op->_timed != 0.0)
+            endtime = _op_time_us + secs_us(op->_timed);
+
+        VERBOSE(*this, "GROUP operation " << op->_timed << " secs, "
+          << op->_repeatgroup << "times");
+
+        do {
+            for (int count = 0; !_stop && count < op->_repeatgroup; count++) {
+                for (std::vector<Operation>::iterator i = op->_group->begin();
+                     i != op->_group->end(); i++)
+                    WT_ERR(op_run(&*i));
+            }
+            workgen_epoch(&now);
+        } while (!_stop && ts_us(now) < endtime);
+
+        if (op->_timed != 0.0)
+            _op_time_us = endtime;
+    }
 err:
     if (own_cursor)
         WT_TRET(cursor->close(cursor));
@@ -995,7 +1020,7 @@ int Throttle::throttle(uint64_t op_count, uint64_t *op_limit) {
 }
 
 ThreadOptions::ThreadOptions() : name(), throttle(0.0), throttle_burst(1.0),
-    _options() {
+    synchronized(false), _options() {
     _options.add_string("name", name, "name of the thread");
     _options.add_double("throttle", throttle,
       "Limit to this number of operations per second");
@@ -1005,7 +1030,8 @@ ThreadOptions::ThreadOptions() : name(), throttle(0.0), throttle_burst(1.0),
 }
 ThreadOptions::ThreadOptions(const ThreadOptions &other) :
     name(other.name), throttle(other.throttle),
-    throttle_burst(other.throttle_burst), _options(other._options) {}
+  throttle_burst(other.throttle_burst), synchronized(other.synchronized),
+  _options(other._options) {}
 ThreadOptions::~ThreadOptions() {}
 
 void
@@ -1051,27 +1077,27 @@ void Thread::describe(std::ostream &os) const {
 
 Operation::Operation() :
     _optype(OP_NONE), _internal(NULL), _table(), _key(), _value(), _config(),
-    _transaction(NULL), _group(NULL), _repeatgroup(0) {
+    _transaction(NULL), _group(NULL), _repeatgroup(0), _timed(0.0) {
     init_internal(NULL);
 }
 
 Operation::Operation(OpType optype, Table table, Key key, Value value) :
     _optype(optype), _internal(NULL), _table(table), _key(key), _value(value),
-    _config(), _transaction(NULL), _group(NULL), _repeatgroup(0) {
+    _config(), _transaction(NULL), _group(NULL), _repeatgroup(0), _timed(0.0) {
     init_internal(NULL);
     size_check();
 }
 
 Operation::Operation(OpType optype, Table table, Key key) :
     _optype(optype), _internal(NULL), _table(table), _key(key), _value(),
-    _config(), _transaction(NULL), _group(NULL), _repeatgroup(0) {
+    _config(), _transaction(NULL), _group(NULL), _repeatgroup(0), _timed(0.0) {
     init_internal(NULL);
     size_check();
 }
 
 Operation::Operation(OpType optype, Table table) :
     _optype(optype), _internal(NULL), _table(table), _key(), _value(),
-    _config(), _transaction(NULL), _group(NULL), _repeatgroup(0) {
+    _config(), _transaction(NULL), _group(NULL), _repeatgroup(0), _timed(0.0) {
     init_internal(NULL);
     size_check();
 }
@@ -1080,7 +1106,7 @@ Operation::Operation(const Operation &other) :
     _optype(other._optype), _internal(NULL), _table(other._table),
     _key(other._key), _value(other._value), _config(other._config),
     _transaction(other._transaction), _group(other._group),
-    _repeatgroup(other._repeatgroup) {
+    _repeatgroup(other._repeatgroup), _timed(other._timed) {
     // Creation and destruction of _group and _transaction is managed
     // by Python.
     init_internal(other._internal);
@@ -1088,7 +1114,8 @@ Operation::Operation(const Operation &other) :
 
 Operation::Operation(OpType optype, const char *config) :
     _optype(optype), _internal(NULL), _table(), _key(), _value(),
-    _config(config), _transaction(NULL), _group(NULL), _repeatgroup(0) {
+    _config(config), _transaction(NULL), _group(NULL), _repeatgroup(0),
+    _timed(0.0) {
     init_internal(NULL);
 }
 
@@ -1105,6 +1132,7 @@ Operation& Operation::operator=(const Operation &other) {
     _transaction = other._transaction;
     _group = other._group;
     _repeatgroup = other._repeatgroup;
+    _timed = other._timed;
     delete _internal;
     _internal = NULL;
     init_internal(other._internal);
@@ -1154,6 +1182,11 @@ void Operation::init_internal(OperationInternal *other) {
     }
 }
 
+bool Operation::combinable() const {
+    return (_group != NULL && _repeatgroup == 1 && _timed == 0.0 &&
+      _transaction == NULL && _config == "");
+}
+
 void Operation::create_all() {
     size_check();
 
@@ -1169,14 +1202,19 @@ void Operation::describe(std::ostream &os) const {
         os << ", "; _value.describe(os);
     }
     if (!_config.empty())
-        os << ", '" << _config;
+        os << ", '" << _config << "'";
     if (_transaction != NULL) {
         os << ", [";
         _transaction->describe(os);
         os << "]";
     }
+    if (_timed != 0.0)
+        os << ", [timed " << _timed << " secs]";
     if (_group != NULL) {
-        os << ", group[" << _repeatgroup << "]: {";
+        os << ", group";
+        if (_repeatgroup != 1)
+            os << "[repeat " << _repeatgroup << "]";
+        os << ": {";
         bool first = true;
         for (std::vector<Operation>::const_iterator i = _group->begin();
              i != _group->end(); i++) {
@@ -1331,6 +1369,19 @@ void Operation::size_check() const {
     }
 }
 
+void Operation::synchronized_check() const {
+    if (_timed != 0.0)
+        return;
+    if (_optype != Operation::OP_NONE) {
+        if (is_table_op() || _internal->sync_time_us() == 0)
+            THROW("operation cannot be synchronized, needs to be timed()");
+    } else if (_group != NULL) {
+        for (std::vector<Operation>::iterator i = _group->begin();
+             i != _group->end(); i++)
+            i->synchronized_check();
+    }
+}
+
 int CheckpointOperationInternal::run(ThreadRunner *runner, WT_SESSION *session)
 {
     (void)runner;    /* not used */
@@ -1357,10 +1408,38 @@ void SleepOperationInternal::parse_config(const std::string &config)
 
 int SleepOperationInternal::run(ThreadRunner *runner, WT_SESSION *session)
 {
+    uint64_t endtime;
+    timespec now;
+    uint64_t now_us;
+
     (void)runner;    /* not used */
     (void)session;   /* not used */
-    sleep(_sleepvalue);
+
+    workgen_epoch(&now);
+    now_us = ts_us(now);
+    if (runner->_thread->options.synchronized)
+        endtime = runner->_op_time_us + secs_us(_sleepvalue);
+    else
+        endtime = now_us + secs_us(_sleepvalue);
+
+    // Sleep for up to a second at a time, so we'll break out if
+    // we should stop.
+    while (!runner->_stop && now_us < endtime) {
+        uint64_t sleep_us = endtime - now_us;
+        if (sleep_us >= WT_MILLION) // one second
+            sleep(1);
+        else
+            usleep(sleep_us);
+
+        workgen_epoch(&now);
+        now_us = ts_us(now);
+    }
     return (0);
+}
+
+uint64_t SleepOperationInternal::sync_time_us() const
+{
+ return (secs_us(_sleepvalue));
 }
 
 void TableOperationInternal::parse_config(const std::string &config)

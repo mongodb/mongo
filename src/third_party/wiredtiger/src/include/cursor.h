@@ -217,6 +217,14 @@ struct __wt_cursor_btree {
 
 	uint8_t	append_tree;		/* Cursor appended to the tree */
 
+	/*
+	 * We have to restart cursor next/prev after a prepare conflict. Keep
+	 * the state of the cursor separately so we can restart at exactly the
+	 * right point.
+	 */
+	enum { WT_CBT_RETRY_NOTSET=0,
+	    WT_CBT_RETRY_INSERT, WT_CBT_RETRY_PAGE } iter_retry;
+
 #ifdef HAVE_DIAGNOSTIC
 	/* Check that cursor next/prev never returns keys out-of-order. */
 	WT_ITEM *lastkey, _lastkey;

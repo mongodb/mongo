@@ -152,7 +152,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	} else
 		WT_ERR(__wt_bad_object_type(session, uri));
 
-err:	if (table != NULL)
-		WT_TRET(__wt_schema_release_table(session, table));
+err:	WT_TRET(__wt_schema_release_table(session, &table));
 	return (ret);
 }

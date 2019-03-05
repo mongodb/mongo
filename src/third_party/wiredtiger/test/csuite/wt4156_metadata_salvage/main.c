@@ -188,10 +188,10 @@ create_data(TABLE_INFO *t)
 
 /*
  * corrupt_metadata --
- *	Corrupt the metadata by scribbling on the "corrupt" URI string.
+ *	Corrupt the file by scribbling on the provided URI string.
  */
 static void
-corrupt_metadata(void)
+corrupt_file(const char *file_name, const char *uri)
 {
 	struct stat sb;
 	FILE *fp;
@@ -207,7 +207,7 @@ corrupt_metadata(void)
 	 * when WiredTiger next reads it.
 	 */
 	testutil_check(__wt_snprintf(
-	    path, sizeof(path), "%s/%s", home, WT_METAFILE));
+	    path, sizeof(path), "%s/%s", home, file_name));
 	if ((fp = fopen(path, "r+")) == NULL)
 		testutil_die(errno, "fopen: %s", path);
 	testutil_check(fstat(fileno(fp), &sb));
@@ -219,7 +219,7 @@ corrupt_metadata(void)
 	/*
 	 * Corrupt all occurrences of the string in the file.
 	 */
-	while ((corrupt = byte_str(buf, meta_size, CORRUPT)) != NULL) {
+	while ((corrupt = byte_str(buf, meta_size, uri)) != NULL) {
 		corrupted = true;
 		testutil_assert(*(char *)corrupt != 'X');
 		*(char *)corrupt = 'X';
@@ -715,9 +715,22 @@ main(int argc, char *argv[])
 	 * Damage/corrupt WiredTiger.wt.
 	 */
 	printf("corrupt metadata\n");
-	corrupt_metadata();
+	corrupt_file(WT_METAFILE, CORRUPT);
 	testutil_check(__wt_snprintf(buf, sizeof(buf),
 	    "cp -p %s/WiredTiger.wt ./%s.SAVE/WiredTiger.wt.CORRUPT",
+	    home, home));
+	printf("copy: %s\n", buf);
+	if ((ret = system(buf)) < 0)
+		testutil_die(ret, "system: %s", buf);
+	run_all_verification(NULL, &table_data[0]);
+
+	/*
+	 * Damage/corrupt WiredTiger.turtle.
+	 */
+	printf("corrupt turtle\n");
+	corrupt_file(WT_METADATA_TURTLE, WT_METAFILE_URI);
+	testutil_check(__wt_snprintf(buf, sizeof(buf),
+	    "cp -p %s/WiredTiger.turtle ./%s.SAVE/WiredTiger.turtle.CORRUPT",
 	    home, home));
 	printf("copy: %s\n", buf);
 	if ((ret = system(buf)) < 0)

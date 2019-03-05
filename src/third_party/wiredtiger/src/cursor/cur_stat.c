@@ -357,6 +357,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	 * Optionally clear the connection statistics.
 	 */
 	__wt_conn_stat_init(session);
+	__wt_stat_connection_init_single(&cst->u.conn_stats);
 	__wt_stat_connection_aggregate(conn->stats, &cst->u.conn_stats);
 	if (F_ISSET(cst, WT_STAT_CLEAR))
 		__wt_stat_connection_clear_all(conn->stats);

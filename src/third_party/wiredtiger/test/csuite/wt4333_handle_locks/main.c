@@ -252,7 +252,7 @@ sweep_stats(void)
 }
 
 static void
-run(bool config_cache)
+runone(bool config_cache)
 {
 	pthread_t idlist[1000];
 	u_int i, j;
@@ -309,8 +309,8 @@ run(bool config_cache)
 	testutil_check(conn->close(conn, NULL));
 }
 
-int
-main(int argc, char *argv[])
+static int
+run(int argc, char *argv[])
 {
 	static const struct {
 		u_int workers;
@@ -338,12 +338,6 @@ main(int argc, char *argv[])
 	u_int i, n;
 	int ch;
 
-	/*
-	 * Bypass this test for valgrind. It has a fairly low thread limit.
-	 */
-	if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
-		return (EXIT_SUCCESS);
-
 	(void)testutil_set_progname(argv);
 	__wt_random_init_seed(NULL, &rnd);
 
@@ -365,10 +359,34 @@ main(int argc, char *argv[])
 		n = __wt_random(&rnd) % WT_ELEMENTS(runs);
 		workers = runs[n].workers;
 		uris = runs[n].uris;
-		run(runs[n].cache_cursors);
+		runone(runs[n].cache_cursors);
 	}
 
 	uri_teardown();
 
 	return (EXIT_SUCCESS);
+}
+
+int
+main(int argc, char *argv[])
+{
+	bool skip;
+
+	skip = false;
+
+	/*
+	 * Bypass this test for valgrind. It has a fairly low thread limit.
+	 */
+	if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
+		skip = true;
+
+	/*
+	 * Bypass this test for OS X. We periodically see it hang without error,
+	 * leaving a zombie process that never exits (WT-4613, BUILD-7616).
+	*/
+#if defined(__APPLE__)
+	skip = true;
+#endif
+
+	return (skip ? EXIT_SUCCESS : run(argc, argv));
 }

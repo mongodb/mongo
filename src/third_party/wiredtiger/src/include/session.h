@@ -40,7 +40,7 @@ struct __wt_hazard {
 typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor)	WT_CURSOR_LIST;
 
 /* Number of cursors cached to trigger cursor sweep. */
-#define	WT_SESSION_CURSOR_SWEEP_COUNTDOWN	20
+#define	WT_SESSION_CURSOR_SWEEP_COUNTDOWN	40
 
 /* Minimum number of buckets to visit during cursor sweep. */
 #define	WT_SESSION_CURSOR_SWEEP_MIN		5

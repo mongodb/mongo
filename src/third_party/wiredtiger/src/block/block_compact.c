@@ -178,7 +178,8 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	}
 	__wt_spin_unlock(session, &block->live_lock);
 
-	if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT)) {
+	if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT) ||
+	    WT_VERBOSE_ISSET(session, WT_VERB_COMPACT_PROGRESS)) {
 		++block->compact_pages_reviewed;
 		if (*skipp)
 			++block->compact_pages_skipped;

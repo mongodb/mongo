@@ -327,7 +327,7 @@ __curjoin_close(WT_CURSOR *cursor)
 	JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 err:
 
-	WT_TRET(__wt_schema_release_table(session, cjoin->table));
+	WT_TRET(__wt_schema_release_table(session, &cjoin->table));
 
 	/* This is owned by the table */
 	cursor->key_format = NULL;

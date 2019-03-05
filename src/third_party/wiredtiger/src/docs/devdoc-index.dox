@@ -9,4 +9,14 @@ see:
 
 - @subpage devdoc-schema
 
+An internal structure called Data Handle (dhandle) is used to represent and
+access a table in WiredTiger. A dhandle gets created when a table is accessed
+for the first time. It is kept in a global list and is shared across the
+sessions.  When a dhandle is not needed anymore and has been idle for a while,
+it is closed and destroyed, releasing all the resources associated with it.
+
+For more information on the lifecycle of a dhandle, see:
+
+- @subpage devdoc-dhandle-lifecycle
+
 */

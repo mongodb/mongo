@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_assert04.py
-#   Timestamps: verify consistency usage on keys
+# test_assert06.py
+#   Timestamps: verify key consistent setting for durable timestamps
 #
 
 from suite_subprocess import suite_subprocess
@@ -36,12 +36,20 @@ import wiredtiger, wttest
 def timestamp_str(t):
     return '%x' % t
 
-class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
+class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
+    def apply_timestamps(self, timestamp):
+        self.session.prepare_transaction(
+            'prepare_timestamp=' + timestamp_str(timestamp))
+        self.session.timestamp_transaction(
+            'commit_timestamp=' + timestamp_str(timestamp))
+        self.session.timestamp_transaction(
+            'durable_timestamp=' + timestamp_str(timestamp))
+
     def test_timestamp_alter(self):
-        base = 'assert04'
+        base = 'assert06'
         uri = 'file:' + base
-        cfg_on = 'assert=(commit_timestamp=key_consistent)'
-        cfg_off = 'assert=(commit_timestamp=none)'
+        cfg_on = 'assert=(durable_timestamp=key_consistent)'
+        cfg_off = 'assert=(durable_timestamp=none)'
         msg_ooo='/out of order/'
         msg_usage='/used inconsistently/'
 
@@ -49,22 +57,19 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         # Create a few items breaking the rules. Then alter the setting and
         # verify the inconsistent usage is detected.
         self.session.create(uri, 'key_format=S,value_format=S')
-
         # Insert a data item at timestamp 2.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(2))
         c['key_ts1'] = 'value2'
+        self.apply_timestamps(2)
         self.session.commit_transaction()
         c.close()
 
         # Modify the data item at timestamp 1.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(1))
         c['key_ts1'] = 'value1'
+        self.apply_timestamps(1)
         self.session.commit_transaction()
         c.close()
 
@@ -78,9 +83,8 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(2))
         c['key_nots'] = 'value2'
+        self.apply_timestamps(2)
         self.session.commit_transaction()
         c.close()
 
@@ -100,17 +104,15 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         # Detect decreasing timestamp.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(5))
         c['key_ts1'] = 'value5'
+        self.apply_timestamps(5)
         self.session.commit_transaction()
         c.close()
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(4))
         c['key_ts1'] = 'value4'
+        self.apply_timestamps(4)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg_ooo)
         c.close()
@@ -135,19 +137,20 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(3))
         c['key_nots'] = 'value3'
+        self.apply_timestamps(3)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg_usage)
         c.close()
+        self.session.checkpoint()
 
         c = self.session.open_cursor(uri)
         self.assertEquals(c['key_ts1'], 'value5')
         self.assertEquals(c['key_nots'], 'value_nots3')
         c.close()
 
-        # Now alter the setting again and detection is off.
+        # Test to make sure that key consistency can be turned off
+        # after turning it on.
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(5))
         self.session.alter(uri, cfg_off)
 
@@ -161,14 +164,13 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(6))
         c['key_nots'] = 'value6'
+        self.apply_timestamps(6)
         self.session.commit_transaction()
         c.close()
 
     def test_timestamp_usage(self):
-        base = 'assert04'
+        base = 'assert06'
         uri = 'file:' + base
         msg_ooo='/out of order/'
         msg_usage='/used inconsistently/'
@@ -177,23 +179,21 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         # That checking will verify any individual key is always or never
         # used with a timestamp. And if it is used with a timestamp that
         # the timestamps are in increasing order for that key.
-        self.session.create(uri, 'key_format=S,value_format=S,assert=(commit_timestamp=key_consistent)')
+        self.session.create(uri, 'key_format=S,value_format=S,assert=(durable_timestamp=key_consistent)')
 
         # Insert a data item at timestamp 2.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(2))
         c['key_ts1'] = 'value2'
+        self.apply_timestamps(2)
         self.session.commit_transaction()
         c.close()
 
         # Modify the data item at timestamp 1. We should detect it is wrong.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(1))
         c['key_ts1'] = 'value1'
+        self.apply_timestamps(1)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg_ooo)
         c.close()
@@ -201,9 +201,8 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         # Make sure we can successfully add a different key at timestamp 1.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(1))
         c['key_ts2'] = 'value1'
+        self.apply_timestamps(1)
         self.session.commit_transaction()
         c.close()
 
@@ -215,22 +214,19 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         #
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(10))
         c['key_ts3'] = 'value10'
+        self.apply_timestamps(10)
         self.session.commit_transaction()
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(15))
         c['key_ts4'] = 'value15'
+        self.apply_timestamps(15)
         self.session.commit_transaction()
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(13))
         c['key_ts3'] = 'value13'
         c['key_ts4'] = 'value13'
+        self.apply_timestamps(13)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg_ooo)
         c.close()
@@ -246,16 +242,14 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         #
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(13))
         c['key_ts3'] = 'value13'
+        self.apply_timestamps(13)
         self.session.commit_transaction()
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(13))
         c['key_ts4'] = 'value13'
+        self.apply_timestamps(13)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg_ooo)
         c.close()
@@ -265,9 +259,8 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         # in the update chain are not considered for the timestamp check.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(14))
         c['key_ts4'] = 'value14'
+        self.apply_timestamps(14)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg_ooo)
         c.close()
@@ -277,9 +270,8 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(16))
         c['key_ts4'] = 'value16'
+        self.apply_timestamps(16)
         self.session.commit_transaction()
         c.close()
         c = self.session.open_cursor(uri)
@@ -316,9 +308,8 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(16))
         c['key_nots'] = 'value16'
+        self.apply_timestamps(16)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg_usage)
         c.close()
@@ -331,9 +322,8 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(17))
         c['key_nots'] = 'value17'
+        self.apply_timestamps(17)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg_usage)
         c.close()
@@ -347,9 +337,8 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
         c['key_ts5'] = 'value_notsyet'
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(20))
         c['key_ts5'] = 'value20'
+        self.apply_timestamps(20)
         self.session.commit_transaction()
         c.close()
 
@@ -361,8 +350,7 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         c['key_ts6'] = 'value_notsyet'
         c['key_ts6'] = 'value21_after'
-        self.session.timestamp_transaction(
-            'commit_timestamp=' + timestamp_str(21))
+        self.apply_timestamps(21)
         self.session.commit_transaction()
         c.close()
 
@@ -370,22 +358,30 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEquals(c['key_ts6'], 'value21_after')
         c.close()
 
-        # Confirm it is okay to set the timestamp on the commit call.
+        # Confirm it is okay to set the durable timestamp on the commit call.
         # That should set the timestamp for the whole thing.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
         c['key_ts6'] = 'value_committs1'
         c['key_ts6'] = 'value22'
-        self.session.commit_transaction('commit_timestamp=' +
+        self.session.prepare_transaction(
+            'prepare_timestamp=' + timestamp_str(22))
+        self.session.timestamp_transaction(
+            'commit_timestamp=' + timestamp_str(22))
+        self.session.commit_transaction('durable_timestamp=' +
             timestamp_str(22))
         c.close()
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
         c['key_nots'] = 'value23'
+        self.session.prepare_transaction(
+            'prepare_timestamp=' + timestamp_str(23))
+        self.session.timestamp_transaction(
+            'commit_timestamp=' + timestamp_str(23))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(
-            'commit_timestamp=' + timestamp_str(23)), msg_usage)
+            'durable_timestamp=' + timestamp_str(23)), msg_usage)
         c.close()
 
 if __name__ == '__main__':

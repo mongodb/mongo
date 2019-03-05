@@ -393,7 +393,7 @@ class Translator:
     def translate_table_create(self):
         opts = self.options
         s = ''
-        s += 'wtperf_table_config = "key_format=S,value_format=S,type=lsm," +\\\n'
+        s += 'wtperf_table_config = "key_format=S,value_format=S," +\\\n'
         s += '    "exclusive=true,allocation_size=4kb," +\\\n'
         s += '    "internal_page_max=64kb,leaf_page_max=4kb,split_pct=100,"\n'
         if opts.compression != '':

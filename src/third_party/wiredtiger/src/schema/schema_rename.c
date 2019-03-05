@@ -236,7 +236,7 @@ __rename_table(WT_SESSION_IMPL *session,
 		    table->indices[i]->name, cfg));
 
 	/* Make sure the table data handle is closed. */
-	WT_TRET(__wt_schema_release_table(session, table));
+	WT_ERR(__wt_schema_release_table(session, &table));
 	WT_ERR(__wt_schema_get_table_uri(
 	    session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
 	F_SET(&table->iface, WT_DHANDLE_DISCARD);
@@ -251,7 +251,7 @@ __rename_table(WT_SESSION_IMPL *session,
 	ret = __metadata_rename(session, uri, newuri);
 
 err:	if (!tracked)
-		WT_TRET(__wt_schema_release_table(session, table));
+		WT_TRET(__wt_schema_release_table(session, &table));
 	return (ret);
 }
 

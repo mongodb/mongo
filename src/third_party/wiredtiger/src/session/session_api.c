@@ -1016,7 +1016,11 @@ __session_reset(WT_SESSION *wt_session)
 
 	WT_TRET(__wt_session_reset_cursors(session, true));
 
-	WT_TRET(__wt_session_cursor_cache_sweep(session));
+	if (--session->cursor_sweep_countdown == 0) {
+		session->cursor_sweep_countdown =
+		    WT_SESSION_CURSOR_SWEEP_COUNTDOWN;
+		WT_TRET(__wt_session_cursor_cache_sweep(session));
+	}
 
 	/* Release common session resources. */
 	WT_TRET(__wt_session_release_resources(session));

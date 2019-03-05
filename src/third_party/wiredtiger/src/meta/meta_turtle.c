@@ -189,11 +189,12 @@ int
 __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	char *metaconf;
-	bool exist_backup, exist_incr, exist_isrc, exist_turtle, load;
+	char *metaconf, *unused_value;
+	bool exist_backup, exist_incr, exist_isrc, exist_turtle;
+	bool load, loadTurtle;
 
 	metaconf = NULL;
-	load = false;
+	load = loadTurtle = false;
 
 	/*
 	 * Discard any turtle setup file left-over from previous runs.  This
@@ -202,6 +203,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE_SET, false));
 
 	/*
+	 * If we found a corrupted turtle file, then delete it and create a new.
 	 * We could die after creating the turtle file and before creating the
 	 * metadata file, or worse, the metadata file might be in some random
 	 * state.  Make sure that doesn't happen: if we don't find the turtle
@@ -220,6 +222,21 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	WT_RET(__wt_fs_exist(session, WT_METADATA_BACKUP, &exist_backup));
 	WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist_turtle));
 	if (exist_turtle) {
+		/*
+		 * Failure to read means a bad turtle file. Remove it and create
+		 * a new turtle file.
+		 */
+		if (F_ISSET(S2C(session), WT_CONN_SALVAGE))
+			WT_WITH_TURTLE_LOCK(session,
+			    ret = __wt_turtle_read(session,
+			    WT_METAFILE_URI, &unused_value));
+
+		if (ret != 0) {
+			WT_RET(__wt_remove_if_exists(
+			    session, WT_METADATA_TURTLE, false));
+			loadTurtle = true;
+		}
+
 		/*
 		 * We need to detect the difference between a source database
 		 * that may have crashed with an incremental backup file
@@ -258,7 +275,9 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 
 		/* Create any bulk-loaded file stubs. */
 		WT_RET(__metadata_load_bulk(session));
+	}
 
+	if (load || loadTurtle) {
 		/* Create the turtle file. */
 		WT_RET(__metadata_config(session, &metaconf));
 		WT_WITH_TURTLE_LOCK(session, ret =
@@ -329,8 +348,11 @@ err:	WT_TRET(__wt_fclose(session, &fs));
 	 * A file error or a missing key/value pair in the turtle file means
 	 * something has gone horribly wrong, except for the compatibility
 	 * setting which is optional.
+	 * Failure to read the turtle file when salvaging means it can't be
+	 * used for salvage.
 	 */
-	if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0)
+	if (ret == 0 || strcmp(key, WT_METADATA_COMPAT) == 0 ||
+	    F_ISSET(S2C(session), WT_CONN_SALVAGE))
 		return (ret);
 	WT_PANIC_RET(session, ret,
 	    "%s: fatal turtle file read error", WT_METADATA_TURTLE);

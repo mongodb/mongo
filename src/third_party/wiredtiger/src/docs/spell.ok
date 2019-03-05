@@ -181,6 +181,7 @@ dbformat
 dbm
 dbt
 decl
+decrementing
 decrypt
 decrypted
 del
@@ -190,6 +191,8 @@ destructors
 dev
 devdoc
 dhandle
+dhandles
+dhandle's
 disjunction
 disjunctions
 distclean
@@ -272,6 +275,7 @@ intl
 inuse
 io
 ip
+ie
 je
 jemalloc
 jitter
@@ -296,6 +300,7 @@ libhe
 libkvs
 libtool
 libwiredtiger
+lifecycle
 lmin
 ln
 loadtext

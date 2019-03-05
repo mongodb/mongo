@@ -184,7 +184,7 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 
 	__wt_curstat_dsrc_final(cst);
 
-err:	WT_TRET(__wt_schema_release_table(session, table));
+err:	WT_TRET(__wt_schema_release_table(session, &table));
 
 	__wt_scr_free(session, &buf);
 	return (ret);

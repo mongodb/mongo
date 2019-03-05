@@ -28,7 +28,8 @@
 #
 
 # Generated from runner/read_write_heavy.wtperf originally, then hand edited.
-# Create waves of extra read and write activity (storms).
+# A short run demonstrating how read or write threads can be synchronized.
+import sys
 
 from runner import *
 from wiredtiger import *
@@ -36,7 +37,7 @@ from workgen import *
 
 context = Context()
 conn_config = ""
-conn_config += ",cache_size=2GB,eviction=(threads_max=8),log=(enabled=true),session_max=250,statistics=(fast),statistics_log=(wait=1,json),io_capacity=(total=30M)"   # explicitly added
+conn_config += ",cache_size=2GB,eviction=(threads_max=8),log=(enabled=true),session_max=250,statistics=(fast),statistics_log=(wait=1,json)"   # explicitly added
 conn = wiredtiger_open("WT_TEST", "create," + conn_config)
 s = conn.open_session("")
 
@@ -101,38 +102,44 @@ logging_thread = Thread(ops)
 ############################################################################
 # This part was added to the generated file.
 # Add threads that do a bunch of operations and sleep, all in a loop.
-# At the beginning of the run the threads will tend to be synchronized,
-# but that effect will dissipate over time.
+# The write threads are in two groups that synchronize with each other
+# every 20 seconds.  The read threads are in two groups that synchronize
+# with each other every 16 seconds.  There is a collective synchronization
+# every 80 seconds.
 
 ops = Operation(Operation.OP_UPDATE, tables[0])
 ops = op_multi_table(ops, tables, False)
 ops = op_log_like(ops, log_table, 0)
-ops = ops * 10000 + Operation(Operation.OP_SLEEP, "10")
+ops = timed(5.0, ops) + sleep(5.0)
 thread_big_10 = Thread(ops)
+thread_big_10.synchronized = True
 
 ops = Operation(Operation.OP_UPDATE, tables[0])
 ops = op_multi_table(ops, tables, False)
 ops = op_log_like(ops, log_table, 0)
-ops = ops * 80000 + Operation(Operation.OP_SLEEP, "20")
+ops = timed(5.0, ops) + sleep(15.0)
 thread_big_20 = Thread(ops)
+thread_big_20.synchronized = True
 
 ops = Operation(Operation.OP_SEARCH, tables[0])
 ops = op_multi_table(ops, tables, False)
 ops = op_log_like(ops, log_table, 0)
-ops = ops * 10000 + Operation(Operation.OP_SLEEP, "8")
+ops = timed(4.0, ops) + sleep(4.0)
 thread_bigread_8 = Thread(ops)
+thread_bigread_8.synchronized = True
 
 ops = Operation(Operation.OP_SEARCH, tables[0])
 ops = op_multi_table(ops, tables, False)
 ops = op_log_like(ops, log_table, 0)
-ops = ops * 80000 + Operation(Operation.OP_SLEEP, "16")
+ops = timed(4.0, ops) + sleep(12.0)
 thread_bigread_16 = Thread(ops)
+thread_bigread_16.synchronized = True
 
 # End of added section.
 # The new threads will also be added to the workload below.
 ############################################################################
 
-workload = Workload(context, 80 * thread0 + 80 * thread1 + checkpoint_thread + logging_thread + 10 * thread_big_10 + 10 * thread_big_20 + 10 * thread_bigread_8 + 10 * thread_bigread_16)
+workload = Workload(context, 20 * thread0 + 20 * thread1 + checkpoint_thread + logging_thread + 50 * thread_big_10 + 50 * thread_big_20 + 50 * thread_bigread_8 + 50 * thread_bigread_16)
 workload.options.report_interval=1
 workload.options.run_time=900
 workload.options.sample_rate=1

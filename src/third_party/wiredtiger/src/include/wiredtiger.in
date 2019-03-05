@@ -2410,14 +2410,15 @@ struct __wt_connection {
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
 	 * chosen from the following options: \c "api"\, \c "block"\, \c
 	 * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c
-	 * "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c "evictserver"\,
-	 * \c "fileops"\, \c "handleops"\, \c "log"\, \c "lookaside"\, \c
-	 * "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\,
-	 * \c "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c
-	 * "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "salvage"\,
-	 * \c "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\,
-	 * \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
-	 * "write"; default empty.}
+	 * "compact_progress"\, \c "error_returns"\, \c "evict"\, \c
+	 * "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\, \c
+	 * "log"\, \c "lookaside"\, \c "lookaside_activity"\, \c "lsm"\, \c
+	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
+	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
+	 * "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
+	 * \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c
+	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -3120,14 +3121,14 @@ struct __wt_connection {
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
  * values chosen from the following options: \c "api"\, \c "block"\, \c
- * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c "error_returns"\,
- * \c "evict"\, \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c
- * "handleops"\, \c "log"\, \c "lookaside"\, \c "lookaside_activity"\, \c
- * "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
- * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
- * "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
- * "temporary"\, \c "thread_group"\, \c "timestamp"\, \c "transaction"\, \c
- * "verify"\, \c "version"\, \c "write"; default empty.}
+ * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c
+ * "compact_progress"\, \c "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c
+ * "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\, \c "lookaside"\,
+ * \c "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
+ * "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c
+ * "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c
+ * "split"\, \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c
+ * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
  * files.  Ignored on non-Windows systems.  Options are given as a list\, such
  * as <code>"write_through=[data]"</code>. Configuring \c write_through requires

@@ -591,7 +591,7 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
 	WT_TXN *txn = &session->txn;
 	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
 	wt_timestamp_t oldest_ts, stable_ts;
-	char ts_string[WT_TS_INT_STRING_SIZE];
+	char ts_string[2][WT_TS_INT_STRING_SIZE];
 	bool has_oldest_ts, has_stable_ts;
 
 	/*
@@ -611,17 +611,17 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
 
 	if (has_oldest_ts && ts < oldest_ts) {
 		__wt_timestamp_to_string(
-		    oldest_ts, ts_string, sizeof(ts_string));
+		    oldest_ts, ts_string[0], sizeof(ts_string[0]));
 		WT_RET_MSG(session, EINVAL,
 		    "%s timestamp %.*s older than oldest timestamp %s",
-		    name, (int)cval->len, cval->str, ts_string);
+		    name, (int)cval->len, cval->str, ts_string[0]);
 	}
 	if (compare_stable && has_stable_ts && ts < stable_ts) {
 		__wt_timestamp_to_string(
-		    stable_ts, ts_string, sizeof(ts_string));
+		    stable_ts, ts_string[0], sizeof(ts_string[0]));
 		WT_RET_MSG(session, EINVAL,
 		    "%s timestamp %.*s older than stable timestamp %s",
-		    name, (int)cval->len, cval->str, ts_string);
+		    name, (int)cval->len, cval->str, ts_string[0]);
 	}
 
 	/*
@@ -631,12 +631,12 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
 	 */
 	if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
 	    ts < txn->first_commit_timestamp) {
-		__wt_timestamp_to_string(
-		    txn->first_commit_timestamp, ts_string, sizeof(ts_string));
+		__wt_timestamp_to_string(txn->first_commit_timestamp,
+		    ts_string[0], sizeof(ts_string[0]));
 		WT_RET_MSG(session, EINVAL,
 		    "%s timestamp %.*s older than the first "
 		    "commit timestamp %s for this transaction",
-		    name, (int)cval->len, cval->str, ts_string);
+		    name, (int)cval->len, cval->str, ts_string[0]);
 	}
 
 	/*
@@ -646,11 +646,23 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
 	 */
 	if (F_ISSET(txn, WT_TXN_PREPARE) && ts < txn->prepare_timestamp) {
 		__wt_timestamp_to_string(
-		    txn->prepare_timestamp, ts_string, sizeof(ts_string));
+		    txn->prepare_timestamp, ts_string[0], sizeof(ts_string[0]));
 		WT_RET_MSG(session, EINVAL,
 		    "%s timestamp %.*s older than the prepare timestamp %s "
 		    "for this transaction",
-		    name, (int)cval->len, cval->str, ts_string);
+		    name, (int)cval->len, cval->str, ts_string[0]);
+	}
+
+	if (F_ISSET(txn, WT_TXN_HAS_TS_DURABLE) &&
+	    txn->durable_timestamp < txn->commit_timestamp) {
+		__wt_timestamp_to_string(
+		    txn->durable_timestamp, ts_string[0], sizeof(ts_string[0]));
+		__wt_timestamp_to_string(
+		    txn->commit_timestamp, ts_string[1], sizeof(ts_string[1]));
+		WT_RET_MSG(session, EINVAL,
+		    "%s timestamp %s older than the commit timestamp %s "
+		    "for this transaction",
+		    name, ts_string[0], ts_string[1]);
 	}
 
 	return (0);
@@ -705,6 +717,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_RET(__wt_txn_parse_timestamp(
 			    session, "durable", &ts, &cval));
 			txn->durable_timestamp = ts;
+			F_SET(txn, WT_TXN_HAS_TS_DURABLE);
 			prepare_allowed = true;
 		}
 	}

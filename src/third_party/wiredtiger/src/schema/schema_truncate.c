@@ -34,7 +34,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		WT_ERR(__wt_schema_truncate(
 		    session, table->indices[i]->source, cfg));
 
-err:	WT_TRET(__wt_schema_release_table(session, table));
+err:	WT_TRET(__wt_schema_release_table(session, &table));
 	return (ret);
 }
 

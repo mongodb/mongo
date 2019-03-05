@@ -11,8 +11,9 @@
 static int usage(void);
 
 int
-util_downgrade(WT_SESSION *session, WT_CONNECTION *conn, int argc, char *argv[])
+util_downgrade(WT_SESSION *session, int argc, char *argv[])
 {
+	WT_CONNECTION *conn;
 	WT_DECL_RET;
 	int ch;
 	char config_str[128], *release;
@@ -39,8 +40,9 @@ util_downgrade(WT_SESSION *session, WT_CONNECTION *conn, int argc, char *argv[])
 	if ((ret = __wt_snprintf(config_str, sizeof(config_str),
 	    "compatibility=(release=%s)", release)) != 0)
 		return (util_err(session, ret, NULL));
+	conn = session->connection;
 	if ((ret = conn->reconfigure(conn, config_str)) != 0)
-		return (util_err(session, ret, "conn.downgrade"));
+		return (util_err(session, ret, "WT_CONNECTION.downgrade"));
 
 	return (0);
 }

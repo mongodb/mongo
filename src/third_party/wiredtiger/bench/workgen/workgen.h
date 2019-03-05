@@ -295,6 +295,7 @@ struct Operation {
     Transaction *_transaction;
     std::vector<Operation> *_group;
     int _repeatgroup;
+    double _timed;
 
     Operation();
     Operation(OpType optype, Table table, Key key, Value value);
@@ -305,6 +306,9 @@ struct Operation {
     Operation(const Operation &other);
     ~Operation();
 
+    // Check if adding (via Python '+') another operation to this one is
+    // as easy as appending the new operation to the _group.
+    bool combinable() const;
     void describe(std::ostream &os) const;
 #ifndef SWIG
     Operation& operator=(const Operation &other);
@@ -317,6 +321,7 @@ struct Operation {
        uint64_t n, char *result) const;
     void kv_size_buffer(bool iskey, size_t &size) const;
     void size_check() const;
+    void synchronized_check() const;
 #endif
 };
 
@@ -327,6 +332,7 @@ struct ThreadOptions {
     std::string name;
     double throttle;
     double throttle_burst;
+    bool synchronized;
 
     ThreadOptions();
     ThreadOptions(const ThreadOptions &other);
@@ -334,6 +340,8 @@ struct ThreadOptions {
 
     void describe(std::ostream &os) const {
 	os << "throttle " << throttle;
+	os << ", throttle_burst " << throttle_burst;
+	os << ", synchronized " << synchronized;
     }
 
     std::string help() const { return _options.help(); }

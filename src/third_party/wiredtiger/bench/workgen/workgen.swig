@@ -158,7 +158,7 @@ WorkgenFrozenClass(WorkloadOptions)
     def __add__(self, other):
         if not isinstance(other, Operation):
             raise Exception('Operation.__sum__ requires an Operation')
-        if self._group == None or self._repeatgroup != 1 or self._transaction != None or self._config != '':
+        if not self.combinable():
             op = Operation()
             op._group = OpList([self, other])
             op._repeatgroup = 1

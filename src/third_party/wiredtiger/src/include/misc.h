@@ -24,18 +24,20 @@
 #define	WT_DIVIDER	"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
 /* Basic constants. */
-#define	WT_THOUSAND	(1000)
-#define	WT_MILLION	(1000000)
-#define	WT_BILLION	(1000000000)
+#define	WT_THOUSAND		(1000)
+#define	WT_MILLION		(1000000)
+#define	WT_BILLION		(1000000000)
 
-#define	WT_MINUTE	(60)
+#define	WT_MINUTE		(60)
 
-#define	WT_KILOBYTE	(1024)
-#define	WT_MEGABYTE	(1048576)
-#define	WT_GIGABYTE	(1073741824)
-#define	WT_TERABYTE	((uint64_t)1099511627776)
-#define	WT_PETABYTE	((uint64_t)1125899906842624)
-#define	WT_EXABYTE	((uint64_t)1152921504606846976)
+#define	WT_PROGRESS_MSG_PERIOD	(20)
+
+#define	WT_KILOBYTE		(1024)
+#define	WT_MEGABYTE		(1048576)
+#define	WT_GIGABYTE		(1073741824)
+#define	WT_TERABYTE		((uint64_t)1099511627776)
+#define	WT_PETABYTE		((uint64_t)1125899906842624)
+#define	WT_EXABYTE		((uint64_t)1152921504606846976)
 
 /*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in

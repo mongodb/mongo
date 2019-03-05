@@ -467,7 +467,8 @@ __wt_checkpoint_progress(WT_SESSION_IMPL *session, bool closing)
 	time_diff = WT_TIMEDIFF_SEC(cur_time,
 	    conn->ckpt_timer_start);
 
-	if (closing || (time_diff / 20) > conn->ckpt_progress_msg_count) {
+	if (closing || (time_diff / WT_PROGRESS_MSG_PERIOD) >
+	    conn->ckpt_progress_msg_count) {
 		__wt_verbose(session, WT_VERB_CHECKPOINT_PROGRESS,
 		    "Checkpoint %s for %" PRIu64
 		    " seconds and wrote: %" PRIu64 " pages (%" PRIu64 " MB)",
@@ -1537,7 +1538,7 @@ __checkpoint_mark_skip(
 
 /*
  * __wt_checkpoint_tree_reconcile_update --
- *	Update a checkpoint based on reconciliation's results.
+ *	Update a checkpoint based on reconciliation results.
  */
 void
 __wt_checkpoint_tree_reconcile_update(
@@ -1554,7 +1555,7 @@ __wt_checkpoint_tree_reconcile_update(
 
 	/*
 	 * Reconciliation just wrote a checkpoint, everything has been written.
-	 * Update the checkpoint with reconciliation's information. The reason
+	 * Update the checkpoint with reconciliation information. The reason
 	 * for this function is the reconciliation code just passes through the
 	 * btree structure's checkpoint array, it doesn't know any more.
 	 */

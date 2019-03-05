@@ -202,6 +202,13 @@ WT_PREPARE_CONFLICT error will be returned indicating that it is not possible
 to choose a version of data to return until a prepared transaction is resolved,
 it is reasonable to retry such operations.
 
+Durability of the data updates performed by a prepared transaction, on tables
+configured with log=(enabled=false), can be controlled by specifying a durable
+timestamp during WT_SESSION::commit_transaction. Checkpoint will consider the
+durable timestamp, instead of commit timestamp for persisting the data updates.
+If the durable timestamp is not specified, then the commit timestamp will be
+considered as the durable timestamp.
+
 @subsection timestamp_connection Managing global timestamp state
 
 Applications that use timestamps need to manage some global state in order

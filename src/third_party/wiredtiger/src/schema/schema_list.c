@@ -14,22 +14,21 @@
  */
 int
 __wt_schema_get_table_uri(WT_SESSION_IMPL *session,
-    const char *uri, bool ok_incomplete, uint32_t flags,
-    WT_TABLE **tablep)
+    const char *uri, bool ok_incomplete, uint32_t flags, WT_TABLE **tablep)
 {
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	saved_dhandle = session->dhandle;
-
 	*tablep = NULL;
+
+	saved_dhandle = session->dhandle;
 
 	WT_ERR(__wt_session_get_dhandle(session, uri, NULL, NULL, flags));
 	table = (WT_TABLE *)session->dhandle;
 	if (!ok_incomplete && !table->cg_complete) {
+		WT_ERR(__wt_session_release_dhandle(session));
 		ret = __wt_set_return(session, EINVAL);
-		WT_TRET(__wt_session_release_dhandle(session));
 		WT_ERR_MSG(session, ret, "'%s' cannot be used "
 		    "until all column groups are created",
 		    table->iface.name);
@@ -68,9 +67,14 @@ err:	__wt_scr_free(session, &namebuf);
  *	Release a table handle.
  */
 int
-__wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE *table)
+__wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
 {
 	WT_DECL_RET;
+	WT_TABLE *table;
+
+	if ((table = *tablep) == NULL)
+		return (0);
+	*tablep = NULL;
 
 	WT_WITH_DHANDLE(session, &table->iface,
 	    ret = __wt_session_release_dhandle(session));

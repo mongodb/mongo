@@ -199,3 +199,9 @@ ts_us(const timespec &ts)
 {
     return (ns_to_us(ts.tv_nsec) + sec_to_us(ts.tv_sec));
 }
+
+inline uint64_t
+secs_us(double secs)
+{
+    return (secs * USEC_PER_SEC);
+}

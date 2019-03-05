@@ -1,0 +1,92 @@
+/*! @page devdoc-dhandle-lifecycle Data Handle Lifecycle
+
+A WiredTiger Data Handle (dhandle) is a generic representation of any named
+data source. This representation contains information such as its name,
+how many references there are to it, individual data source statistics and
+what type of underlying data object it is.
+
+WiredTiger maintains all dhandles in a global dhandle list accessed
+from the connection. Multiple sessions access this list, which is
+protected by a R/W lock. Each session also maintains a session
+dhandle cache which is a cache of dhandles a session has operated
+upon. The entries in the cache are references into the global dhandle
+list.
+
+@section dhandle-creation dhandle creation
+
+When a cursor in a session attempts to access a WiredTiger table
+that has not been accessed before, the dhandle for the table will
+neither be in the session's dhandle cache nor in the connection's
+global dhandle list. A new dhandle will have to be created for this
+table. The cursor trying to access a table first attempts to find
+the dhandle in the session dhandle cache. When it doesn't find the
+dhandle in the session cache, it searches in the global dhandle
+list while holding the read lock. When it doesn't find the dhandle
+there, it creates a dhandle for this table and puts it in the global
+dhandle list while holding the write lock on the global dhandle
+list. The cursor operation then puts a reference to the dhandle in
+the session's dhandle cache.
+
+There are two relevant reference counters in the dhandle structure,
+\c session_ref and \c session_inuse. \c session_ref counts the
+number of session dhandle cache lists that this contain dhandle.
+\c session_inuse is a count of cursors opened and operating on this
+dhandle. Both these counters are incremented by this session as the
+cursor attempts to use this dhandle. When the operation completes
+and the cursor is closed, the \c session_inuse is decremented. The
+dhandle reference is not removed immediately from the session dhandle
+cache. If this session accesses the same table again in the near
+future, having the dhandle reference already in the session dhandle
+cache is a performance optimization.
+
+@section session-cache-sweep dhandle session cache sweep
+
+Dhandle cache sweep is the only way a cleanup is performed on the
+session' dhandle cache list. The references to the dhandles that have not
+been accessed by this session in a long time are removed from the
+cache. Since a session is single-threaded, a session's dhandle cache
+can only be altered by that session alone.
+
+Each time a session accesses a dhandle, it checks if enough
+time has elapsed to do a session cache sweep for that session.
+As it walks the session dhandle cache list, it notices if any dhandle
+on its list has been marked dead (idle too long). If it has, the
+session removes that dhandle from its list and decrements the
+\c session_ref count.
+
+Since accessing a dhandle involves walking the session dhandle cache
+list anyway, cache cleanup is piggy-backed on this operation.
+
+@section dhandle-sweep sweep-server dhandle sweep
+
+WiredTiger maintains a sweep server in the background for the cleanup of the
+global dhandle list. The sweep server periodically (\c close_scan_interval)
+revisits the dhandles in the global list and if the dhandles are not being used,
+i.e., the \c session_inuse count is 0, it assigns the current time as the time
+of death for the dhandle, if not already done before.
+
+If a dhandle has already got a time of death set for it in a previous iteration
+of the dhandle sweep and the dhandle has stayed not in use, the sweep server
+compares the time of death with the current time to check if the dhandle has
+remained idle for the configured idle time (\c close_idle_time). If the dhandle
+has remained idle, the sweep server closes the associated btree contained in the
+dhandle and releases some of the resources for that dhandle. It also marks
+the dhandle as dead so that the next time a session with a reference walks its
+own cache list, it will see the handle marked dead and remove it from the
+session's dhandle cache list (see above).
+
+The sweep server then checks for whether or not any session is referencing this
+dhandle, i.e., if a session's dhandle cache still contains a reference to this
+dhandle. If a dhandle stays referenced by at least one session, i.e., the
+\c session_ref count is not 0, the dhandle can't be removed from the global
+list. If this dhandle is not referenced by any session, i.e., \c session_ref
+count is 0, the sweep server removes the dhandle from the global dhandle list
+and frees any remaining resources associated with it. The removal of the dhandle
+from the global list hence completes this dhandle's lifecycle. Any future access
+of the associated table would need to start by creating the dhandle again.
+
+Note: The sweep server's scan interval and a dhandle's close idle time can be
+configured using \c file_manager configuration settings of the connection
+handle.
+
+*/

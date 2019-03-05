@@ -278,7 +278,7 @@ err:	__wt_free(session, cgconf);
 	__wt_buf_free(session, &namebuf);
 
 	if (!tracked)
-		WT_TRET(__wt_schema_release_table(session, table));
+		WT_TRET(__wt_schema_release_table(session, &table));
 	return (ret);
 }
 
@@ -415,7 +415,7 @@ __create_index(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, ret,
 		    "Can't create an index for table: %.*s",
 		    (int)tlen, tablename);
-	WT_RET(__wt_schema_release_table(session, table));
+	WT_RET(__wt_schema_release_table(session, &table));
 
 	if ((ret = __wt_schema_get_table(
 	    session, tablename, tlen, true, 0, &table)) != 0)
@@ -565,7 +565,7 @@ err:	__wt_free(session, idxconf);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
 
-	WT_TRET(__wt_schema_release_table(session, table));
+	WT_TRET(__wt_schema_release_table(session, &table));
 	return (ret);
 }
 
@@ -636,8 +636,7 @@ __create_table(WT_SESSION_IMPL *session,
 		table = NULL;
 	}
 
-err:	if (table != NULL)
-		WT_TRET(__wt_schema_release_table(session, table));
+err:	WT_TRET(__wt_schema_release_table(session, &table));
 	__wt_free(session, cgname);
 	__wt_free(session, tableconf);
 	return (ret);

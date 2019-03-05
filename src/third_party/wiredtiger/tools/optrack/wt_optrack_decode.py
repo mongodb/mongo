@@ -265,7 +265,6 @@ def waitOnOneProcess(runningProcesses):
 def main():
 
     runnableProcesses = {};
-    returnValues = {};
     spawnedProcesses = {};
     successfullyProcessedFiles = [];
     targetParallelism = multiprocessing.cpu_count();

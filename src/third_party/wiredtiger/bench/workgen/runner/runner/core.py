@@ -38,6 +38,23 @@ def txn(op, config=None):
     op._transaction = t
     return op
 
+# sleep --
+#   Create an operation to sleep a given number of seconds.
+def sleep(seconds):
+    return Operation(Operation.OP_SLEEP, str(seconds))
+
+# timed --
+#   Configure the operation (and suboperations) to run until the time elapses.
+def timed(seconds, op):
+    if op._group == None:
+        result = Operation()
+        result._group = OpList([op])
+        result._repeatgroup = 1
+    else:
+        result = op
+    result._timed = seconds
+    return result
+
 # Check for a local build that contains the wt utility. First check in
 # current working directory, then in build_posix and finally in the disttop
 # directory. This isn't ideal - if a user has multiple builds in a tree we

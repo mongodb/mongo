@@ -382,7 +382,7 @@ err:
 	if (cindex->child != NULL)
 		WT_TRET(cindex->child->close(cindex->child));
 
-	WT_TRET(__wt_schema_release_table(session, cindex->table));
+	WT_TRET(__wt_schema_release_table(session, &cindex->table));
 	/* The URI is owned by the index. */
 	cursor->internal_uri = NULL;
 	__wt_cursor_close(cursor);
@@ -489,7 +489,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	if ((ret = __wt_schema_open_index(
 	    session, table, idxname, namesize, &idx)) != 0) {
-		WT_TRET(__wt_schema_release_table(session, table));
+		WT_TRET(__wt_schema_release_table(session, &table));
 		return (ret);
 	}
 	WT_RET(__wt_calloc_one(session, &cindex));

@@ -131,7 +131,7 @@ __drop_table(
 	 */
 	WT_ERR(__wt_schema_get_table_uri(session, uri, true,
 	    WT_DHANDLE_EXCLUSIVE, &table));
-	WT_ERR(__wt_schema_release_table(session, table));
+	WT_ERR(__wt_schema_release_table(session, &table));
 	WT_ERR(__wt_schema_get_table_uri(session, uri, true, 0, &table));
 
 	/* Drop the column groups. */
@@ -162,7 +162,7 @@ __drop_table(
 	}
 
 	/* Make sure the table data handle is closed. */
-	WT_TRET(__wt_schema_release_table(session, table));
+	WT_ERR(__wt_schema_release_table(session, &table));
 	WT_ERR(__wt_schema_get_table_uri(
 	    session, uri, true, WT_DHANDLE_EXCLUSIVE, &table));
 	F_SET(&table->iface, WT_DHANDLE_DISCARD);
@@ -176,8 +176,8 @@ __drop_table(
 	/* Remove the metadata entry (ignore missing items). */
 	WT_ERR(__wt_metadata_remove(session, uri));
 
-err:	if (table != NULL && !tracked)
-		WT_TRET(__wt_schema_release_table(session, table));
+err:	if (!tracked)
+		WT_TRET(__wt_schema_release_table(session, &table));
 	return (ret);
 }
 
