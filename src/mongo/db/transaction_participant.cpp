@@ -42,6 +42,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/dbdirectclient.h"
@@ -1091,7 +1092,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     // Re-acquire the RSTL to prevent state transitions while committing the transaction. When the
     // transaction was prepared, we dropped the RSTL. We do not need to reacquire the PBWM because
     // if we're not the primary we will uassert anyways.
-    Lock::ResourceLock rstl(opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     if (opCtx->writesAreReplicated()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::NotMaster,
@@ -1252,7 +1253,7 @@ void TransactionParticipant::Participant::abortActiveTransaction(OperationContex
     // Re-acquire the RSTL to prevent state transitions while aborting the transaction. If the
     // transaction was prepared then we dropped it on preparing the transaction. We do not need to
     // reacquire the PBWM because if we're not the primary we will uassert anyways.
-    Lock::ResourceLock rstl(opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     if (o().txnState.isPrepared() && opCtx->writesAreReplicated()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::NotMaster,

@@ -891,7 +891,6 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
 }
 
 LockResult LockerImpl::lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
-    invariant(!opCtx->lockState()->isLocked());
     return lockBegin(opCtx, resourceIdReplicationStateTransitionLock, mode);
 }
 
