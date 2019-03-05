@@ -45,7 +45,7 @@ namespace {
 
 class MockExecutor : public OutOfLineExecutor {
 public:
-    void schedule(unique_function<void()> func) override {
+    void schedule(Task func) override {
         _deque.push_front(std::move(func));
     }
 
@@ -60,7 +60,7 @@ public:
 
         auto x = std::move(_deque.back());
         _deque.pop_back();
-        x();
+        x(Status::OK());
 
         return true;
     }
@@ -71,27 +71,7 @@ public:
     }
 
 private:
-    std::deque<unique_function<void()>> _deque;
-};
-
-class ThreadPoolExecutor : public OutOfLineExecutor {
-public:
-    ThreadPoolExecutor() : _threadPool(ThreadPool::Options{}) {}
-
-    void start() {
-        _threadPool.startup();
-    }
-
-    void shutdown() {
-        _threadPool.shutdown();
-    }
-
-    void schedule(unique_function<void()> func) override {
-        ASSERT_OK(_threadPool.schedule(std::move(func)));
-    }
-
-private:
-    ThreadPool _threadPool;
+    std::deque<Task> _deque;
 };
 
 TEST(KeyedExecutor, basicExecute) {
@@ -332,9 +312,9 @@ TEST(KeyedExecutor, gracefulShutdown) {
 }
 
 TEST(KeyedExecutor, withThreadsTest) {
-    ThreadPoolExecutor tpe;
-    KeyedExecutor<int> ke(&tpe);
-    tpe.start();
+    auto thread_pool = ThreadPool(ThreadPool::Options{});
+    KeyedExecutor<int> ke(&thread_pool);
+    thread_pool.startup();
 
     constexpr size_t n = (1 << 16);
 
@@ -372,7 +352,7 @@ TEST(KeyedExecutor, withThreadsTest) {
     stdx::unique_lock<stdx::mutex> lk(mutex);
     condvar.wait(lk, [&] { return counter == n; });
 
-    tpe.shutdown();
+    thread_pool.shutdown();
 
     ASSERT_EQUALS(counter, n);
 }

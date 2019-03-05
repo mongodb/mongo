@@ -144,7 +144,7 @@ COMMON_THREAD_POOL_TEST(UnusedPool) {
 COMMON_THREAD_POOL_TEST(CannotScheduleAfterShutdown) {
     auto& pool = getThreadPool();
     pool.shutdown();
-    ASSERT_EQ(ErrorCodes::ShutdownInProgress, pool.schedule([] {}));
+    pool.schedule([](auto status) { ASSERT_EQ(status, ErrorCodes::ShutdownInProgress); });
 }
 
 COMMON_THREAD_POOL_DEATH_TEST(DieOnDoubleStartUp, "it has already started") {
@@ -160,9 +160,9 @@ constexpr auto kExceptionMessage = "No good very bad exception";
 COMMON_THREAD_POOL_DEATH_TEST(DieWhenExceptionBubblesUp, kExceptionMessage) {
     auto& pool = getThreadPool();
     pool.startup();
-    ASSERT_OK(pool.schedule([] {
+    pool.schedule([](auto status) {
         uassertStatusOK(Status({ErrorCodes::BadValue, kExceptionMessage}));
-    }));
+    });
     pool.shutdown();
     pool.join();
 }
@@ -177,7 +177,10 @@ COMMON_THREAD_POOL_DEATH_TEST(DieOnDoubleJoin, "Attempted to join pool") {
 COMMON_THREAD_POOL_TEST(PoolDestructorExecutesRemainingTasks) {
     auto& pool = getThreadPool();
     bool executed = false;
-    ASSERT_OK(pool.schedule([&executed] { executed = true; }));
+    pool.schedule([&executed](auto status) {
+        ASSERT_OK(status);
+        executed = true;
+    });
     deleteThreadPool();
     ASSERT_EQ(executed, true);
 }
@@ -185,7 +188,10 @@ COMMON_THREAD_POOL_TEST(PoolDestructorExecutesRemainingTasks) {
 COMMON_THREAD_POOL_TEST(PoolJoinExecutesRemainingTasks) {
     auto& pool = getThreadPool();
     bool executed = false;
-    ASSERT_OK(pool.schedule([&executed] { executed = true; }));
+    pool.schedule([&executed](auto status) {
+        ASSERT_OK(status);
+        executed = true;
+    });
     pool.shutdown();
     pool.join();
     ASSERT_EQ(executed, true);
@@ -198,12 +204,15 @@ COMMON_THREAD_POOL_TEST(RepeatedScheduleDoesntSmashStack) {
     std::size_t n = 0;
     stdx::mutex mutex;
     stdx::condition_variable condvar;
-    func = [&pool, &n, &func, &condvar, &mutex, depth] {
+    func = [&pool, &n, &func, &condvar, &mutex, depth]() {
         stdx::unique_lock<stdx::mutex> lk(mutex);
         if (n < depth) {
             n++;
             lk.unlock();
-            ASSERT_OK(pool.schedule(func));
+            pool.schedule([&](auto status) {
+                ASSERT_OK(status);
+                func();
+            });
         } else {
             pool.shutdown();
             condvar.notify_one();

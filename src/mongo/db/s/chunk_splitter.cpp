@@ -272,10 +272,13 @@ void ChunkSplitter::trySplitting(std::shared_ptr<ChunkSplitStateDriver> chunkSpl
     if (!_isPrimary) {
         return;
     }
-    uassertStatusOK(_threadPool.schedule(
-        [ this, csd = std::move(chunkSplitStateDriver), nss, min, max, dataWritten ]() noexcept {
+    _threadPool.schedule(
+        [ this, csd = std::move(chunkSplitStateDriver), nss, min, max, dataWritten ](
+            auto status) noexcept {
+            invariant(status);
+
             _runAutosplit(csd, nss, min, max, dataWritten);
-        }));
+        });
 }
 
 void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSplitStateDriver,

@@ -70,10 +70,12 @@ public:
     void startup() override;
     void shutdown() override;
     void join() override;
-    Status schedule(Task task) override;
+    void schedule(Task task) override;
 
 private:
-    void consumeTasks(stdx::unique_lock<stdx::mutex>* lk);
+    void _consumeOneTask(stdx::unique_lock<stdx::mutex>& lk);
+    void _shutdown(stdx::unique_lock<stdx::mutex>& lk);
+    void _join(stdx::unique_lock<stdx::mutex>& lk);
 
     // These are the options with which the pool was configured at construction time.
     const Options _options;
