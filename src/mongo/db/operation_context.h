@@ -446,26 +446,7 @@ private:
     // once from OK to some kill code.
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
 
-    // A transport Baton associated with the operation. The presence of this object implies that a
-    // client thread is doing it's own async networking by blocking on it's own thread.
     BatonHandle _baton;
-
-    // If non-null, _waitMutex and _waitCV are the (mutex, condition variable) pair that the
-    // operation is currently waiting on inside a call to waitForConditionOrInterrupt...().
-    //
-    // _waitThread is the calling thread's thread id.
-    //
-    // All access guarded by the Client's lock.
-    stdx::mutex* _waitMutex = nullptr;
-    stdx::condition_variable* _waitCV = nullptr;
-    stdx::thread::id _waitThread;
-
-    // If _waitMutex and _waitCV are non-null, this is the number of threads in a call to markKilled
-    // actively attempting to kill the operation. If this value is non-zero, the operation is inside
-    // waitForConditionOrInterrupt...() and must stay there until _numKillers reaches 0.
-    //
-    // All access guarded by the Client's lock.
-    int _numKillers = 0;
 
     WriteConcernOptions _writeConcern;
 

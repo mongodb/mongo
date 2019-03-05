@@ -879,13 +879,10 @@ SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
 
 #ifdef __linux__
 BatonHandle TransportLayerASIO::makeBaton(OperationContext* opCtx) const {
-    auto baton = std::make_shared<BatonASIO>(opCtx);
+    invariant(!opCtx->getBaton());
 
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        invariant(!opCtx->getBaton());
-        opCtx->setBaton(baton);
-    }
+    auto baton = std::make_shared<BatonASIO>(opCtx);
+    opCtx->setBaton(baton);
 
     return baton;
 }

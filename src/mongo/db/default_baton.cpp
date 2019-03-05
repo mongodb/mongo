@@ -57,11 +57,8 @@ void DefaultBaton::detachImpl() noexcept {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-        {
-            stdx::lock_guard<Client> lk(*_opCtx->getClient());
-            invariant(_opCtx->getBaton().get() == this);
-            _opCtx->setBaton(nullptr);
-        }
+        invariant(_opCtx->getBaton().get() == this);
+        _opCtx->setBaton(nullptr);
 
         _opCtx = nullptr;
         _hasIngressSocket = false;

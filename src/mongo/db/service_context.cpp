@@ -248,21 +248,20 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
-    {
-        stdx::lock_guard<Client> lk(*client);
-        client->setOperationContext(opCtx.get());
-    }
+    // The baton must be attached before attaching to a client
     if (_transportLayer) {
         _transportLayer->makeBaton(opCtx.get());
     } else {
         makeBaton(opCtx.get());
     }
+    {
+        stdx::lock_guard<Client> lk(*client);
+        client->setOperationContext(opCtx.get());
+    }
     return UniqueOperationContext(opCtx.release());
 };
 
 void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx) const {
-    opCtx->getBaton()->detach();
-
     auto client = opCtx->getClient();
     if (client->session()) {
         _numCurrentOps.subtractAndFetch(1);
@@ -272,6 +271,8 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
         stdx::lock_guard<Client> lk(*client);
         client->resetOperationContext();
     }
+    opCtx->getBaton()->detach();
+
     onDestroy(opCtx, service->_clientObservers);
     delete opCtx;
 }
@@ -413,13 +414,10 @@ void ServiceContext::ServiceContextDeleter::operator()(ServiceContext* service) 
 }
 
 BatonHandle ServiceContext::makeBaton(OperationContext* opCtx) const {
-    auto baton = std::make_shared<DefaultBaton>(opCtx);
+    invariant(!opCtx->getBaton());
 
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        invariant(!opCtx->getBaton());
-        opCtx->setBaton(baton);
-    }
+    auto baton = std::make_shared<DefaultBaton>(opCtx);
+    opCtx->setBaton(baton);
 
     return baton;
 }

@@ -47,6 +47,19 @@ namespace mongo {
  */
 class Notifyable {
 public:
+    // !!! PAY ATTENTION, THERE IS DANGER HERE !!!
+    //
+    // Implementers of the notifyable api must be level triggered by notify, rather than edge
+    // triggered.
+    //
+    // I.e. a call to notify() must either unblock the notifyable immediately, if it is currently
+    // blocked, or unblock it the next time it would wait, if it is not currently blocked.
+    //
+    // In addition to unblocking, the notifyable should also atomically consume that notification
+    // state as a result of waking.  I.e. any number of calls to notify before or during a wait must
+    // unblock exactly one wait.
+    //
+    // Notifyable::notify is not like condition_variable::notify_X()
     virtual void notify() noexcept = 0;
 
 protected:
