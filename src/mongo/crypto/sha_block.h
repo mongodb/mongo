@@ -99,7 +99,8 @@ public:
                                 const uint8_t* input,
                                 size_t inputLen) {
         SHABlock output;
-        SHABlock::computeHmac(key, keyLen, input, inputLen, &output);
+        SHABlock::computeHmac(
+            key, keyLen, {ConstDataRange(reinterpret_cast<const char*>(input), inputLen)}, &output);
         return output;
     }
 
@@ -112,7 +113,23 @@ public:
                             const uint8_t* input,
                             size_t inputLen,
                             SHABlock* const output) {
-        return Traits::computeHmac(key, keyLen, input, inputLen, &(output->_hash));
+        SHABlock::computeHmac(
+            key, keyLen, {ConstDataRange(reinterpret_cast<const char*>(input), inputLen)}, output);
+    }
+
+    static SHABlock computeHmac(const uint8_t* key,
+                                size_t keyLen,
+                                std::initializer_list<ConstDataRange> input) {
+        SHABlock output;
+        SHABlock::computeHmac(key, keyLen, input, &output);
+        return output;
+    }
+
+    static void computeHmac(const uint8_t* key,
+                            size_t keyLen,
+                            std::initializer_list<ConstDataRange> input,
+                            SHABlock* const output) {
+        Traits::computeHmac(key, keyLen, input, &(output->_hash));
     }
 
     const uint8_t* data() const& {

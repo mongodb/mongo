@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -36,12 +36,12 @@
 namespace mongo {
 
 /**
- * A Traits type for adapting SHABlock to sha256 hashes.
+ * A Traits type for adapting SHABlock to sha512 hashes.
  */
-struct SHA256BlockTraits {
-    using HashType = MakeArrayType<std::uint8_t, 32, SHA256BlockTraits>;
+struct SHA512BlockTraits {
+    using HashType = MakeArrayType<std::uint8_t, 64, SHA512BlockTraits>;
 
-    static constexpr StringData name = "SHA256Block"_sd;
+    static constexpr StringData name = "SHA512Block"_sd;
 
     static HashType computeHash(std::initializer_list<ConstDataRange> input);
 
@@ -49,8 +49,12 @@ struct SHA256BlockTraits {
                             size_t keyLen,
                             std::initializer_list<ConstDataRange> input,
                             HashType* const output);
+
+    static HashType computeHmac(const uint8_t* key,
+                                size_t keyLen,
+                                std::initializer_list<ConstDataRange> input);
 };
 
-using SHA256Block = SHABlock<SHA256BlockTraits>;
+using SHA512Block = SHABlock<SHA512BlockTraits>;
 
 }  // namespace mongo

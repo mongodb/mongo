@@ -43,6 +43,7 @@ FILES=(
     hashes/helper/hash_memory.c
     hashes/sha1.c
     hashes/sha2/sha256.c
+    hashes/sha2/sha512.c
     mac/hmac/hmac_done.c
     mac/hmac/hmac_init.c
     mac/hmac/hmac_memory.c

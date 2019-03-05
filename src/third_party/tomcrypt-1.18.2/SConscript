@@ -31,6 +31,7 @@ env.Library(
         "src/hashes/helper/hash_memory.c",
         "src/hashes/sha1.c",
         "src/hashes/sha2/sha256.c",
+        "src/hashes/sha2/sha512.c",
         "src/mac/hmac/hmac_done.c",
         "src/mac/hmac/hmac_init.c",
         "src/mac/hmac/hmac_memory.c",

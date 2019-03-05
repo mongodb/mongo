@@ -33,6 +33,7 @@
 
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
+#include "mongo/crypto/sha512_block.h"
 
 #include "mongo/config.h"
 #include "mongo/util/assert_util.h"
@@ -49,16 +50,24 @@ public:
     BCryptHashLoader() {
         loadAlgo(&_algoSHA1, BCRYPT_SHA1_ALGORITHM, false);
         loadAlgo(&_algoSHA256, BCRYPT_SHA256_ALGORITHM, false);
+        loadAlgo(&_algoSHA512, BCRYPT_SHA512_ALGORITHM, false);
 
         loadAlgo(&_algoSHA1Hmac, BCRYPT_SHA1_ALGORITHM, true);
         loadAlgo(&_algoSHA256Hmac, BCRYPT_SHA256_ALGORITHM, true);
+        loadAlgo(&_algoSHA512Hmac, BCRYPT_SHA512_ALGORITHM, true);
     }
 
     ~BCryptHashLoader() {
+        invariant(BCryptCloseAlgorithmProvider(_algoSHA512, 0) == STATUS_SUCCESS);
         invariant(BCryptCloseAlgorithmProvider(_algoSHA256, 0) == STATUS_SUCCESS);
         invariant(BCryptCloseAlgorithmProvider(_algoSHA1, 0) == STATUS_SUCCESS);
+        invariant(BCryptCloseAlgorithmProvider(_algoSHA512Hmac, 0) == STATUS_SUCCESS);
         invariant(BCryptCloseAlgorithmProvider(_algoSHA256Hmac, 0) == STATUS_SUCCESS);
         invariant(BCryptCloseAlgorithmProvider(_algoSHA1Hmac, 0) == STATUS_SUCCESS);
+    }
+
+    BCRYPT_ALG_HANDLE getAlgoSHA512() {
+        return _algoSHA512;
     }
 
     BCRYPT_ALG_HANDLE getAlgoSHA256() {
@@ -68,6 +77,10 @@ public:
     BCRYPT_ALG_HANDLE getAlgoSHA1() {
         return _algoSHA1;
     }
+
+    BCRYPT_ALG_HANDLE getAlgoSHA512Hmac() {
+        return _algoSHA512Hmac;
+    };
 
     BCRYPT_ALG_HANDLE getAlgoSHA256Hmac() {
         return _algoSHA256Hmac;
@@ -86,8 +99,10 @@ private:
     }
 
 private:
+    BCRYPT_ALG_HANDLE _algoSHA512;
     BCRYPT_ALG_HANDLE _algoSHA256;
     BCRYPT_ALG_HANDLE _algoSHA1;
+    BCRYPT_ALG_HANDLE _algoSHA512Hmac;
     BCRYPT_ALG_HANDLE _algoSHA256Hmac;
     BCRYPT_ALG_HANDLE _algoSHA1Hmac;
 };
@@ -133,10 +148,11 @@ template <typename HashType>
 void computeHmacImpl(BCRYPT_ALG_HANDLE algo,
                      const uint8_t* key,
                      size_t keyLen,
-                     const uint8_t* input,
-                     size_t inputLen,
+                     std::initializer_list<ConstDataRange> input,
                      HashType* const output) {
-    invariant(key && input);
+    invariant(key);
+    invariant(
+        std::all_of(begin(input), end(input), [&](const auto& i) { return i.data() != nullptr; }));
 
     BCRYPT_HASH_HANDLE hHash;
 
@@ -144,7 +160,15 @@ void computeHmacImpl(BCRYPT_ALG_HANDLE algo,
             BCryptCreateHash(algo, &hHash, NULL, 0, const_cast<PUCHAR>(key), keyLen, 0) ==
                     STATUS_SUCCESS &&
 
-                BCryptHashData(hHash, const_cast<PUCHAR>(input), inputLen, 0) == STATUS_SUCCESS &&
+                std::all_of(begin(input),
+                            end(input),
+                            [&](const auto& i) {
+                                return BCryptHashData(
+                                           hHash,
+                                           reinterpret_cast<PUCHAR>(const_cast<char*>(i.data())),
+                                           i.length(),
+                                           0) == STATUS_SUCCESS;
+                            }) &&
 
                 BCryptFinishHash(hHash, output->data(), output->size(), 0) == STATUS_SUCCESS &&
 
@@ -165,22 +189,34 @@ SHA256BlockTraits::HashType SHA256BlockTraits::computeHash(
                                                         std::move(input));
 }
 
+SHA512BlockTraits::HashType SHA512BlockTraits::computeHash(
+    std::initializer_list<ConstDataRange> input) {
+    return computeHashImpl<SHA512BlockTraits::HashType>(getBCryptHashLoader().getAlgoSHA512(),
+                                                        std::move(input));
+}
+
 void SHA1BlockTraits::computeHmac(const uint8_t* key,
                                   size_t keyLen,
-                                  const uint8_t* input,
-                                  size_t inputLen,
+                                  std::initializer_list<ConstDataRange> input,
                                   HashType* const output) {
     return computeHmacImpl<HashType>(
-        getBCryptHashLoader().getAlgoSHA1Hmac(), key, keyLen, input, inputLen, output);
+        getBCryptHashLoader().getAlgoSHA1Hmac(), key, keyLen, input, output);
 }
 
 void SHA256BlockTraits::computeHmac(const uint8_t* key,
                                     size_t keyLen,
-                                    const uint8_t* input,
-                                    size_t inputLen,
+                                    std::initializer_list<ConstDataRange> input,
                                     HashType* const output) {
     return computeHmacImpl<HashType>(
-        getBCryptHashLoader().getAlgoSHA256Hmac(), key, keyLen, input, inputLen, output);
+        getBCryptHashLoader().getAlgoSHA256Hmac(), key, keyLen, input, output);
+}
+
+void SHA512BlockTraits::computeHmac(const uint8_t* key,
+                                    size_t keyLen,
+                                    std::initializer_list<ConstDataRange> input,
+                                    HashType* const output) {
+    return computeHmacImpl<HashType>(
+        getBCryptHashLoader().getAlgoSHA512Hmac(), key, keyLen, input, output);
 }
 
 }  // namespace mongo

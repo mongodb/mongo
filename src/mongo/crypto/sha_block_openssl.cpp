@@ -31,6 +31,7 @@
 
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
+#include "mongo/crypto/sha512_block.h"
 
 #include "mongo/config.h"
 #include "mongo/stdx/memory.h"
@@ -63,6 +64,21 @@ void EVP_MD_CTX_free(EVP_MD_CTX* ctx) {
     EVP_MD_CTX_cleanup(ctx);
     OPENSSL_free(ctx);
 }
+
+HMAC_CTX* HMAC_CTX_new() {
+    void* ctx = OPENSSL_malloc(sizeof(HMAC_CTX));
+
+    if (ctx != NULL) {
+        memset(ctx, 0, sizeof(HMAC_CTX));
+    }
+    return static_cast<HMAC_CTX*>(ctx);
+}
+
+void HMAC_CTX_free(HMAC_CTX* ctx) {
+    HMAC_CTX_cleanup(ctx);
+    OPENSSL_free(ctx);
+}
+
 }  // namespace
 #endif
 
@@ -91,17 +107,24 @@ HashType computeHashImpl(const EVP_MD* md, std::initializer_list<ConstDataRange>
     return output;
 }
 
-/*
- * Computes a HMAC SHA'd keyed hash of 'input' using the key 'key', writes output into 'output'.
- */
 template <typename HashType>
 void computeHmacImpl(const EVP_MD* md,
                      const uint8_t* key,
                      size_t keyLen,
-                     const uint8_t* input,
-                     size_t inputLen,
+                     std::initializer_list<ConstDataRange> input,
                      HashType* const output) {
-    fassert(40380, HMAC(md, key, keyLen, input, inputLen, output->data(), NULL) != NULL);
+    std::unique_ptr<HMAC_CTX, decltype(&HMAC_CTX_free)> digestCtx(HMAC_CTX_new(), HMAC_CTX_free);
+
+    fassert(40380,
+            HMAC_Init_ex(digestCtx.get(), key, keyLen, md, NULL) == 1 &&
+                std::all_of(begin(input),
+                            end(input),
+                            [&](const auto& i) {
+                                return HMAC_Update(digestCtx.get(),
+                                                   reinterpret_cast<const unsigned char*>(i.data()),
+                                                   i.length()) == 1;
+                            }) &&
+                HMAC_Final(digestCtx.get(), output->data(), NULL) == 1);
 }
 
 }  // namespace
@@ -116,22 +139,30 @@ SHA256BlockTraits::HashType SHA256BlockTraits::computeHash(
     return computeHashImpl<SHA256BlockTraits::HashType>(EVP_sha256(), input);
 }
 
+SHA512BlockTraits::HashType SHA512BlockTraits::computeHash(
+    std::initializer_list<ConstDataRange> input) {
+    return computeHashImpl<SHA512BlockTraits::HashType>(EVP_sha512(), input);
+}
+
 void SHA1BlockTraits::computeHmac(const uint8_t* key,
                                   size_t keyLen,
-                                  const uint8_t* input,
-                                  size_t inputLen,
+                                  std::initializer_list<ConstDataRange> input,
                                   SHA1BlockTraits::HashType* const output) {
-    return computeHmacImpl<SHA1BlockTraits::HashType>(
-        EVP_sha1(), key, keyLen, input, inputLen, output);
+    return computeHmacImpl<SHA1BlockTraits::HashType>(EVP_sha1(), key, keyLen, input, output);
 }
 
 void SHA256BlockTraits::computeHmac(const uint8_t* key,
                                     size_t keyLen,
-                                    const uint8_t* input,
-                                    size_t inputLen,
+                                    std::initializer_list<ConstDataRange> input,
                                     SHA256BlockTraits::HashType* const output) {
-    return computeHmacImpl<SHA256BlockTraits::HashType>(
-        EVP_sha256(), key, keyLen, input, inputLen, output);
+    return computeHmacImpl<SHA256BlockTraits::HashType>(EVP_sha256(), key, keyLen, input, output);
+}
+
+void SHA512BlockTraits::computeHmac(const uint8_t* key,
+                                    size_t keyLen,
+                                    std::initializer_list<ConstDataRange> input,
+                                    SHA512BlockTraits::HashType* const output) {
+    return computeHmacImpl<SHA512BlockTraits::HashType>(EVP_sha512(), key, keyLen, input, output);
 }
 
 }  // namespace mongo

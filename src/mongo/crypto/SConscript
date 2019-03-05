@@ -65,6 +65,10 @@ env.CppUnitTest('sha256_block_test',
                 ['sha256_block_test.cpp'],
                 LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
 
+env.CppUnitTest('sha512_block_test',
+                ['sha512_block_test.cpp'],
+                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
+
 env.CppUnitTest('mechanism_scram_test',
                 ['mechanism_scram_test.cpp'],
                 LIBDEPS_PRIVATE=[

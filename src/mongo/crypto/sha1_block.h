@@ -36,7 +36,7 @@
 namespace mongo {
 
 /**
- * A Traits type for adapting SHABlock to sha256 hashes.
+ * A Traits type for adapting SHABlock to sha1 hashes.
  */
 struct SHA1BlockTraits {
     using HashType = MakeArrayType<std::uint8_t, 20, SHA1BlockTraits>;
@@ -47,8 +47,7 @@ struct SHA1BlockTraits {
 
     static void computeHmac(const uint8_t* key,
                             size_t keyLen,
-                            const uint8_t* input,
-                            size_t inputLen,
+                            std::initializer_list<ConstDataRange> input,
                             HashType* const output);
 };
 
