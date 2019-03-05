@@ -314,7 +314,7 @@ void BackgroundSync::_produce() {
 
         // Need to take the RSTL in mode X to transition out of SECONDARY.
         auto opCtx = cc().makeOperationContext();
-        ReplicationStateTransitionLockGuard transitionGuard(opCtx.get());
+        ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
 
         error() << "too stale to catch up -- entering maintenance mode";
         log() << "Our newest OpTime : " << lastOpTimeFetched;

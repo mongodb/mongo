@@ -196,20 +196,20 @@ public:
     virtual bool unlockGlobal() = 0;
 
     /**
-     * Requests the RSTL to be acquired in mode X. This should only be called inside
-     * ReplicationStateTransitionLockGuard.
+     * Requests the RSTL to be acquired in the requested mode (typically mode X) . This should only
+     * be called inside ReplicationStateTransitionLockGuard.
      *
      * See the comments for lockBegin/Complete for more information on the semantics.
      */
-    virtual LockResult lockRSTLBegin(OperationContext* opCtx) = 0;
+    virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode) = 0;
 
     /**
-     * Waits for the completion of acquiring the RSTL in mode X. This should only be called inside
+     * Waits for the completion of acquiring the RSTL. This should only be called inside
      * ReplicationStateTransitionLockGuard.
      *
      * It may throw an exception if it is interrupted.
      */
-    virtual void lockRSTLComplete(OperationContext* opCtx, Date_t deadline) = 0;
+    virtual void lockRSTLComplete(OperationContext* opCtx, LockMode mode, Date_t deadline) = 0;
 
     /**
      * Unlocks the RSTL when the transaction becomes prepared. This is used to bypass two-phase

@@ -52,15 +52,15 @@ public:
     class EnqueueOnly {};
 
     /**
-     * Acquires the RSTL in mode X.
+     * Acquires the RSTL in the requested mode (typically mode X).
      */
-    ReplicationStateTransitionLockGuard(OperationContext* opCtx);
+    ReplicationStateTransitionLockGuard(OperationContext* opCtx, LockMode mode);
 
     /**
-     * Enqueues RSTL in mode X but does not block on lock acquisition.
+     * Enqueues RSTL but does not block on lock acquisition.
      * Must call waitForLockUntil() to complete locking process.
      */
-    ReplicationStateTransitionLockGuard(OperationContext* opCtx, EnqueueOnly);
+    ReplicationStateTransitionLockGuard(OperationContext* opCtx, LockMode mode, EnqueueOnly);
 
     ReplicationStateTransitionLockGuard(ReplicationStateTransitionLockGuard&&);
     ReplicationStateTransitionLockGuard& operator=(ReplicationStateTransitionLockGuard&&) = delete;
@@ -73,7 +73,7 @@ public:
     void waitForLockUntil(Date_t deadline);
 
     /**
-     * Release and reacquire the RSTL in mode X.
+     * Release and reacquire the RSTL.
      */
     void release();
     void reacquire();
@@ -87,6 +87,7 @@ private:
     void _unlock();
 
     OperationContext* const _opCtx;
+    LockMode _mode;
     LockResult _result;
 };
 

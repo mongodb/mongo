@@ -118,11 +118,11 @@ public:
         return false;
     }
 
-    virtual LockResult lockRSTLBegin(OperationContext* opCtx) {
+    virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
         MONGO_UNREACHABLE;
     }
 
-    virtual void lockRSTLComplete(OperationContext* opCtx, Date_t deadline) {
+    virtual void lockRSTLComplete(OperationContext* opCtx, LockMode mode, Date_t deadline) {
         MONGO_UNREACHABLE;
     }
 

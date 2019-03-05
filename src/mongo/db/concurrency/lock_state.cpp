@@ -890,13 +890,13 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
     unlockOnErrorGuard.dismiss();
 }
 
-LockResult LockerImpl::lockRSTLBegin(OperationContext* opCtx) {
+LockResult LockerImpl::lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
     invariant(!opCtx->lockState()->isLocked());
-    return lockBegin(opCtx, resourceIdReplicationStateTransitionLock, MODE_X);
+    return lockBegin(opCtx, resourceIdReplicationStateTransitionLock, mode);
 }
 
-void LockerImpl::lockRSTLComplete(OperationContext* opCtx, Date_t deadline) {
-    lockComplete(opCtx, resourceIdReplicationStateTransitionLock, MODE_X, deadline);
+void LockerImpl::lockRSTLComplete(OperationContext* opCtx, LockMode mode, Date_t deadline) {
+    lockComplete(opCtx, resourceIdReplicationStateTransitionLock, mode, deadline);
 }
 
 void LockerImpl::releaseTicket() {

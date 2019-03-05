@@ -904,7 +904,7 @@ void shutdownTask() {
         // destroy all stashed transaction resources in order to release locks, and finally wait
         // until the lock request is granted.
         repl::ReplicationStateTransitionLockGuard rstl(
-            opCtx, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
+            opCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
 
         // Kill all operations. After this point, the opCtx will have been marked as killed and will
         // not be usable other than to kill all transactions directly below.

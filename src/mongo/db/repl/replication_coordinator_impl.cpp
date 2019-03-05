@@ -992,7 +992,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
 
     _externalState->onDrainComplete(opCtx);
 
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx);
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
     lk.lock();
 
     // Exit drain mode only if we're actually in draining mode, the apply buffer is empty in the
@@ -1859,7 +1859,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     uassert(ErrorCodes::NotMaster, "not primary so can't step down", getMemberState().primary());
 
     ReplicationStateTransitionLockGuard rstlLock(
-        opCtx, ReplicationStateTransitionLockGuard::EnqueueOnly());
+        opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
 
     // Kill all write operations which are no longer safe to run on step down. Also, operations that
     // have taken global lock in S mode will be killed to avoid 3-way deadlock between read,
@@ -2537,7 +2537,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
         // Since it's a force reconfig, the primary node may not be electable after the
         // configuration change.  In case we are that primary node, finish the reconfig under the
         // RSTL, so that the step down occurs safely.
-        transitionGuard.emplace(opCtx.get());
+        transitionGuard.emplace(opCtx.get(), MODE_X);
     }
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 

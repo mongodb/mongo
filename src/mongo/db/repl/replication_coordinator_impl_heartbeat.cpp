@@ -379,7 +379,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     auto opCtx = cc().makeOperationContext();
 
     ReplicationStateTransitionLockGuard rstlLock(
-        opCtx.get(), ReplicationStateTransitionLockGuard::EnqueueOnly());
+        opCtx.get(), MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
 
     // kill all write operations which are no longer safe to run on step down. Also, operations that
     // have taken global lock in S mode will be killed to avoid 3-way deadlock between read,
@@ -574,7 +574,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         // transition out of primary while waiting for the RSTL, there's no harm in holding
         // it.
         lk.unlock();
-        transitionGuard.emplace(opCtx.get());
+        transitionGuard.emplace(opCtx.get(), MODE_X);
         lk.lock();
     }
 

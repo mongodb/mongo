@@ -340,7 +340,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
 
     log() << "transition to ROLLBACK";
     {
-        ReplicationStateTransitionLockGuard transitionGuard(opCtx);
+        ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
 
         auto status =
             _replicationCoordinator->setFollowerModeStrict(opCtx, MemberState::RS_ROLLBACK);
@@ -1043,7 +1043,7 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
 
     log() << "transition to SECONDARY";
 
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx);
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
 
     auto status = _replicationCoordinator->setFollowerMode(MemberState::RS_SECONDARY);
     if (!status.isOK()) {

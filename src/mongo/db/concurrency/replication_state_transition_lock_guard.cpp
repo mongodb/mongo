@@ -37,14 +37,16 @@
 namespace mongo {
 namespace repl {
 
-ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx)
-    : ReplicationStateTransitionLockGuard(opCtx, EnqueueOnly()) {
+ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx,
+                                                                         LockMode mode)
+    : ReplicationStateTransitionLockGuard(opCtx, mode, EnqueueOnly()) {
     waitForLockUntil(Date_t::max());
 }
 
 ReplicationStateTransitionLockGuard::ReplicationStateTransitionLockGuard(OperationContext* opCtx,
+                                                                         LockMode mode,
                                                                          EnqueueOnly)
-    : _opCtx(opCtx) {
+    : _opCtx(opCtx), _mode(mode) {
     _enqueueLock();
 }
 
@@ -65,8 +67,8 @@ void ReplicationStateTransitionLockGuard::waitForLockUntil(mongo::Date_t deadlin
     }
 
     _result = LOCK_INVALID;
-    // Wait for the completion of the lock request for the RSTL in mode X.
-    _opCtx->lockState()->lockRSTLComplete(_opCtx, deadline);
+    // Wait for the completion of the lock request for the RSTL.
+    _opCtx->lockState()->lockRSTLComplete(_opCtx, _mode, deadline);
     _result = LOCK_OK;
 }
 
@@ -80,8 +82,8 @@ void ReplicationStateTransitionLockGuard::reacquire() {
 }
 
 void ReplicationStateTransitionLockGuard::_enqueueLock() {
-    // Enqueue a lock request for the RSTL in mode X.
-    _result = _opCtx->lockState()->lockRSTLBegin(_opCtx);
+    // Enqueue a lock request for the RSTL.
+    _result = _opCtx->lockState()->lockRSTLBegin(_opCtx, _mode);
 }
 
 void ReplicationStateTransitionLockGuard::_unlock() {

@@ -649,7 +649,7 @@ TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
 
     // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.
     const auto opCtx = makeOperationContext();
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get());
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
 
     ASSERT_EQUALS(ErrorCodes::ElectionInProgress,
                   getReplCoord()->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));
@@ -1401,7 +1401,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
 
     // We must take the RSTL in mode X before transitioning to RS_ROLLBACK.
     const auto opCtx = makeOperationContext();
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get());
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
 
     // Transitioning to rollback state should cancel the takeover
     ASSERT_OK(replCoord->setFollowerModeStrict(opCtx.get(), MemberState::RS_ROLLBACK));

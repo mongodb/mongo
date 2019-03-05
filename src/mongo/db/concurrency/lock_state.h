@@ -145,8 +145,8 @@ public:
 
     virtual bool unlockGlobal();
 
-    virtual LockResult lockRSTLBegin(OperationContext* opCtx);
-    virtual void lockRSTLComplete(OperationContext* opCtx, Date_t deadline);
+    virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode);
+    virtual void lockRSTLComplete(OperationContext* opCtx, LockMode mode, Date_t deadline);
 
     virtual bool unlockRSTLforPrepare();
 

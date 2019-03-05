@@ -2087,14 +2087,14 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardTimeout) {
     auto secondOpCtx = clients[1].second.get();
 
     // The first opCtx holds the RSTL.
-    repl::ReplicationStateTransitionLockGuard firstRSTL(firstOpCtx);
+    repl::ReplicationStateTransitionLockGuard firstRSTL(firstOpCtx, MODE_X);
     ASSERT_TRUE(firstRSTL.isLocked());
     ASSERT_EQ(firstOpCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
               MODE_X);
 
     // The second opCtx enqueues the lock request but cannot acquire it.
     repl::ReplicationStateTransitionLockGuard secondRSTL(
-        secondOpCtx, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
+        secondOpCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT_FALSE(secondRSTL.isLocked());
 
     // The second opCtx times out.
@@ -2115,7 +2115,8 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardEnqueueAndWait) {
     auto secondOpCtx = clients[1].second.get();
 
     // The first opCtx holds the RSTL.
-    auto firstRSTL = stdx::make_unique<repl::ReplicationStateTransitionLockGuard>(firstOpCtx);
+    auto firstRSTL =
+        stdx::make_unique<repl::ReplicationStateTransitionLockGuard>(firstOpCtx, MODE_X);
     ASSERT_TRUE(firstRSTL->isLocked());
     ASSERT_EQ(firstOpCtx->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
               MODE_X);
@@ -2123,7 +2124,7 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardEnqueueAndWait) {
 
     // The second opCtx enqueues the lock request but cannot acquire it.
     repl::ReplicationStateTransitionLockGuard secondRSTL(
-        secondOpCtx, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
+        secondOpCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT_FALSE(secondRSTL.isLocked());
 
     // The first opCtx unlocks so the second opCtx acquires it.

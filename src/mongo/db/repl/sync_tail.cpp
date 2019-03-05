@@ -549,7 +549,7 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx,
     ON_BLOCK_EXIT([] { attemptsToBecomeSecondary.increment(); });
 
     // Need the RSTL in mode X to transition to SECONDARY
-    ReplicationStateTransitionLockGuard transitionGuard(opCtx);
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
 
     // Check if we are primary or secondary again now that we have the RSTL in mode X.
     if (replCoord->isInPrimaryOrSecondaryState(opCtx)) {

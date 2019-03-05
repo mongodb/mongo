@@ -1517,7 +1517,7 @@ void rollback(OperationContext* opCtx,
     // then.
 
     {
-        ReplicationStateTransitionLockGuard transitionGuard(opCtx);
+        ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);
 
         auto status = replCoord->setFollowerModeStrict(opCtx, MemberState::RS_ROLLBACK);
         if (!status.isOK()) {
