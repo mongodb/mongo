@@ -1,13 +1,12 @@
-# TODO: Distfiles and equivalent for the dist target
-# TODO: move keep_targetinfo to tag_install
 # TODO: Add test tag automatically for unit tests, etc.
 # TODO: Test tag still leaves things in the runtime component
 # TODO: Debug info locations should follow associated binary
 # TODO: How should debug info work for tests?
-# TODO: Handle chmod state
-# TODO: tarfile generation
 # TODO: library dependency chaining for windows dynamic builds, static dev packages
 # TODO: Injectible component dependencies (jscore -> resmoke, etc.)
+# TODO: Distfiles and equivalent for the dist target
+# TODO: Handle chmod state
+# TODO: tarfile generation
 # TODO: Installing resmoke and configurations
 # TODO: package decomposition
 # TODO: Install/package target help text
@@ -65,6 +64,14 @@ def generate(env):
     alias_map = defaultdict(dict)
 
     def auto_install(env, target, source, **kwargs):
+
+        # We want to make sure that the executor information stays
+        # persisted for this node after it is built so that we can
+        # access it in our install emitter below.
+        source = map(env.Entry, env.Flatten([source]))
+        for s in source:
+            s.attributes.keep_targetinfo = 1
+
         prefixDir = env.Dir('$INSTALL_DIR')
 
         actions = []
@@ -74,8 +81,9 @@ def generate(env):
             target=targetDir,
             source=source,
         )
-        for s in map(env.Entry, env.Flatten(source)):
-            setattr(s.attributes, "aib_install_actions", actions)
+
+        for s in source:
+            s.attributes.aib_install_actions = actions
 
         # Get the tags. If no tags were set, or a non-falsish thing
         # was set then interpret that as a request for normal
@@ -145,17 +153,13 @@ def generate(env):
     def auto_install_emitter(target, source, env):
         for t in target:
             tentry = env.Entry(t)
-            # We want to make sure that the executor information stays
-            # persisted for this node after it is built so that we can
-            # access it in our install emitter below.
-            tentry.attributes.keep_targetinfo = 1
             tsuf = tentry.get_suffix()
             auto_install_location = suffix_map.get(tsuf)
             if auto_install_location:
                 tentry_install_tags = env.get('INSTALL_ALIAS', [])
                 tentry_install_tags.extend(auto_install_location[1])
                 setattr(tentry.attributes, 'INSTALL_ALIAS', tentry_install_tags)
-                install = env.AutoInstall(auto_install_location[0], tentry, INSTALL_ALIAS=tentry_install_tags)
+                env.AutoInstall(auto_install_location[0], tentry, INSTALL_ALIAS=tentry_install_tags)
         return (target, source)
 
     def add_emitter(builder):
