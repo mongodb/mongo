@@ -114,7 +114,7 @@ void WiredTigerOperationStats::fetchStats(WT_SESSION* session,
 
     const char* desc;
     uint64_t value;
-    uint32_t key;
+    int32_t key;
     while (c->next(c) == 0 && c->get_key(c, &key) == 0) {
         fassert(51035, c->get_value(c, &desc, nullptr, &value) == 0);
         _stats[key] = WiredTigerUtil::castStatisticsValue<long long>(value);
