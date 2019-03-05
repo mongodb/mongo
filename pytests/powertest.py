@@ -66,6 +66,10 @@ if os.name == "posix" and sys.version_info[0] == 2:
 else:
     import subprocess
 
+# We replace the subprocess module imported by the psutil package so we can safely use
+# psutil.Popen() in addition to subprocess.Popen().
+psutil.subprocess = subprocess
+
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -245,42 +249,27 @@ def dump_stacks_and_exit(signum, frame):  # pylint: disable=unused-argument
         sys.exit(1)
 
 
-def child_processes(parent_pid):
-    """Return a list of all child processes for a pid."""
-    # The child processes cannot be obtained from the parent on Windows from psutil. See
-    # https://stackoverflow.com/questions/30220732/python-psutil-not-showing-all-child-processes
-    child_procs = []
-    while psutil.pid_exists(parent_pid):
-        try:
-            child_procs = [p for p in psutil.process_iter(attrs=["pid"]) if parent_pid == p.ppid()]
-            break
-        except psutil.NoSuchProcess:
-            pass
-    for proc in child_procs:
-        proc_children = child_processes(proc.pid)
-        if proc_children:
-            child_procs += proc_children
-    return list(set(child_procs))
-
-
-def kill_process(pid, kill_children=True):
+def kill_process(parent, kill_children=True):
     """Kill a process, and optionally it's children, by it's pid. Returns 0 if successful."""
     try:
-        parent = psutil.Process(pid)
+        # parent.children() implicitly calls parent.is_running(), which raises a
+        # psutil.NoSuchProcess exception if the creation time for the process with pid=parent.pid is
+        # different than parent.create_time(). We can reliably detect pid reuse this way because
+        # 'parent' is the same psutil.Process instance returned by start_cmd() and therefore has an
+        # accurate notion of the creation time.
+        procs = parent.children(recursive=True) if kill_children else []
     except psutil.NoSuchProcess:
-        LOGGER.warn("Could not kill process %d, as it no longer exists", pid)
+        LOGGER.warn("Could not kill process %d, as it no longer exists", parent.pid)
         return 0
 
-    procs = [parent]
-    if kill_children:
-        procs += child_processes(pid)
+    procs.append(parent)
 
     for proc in procs:
         try:
             LOGGER.debug("Killing process '%s' pid %d", proc.name(), proc.pid)
             proc.kill()
         except psutil.NoSuchProcess:
-            LOGGER.warn("Could not kill process %d, as it no longer exists", pid)
+            LOGGER.warn("Could not kill process %d, as it no longer exists", proc.pid)
 
     _, alive = psutil.wait_procs(procs, timeout=30, callback=None)
     if alive:
@@ -293,7 +282,7 @@ def kill_processes(procs, kill_children=True):
     """Kill a list of processes and optionally it's children."""
     for proc in procs:
         LOGGER.debug("Starting kill of parent process %d", proc.pid)
-        kill_process(proc.pid, kill_children=kill_children)
+        kill_process(proc, kill_children=kill_children)
         ret = proc.wait()
         LOGGER.debug("Finished kill of parent process %d has return code of %d", proc.pid, ret)
 
@@ -371,8 +360,10 @@ def start_cmd(cmd, use_file=False):
     else:
         LOGGER.debug("Executing '%s'", cmd)
 
-    proc = subprocess.Popen(cmd, close_fds=True)
-    LOGGER.debug("Spawned process %s pid %d", psutil.Process(proc.pid).name(), proc.pid)
+    # We use psutil.Popen() rather than subprocess.Popen() in order to cache the creation time of
+    # the process. This enables us to reliably detect pid reuse in kill_process().
+    proc = psutil.Popen(cmd, close_fds=True)
+    LOGGER.debug("Spawned process %s pid %d", proc.name(), proc.pid)
 
     return proc
 
