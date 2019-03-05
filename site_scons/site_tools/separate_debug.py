@@ -38,9 +38,8 @@ def _update_builder(env, builder, bitcode):
         path_function=old_path_function,
     )
 
-    base_action = builder.action
     if not isinstance(base_action, SCons.Action.ListAction):
-        base_action = SCons.Action.ListAction([base_action])
+        base_action = builder.action = SCons.Action.ListAction([base_action])
 
     # TODO: Make variables for dsymutil and strip, and for the action
     # strings. We should really be running these tools as found by
@@ -62,6 +61,14 @@ def _update_builder(env, builder, bitcode):
                                     "Generating debug info for $TARGET into ${TARGET}.dSYM"))
         base_action.list.append(SCons.Action.Action("strip -Sx ${TARGET}", "Stripping ${TARGET}"))
     elif env.TargetOSIs('posix'):
+        if 'split_dwarf' in env['TOOLS']:
+            base_action.list.extend([
+                SCons.Action.Action(
+                    "${DWP} -e ${TARGET} -o ${TARGET}.dwp",
+                    "Generating dwp file for $TARGET into ${TARGET}.dwp"
+                )
+            ])
+
         base_action.list.extend([
             SCons.Action.Action("${OBJCOPY} --only-keep-debug $TARGET ${TARGET}.debug",
                                 "Generating debug info for $TARGET into ${TARGET}.debug"),
@@ -80,18 +87,21 @@ def _update_builder(env, builder, bitcode):
 
         bitcode_file = None
         if env.TargetOSIs('darwin'):
-            debug_file = env.Dir(str(target[0]) + ".dSYM")
+            debug_files = [env.Dir(str(target[0]) + ".dSYM")]
             if bitcode:
                 bitcode_file = env.File(str(target[0]) + ".bcsymbolmap")
         elif env.TargetOSIs('posix'):
-            debug_file = env.File(str(target[0]) + ".debug")
+            debug_files = [env.File(str(target[0]) + ".debug")]
+            if 'split_dwarf' in env['TOOLS']:
+                debug_files.append(env.File(str(target[0]) + ".dwp"))
         else:
             pass
 
-        setattr(debug_file.attributes, "debug_file_for", target[0])
-        setattr(target[0].attributes, "separate_debug_file", debug_file)
+        for debug_file in debug_files:
+            setattr(debug_file.attributes, "debug_file_for", target[0])
+        setattr(target[0].attributes, "separate_debug_files", debug_files)
 
-        target.append(debug_file)
+        target.extend(debug_files)
 
         if bitcode_file:
             setattr(bitcode_file.attributes, "bcsymbolmap_file_for", target[0])

@@ -61,4 +61,11 @@ StatusWith<boost::optional<DWORD>> windows::getDWORDRegistryKey(const CString& g
 
 }  // namespace mongo
 
+#else
+
+namespace mongo {
+void shim_winutil() {
+}
+}  // namespace mongo
+
 #endif

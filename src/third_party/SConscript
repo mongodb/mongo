@@ -208,7 +208,8 @@ pcreEnv.Library(
     target="shim_pcrecpp",
     source=[
         'shim_pcrecpp.cc',
-    ])
+    ],
+)
 
 
 boostEnv = env

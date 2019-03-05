@@ -64,6 +64,7 @@ def generate(env):
     # TODO: These probably need to be patterns of some sort, not just suffixes.
     # TODO: The runtime libs should be in runtime, the dev symlinks in dev
     suffix_map = {
+
         env.subst('$PROGSUFFIX') : (
             '$INSTALLDIR_BINDIR', [
                 'runtime',
@@ -102,6 +103,12 @@ def generate(env):
             ]
         ),
 
+        '.dwp' : (
+            '$INSTALLDIR_DEBUGDIR', [
+                'debug',
+            ]
+        ),
+
         '.dSYM' : (
             '$INSTALLDIR_LIBDIR', [
                 'runtime'
@@ -112,7 +119,7 @@ def generate(env):
             '$INSTALLDIR_LIBDIR', [
                 'runtime'
             ]
-        ),
+        ), 
     }
 
     def _aib_debugdir(source, target, env, for_signature):

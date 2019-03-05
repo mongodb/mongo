@@ -723,6 +723,9 @@ env_vars.Add('CXXFLAGS',
     help='Sets flags for the C++ compiler',
     converter=variable_shlex_converter)
 
+env_vars.Add('DWP',
+    help='Path to the DWP tool')
+
 # Note: This probably is only really meaningful when configured via a variables file. It will
 # also override whatever the SCons platform defaults would be.
 env_vars.Add('ENV',
@@ -3566,6 +3569,13 @@ def doConfigure(myenv):
 
 env = doConfigure( env )
 
+# If the flags in the environment are configured for -gsplit-dwarf,
+# inject the necessary emitter. Do this before separate_debug, as it needs
+# to know.
+split_dwarf = Tool('split_dwarf')
+if split_dwarf.exists(env):
+    split_dwarf(env)
+
 # TODO: Later, this should live somewhere more graceful.
 if get_option('install-mode') == 'hygienic':
 
@@ -3606,12 +3616,6 @@ elif get_option('separate-debug') == "on":
 
 # Now that we are done with configure checks, enable icecream, if available.
 env.Tool('icecream')
-
-# If the flags in the environment are configured for -gsplit-dwarf,
-# inject the necessary emitter.
-split_dwarf = Tool('split_dwarf')
-if split_dwarf.exists(env):
-    split_dwarf(env)
 
 # Load the compilation_db tool. We want to do this after configure so we don't end up with
 # compilation database entries for the configure tests, which is weird.
