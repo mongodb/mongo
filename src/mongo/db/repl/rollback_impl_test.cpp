@@ -176,7 +176,7 @@ protected:
         auto coll = std::make_unique<CollectionMock>(nss);
 
         // Register the UUID to that collection in the UUIDCatalog.
-        UUIDCatalog::get(opCtx).registerUUIDCatalogEntry(uuid, coll.get());
+        UUIDCatalog::get(opCtx).registerUUIDCatalogEntry(uuid, std::move(coll));
         return std::move(coll);
     }
 

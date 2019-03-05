@@ -54,7 +54,12 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     for (auto&& dbName : allDbs) {
         const auto db = databaseHolder->getDb(opCtx, dbName);
-        for (Collection* coll : *db) {
+        for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+            auto coll = *collIt;
+            if (!coll) {
+                break;
+            }
+
             OptionalCollectionUUID uuid = coll->uuid();
             boost::optional<Timestamp> minVisible = coll->getMinimumVisibleSnapshot();
 
@@ -167,7 +172,6 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
 
     // Open all databases and repopulate the UUID catalog.
     log() << "openCatalog: reopening all databases";
-    auto& uuidCatalog = UUIDCatalog::get(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<std::string> databasesToOpen;
     storageEngine->listDatabases(&databasesToOpen);
@@ -188,10 +192,6 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
 
             auto uuid = collection->uuid();
             invariant(uuid);
-
-            LOG(1) << "openCatalog: registering uuid " << uuid->toString() << " for collection "
-                   << collName;
-            uuidCatalog.registerUUIDCatalogEntry(*uuid, collection);
 
             if (minVisibleTimestampMap.count(*uuid) > 0) {
                 collection->setMinimumVisibleSnapshot(minVisibleTimestampMap.find(*uuid)->second);

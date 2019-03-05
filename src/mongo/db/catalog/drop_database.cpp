@@ -144,7 +144,12 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         auto dropPendingGuard = makeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
 
         std::vector<NamespaceString> collectionsToDrop;
-        for (Collection* collection : *db) {
+        for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+            auto collection = *collIt;
+            if (!collection) {
+                break;
+            }
+
             const auto& nss = collection->ns();
             numCollections++;
 

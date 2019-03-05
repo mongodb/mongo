@@ -520,8 +520,11 @@ Status _updateNonReplicatedUniqueIndexesPerDatabase(OperationContext* opCtx,
 
     // Iterate through all collections if we're in the "local" database.
     if (dbName == "local") {
-        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
+        for (auto collectionIt = db->begin(opCtx); collectionIt != db->end(opCtx); ++collectionIt) {
             Collection* coll = *collectionIt;
+            if (!coll) {
+                break;
+            }
 
             auto collModStatus = _updateNonReplicatedIndexPerCollection(opCtx, coll);
             if (!collModStatus.isOK())
@@ -553,8 +556,12 @@ void _updateUniqueIndexesForDatabase(OperationContext* opCtx, const std::string&
         if (!db)
             return;
 
-        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
+        for (auto collectionIt = db->begin(opCtx); collectionIt != db->end(opCtx); ++collectionIt) {
             Collection* coll = *collectionIt;
+            if (!coll) {
+                break;
+            }
+
             NamespaceString collNSS = coll->ns();
 
             // Skip non-replicated collection.

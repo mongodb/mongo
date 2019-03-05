@@ -176,7 +176,12 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     auto const serviceContext = opCtx->getServiceContext();
 
-    for (auto&& coll : *db) {
+    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+        auto coll = *collIt;
+        if (!coll) {
+            break;
+        }
+
         Top::get(serviceContext).collectionDropped(coll->ns().ns(), true);
     }
 
@@ -190,10 +195,15 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
 namespace {
 void evictDatabaseFromUUIDCatalog(OperationContext* opCtx, Database* db) {
-    UUIDCatalog::get(opCtx).onCloseDatabase(db);
-    for (auto&& coll : *db) {
+    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+        auto coll = *collIt;
+        if (!coll) {
+            break;
+        }
+
         NamespaceUUIDCache::get(opCtx).evictNamespace(coll->ns());
     }
+    UUIDCatalog::get(opCtx).onCloseDatabase(db);
 }
 }  // namespace
 

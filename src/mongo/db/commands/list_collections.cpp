@@ -321,7 +321,12 @@ public:
                         }
                     }
                 } else {
-                    for (auto&& collection : *db) {
+                    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+                        auto collection = *collIt;
+                        if (!collection) {
+                            break;
+                        }
+
                         if (authorizedCollections &&
                             (collection->ns().coll().startsWith("system.") ||
                              !as->isAuthorizedForAnyActionOnResource(

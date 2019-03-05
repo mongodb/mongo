@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/string_map.h"
@@ -54,11 +55,6 @@ class OperationContext;
  */
 class Database : public Decorable<Database> {
 public:
-    // TODO(SERVER-39507): Remove the collection map from the Database object.
-    // Currently the map uses a bare pointer in addition to the unique_ptr in order to implement the
-    // current iterator interface, which requires returning a reference to the pointer.
-    using CollectionMap = StringMap<std::pair<std::unique_ptr<Collection>, Collection*>>;
-
     /**
      * Creates the namespace 'ns' in the database 'db' according to 'options'. If
      * 'createDefaultIndexes' is true, creates the _id index for the collection (and the system
@@ -71,51 +67,6 @@ public:
                                 bool createDefaultIndexes = true,
                                 const BSONObj& idIndex = BSONObj()) = 0;
 
-    /**
-     * Iterating over a Database yields Collection* pointers.
-     */
-    class iterator {
-    public:
-        using iterator_category = std::forward_iterator_tag;
-        using value_type = Collection*;
-        using pointer = const value_type*;
-        using reference = const value_type&;
-        using difference_type = ptrdiff_t;
-
-        explicit inline iterator() = default;
-        inline iterator(CollectionMap::const_iterator it) : _it(std::move(it)) {}
-
-        inline reference operator*() const {
-            return _it->second.second;
-        }
-
-        inline pointer operator->() const {
-            return &_it->second.second;
-        }
-
-        inline friend bool operator==(const iterator& lhs, const iterator& rhs) {
-            return lhs._it == rhs._it;
-        }
-
-        inline friend bool operator!=(const iterator& lhs, const iterator& rhs) {
-            return !(lhs == rhs);
-        }
-
-        inline iterator& operator++() {
-            ++_it;
-            return *this;
-        }
-
-        inline iterator operator++(int) {
-            auto oldPosition = *this;
-            ++_it;
-            return oldPosition;
-        }
-
-    private:
-        CollectionMap::const_iterator _it;
-    };
-
     Database() = default;
 
     // must call close first
@@ -124,8 +75,8 @@ public:
     inline Database(Database&&) = delete;
     inline Database& operator=(Database&&) = delete;
 
-    virtual iterator begin() const = 0;
-    virtual iterator end() const = 0;
+    virtual UUIDCatalog::iterator begin(OperationContext* opCtx) const = 0;
+    virtual UUIDCatalog::iterator end(OperationContext* opCtx) const = 0;
 
     /**
      * Sets up internal memory structures.

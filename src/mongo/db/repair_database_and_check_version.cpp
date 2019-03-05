@@ -164,7 +164,12 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db);
 
-        for (Collection* coll : *db) {
+        for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+            auto coll = *collIt;
+            if (!coll) {
+                break;
+            }
+
             // We expect all collections to have UUIDs in MongoDB 4.2
             if (!coll->uuid()) {
                 return downgradeError;

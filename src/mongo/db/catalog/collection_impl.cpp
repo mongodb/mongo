@@ -236,8 +236,6 @@ CollectionImpl::~CollectionImpl() {
 
     if (_uuid) {
         if (auto opCtx = cc().getOperationContext()) {
-            auto& uuidCatalog = UUIDCatalog::get(opCtx);
-            invariant(uuidCatalog.lookupCollectionByUUID(_uuid.get()) != this);
             auto& cache = NamespaceUUIDCache::get(opCtx);
             // TODO(geert): cache.verifyNotCached(ns(), uuid().get());
             cache.evictNamespace(ns());

@@ -145,12 +145,12 @@ public:
 
     void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) final;
 
-    iterator begin() const final {
-        return iterator(_collections.begin());
+    UUIDCatalog::iterator begin(OperationContext* opCtx) const final {
+        return UUIDCatalog::get(opCtx).begin(_name);
     }
 
-    iterator end() const final {
-        return iterator(_collections.end());
+    UUIDCatalog::iterator end(OperationContext* opCtx) const final {
+        return UUIDCatalog::get(opCtx).end();
     }
 
     uint64_t epoch() const {
@@ -158,8 +158,6 @@ public:
     }
 
 private:
-    class FinishDropChange;
-
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection.
      */
@@ -168,8 +166,7 @@ private:
                                    const CollectionOptions& options);
 
     /**
-     * Completes a collection drop by removing all the indexes and removing the collection itself
-     * from the storage engine.
+     * Completes a collection drop by removing the collection itself from the storage engine.
      *
      * This is called from dropCollectionEvenIfSystem() to drop the collection immediately on
      * unreplicated collection drops.
@@ -177,6 +174,13 @@ private:
     Status _finishDropCollection(OperationContext* opCtx,
                                  const NamespaceString& fullns,
                                  Collection* collection);
+
+    /**
+     * Removes all indexes for a collection.
+     */
+    void _dropCollectionIndexes(OperationContext* opCtx,
+                                const NamespaceString& fullns,
+                                Collection* collection);
 
     const std::string _name;  // "dbname"
 
@@ -198,8 +202,6 @@ private:
     // collections. Lazily created on first call to makeUniqueCollectionNamespace().
     // This variable may only be read/written while the database is locked in MODE_X.
     std::unique_ptr<PseudoRandom> _uniqueCollectionNamespacePseudoRandom;
-
-    CollectionMap _collections;
 };
 
 }  // namespace mongo

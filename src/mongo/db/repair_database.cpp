@@ -219,8 +219,11 @@ Status repairDatabase(OperationContext* opCtx,
         // versions are in the committed view.
         auto clusterTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
 
-        for (auto&& collection : *db) {
-            collection->setMinimumVisibleSnapshot(clusterTime);
+        for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+            auto collection = *collIt;
+            if (collection) {
+                collection->setMinimumVisibleSnapshot(clusterTime);
+            }
         }
 
         // Restore oplog Collection pointer cache.

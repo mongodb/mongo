@@ -97,7 +97,7 @@ public:
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
-                            const OplogSlot& createOpTime) override;
+                            const OplogSlot& createOpTime) override {}
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,
@@ -185,7 +185,7 @@ public:
         using pointer = const value_type*;
         using reference = const value_type&;
 
-        iterator(std::string dbName, uint64_t genNum, const UUIDCatalog& uuidCatalog);
+        iterator(StringData dbName, uint64_t genNum, const UUIDCatalog& uuidCatalog);
         iterator(
             std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator mapIter);
         pointer operator->();
@@ -220,7 +220,9 @@ public:
      * This function inserts the entry for uuid, coll into the UUID Collection. It is called by
      * the op observer when a collection is created.
      */
-    void onCreateCollection(OperationContext* opCtx, Collection* coll, CollectionUUID uuid);
+    void onCreateCollection(OperationContext* opCtx,
+                            std::unique_ptr<Collection> coll,
+                            CollectionUUID uuid);
 
     /**
      * This function removes the entry for uuid from the UUID catalog. It is called by the op
@@ -245,9 +247,9 @@ public:
      */
     void onCloseDatabase(Database* db);
 
-    Collection* replaceUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
-    void registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
-    Collection* removeUUIDCatalogEntry(CollectionUUID uuid);
+    Collection* replaceUUIDCatalogEntry(CollectionUUID uuid, std::unique_ptr<Collection> coll);
+    void registerUUIDCatalogEntry(CollectionUUID uuid, std::unique_ptr<Collection> coll);
+    std::unique_ptr<Collection> removeUUIDCatalogEntry(CollectionUUID uuid);
 
     /**
      * This function gets the Collection pointer that corresponds to the CollectionUUID. The
@@ -309,10 +311,12 @@ public:
     iterator end() const;
 
 private:
+    class FinishDropChange;
+
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
                                                            const stdx::lock_guard<stdx::mutex>&);
-    void _registerUUIDCatalogEntry_inlock(CollectionUUID uuid, Collection* coll);
-    Collection* _removeUUIDCatalogEntry_inlock(CollectionUUID uuid);
+    void _registerUUIDCatalogEntry_inlock(CollectionUUID uuid, std::unique_ptr<Collection> coll);
+    std::unique_ptr<Collection> _removeUUIDCatalogEntry_inlock(CollectionUUID uuid);
 
     mutable mongo::stdx::mutex _catalogLock;
     /**
@@ -324,14 +328,15 @@ private:
         _shadowCatalog;
 
     /**
+     * Unordered map from Collection UUID to the corresponding Collection object.
+     */
+    mongo::stdx::unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>
+        _catalog;
+
+    /**
      * Ordered map from <database name, collection UUID> to a Collection object.
      */
     std::map<std::pair<std::string, CollectionUUID>, Collection*> _orderedCollections;
-
-    /**
-     * Unordered map from Collection UUID to the corresponding Collection object.
-     */
-    mongo::stdx::unordered_map<CollectionUUID, Collection*, CollectionUUID::Hash> _catalog;
 
     mongo::stdx::unordered_map<NamespaceString, Collection*> _collections;
     /**

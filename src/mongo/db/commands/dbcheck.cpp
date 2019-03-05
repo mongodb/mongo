@@ -139,7 +139,12 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     int64_t max = std::numeric_limits<int64_t>::max();
     auto rate = invocation.getMaxCountPerSecond();
 
-    for (Collection* coll : *db) {
+    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+        auto coll = *collIt;
+        if (!coll) {
+            break;
+        }
+
         DbCheckCollectionInfo info{coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate};
         result->push_back(info);
     }
