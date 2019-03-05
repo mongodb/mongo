@@ -1259,7 +1259,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
             opCtx, statements.size() /* stmtId */, oplogSlots.back().opTime, commitSlot);
     }
     invariant(!commitOpTime.isNull());
-    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, commitOpTime);
+    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements);
 }
 
 void OpObserverImpl::onPreparedTransactionCommit(
@@ -1380,7 +1380,7 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
             });
     }
 
-    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, {});
+    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements);
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,

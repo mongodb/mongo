@@ -161,9 +161,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
 }
 
 void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
-    OperationContext* opCtx,
-    const std::vector<repl::ReplOperation>& stmts,
-    const repl::OpTime& opTime) {
+    OperationContext* opCtx, const std::vector<repl::ReplOperation>& stmts) {
 
     for (const auto stmt : stmts) {
         auto const nss = stmt.getNss();
@@ -178,16 +176,18 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
 
         auto const opType = stmt.getOpType();
 
+        // We pass an empty opTime to observers because retryable write history doesn't care about
+        // writes in transactions.
         if (opType == repl::OpTypeEnum::kInsert) {
-            msm->getCloner()->onInsertOp(opCtx, stmt.getObject(), opTime);
+            msm->getCloner()->onInsertOp(opCtx, stmt.getObject(), {});
         } else if (opType == repl::OpTypeEnum::kUpdate) {
             if (auto updateDoc = stmt.getObject2()) {
-                msm->getCloner()->onUpdateOp(opCtx, *updateDoc, opTime, {});
+                msm->getCloner()->onUpdateOp(opCtx, *updateDoc, {}, {});
             }
         } else if (opType == repl::OpTypeEnum::kDelete) {
             if (isMigratingWithCSRLock(csr, csrLock, stmt.getObject())) {
                 msm->getCloner()->onDeleteOp(
-                    opCtx, getDocumentKey(opCtx, nss, stmt.getObject()), opTime, {});
+                    opCtx, getDocumentKey(opCtx, nss, stmt.getObject()), {}, {});
             }
         }
     }
