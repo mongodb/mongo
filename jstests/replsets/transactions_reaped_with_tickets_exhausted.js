@@ -19,10 +19,10 @@
             setParameter: {
                 wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
 
-                // Setting a transaction lifetime of 5 seconds works fine locally because the
+                // Setting a transaction lifetime of 20 seconds works fine locally because the
                 // threads which attempt to run the drop command are spawned quickly enough. This
                 // might not be the case for Evergreen hosts and may need to be tuned accordingly.
-                transactionLifetimeLimitSeconds: 5,
+                transactionLifetimeLimitSeconds: 20,
             }
         }
     });
