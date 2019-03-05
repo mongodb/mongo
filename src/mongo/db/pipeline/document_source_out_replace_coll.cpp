@@ -52,12 +52,11 @@ DocumentSourceOutReplaceColl::~DocumentSourceOutReplaceColl() {
 
             LocalReadConcernBlock readLocal(cleanupOpCtx.get());
 
-            pExpCtx->mongoProcessInterface->setOperationContext(cleanupOpCtx.get());
-
             // Reset the operation context back to original once dropCollection is done.
             ON_BLOCK_EXIT(
                 [this] { pExpCtx->mongoProcessInterface->setOperationContext(pExpCtx->opCtx); });
 
+            pExpCtx->mongoProcessInterface->setOperationContext(cleanupOpCtx.get());
             pExpCtx->mongoProcessInterface->directClient()->dropCollection(_tempNs.ns());
         });
 }
