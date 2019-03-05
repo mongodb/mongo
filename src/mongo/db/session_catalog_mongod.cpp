@@ -80,21 +80,22 @@ void killSessionTokensFunction(
     if (sessionKillTokens->empty())
         return;
 
-    uassertStatusOK(getThreadPool(opCtx)->schedule([
-        service = opCtx->getServiceContext(),
-        sessionKillTokens = std::move(sessionKillTokens)
-    ]() mutable {
-        auto uniqueClient = service->makeClient("Kill-Session");
-        auto uniqueOpCtx = uniqueClient->makeOperationContext();
-        const auto opCtx = uniqueOpCtx.get();
-        const auto catalog = SessionCatalog::get(opCtx);
+    getThreadPool(opCtx)->schedule(
+        [ service = opCtx->getServiceContext(),
+          sessionKillTokens = std::move(sessionKillTokens) ](auto status) mutable {
+            invariant(status);
 
-        for (auto& sessionKillToken : *sessionKillTokens) {
-            auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
+            auto uniqueClient = service->makeClient("Kill-Session");
+            auto uniqueOpCtx = uniqueClient->makeOperationContext();
+            const auto opCtx = uniqueOpCtx.get();
+            const auto catalog = SessionCatalog::get(opCtx);
 
-            TransactionParticipant::get(session).invalidate(opCtx);
-        }
-    }));
+            for (auto& sessionKillToken : *sessionKillTokens) {
+                auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
+
+                TransactionParticipant::get(session).invalidate(opCtx);
+            }
+        });
 }
 
 }  // namespace

@@ -123,7 +123,7 @@ public:
     void startup() override;
     void shutdown() override;
     void join() override;
-    Status schedule(Task task) override;
+    void schedule(Task task) override;
 
     /**
      * Blocks the caller until there are no pending tasks on this pool.

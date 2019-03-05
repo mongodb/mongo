@@ -57,7 +57,7 @@ public:
     void startup() override;
     void shutdown() override;
     void join() override;
-    Status schedule(Task task) override;
+    void schedule(Task task) override;
 
 private:
     void _consumeTasks(stdx::unique_lock<stdx::mutex> lk);

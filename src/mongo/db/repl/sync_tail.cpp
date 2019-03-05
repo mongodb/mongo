@@ -418,7 +418,9 @@ void scheduleWritesToOplog(OperationContext* opCtx,
         // The returned function will be run in a separate thread after this returns. Therefore all
         // captures other than 'ops' must be by value since they will not be available. The caller
         // guarantees that 'ops' will stay in scope until the spawned threads complete.
-        return [storageInterface, &ops, begin, end] {
+        return [storageInterface, &ops, begin, end](auto status) {
+            invariant(status);
+
             auto opCtx = cc().makeOperationContext();
             UnreplicatedWritesBlock uwb(opCtx.get());
             ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
@@ -453,7 +455,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     if (!enoughToMultiThread ||
         !opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
 
-        invariant(threadPool->schedule(makeOplogWriterForRange(0, ops.size())));
+        threadPool->schedule(makeOplogWriterForRange(0, ops.size()));
         return;
     }
 
@@ -463,7 +465,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     for (size_t thread = 0; thread < numOplogThreads; thread++) {
         size_t begin = thread * numOpsPerThread;
         size_t end = (thread == numOplogThreads - 1) ? ops.size() : begin + numOpsPerThread;
-        invariant(threadPool->schedule(makeOplogWriterForRange(begin, end)));
+        threadPool->schedule(makeOplogWriterForRange(begin, end));
     }
 }
 
@@ -1356,16 +1358,18 @@ void SyncTail::_applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors
         if (writerVectors[i].empty())
             continue;
 
-        invariant(_writerPool->schedule([
+        _writerPool->schedule([
             this,
             &writer = writerVectors.at(i),
             &status = statusVector->at(i),
             &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
-        ] {
+        ](auto scheduleStatus) {
+            invariant(scheduleStatus);
+
             auto opCtx = cc().makeOperationContext();
             status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
                 [&] { return _applyFunc(opCtx.get(), &writer, this, &workerMultikeyPathInfo); });
-        }));
+        });
     }
 }
 

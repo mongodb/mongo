@@ -183,7 +183,8 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
     }
 
     auto wrappedTask =
-        [ this, task = std::move(task), scheduleTime, pendingCounterPtr, taskName, flags ] {
+        [ this, task = std::move(task), scheduleTime, pendingCounterPtr, taskName, flags ](
+            auto status) {
         pendingCounterPtr->subtractAndFetch(1);
         auto start = _tickSource->getTicks();
         _totalSpentQueued.addAndFetch(start - scheduleTime);

@@ -104,14 +104,17 @@ TEST_F(ThreadPoolTest, MinPoolSize0) {
     pool.startup();
     ASSERT_EQ(0U, pool.getStats().numThreads);
     stdx::unique_lock<stdx::mutex> lk(mutex);
-    ASSERT_OK(pool.schedule([this] { blockingWork(); }));
+    pool.schedule([this](auto status) {
+        ASSERT_OK(status);
+        blockingWork();
+    });
     while (count1 != 1U) {
         cv1.wait(lk);
     }
     auto stats = pool.getStats();
     ASSERT_EQUALS(1U, stats.numThreads);
     ASSERT_EQUALS(0U, stats.numPendingTasks);
-    ASSERT_OK(pool.schedule([] {}));
+    pool.schedule([](auto status) { ASSERT_OK(status); });
     stats = pool.getStats();
     ASSERT_EQUALS(1U, stats.numThreads);
     ASSERT_EQUALS(0U, stats.numIdleThreads);
@@ -129,7 +132,10 @@ TEST_F(ThreadPoolTest, MinPoolSize0) {
     lk.lock();
     flag2 = false;
     count1 = 0;
-    ASSERT_OK(pool.schedule([this] { blockingWork(); }));
+    pool.schedule([this](auto status) {
+        ASSERT_OK(status);
+        blockingWork();
+    });
     while (count1 == 0) {
         cv1.wait(lk);
     }
@@ -151,7 +157,10 @@ TEST_F(ThreadPoolTest, MaxPoolSize20MinPoolSize15) {
     pool.startup();
     stdx::unique_lock<stdx::mutex> lk(mutex);
     for (size_t i = 0U; i < 30U; ++i) {
-        ASSERT_OK(pool.schedule([this] { blockingWork(); })) << i;
+        pool.schedule([this, i](auto status) {
+            ASSERT_OK(status) << i;
+            blockingWork();
+        });
     }
     while (count1 < 20U) {
         cv1.wait(lk);
@@ -225,7 +234,10 @@ DEATH_TEST(ThreadPoolTest,
         sleepmillis(50);
     }
     stdx::unique_lock<stdx::mutex> lk(mutex);
-    ASSERT_OK(pool->schedule([&mutex] { stdx::lock_guard<stdx::mutex> lk(mutex); }));
+    pool->schedule([&mutex](auto status) {
+        ASSERT_OK(status);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
+    });
     stdx::thread t([&pool] {
         pool->shutdown();
         pool->join();
@@ -257,7 +269,10 @@ TEST_F(ThreadPoolTest, ThreadPoolRunsOnCreateThreadFunctionBeforeConsumingTasks)
     ThreadPool pool(options);
     pool.startup();
 
-    ASSERT_OK(pool.schedule([&barrier] { barrier.countDownAndWait(); }));
+    pool.schedule([&barrier](auto status) {
+        ASSERT_OK(status);
+        barrier.countDownAndWait();
+    });
     barrier.countDownAndWait();
 
     ASSERT_TRUE(onCreateThreadCalled);

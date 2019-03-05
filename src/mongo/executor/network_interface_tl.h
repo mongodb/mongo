@@ -102,7 +102,7 @@ private:
             transport::ReactorHandle reactor;
 
             void operator()(ConnectionPool::ConnectionInterface* ptr) const {
-                reactor->dispatch([ ret = returner, ptr ] { ret(ptr); });
+                reactor->dispatch([ ret = returner, ptr ](auto) { ret(ptr); });
             }
         };
         using ConnHandle = std::unique_ptr<ConnectionPool::ConnectionInterface, Deleter>;

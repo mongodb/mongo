@@ -143,7 +143,13 @@ void scheduleCleanup(executor::TaskExecutor* executor,
                      Date_t when) {
     LOG(1) << "Scheduling cleanup on " << nss.ns() << " at " << when;
     auto swCallbackHandle = executor->scheduleWorkAt(
-        when, [ executor, nss = std::move(nss), epoch = std::move(epoch) ](auto&) {
+        when, [ executor, nss = std::move(nss), epoch = std::move(epoch) ](auto& args) {
+            auto& status = args.status;
+            if (ErrorCodes::isCancelationError(status.code())) {
+                return;
+            }
+            invariant(status);
+
             ThreadClient tc("Collection-Range-Deleter", getGlobalServiceContext());
             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();

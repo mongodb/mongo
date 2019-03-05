@@ -79,18 +79,24 @@ public:
             auto scheduledWorkHandle = uassertStatusOK(_executor->scheduleWorkAt(
                 when,
                 [ this, task = std::forward<Callable>(task), taskCompletionPromise ](
-                    const executor::TaskExecutor::CallbackArgs&) mutable noexcept {
+                    const executor::TaskExecutor::CallbackArgs& args) mutable noexcept {
                     taskCompletionPromise->setWith([&] {
-                        ThreadClient tc("TransactionCoordinator", _serviceContext);
-                        stdx::unique_lock<stdx::mutex> ul(_mutex);
-                        uassertStatusOK(_shutdownStatus);
+                        {
+                            stdx::lock_guard lk(_mutex);
+                            uassertStatusOK(_shutdownStatus);
+                            uassertStatusOK(args.status);
+                        }
 
-                        auto uniqueOpCtxIter = _activeOpContexts.emplace(
-                            _activeOpContexts.begin(), tc->makeOperationContext());
-                        ul.unlock();
+                        ThreadClient tc("TransactionCoordinator", _serviceContext);
+
+                        auto uniqueOpCtxIter = [&] {
+                            stdx::lock_guard lk(_mutex);
+                            return _activeOpContexts.emplace(_activeOpContexts.begin(),
+                                                             tc->makeOperationContext());
+                        }();
 
                         ON_BLOCK_EXIT([&] {
-                            ul.lock();
+                            stdx::lock_guard lk(_mutex);
                             _activeOpContexts.erase(uniqueOpCtxIter);
                             // There is no need to call _notifyAllTasksComplete here, because we
                             // will still have an outstanding _activeHandles entry, so the scheduler

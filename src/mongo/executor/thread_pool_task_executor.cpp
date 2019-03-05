@@ -597,7 +597,9 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
 
     if (MONGO_FAIL_POINT(scheduleIntoPoolSpinsUntilThreadPoolShutsDown)) {
         scheduleIntoPoolSpinsUntilThreadPoolShutsDown.setMode(FailPoint::off);
-        while (_pool->schedule([] {}) != ErrorCodes::ShutdownInProgress) {
+
+        auto checkStatus = [&] { return _pool->execute([] {}).getNoThrow(); };
+        while (!ErrorCodes::isCancelationError(checkStatus().code())) {
             sleepmillis(100);
         }
     }
@@ -611,16 +613,24 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
                 }
 
                 cbState->canceled.store(1);
-                const auto status =
-                    _pool->schedule([this, cbState] { runCallback(std::move(cbState)); });
-                invariant(status.isOK() || status == ErrorCodes::ShutdownInProgress);
+                _pool->schedule([this, cbState](auto status) {
+                    invariant(status.isOK() || ErrorCodes::isCancelationError(status.code()));
+
+                    runCallback(std::move(cbState));
+                });
             });
         } else {
-            const auto status =
-                _pool->schedule([this, cbState] { runCallback(std::move(cbState)); });
-            if (status == ErrorCodes::ShutdownInProgress)
-                break;
-            fassert(28735, status);
+            _pool->schedule([this, cbState](auto status) {
+                if (ErrorCodes::isCancelationError(status.code())) {
+                    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+                    cbState->canceled.store(1);
+                } else {
+                    fassert(28735, status);
+                }
+
+                runCallback(std::move(cbState));
+            });
         }
     }
     _net->signalWorkAvailable();
