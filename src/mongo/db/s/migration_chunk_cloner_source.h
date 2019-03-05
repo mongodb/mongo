@@ -129,8 +129,7 @@ public:
      */
     virtual void onInsertOp(OperationContext* opCtx,
                             const BSONObj& insertedDoc,
-                            const repl::OpTime& opTime,
-                            const bool fromPreparedTransactionCommit) = 0;
+                            const repl::OpTime& opTime) = 0;
 
     /**
      * Notifies this cloner that an update happened to the collection, which it owns. It is up to
@@ -142,8 +141,7 @@ public:
     virtual void onUpdateOp(OperationContext* opCtx,
                             const BSONObj& updatedDoc,
                             const repl::OpTime& opTime,
-                            const repl::OpTime& prePostImageOpTime,
-                            const bool fromPreparedTransactionCommit) = 0;
+                            const repl::OpTime& prePostImageOpTime) = 0;
 
     /**
      * Notifies this cloner that a delede happened to the collection, which it owns. It is up to the
@@ -155,8 +153,7 @@ public:
     virtual void onDeleteOp(OperationContext* opCtx,
                             const BSONObj& deletedDocId,
                             const repl::OpTime& opTime,
-                            const repl::OpTime& preImageOpTime,
-                            const bool fromPreparedTransactionCommit) = 0;
+                            const repl::OpTime& preImageOpTime) = 0;
 
 protected:
     MigrationChunkClonerSource();

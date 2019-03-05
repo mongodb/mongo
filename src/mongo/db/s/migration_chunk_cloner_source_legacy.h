@@ -75,30 +75,19 @@ public:
 
     bool isDocumentInMigratingChunk(const BSONObj& doc) override;
 
-
-    /**
-     * For the following operation handlers:
-     *
-     * If 'fromPreparedTransactionCommit' is true, the cloner will immediately apply the operation
-     * instead of registering it with the RecoveryUnit's onCommitHandler. If 'fromPrepareCommit'
-     * is true, this implies the operation was already committed to storage.
-     */
     void onInsertOp(OperationContext* opCtx,
                     const BSONObj& insertedDoc,
-                    const repl::OpTime& opTime,
-                    const bool fromPreparedTransactionCommit) override;
+                    const repl::OpTime& opTime) override;
 
     void onUpdateOp(OperationContext* opCtx,
                     const BSONObj& updatedDoc,
                     const repl::OpTime& opTime,
-                    const repl::OpTime& prePostImageOpTime,
-                    const bool fromPreparedTransactionCommit) override;
+                    const repl::OpTime& prePostImageOpTime) override;
 
     void onDeleteOp(OperationContext* opCtx,
                     const BSONObj& deletedDocId,
                     const repl::OpTime& opTime,
-                    const repl::OpTime& preImageOpTime,
-                    const bool fromPreparedTransactionCommit) override;
+                    const repl::OpTime& preImageOpTime) override;
 
     // Legacy cloner specific functionality
 

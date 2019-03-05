@@ -1251,7 +1251,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
             opCtx, statements.size() /* stmtId */, oplogSlots.back().opTime, commitSlot);
     }
     invariant(!commitOpTime.isNull());
-    shardObserveTransactionCommit(opCtx, statements, commitOpTime, false);
+    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, commitOpTime);
 }
 
 void OpObserverImpl::onPreparedTransactionCommit(
@@ -1271,8 +1271,6 @@ void OpObserverImpl::onPreparedTransactionCommit(
     cmdObj.setCommitTimestamp(commitTimestamp);
     logCommitOrAbortForPreparedTransaction(
         opCtx, commitOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kCommitted);
-
-    shardObserveTransactionCommit(opCtx, statements, commitOplogEntryOpTime.opTime, true);
 }
 
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
@@ -1316,6 +1314,8 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
             logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
         }
     }
+
+    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, {});
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,

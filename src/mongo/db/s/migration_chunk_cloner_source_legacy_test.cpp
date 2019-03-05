@@ -256,14 +256,14 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
 
         WriteUnitOfWork wuow(operationContext());
 
-        cloner.onInsertOp(operationContext(), createCollectionDocument(90), {}, false);
-        cloner.onInsertOp(operationContext(), createCollectionDocument(150), {}, false);
-        cloner.onInsertOp(operationContext(), createCollectionDocument(151), {}, false);
-        cloner.onInsertOp(operationContext(), createCollectionDocument(210), {}, false);
+        cloner.onInsertOp(operationContext(), createCollectionDocument(90), {});
+        cloner.onInsertOp(operationContext(), createCollectionDocument(150), {});
+        cloner.onInsertOp(operationContext(), createCollectionDocument(151), {});
+        cloner.onInsertOp(operationContext(), createCollectionDocument(210), {});
 
-        cloner.onDeleteOp(operationContext(), createCollectionDocument(80), {}, {}, false);
-        cloner.onDeleteOp(operationContext(), createCollectionDocument(199), {}, {}, false);
-        cloner.onDeleteOp(operationContext(), createCollectionDocument(220), {}, {}, false);
+        cloner.onDeleteOp(operationContext(), createCollectionDocument(80), {}, {});
+        cloner.onDeleteOp(operationContext(), createCollectionDocument(199), {}, {});
+        cloner.onDeleteOp(operationContext(), createCollectionDocument(220), {}, {});
 
         wuow.commit();
     }

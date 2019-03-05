@@ -113,7 +113,7 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
     auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);
     if (msm) {
-        msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime, false);
+        msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
     }
 }
 
@@ -134,7 +134,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
     auto msm = MigrationSourceManager::get(csr, csrLock);
     if (msm) {
-        msm->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime, false);
+        msm->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
     }
 }
 
@@ -156,15 +156,14 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
     auto msm = MigrationSourceManager::get(csr, csrLock);
 
     if (msm && getIsMigrating(opCtx)) {
-        msm->getCloner()->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime, false);
+        msm->getCloner()->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
     }
 }
 
-void OpObserverShardingImpl::shardObserveTransactionCommit(
+void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
     OperationContext* opCtx,
     const std::vector<repl::ReplOperation>& stmts,
-    const repl::OpTime& opTime,
-    const bool fromPreparedTransactionCommit) {
+    const repl::OpTime& opTime) {
 
     for (const auto stmt : stmts) {
         auto const nss = stmt.getNss();
@@ -180,20 +179,15 @@ void OpObserverShardingImpl::shardObserveTransactionCommit(
         auto const opType = stmt.getOpType();
 
         if (opType == repl::OpTypeEnum::kInsert) {
-            msm->getCloner()->onInsertOp(
-                opCtx, stmt.getObject(), opTime, fromPreparedTransactionCommit);
+            msm->getCloner()->onInsertOp(opCtx, stmt.getObject(), opTime);
         } else if (opType == repl::OpTypeEnum::kUpdate) {
             if (auto updateDoc = stmt.getObject2()) {
-                msm->getCloner()->onUpdateOp(
-                    opCtx, *updateDoc, opTime, {}, fromPreparedTransactionCommit);
+                msm->getCloner()->onUpdateOp(opCtx, *updateDoc, opTime, {});
             }
         } else if (opType == repl::OpTypeEnum::kDelete) {
             if (isMigratingWithCSRLock(csr, csrLock, stmt.getObject())) {
-                msm->getCloner()->onDeleteOp(opCtx,
-                                             getDocumentKey(opCtx, nss, stmt.getObject()),
-                                             opTime,
-                                             {},
-                                             fromPreparedTransactionCommit);
+                msm->getCloner()->onDeleteOp(
+                    opCtx, getDocumentKey(opCtx, nss, stmt.getObject()), opTime, {});
             }
         }
     }
