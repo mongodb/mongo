@@ -667,7 +667,7 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
 
 Shard::CommandResponse TransactionRouter::commitTransaction(
     OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken) {
-    if (_participants.empty()) {
+    if (_isRecoveringCommit) {
         uassert(50940, "cannot commit with no participants", recoveryToken);
         return _commitWithRecoveryToken(opCtx, *recoveryToken);
     }

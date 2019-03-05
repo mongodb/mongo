@@ -665,7 +665,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotCommitWithoutParticipants)
 
     auto& txnRouter(*TransactionRouter::get(operationContext()));
     txnRouter.beginOrContinueTxn(
-        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     ASSERT_THROWS(txnRouter.commitTransaction(operationContext(), boost::none), AssertionException);
