@@ -437,6 +437,17 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
                                                           TxnNumber txnNumber,
                                                           boost::optional<bool> autocommit,
                                                           boost::optional<bool> startTransaction) {
+    // Make sure we are still a primary. We need to hold on to the RSTL through the end of this
+    // method, as we otherwise risk stepping down in the interim and incorrectly updating the
+    // transaction number, which can abort active transactions.
+    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+    if (opCtx->writesAreReplicated()) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        uassert(ErrorCodes::NotMaster,
+                "Not primary so we cannot begin or continue a transaction",
+                replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
+    }
+
     uassert(ErrorCodes::TransactionTooOld,
             str::stream() << "Cannot start transaction " << txnNumber << " on session "
                           << _sessionId()

@@ -2153,7 +2153,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
-        if (!_readWriteAbility->canAcceptNonLocalWrites_UNSAFE() && !getTestCommandsEnabled()) {
+        if (!_readWriteAbility->canAcceptNonLocalWrites_UNSAFE()) {
             return Status(ErrorCodes::NotMaster,
                           "Multi-document transactions are only allowed on replica set primaries.");
         }
