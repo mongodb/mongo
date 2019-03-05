@@ -1,7 +1,7 @@
 /**
  * Test that applying DDL operation on secondary does not take a global X lock.
  *
- * @tags: [requires_replication]
+ * @tags: [requires_replication, requires_snapshot_read]
  */
 
 (function() {
@@ -30,14 +30,18 @@
 
     const findWait = startParallelShell(function() {
         db.getMongo().setSlaveOk();
-        assert.eq(db.getSiblingDB('read').getCollection('readColl').find().itcount(), 1);
+        assert.eq(db.getSiblingDB('read')
+                      .getCollection('readColl')
+                      .find()
+                      .comment('read hangs')
+                      .itcount(),
+                  1);
     }, secondary.port);
 
     assert.soon(function() {
-        let findOp =
-            secondary.getDB('admin')
-                .aggregate([{$currentOp: {}}, {$match: {msg: 'waitInFindBeforeMakingBatch'}}])
-                .toArray();
+        let findOp = secondary.getDB('admin')
+                         .aggregate([{$currentOp: {}}, {$match: {'command.comment': 'read hangs'}}])
+                         .toArray();
         return findOp.length == 1;
     });
 
