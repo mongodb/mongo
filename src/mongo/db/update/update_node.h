@@ -39,6 +39,7 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
 
@@ -178,6 +179,12 @@ public:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const = 0;
+
+    /**
+     * This allows an arbitrary class to implement logic which gets dispatched to at runtime
+     * depending on the type of the UpdateNode.
+     */
+    virtual void acceptVisitor(UpdateNodeVisitor* visitor) = 0;
 
 public:
     const Context context;

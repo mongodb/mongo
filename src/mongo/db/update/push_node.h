@@ -55,6 +55,10 @@ public:
         }
     }
 
+    void acceptVisitor(UpdateNodeVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 protected:
     ModifyResult updateExistingElement(mutablebson::Element* element,
                                        std::shared_ptr<FieldRef> elementPath) const final;

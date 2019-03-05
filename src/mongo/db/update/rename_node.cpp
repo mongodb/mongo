@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-namespace {
-
 /**
  * The SetElementNode class provides the $set functionality for $rename. A $rename from a source
  * field to a destination field behaves logically like a $set on the destination followed by a
@@ -78,6 +76,10 @@ public:
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const final {}
 
+    void acceptVisitor(UpdateNodeVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 protected:
     ModifierNode::ModifyResult updateExistingElement(
         mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const final {
@@ -108,8 +110,6 @@ private:
 
     mutablebson::Element _elemToSet;
 };
-
-}  // namespace
 
 Status RenameNode::init(BSONElement modExpr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {

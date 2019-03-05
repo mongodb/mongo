@@ -91,6 +91,10 @@ public:
         }
     }
 
+    void acceptVisitor(UpdateNodeVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& _arrayFilters;
     std::map<std::string, clonable_ptr<UpdateNode>> _children;

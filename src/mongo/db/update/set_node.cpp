@@ -38,7 +38,7 @@ namespace mongo {
 Status SetNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    _val = modExpr;
+    val = modExpr;
 
     return Status::OK();
 }
@@ -46,17 +46,17 @@ Status SetNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionC
 ModifierNode::ModifyResult SetNode::updateExistingElement(
     mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const {
     // If 'element' is deserialized, then element.getValue() will be EOO, which will never equal
-    // _val.
-    if (element->getValue().binaryEqualValues(_val)) {
+    // val.
+    if (element->getValue().binaryEqualValues(val)) {
         return ModifyResult::kNoOp;
     } else {
-        invariant(element->setValueBSONElement(_val));
+        invariant(element->setValueBSONElement(val));
         return ModifyResult::kNormalUpdate;
     }
 }
 
 void SetNode::setValueForNewElement(mutablebson::Element* element) const {
-    invariant(element->setValueBSONElement(_val));
+    invariant(element->setValueBSONElement(val));
 }
 
 }  // namespace mongo

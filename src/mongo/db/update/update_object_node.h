@@ -121,6 +121,14 @@ public:
         }
     }
 
+    void acceptVisitor(UpdateNodeVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    const std::map<std::string, clonable_ptr<UpdateNode>>& getChildren() const {
+        return _children;
+    }
+
 private:
     std::map<std::string, clonable_ptr<UpdateNode>> _children;
     clonable_ptr<UpdateNode> _positionalChild;

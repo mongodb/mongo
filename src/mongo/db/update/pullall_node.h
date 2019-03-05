@@ -50,6 +50,10 @@ public:
         return stdx::make_unique<PullAllNode>(*this);
     }
 
+    void acceptVisitor(UpdateNodeVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     StringData operatorName() const final {
         return "$pullAll";

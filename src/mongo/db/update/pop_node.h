@@ -62,6 +62,10 @@ public:
         return _popFromFront;
     }
 
+    void acceptVisitor(UpdateNodeVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     StringData operatorName() const final {
         return "$pop";

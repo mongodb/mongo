@@ -66,6 +66,10 @@ public:
         return true;
     }
 
+    void acceptVisitor(UpdateNodeVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     StringData operatorName() const final {
         return "$unset";

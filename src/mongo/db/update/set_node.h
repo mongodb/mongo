@@ -50,6 +50,12 @@ public:
 
     void setCollator(const CollatorInterface* collator) final {}
 
+    void acceptVisitor(UpdateNodeVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    BSONElement val;
+
 protected:
     ModifyResult updateExistingElement(mutablebson::Element* element,
                                        std::shared_ptr<FieldRef> elementPath) const final;
@@ -69,10 +75,8 @@ private:
     }
 
     BSONObj operatorValue() const final {
-        return BSON("" << _val);
+        return BSON("" << val);
     }
-
-    BSONElement _val;
 };
 
 }  // namespace mongo

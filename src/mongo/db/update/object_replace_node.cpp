@@ -44,11 +44,11 @@ namespace {
 constexpr StringData kIdFieldName = "_id"_sd;
 }  // namespace
 
-ObjectReplaceNode::ObjectReplaceNode(BSONObj val)
-    : UpdateNode(Type::Replacement), _val(val.getOwned()), _containsId(false) {
+ObjectReplaceNode::ObjectReplaceNode(BSONObj value)
+    : UpdateNode(Type::Replacement), val(value.getOwned()), _containsId(false) {
 
     // Replace all zero-valued timestamps with the current time and check for the existence of _id.
-    for (auto&& elem : _val) {
+    for (auto&& elem : val) {
 
         // Do not change the _id field.
         if (elem.fieldNameStringData() == kIdFieldName) {
@@ -77,7 +77,7 @@ UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const 
     auto original = applyParams.element.getDocument().getObject();
 
     // Check for noop.
-    if (original.binaryEqual(_val)) {
+    if (original.binaryEqual(val)) {
         return ApplyResult::noopResult();
     }
 
@@ -97,7 +97,7 @@ UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const 
     }
 
     // Insert the provided contents instead.
-    for (auto&& elem : _val) {
+    for (auto&& elem : val) {
         invariant(applyParams.element.appendElement(elem));
     }
 
