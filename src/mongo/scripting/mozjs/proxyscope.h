@@ -200,7 +200,8 @@ private:
     Status _status;
     OperationContext* _opCtx = nullptr;
 
-    stdx::condition_variable _condvar;
+    stdx::condition_variable _proxyCondvar;
+    stdx::condition_variable _implCondvar;
     PRThread* _thread;
 };
 
