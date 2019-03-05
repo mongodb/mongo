@@ -148,8 +148,7 @@ protected:
         return shardCheckResumability;
     }
     intrusive_ptr<DocumentSourceShardCheckResumability> createShardCheckResumability(Timestamp ts) {
-        return createShardCheckResumability(
-            ResumeToken::makeHighWaterMarkToken(ts, testUuid()).getData());
+        return createShardCheckResumability(ResumeToken::makeHighWaterMarkToken(ts).getData());
     }
 };
 

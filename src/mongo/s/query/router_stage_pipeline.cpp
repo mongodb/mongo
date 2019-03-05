@@ -87,26 +87,7 @@ std::size_t RouterStagePipeline::getNumRemotes() const {
 }
 
 BSONObj RouterStagePipeline::getPostBatchResumeToken() const {
-    auto pbrt = _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMark() : BSONObj();
-    return pbrt.isEmpty() ? pbrt : _setPostBatchResumeTokenUUID(pbrt);
-}
-
-BSONObj RouterStagePipeline::_setPostBatchResumeTokenUUID(BSONObj pbrt) const {
-    // If the PBRT does not match the sort key of the latest document, it is a high water mark.
-    const bool isHighWaterMark = !pbrt.binaryEqual(_latestSortKey);
-
-    // If this stream is on a single collection and the token is a high water mark, then it may have
-    // come from a shard that does not have the collection. If so, we must fill in the correct UUID.
-    if (isHighWaterMark && _mergePipeline->getContext()->uuid) {
-        auto tokenData = ResumeToken::parse(pbrt).getData();
-        // Check whether the UUID is missing before regenerating the token.
-        if (!tokenData.uuid) {
-            invariant(tokenData.tokenType == ResumeTokenData::kHighWaterMarkToken);
-            tokenData.uuid = _mergePipeline->getContext()->uuid;
-            pbrt = ResumeToken(tokenData).toDocument().toBson();
-        }
-    }
-    return pbrt;
+    return _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMark() : BSONObj();
 }
 
 BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
@@ -130,8 +111,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
             idField.binaryEqual(resumeToken));
 
-    // Record the latest resume token for later comparison, then return the event in BSONObj form.
-    _latestSortKey = resumeToken;
+    // Return the event in BSONObj form, minus the $sortKey metadata.
     return eventBSON;
 }
 

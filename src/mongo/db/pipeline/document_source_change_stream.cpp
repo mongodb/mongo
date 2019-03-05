@@ -44,7 +44,6 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
 #include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_source_watch_for_uuid.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -360,20 +359,14 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
         if (expCtx->initialPostBatchResumeToken.isEmpty()) {
             Timestamp startTime{startFrom->getSecs(), startFrom->getInc() + (!startFromInclusive)};
             expCtx->initialPostBatchResumeToken =
-                ResumeToken::makeHighWaterMarkToken(startTime, expCtx->uuid).toDocument().toBson();
+                ResumeToken::makeHighWaterMarkToken(startTime).toDocument().toBson();
         }
     }
 
+    // Obtain the current FCV and use it to create the DocumentSourceChangeStreamTransform stage.
     const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
     stages.push_back(
         DocumentSourceChangeStreamTransform::create(expCtx, fcv, elem.embeddedObject()));
-
-    // If this is a single-collection stream but we don't have a UUID set on the expression context,
-    // then the stream was opened before the collection exists. Add a stage which will populate the
-    // UUID using the first change stream result observed by the pipeline during execution.
-    if (!expCtx->uuid && expCtx->isSingleNamespaceAggregation()) {
-        stages.push_back(DocumentSourceWatchForUUID::create(expCtx));
-    }
 
     // The resume stage must come after the check invalidate stage so that the former can determine
     // whether the event that matches the resume token should be followed by an "invalidate" event.
@@ -418,13 +411,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
         // There should only be one close cursor stage. If we're on the shards and producing input
         // to be merged, do not add a close cursor stage, since the mongos will already have one.
         stages.push_back(DocumentSourceCloseCursor::create(expCtx));
-
-        // If this is a single-collection stream but we do not have a UUID set on the expression
-        // context, then the stream was opened before the collection exists. Add a stage on mongoS
-        // which will watch for and populate the UUID using the first result seen by the pipeline.
-        if (expCtx->inMongos && !expCtx->uuid && expCtx->isSingleNamespaceAggregation()) {
-            stages.push_back(DocumentSourceWatchForUUID::create(expCtx));
-        }
 
         // There should be only one post-image lookup stage.  If we're on the shards and producing
         // input to be merged, the lookup is done on the mongos.

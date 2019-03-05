@@ -222,7 +222,7 @@ Value DocumentSourceShardCheckResumability::serialize(
 intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResumability::create(
     const intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts) {
     // We are resuming from a point in time, not an event. Seed the stage with a high water mark.
-    return create(expCtx, ResumeToken::makeHighWaterMarkToken(ts, expCtx->uuid).getData());
+    return create(expCtx, ResumeToken::makeHighWaterMarkToken(ts).getData());
 }
 
 intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResumability::create(

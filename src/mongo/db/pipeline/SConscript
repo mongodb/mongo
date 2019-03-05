@@ -403,7 +403,6 @@ pipelineeEnv.Library(
         'document_source_sort_by_count.cpp',
         'document_source_tee_consumer.cpp',
         'document_source_unwind.cpp',
-        'document_source_watch_for_uuid.cpp',
         'pipeline.cpp',
         'sequential_document_cache.cpp',
         'stage_constraints.cpp',

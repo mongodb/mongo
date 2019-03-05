@@ -65,13 +65,9 @@ protected:
 private:
     BSONObj _validateAndConvertToBSON(const Document& event);
 
-    BSONObj _setPostBatchResumeTokenUUID(BSONObj pbrt) const;
-
     std::unique_ptr<Pipeline, PipelineDeleter> _mergePipeline;
 
     // May be null if this pipeline runs exclusively on mongos without contacting the shards at all.
     boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursorsStage;
-
-    BSONObj _latestSortKey;
 };
 }  // namespace mongo

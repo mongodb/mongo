@@ -230,8 +230,8 @@ ResumeToken ResumeToken::parse(const Document& resumeDoc) {
     return ResumeToken(resumeDoc);
 }
 
-ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime, boost::optional<UUID> uuid) {
-    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime, uuid));
+ResumeToken ResumeToken::makeHighWaterMarkToken(Timestamp clusterTime) {
+    return ResumeToken(makeHighWaterMarkResumeTokenData(clusterTime, boost::none));
 }
 
 bool ResumeToken::isHighWaterMarkToken(const ResumeTokenData& tokenData) {
