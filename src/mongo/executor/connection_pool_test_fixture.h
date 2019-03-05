@@ -134,6 +134,16 @@ private:
 };
 
 /**
+ * An "OutOfLineExecutor" that actually runs on the same thread of execution
+ */
+class InlineOutOfLineExecutor : public OutOfLineExecutor {
+public:
+    void schedule(Task task) override {
+        std::move(task)(Status::OK());
+    }
+};
+
+/**
  * Mock for the pool implementation
  */
 class PoolImpl final : public ConnectionPool::DependentTypeFactoryInterface {
@@ -146,6 +156,11 @@ public:
         size_t generation) override;
 
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
+
+    OutOfLineExecutor& getExecutor() override {
+        static InlineOutOfLineExecutor _executor;
+        return _executor;
+    }
 
     Date_t now() override;
 
