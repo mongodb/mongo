@@ -135,6 +135,10 @@ public:
             return _oplogStats.modeStats[mode];
         }
 
+        if (resId == resourceIdGlobal) {
+            return _resourceIdGlobal.modeStats[mode];
+        }
+
         return _stats[resId.getType()].modeStats[mode];
     }
 
@@ -157,6 +161,12 @@ public:
             LockStatCountersType& thisStats = _oplogStats.modeStats[mode];
             thisStats.append(otherStats);
         }
+
+        for (int mode = 0; mode < LockModesCount; ++mode) {
+            const OtherLockStatCountersType& otherStats = other._resourceIdGlobal.modeStats[mode];
+            LockStatCountersType& thisStats = _resourceIdGlobal.modeStats[mode];
+            thisStats.append(otherStats);
+        }
     }
 
     template <typename OtherType>
@@ -174,6 +184,12 @@ public:
         for (int mode = 0; mode < LockModesCount; mode++) {
             const OtherLockStatCountersType& otherStats = other._oplogStats.modeStats[mode];
             LockStatCountersType& thisStats = _oplogStats.modeStats[mode];
+            thisStats.subtract(otherStats);
+        }
+
+        for (int mode = 0; mode < LockModesCount; ++mode) {
+            const OtherLockStatCountersType& otherStats = other._resourceIdGlobal.modeStats[mode];
+            LockStatCountersType& thisStats = _resourceIdGlobal.modeStats[mode];
             thisStats.subtract(otherStats);
         }
     }
@@ -197,12 +213,14 @@ private:
 
     void _report(BSONObjBuilder* builder,
                  const char* sectionName,
-                 const PerModeLockStatCounters& stat) const;
+                 const PerModeLockStatCounters& stat,
+                 const bool includeCanonicalGlobal) const;
 
 
-    // Split the lock stats per resource type and special-case the oplog so we can collect
-    // more detailed stats for it.
+    // Split the lock stats per resource type. Special-case the oplog and global lock so we can
+    // collect more detailed stats for it.
     PerModeLockStatCounters _stats[ResourceTypesCount];
+    PerModeLockStatCounters _resourceIdGlobal;
     PerModeLockStatCounters _oplogStats;
 };
 

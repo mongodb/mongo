@@ -143,4 +143,66 @@ TEST(LockStats, Subtraction) {
     ASSERT_GREATER_THAN(stats2.get(resId, MODE_S).combinedWaitTimeMicros, 0);
 }
 
+namespace {
+void assertAcquisitionStats(ResourceId rid) {
+    resetGlobalLockStats();
+
+    SingleThreadedLockStats stats;
+    reportGlobalLockingStats(&stats);
+    ASSERT_EQUALS(0, stats.get(rid, LockMode::MODE_IX).numAcquisitions);
+
+    LockerImpl locker;
+    if (rid == resourceIdGlobal) {
+        locker.lockGlobal(LockMode::MODE_IX);
+    } else {
+        locker.lock(rid, LockMode::MODE_IX);
+    }
+
+    reportGlobalLockingStats(&stats);
+    if (rid == resourceIdGlobal) {
+        ASSERT_EQUALS(1, stats.get(resourceIdGlobal, LockMode::MODE_IX).numAcquisitions);
+    } else {
+        ASSERT_EQUALS(0, stats.get(resourceIdGlobal, LockMode::MODE_IX).numAcquisitions);
+    }
+
+    if (rid == resourceIdGlobal) {
+        ASSERT_TRUE(locker.unlockGlobal());
+    } else {
+        ASSERT_TRUE(locker.unlock(rid));
+    }
+}
+}  // namespace
+
+TEST(LockStats, GlobalRetrievableSeparately) {
+    assertAcquisitionStats(resourceIdGlobal);
+    assertAcquisitionStats(resourceIdParallelBatchWriterMode);
+    assertAcquisitionStats(resourceIdReplicationStateTransitionLock);
+}
+
+TEST(LockStats, ServerStatusAggregatesAllGlobal) {
+    resetGlobalLockStats();
+
+    SingleThreadedLockStats stats;
+    reportGlobalLockingStats(&stats);
+    BSONObjBuilder builder;
+    stats.report(&builder);
+    ASSERT_EQUALS(0, builder.done().nFields());
+
+    LockerImpl locker;
+    locker.lockGlobal(LockMode::MODE_IX);
+    locker.lock(resourceIdParallelBatchWriterMode, LockMode::MODE_IX);
+    locker.lock(resourceIdReplicationStateTransitionLock, LockMode::MODE_IX);
+
+    locker.unlock(resourceIdReplicationStateTransitionLock);
+    locker.unlock(resourceIdParallelBatchWriterMode);
+    locker.unlockGlobal();
+
+    reportGlobalLockingStats(&stats);
+    BSONObjBuilder builder2;
+    stats.report(&builder2);
+    ASSERT_EQUALS(
+        3,
+        builder2.done().getObjectField("Global").getObjectField("acquireCount").getIntField("w"));
+}
+
 }  // namespace mongo

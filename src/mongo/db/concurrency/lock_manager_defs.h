@@ -260,6 +260,13 @@ extern const ResourceId resourceIdOplog;
 // are serialized (see SERVER-16092)
 extern const ResourceId resourceIdAdminDB;
 
+// Global lock. Every server operation, which uses the Locker must acquire this lock at least
+// once. See comments in the header file (begin/endTransaction) for more information.
+//
+// There are multiple locks with the "GLOBAL" type. This one is colloquially known as the global
+// lock.
+extern const ResourceId resourceIdGlobal;
+
 // Hardcoded resource id for ParallelBatchWriterMode. We use the same resource type
 // as resourceIdGlobal. This will also ensure the waits are reported as global, which
 // is appropriate. The lock will never be contended unless the parallel batch writers
