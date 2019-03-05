@@ -140,6 +140,22 @@ DEATH_TEST(OperationContextTest, SettingTransactionNumberWithoutSessionIdShouldC
     opCtx->setTxnNumber(5);
 }
 
+DEATH_TEST(OperationContextTest, CallingMarkKillWithExtraInfoCrashes, "invariant") {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->markKilled(ErrorCodes::ForTestingErrorExtraInfo);
+}
+
+DEATH_TEST(OperationContextTest, CallingSetDeadlineWithExtraInfoCrashes, "invariant") {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setDeadlineByDate(Date_t::now(), ErrorCodes::ForTestingErrorExtraInfo);
+}
+
 TEST(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group1;
     ASSERT_TRUE(group1.isEmpty());

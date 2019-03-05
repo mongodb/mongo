@@ -93,6 +93,7 @@ void OperationContext::setDeadlineAndMaxTime(Date_t when,
                                              ErrorCodes::Error timeoutError) {
     invariant(!getClient()->isInDirectClient() || _hasArtificialDeadline);
     invariant(ErrorCodes::isExceededTimeLimitError(timeoutError));
+    invariant(!ErrorExtraInfo::parserFor(timeoutError));
     uassert(40120,
             "Illegal attempt to change operation deadline",
             _hasArtificialDeadline || !hasDeadline());
@@ -345,6 +346,7 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
 
 void OperationContext::markKilled(ErrorCodes::Error killCode) {
     invariant(killCode != ErrorCodes::OK);
+    invariant(!ErrorExtraInfo::parserFor(killCode));
 
     if (killCode == ErrorCodes::ClientDisconnect) {
         log() << "operation was interrupted because a client disconnected";
