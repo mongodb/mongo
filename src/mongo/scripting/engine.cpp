@@ -73,7 +73,10 @@ ScriptEngine::ScriptEngine() : _scopeInitCallback() {}
 ScriptEngine::~ScriptEngine() {}
 
 Scope::Scope()
-    : _localDBName(""), _loadedVersion(0), _numTimesUsed(0), _lastRetIsNativeCode(false) {}
+    : _localDBName(""),
+      _loadedVersion(0),
+      _createTime(Date_t::now()),
+      _lastRetIsNativeCode(false) {}
 
 Scope::~Scope() {}
 
@@ -338,8 +341,8 @@ public:
             return;
         }
 
-        if (scope->getTimesUsed() > kMaxScopeReuse)
-            return;  // used too many times to save
+        if (Date_t::now() - scope->getCreateTime() > kMaxScopeReuseTime)
+            return;  // too old to save
 
         if (!scope->getError().empty())
             return;  // not saving errored scopes
@@ -361,7 +364,6 @@ public:
             if (it->poolName == poolName) {
                 std::shared_ptr<Scope> scope = it->scope;
                 _pools.erase(it);
-                scope->incTimesUsed();
                 scope->reset();
                 scope->registerOperation(opCtx);
                 return scope;
@@ -385,7 +387,7 @@ private:
 
     // Note: if these numbers change, reconsider choice of datastructure for _pools
     static const unsigned kMaxPoolSize = 10;
-    static const int kMaxScopeReuse = 10;
+    constexpr static inline Seconds kMaxScopeReuseTime = Seconds(10);
 
     typedef std::deque<ScopeAndPool> Pools;  // More-recently used Scopes are kept at the front.
     Pools _pools;                            // protected by _mutex

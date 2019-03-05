@@ -173,14 +173,9 @@ public:
 
     static void validateObjectIdString(const std::string& str);
 
-    /** increments the number of times a scope was used */
-    void incTimesUsed() {
-        ++_numTimesUsed;
-    }
-
-    /** gets the number of times a scope was used */
-    int getTimesUsed() const {
-        return _numTimesUsed;
+    /** gets the time at which the scope was created */
+    Date_t getCreateTime() const {
+        return _createTime;
     }
 
     /** return true if last invoke() return'd native code */
@@ -204,7 +199,7 @@ protected:
     std::set<std::string> _storedNames;
     static AtomicWord<long long> _lastVersion;
     FunctionCacheMap _cachedFunctions;
-    int _numTimesUsed;
+    Date_t _createTime;
     bool _lastRetIsNativeCode;  // v8 only: set to true if eval'd script returns a native func
 };
 
