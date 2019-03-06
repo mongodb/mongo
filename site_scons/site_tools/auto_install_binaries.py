@@ -118,6 +118,7 @@ def generate(env):
     def _aib_debugdir(source, target, env, for_signature):
         for s in source:
             # TODO: Dry this with auto_install_emitter
+            # TODO: We shouldn't need to reach into the attributes of the debug tool like this.
             origin = getattr(s.attributes, "debug_file_for", None)
             oentry = env.Entry(origin)
             osuf = oentry.get_suffix()
