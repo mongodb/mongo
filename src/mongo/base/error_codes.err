@@ -283,6 +283,7 @@ error_code("TransactionCoordinatorSteppingDown", 281) # Gets converted to Interr
 error_code("TransactionCoordinatorReachedAbortDecision", 282)
 error_code("WouldChangeOwningShard", 283, extra="WouldChangeOwningShardInfo")
 error_code("ForTestingErrorExtraInfoWithExtraInfoInNamespace", 284, extra="nested::twice::NestedErrorExtraInfoExample")
+error_code("IndexBuildAlreadyInProgress", 285)
 
 # Error codes 4000-8999 are reserved.
 

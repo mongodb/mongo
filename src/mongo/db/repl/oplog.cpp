@@ -968,7 +968,9 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           createIndexForApplyOps(opCtx, indexSpec, nss, {}, mode);
           return Status::OK();
       },
-      {ErrorCodes::IndexAlreadyExists, ErrorCodes::NamespaceNotFound}}},
+      {ErrorCodes::IndexAlreadyExists,
+       ErrorCodes::IndexBuildAlreadyInProgress,
+       ErrorCodes::NamespaceNotFound}}},
     {"startIndexBuild",
      {[](OperationContext* opCtx,
          const char* ns,

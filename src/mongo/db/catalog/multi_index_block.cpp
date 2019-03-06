@@ -64,6 +64,8 @@ namespace mongo {
 
 namespace {
 
+const StringData kCreateIndexesFieldName = "createIndexes"_sd;
+const StringData kIndexesFieldName = "indexes"_sd;
 const StringData kBuildUUIDFieldName = "buildUUID"_sd;
 const StringData kBuildingPhaseCompleteFieldName = "buildingPhaseComplete"_sd;
 const StringData kRunTwoPhaseIndexBuildFieldName = "runTwoPhaseIndexBuild"_sd;
@@ -227,7 +229,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 
     _buildIsCleanedUp = false;
 
-    _updateCurOpOpDescription(opCtx, false);
+    _updateCurOpOpDescription(opCtx, collection->ns(), indexSpecs, false);
 
     WriteUnitOfWork wunit(opCtx);
 
@@ -610,7 +612,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
         }
     }
 
-    _updateCurOpOpDescription(opCtx, true);
+    _updateCurOpOpDescription(opCtx, {}, {}, true);
     return Status::OK();
 }
 
@@ -796,8 +798,25 @@ void MultiIndexBlock::_setStateToAbortedIfNotCommitted(StringData reason) {
 }
 
 void MultiIndexBlock::_updateCurOpOpDescription(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const std::vector<BSONObj>& indexSpecs,
                                                 bool isBuildingPhaseComplete) const {
     BSONObjBuilder builder;
+
+    // If the collection namespace is provided, add a 'createIndexes' field with the collection name
+    // to allow tests to identify this op as an index build.
+    if (!nss.isEmpty()) {
+        builder.append(kCreateIndexesFieldName, nss.coll());
+    }
+
+    // If index specs are provided, add them under the 'indexes' field.
+    if (!indexSpecs.empty()) {
+        BSONArrayBuilder indexesBuilder;
+        for (const auto& spec : indexSpecs) {
+            indexesBuilder.append(spec);
+        }
+        builder.append(kIndexesFieldName, indexesBuilder.arr());
+    }
 
     // TODO(SERVER-37980): Replace with index build UUID.
     auto buildUUID = UUID::gen();
@@ -827,6 +846,7 @@ void MultiIndexBlock::_updateCurOpOpDescription(OperationContext* opCtx,
     auto curOp = CurOp::get(opCtx);
     builder.appendElementsUnique(curOp->opDescription());
     auto opDescObj = builder.obj();
+    curOp->setLogicalOp_inlock(LogicalOp::opCommand);
     curOp->setOpDescription_inlock(opDescObj);
     curOp->ensureStarted();
 }

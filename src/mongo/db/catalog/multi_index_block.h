@@ -55,6 +55,7 @@ MONGO_FAIL_POINT_DECLARE(leaveIndexBuildUnfinishedForShutdown);
 
 class Collection;
 class MatchExpression;
+class NamespaceString;
 class OperationContext;
 
 /**
@@ -324,7 +325,10 @@ private:
     /**
      * Updates CurOp's 'opDescription' field with the current state of this index build.
      */
-    void _updateCurOpOpDescription(OperationContext* opCtx, bool isBuildingPhaseComplete) const;
+    void _updateCurOpOpDescription(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const std::vector<BSONObj>& indexSpecs,
+                                   bool isBuildingPhaseComplete) const;
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;

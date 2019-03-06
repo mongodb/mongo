@@ -145,10 +145,12 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
     // Task in thread pool should have similar CurOp representation to the caller so that it can be
     // identified as a createIndexes operation.
+    LogicalOp logicalOp = LogicalOp::opInvalid;
     BSONObj opDesc;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         auto curOp = CurOp::get(opCtx);
+        logicalOp = curOp->getLogicalOp();
         opDesc = curOp->opDescription().getOwned();
     }
 
@@ -159,6 +161,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         timeoutError,
         writesAreReplicated,
         shouldNotConflictWithSecondaryBatchApplication,
+        logicalOp,
         opDesc
     ]() noexcept {
         auto opCtx = Client::getCurrent()->makeOperationContext();
@@ -179,6 +182,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
             auto curOp = CurOp::get(opCtx.get());
+            curOp->setLogicalOp_inlock(logicalOp);
             curOp->setOpDescription_inlock(opDesc);
         }
 

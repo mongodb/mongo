@@ -455,12 +455,15 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
     if (collIndexBuildsIt != _collectionIndexBuilds.end()) {
         for (const auto& name : replIndexBuildState->indexNames) {
             if (collIndexBuildsIt->second->hasIndexBuildState(lk, name)) {
-                return Status(ErrorCodes::IndexKeySpecsConflict,
+                auto registeredIndexBuilds =
+                    collIndexBuildsIt->second->getIndexBuildState(lk, name);
+                return Status(ErrorCodes::IndexBuildAlreadyInProgress,
                               str::stream() << "There's already an index with name '" << name
                                             << "' being built on the collection: "
                                             << " ( "
                                             << replIndexBuildState->collectionUUID
-                                            << " )");
+                                            << " ). Index build: "
+                                            << registeredIndexBuilds->buildUUID);
             }
         }
     }
@@ -629,6 +632,21 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
 
     // Unregister the index build before setting the promise, so callers do not see the build again.
     _unregisterIndexBuild(lk, replIndexBuildState);
+
+    if (status == ErrorCodes::IndexAlreadyExists ||
+        ((status == ErrorCodes::IndexOptionsConflict ||
+          status == ErrorCodes::IndexKeySpecsConflict) &&
+         options.indexConstraints == IndexBuildsManager::IndexConstraints::kRelax)) {
+        LOG(1) << "Ignoring indexing error: " << redact(status);
+
+        // The requested index (specs) are already built or are being built. Return success
+        // early (this is v4.0 behavior compatible).
+        ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
+        int numIndexes = replIndexBuildState->stats.numIndexesBefore;
+        indexCatalogStats.numIndexesBefore = numIndexes;
+        indexCatalogStats.numIndexesAfter = numIndexes;
+        return SharedSemiFuture(indexCatalogStats);
+    }
 
     // Set the promise in case another thread already joined the index build.
     replIndexBuildState->sharedPromise.setError(status);
@@ -1056,6 +1074,13 @@ std::vector<BSONObj> IndexBuildsCoordinator::_addDefaultsAndFilterExistingIndexe
     const std::vector<BSONObj>& indexSpecs) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X));
     invariant(collection);
+
+    // During secondary oplog application, the index specs have already been normalized in the
+    // oplog entries read from the primary. We should not be modifying the specs any further.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getSettings().usingReplSets() && !replCoord->canAcceptWritesFor(opCtx, nss)) {
+        return indexSpecs;
+    }
 
     auto specsWithCollationDefaults =
         uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs));
