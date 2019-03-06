@@ -41,6 +41,9 @@ def generate(env):
     ])
 
     role_dependencies = {
+        'debug' : [
+            'runtime',
+        ],
         'dev' : [
             'runtime',
             'common',
