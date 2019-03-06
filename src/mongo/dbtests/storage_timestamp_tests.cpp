@@ -1466,6 +1466,12 @@ public:
         repl::OplogApplier::Options options;
         options.allowNamespaceNotFoundErrorsOnCrudOps = true;
         options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
+        // TODO (SERVER-39982): The use of the skipWritesToOplog setting to build the indexes in
+        // the foreground should be considered a temporary fix.
+        // SERVER-39982 tracks the work for investigating whether it is possible to remove this
+        // temporary fix and only will remove it if it is possible, because we do not know the
+        // underlying cause of the failure yet.
+        options.skipWritesToOplog = true;
         repl::OplogApplierImpl oplogApplier(
             nullptr,  // task executor. not required for multiApply().
             nullptr,  // oplog buffer. not required for multiApply().
