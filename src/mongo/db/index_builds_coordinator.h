@@ -152,9 +152,6 @@ public:
      * This should only be called when certain the server will not start any new index builds --
      * i.e. when the server is not accepting user requests and no internal operations are
      * concurrently starting new index builds.
-     *
-     * TODO: not yet fully implemented. IndexBuildsManager::interruptIndexBuild is not yet
-     * implemented.
      */
     void interruptAllIndexBuilds(const std::string& reason);
 

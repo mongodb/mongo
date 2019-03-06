@@ -167,10 +167,10 @@ public:
      *
      * Returns true if a build existed to be signaled, as opposed to having already finished and
      * been cleared away, or not having yet started..
-     *
-     * TODO: Not yet implemented.
      */
-    bool interruptIndexBuild(const UUID& buildUUID, const std::string& reason);
+    bool interruptIndexBuild(OperationContext* opCtx,
+                             const UUID& buildUUID,
+                             const std::string& reason);
 
     /**
      * Cleans up the index build state and unregisters it from the manager.

@@ -273,7 +273,7 @@ void IndexBuildsCoordinator::interruptAllIndexBuilds(const std::string& reason) 
 
     // Signal all the index builds to stop.
     for (auto& buildStateIt : _allIndexBuilds) {
-        _indexBuildsManager.interruptIndexBuild(buildStateIt.second->buildUUID, reason);
+        _indexBuildsManager.abortIndexBuild(buildStateIt.second->buildUUID, reason);
     }
 
     // Wait for all the index builds to stop.
@@ -700,23 +700,41 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
               str::stream() << "Collection " << nss
                             << " should exist because an index build is in progress.");
 
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    auto replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
+        !replCoord->canAcceptWritesForDatabase(opCtx, replState->dbName);
+
     try {
-        _buildIndex(opCtx, collection, nss, replState, &dbLock);
+        if (replSetAndNotPrimary) {
+            // This index build can only be interrupted at shutdown. For the duration of the
+            // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown() invocation, any kill
+            // status set by the killOp command will be ignored. After
+            // OperationContext::runWithoutInterruptionExceptAtGlobalShutdown() returns, any call to
+            // OperationContext::checkForInterrupt() will see the kill status and respond
+            // accordingly (checkForInterrupt() will throw an exception while
+            // checkForInterruptNoAssert() returns an error Status).
+            opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+                [&, this] { _buildIndex(opCtx, collection, nss, replState, &dbLock); });
+        } else {
+            _buildIndex(opCtx, collection, nss, replState, &dbLock);
+        }
         replState->stats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
         status = Status::OK();
     } catch (const DBException& ex) {
         status = ex.toStatus();
-        logFailure(status, nss, replState);
-        throw;
     }
 
     invariant(opCtx->lockState()->isDbLockedForMode(replState->dbName, MODE_X));
 
-    if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+    if (replSetAndNotPrimary && status == ErrorCodes::InterruptedAtShutdown) {
+        // Leave it as-if kill -9 happened. This will be handled on restart.
+        _indexBuildsManager.interruptIndexBuild(opCtx, replState->buildUUID, "shutting down");
+        replState->stats.numIndexesAfter = replState->stats.numIndexesBefore;
+        status = Status::OK();
+    } else if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
         // Only the primary node removes the index build entry, as the secondaries will
         // replicate.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
+        if (!replSetAndNotPrimary) {
             auto removeStatus = removeIndexBuildEntry(opCtx, replState->buildUUID);
             if (!removeStatus.isOK()) {
                 logFailure(removeStatus, nss, replState);
