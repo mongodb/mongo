@@ -885,6 +885,7 @@ Status _syncRollback(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
 
     FixUpInfo how;
+    how.localTopOfOplog = replCoord->getMyLastAppliedOpTime();
     log() << "Starting rollback. Sync source: " << rollbackSource.getSource() << rsLog;
     how.rbid = rollbackSource.getRollbackId();
     uassert(
@@ -1046,6 +1047,16 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     log() << "Finished refetching documents. Total size of documents refetched: "
           << goodVersions.size();
+
+    // We must start taking unstable checkpoints before rolling back oplog entries. Otherwise, a
+    // stable checkpoint could include the fixup write (since it is untimestamped) but not the write
+    // being rolled back (if it is after the stable timestamp), leading to inconsistent state. An
+    // unstable checkpoint will include both writes.
+    if (!serverGlobalParams.enableMajorityReadConcern) {
+        log() << "Setting initialDataTimestamp to 0 so that we start taking unstable checkpoints.";
+        opCtx->getServiceContext()->getStorageEngine()->setInitialDataTimestamp(
+            Timestamp::kAllowUnstableCheckpointsSentinel);
+    }
 
     log() << "Checking the RollbackID and updating the MinValid if necessary";
 
@@ -1404,19 +1415,38 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     log() << "Rollback deleted " << deletes << " documents and updated " << updates
           << " documents.";
 
-    // When majority read concern is disabled, the stable timestamp may be ahead of the common
-    // point. Force the stable timestamp back to the common point.
     if (!serverGlobalParams.enableMajorityReadConcern) {
+        // When majority read concern is disabled, the stable timestamp may be ahead of the common
+        // point. Force the stable timestamp back to the common point, to allow writes after the
+        // common point.
         const bool force = true;
-        log() << "Forcing the stable timestamp to " << fixUpInfo.commonPoint.getTimestamp();
+        log() << "Forcing the stable timestamp to the common point: "
+              << fixUpInfo.commonPoint.getTimestamp();
         opCtx->getServiceContext()->getStorageEngine()->setStableTimestamp(
             fixUpInfo.commonPoint.getTimestamp(), boost::none, force);
 
-        // We must wait for a checkpoint before truncating oplog, so that if we crash after
-        // truncating oplog, we are guaranteed to recover from a checkpoint that includes all of the
-        // writes performed during the rollback.
-        log() << "Waiting for a stable checkpoint";
-        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable();
+        // We must not take a stable checkpoint until it is guaranteed to include all writes from
+        // before the rollback (i.e. the stable timestamp is at least the local top of oplog). In
+        // addition, we must not take a stable checkpoint until the stable timestamp reaches the
+        // sync source top of oplog (minValid), since we must not take a stable checkpoint until we
+        // are in a consistent state. We control this by seting the initialDataTimestamp to the
+        // maximum of these two values. No checkpoints are taken until stable timestamp >=
+        // initialDataTimestamp.
+        auto syncSourceTopOfOplog = OpTime::parseFromOplogEntry(rollbackSource.getLastOperation())
+                                        .getValue()
+                                        .getTimestamp();
+        log() << "Setting initialDataTimestamp to the max of local top of oplog and sync source "
+                 "top of oplog. Local top of oplog: "
+              << fixUpInfo.localTopOfOplog.getTimestamp()
+              << ", sync source top of oplog: " << syncSourceTopOfOplog;
+        opCtx->getServiceContext()->getStorageEngine()->setInitialDataTimestamp(
+            std::max(fixUpInfo.localTopOfOplog.getTimestamp(), syncSourceTopOfOplog));
+
+        // Take an unstable checkpoint to ensure that all of the writes performed during rollback
+        // are persisted to disk before truncating oplog.
+        log() << "Waiting for an unstable checkpoint";
+        const bool stableCheckpoint = false;
+        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(stableCheckpoint);
     }
 
     log() << "Truncating the oplog at " << fixUpInfo.commonPoint.toString() << " ("
@@ -1437,6 +1467,28 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         }
         // TODO: fatal error if this throws?
         oplogCollection->cappedTruncateAfter(opCtx, fixUpInfo.commonPointOurDiskloc, false);
+    }
+
+    if (!serverGlobalParams.enableMajorityReadConcern) {
+        // If the server crashes and restarts before a stable checkpoint is taken, it will restart
+        // from the unstable checkpoint taken at the end of rollback. To ensure replication recovery
+        // replays all oplog after the common point, we set the appliedThrough to the common point.
+        // This is done using an untimestamped write, since timestamping the write with the common
+        // point TS would be incorrect (since this is equal to the stable timestamp), and this write
+        // will be included in the unstable checkpoint regardless of its timestamp.
+        log() << "Setting appliedThrough to the common point: " << fixUpInfo.commonPoint;
+        const bool setTimestamp = false;
+        replicationProcess->getConsistencyMarkers()->setAppliedThrough(
+            opCtx, fixUpInfo.commonPoint, setTimestamp);
+
+        // Take an unstable checkpoint to ensure the appliedThrough write is persisted to disk.
+        log() << "Waiting for an unstable checkpoint";
+        const bool stableCheckpoint = false;
+        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(stableCheckpoint);
+
+        // Ensure that appliedThrough is unset in the next stable checkpoint.
+        log() << "Clearing appliedThrough";
+        replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, Timestamp());
     }
 
     Status status = AuthorizationManager::get(opCtx->getServiceContext())->initialize(opCtx);

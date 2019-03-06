@@ -243,7 +243,8 @@ void ReplicationConsistencyMarkersImpl::setMinValidToAtLeast(OperationContext* o
 }
 
 void ReplicationConsistencyMarkersImpl::setAppliedThrough(OperationContext* opCtx,
-                                                          const OpTime& optime) {
+                                                          const OpTime& optime,
+                                                          bool setTimestamp) {
     invariant(!optime.isNull());
     LOG(3) << "setting appliedThrough to: " << optime.toString() << "(" << optime.toBSON() << ")";
 
@@ -251,7 +252,9 @@ void ReplicationConsistencyMarkersImpl::setAppliedThrough(OperationContext* opCt
     // in checkpoints that contain all writes through this timestamp since it indicates the top of
     // the oplog.
     TimestampedBSONObj update;
-    update.timestamp = optime.getTimestamp();
+    if (setTimestamp) {
+        update.timestamp = optime.getTimestamp();
+    }
     update.obj = BSON("$set" << BSON(MinValidDocument::kAppliedThroughFieldName << optime));
 
     _updateMinValidDocument(opCtx, update);

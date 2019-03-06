@@ -3431,6 +3431,8 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_recalculateStableOpTime(Wit
     return stableOpTime;
 }
 
+MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
+
 void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     // Get the current stable optime.
     auto stableOpTime = _recalculateStableOpTime(lk);
@@ -3459,7 +3461,9 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
                 }
                 // Set the stable timestamp regardless of whether the majority commit point moved
                 // forward.
-                _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
+                if (!MONGO_FAIL_POINT(disableSnapshotting)) {
+                    _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
+                }
             }
         }
         _cleanupStableOpTimeCandidates(&_stableOpTimeCandidates, stableOpTime.get());
@@ -3691,8 +3695,6 @@ void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* op
 size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
     return _uncommittedSnapshotsSize.load();
 }
-
-MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
 
 bool ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
     const OpTime& newCommittedSnapshot) {

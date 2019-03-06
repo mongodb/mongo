@@ -72,7 +72,9 @@ public:
     void setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getOplogTruncateAfterPoint(OperationContext* opCtx) const override;
 
-    void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
+    void setAppliedThrough(OperationContext* opCtx,
+                           const OpTime& optime,
+                           bool setTimestamp = true) override;
     void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
 

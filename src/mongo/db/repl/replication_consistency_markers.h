@@ -165,9 +165,12 @@ public:
     /**
      * The applied through point is a persistent record of which oplog entries we've applied.
      * If we crash while applying a batch of oplog entries, this OpTime tells us where to start
-     * applying operations on startup.
+     * applying operations on startup. If 'setTimestamp' is true, the write will be timestamped with
+     * the timestamp from 'optime'.
      */
-    virtual void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) = 0;
+    virtual void setAppliedThrough(OperationContext* opCtx,
+                                   const OpTime& optime,
+                                   bool setTimestamp = true) = 0;
 
     /**
      * Unsets the applied through OpTime at the given 'writeTimestamp'.

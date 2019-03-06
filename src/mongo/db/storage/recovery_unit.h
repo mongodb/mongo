@@ -142,13 +142,13 @@ public:
     /**
      * Unlike `waitUntilDurable`, this method takes a stable checkpoint, making durable any writes
      * on unjournaled tables that are behind the current stable timestamp. If the storage engine
-     * is starting from an "unstable" checkpoint, this method call will turn into an unstable
-     * checkpoint.
+     * is starting from an "unstable" checkpoint or 'stableCheckpoint'=false, this method call will
+     * turn into an unstable checkpoint.
      *
      * This must not be called by a system taking user writes until after a stable timestamp is
      * passed to the storage engine.
      */
-    virtual bool waitUntilUnjournaledWritesDurable() {
+    virtual bool waitUntilUnjournaledWritesDurable(bool stableCheckpoint = true) {
         return waitUntilDurable();
     }
 
