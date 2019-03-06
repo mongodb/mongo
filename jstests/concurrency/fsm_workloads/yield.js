@@ -8,6 +8,15 @@
  */
 var $config = (function() {
 
+    // The explain used to build the assertion message in advanceCursor() is the only command not
+    // allowed in a transaction used in the query state function. With shard stepdowns, getMores
+    // aren't allowed outside a transaction, so if the explain runs when the suite is configured to
+    // run with transactions and shard stepdowns, the query state function will be retried outside a
+    // transaction, which fails the test. This can be avoided by not running explain with this
+    // configuration.
+    const skipExplainInErrorMessage =
+        TestData.runInsideTransaction && TestData.runningWithShardStepdowns;
+
     var data = {
         // Number of docs to insert at the beginning.
         nDocs: 200,
@@ -29,7 +38,9 @@ var $config = (function() {
                 doc = cursor.next();
                 assertAlways(verifier(doc, prevDoc),
                              'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
-                                 'Query plan: ' + tojson(cursor.explain()) + '\n' +
+                                 (skipExplainInErrorMessage ? '' : 'Query plan: ' +
+                                          tojson(cursor.explain())) +
+                                 '\n' +
                                  'Previous doc: ' + tojson(prevDoc) + '\n' +
                                  'This doc: ' + tojson(doc));
             }

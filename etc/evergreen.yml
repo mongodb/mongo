@@ -6358,6 +6358,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: concurrency_sharded_multi_stmt_txn_with_stepdowns
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_sharded_multi_stmt_txn_with_stepdowns --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: concurrency_simultaneous
   commands:
   - func: "do setup"
@@ -7945,6 +7954,7 @@ buildvariants:
   - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
   - name: concurrency_sharded_multi_stmt_txn
   - name: concurrency_sharded_multi_stmt_txn_with_balancer
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
@@ -9590,6 +9600,9 @@ buildvariants:
   - name: concurrency_sharded_multi_stmt_txn_with_balancer
     distros:
     - windows-64-vs2017-compile
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
+    distros:
+    - windows-64-vs2017-compile
   - name: concurrency_sharded_with_stepdowns
     distros:
     - windows-64-vs2017-compile
@@ -10082,6 +10095,7 @@ buildvariants:
   - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
   - name: concurrency_sharded_multi_stmt_txn
   - name: concurrency_sharded_multi_stmt_txn_with_balancer
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
@@ -10813,6 +10827,7 @@ buildvariants:
   - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
   - name: concurrency_sharded_multi_stmt_txn
   - name: concurrency_sharded_multi_stmt_txn_with_balancer
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
@@ -13087,6 +13102,9 @@ buildvariants:
   - name: concurrency_sharded_multi_stmt_txn_with_balancer
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
+    distros:
+    - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_sharded_with_stepdowns
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
@@ -13832,6 +13850,7 @@ buildvariants:
   - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
   - name: concurrency_sharded_multi_stmt_txn
   - name: concurrency_sharded_multi_stmt_txn_with_balancer
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
@@ -14047,6 +14066,7 @@ buildvariants:
   - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
   - name: concurrency_sharded_multi_stmt_txn
   - name: concurrency_sharded_multi_stmt_txn_with_balancer
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous

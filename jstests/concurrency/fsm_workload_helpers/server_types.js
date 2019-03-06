@@ -5,9 +5,8 @@
  *
  */
 function isMongos(db) {
-    var res = db.runCommand('ismaster');
-    assert.commandWorked(res);
-
+    // Run isMaster directly on the database's session's client to bypass any session machinery.
+    const res = assert.commandWorked(db.getSession().getClient().adminCommand('ismaster'));
     return 'isdbgrid' === res.msg;
 }
 
