@@ -165,6 +165,16 @@ public:
     boost::optional<repl::OpTime> nextSessionMigrationBatch(OperationContext* opCtx,
                                                             BSONArrayBuilder* arrBuilder);
 
+    /**
+     * Returns a notification that can be used to wait for new oplog that needs to be migrated.
+     * If the value in the notification returns true, it means that there are no more new batches
+     * that needs to be fetched because the migration has already entered the critical section or
+     * aborted.
+     *
+     * Returns nullptr if there is no session migration associated with this migration.
+     */
+    std::shared_ptr<Notification<bool>> getNotificationForNextSessionMigrationBatch();
+
 private:
     friend class DeleteNotificationStage;
     friend class LogOpForShardingHandler;
