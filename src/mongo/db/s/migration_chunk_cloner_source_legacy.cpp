@@ -292,8 +292,14 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
 StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationContext* opCtx) {
     invariant(_state == kCloning);
     invariant(!opCtx->lockState()->isLocked());
+
+    if (_sessionCatalogSource) {
+        _sessionCatalogSource->onCommitCloneStarted();
+    }
+
     auto responseStatus =
         _callRecipient(createRequestWithSessionId(kRecvChunkCommit, _args.getNss(), _sessionId));
+
     if (responseStatus.isOK()) {
         _cleanup(opCtx);
 
@@ -312,6 +318,10 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationConte
 
 void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
+
+    if (_sessionCatalogSource) {
+        _sessionCatalogSource->onCloneCleanup();
+    }
 
     switch (_state) {
         case kDone:
@@ -786,6 +796,15 @@ boost::optional<repl::OpTime> MigrationChunkClonerSourceLegacy::nextSessionMigra
     }
 
     return boost::make_optional(opTimeToWaitIfWaitingForMajority);
+}
+
+std::shared_ptr<Notification<bool>>
+MigrationChunkClonerSourceLegacy::getNotificationForNextSessionMigrationBatch() {
+    if (!_sessionCatalogSource) {
+        return nullptr;
+    }
+
+    return _sessionCatalogSource->getNotificationForNewOplog();
 }
 
 }  // namespace mongo

@@ -54,6 +54,7 @@ namespace mongo {
 namespace {
 
 const auto kOplogField = "oplog";
+const auto kWaitsForNewOplogField = "waitsForNewOplog";
 const WriteConcernOptions kMajorityWC(WriteConcernOptions::kMajority,
                                       WriteConcernOptions::SyncMode::UNSET,
                                       Milliseconds(0));
@@ -419,6 +420,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
 
             nextBatch = getNextSessionOplogBatch(opCtx, _fromShard, _migrationSessionId);
             oplogArray = BSONArray{nextBatch[kOplogField].Obj()};
+            const auto donorWaitsForNewOplog = nextBatch[kWaitsForNewOplogField].trueValue();
 
             if (oplogArray.isEmpty()) {
                 {
@@ -451,10 +453,12 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                     }
                 }
 
-                if (lastOpTimeWaited == lastResult.oplogTime) {
+                // TODO: SERVER-40187 Completely remove after v4.2. donorWaitsForNewOplog is a
+                // 'feature flag' indicating that the donor does block until there are new oplog
+                // to return so we don't need to sleep here.
+                if (!donorWaitsForNewOplog && lastOpTimeWaited == lastResult.oplogTime) {
                     // We got an empty result at least twice in a row from the source shard so space
-                    // it
-                    // out a little bit so we don't hammer the shard
+                    // it out a little bit so we don't hammer the shard
                     opCtx->sleepFor(Milliseconds(200));
                 }
 
