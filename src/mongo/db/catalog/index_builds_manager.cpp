@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_timestamp_helper.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -194,10 +195,12 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     return std::make_pair(numRecords, dataSize);
 }
 
-Status IndexBuildsManager::drainBackgroundWrites(OperationContext* opCtx, const UUID& buildUUID) {
+Status IndexBuildsManager::drainBackgroundWrites(OperationContext* opCtx,
+                                                 const UUID& buildUUID,
+                                                 RecoveryUnit::ReadSource readSource) {
     auto builder = _getBuilder(buildUUID);
 
-    return builder->drainBackgroundWrites(opCtx);
+    return builder->drainBackgroundWrites(opCtx, readSource);
 }
 
 Status IndexBuildsManager::finishBuildingPhase(const UUID& buildUUID) {
@@ -224,20 +227,25 @@ Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
                                             MultiIndexBlock::OnCommitFn onCommitFn) {
     auto builder = _getBuilder(buildUUID);
 
-    return writeConflictRetry(opCtx,
-                              "IndexBuildsManager::commitIndexBuild",
-                              nss.ns(),
-                              [builder, opCtx, collection, &onCreateEachFn, &onCommitFn] {
-                                  WriteUnitOfWork wunit(opCtx);
-                                  auto status = builder->commit(
-                                      opCtx, collection, onCreateEachFn, onCommitFn);
-                                  if (!status.isOK()) {
-                                      return status;
-                                  }
+    return writeConflictRetry(
+        opCtx,
+        "IndexBuildsManager::commitIndexBuild",
+        nss.ns(),
+        [builder, opCtx, collection, nss, &onCreateEachFn, &onCommitFn] {
+            WriteUnitOfWork wunit(opCtx);
+            auto status = builder->commit(opCtx, collection, onCreateEachFn, onCommitFn);
+            if (!status.isOK()) {
+                return status;
+            }
 
-                                  wunit.commit();
-                                  return Status::OK();
-                              });
+            // Eventually, we will obtain the timestamp for completing the index build from the
+            // commitIndexBuild oplog entry.
+            // The current logic for timestamping index completion is consistent with the
+            // IndexBuilder. See SERVER-38986 and SERVER-34896.
+            IndexTimestampHelper::setGhostCommitTimestampForCatalogWrite(opCtx, nss);
+            wunit.commit();
+            return Status::OK();
+        });
 }
 
 bool IndexBuildsManager::abortIndexBuild(const UUID& buildUUID, const std::string& reason) {

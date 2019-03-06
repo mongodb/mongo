@@ -650,27 +650,34 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         return it->second;
     }();
 
+    auto status = [&]() {
+        try {
+            _runIndexBuildInner(opCtx, replState);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+        return Status::OK();
+    }();
+
+    // Ensure the index build is unregistered from the Coordinator and the Promise is set with
+    // the build's result so that callers are notified of the outcome.
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    _unregisterIndexBuild(lk, replState);
+
+    if (status.isOK()) {
+        replState->sharedPromise.emplaceValue(replState->stats);
+    } else {
+        replState->sharedPromise.setError(status);
+    }
+}
+
+void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
+                                                 std::shared_ptr<ReplIndexBuildState> replState) {
     // 'status' should always be set to something else before this function exits.
     Status status{ErrorCodes::InternalError,
                   "Uninitialized status value in IndexBuildsCoordinator"};
-
-    ON_BLOCK_EXIT([&] {
-        // Ensure the index build is unregistered from the Coordinator and the Promise is set with
-        // the build's result so that callers are notified of the outcome.
-
-        invariant(status.code() != ErrorCodes::InternalError, status.toString());
-
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-        _unregisterIndexBuild(lk, replState);
-
-        if (status.isOK()) {
-            replState->sharedPromise.emplaceValue(replState->stats);
-        } else {
-            replState->sharedPromise.setError(status);
-        }
-    });
-
     NamespaceString nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(replState->collectionUUID);
 
     invariant(!nss.isEmpty(),
@@ -692,10 +699,11 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
     try {
         _buildIndex(opCtx, collection, nss, replState, &dbLock);
         replState->stats.numIndexesAfter = _getNumIndexesTotal(opCtx, collection);
+        status = Status::OK();
     } catch (const DBException& ex) {
         status = ex.toStatus();
         logFailure(status, nss, replState);
-        return;
+        throw;
     }
 
     invariant(opCtx->lockState()->isDbLockedForMode(replState->dbName, MODE_X));
@@ -705,24 +713,27 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
         // replicate.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord->canAcceptWritesFor(opCtx, collection->ns())) {
-            status = removeIndexBuildEntry(opCtx, buildUUID);
-            if (!status.isOK()) {
-                logFailure(status, nss, replState);
-                return;
+            auto removeStatus = removeIndexBuildEntry(opCtx, replState->buildUUID);
+            if (!removeStatus.isOK()) {
+                logFailure(removeStatus, nss, replState);
+                uassertStatusOK(removeStatus);
+                MONGO_UNREACHABLE;
             }
         }
     }
 
     _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replState->buildUUID);
 
+    if (!status.isOK()) {
+        logFailure(status, nss, replState);
+        uassertStatusOK(status);
+        MONGO_UNREACHABLE;
+    }
+
     log() << "Index build completed successfully: " << replState->buildUUID << ": " << nss << " ( "
           << replState->collectionUUID << " ). Index specs built: " << replState->indexSpecs.size()
           << ". Indexes in catalog before build: " << replState->stats.numIndexesBefore
           << ". Indexes in catalog after build: " << replState->stats.numIndexesAfter;
-
-    status = Status::OK();
-
-    return;
 }
 
 void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
@@ -766,7 +777,10 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), nss.ns(), MODE_IS);
 
-        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(opCtx, replState->buildUUID));
+        // Read at a point in time so that the drain, which will timestamp writes at lastApplied,
+        // can never commit writes earlier than its read timestamp.
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kNoOverlap));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
@@ -779,7 +793,8 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
         Lock::CollectionLock colLock(opCtx->lockState(), nss.ns(), MODE_S);
 
-        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(opCtx, replState->buildUUID));
+        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+            opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
     }
 
     if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
@@ -821,7 +836,8 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
 
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the database.
-    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(opCtx, replState->buildUUID));
+    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+        opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
 
     // Index constraint checking phase.
     uassertStatusOK(

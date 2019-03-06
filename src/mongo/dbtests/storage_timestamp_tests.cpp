@@ -640,9 +640,11 @@ public:
 
         MultikeyPaths actualMultikeyPaths;
         if (!shouldBeMultikey) {
-            ASSERT_FALSE(catalog->isIndexMultikey(opCtx, indexName, &actualMultikeyPaths));
+            ASSERT_FALSE(catalog->isIndexMultikey(opCtx, indexName, &actualMultikeyPaths))
+                << "index " << indexName << " should not be multikey at timestamp " << ts;
         } else {
-            ASSERT(catalog->isIndexMultikey(opCtx, indexName, &actualMultikeyPaths));
+            ASSERT(catalog->isIndexMultikey(opCtx, indexName, &actualMultikeyPaths))
+                << "index " << indexName << " should be multikey at timestamp " << ts;
         }
 
         const bool match = (expectedMultikeyPaths == actualMultikeyPaths);

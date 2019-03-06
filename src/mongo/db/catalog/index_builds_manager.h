@@ -104,7 +104,9 @@ public:
      * Document inserts observed during the scanning/insertion phase of an index build are not
      * added but are instead stored in a temporary buffer until this function is invoked.
      */
-    Status drainBackgroundWrites(OperationContext* opCtx, const UUID& buildUUID);
+    Status drainBackgroundWrites(OperationContext* opCtx,
+                                 const UUID& buildUUID,
+                                 RecoveryUnit::ReadSource readSource);
 
     /**
      * Persists information in the index catalog entry to reflect the successful completion of the
