@@ -766,6 +766,15 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
     if (!status.isOK()) {
         logFailure(status, nss, replState);
+
+        // Failed index builds should abort secondary oplog application.
+        if (replSetAndNotPrimary) {
+            fassert(51101,
+                    status.withContext(str::stream() << "Index build: " << replState->buildUUID
+                                                     << "; Database: "
+                                                     << replState->dbName));
+        }
+
         uassertStatusOK(status);
         MONGO_UNREACHABLE;
     }
