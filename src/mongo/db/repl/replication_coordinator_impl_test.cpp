@@ -5998,6 +5998,58 @@ TEST_F(ReplCoordTest, NodeFailsVoteRequestIfItFailsToStoreLastVote) {
     ASSERT_EQUALS(lastVote.getCandidateIndex(), 0);
 }
 
+TEST_F(ReplCoordTest, NodeNodesNotGrantVoteIfInTerminalShutdown) {
+    // Set up a 2-node replica set config.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id"
+                                                  << 1))),
+                       HostAndPort("node1", 12345));
+    auto time = OpTimeWithTermOne(100, 1);
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->setMyLastAppliedOpTime(time);
+    getReplCoord()->setMyLastDurableOpTime(time);
+    simulateSuccessfulV1Election();
+
+    // Get our current term, as primary.
+    ASSERT(getReplCoord()->getMemberState().primary());
+    auto initTerm = getReplCoord()->getTerm();
+
+    auto opCtx = makeOperationContext();
+
+    ReplSetRequestVotesArgs args;
+    ASSERT_OK(args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
+                                                         << "mySet"
+                                                         << "term"
+                                                         << initTerm + 1  // term of new candidate.
+                                                         << "candidateIndex"
+                                                         << 1LL
+                                                         << "configVersion"
+                                                         << 2LL
+                                                         << "dryRun"
+                                                         << false
+                                                         << "lastCommittedOp"
+                                                         << time.asOpTime().toBSON())));
+    ReplSetRequestVotesResponse response;
+
+    getReplCoord()->enterTerminalShutdown();
+
+    auto r = getReplCoord()->processReplSetRequestVotes(opCtx.get(), args, &response);
+
+    ASSERT_NOT_OK(r);
+    ASSERT_EQUALS("In the process of shutting down", r.reason());
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, r.code());
+}
+
 // TODO(schwerin): Unit test election id updating
 }  // namespace
 }  // namespace repl

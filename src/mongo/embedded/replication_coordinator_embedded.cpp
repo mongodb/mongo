@@ -50,6 +50,8 @@ ReplicationCoordinatorEmbedded::~ReplicationCoordinatorEmbedded() = default;
 
 void ReplicationCoordinatorEmbedded::startup(OperationContext* opCtx) {}
 
+void ReplicationCoordinatorEmbedded::enterTerminalShutdown() {}
+
 void ReplicationCoordinatorEmbedded::shutdown(OperationContext* opCtx) {}
 
 const ReplSettings& ReplicationCoordinatorEmbedded::getSettings() const {

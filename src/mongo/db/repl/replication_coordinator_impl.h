@@ -104,6 +104,8 @@ public:
 
     virtual void startup(OperationContext* opCtx) override;
 
+    virtual void enterTerminalShutdown() override;
+
     virtual void shutdown(OperationContext* opCtx) override;
 
     virtual const ReplSettings& getSettings() const override;
@@ -1350,6 +1352,9 @@ private:
     // When we decide to step down due to hearing about a higher term, we remember the term we heard
     // here so we can update our term to match as part of finishing stepdown.
     boost::optional<long long> _pendingTermUpdateDuringStepDown;  // (M)
+
+    // If we're in terminal shutdown.  If true, we'll refuse to vote in elections.
+    bool _inTerminalShutdown = false;  // (M)
 };
 
 }  // namespace repl

@@ -114,6 +114,15 @@ public:
     virtual void startup(OperationContext* opCtx) = 0;
 
     /**
+     * Start terminal shutdown.  This causes the topology coordinator to refuse to vote in any
+     * further elections.  This should only be called from global shutdown after we've passed the
+     * point of no return.
+     *
+     * This should be called once we are sure to call shutdown().
+     */
+    virtual void enterTerminalShutdown() = 0;
+
+    /**
      * Does whatever cleanup is required to stop replication, including instructing the other
      * components of the replication system to shut down and stop any threads they are using,
      * blocking until all replication-related shutdown tasks are complete.
