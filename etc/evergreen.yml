@@ -3335,7 +3335,7 @@ tasks:
     - func: "build new tools"
     - func: "scons compile"
       vars:
-        targets: core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
+        targets: core tools integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
         task_compile_flags: >-
           --use-new-tools
           --build-mongoreplay="${build_mongoreplay}"
@@ -3380,7 +3380,6 @@ tasks:
           # before tarring them up
           if [ -x ${strip_path|/usr/bin/strip} ]; then
             cat build/integration_tests.txt | xargs ${strip_command|/usr/bin/strip}
-            ${strip_command|/usr/bin/strip} dbtest
             ${strip_command|/usr/bin/strip} mongobridge
             ${strip_command|/usr/bin/strip} wt
           fi
@@ -3430,7 +3429,6 @@ tasks:
           - "jstests/**"
           - "pytests/**"
           - "./test*"
-          - "./dbtest*"
           - "./mongobridge*"
           - "./mongoebench*"
           - "./mongoed*"
@@ -4611,9 +4609,6 @@ tasks:
         if [ "${is_patch}" != "true" ]; then
           burn_in_args="--checkEvergreen"
         fi
-        # Copy the dbtest executable from the src dir because burn_in_tests.py calls it to get the
-        # list of dbtest suites.
-        cp ../src/dbtest${exe} .
         pushd ../src
         ${activate_virtualenv}
         $python -m pip install -r etc/pip/evgtest-requirements.txt
