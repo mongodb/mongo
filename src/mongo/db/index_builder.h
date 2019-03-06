@@ -70,7 +70,7 @@ class OperationContext;
 class IndexBuilder : public BackgroundJob {
 public:
     /**
-     * Indicates whether or not to ignore indexing errors.
+     * Indicates whether or not to ignore indexing constraints.
      */
     enum class IndexConstraints { kEnforce, kRelax };
 

@@ -244,12 +244,10 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::startIndexRe
         indexCatalogStats.numIndexesBefore =
             _getNumIndexesTotal(opCtx, collection.get()) + indexNames.size();
 
-        status = _indexBuildsManager.setUpIndexBuild(opCtx,
-                                                     collection.get(),
-                                                     specs,
-                                                     buildUUID,
-                                                     MultiIndexBlock::kNoopOnInitFn,
-                                                     /*forRecovery=*/true);
+        IndexBuildsManager::SetupOptions options;
+        options.forRecovery = true;
+        status = _indexBuildsManager.setUpIndexBuild(
+            opCtx, collection.get(), specs, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
         if (!status.isOK()) {
             // An index build failure during recovery is fatal.
             logFailure(status, nss, replIndexBuildState);
@@ -611,25 +609,31 @@ IndexBuildsCoordinator::_registerAndSetUpIndexBuild(
         onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection);
     }
 
-    status = _indexBuildsManager.setUpIndexBuild(opCtx,
-                                                 collection,
-                                                 filteredSpecs,
-                                                 replIndexBuildState->buildUUID,
-                                                 onInitFn,
-                                                 /*forRecovery=*/false);
-    if (!status.isOK()) {
-        // Unregister the index build before setting the promise, so callers do not see the
-        // build
-        // again.
-        _unregisterIndexBuild(lk, replIndexBuildState);
+    IndexBuildsManager::SetupOptions options;
+    options.indexConstraints =
+        repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, nss)
+        ? IndexBuildsManager::IndexConstraints::kRelax
+        : IndexBuildsManager::IndexConstraints::kEnforce;
+    status = _indexBuildsManager.setUpIndexBuild(
+        opCtx, collection, filteredSpecs, replIndexBuildState->buildUUID, onInitFn, options);
 
-        // Set the promise in case another thread already joined the index build.
-        replIndexBuildState->sharedPromise.setError(status);
-
-        return status;
+    // Indexes are present in the catalog in an unfinished state. Return an uninitialized
+    // Future so that the caller will continue building the indexes by calling _runIndexBuild().
+    // The completion of the index build will be communicated via a Future obtained from
+    // 'replIndexBuildState->sharedPromise'.
+    if (status.isOK()) {
+        return boost::none;
     }
 
-    return boost::none;
+    _indexBuildsManager.tearDownIndexBuild(opCtx, collection, replIndexBuildState->buildUUID);
+
+    // Unregister the index build before setting the promise, so callers do not see the build again.
+    _unregisterIndexBuild(lk, replIndexBuildState);
+
+    // Set the promise in case another thread already joined the index build.
+    replIndexBuildState->sharedPromise.setError(status);
+
+    return status;
 }
 
 void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,

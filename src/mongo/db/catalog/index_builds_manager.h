@@ -56,6 +56,20 @@ class IndexBuildsManager {
     MONGO_DISALLOW_COPYING(IndexBuildsManager);
 
 public:
+    /**
+     * Indicates whether or not to ignore indexing constraints.
+     */
+    enum class IndexConstraints { kEnforce, kRelax };
+
+    /**
+     * Additional options for setUpIndexBuild. The default values are sufficient in most cases.
+     */
+    struct SetupOptions {
+        SetupOptions();
+        IndexConstraints indexConstraints = IndexConstraints::kEnforce;
+        bool forRecovery = false;
+    };
+
     IndexBuildsManager() = default;
     ~IndexBuildsManager();
 
@@ -68,7 +82,7 @@ public:
                            const std::vector<BSONObj>& specs,
                            const UUID& buildUUID,
                            OnInitFn onInit,
-                           bool forRecovery);
+                           SetupOptions options = {});
 
     /**
      * Recovers the index build from its persisted state and sets it up to run again.

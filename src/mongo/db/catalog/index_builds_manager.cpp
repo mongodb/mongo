@@ -69,6 +69,8 @@ std::string toSummary(const std::map<UUID, std::shared_ptr<MultiIndexBlock>>& bu
 
 }  // namespace
 
+IndexBuildsManager::SetupOptions::SetupOptions() = default;
+
 IndexBuildsManager::~IndexBuildsManager() {
     invariant(_builders.empty(),
               str::stream() << "Index builds still active: " << toSummary(_builders));
@@ -79,7 +81,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            const std::vector<BSONObj>& specs,
                                            const UUID& buildUUID,
                                            OnInitFn onInit,
-                                           bool forRecovery) {
+                                           SetupOptions options) {
     _registerIndexBuild(buildUUID);
 
     const auto& nss = collection->ns();
@@ -89,6 +91,13 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                             << " is not locked in exclusive mode.");
 
     auto builder = _getBuilder(buildUUID);
+
+    // Ignore uniqueness constraint violations when relaxed (on secondaries). Secondaries can
+    // complete index builds in the middle of batches, which creates the potential for finding
+    // duplicate key violations where there otherwise would be none at consistent states.
+    if (options.indexConstraints == IndexConstraints::kRelax) {
+        builder->ignoreUniqueConstraint();
+    }
 
     auto initResult = writeConflictRetry(opCtx,
                                          "IndexBuildsManager::setUpIndexBuild",
@@ -101,7 +110,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         return initResult.getStatus();
     }
 
-    if (forRecovery) {
+    if (options.forRecovery) {
         log() << "Index build initialized: " << buildUUID << ": " << nss
               << ": indexes: " << initResult.getValue().size();
     } else {
