@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,29 +27,29 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/timestamp_block.h"
+
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-/**
- * TimestampBlock is an raii type that sets a commit timestamp on the RecoveryUnit at construction
- * and clears it at destruction. RecoveryUnit::setTimestamp() should not be called while a
- * TimestampBlock is in scope.
- */
-class TimestampBlock {
-    MONGO_DISALLOW_COPYING(TimestampBlock);
+TimestampBlock::TimestampBlock(OperationContext* opCtx, Timestamp ts) : _opCtx(opCtx), _ts(ts) {
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot timestamp a write operation in read-only mode",
+            !storageGlobalParams.readOnly);
+    if (!_ts.isNull()) {
+        _opCtx->recoveryUnit()->setCommitTimestamp(_ts);
+    }
+}
 
-public:
-    TimestampBlock(OperationContext* opCtx, Timestamp ts);
-    ~TimestampBlock();
-
-private:
-    OperationContext* const _opCtx;
-    Timestamp _ts;
-};
+TimestampBlock::~TimestampBlock() {
+    if (!_ts.isNull()) {
+        _opCtx->recoveryUnit()->clearCommitTimestamp();
+    }
+}
 
 }  // namespace mongo

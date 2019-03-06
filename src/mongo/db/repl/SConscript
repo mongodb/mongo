@@ -27,6 +27,7 @@ env.Library(
         'dbcheck',
         'repl_coordinator_interface',
         'repl_settings',
+        'timestamp_block',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
@@ -94,6 +95,17 @@ env.CppUnitTest(
         'oplog_entry',
         'oplog_interface_local',
         'replmocks',
+    ],
+)
+
+env.Library(
+    target='timestamp_block',
+    source=[
+        'timestamp_block.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
 )
 
