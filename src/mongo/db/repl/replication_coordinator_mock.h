@@ -66,6 +66,8 @@ public:
 
     virtual void startup(OperationContext* opCtx);
 
+    virtual void enterTerminalShutdown();
+
     virtual void shutdown(OperationContext* opCtx);
 
     virtual void appendDiagnosticBSON(BSONObjBuilder* bob) override {}

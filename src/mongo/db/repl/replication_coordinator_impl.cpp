@@ -803,6 +803,11 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
     }
 }
 
+void ReplicationCoordinatorImpl::enterTerminalShutdown() {
+    stdx::lock_guard lk(_mutex);
+    _inTerminalShutdown = true;
+}
+
 void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
     // Shutdown must:
     // * prevent new threads from blocking in awaitReplication
@@ -3505,6 +3510,13 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        // We should only enter terminal shutdown from global terminal exit.  In that case, rather
+        // than voting in a term we don't plan to stay alive in, refuse to vote.
+        if (_inTerminalShutdown) {
+            return Status(ErrorCodes::ShutdownInProgress, "In the process of shutting down");
+        }
+
         _topCoord->processReplSetRequestVotes(args, response);
     }
 

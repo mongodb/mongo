@@ -47,6 +47,8 @@ public:
 
     void startup(OperationContext* opCtx) override;
 
+    void enterTerminalShutdown() override;
+
     void shutdown(OperationContext* opCtx) override;
 
     // Returns the ServiceContext where this instance runs.

@@ -76,6 +76,10 @@ void ReplicationCoordinatorMock::startup(OperationContext* opCtx) {
     // TODO
 }
 
+void ReplicationCoordinatorMock::enterTerminalShutdown() {
+    // TODO
+}
+
 void ReplicationCoordinatorMock::shutdown(OperationContext*) {
     // TODO
 }

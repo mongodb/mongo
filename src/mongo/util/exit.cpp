@@ -52,13 +52,13 @@ stdx::condition_variable shutdownTasksComplete;
 boost::optional<ExitCode> shutdownExitCode;
 bool shutdownTasksInProgress = false;
 AtomicWord<unsigned> shutdownFlag;
-std::stack<stdx::function<void()>> shutdownTasks;
+std::stack<unique_function<void(const ShutdownTaskArgs&)>> shutdownTasks;
 stdx::thread::id shutdownTasksThreadId;
 
-void runTasks(decltype(shutdownTasks) tasks) noexcept {
+void runTasks(decltype(shutdownTasks) tasks, const ShutdownTaskArgs& shutdownArgs) noexcept {
     while (!tasks.empty()) {
         const auto& task = tasks.top();
-        task();
+        task(shutdownArgs);
         tasks.pop();
     }
 }
@@ -92,13 +92,13 @@ ExitCode waitForShutdown() {
     return shutdownExitCode.get();
 }
 
-void registerShutdownTask(stdx::function<void()> task) {
+void registerShutdownTask(unique_function<void(const ShutdownTaskArgs&)> task) {
     stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
     invariant(!globalInShutdownDeprecated());
     shutdownTasks.emplace(std::move(task));
 }
 
-void shutdown(ExitCode code) {
+void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
     decltype(shutdownTasks) localTasks;
 
     {
@@ -134,7 +134,7 @@ void shutdown(ExitCode code) {
         localTasks.swap(shutdownTasks);
     }
 
-    runTasks(std::move(localTasks));
+    runTasks(std::move(localTasks), shutdownArgs);
 
     {
         stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
@@ -146,7 +146,7 @@ void shutdown(ExitCode code) {
     }
 }
 
-void shutdownNoTerminate() {
+void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
     decltype(shutdownTasks) localTasks;
 
     {
@@ -162,7 +162,7 @@ void shutdownNoTerminate() {
         localTasks.swap(shutdownTasks);
     }
 
-    runTasks(std::move(localTasks));
+    runTasks(std::move(localTasks), shutdownArgs);
 
     {
         stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
