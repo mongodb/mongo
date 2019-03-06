@@ -1,7 +1,10 @@
+# TODO: Filter child chains by role (install bin/foo should not install lib/dep.debug)
 # TODO: Add test tag automatically for unit tests, etc.
 # TODO: Test tag still leaves things in the runtime component
-# TODO: Debug info locations should follow associated binary
+# TODO: But meta doesn't depend on test! Should it though?
 # TODO: How should debug info work for tests?
+# TODO: destdir vs prefix (what about --install-sandbox?)
+# TODO: Versioned libraries
 # TODO: library dependency chaining for windows dynamic builds, static dev packages
 # TODO: Injectible component dependencies (jscore -> resmoke, etc.)
 # TODO: Distfiles and equivalent for the dist target
@@ -10,7 +13,6 @@
 # TODO: Installing resmoke and configurations
 # TODO: package decomposition
 # TODO: Install/package target help text
-# TODO: destdir vs prefix (what about --install-sandbox?)
 # TODO: implement sdk_headers
 # TODO: Namedtuple for alias_map
 
@@ -26,6 +28,10 @@ def exists(env):
 
 def generate(env):
 
+    env['INSTALLDIR_BINDIR'] = '$INSTALL_DIR/bin'
+    env['INSTALLDIR_LIBDIR'] = '$INSTALL_DIR/lib'
+    env['INSTALLDIR_INCLUDEDIR'] = '$INSTALL_DIR/include'
+
     role_tags = set([
         'common',
         'debug',
@@ -35,35 +41,92 @@ def generate(env):
     ])
 
     role_dependencies = {
-        'dev' : ['runtime', 'common'],
-        'meta' : ['dev', 'runtime', 'common', 'debug'],
-        'runtime' : ['common'],
+        'dev' : [
+            'runtime',
+            'common',
+        ],
+        'meta' : [
+            'dev',
+            'runtime',
+            'common',
+            'debug',
+        ],
+        'runtime' : [
+            'common',
+        ],
     }
 
     env.Tool('install')
 
     # TODO: These probably need to be patterns of some sort, not just suffixes.
+    # TODO: The runtime libs should be in runtime, the dev symlinks in dev
     suffix_map = {
-        env.subst('$PROGSUFFIX') : ('bin', ['runtime',]),
-        env.subst('$LIBSUFFIX') : ('lib', ['dev',]),
+        env.subst('$PROGSUFFIX') : (
+            '$INSTALLDIR_BINDIR', [
+                'runtime',
+            ]
+        ),
 
-        # TODO: Debug symbols?
-        '.dll' :   ('bin', ['runtime',]),
-        # TODO: The runtime libs should be in runtime, the dev symlinks in dev
-        '.dylib' : ('lib', ['runtime', 'dev',]),
-        '.so' :    ('lib', ['runtime', 'dev',]),
-        # TODO: These 'lib' answers are incorrect. The location for the debug info
-        # should be the same as the target itself, which might be bin or lib. We need
-        # a solution for that. When that is fixed, add 'Program' back into the list
-        # of separate debug targets in the separate_debug.py tool.
-        '.dSYM': ('lib',),
-        '.debug': ('lib',),
-        '.lib': ('lib',),
+        env.subst('$LIBSUFFIX') : (
+            '$INSTALLDIR_LIBDIR', [
+                'dev',
+            ]
+        ),
+
+        '.dll' : (
+            '$INSTALLDIR_BINDIR', [
+                'runtime',
+            ]
+        ),
+
+        '.dylib' : (
+            '$INSTALLDIR_LIBDIR', [
+                'runtime',
+                'dev',
+            ]
+        ),
+
+        '.so' : (
+            '$INSTALLDIR_LIBDIR', [
+                'runtime',
+                'dev',
+            ]
+        ),
+
+        '.debug' : (
+            '$INSTALLDIR_DEBUGDIR', [
+                'debug',
+            ]
+        ),
+
+        '.dSYM' : (
+            '$INSTALLDIR_LIBDIR', [
+                'runtime'
+            ]
+        ),
+
+        '.lib' : (
+            '$INSTALLDIR_LIBDIR', [
+                'runtime'
+            ]
+        ),
     }
+
+    def _aib_debugdir(source, target, env, for_signature):
+        for s in source:
+            # TODO: Dry this with auto_install_emitter
+            origin = getattr(s.attributes, "debug_file_for", None)
+            oentry = env.Entry(origin)
+            osuf = oentry.get_suffix()
+            return suffix_map.get(osuf)[0]
+
+    env['INSTALLDIR_DEBUGDIR'] = _aib_debugdir
 
     alias_map = defaultdict(dict)
 
     def auto_install(env, target, source, **kwargs):
+
+        target = env.Dir(env.subst(target, source=source))
 
         # We want to make sure that the executor information stays
         # persisted for this node after it is built so that we can
@@ -72,13 +135,8 @@ def generate(env):
         for s in source:
             s.attributes.keep_targetinfo = 1
 
-        prefixDir = env.Dir('$INSTALL_DIR')
-
-        actions = []
-        targetDir = prefixDir.Dir(target)
-
         actions = SCons.Script.Install(
-            target=targetDir,
+            target=target,
             source=source,
         )
 

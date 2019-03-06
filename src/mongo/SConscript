@@ -802,7 +802,7 @@ if not hygienic:
     compass_script_installer = env.Install("$INSTALL_DIR/bin", compass_installer)
 else:
     compass_script_installer = env.AutoInstall(
-        'bin',
+        '$INSTALLDIR_BINDIR',
         source=[
             compass_installer,
         ],

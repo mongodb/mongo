@@ -10,14 +10,15 @@ env = env.Clone()
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'share/doc/mongo_embedded',
+        '$INSTALL_DIR/share/doc/mongo_embedded',
         source=[
             '#/LICENSE-Community.txt',
             '#/distsrc/THIRD-PARTY-NOTICES',
             '../LICENSE-Embedded.txt',
         ],
         INSTALL_ALIAS=[
-            'embedded-dev',
+            'embedded',
+            'common',
         ],
     )
 
@@ -80,7 +81,7 @@ mongoEmbeddedTargets = mongoEmbeddedEnv.Library(
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'include/mongo_embedded/v1/mongo_embedded',
+        '$INSTALL_DIR/include/mongo_embedded/v1/mongo_embedded',
         source=['mongo_embedded.h'],
         INSTALL_ALIAS=[
             'embedded',

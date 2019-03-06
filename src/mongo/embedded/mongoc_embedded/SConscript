@@ -12,13 +12,14 @@ if not env['MONGO_HAVE_LIBMONGOC']:
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'share/doc/mongoc_embedded',
+        '$INSTALL_DIR/share/doc/mongoc_embedded',
         source=[
             '#/LICENSE-Community.txt',
             '../LICENSE-Embedded.txt',
         ],
         INSTALL_ALIAS=[
-            'embedded-dev',
+            'embedded',
+            'common',
         ],
     )
 
@@ -79,7 +80,7 @@ mongocEmbeddedTargets = mongocEmbeddedEnv.Library(
 
 if get_option('install-mode') == 'hygienic':
     env.AutoInstall(
-        'include/mongoc_embedded/v1/mongoc_embedded',
+        '$INSTALL_DIR/include/mongoc_embedded/v1/mongoc_embedded',
         source=['mongoc_embedded.h'],
         INSTALL_ALIAS=[
             'embedded',
