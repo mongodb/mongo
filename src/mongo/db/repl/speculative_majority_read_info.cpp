@@ -60,16 +60,16 @@ bool SpeculativeMajorityReadInfo::isSpeculativeRead() const {
     return _isSpeculativeRead;
 }
 
-void SpeculativeMajorityReadInfo::setSpeculativeReadOpTimeForward(const OpTime& opTime) {
+void SpeculativeMajorityReadInfo::setSpeculativeReadTimestampForward(const Timestamp& ts) {
     invariant(_isSpeculativeRead);
-    // Set the optime initially if needed. Update it only if the given optime is greater.
-    _speculativeReadOpTime =
-        _speculativeReadOpTime ? std::max(*_speculativeReadOpTime, opTime) : opTime;
+    // Set the timestamp initially if needed. Update it only if the given timestamp is greater.
+    _speculativeReadTimestamp =
+        _speculativeReadTimestamp ? std::max(*_speculativeReadTimestamp, ts) : ts;
 }
 
-boost::optional<OpTime> SpeculativeMajorityReadInfo::getSpeculativeReadOpTime() {
+boost::optional<Timestamp> SpeculativeMajorityReadInfo::getSpeculativeReadTimestamp() {
     invariant(_isSpeculativeRead);
-    return _speculativeReadOpTime;
+    return _speculativeReadTimestamp;
 }
 
 }  // namespace repl

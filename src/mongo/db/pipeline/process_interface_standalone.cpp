@@ -431,15 +431,15 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
                                 << "]");
     }
 
-    // Set the speculative read optime appropriately after we do a document lookup locally. We don't
-    // know exactly what optime the document reflects, we so set the speculative read optime to the
-    // most recent applied optime.
+    // Set the speculative read timestamp appropriately after we do a document lookup locally. We
+    // don't know exactly what timestamp the document reflects, we so set the speculative read
+    // timestamp to the most recent applied timestamp.
     repl::SpeculativeMajorityReadInfo& speculativeMajorityReadInfo =
         repl::SpeculativeMajorityReadInfo::get(expCtx->opCtx);
     if (speculativeMajorityReadInfo.isSpeculativeRead()) {
         auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-        speculativeMajorityReadInfo.setSpeculativeReadOpTimeForward(
-            replCoord->getMyLastAppliedOpTime());
+        speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(
+            replCoord->getMyLastAppliedOpTime().getTimestamp());
     }
 
     return lookedUpDocument;

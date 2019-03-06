@@ -1443,15 +1443,13 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTimeForReadDeprecated(
     return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime);
 }
 
-Status ReplicationCoordinatorImpl::awaitOpTimeCommitted(OperationContext* opCtx, OpTime opTime) {
-    // The optime given to this method is required to be an optime in this node's local oplog.
-    // Furthermore, the execution of this method must not span rollbacks, so the oplog at the start
-    // of the waiting period will be a prefix of the oplog at the end of the waiting period. This
-    // makes it valid to compare optimes from this node's oplog based on their timestamps alone, and
-    // so allows this method to determine if an optime is committed by comparing its timestamp to
-    // the timestamp of the last committed optime.
+Status ReplicationCoordinatorImpl::awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) {
+    // Using an uninitialized term means that this optime will be compared to other optimes only by
+    // its timestamp. This allows us to wait only on the timestamp of the commit point surpassing
+    // this timestamp, without worrying about terms.
+    OpTime waitOpTime(ts, OpTime::kUninitializedTerm);
     const bool isMajorityCommittedRead = true;
-    return _waitUntilOpTime(opCtx, isMajorityCommittedRead, opTime);
+    return _waitUntilOpTime(opCtx, isMajorityCommittedRead, waitOpTime);
 }
 
 OpTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTime_inlock() const {

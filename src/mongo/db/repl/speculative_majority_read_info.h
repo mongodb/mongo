@@ -33,7 +33,6 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
-#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 
@@ -47,22 +46,23 @@ namespace repl {
  * Instead, they read from a local (uncommitted) snapshot of data, and, at the end of command
  * execution, block to ensure that any results returned are majority committed.
  *
- * For the sake of correctness, it would be fine to always wait on the most recent lastApplied
- * optime after a command completes, but, as an optimization, we also allow commands to choose what
- * optime to wait on. For example, if a command generates a batch of data and it knows that the data
- * doesn't reflect any operations newer than optime T, it can set the "speculative majority optime"
- * to T. If T is much less than lastApplied, this can save unnecessary waiting.
+ * We allow commands to optionally choose what timestamp to wait on. For example, if a command
+ * generates a batch of data and it knows that the data doesn't reflect any operations newer than
+ * timestamp T, it can set the "speculative majority timestamp" to T. This is an optimization that
+ * can save unnecessary waiting.
  *
  * The basic theory of operation of this class is that once an operation has been marked as a
  * speculative majority read, it cannot be "unmarked" as such. Trying to mark it as speculative
- * again should have no effect. Once it has been marked as "speculative", a specific optime to wait
- * on can also be optionally provided. This read optime can be set multiple times, but every new
- * optime must be >= the previously set optime. This ensures that clients of this class utilize it
- * sensibly. The goal is to avoid a later caller invalidating the optime set by an earlier caller,
- * by setting the optime backwards. By enforcing the monotonicity of optimes, we ensure that waiting
- * on any read optime of this class will always guarantee that previously set optimes are also
- * majority committed. If no optime is ever set, then a speculative read operation should wait on
- * the most recent, system-wide lastApplied optime after completing.
+ * again should have no effect. Once it has been marked as "speculative", a specific timestamp to
+ * wait on can also be optionally provided. This read timestamp can be set multiple times, but every
+ * new timestamp must be >= the previously set timestamp. This ensures that clients of this class
+ * utilize it sensibly. The goal is to avoid a later caller invalidating the timestamp set by an
+ * earlier caller, by setting the timestamp backwards. By enforcing the monotonicity of timestamps,
+ * we ensure that waiting on any read timestamp of this class will always guarantee that previously
+ * set timestamps are also majority committed. If no timestamp is ever set, then it is up to the
+ * user of this structure to determine what timestamp to wait on so that data read is guaranteed to
+ * be majority committed. This, for example, could be the timestamp of the read source chosen by the
+ * storage engine.
  */
 class SpeculativeMajorityReadInfo {
 public:
@@ -81,33 +81,32 @@ public:
     bool isSpeculativeRead() const;
 
     /**
-     * Set a speculative majority optime for this operation to wait on.
+     * Set a speculative majority timestamp for this operation to wait on.
      *
      * May only be called if this operation has already been marked as a speculative read.
      *
-     * If no read optime has been set already, then this will set the speculative read optime to the
-     * optime given. If a speculative read optime has already been set at T, then any subsequent
-     * call to this method with an optime T' only updates the speculative read optime if T' > T.
-     * This guarantees that speculative read optimes advance monotonically.
+     * If no read timestamp has been set already, then this will set the speculative read timestamp
+     * to the timestamp given. If a speculative read timestamp has already been set at T, then any
+     * subsequent call to this method with a timestamp T' only updates the speculative read
+     * timestamp if T' > T. This guarantees that speculative read timestamps advance monotonically.
      */
-    void setSpeculativeReadOpTimeForward(const OpTime& opTime);
+    void setSpeculativeReadTimestampForward(const Timestamp& ts);
 
     /**
-     * Get the speculative read optime for this operation, if one exists.
+     * Get the speculative read timestamp for this operation, if one exists.
      *
      * Only valid to call if this operation is a speculative read. Returns boost::none if there is
-     * no provided optime to wait on. If this returns boost::none, indicates that this speculative
-     * read operation should wait on lastApplied.
+     * no provided timestamp to wait on.
      */
-    boost::optional<OpTime> getSpeculativeReadOpTime();
+    boost::optional<Timestamp> getSpeculativeReadTimestamp();
 
 private:
     // Is this operation a speculative majority read.
     bool _isSpeculativeRead = false;
 
-    // An optional optime to wait on to become majority committed, if we are doing a speculative
+    // An optional timestamp to wait on to become majority committed, if we are doing a speculative
     // majority read. This can only be non-empty if this operation is a speculative read.
-    boost::optional<OpTime> _speculativeReadOpTime;
+    boost::optional<Timestamp> _speculativeReadTimestamp;
 };
 
 }  // namespace repl

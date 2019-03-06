@@ -390,38 +390,38 @@ MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
 (OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo)->Status {
     invariant(speculativeReadInfo.isSpeculativeRead());
 
-    // Select the optime to wait on. A command may have selected a specific optime to wait on. If
-    // not, then we just wait on the most recent optime written on this node i.e. lastApplied.
+    // Select the timestamp to wait on. A command may have selected a specific timestamp to wait on.
+    // If not, then we just wait on the most recent timestamp written on this node i.e. lastApplied.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    repl::OpTime waitOpTime;
-    auto lastApplied = replCoord->getMyLastAppliedOpTime();
-    auto speculativeReadOpTime = speculativeReadInfo.getSpeculativeReadOpTime();
-    if (speculativeReadOpTime) {
-        // The optime provided must not be greater than the current lastApplied.
-        invariant(*speculativeReadOpTime <= lastApplied);
-        waitOpTime = *speculativeReadOpTime;
+    Timestamp waitTs;
+    auto lastAppliedTs = replCoord->getMyLastAppliedOpTime().getTimestamp();
+    auto speculativeReadTimestamp = speculativeReadInfo.getSpeculativeReadTimestamp();
+    if (speculativeReadTimestamp) {
+        // The timestamp provided must not be greater than the current lastApplied.
+        invariant(*speculativeReadTimestamp <= lastAppliedTs);
+        waitTs = *speculativeReadTimestamp;
     } else {
-        waitOpTime = lastApplied;
+        waitTs = lastAppliedTs;
     }
 
     // Block to make sure returned data is majority committed.
-    LOG(1) << "Servicing speculative majority read, waiting for optime " << waitOpTime
+    LOG(1) << "Servicing speculative majority read, waiting for timestamp " << waitTs
            << " to become committed, current commit point: " << replCoord->getLastCommittedOpTime();
 
     if (!opCtx->hasDeadline()) {
-        // This hard-coded value represents the maximum time we are willing to wait for an optime to
-        // majority commit when doing a speculative majority read if no maxTimeMS value has been set
-        // for the command. We make this value rather conservative. This exists primarily to address
-        // the fact that getMore commands do not respect maxTimeMS properly. In this case, we still
-        // want speculative majority reads to time out after some period if an optime cannot
-        // majority commit.
+        // This hard-coded value represents the maximum time we are willing to wait for a timestamp
+        // to majority commit when doing a speculative majority read if no maxTimeMS value has been
+        // set for the command. We make this value rather conservative. This exists primarily to
+        // address the fact that getMore commands do not respect maxTimeMS properly. In this case,
+        // we still want speculative majority reads to time out after some period if a timestamp
+        // cannot majority commit.
         auto timeout = Seconds(15);
         opCtx->setDeadlineAfterNowBy(timeout, ErrorCodes::MaxTimeMSExpired);
     }
     Timer t;
-    auto waitStatus = replCoord->awaitOpTimeCommitted(opCtx, waitOpTime);
+    auto waitStatus = replCoord->awaitTimestampCommitted(opCtx, waitTs);
     if (waitStatus.isOK()) {
-        LOG(1) << "Optime " << waitOpTime << " became majority committed, waited " << t.millis()
+        LOG(1) << "Timestamp " << waitTs << " became majority committed, waited " << t.millis()
                << "ms for speculative majority read to be satisfied.";
     }
     return waitStatus;

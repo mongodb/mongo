@@ -86,9 +86,10 @@ private:
     BSONObj _validateAndConvertToBSON(const Document& event) const;
 
     /**
-     * Set the speculative majority read optime if we have scanned up to a certain oplog timestamp.
+     * Set the speculative majority read timestamp if we have scanned up to a certain oplog
+     * timestamp.
      */
-    void _setSpeculativeReadOpTime();
+    void _setSpeculativeReadTimestamp();
 
     Timestamp _latestOplogTimestamp;
     BSONObj _postBatchResumeToken;
