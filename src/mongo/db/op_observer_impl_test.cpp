@@ -1414,7 +1414,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
                                  << "w"),
                       oplogEntries[3].getObject());
     ASSERT_FALSE(oplogEntries[3].getObject2());
-    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepare" << false),
+    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepared" << false),
                       oplogEntries[4].getObject());
 }
 
@@ -1488,7 +1488,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
                       oplogEntries[1].getObject());
     ASSERT_TRUE(oplogEntries[1].getObject2());
     ASSERT_BSONOBJ_EQ(*oplogEntries[1].getObject2(), BSON("_id" << 1));
-    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepare" << false),
+    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepared" << false),
                       oplogEntries[2].getObject());
 }
 
@@ -1547,7 +1547,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
     ASSERT_EQ(uuid2, *oplogEntries[1].getUuid());
     ASSERT_BSONOBJ_EQ(oplogEntries[1].getObject(), BSON("_id" << 1));
     ASSERT_FALSE(oplogEntries[1].getObject2());
-    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepare" << false),
+    ASSERT_BSONOBJ_EQ(BSON("commitTransaction" << 1 << "prepared" << false),
                       oplogEntries[2].getObject());
 }
 

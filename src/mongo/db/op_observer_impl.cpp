@@ -1203,7 +1203,7 @@ repl::OpTime logCommitForUnpreparedTransaction(OperationContext* opCtx,
     sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
     oplogLink.prevOpTime = prevOpTime;
-    cmdObj.setPrepare(false);
+    cmdObj.setPrepared(false);
 
     const auto oplogOpTime = logOperation(opCtx,
                                           "c",

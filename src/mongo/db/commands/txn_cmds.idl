@@ -65,7 +65,7 @@ structs:
                 description: "Specifies the timestamp at which the multi-document transaction should
                               be committed.  Required for prepared transactions, not permitted for
                               unprepared ones."
-            prepare:
+            prepared:
                 type: bool
                 optional: true
                 description: "Set to false for a commit for an unprepared transaction.  Implicit
