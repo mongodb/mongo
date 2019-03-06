@@ -403,24 +403,9 @@ public:
                 lineOff++;
             meminfo = meminfo.substr(lineOff);
 
-            unsigned long long systemMemKB = 0;
-            if (mongo::parseNumberFromString(meminfo, &systemMemKB).isOK()) {
-                unsigned long long systemMemBytes = systemMemKB * 1024;  // convert from kB to bytes
-
-                /*
-                 * If memory is being limited by the applied control group and it's less
-                 * than the OS system memory (default cgroup limit is ulonglong max) let's
-                 * return the actual memory we'll have available to the process. 
-                 */
-                unsigned long long cgroupMemBytes = 0;
-                std::string cgmemlimit = readLineFromFile("/sys/fs/cgroup/memory/memory.limit_in_bytes"); 
-                if (!cgmemlimit.empty() && mongo::parseNumberFromString(cgmemlimit, &cgroupMemBytes).isOK() && cgroupMemBytes < systemMemBytes) {
-                    log() << "cgroup memory limit of " << cgroupMemBytes << " bytes detected -- using this as the applicable memory limit";
-                    return cgroupMemBytes;
-                }
-
-                log() << "Total OS memory size of " << systemMemBytes << " bytes detected";
-                return systemMemBytes;
+            unsigned long long systemMem = 0;
+            if (mongo::parseNumberFromString(meminfo, &systemMem).isOK()) {
+                return systemMem * 1024;  // convert from kB to bytes
             } else
                 log() << "Unable to collect system memory information";
         }
