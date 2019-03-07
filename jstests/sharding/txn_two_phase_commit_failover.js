@@ -28,7 +28,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     let lsid = {id: UUID()};
     let txnNumber = 0;
 
-    const runTest = function(sameNodeStepsUpAfterFailover, overrideCoordinatorToBeConfigServer) {
+    const runTest = function(sameNodeStepsUpAfterFailover) {
         let stepDownSecs;  // The amount of time the node has to wait before becoming primary again.
         let numCoordinatorNodes;
         if (sameNodeStepsUpAfterFailover) {
@@ -39,41 +39,14 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             stepDownSecs = 3;
         }
 
-        let st, coordinatorReplSetTest;
-        if (overrideCoordinatorToBeConfigServer) {
-            st = new ShardingTest({
-                shards: 3,                    // number of *regular shards*
-                config: numCoordinatorNodes,  // number of replica set *nodes* in *config shard*
-                causallyConsistent: true,
-                other: {
-                    mongosOptions: {
-                        // This failpoint is needed because it is not yet possible to step down a
-                        // node with a prepared transaction.
-                        setParameter: {
-                            "failpoint.sendCoordinateCommitToConfigServer": "{'mode': 'alwaysOn'}"
-                        },
-                        verbose: 3
-                    },
-                    configOptions: {
-                        // This failpoint is needed because of the other failpoint: the config
-                        // server will not have a local participant, so coordinateCommitTransaction
-                        // cannot fall back to recovering the decision from the local participant.
-                        setParameter: {"failpoint.doNotForgetCoordinator": "{'mode': 'alwaysOn'}"},
-                    }
-                }
-            });
+        let st = new ShardingTest({
+            shards: 3,
+            rs0: {nodes: numCoordinatorNodes},
+            causallyConsistent: true,
+            other: {mongosOptions: {verbose: 3}}
+        });
 
-            coordinatorReplSetTest = st.configRS;
-        } else {
-            st = new ShardingTest({
-                shards: 3,
-                rs0: {nodes: numCoordinatorNodes},
-                causallyConsistent: true,
-                other: {mongosOptions: {verbose: 3}}
-            });
-
-            coordinatorReplSetTest = st.rs0;
-        }
+        let coordinatorReplSetTest = st.rs0;
 
         let participant0 = st.shard0;
         let participant1 = st.shard1;
@@ -127,8 +100,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         const testCommitProtocol = function(
             makeAParticipantAbort, failpointData, expectAbortResponse) {
             jsTest.log("Testing commit protocol with sameNodeStepsUpAfterFailover: " +
-                       sameNodeStepsUpAfterFailover + ", overrideCoordinatorToBeConfigServer: " +
-                       overrideCoordinatorToBeConfigServer + ", makeAParticipantAbort: " +
+                       sameNodeStepsUpAfterFailover + ", makeAParticipantAbort: " +
                        makeAParticipantAbort + ", expectAbortResponse: " + expectAbortResponse +
                        ", and failpointData: " + tojson(failpointData));
 
@@ -139,14 +111,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             let coordPrimary = coordinatorReplSetTest.getPrimary();
 
             if (makeAParticipantAbort) {
-                // In order to test coordinator failover for a coordinator colocated with a
-                // participant, the participant colocated with the coordinator must fail to prepare,
-                // because prepare does not yet support failover.
-                let nodeToAbort = overrideCoordinatorToBeConfigServer ? participant2 : coordPrimary;
-
                 // Manually abort the transaction on one of the participants, so that the
                 // participant fails to prepare.
-                assert.commandWorked(nodeToAbort.adminCommand({
+                assert.commandWorked(participant2.adminCommand({
                     abortTransaction: 1,
                     lsid: lsid,
                     txnNumber: NumberLong(txnNumber),
@@ -170,14 +137,13 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
             // TODO(SERVER-39754): Rewrite this entire test as a unit-test instead
             var numTimesShouldBeHit = failpointData.numTimesShouldBeHit;
-            if (!overrideCoordinatorToBeConfigServer &&  // Coordinator is co-located with a
-                                                         // participant
-                (failpointData.failpoint == "hangWhileTargetingRemoteHost" &&
+            if ((failpointData.failpoint == "hangWhileTargetingLocalHost" &&
                  !failpointData.skip) &&  // We are testing the prepare phase
-                makeAParticipantAbort) {  // The local participant will vote abort
+                makeAParticipantAbort) {  // A remote participant will vote abort
                 // Wait for those two to be scheduled as well
-                numTimesShouldBeHit += 2;
+                numTimesShouldBeHit++;
             }
+
             waitForFailpoint("Hit " + failpointData.failpoint + " failpoint", numTimesShouldBeHit);
 
             // Induce the coordinator primary to step down.
@@ -216,18 +182,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         //
 
         failpointDataArr.forEach(function(failpointData) {
-            if (overrideCoordinatorToBeConfigServer) {
-                if (failpointData.failpoint == "hangWhileTargetingLocalHost") {
-                    // If the coordinator is overridden to be the config server, it will never
-                    // target itself, so don't test the target local path.
-                    return;
-                } else if (failpointData.failpoint == "hangBeforeDeletingCoordinatorDoc") {
-                    // If the coordinator is overridden to be the config server, it will never
-                    // delete the coordinator document, so skip this test.
-                    return;
-                }
-            }
-
             testCommitProtocol(true /* make a participant abort */,
                                failpointData,
                                true /* expect abort decision */);
@@ -237,57 +191,21 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // Run through all the failpoints when all participants respond to prepare with vote commit.
         //
 
-        // We only test two-phase commit (as opposed to two-phase abort) if the coordinator is
-        // overridden to be the config server, because prepare does not yet support failover.
-        if (overrideCoordinatorToBeConfigServer) {
-            failpointDataArr.forEach(function(failpointData) {
-                if (failpointData.failpoint == "hangWhileTargetingLocalHost") {
-                    // If the coordinator is overridden to be the config server, it will never
-                    // target itself, so don't test the target local path.
-                    return;
-                } else if (failpointData.failpoint == "hangBeforeDeletingCoordinatorDoc") {
-                    // If the coordinator is overridden to be the config server, it will never
-                    // delete the coordinator document, so skip this test.
-                    return;
-                }
-
-                // Note: If the coordinator fails over before making the participant list durable,
-                // the transaction will abort even if all participants could have committed. This is
-                // a property of the coordinator only, and would be true even if a participant's
-                // in-progress transaction could survive failover.
-                let expectAbort =
-                    (failpointData.failpoint == "hangBeforeWritingParticipantList") || false;
-                testCommitProtocol(
-                    false /* make a participant abort */, failpointData, expectAbort);
-            });
-        }
+        failpointDataArr.forEach(function(failpointData) {
+            // Note: If the coordinator fails over before making the participant list durable,
+            // the transaction will abort even if all participants could have committed. This is
+            // a property of the coordinator only, and would be true even if a participant's
+            // in-progress transaction could survive failover.
+            let expectAbort = (failpointData.failpoint == "hangBeforeWritingParticipantList") ||
+                (failpointData.failpoint == "hangWhileTargetingLocalHost" && !failpointData.skip) ||
+                false;
+            testCommitProtocol(false /* make a participant abort */, failpointData, expectAbort);
+        });
         st.stop();
     };
 
     const failpointDataArr = getCoordinatorFailpoints();
 
-    //
-    // Coordinator is co-located with a participant
-    //
-
     runTest(true /* same node always steps up after stepping down */, false);
     runTest(false /* same node always steps up after stepping down */, false);
-
-    //
-    // Override coordinator to be config server
-    //
-
-    // If the coordinator is overridden to be the config server, it will send a remote request
-    // rather than local request, so there is one additional remote request.
-    failpointDataArr.forEach(function(failpointData) {
-        if (failpointData.failpoint == "hangWhileTargetingRemoteHost") {
-            failpointData.numTimesShouldBeHit++;
-            if (failpointData.skip) {
-                failpointData.skip++;
-            }
-        }
-    });
-
-    runTest(true /* same node always steps up after stepping down */, true);
-    runTest(false /* same node always steps up after stepping down */, true);
 })();

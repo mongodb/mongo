@@ -5,6 +5,10 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
+// The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
+// test causes failovers on a shard, so the cached connection is not usable.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
 
@@ -15,29 +19,16 @@
     const collName = "foo";
     const ns = dbName + "." + collName;
 
-    let numCoordinatorNodes = 2;
     let st = new ShardingTest({
-        shards: 3,                    // number of *regular shards*
-        config: numCoordinatorNodes,  // number of replica set *nodes* in *config shard*
+        shards: 3,
+        rs0: {nodes: 2},
         causallyConsistent: true,
         other: {
-            mongosOptions: {
-                // This failpoint is needed because it is not yet possible to step down a node
-                // with a prepared transaction.
-                setParameter:
-                    {"failpoint.sendCoordinateCommitToConfigServer": "{'mode': 'alwaysOn'}"},
-                verbose: 3
-            },
-            configOptions: {
-                // This failpoint is needed because of the other failpoint: the config server
-                // will not have a local participant, so coordinateCommitTransaction cannot fall
-                // back to recovering the decision from the local participant.
-                setParameter: {"failpoint.doNotForgetCoordinator": "{'mode': 'alwaysOn'}"},
-            }
+            mongosOptions: {verbose: 3},
         }
     });
 
-    let coordinatorReplSetTest = st.configRS;
+    let coordinatorReplSetTest = st.rs0;
     let participant0 = st.shard0;
     let participant1 = st.shard1;
     let participant2 = st.shard2;
