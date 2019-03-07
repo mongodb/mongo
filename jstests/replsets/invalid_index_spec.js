@@ -46,15 +46,10 @@
     const exitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
     replTest.stop(secondary, undefined, {allowedExitCode: exitCode});
 
-    // During the transition from the old code path in IndexBuilder to IndexBuildsCoordinator, we
-    // will accept the fatal assertion code from either component.
-    const msgIndexBuilder = "Fatal Assertion 50769";
-    const msgIndexBuildsCoordinator = "Fatal assertion 34437";
-    const msgIndexError = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
+    const msg1 = "Fatal Assertion 50769";
+    const msg2 = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
 
-    assert((rawMongoProgramOutput().match(msgIndexBuilder) ||
-            rawMongoProgramOutput().match(msgIndexBuildsCoordinator)) &&
-               rawMongoProgramOutput().match(msgIndexError),
+    assert(rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2),
            "Replication should have aborted on invalid index specification");
 
     replTest.stopSet();
