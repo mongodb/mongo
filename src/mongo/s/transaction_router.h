@@ -315,7 +315,8 @@ private:
      */
     void _verifyParticipantAtClusterTime(const Participant& participant);
 
-    // The currently active transaction number on this transaction router (i.e. on the session)
+    // The currently active transaction number on this router, if beginOrContinueTxn has been
+    // called. Otherwise set to kUninitializedTxnNumber.
     TxnNumber _txnNumber{kUninitializedTxnNumber};
 
     // Whether the router has initiated a two-phase commit by handing off commit coordination to the

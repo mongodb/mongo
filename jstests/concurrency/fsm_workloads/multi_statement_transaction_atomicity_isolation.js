@@ -35,6 +35,7 @@
  *   (b) transaction C's (tid, txnNumber, numToUpdate) element doesn't appear numToUpdate times
  *       across a consistent snapshot of all of the documents. This would suggest that the database
  *       failed to atomically update all documents modified in a concurrent transaction.
+ *
  *   (c) transaction D's (tid, txnNumber) for a given (docId, dbName, collName) doesn't match the
  *       (tid, txnNumber) for the thread with threadId == tid. This indicates that there are writes
  *       that exist in the database that were not committed.

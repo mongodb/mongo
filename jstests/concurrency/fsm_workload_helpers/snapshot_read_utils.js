@@ -83,7 +83,6 @@ function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionE
     const commitCmd = {
         commitTransaction: 1,
         txnNumber: NumberLong(data.txnNumber),
-        stmtId: NumberInt(data.stmtId++),
         autocommit: false
     };
     res = data.sessionDb.adminCommand(commitCmd);

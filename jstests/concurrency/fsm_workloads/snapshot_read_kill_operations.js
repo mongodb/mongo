@@ -6,7 +6,9 @@
  *
  * @tags: [uses_transactions, state_functions_share_transaction]
  */
+
 load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');
+
 var $config = (function() {
     const data = {numIds: 100, batchSize: 50};
 
@@ -24,11 +26,12 @@ var $config = (function() {
 
         snapshotFind: function snapshotFind(db, collName) {
             const sortByAscending = false;
-            doSnapshotFind(
-                sortByAscending,
-                collName,
-                this,
-                [ErrorCodes.NoSuchTransaction, ErrorCodes.LockTimeout, ErrorCodes.Interrupted]);
+            doSnapshotFind(sortByAscending, collName, this, [
+                ErrorCodes.NoSuchTransaction,
+                ErrorCodes.LockTimeout,
+                ErrorCodes.Interrupted,
+                ErrorCodes.SnapshotTooOld,
+            ]);
         },
 
         snapshotGetMore: function snapshotGetMore(db, collName) {

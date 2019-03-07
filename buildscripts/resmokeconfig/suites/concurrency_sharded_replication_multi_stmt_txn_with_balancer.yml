@@ -115,9 +115,7 @@ selector:
   # router tries to commit, it may not know the full participant list.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
-  # TODO SERVER-38190: Killing an operation committing a prepared txn can crash.
   # TODO SERVER-38297: Killing session on a secondary applying a prepare oplog entry can crash.
-  # TODO SERVER-38299: Killing an operation preparing a transaction can crash.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
 
   # Expects reads to die with a particular error, but other errors are possible if the read is part

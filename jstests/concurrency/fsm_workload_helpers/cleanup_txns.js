@@ -11,13 +11,14 @@ function abortTransaction(sessionAwareDB, txnNumber, errorCodes) {
     // Don't use the given session as it might be in a state we don't want to be and
     // because we are trying to abort with arbitrary txnNumber.
     let rawDB = sessionAwareDB.getSession().getClient().getDB(sessionAwareDB.getName());
-    const res = rawDB.adminCommand({
+
+    const abortCmd = {
         abortTransaction: 1,
         lsid: sessionAwareDB.getSession().getSessionId(),
         txnNumber: NumberLong(txnNumber),
         autocommit: false
-    });
-
+    };
+    const res = rawDB.adminCommand(abortCmd);
     return assert.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: ${tojson(abortCmd)}`);
 }
 

@@ -674,8 +674,15 @@ Shard::CommandResponse TransactionRouter::commitTransaction(
         return _commitWithRecoveryToken(opCtx, *recoveryToken);
     }
 
-    uassert(
-        ErrorCodes::IllegalOperation, "Cannot commit without participants", !_participants.empty());
+    if (_participants.empty()) {
+        // The participants list can be empty if a transaction was began on mongos, but it never
+        // ended up targeting any hosts. Such cases are legal for example if a find is issued
+        // against a non-existend database.
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot commit without participants",
+                _txnNumber != kUninitializedTxnNumber);
+        return {boost::none, BSON("ok" << true), Status::OK(), Status::OK()};
+    }
 
     if (_participants.size() == 1) {
         return _commitSingleShardTransaction(opCtx);
