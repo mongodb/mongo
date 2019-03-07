@@ -122,7 +122,8 @@ public:
         bSys.appendDate("currentTime", jsTime());
         bSys.append("hostname", prettyHostName());
         bSys.append("cpuAddrSize", p.getAddrSize());
-        bSys.append("memSizeMB", static_cast<unsigned>(p.getMemSizeMB()));
+        bSys.append("memSizeMB", static_cast<unsigned>(p.getSystemMemSizeMB()));
+        bSys.append("memLimitMB", static_cast<unsigned>(p.getMemSizeMB()));
         bSys.append("numCores", p.getNumCores());
         bSys.append("cpuArch", p.getArch());
         bSys.append("numaEnabled", p.hasNumaEnabled());

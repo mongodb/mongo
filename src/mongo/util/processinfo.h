@@ -84,9 +84,16 @@ public:
     }
 
     /**
-     * Get the total amount of system memory in MB
+     * Get the size of total memory available to the process in MB
      */
     static unsigned long long getMemSizeMB() {
+        return sysInfo().memLimit / (1024 * 1024);
+    }
+
+    /**
+     * Get the total memory available on the machine in MB
+     */
+    static unsigned long long getSystemMemSizeMB() {
         return sysInfo().memSize / (1024 * 1024);
     }
 
@@ -189,6 +196,7 @@ private:
         std::string osVersion;
         unsigned addrSize;
         unsigned long long memSize;
+        unsigned long long memLimit;
         unsigned numCores;
         unsigned long long pageSize;
         std::string cpuArch;
@@ -205,6 +213,7 @@ private:
         SystemInfo()
             : addrSize(0),
               memSize(0),
+              memLimit(0),
               numCores(0),
               pageSize(0),
               hasNuma(false),

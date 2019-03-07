@@ -184,6 +184,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     osVersion = getSysctlByName<std::string>("kern.osrelease");
     addrSize = (getSysctlByName<NumberVal>("hw.cpu64bit_capable") ? 64 : 32);
     memSize = getSysctlByName<NumberVal>("hw.memsize");
+    memLimit = memSize;
     numCores = getSysctlByName<NumberVal>("hw.ncpu");  // includes hyperthreading cores
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
     cpuArch = getSysctlByName<std::string>("hw.machine");
