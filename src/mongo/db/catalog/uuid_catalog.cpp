@@ -140,6 +140,7 @@ UUIDCatalog::iterator UUIDCatalog::iterator::operator++() {
         // If the iterator is at the end of the map or now points to an entry that does not
         // correspond to the correct database.
         _mapIter = _uuidCatalog->_orderedCollections.end();
+        _uuid = boost::none;
         return *this;
     }
 
@@ -157,7 +158,7 @@ bool UUIDCatalog::iterator::operator==(const iterator& other) {
     stdx::lock_guard<stdx::mutex> lock(_uuidCatalog->_catalogLock);
 
     if (other._mapIter == _uuidCatalog->_orderedCollections.end()) {
-        return _mapIter == _uuidCatalog->_orderedCollections.end();
+        return _uuid == boost::none;
     }
 
     return _uuid == other._uuid;
@@ -172,23 +173,26 @@ bool UUIDCatalog::iterator::operator!=(const iterator& other) {
 // currently pointing to has been deleted, the iterator will be repositioned to the element that
 // followed it.
 bool UUIDCatalog::iterator::_repositionIfNeeded() {
+    // If the generation number has changed, the _orderedCollections map has been modified in a
+    // way that could possibly invalidate this iterator. In this case, try to find the same
+    // entry the iterator was on, or the one right after it.
+
     if (_genNum == _uuidCatalog->_generationNumber) {
         return false;
     }
 
     _genNum = _uuidCatalog->_generationNumber;
-    // If the generation number has changed, the _orderedCollections map has been modified in a
-    // way that could possibly invalidate this iterator. In this case, try to find the same
-    // entry the iterator was on, or the one right before it.
     _mapIter = _uuidCatalog->_orderedCollections.lower_bound(std::make_pair(_dbName, *_uuid));
-    if (_mapIter == _uuidCatalog->_orderedCollections.end() ||
-        (_mapIter->first.first == _dbName && _mapIter->first.second == _uuid)) {
-        // Element deleted was the last one in the map or the element we were pointing at was
-        // not deleted.
-        return false;
+
+    if (_exhausted()) {
+        // The deleted entry was the final one for this database and the iterator has been
+        // repositioned.
+        return true;
     }
 
-    return true;  // repositioned to one element behind previous position
+    // If the old pair matches the previous DB name and UUID, the iterator was not repositioned.
+    auto dbUuidPair = _mapIter->first;
+    return !(dbUuidPair.first == _dbName && dbUuidPair.second == _uuid);
 }
 
 bool UUIDCatalog::iterator::_exhausted() {

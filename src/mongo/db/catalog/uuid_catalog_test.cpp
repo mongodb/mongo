@@ -206,6 +206,29 @@ TEST_F(UUIDCatalogIterationTest, InvalidateLastEntryAndDereference) {
     ASSERT(*it == nullptr);
 }
 
+// Delete the last entry in the map while pointing to it and dereference the iterator.
+TEST_F(UUIDCatalogIterationTest, InvalidateLastEntryInMapAndDereference) {
+    auto it = catalog.begin("foo");
+    NamespaceString lastNs;
+    boost::optional<CollectionUUID> uuid;
+    for (auto collsIt = collsIterator("foo"); collsIt != collsIteratorEnd("foo"); ++collsIt) {
+        lastNs = collsIt->second.get()->ns();
+        uuid = collsIt->first;
+    }
+
+    // Increment until it points to the last collection.
+    for (; it != catalog.end(); ++it) {
+        auto coll = *it;
+        ASSERT(coll != nullptr);
+        if (coll->ns() == lastNs) {
+            break;
+        }
+    }
+
+    catalog.onDropCollection(&opCtx, *uuid);
+    ASSERT(*it == nullptr);
+}
+
 TEST_F(UUIDCatalogTest, OnCreateCollection) {
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == &col);
 }
