@@ -146,6 +146,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     uintptr_t defaultNum = 1;
     status = getSysctlByNameWithDefault("hw.physmem", defaultNum, &numBuffer);
     memSize = numBuffer;
+    memLimit = memSize;
     if (status != 0)
         log() << "Unable to collect Physical Memory. (errno: " << status
               << " msg: " << strerror(status) << ")";

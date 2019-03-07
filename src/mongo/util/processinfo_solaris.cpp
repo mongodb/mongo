@@ -162,6 +162,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     osVersion = unameData.version;
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
     memSize = pageSize * static_cast<unsigned long long>(sysconf(_SC_PHYS_PAGES));
+    memLimit = memSize;
     numCores = static_cast<unsigned>(sysconf(_SC_NPROCESSORS_CONF));
     cpuArch = unameData.machine;
     hasNuma = checkNumaEnabled();

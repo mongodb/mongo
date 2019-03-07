@@ -415,6 +415,23 @@ public:
         }
         return 0;
     }
+
+    /**
+    * Get memory limit for the process.
+    * If memory is being limited by the applied control group and it's less
+    * than the OS system memory (default cgroup limit is ulonglong max) let's
+    * return the actual memory we'll have available to the process.
+    */
+    static unsigned long long getMemorySizeLimit() {
+        unsigned long long systemMemBytes = getSystemMemorySize();
+        unsigned long long cgroupMemBytes = 0;
+        std::string cgmemlimit = readLineFromFile("/sys/fs/cgroup/memory/memory.limit_in_bytes");
+        if (!cgmemlimit.empty() &&
+            mongo::parseNumberFromString(cgmemlimit, &cgroupMemBytes).isOK()) {
+            return std::min(systemMemBytes, cgroupMemBytes);
+        }
+        return systemMemBytes;
+    }
 };
 
 
@@ -490,6 +507,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     osName = distroName;
     osVersion = distroVersion;
     memSize = LinuxSysHelper::getSystemMemorySize();
+    memLimit = LinuxSysHelper::getMemorySizeLimit();
     addrSize = sizeof(void*) * CHAR_BIT;
     numCores = cpuCount;
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
