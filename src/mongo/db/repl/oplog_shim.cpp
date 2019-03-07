@@ -31,6 +31,6 @@
 
 namespace mongo {
 namespace repl {
-MONGO_DEFINE_SHIM(GetNextOpTimeClass::getNextOpTime);
+MONGO_DEFINE_SHIM(GetNextOpTimeClass::getNextOpTimes);
 }  // namespace repl
 }  // namespace mongo

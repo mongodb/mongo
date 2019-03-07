@@ -818,17 +818,6 @@ void createOplog(OperationContext* opCtx) {
     createOplog(opCtx, localOplogInfo(opCtx->getServiceContext()).oplogName, isReplSet);
 }
 
-MONGO_REGISTER_SHIM(GetNextOpTimeClass::getNextOpTime)(OperationContext* opCtx)->OplogSlot {
-    // The local oplog collection pointer must already be established by this point.
-    // We can't establish it here because that would require locking the local database, which would
-    // be a lock order violation.
-    auto oplog = localOplogInfo(opCtx->getServiceContext()).oplog;
-    invariant(oplog);
-    OplogSlot os;
-    _getNextOpTimes(opCtx, oplog, 1, &os);
-    return os;
-}
-
 OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx) {
     auto oplog = localOplogInfo(opCtx->getServiceContext()).oplog;
     invariant(oplog);
@@ -838,7 +827,8 @@ OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx) {
     return os;
 }
 
-std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) {
+MONGO_REGISTER_SHIM(GetNextOpTimeClass::getNextOpTimes)
+(OperationContext* opCtx, std::size_t count)->std::vector<OplogSlot> {
     // The local oplog collection pointer must already be established by this point.
     // We can't establish it here because that would require locking the local database, which would
     // be a lock order violation.
@@ -849,7 +839,6 @@ std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count
     _getNextOpTimes(opCtx, oplog, count, &(*oplogSlot));
     return oplogSlots;
 }
-
 
 // -------------------------------------
 

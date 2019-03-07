@@ -1087,11 +1087,15 @@ OpTimeBundle logReplOperationForTransaction(OperationContext* opCtx,
     return times;
 }
 
+// This function expects that the size of 'oplogSlots' be at least as big as the size of 'stmts'. If
+// there are more oplog slots than statements, then only the first n slots are used, where n is the
+// size of 'stmts'.
 void logOplogEntriesForTransaction(OperationContext* opCtx,
                                    const std::vector<repl::ReplOperation>& stmts,
                                    const std::vector<OplogSlot>& oplogSlots) {
     invariant(!stmts.empty());
-    invariant(stmts.size() == oplogSlots.size());
+    invariant(stmts.size() <= oplogSlots.size());
+
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
@@ -1246,6 +1250,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size() + 1);
         auto commitSlot = oplogSlots.back();
         oplogSlots.pop_back();
+        invariant(oplogSlots.size() == statements.size());
         logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
         commitOpTime = logCommitForUnpreparedTransaction(
             opCtx, statements.size() /* stmtId */, oplogSlots.back().opTime, commitSlot);
@@ -1275,9 +1280,48 @@ void OpObserverImpl::onPreparedTransactionCommit(
     shardObserveTransactionCommit(opCtx, statements, commitOplogEntryOpTime.opTime, true);
 }
 
+repl::OpTime logPrepareTransaction(OperationContext* opCtx,
+                                   StmtId stmtId,
+                                   const repl::OpTime& prevOpTime,
+                                   const OplogSlot oplogSlot) {
+    const NamespaceString cmdNss{"admin", "$cmd"};
+
+    const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
+
+    OperationSessionInfo sessionInfo;
+    repl::OplogLink oplogLink;
+    PrepareTransactionOplogObject cmdObj;
+    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+    oplogLink.prevOpTime = prevOpTime;
+
+    const auto oplogOpTime = logOperation(opCtx,
+                                          "c",
+                                          cmdNss,
+                                          {} /* uuid */,
+                                          cmdObj.toBSON(),
+                                          nullptr /* o2 */,
+                                          false /* fromMigrate */,
+                                          wallClockTime,
+                                          sessionInfo,
+                                          stmtId,
+                                          oplogLink,
+                                          false /* prepare */,
+                                          false /* inTxn */,
+                                          oplogSlot);
+    invariant(oplogSlot.opTime == oplogOpTime);
+
+    onWriteOpCompleted(
+        opCtx, cmdNss, {stmtId}, oplogOpTime, wallClockTime, DurableTxnStateEnum::kPrepared);
+
+    return oplogSlot.opTime;
+}
+
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
-                                          const OplogSlot& prepareOpTime,
+                                          const std::vector<OplogSlot>& reservedSlots,
                                           std::vector<repl::ReplOperation>& statements) {
+    invariant(!reservedSlots.empty());
+    const auto prepareOpTime = reservedSlots.back();
     invariant(opCtx->getTxnNumber());
     invariant(!prepareOpTime.opTime.isNull());
 
@@ -1291,30 +1335,45 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
         // transaction.
         // We write an empty 'applyOps' entry if there were no writes to choose a prepare timestamp
         // and allow this transaction to be continued on failover.
-        {
-            TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+        TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
-            writeConflictRetry(
-                opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
+        writeConflictRetry(
+            opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
 
-                    // Writes to the oplog only require a Global intent lock.
-                    Lock::GlobalLock globalLock(opCtx, MODE_IX);
+                // Writes to the oplog only require a Global intent lock.
+                Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
-                    WriteUnitOfWork wuow(opCtx);
-                    logApplyOpsForTransaction(opCtx, statements, prepareOpTime);
-                    wuow.commit();
-                });
-        }
+                WriteUnitOfWork wuow(opCtx);
+                logApplyOpsForTransaction(opCtx, statements, prepareOpTime);
+                wuow.commit();
+            });
     } else {
-        // It is possible that the transaction resulted in no changes.  In that case, we should
-        // not write any operations other than the prepare oplog entry.
-        if (!statements.empty()) {
-            // Reserve all the optimes in advance, so we only need to get the opTime mutex once.
-            // TODO (SERVER-39441): Reserve an extra slot here for the prepare oplog entry.
-            TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
-            auto oplogSlots = repl::getNextOpTimes(opCtx, statements.size());
-            logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
-        }
+        // We should have reserved an extra oplog slot for the prepare oplog entry.
+        invariant(reservedSlots.size() == statements.size() + 1);
+        TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+
+        // prevOpTime is a null OpTime if there were no operations written other than the prepare
+        // oplog entry.
+        repl::OpTime prevOpTime;
+
+        writeConflictRetry(
+            opCtx, "onTransactionPrepare", NamespaceString::kRsOplogNamespace.ns(), [&] {
+                // Writes to the oplog only require a Global intent lock.
+                Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
+                WriteUnitOfWork wuow(opCtx);
+                // It is possible that the transaction resulted in no changes, In that case, we
+                // should not write any operations other than the prepare oplog entry.
+                if (!statements.empty()) {
+                    logOplogEntriesForTransaction(opCtx, statements, reservedSlots);
+
+                    // The prevOpTime is the OpTime of the second last entry in the reserved slots.
+                    prevOpTime = reservedSlots.rbegin()[1].opTime;
+                }
+                logPrepareTransaction(
+                    opCtx, statements.size() /* stmtId */, prevOpTime, prepareOpTime);
+                wuow.commit();
+            });
     }
 }
 
