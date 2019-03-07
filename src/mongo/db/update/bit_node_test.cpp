@@ -159,7 +159,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentAnd) {
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
@@ -174,7 +174,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentOr) {
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
@@ -189,7 +189,7 @@ TEST_F(BitNodeTest, ApplyAndLogEmptyDocumentXor) {
 
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
@@ -204,7 +204,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentAnd) {
 
     mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0100), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
@@ -219,7 +219,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentOr) {
 
     mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0111), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
@@ -234,7 +234,7 @@ TEST_F(BitNodeTest, ApplyAndLogSimpleDocumentXor) {
 
     mutablebson::Document doc(BSON("a" << 0b0101));
     setPathTaken("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0011), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
@@ -249,7 +249,7 @@ TEST_F(BitNodeTest, ApplyShouldReportNoOp) {
 
     mutablebson::Document doc(BSON("a" << 1));
     setPathTaken("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_EQUALS(BSON("a" << static_cast<int>(1)), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
@@ -269,7 +269,7 @@ TEST_F(BitNodeTest, ApplyMultipleBitOps) {
 
     mutablebson::Document doc(BSON("a" << 0b1111111100000000));
     setPathTaken("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b0101011001100110), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
@@ -284,7 +284,7 @@ TEST_F(BitNodeTest, ApplyRepeatedBitOps) {
 
     mutablebson::Document doc(BSON("a" << 0b11110000));
     setPathTaken("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(BSON("a" << 0b10010110), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());

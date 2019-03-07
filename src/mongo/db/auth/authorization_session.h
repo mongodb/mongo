@@ -43,6 +43,7 @@
 #include "mongo/db/auth/user_set.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 
 namespace mongo {
 
@@ -203,7 +204,7 @@ public:
     virtual Status checkAuthForUpdate(OperationContext* opCtx,
                                       const NamespaceString& ns,
                                       const BSONObj& query,
-                                      const BSONObj& update,
+                                      const write_ops::UpdateModification& update,
                                       bool upsert) = 0;
 
     // Checks if this connection has the privileges necessary to insert to the given namespace.

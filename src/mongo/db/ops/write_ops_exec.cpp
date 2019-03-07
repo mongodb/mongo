@@ -672,7 +672,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
 
     UpdateRequest request(ns);
     request.setQuery(op.getQ());
-    request.setUpdates(op.getU());
+    request.setUpdateModification(op.getU());
     request.setCollation(write_ops::collationOf(op));
     request.setStmtId(stmtId);
     request.setArrayFilters(write_ops::arrayFiltersOf(op));
@@ -736,6 +736,20 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     out.results.reserve(wholeOp.getUpdates().size());
 
     for (auto&& singleOp : wholeOp.getUpdates()) {
+        if (singleOp.getU().type() == write_ops::UpdateModification::Type::kPipeline) {
+            // TODO SERVER-40400: Remove once bypassDocumentValidation is supported and tested for
+            // pipeline updates.
+            uassert(ErrorCodes::NotImplemented,
+                    "bypassDocumentValidation is not yet supported for pipeline-style updates",
+                    !wholeOp.getWriteCommandBase().getBypassDocumentValidation());
+
+            // TODO SERVER-40402: Remove once writeConcern is supported and tested for pipeline
+            // updates.
+            uassert(ErrorCodes::NotImplemented,
+                    "writeConcern is not yet supported for pipeline-style updates",
+                    opCtx->getWriteConcern().usedDefault);
+        }
+
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
             if (!txnParticipant.inMultiDocumentTransaction()) {

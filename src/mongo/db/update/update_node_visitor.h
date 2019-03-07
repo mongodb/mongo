@@ -40,6 +40,7 @@ class CompareNode;
 class ConflictPlaceholderNode;
 class CurrentDateNode;
 class ObjectReplaceNode;
+class PipelineExecutor;
 class PopNode;
 class PullAllNode;
 class PullNode;
@@ -72,6 +73,7 @@ public:
     virtual void visit(ConflictPlaceholderNode*) = 0;
     virtual void visit(CurrentDateNode*) = 0;
     virtual void visit(ObjectReplaceNode*) = 0;
+    virtual void visit(PipelineExecutor*) = 0;
     virtual void visit(PopNode*) = 0;
     virtual void visit(PullAllNode*) = 0;
     virtual void visit(PullNode*) = 0;

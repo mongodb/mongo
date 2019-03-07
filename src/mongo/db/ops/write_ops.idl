@@ -44,6 +44,14 @@ types:
         serializer: "::mongo::write_ops::writeMultiDeleteProperty"
         deserializer: "::mongo::write_ops::readMultiDeleteProperty"
 
+    update_modification:
+        bson_serialization_type: any
+        description: "Holds the contents of the update command 'u' field, describing the
+                      modifications to apply on update."
+        cpp_type: "mongo::write_ops::UpdateModification"
+        serializer: "mongo::write_ops::UpdateModification::serializeToBSON"
+        deserializer: "mongo::write_ops::UpdateModification::parseFromBSON"
+
 structs:
 
     WriteCommandBase:
@@ -91,7 +99,7 @@ structs:
                 type: object
             u:
                 description: "Set of modifications to apply."
-                type: object
+                type: update_modification
             arrayFilters:
                 description: "Specifies which array elements an update modifier should apply to."
                 type: array<object>

@@ -76,6 +76,7 @@ env.Library(
         'modifier_node.cpp',
         'modifier_table.cpp',
         'object_replace_node.cpp',
+        'pipeline_executor.cpp',
         'pop_node.cpp',
         'pull_node.cpp',
         'pullall_node.cpp',
@@ -91,6 +92,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/pipeline/document_source_mock',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/update_index_data',
         'update_common',
     ],
@@ -105,6 +108,7 @@ env.CppUnitTest(
         'compare_node_test.cpp',
         'current_date_node_test.cpp',
         'object_replace_node_test.cpp',
+        'pipeline_executor_test.cpp',
         'pop_node_test.cpp',
         'pull_node_test.cpp',
         'pullall_node_test.cpp',
@@ -119,6 +123,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/logical_clock',
+        '$BUILD_DIR/mongo/db/pipeline/document_value_test_util',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'update',
@@ -141,8 +146,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/server_options_core',
         'update',
     ],
 )

@@ -170,7 +170,7 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
 
         UpdateRequest updateReq(NamespaceString::kServerConfigurationNamespace);
         updateReq.setQuery(RecoveryDocument::getQuery());
-        updateReq.setUpdates(updateObj);
+        updateReq.setUpdateModification(updateObj);
         updateReq.setUpsert();
 
         UpdateResult result = update(opCtx, autoGetOrCreateDb->getDb(), updateReq);

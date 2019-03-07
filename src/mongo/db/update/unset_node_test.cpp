@@ -53,14 +53,16 @@ DEATH_TEST(UnsetNodeTest, InitFailsForEmptyElement, "Invariant failure modExpr.o
     node.init(update["$unset"].embeddedObject().firstElement(), expCtx).transitional_ignore();
 }
 
-DEATH_TEST_F(UnsetNodeTest, ApplyToRootFails, "Invariant failure !applyParams.pathTaken->empty()") {
+DEATH_TEST_F(UnsetNodeTest,
+             ApplyToRootFails,
+             "Invariant failure !updateNodeApplyParams.pathTaken->empty()") {
     auto update = fromjson("{$unset: {}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UnsetNode node;
     ASSERT_OK(node.init(update["$unset"], expCtx));
 
     mutablebson::Document doc(fromjson("{a: 5}"));
-    node.apply(getApplyParams(doc.root()));
+    node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
 }
 
 TEST(UnsetNodeTest, InitSucceedsForNonemptyElement) {
@@ -80,7 +82,7 @@ TEST_F(UnsetNodeTest, UnsetNoOp) {
     mutablebson::Document doc(fromjson("{b: 5}"));
     setPathToCreate("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 5}"), doc);
@@ -99,7 +101,7 @@ TEST_F(UnsetNodeTest, UnsetNoOpDottedPath) {
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 5}"), doc);
@@ -118,7 +120,7 @@ TEST_F(UnsetNodeTest, UnsetNoOpThroughArray) {
     setPathToCreate("b");
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[{b:1}]}"), doc);
@@ -136,7 +138,7 @@ TEST_F(UnsetNodeTest, UnsetNoOpEmptyDoc) {
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -154,7 +156,7 @@ TEST_F(UnsetNodeTest, UnsetTopLevelPath) {
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -172,7 +174,7 @@ TEST_F(UnsetNodeTest, UnsetNestedPath) {
     mutablebson::Document doc(fromjson("{a: {b: {c: 6}}}}"));
     setPathTaken("a.b.c");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: {}}}"), doc);
@@ -190,7 +192,7 @@ TEST_F(UnsetNodeTest, UnsetObject) {
     mutablebson::Document doc(fromjson("{a: {b: {c: 6}}}}"));
     setPathTaken("a.b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
@@ -208,7 +210,7 @@ TEST_F(UnsetNodeTest, UnsetArrayElement) {
     mutablebson::Document doc(fromjson("{a:[1], b:1}"));
     setPathTaken("a.0");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"][0]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][0]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[null], b:1}"), doc);
@@ -227,7 +229,7 @@ TEST_F(UnsetNodeTest, UnsetPositional) {
     setPathTaken("a.1");
     setMatchedField("1");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"][1]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][1]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, null, 2]}"), doc);
@@ -245,7 +247,7 @@ TEST_F(UnsetNodeTest, UnsetEntireArray) {
     mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -263,7 +265,7 @@ TEST_F(UnsetNodeTest, UnsetFromObjectInArray) {
     mutablebson::Document doc(fromjson("{a: [{b: 1}]}"));
     setPathTaken("a.0.b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"][0]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][0]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[{}]}"), doc);
@@ -281,7 +283,7 @@ TEST_F(UnsetNodeTest, CanUnsetInvalidField) {
     mutablebson::Document doc(fromjson("{b: 1, a: [{$b: 1}]}"));
     setPathTaken("a.0.$b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"][0]["$b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][0]["$b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 1, a: [{}]}"), doc);
@@ -299,7 +301,7 @@ TEST_F(UnsetNodeTest, ApplyNoIndexDataNoLogBuilder) {
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     setLogBuilderToNull();
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -316,7 +318,7 @@ TEST_F(UnsetNodeTest, ApplyDoesNotAffectIndexes) {
     mutablebson::Document doc(fromjson("{a: 5}"));
     setPathTaken("a");
     addIndexedPath("b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
@@ -334,7 +336,7 @@ TEST_F(UnsetNodeTest, ApplyFieldWithDot) {
     mutablebson::Document doc(fromjson("{'a.b':4, a: {b: 2}}"));
     setPathTaken("a.b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{'a.b':4, a: {}}"), doc);
@@ -351,10 +353,11 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveRequiredPartOfDBRef) {
 
     mutablebson::Document doc(fromjson("{a: {$ref: 'c', $id: 0}}"));
     setPathTaken("a.$id");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["$id"])),
-                                AssertionException,
-                                ErrorCodes::InvalidDBRef,
-                                "The DBRef $ref field must be followed by a $id field");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(getApplyParams(doc.root()["a"]["$id"]), getUpdateNodeApplyParams()),
+        AssertionException,
+        ErrorCodes::InvalidDBRef,
+        "The DBRef $ref field must be followed by a $id field");
 }
 
 TEST_F(UnsetNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFalse) {
@@ -367,7 +370,7 @@ TEST_F(UnsetNodeTest, ApplyCanRemoveRequiredPartOfDBRefIfValidateForStorageIsFal
     setPathTaken("a.$id");
     addIndexedPath("a");
     setValidateForStorage(false);
-    auto result = node.apply(getApplyParams(doc.root()["a"]["$id"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]["$id"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     auto updated = BSON("a" << BSON("$ref"
@@ -388,7 +391,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveImmutablePath) {
     setPathTaken("a.b");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(getApplyParams(doc.root()["a"]["b"])),
+        node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::ImmutableField,
         "Performing an update on the path 'a.b' would modify the immutable field 'a.b'");
@@ -404,7 +407,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemovePrefixOfImmutablePath) {
     setPathTaken("a");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(getApplyParams(doc.root()["a"])),
+        node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::ImmutableField,
         "Performing an update on the path 'a' would modify the immutable field 'a.b'");
@@ -420,7 +423,7 @@ TEST_F(UnsetNodeTest, ApplyCannotRemoveSuffixOfImmutablePath) {
     setPathTaken("a.b.c");
     addImmutablePath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(getApplyParams(doc.root()["a"]["b"]["c"])),
+        node.apply(getApplyParams(doc.root()["a"]["b"]["c"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::ImmutableField,
         "Performing an update on the path 'a.b.c' would modify the immutable field 'a.b'");
@@ -437,7 +440,7 @@ TEST_F(UnsetNodeTest, ApplyCanRemoveImmutablePathIfNoop) {
     setPathTaken("a.b");
     addImmutablePath("a.b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 1}}"), doc);

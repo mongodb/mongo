@@ -542,7 +542,10 @@ TEST_F(StitchSupportTest, TestUpdateWithSetOnInsert) {
 }
 
 TEST_F(StitchSupportTest, TestUpdateProducesProperStatus) {
-    ASSERT_EQ("Unknown modifier: $bogus", checkUpdateStatus("{$bogus: {a: 2}}", "{a: 1}"));
+    ASSERT_EQ(
+        "Unknown modifier: $bogus. Expected a valid update modifier or pipeline-style update "
+        "specified as an array",
+        checkUpdateStatus("{$bogus: {a: 2}}", "{a: 1}"));
     ASSERT_EQ("Updating the path 'a' would create a conflict at 'a'",
               checkUpdateStatus("{$set: {a: 2, a: 3}}", "{a: 1}"));
     ASSERT_EQ("No array filter found for identifier 'i' in path 'a.$[i]'",

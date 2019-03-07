@@ -113,7 +113,7 @@ TEST_F(AddToSetNodeTest, ApplyFailsOnNonArray) {
     mutablebson::Document doc(fromjson("{a: 2}"));
     setPathTaken("a");
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(getApplyParams(doc.root()["a"])),
+        node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::BadValue,
         "Cannot apply $addToSet to non-array field. Field named 'a' has non-array type int");
@@ -128,7 +128,7 @@ TEST_F(AddToSetNodeTest, ApplyNonEach) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
@@ -146,7 +146,7 @@ TEST_F(AddToSetNodeTest, ApplyNonEachArray) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, [1]]}"), doc);
@@ -164,7 +164,7 @@ TEST_F(AddToSetNodeTest, ApplyEach) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 1, 2]}"), doc);
@@ -182,7 +182,7 @@ TEST_F(AddToSetNodeTest, ApplyToEmptyArray) {
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
@@ -200,7 +200,7 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicateElementsToAdd) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
@@ -218,7 +218,7 @@ TEST_F(AddToSetNodeTest, ApplyDoNotAddExistingElements) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
@@ -236,7 +236,7 @@ TEST_F(AddToSetNodeTest, ApplyDoNotDeduplicateExistingElements) {
     mutablebson::Document doc(fromjson("{a: [0, 0]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 0, 1]}"), doc);
@@ -254,7 +254,7 @@ TEST_F(AddToSetNodeTest, ApplyNoElementsToAdd) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0]}"), doc);
@@ -272,7 +272,7 @@ TEST_F(AddToSetNodeTest, ApplyNoNonDuplicateElementsToAdd) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0]}"), doc);
@@ -290,7 +290,7 @@ TEST_F(AddToSetNodeTest, ApplyCreateArray) {
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);
@@ -308,7 +308,7 @@ TEST_F(AddToSetNodeTest, ApplyCreateEmptyArrayIsNotNoop) {
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
@@ -328,7 +328,7 @@ TEST_F(AddToSetNodeTest, ApplyDeduplicationOfElementsToAddRespectsCollation) {
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['abc', 'def']}"), doc);
@@ -348,7 +348,7 @@ TEST_F(AddToSetNodeTest, ApplyComparisonToExistingElementsRespectsCollation) {
     mutablebson::Document doc(fromjson("{a: ['ABC']}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['ABC', 'def']}"), doc);
@@ -370,7 +370,7 @@ TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
     mutablebson::Document doc(fromjson("{a: []}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['abc', 'def']}"), doc);
@@ -410,7 +410,7 @@ TEST_F(AddToSetNodeTest, ApplyNestedArray) {
     mutablebson::Document doc(fromjson("{ _id : 1, a : [ 1, [ ] ] }"));
     setPathTaken("a.1");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"][1]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][1]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{ _id : 1, a : [ 1, [ 1 ] ] }"), doc);
@@ -428,7 +428,7 @@ TEST_F(AddToSetNodeTest, ApplyIndexesNotAffected) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     addIndexedPath("b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
@@ -445,7 +445,7 @@ TEST_F(AddToSetNodeTest, ApplyNoIndexDataOrLogBuilder) {
     mutablebson::Document doc(fromjson("{a: [0]}"));
     setPathTaken("a");
     setLogBuilderToNull();
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 1]}"), doc);

@@ -2266,7 +2266,8 @@ TEST_F(StorageInterfaceImplTest,
         storage.upsertById(opCtx, nss, BSON("" << 1).firstElement(), unknownUpdateOp),
         AssertionException,
         ErrorCodes::FailedToParse,
-        "Unknown modifier: $unknownUpdateOp");
+        "Unknown modifier: $unknownUpdateOp. Expected a valid update modifier or pipeline-style "
+        "update specified as an array");
 
     ASSERT_THROWS_CODE(storage.upsertById(opCtx,
                                           {nss.db().toString(), *options.uuid},

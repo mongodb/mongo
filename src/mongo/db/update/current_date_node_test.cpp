@@ -132,7 +132,7 @@ TEST_F(CurrentDateNodeTest, ApplyTrue) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
 
@@ -156,7 +156,7 @@ TEST_F(CurrentDateNodeTest, ApplyFalse) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
 
@@ -180,7 +180,7 @@ TEST_F(CurrentDateNodeTest, ApplyDate) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
 
@@ -204,7 +204,7 @@ TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
 
@@ -228,7 +228,7 @@ TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
 
@@ -252,7 +252,7 @@ TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
 
@@ -276,7 +276,7 @@ TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     setLogBuilderToNull();
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
 

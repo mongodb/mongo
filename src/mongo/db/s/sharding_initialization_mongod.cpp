@@ -313,7 +313,7 @@ Status ShardingInitializationMongoD::updateShardIdentityConfigString(
 
     UpdateRequest updateReq(NamespaceString::kServerConfigurationNamespace);
     updateReq.setQuery(BSON("_id" << ShardIdentityType::IdName));
-    updateReq.setUpdates(updateObj);
+    updateReq.setUpdateModification(updateObj);
 
     try {
         AutoGetOrCreateDb autoDb(

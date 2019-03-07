@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -338,11 +339,55 @@ TEST(CommandWriteOpsParsers, Update) {
                 ASSERT_EQ(op.getWriteCommandBase().getOrdered(), true);
                 ASSERT_EQ(op.getUpdates().size(), 1u);
                 ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query);
-                ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getU(), update);
+
+                const auto& updateMod = op.getUpdates()[0].getU();
+                ASSERT(updateMod.type() == write_ops::UpdateModification::Type::kClassic);
+                ASSERT_BSONOBJ_EQ(updateMod.getUpdateClassic(), update);
+
                 ASSERT_BSONOBJ_EQ(write_ops::collationOf(op.getUpdates()[0]), collation);
                 ASSERT_EQ(write_ops::arrayFiltersOf(op.getUpdates()[0]).size(), 1u);
                 ASSERT_BSONOBJ_EQ(write_ops::arrayFiltersOf(op.getUpdates()[0]).front(),
                                   arrayFilter);
+                ASSERT_EQ(op.getUpdates()[0].getUpsert(), upsert);
+                ASSERT_EQ(op.getUpdates()[0].getMulti(), multi);
+                ASSERT_BSONOBJ_EQ(op.getUpdates()[0].toBSON(), rawUpdate);
+            }
+        }
+    }
+}
+
+TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
+    // TODO SERVER-40419: Remove 'setTestCommandsEnable(true)' for this test.
+    setTestCommandsEnabled(true);
+    const auto ns = NamespaceString("test", "foo");
+    const BSONObj query = BSON("q" << BSON("x" << 1));
+    std::vector<BSONObj> pipeline{BSON("$addFields" << BSON("x" << 1))};
+    const BSONObj update = BSON("u" << pipeline);
+    const BSONObj collation = BSON("locale"
+                                   << "en_US");
+    for (bool upsert : {false, true}) {
+        for (bool multi : {false, true}) {
+            auto rawUpdate = BSON(
+                "q" << query["q"] << "u" << update["u"] << "multi" << multi << "upsert" << upsert
+                    << "collation"
+                    << collation);
+            auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
+            for (bool seq : {false, true}) {
+                auto request = toOpMsg(ns.db(), cmd, seq);
+                auto op = UpdateOp::parse(request);
+                ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+                ASSERT(!op.getWriteCommandBase().getBypassDocumentValidation());
+                ASSERT_EQ(op.getWriteCommandBase().getOrdered(), true);
+                ASSERT_EQ(op.getUpdates().size(), 1u);
+                ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query["q"].Obj());
+
+                const auto& updateMod = op.getUpdates()[0].getU();
+                const auto& updateModPipeline = updateMod.getUpdatePipeline();
+                ASSERT(updateMod.type() == write_ops::UpdateModification::Type::kPipeline);
+                ASSERT_EQ(updateModPipeline.size(), 1u);
+                ASSERT_BSONOBJ_EQ(updateModPipeline[0], pipeline[0]);
+
+                ASSERT_BSONOBJ_EQ(write_ops::collationOf(op.getUpdates()[0]), collation);
                 ASSERT_EQ(op.getUpdates()[0].getUpsert(), upsert);
                 ASSERT_EQ(op.getUpdates()[0].getMulti(), multi);
                 ASSERT_BSONOBJ_EQ(op.getUpdates()[0].toBSON(), rawUpdate);
@@ -451,7 +496,37 @@ TEST(LegacyWriteOpsParsers, Update) {
             ASSERT_EQ(op.getWriteCommandBase().getOrdered(), true);
             ASSERT_EQ(op.getUpdates().size(), 1u);
             ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query);
-            ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getU(), update);
+            ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getU().getUpdateClassic(), update);
+            ASSERT_EQ(op.getUpdates()[0].getUpsert(), upsert);
+            ASSERT_EQ(op.getUpdates()[0].getMulti(), multi);
+        }
+    }
+}
+
+// When parsing from legacy OP_UPDATE messages, we receive the "u" field as an object. When an array
+// is parsed, we receive it as an object with numeric fields names and can't differentiate between a
+// user constructed object and an array. For that reason, we parse as a classic-style update rather
+// than as pipeline-style.
+TEST(LegacyWriteOpsParsers, UpdateWithArrayUpdateFieldIsParsedAsReplacementStyleUpdate) {
+    const std::string ns = "test.foo";
+    const BSONObj query = BSON("x" << 1);
+    const BSONObj update = BSON_ARRAY(BSON("$addFields" << BSON("x" << 1)));
+    for (bool upsert : {false, true}) {
+        for (bool multi : {false, true}) {
+            auto message = makeUpdateMessage(ns,
+                                             query,
+                                             update,
+                                             (upsert ? UpdateOption_Upsert : 0) |
+                                                 (multi ? UpdateOption_Multi : 0));
+            const auto op = UpdateOp::parseLegacy(message);
+            ASSERT_EQ(op.getNamespace().ns(), ns);
+            ASSERT(!op.getWriteCommandBase().getBypassDocumentValidation());
+            ASSERT_EQ(op.getWriteCommandBase().getOrdered(), true);
+            ASSERT_EQ(op.getUpdates().size(), 1u);
+            ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query);
+            ASSERT(op.getUpdates()[0].getU().type() ==
+                   write_ops::UpdateModification::Type::kClassic);
+            ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getU().getUpdateClassic(), update);
             ASSERT_EQ(op.getUpdates()[0].getUpsert(), upsert);
             ASSERT_EQ(op.getUpdates()[0].getMulti(), multi);
         }

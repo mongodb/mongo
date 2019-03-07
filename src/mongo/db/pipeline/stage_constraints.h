@@ -289,5 +289,8 @@ struct StageConstraints {
     // order of documents can be swapped with a $sample because our implementation of sample will do
     // a random sort which shuffles the order.
     bool canSwapWithLimitAndSample = false;
+
+    // Indicates that a stage is allowed within a pipeline-stlye update.
+    bool isAllowedWithinUpdatePipeline = false;
 };
 }  // namespace mongo

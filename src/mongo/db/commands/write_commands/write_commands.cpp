@@ -361,7 +361,7 @@ private:
 
             UpdateRequest updateRequest(_batch.getNamespace());
             updateRequest.setQuery(_batch.getUpdates()[0].getQ());
-            updateRequest.setUpdates(_batch.getUpdates()[0].getU());
+            updateRequest.setUpdateModification(_batch.getUpdates()[0].getU());
             updateRequest.setCollation(write_ops::collationOf(_batch.getUpdates()[0]));
             updateRequest.setArrayFilters(write_ops::arrayFiltersOf(_batch.getUpdates()[0]));
             updateRequest.setMulti(_batch.getUpdates()[0].getMulti());

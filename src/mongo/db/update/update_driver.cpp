@@ -74,9 +74,13 @@ StatusWith<UpdateSemantics> updateSemanticsFromElement(BSONElement element) {
 modifiertable::ModifierType validateMod(BSONElement mod) {
     auto modType = modifiertable::getType(mod.fieldName());
 
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "Unknown modifier: " << mod.fieldName(),
-            modType != modifiertable::MOD_UNKNOWN);
+    uassert(
+        ErrorCodes::FailedToParse,
+        str::stream()
+            << "Unknown modifier: "
+            << mod.fieldName()
+            << ". Expected a valid update modifier or pipeline-style update specified as an array",
+        modType != modifiertable::MOD_UNKNOWN);
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Modifiers operate on fields but we found type "
@@ -145,30 +149,39 @@ UpdateDriver::UpdateDriver(const boost::intrusive_ptr<ExpressionContext>& expCtx
     : _expCtx(expCtx) {}
 
 void UpdateDriver::parse(
-    const BSONObj& updateExpr,
+    const write_ops::UpdateModification& updateMod,
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
     const bool multi) {
-    invariant(!_root && !_replacementMode, "Multiple calls to parse() on same UpdateDriver");
+    invariant(!_updateExecutor, "Multiple calls to parse() on same UpdateDriver");
 
-    // Check if the update expression is a full object replacement.
-    if (isDocReplacement(updateExpr)) {
-        uassert(ErrorCodes::FailedToParse, "multi update only works with $ operators", !multi);
-
-        _root = stdx::make_unique<ObjectReplaceNode>(updateExpr);
-
-        // Register the fact that this driver will only do full object replacements.
-        _replacementMode = true;
-
+    if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
+        uassert(ErrorCodes::FailedToParse,
+                "arrayFilters may not be specified for pipeline-syle updates",
+                arrayFilters.empty());
+        _updateExecutor =
+            stdx::make_unique<PipelineExecutor>(_expCtx, updateMod.getUpdatePipeline());
+        _updateType = UpdateType::kPipeline;
         return;
     }
 
-    // Register the fact that this driver is not doing a full object replacement.
-    _replacementMode = false;
+    // Check if the update expression is a full object replacement.
+    if (isDocReplacement(updateMod)) {
+        uassert(ErrorCodes::FailedToParse, "multi update only works with $ operators", !multi);
+
+        _updateExecutor = stdx::make_unique<ObjectReplaceNode>(updateMod.getUpdateClassic());
+
+        // Register the fact that this driver will only do full object replacements.
+        _updateType = UpdateType::kReplacement;
+        return;
+    }
+
+    invariant(_updateType == UpdateType::kOperator);
 
     // Some versions of mongod support more than one version of the update language and look for a
     // $v "UpdateSemantics" field when applying an oplog entry, in order to know which version of
     // the update language to apply with. We currently only support the 'kUpdateNode' version, but
     // we parse $v and check its value for compatibility.
+    auto updateExpr = updateMod.getUpdateClassic();
     BSONElement updateSemanticsElement = updateExpr[LogBuilder::kUpdateSemanticsFieldName];
     if (updateSemanticsElement) {
         uassert(ErrorCodes::FailedToParse,
@@ -180,7 +193,7 @@ void UpdateDriver::parse(
 
     auto root = stdx::make_unique<UpdateObjectNode>();
     _positional = parseUpdateExpression(updateExpr, root.get(), _expCtx, arrayFilters);
-    _root = std::move(root);
+    _updateExecutor = std::move(root);
 }
 
 Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
@@ -216,13 +229,12 @@ Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query
     EqualityMatches equalities;
     Status status = Status::OK();
 
-    if (isDocReplacement()) {
-
-        // Extract only immutable fields from replacement-style
+    if (_updateType == UpdateType::kReplacement) {
+        // Extract only immutable fields.
         status =
             pathsupport::extractFullEqualityMatches(*query.root(), immutablePaths, &equalities);
     } else {
-        // Extract all fields from op-style
+        // Extract all fields from op-style update.
         status = pathsupport::extractEqualityMatches(*query.root(), &equalities);
     }
 
@@ -243,7 +255,9 @@ Status UpdateDriver::update(StringData matchedField,
                             FieldRefSetWithStorage* modifiedPaths) {
     // TODO: assert that update() is called at most once in a !_multi case.
 
-    _affectIndices = (isDocReplacement() && (_indexedFields != NULL));
+    _affectIndices =
+        ((_updateType == UpdateType::kReplacement || _updateType == UpdateType::kPipeline) &&
+         (_indexedFields != NULL));
 
     _logDoc.reset();
     LogBuilder logBuilder(_logDoc.root());
@@ -261,7 +275,9 @@ Status UpdateDriver::update(StringData matchedField,
     if (_logOp && logOpRec) {
         applyParams.logBuilder = &logBuilder;
     }
-    auto applyResult = _root->apply(applyParams);
+
+    invariant(_updateExecutor);
+    auto applyResult = _updateExecutor->applyUpdate(applyParams);
     if (applyResult.indexesAffected) {
         _affectIndices = true;
         doc->disableInPlaceUpdates();
@@ -269,7 +285,7 @@ Status UpdateDriver::update(StringData matchedField,
     if (docWasModified) {
         *docWasModified = !applyResult.noop;
     }
-    if (!_replacementMode && _logOp && logOpRec) {
+    if (_updateType == UpdateType::kOperator && _logOp && logOpRec) {
         // If there are binVersion=3.6 mongod nodes in the replica set, they need to be told that
         // this update is using the "kUpdateNode" version of the update semantics and not the older
         // update semantics that could be used by a featureCompatibilityVersion=3.4 node.
@@ -289,44 +305,18 @@ Status UpdateDriver::update(StringData matchedField,
     return Status::OK();
 }
 
-bool UpdateDriver::isDocReplacement() const {
-    return _replacementMode;
-}
-
-bool UpdateDriver::modsAffectIndices() const {
-    return _affectIndices;
-}
-
-void UpdateDriver::refreshIndexKeys(const UpdateIndexData* indexedFields) {
-    _indexedFields = indexedFields;
-}
-
-bool UpdateDriver::logOp() const {
-    return _logOp;
-}
-
-void UpdateDriver::setLogOp(bool logOp) {
-    _logOp = logOp;
-}
-
-bool UpdateDriver::fromOplogApplication() const {
-    return _fromOplogApplication;
-}
-
-void UpdateDriver::setFromOplogApplication(bool fromOplogApplication) {
-    _fromOplogApplication = fromOplogApplication;
-}
-
 void UpdateDriver::setCollator(const CollatorInterface* collator) {
-    if (_root) {
-        _root->setCollator(collator);
+    if (_updateExecutor) {
+        _updateExecutor->setCollator(collator);
     }
 
     _expCtx->setCollator(collator);
 }
 
-bool UpdateDriver::isDocReplacement(const BSONObj& updateExpr) {
-    return *updateExpr.firstElementFieldName() != '$';
+bool UpdateDriver::isDocReplacement(const write_ops::UpdateModification& updateMod) {
+    return (updateMod.type() == write_ops::UpdateModification::Type::kClassic &&
+            *updateMod.getUpdateClassic().firstElementFieldName() != '$') ||
+        updateMod.type() == write_ops::UpdateModification::Type::kPipeline;
 }
 
 }  // namespace mongo

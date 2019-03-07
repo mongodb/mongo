@@ -37,6 +37,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/rpc/op_msg.h"
 
 namespace mongo {
@@ -137,7 +138,7 @@ void logQueryAuthzCheck(Client* client,
 void logUpdateAuthzCheck(Client* client,
                          const NamespaceString& ns,
                          const BSONObj& query,
-                         const BSONObj& updateObj,
+                         const write_ops::UpdateModification& update,
                          bool isUpsert,
                          bool isMulti,
                          ErrorCodes::Error result);

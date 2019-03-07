@@ -57,7 +57,8 @@ class ModifierNode : public UpdateLeafNode {
 public:
     explicit ModifierNode(Context context = Context::kAll) : UpdateLeafNode(context) {}
 
-    ApplyResult apply(ApplyParams applyParams) const final;
+    ApplyResult apply(ApplyParams applyParams,
+                      UpdateNodeApplyParams updateNodeApplyParams) const final;
 
 protected:
     enum class ModifyResult {
@@ -195,8 +196,10 @@ private:
      */
     virtual BSONObj operatorValue() const = 0;
 
-    ApplyResult applyToNonexistentElement(ApplyParams applyParams) const;
-    ApplyResult applyToExistingElement(ApplyParams applyParams) const;
+    ApplyResult applyToNonexistentElement(ApplyParams applyParams,
+                                          UpdateNodeApplyParams updateNodeApplyParams) const;
+    ApplyResult applyToExistingElement(ApplyParams applyParams,
+                                       UpdateNodeApplyParams updateNodeApplyParams) const;
 };
 
 }  // namespace mongo

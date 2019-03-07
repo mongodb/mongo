@@ -56,6 +56,12 @@ Status ParsedUpdate::parseRequest() {
     invariant(_request->getProj().isEmpty() || _request->shouldReturnAnyDocs());
 
     if (!_request->getCollation().isEmpty()) {
+        // TODO SERVER-40398: Remove once collation is supported and tested for pipeline updates.
+        uassert(ErrorCodes::NotImplemented,
+                "Collation is not yet supported for pipeline-style updates",
+                _request->getUpdateModification().type() !=
+                    write_ops::UpdateModification::Type::kPipeline);
+
         auto collator = CollatorFactoryInterface::get(_opCtx->getServiceContext())
                             ->makeFromBSON(_request->getCollation());
         if (!collator.isOK()) {
@@ -145,7 +151,7 @@ void ParsedUpdate::parseUpdate() {
     _driver.setLogOp(true);
     _driver.setFromOplogApplication(_request->isFromOplogApplication());
 
-    _driver.parse(_request->getUpdates(), _arrayFilters, _request->isMulti());
+    _driver.parse(_request->getUpdateModification(), _arrayFilters, _request->isMulti());
 }
 
 StatusWith<std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>>

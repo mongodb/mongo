@@ -1769,7 +1769,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateField) {
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     addIndexedPath("b");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 5, b: 6}"), doc);
@@ -1793,7 +1793,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
 
     mutablebson::Document doc(fromjson("{a: 5}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 6}"), doc);
@@ -1835,7 +1835,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
 
     mutablebson::Document doc(fromjson("{a: 0, c: 0}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, c: 7, b: 6, d: 8}"), doc.getObject());
@@ -1877,7 +1877,7 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
 
     mutablebson::Document doc(fromjson("{a: {b: 5, c: 5}, b: {d: 5, e: 5}}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 6, c: 7}, b: {d: 8, e: 9}}"), doc.getObject());
@@ -1920,7 +1920,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
 
     mutablebson::Document doc(fromjson("{z: 0}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{z: 0, a: {b: 6, c: 7}, b: {d: 8, e: 9}}"), doc.getObject());
@@ -1957,7 +1957,7 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
 
     mutablebson::Document doc(fromjson("{z: 0}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{z: 0, a: {b: {c: {d: 6, e: 7}}, f: 8}}"), doc.getObject());
@@ -2006,7 +2006,7 @@ TEST_F(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
 
     mutablebson::Document doc(fromjson("{z: 0, a: 0}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{z: 9, a: 5, b: 8, c: 7, d: 6}"), doc.getObject());
@@ -2038,7 +2038,7 @@ TEST_F(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
 
     mutablebson::Document doc(fromjson("{}"));
     addIndexedPath("abc");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{abc: 5, cba: 6}"), doc.getObject());
@@ -2075,7 +2075,7 @@ TEST_F(UpdateObjectNodeTest, ApplyNoop) {
     addIndexedPath("a");
     addIndexedPath("b");
     addIndexedPath("c");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_TRUE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
@@ -2113,7 +2113,7 @@ TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
     addIndexedPath("a");
     addIndexedPath("b");
     addIndexedPath("c");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
@@ -2138,7 +2138,7 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElement) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     addIndexedPath("a");
     ASSERT_EQUALS(getModifiedPaths(), "{}");
-    ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
+    ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams()),
                                 AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: 0}");
@@ -2166,7 +2166,7 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     addIndexedPath("a");
     setFromOplogApplication(true);
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: 0, b: 6}"), doc.getObject());
@@ -2191,7 +2191,7 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
     addIndexedPath("a");
     ASSERT_EQUALS(getModifiedPaths(), "{}");
     ASSERT_THROWS_CODE_AND_WHAT(
-        root.apply(getApplyParams(doc.root())),
+        root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::BadValue,
         "The positional operator did not find the match needed from the query.");
@@ -2219,7 +2219,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMergePositionalChild) {
     mutablebson::Document doc(fromjson("{a: [{b: 0, c: 0}]}"));
     setMatchedField("0");
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
@@ -2262,7 +2262,7 @@ TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
     mutablebson::Document doc(fromjson("{}"));
     setMatchedField("1");
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 7, '1': {b: 6, c: 8}, '2': 5}}"), doc.getObject());
@@ -2295,7 +2295,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMergeConflictWithPositionalChild) {
     setMatchedField("0");
     addIndexedPath("a");
     ASSERT_EQUALS(getModifiedPaths(), "{}");
-    ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
+    ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams()),
                                 AssertionException,
                                 ErrorCodes::ConflictingUpdateOperators,
                                 "Update created a conflict at 'a.0'");
@@ -2329,7 +2329,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
     mutablebson::Document doc(fromjson("{}"));
     setMatchedField("1");
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 5, '1': 7, '2': 6}}"), doc.getObject());
@@ -2366,7 +2366,7 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
     mutablebson::Document doc(fromjson("{}"));
     setMatchedField("2");
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 6, '1': 7, '2': 5}}"), doc.getObject());
@@ -2397,7 +2397,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     mutablebson::Document doc(fromjson("{a: [{b: 0, c: 0}]}"));
     setMatchedField("0");
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
@@ -2409,7 +2409,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     resetApplyParams();
     setMatchedField("0");
     addIndexedPath("a");
-    result = root.apply(getApplyParams(doc2.root()));
+    result = root.apply(getApplyParams(doc2.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc2.getObject());
@@ -2446,7 +2446,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     mutablebson::Document doc(fromjson("{a: [{b: 0, c: 0}, {c: 0, d: 0}]}"));
     setMatchedField("0");
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}, {c: 0, d: 7}]}"), doc.getObject());
@@ -2459,7 +2459,7 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     resetApplyParams();
     setMatchedField("1");
     addIndexedPath("a");
-    result = root.apply(getApplyParams(doc2.root()));
+    result = root.apply(getApplyParams(doc2.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 0}, {c: 6, d: 7}]}"), doc2.getObject());
@@ -2489,7 +2489,7 @@ TEST_F(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
 
     mutablebson::Document doc(fromjson("{a: [0, 0, 0, 0, 0]}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [0, 0, 2, 0, 0]}"), doc.getObject());
@@ -2525,7 +2525,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
 
     mutablebson::Document doc(fromjson("{a: []}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(
@@ -2556,7 +2556,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleUpdatesToDocumentInArray) {
 
     mutablebson::Document doc(fromjson("{a: []}"));
     addIndexedPath("a");
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [null, null, {b: 1, c: 1}]}"), doc.getObject());
@@ -2580,7 +2580,7 @@ TEST_F(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
 
     mutablebson::Document doc(fromjson("{a: [{b: 1}, {b: 2}]}"));
     addIndexedPath("a");
-    ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root())),
+    ASSERT_THROWS_CODE_AND_WHAT(root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams()),
                                 AssertionException,
                                 ErrorCodes::PathNotViable,
                                 "Cannot create field 'b' in element {a: [ { b: 1 }, { b: 2 } ]}");
@@ -2606,7 +2606,7 @@ TEST_F(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully
                                               foundIdentifiers));
 
     mutablebson::Document doc(fromjson("{a: {b: 3, c: [1, 2, 3, 4]}}"));
-    auto result = root.apply(getApplyParams(doc.root()));
+    auto result = root.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 5, c: [2, 3, 4]}}"), doc.getObject());

@@ -63,7 +63,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameNumber) {
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
@@ -80,7 +80,7 @@ TEST_F(CompareNodeTest, ApplyMinSameNumber) {
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
@@ -97,7 +97,7 @@ TEST_F(CompareNodeTest, ApplyMaxNumberIsLess) {
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
@@ -114,7 +114,7 @@ TEST_F(CompareNodeTest, ApplyMinNumberIsMore) {
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
@@ -131,7 +131,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameValInt) {
     mutablebson::Document doc(fromjson("{a: 1.0}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1.0}"), doc);
@@ -148,7 +148,7 @@ TEST_F(CompareNodeTest, ApplyMaxSameValIntZero) {
     mutablebson::Document doc(fromjson("{a: 0.0}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0.0}"), doc);
@@ -165,7 +165,7 @@ TEST_F(CompareNodeTest, ApplyMinSameValIntZero) {
     mutablebson::Document doc(fromjson("{a: 0.0}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0.0}"), doc);
@@ -182,7 +182,7 @@ TEST_F(CompareNodeTest, ApplyMissingFieldMinNumber) {
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
@@ -199,7 +199,7 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMinNumber) {
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
@@ -216,7 +216,7 @@ TEST_F(CompareNodeTest, ApplyMissingFieldMaxNumber) {
     mutablebson::Document doc(fromjson("{}"));
     setPathToCreate("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 0}"), doc);
@@ -233,7 +233,7 @@ TEST_F(CompareNodeTest, ApplyExistingNumberMaxNumber) {
     mutablebson::Document doc(fromjson("{a: 1}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 2}"), doc);
@@ -250,7 +250,7 @@ TEST_F(CompareNodeTest, ApplyExistingDateMaxDate) {
     mutablebson::Document doc(fromjson("{a: {$date: 0}}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {$date: 123123123}}"), doc);
@@ -267,7 +267,7 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxDoc) {
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 3}}"), doc);
@@ -284,7 +284,7 @@ TEST_F(CompareNodeTest, ApplyExistingEmbeddedDocMaxNumber) {
     mutablebson::Document doc(fromjson("{a: {b: 2}}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 2}}"), doc);
@@ -303,7 +303,7 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollation) {
     mutablebson::Document doc(fromjson("{a: 'cbc'}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 'dba'}"), doc);
@@ -324,7 +324,7 @@ TEST_F(CompareNodeTest, ApplyMinRespectsCollationFromSetCollator) {
     mutablebson::Document doc(fromjson("{a: 'cbc'}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 'dba'}"), doc);
@@ -345,7 +345,7 @@ TEST_F(CompareNodeTest, ApplyMaxRespectsCollationFromSetCollator) {
     mutablebson::Document doc(fromjson("{a: 'cbc'}"));
     setPathTaken("a");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 'abd'}"), doc);
@@ -384,7 +384,7 @@ TEST_F(CompareNodeTest, ApplyIndexesNotAffected) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     addIndexedPath("b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);
@@ -401,7 +401,7 @@ TEST_F(CompareNodeTest, ApplyNoIndexDataOrLogBuilder) {
     mutablebson::Document doc(fromjson("{a: 0}"));
     setPathTaken("a");
     setLogBuilderToNull();
-    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);

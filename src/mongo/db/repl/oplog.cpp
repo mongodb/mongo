@@ -1703,7 +1703,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 UpdateRequest request(requestNss);
                 request.setQuery(b.done());
-                request.setUpdates(o);
+                request.setUpdateModification(o);
                 request.setUpsert();
                 request.setFromOplogApplication(true);
 
@@ -1749,7 +1749,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
         UpdateRequest request(requestNss);
         request.setQuery(updateCriteria);
-        request.setUpdates(o);
+        request.setUpdateModification(o);
         request.setUpsert(upsert);
         request.setFromOplogApplication(true);
 

@@ -146,9 +146,10 @@ void checkImmutablePathsNotModified(mutablebson::Element element,
 
 }  // namespace
 
-UpdateNode::ApplyResult ModifierNode::applyToExistingElement(ApplyParams applyParams) const {
-    invariant(!applyParams.pathTaken->empty());
-    invariant(applyParams.pathToCreate->empty());
+UpdateExecutor::ApplyResult ModifierNode::applyToExistingElement(
+    ApplyParams applyParams, UpdateNodeApplyParams updateNodeApplyParams) const {
+    invariant(!updateNodeApplyParams.pathTaken->empty());
+    invariant(updateNodeApplyParams.pathToCreate->empty());
     invariant(applyParams.element.ok());
 
     mutablebson::ConstElement leftSibling = applyParams.element.leftSibling();
@@ -159,7 +160,7 @@ UpdateNode::ApplyResult ModifierNode::applyToExistingElement(ApplyParams applyPa
         for (auto immutablePath = applyParams.immutablePaths.begin();
              immutablePath != applyParams.immutablePaths.end();
              ++immutablePath) {
-            if (applyParams.pathTaken->isPrefixOf(**immutablePath)) {
+            if (updateNodeApplyParams.pathTaken->isPrefixOf(**immutablePath)) {
                 compareWithOriginal = true;
                 break;
             }
@@ -172,37 +173,40 @@ UpdateNode::ApplyResult ModifierNode::applyToExistingElement(ApplyParams applyPa
     ModifyResult updateResult;
     if (compareWithOriginal) {
         BSONObj original = applyParams.element.getDocument().getObject();
-        updateResult = updateExistingElement(&applyParams.element, applyParams.pathTaken);
+        updateResult = updateExistingElement(&applyParams.element, updateNodeApplyParams.pathTaken);
         if (updateResult == ModifyResult::kNoOp) {
             return ApplyResult::noopResult();
         }
-        checkImmutablePathsNotModifiedFromOriginal(
-            applyParams.element, applyParams.pathTaken.get(), applyParams.immutablePaths, original);
+        checkImmutablePathsNotModifiedFromOriginal(applyParams.element,
+                                                   updateNodeApplyParams.pathTaken.get(),
+                                                   applyParams.immutablePaths,
+                                                   original);
     } else {
-        updateResult = updateExistingElement(&applyParams.element, applyParams.pathTaken);
+        updateResult = updateExistingElement(&applyParams.element, updateNodeApplyParams.pathTaken);
         if (updateResult == ModifyResult::kNoOp) {
             return ApplyResult::noopResult();
         }
         checkImmutablePathsNotModified(
-            applyParams.element, applyParams.pathTaken.get(), applyParams.immutablePaths);
+            applyParams.element, updateNodeApplyParams.pathTaken.get(), applyParams.immutablePaths);
     }
     invariant(updateResult != ModifyResult::kCreated);
 
     ApplyResult applyResult;
 
-    if (!applyParams.indexData || !applyParams.indexData->mightBeIndexed(*applyParams.pathTaken)) {
+    if (!applyParams.indexData ||
+        !applyParams.indexData->mightBeIndexed(*updateNodeApplyParams.pathTaken)) {
         applyResult.indexesAffected = false;
     }
 
     if (applyParams.validateForStorage) {
-        const uint32_t recursionLevel = applyParams.pathTaken->numParts();
+        const uint32_t recursionLevel = updateNodeApplyParams.pathTaken->numParts();
         validateUpdate(
             applyParams.element, leftSibling, rightSibling, recursionLevel, updateResult);
     }
 
     if (applyParams.logBuilder) {
         logUpdate(applyParams.logBuilder,
-                  applyParams.pathTaken->dottedField(),
+                  updateNodeApplyParams.pathTaken->dottedField(),
                   applyParams.element,
                   updateResult);
     }
@@ -210,16 +214,17 @@ UpdateNode::ApplyResult ModifierNode::applyToExistingElement(ApplyParams applyPa
     return applyResult;
 }
 
-UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams applyParams) const {
+UpdateExecutor::ApplyResult ModifierNode::applyToNonexistentElement(
+    ApplyParams applyParams, UpdateNodeApplyParams updateNodeApplyParams) const {
     if (allowCreation()) {
-        auto newElementFieldName =
-            applyParams.pathToCreate->getPart(applyParams.pathToCreate->numParts() - 1);
+        auto newElementFieldName = updateNodeApplyParams.pathToCreate->getPart(
+            updateNodeApplyParams.pathToCreate->numParts() - 1);
         auto newElement = applyParams.element.getDocument().makeElementNull(newElementFieldName);
         setValueForNewElement(&newElement);
 
         invariant(newElement.ok());
         auto statusWithFirstCreatedElem = pathsupport::createPathAt(
-            *(applyParams.pathToCreate), 0, applyParams.element, newElement);
+            *(updateNodeApplyParams.pathToCreate), 0, applyParams.element, newElement);
         if (!statusWithFirstCreatedElem.isOK()) {
             // $set operaions on non-viable paths are ignored when the update came from replication.
             // We do not error because idempotency requires that any other update modifiers must
@@ -241,7 +246,7 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
         }
 
         if (applyParams.validateForStorage) {
-            const uint32_t recursionLevel = applyParams.pathTaken->numParts() + 1;
+            const uint32_t recursionLevel = updateNodeApplyParams.pathTaken->numParts() + 1;
             mutablebson::ConstElement elementForValidation = statusWithFirstCreatedElem.getValue();
             validateUpdate(elementForValidation,
                            elementForValidation.leftSibling(),
@@ -259,27 +264,29 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
             // (Note that this behavior is subtly different from checkImmutablePathsNotModified(),
             // because we just created this element.)
             uassert(ErrorCodes::ImmutableField,
-                    str::stream() << "Updating the path '" << applyParams.pathTaken->dottedField()
+                    str::stream() << "Updating the path '"
+                                  << updateNodeApplyParams.pathTaken->dottedField()
                                   << "' to "
                                   << applyParams.element.toString()
                                   << " would modify the immutable field '"
                                   << (*immutablePath)->dottedField()
                                   << "'",
-                    applyParams.pathTaken->commonPrefixSize(**immutablePath) !=
+                    updateNodeApplyParams.pathTaken->commonPrefixSize(**immutablePath) !=
                         (*immutablePath)->numParts());
         }
 
-        invariant(!applyParams.pathToCreate->empty());
+        invariant(!updateNodeApplyParams.pathToCreate->empty());
         FieldRef fullPath;
-        if (applyParams.pathTaken->empty()) {
-            fullPath = *applyParams.pathToCreate;
+        if (updateNodeApplyParams.pathTaken->empty()) {
+            fullPath = *updateNodeApplyParams.pathToCreate;
         } else {
-            fullPath = FieldRef(str::stream() << applyParams.pathTaken->dottedField() << "."
-                                              << applyParams.pathToCreate->dottedField());
+            fullPath =
+                FieldRef(str::stream() << updateNodeApplyParams.pathTaken->dottedField() << "."
+                                       << updateNodeApplyParams.pathToCreate->dottedField());
 
             // If adding an element to an array, only mark the path to the array itself as modified.
             if (applyParams.modifiedPaths && applyParams.element.getType() == BSONType::Array) {
-                applyParams.modifiedPaths->keepShortest(*applyParams.pathTaken);
+                applyParams.modifiedPaths->keepShortest(*updateNodeApplyParams.pathTaken);
             }
         }
 
@@ -294,7 +301,7 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
         if (!applyParams.indexData ||
             !applyParams.indexData->mightBeIndexed(applyParams.element.getType() != BSONType::Array
                                                        ? fullPath
-                                                       : *applyParams.pathTaken)) {
+                                                       : *updateNodeApplyParams.pathTaken)) {
             applyResult.indexesAffected = false;
         }
 
@@ -310,26 +317,29 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
         if (!allowNonViablePath()) {
             // One exception: some of these modifiers still fail when the nonexistent path is
             // "non-viable," meaning it couldn't be created even if we intended to.
-            UpdateLeafNode::checkViability(
-                applyParams.element, *(applyParams.pathToCreate), *(applyParams.pathTaken));
+            UpdateLeafNode::checkViability(applyParams.element,
+                                           *(updateNodeApplyParams.pathToCreate),
+                                           *(updateNodeApplyParams.pathTaken));
         }
 
         return ApplyResult::noopResult();
     }
 }
 
-UpdateNode::ApplyResult ModifierNode::apply(ApplyParams applyParams) const {
+UpdateExecutor::ApplyResult ModifierNode::apply(ApplyParams applyParams,
+                                                UpdateNodeApplyParams updateNodeApplyParams) const {
     ApplyResult result;
     if (context == Context::kInsertOnly && !applyParams.insert) {
         result = ApplyResult::noopResult();
-    } else if (!applyParams.pathToCreate->empty()) {
-        result = applyToNonexistentElement(applyParams);
+    } else if (!updateNodeApplyParams.pathToCreate->empty()) {
+        result = applyToNonexistentElement(applyParams, updateNodeApplyParams);
     } else {
-        result = applyToExistingElement(applyParams);
+        result = applyToExistingElement(applyParams, updateNodeApplyParams);
     }
 
     if (applyParams.modifiedPaths) {
-        applyParams.modifiedPaths->keepShortest(*applyParams.pathTaken + *applyParams.pathToCreate);
+        applyParams.modifiedPaths->keepShortest(*updateNodeApplyParams.pathTaken +
+                                                *updateNodeApplyParams.pathToCreate);
     }
 
     return result;

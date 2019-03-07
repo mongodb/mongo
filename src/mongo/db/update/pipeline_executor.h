@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -34,48 +34,58 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/update/update_leaf_node.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/update/update_executor.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 /**
- * Represents a placeholder update that generates conflicts with other updates on the same path but
- * has no effect of its own (i.e., its apply() function does nothing).
- *
- * We use the ConflictPlaceholderNode to ensure that the "from" path of a $rename does not conflict
- * with any other updates. A {$rename: {'from': 'to'}} results in a ConflictPlaceholderNode on the
- * "from" path and a RenameNode on the "to" path. The actual rename operation executes with
- * RenameNode::apply().
+ * An UpdateExecutor representing a pipeline-style update.
  */
-class ConflictPlaceholderNode : public UpdateLeafNode {
+class PipelineExecutor : public UpdateExecutor {
+
 public:
-    Status init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
-        return Status::OK();
-    }
-
-    std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<ConflictPlaceholderNode>(*this);
-    }
-
-    void setCollator(const CollatorInterface* collator) final {}
-
-    ApplyResult apply(ApplyParams applyParams,
-                      UpdateNodeApplyParams updateNodeApplyParams) const final {
-        return ApplyResult::noopResult();
-    }
+    /**
+     * Initializes the node with an aggregation pipeline definition.
+     */
+    explicit PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              const std::vector<BSONObj>& pipeline);
 
     /**
-     * These internally-generated nodes do not need to be serialized.
+     * Replaces the document that 'applyParams.element' belongs to with 'val'. If 'val' does not
+     * contain an _id, the _id from the original document is preserved. 'applyParams.element' must
+     * be the root of the document. Always returns a result stating that indexes are affected when
+     * the replacement is not a noop.
      */
-    void produceSerializationMap(
-        FieldRef* currentPath,
-        std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
-            operatorOrientedUpdates) const final {}
+    ApplyResult applyUpdate(ApplyParams applyParams) const final;
+
+    Value serialize() const {
+        std::vector<Value> valueArray;
+        for (const auto& stage : _pipeline->getSources()) {
+            // TODO SERVER-40539: Consider subclassing DocumentSourceQueue with a class that is
+            // explicitly skipped when serializing. With that change call Pipeline::serialize()
+            // directly.
+            if (stage->getSourceName() == "mock"_sd) {
+                continue;
+            }
+
+            stage->serializeToArray(valueArray);
+        }
+
+        return Value(valueArray);
+    }
 
     void acceptVisitor(UpdateNodeVisitor* visitor) final {
         visitor->visit(this);
     }
+
+    void setCollator(const CollatorInterface* collator) final {}
+
+private:
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 };
 
 }  // namespace mongo

@@ -204,7 +204,7 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
 void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequest) {
     // Current code only supports replacement update.
-    dassert(UpdateDriver::isDocReplacement(updateRequest.getUpdates()));
+    dassert(UpdateDriver::isDocReplacement(updateRequest.getUpdateModification()));
 
     AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
 
@@ -233,11 +233,11 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     dassert(idToFetch.fieldNameStringData() == "_id"_sd);
     auto recordId = indexAccess->findSingle(opCtx, toUpdateIdDoc);
     auto startingSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+    const auto updateMod = updateRequest.getUpdateModification().getUpdateClassic();
 
     if (recordId.isNull()) {
         // Upsert case.
-        auto status = collection->insertDocument(
-            opCtx, InsertStatement(updateRequest.getUpdates()), nullptr, false);
+        auto status = collection->insertDocument(opCtx, InsertStatement(updateMod), nullptr, false);
 
         if (status == ErrorCodes::DuplicateKey) {
             throw WriteConflictException();
@@ -262,14 +262,14 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     }
 
     CollectionUpdateArgs args;
-    args.update = updateRequest.getUpdates();
+    args.update = updateMod;
     args.criteria = toUpdateIdDoc;
     args.fromMigrate = false;
 
     collection->updateDocument(opCtx,
                                recordId,
                                Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
-                               updateRequest.getUpdates(),
+                               updateMod,
                                false,  // indexesAffected = false because _id is the only index
                                nullptr,
                                &args);
@@ -2076,7 +2076,7 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
         }
         return newTxnRecord.toBSON();
     }();
-    updateRequest.setUpdates(updateBSON);
+    updateRequest.setUpdateModification(updateBSON);
     updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName << _sessionId().toBSON()));
     updateRequest.setUpsert(true);
 

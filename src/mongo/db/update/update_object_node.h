@@ -94,7 +94,8 @@ public:
         }
     }
 
-    ApplyResult apply(ApplyParams applyParams) const final;
+    ApplyResult apply(ApplyParams applyParams,
+                      UpdateNodeApplyParams updateNodeApplyParams) const final;
 
     UpdateNode* getChild(const std::string& field) const final;
 

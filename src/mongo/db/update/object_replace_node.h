@@ -34,50 +34,42 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/update/update_node.h"
+#include "mongo/db/update/update_executor.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 /**
- * An UpdateNode representing a replacement-style update.
+ * An UpdateExecutor representing a replacement-style update.
  */
-class ObjectReplaceNode : public UpdateNode {
+class ObjectReplaceNode : public UpdateExecutor {
 
 public:
+    // Applies a replacement style update to 'applyParams.element'. If
+    // 'replacementDocContainsIdField' is false then the _id field from the original document will
+    // be preserved.
+    static ApplyResult applyReplacementUpdate(ApplyParams applyParams,
+                                              const BSONObj& replacementDoc,
+                                              bool replacementDocContainsIdField);
+
     /**
      * Initializes the node with the document to replace with. Any zero-valued timestamps (except
      * for the _id) are updated to the current time.
      */
     explicit ObjectReplaceNode(BSONObj value);
 
-    std::unique_ptr<UpdateNode> clone() const final {
-        return stdx::make_unique<ObjectReplaceNode>(*this);
-    }
-
     void setCollator(const CollatorInterface* collator) final {}
 
     /**
      * Replaces the document that 'applyParams.element' belongs to with 'val'. If 'val' does not
      * contain an _id, the _id from the original document is preserved. 'applyParams.element' must
-     * be the root of the document. 'applyParams.pathToCreate' and 'applyParams.pathTaken' must be
-     * empty. Always returns a result stating that indexes are affected when the replacement is not
-     * a noop.
+     * be the root of the document. Always returns a result stating that indexes are affected when
+     * the replacement is not a noop.
      */
-    ApplyResult apply(ApplyParams applyParams) const final;
+    ApplyResult applyUpdate(ApplyParams applyParams) const final;
 
     BSONObj serialize() const {
         return val;
-    }
-
-    /**
-     * ObjectReplaceNode is never part of an update operator tree so this method cannot be called.
-     */
-    virtual void produceSerializationMap(
-        FieldRef* currentPath,
-        std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
-            operatorOrientedUpdates) const {
-        MONGO_UNREACHABLE;
     }
 
     void acceptVisitor(UpdateNodeVisitor* visitor) final {

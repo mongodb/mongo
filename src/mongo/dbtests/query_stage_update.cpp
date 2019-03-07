@@ -212,12 +212,12 @@ public:
 
             request.setUpsert();
             request.setQuery(query);
-            request.setUpdates(updates);
+            request.setUpdateModification(updates);
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
             ASSERT_DOES_NOT_THROW(
-                driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+                driver.parse(request.getUpdateModification(), arrayFilters, request.isMulti()));
 
             // Setup update params.
             UpdateStageParams params(&request, &driver, opDebug);
@@ -285,12 +285,12 @@ public:
 
             request.setMulti();
             request.setQuery(query);
-            request.setUpdates(updates);
+            request.setUpdateModification(updates);
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
             ASSERT_DOES_NOT_THROW(
-                driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+                driver.parse(request.getUpdateModification(), arrayFilters, request.isMulti()));
 
             // Configure the scan.
             CollectionScanParams collScanParams;
@@ -393,14 +393,15 @@ public:
 
         // Populate the request.
         request.setQuery(query);
-        request.setUpdates(fromjson("{$set: {x: 0}}"));
+        request.setUpdateModification(fromjson("{$set: {x: 0}}"));
         request.setSort(BSONObj());
         request.setMulti(false);
         request.setReturnDocs(UpdateRequest::RETURN_OLD);
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-        ASSERT_DOES_NOT_THROW(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+        ASSERT_DOES_NOT_THROW(
+            driver.parse(request.getUpdateModification(), arrayFilters, request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.
@@ -483,14 +484,15 @@ public:
 
         // Populate the request.
         request.setQuery(query);
-        request.setUpdates(fromjson("{$set: {x: 0}}"));
+        request.setUpdateModification(fromjson("{$set: {x: 0}}"));
         request.setSort(BSONObj());
         request.setMulti(false);
         request.setReturnDocs(UpdateRequest::RETURN_NEW);
 
         const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-        ASSERT_DOES_NOT_THROW(driver.parse(request.getUpdates(), arrayFilters, request.isMulti()));
+        ASSERT_DOES_NOT_THROW(
+            driver.parse(request.getUpdateModification(), arrayFilters, request.isMulti()));
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // RID_AND_OBJ state.

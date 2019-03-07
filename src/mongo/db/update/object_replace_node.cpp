@@ -44,8 +44,7 @@ namespace {
 constexpr StringData kIdFieldName = "_id"_sd;
 }  // namespace
 
-ObjectReplaceNode::ObjectReplaceNode(BSONObj value)
-    : UpdateNode(Type::Replacement), val(value.getOwned()), _containsId(false) {
+ObjectReplaceNode::ObjectReplaceNode(BSONObj value) : val(value.getOwned()), _containsId(false) {
 
     // Replace all zero-valued timestamps with the current time and check for the existence of _id.
     for (auto&& elem : val) {
@@ -70,14 +69,12 @@ ObjectReplaceNode::ObjectReplaceNode(BSONObj value)
     }
 }
 
-UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const {
-    invariant(applyParams.pathToCreate->empty());
-    invariant(applyParams.pathTaken->empty());
-
-    auto original = applyParams.element.getDocument().getObject();
+UpdateExecutor::ApplyResult ObjectReplaceNode::applyReplacementUpdate(
+    ApplyParams applyParams, const BSONObj& replacementDoc, bool replacementDocContainsIdField) {
+    auto originalDoc = applyParams.element.getDocument().getObject();
 
     // Check for noop.
-    if (original.binaryEqual(val)) {
+    if (originalDoc.binaryEqual(replacementDoc)) {
         return ApplyResult::noopResult();
     }
 
@@ -86,7 +83,7 @@ UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const 
     while (current.ok()) {
 
         // Keep the _id if the replacement document does not have one.
-        if (!_containsId && current.getFieldName() == kIdFieldName) {
+        if (!replacementDocContainsIdField && current.getFieldName() == kIdFieldName) {
             current = current.rightSibling();
             continue;
         }
@@ -97,7 +94,7 @@ UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const 
     }
 
     // Insert the provided contents instead.
-    for (auto&& elem : val) {
+    for (auto&& elem : replacementDoc) {
         invariant(applyParams.element.appendElement(elem));
     }
 
@@ -125,13 +122,14 @@ UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const 
                     newElem.getType() != BSONType::Array);
         }
 
-        auto oldElem = dotted_path_support::extractElementAtPath(original, (*path)->dottedField());
+        auto oldElem =
+            dotted_path_support::extractElementAtPath(originalDoc, (*path)->dottedField());
 
         uassert(ErrorCodes::ImmutableField,
                 str::stream() << "After applying the update, the '" << (*path)->dottedField()
                               << "' (required and immutable) field was "
                                  "found to have been removed --"
-                              << original,
+                              << originalDoc,
                 newElem.ok() || !oldElem.ok());
         if (newElem.ok() && oldElem.ok()) {
             uassert(ErrorCodes::ImmutableField,
@@ -153,6 +151,10 @@ UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const 
     }
 
     return ApplyResult();
+}
+
+UpdateExecutor::ApplyResult ObjectReplaceNode::applyUpdate(ApplyParams applyParams) const {
+    return applyReplacementUpdate(applyParams, val, _containsId);
 }
 
 }  // namespace mongo

@@ -55,14 +55,21 @@ const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
 using UpdateType = ChunkManagerTargeter::UpdateType;
 
 /**
- * There are two styles of update expressions:
+ * Update expressions are bucketed into one of two types for the purposes of shard targeting:
  *
  * Replacement style: coll.update({ x : 1 }, { y : 2 })
  * OpStyle: coll.update({ x : 1 }, { $set : { y : 2 } })
+ *            or
+ *          coll.update({x: 1}, [{$addFields: {y: 2}}])
  */
 StatusWith<UpdateType> getUpdateExprType(const write_ops::UpdateOpEntry& updateDoc) {
+    const auto updateMod = updateDoc.getU();
+    if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
+        return UpdateType::kOpStyle;
+    }
+
     // Obtain the update expression from the request.
-    const auto updateExpr = updateDoc.getU();
+    const auto& updateExpr = updateMod.getUpdateClassic();
 
     // Empty update is replacement-style by default.
     auto updateType = (updateExpr.isEmpty() ? UpdateType::kReplacement : UpdateType::kUnknown);
@@ -106,11 +113,16 @@ StatusWith<BSONObj> getUpdateExpr(OperationContext* opCtx,
 
     // If this is not a replacement update, then the update expression remains unchanged.
     if (updateType != UpdateType::kReplacement) {
-        return updateDoc.getU();
+        const auto& updateMod = updateDoc.getU();
+        BSONObjBuilder objBuilder;
+        updateMod.serializeToBSON("u", &objBuilder);
+        return objBuilder.obj();
     }
 
     // Extract the raw update expression from the request.
-    auto updateExpr = updateDoc.getU();
+    const auto& updateMod = updateDoc.getU();
+    invariant(updateMod.type() == write_ops::UpdateModification::Type::kClassic);
+    auto updateExpr = updateMod.getUpdateClassic();
 
     // Find the set of all shard key fields that are missing from the update expression.
     const auto missingFields = shardKeyPattern.findMissingShardKeyFieldsFromDoc(updateExpr);
@@ -402,10 +414,10 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     // Because drivers do not know the shard key, they can't pull the shard key automatically
     // into the query doc, and to correctly support upsert we must target a single shard.
     //
-    // The rule is simple - If the update is replacement style (no '$set'), we target using the
-    // update. If the update is not replacement style, we target using the query. Because mongoD
-    // will automatically propagate '_id' from an existing document, and will extract it from an
-    // exact-match in the query in the case of an upsert, we augment the replacement doc with the
+    // The rule is simple - If the update is replacement style (no '$set' or pipeline), we target
+    // using the update. If the update is not replacement style, we target using the query. Because
+    // mongoD will automatically propagate '_id' from an existing document, and will extract it from
+    // an exact-match in the query in the case of an upsert, we augment the replacement doc with the
     // query's '_id' for targeting purposes, if it exists.
     //
     // Once we have determined the correct component to target on, we attempt to extract an exact

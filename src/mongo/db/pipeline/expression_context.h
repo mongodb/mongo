@@ -188,12 +188,8 @@ public:
         return tailableMode == TailableModeEnum::kTailableAndAwaitData;
     }
 
-    /**
-     * Sets the resolved definition for an involved namespace.
-     */
-    void setResolvedNamespace_forTest(const NamespaceString& nss,
-                                      ResolvedNamespace resolvedNamespace) {
-        _resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
+    void setResolvedNamespaces(StringMap<ResolvedNamespace> resolvedNamespaces) {
+        _resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
     auto getRuntimeConstants() const {

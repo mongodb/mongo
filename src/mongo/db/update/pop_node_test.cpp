@@ -111,7 +111,7 @@ TEST_F(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {
     mmb::Document doc(fromjson("{b: [1, 2, 3]}"));
     setPathToCreate("a.b");
     addIndexedPath("a.b");
-    auto result = popNode.apply(getApplyParams(doc.root()));
+    auto result = popNode.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: [1, 2, 3]}"), doc);
@@ -129,7 +129,7 @@ TEST_F(PopNodeTest, NoopWhenPathPartiallyExists) {
     setPathToCreate("b.c");
     setPathTaken("a");
     addIndexedPath("a.b.c");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
@@ -147,7 +147,7 @@ TEST_F(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
     setPathToCreate("0");
     setPathTaken("a");
     addIndexedPath("a.0");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
@@ -166,7 +166,7 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsBlockedByAScalar) {
     setPathTaken("a");
     addIndexedPath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        popNode.apply(getApplyParams(doc.root()["a"])),
+        popNode.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::PathNotViable,
         "Cannot use the part (b) of (a.b) to traverse the element ({a: \"foo\"})");
@@ -183,7 +183,7 @@ DEATH_TEST_F(PopNodeTest,
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
-    popNode.apply(getApplyParams(doc.end()));
+    popNode.apply(getApplyParams(doc.end()), getUpdateNodeApplyParams());
 }
 
 TEST_F(PopNodeTest, ThrowsWhenPathExistsButDoesNotContainAnArray) {
@@ -195,10 +195,11 @@ TEST_F(PopNodeTest, ThrowsWhenPathExistsButDoesNotContainAnArray) {
     mmb::Document doc(fromjson("{a: {b: 'foo'}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
-    ASSERT_THROWS_CODE_AND_WHAT(popNode.apply(getApplyParams(doc.root()["a"]["b"])),
-                                AssertionException,
-                                ErrorCodes::TypeMismatch,
-                                "Path 'a.b' contains an element of non-array type 'string'");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams()),
+        AssertionException,
+        ErrorCodes::TypeMismatch,
+        "Path 'a.b' contains an element of non-array type 'string'");
 }
 
 TEST_F(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
@@ -210,7 +211,7 @@ TEST_F(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
     mmb::Document doc(fromjson("{a: {b: []}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
@@ -228,7 +229,7 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheBack) {
     mmb::Document doc(fromjson("{a: {b: [1]}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
@@ -246,7 +247,7 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheFront) {
     mmb::Document doc(fromjson("{a: {b: [[1]]}}"));
     setPathTaken("a.b");
     addIndexedPath("a");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
@@ -264,7 +265,7 @@ TEST_F(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b.c");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
@@ -282,7 +283,7 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
     setPathTaken("a.b");
     addIndexedPath("a.b");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
@@ -300,7 +301,7 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
     setPathTaken("a.b");
     addIndexedPath("unrelated.path");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
@@ -317,7 +318,7 @@ TEST_F(PopNodeTest, SucceedsWithNullUpdateIndexData) {
 
     mmb::Document doc(fromjson("{a: {b: [1, 2, 3]}}"));
     setPathTaken("a.b");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
@@ -336,7 +337,7 @@ TEST_F(PopNodeTest, SucceedsWithNullLogBuilder) {
     setPathTaken("a.b");
     addIndexedPath("a.b.c");
     setLogBuilderToNull();
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
@@ -354,7 +355,7 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsImmutable) {
     addImmutablePath("a.b");
     addIndexedPath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        popNode.apply(getApplyParams(doc.root()["a"]["b"])),
+        popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::ImmutableField,
         "Performing an update on the path 'a.b' would modify the immutable field 'a.b'");
@@ -376,7 +377,7 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsPrefixOfImmutable) {
     addImmutablePath("a.0");
     addIndexedPath("a");
     ASSERT_THROWS_CODE_AND_WHAT(
-        popNode.apply(getApplyParams(doc.root()["a"])),
+        popNode.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::ImmutableField,
         "Performing an update on the path 'a' would modify the immutable field 'a.0'");
@@ -393,7 +394,7 @@ TEST_F(PopNodeTest, ThrowsWhenPathIsSuffixOfImmutable) {
     addImmutablePath("a");
     addIndexedPath("a.b");
     ASSERT_THROWS_CODE_AND_WHAT(
-        popNode.apply(getApplyParams(doc.root()["a"]["b"])),
+        popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams()),
         AssertionException,
         ErrorCodes::ImmutableField,
         "Performing an update on the path 'a.b' would modify the immutable field 'a'");
@@ -409,7 +410,7 @@ TEST_F(PopNodeTest, NoopOnImmutablePathSucceeds) {
     setPathTaken("a.b");
     addImmutablePath("a.b");
     addIndexedPath("a.b");
-    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]));
+    auto result = popNode.apply(getApplyParams(doc.root()["a"]["b"]), getUpdateNodeApplyParams());
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);

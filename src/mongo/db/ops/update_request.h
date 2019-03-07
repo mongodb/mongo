@@ -33,6 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/util/str.h"
 
@@ -101,12 +102,12 @@ public:
         return _collation;
     }
 
-    inline void setUpdates(const BSONObj& updates) {
-        _updates = updates;
+    inline void setUpdateModification(const write_ops::UpdateModification& updateMod) {
+        _updateMod = updateMod;
     }
 
-    inline const BSONObj& getUpdates() const {
-        return _updates;
+    inline const write_ops::UpdateModification& getUpdateModification() const {
+        return _updateMod;
     }
 
     inline void setArrayFilters(const std::vector<BSONObj>& arrayFilters) {
@@ -206,7 +207,7 @@ public:
         builder << " projection: " << _proj;
         builder << " sort: " << _sort;
         builder << " collation: " << _collation;
-        builder << " updates: " << _updates;
+        builder << " updateModification: " << _updateMod.toString();
         builder << " stmtId: " << _stmtId;
 
         builder << " arrayFilters: [";
@@ -245,7 +246,7 @@ private:
     BSONObj _collation;
 
     // Contains the modifiers to apply to matched objects, or a replacement document.
-    BSONObj _updates;
+    write_ops::UpdateModification _updateMod;
 
     // Filters to specify which array elements should be updated.
     std::vector<BSONObj> _arrayFilters;

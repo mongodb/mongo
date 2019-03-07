@@ -52,7 +52,7 @@ public:
      * May throw a AssertionException if there is an invalid stage specification, although full
      * validation happens later, during Pipeline construction.
      */
-    LiteParsedPipeline(const AggregationRequest& request) : _nss(request.getNamespaceString()) {
+    LiteParsedPipeline(const AggregationRequest& request) {
         _stageSpecs.reserve(request.getPipeline().size());
 
         for (auto&& rawStage : request.getPipeline()) {
@@ -152,7 +152,6 @@ public:
 
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
-    NamespaceString _nss;
 };
 
 }  // namespace mongo

@@ -178,9 +178,7 @@ UpdateStage::UpdateStage(OperationContext* opCtx,
         !(request->isFromOplogApplication() || request->getNamespaceString().isConfigDB() ||
           request->isFromMigration());
 
-    // Before we even start executing, we know whether or not this is a replacement
-    // style or $mod style update.
-    _specificStats.isDocReplacement = params.driver->isDocReplacement();
+    _specificStats.isModUpdate = params.driver->type() == UpdateDriver::UpdateType::kOperator;
 }
 
 BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& recordId) {
@@ -417,7 +415,7 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
         }
         requiredPaths.keepShortest(&idFieldRef);
         uassertStatusOK(driver->populateDocumentWithQueryFields(*cq, requiredPaths, *doc));
-        if (driver->isDocReplacement())
+        if (driver->type() == UpdateDriver::UpdateType::kReplacement)
             stats->fastmodinsert = true;
     } else {
         fassert(17354, CanonicalQuery::isSimpleIdQuery(query));
@@ -877,7 +875,7 @@ void UpdateStage::recordUpdateStatsInOpDebug(const UpdateStats* updateStats, OpD
 
 UpdateResult UpdateStage::makeUpdateResult(const UpdateStats* updateStats) {
     return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
-                        !updateStats->isDocReplacement /* $mod or obj replacement */,
+                        updateStats->isModUpdate /* Is this a $mod update? */,
                         updateStats->nModified /* number of modified docs, no no-ops */,
                         updateStats->nMatched /* # of docs matched/updated, even no-ops */,
                         updateStats->objInserted);

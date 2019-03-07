@@ -32,9 +32,15 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 namespace write_ops {
+
+// Conservative per array element overhead. This value was calculated as 1 byte (element type) + 5
+// bytes (max string encoding of the array index encoded as string and the maximum key is 99999) + 1
+// byte (zero terminator) = 7 bytes
+constexpr int kBSONArrayPerElementOverheadBytes = 7;
 
 /**
  * Parses the 'limit' property of a delete entry, which has inverted meaning from the 'multi'
@@ -46,6 +52,82 @@ bool readMultiDeleteProperty(const BSONElement& limitElement);
  * Writes the 'isMulti' value as a limit property.
  */
 void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder* builder);
+
+class UpdateModification {
+public:
+    enum class Type { kClassic, kPipeline };
+
+    static StringData typeToString(Type type) {
+        return (type == Type::kClassic ? "Classic"_sd : "Pipeline"_sd);
+    }
+
+    UpdateModification() = default;
+    UpdateModification(BSONElement update);
+
+    // This constructor exists only to provide a fast-path for constructing classic-style updates.
+    UpdateModification(const BSONObj& update);
+
+
+    /**
+     * These methods support IDL parsing of the "u" field from the update command and OP_UPDATE.
+     */
+    static UpdateModification parseFromBSON(BSONElement elem);
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
+
+    // When parsing from legacy OP_UPDATE messages, we receive the "u" field as an object. When an
+    // array is parsed, we receive it as an object with numeric fields names and can't differentiate
+    // between a user constructed object and an array. For that reason, we don't support pipeline
+    // style update via OP_UPDATE and 'obj' is assumed to be a classic update.
+    //
+    // If a user did send a pipeline-style update via OP_UPDATE, it would fail parsing a field
+    // representing an aggregation stage, due to the leading '$'' character.
+    static UpdateModification parseLegacyOpUpdateFromBSON(const BSONObj& obj);
+
+    int objsize() const {
+        if (_type == Type::kClassic) {
+            return _classicUpdate->objsize();
+        }
+
+        int size = 0;
+        std::for_each(_pipeline->begin(), _pipeline->end(), [&size](const BSONObj& obj) {
+            size += obj.objsize() + kBSONArrayPerElementOverheadBytes;
+        });
+
+        return size + kBSONArrayPerElementOverheadBytes;
+    }
+
+    Type type() const {
+        return _type;
+    }
+
+    BSONObj getUpdateClassic() const {
+        invariant(_type == Type::kClassic);
+        return *_classicUpdate;
+    }
+
+    const std::vector<BSONObj>& getUpdatePipeline() const {
+        invariant(_type == Type::kPipeline);
+        return *_pipeline;
+    }
+
+    std::string toString() const {
+        StringBuilder sb;
+        sb << "{type: " << typeToString(_type) << ", update: ";
+
+        if (_type == Type::kClassic) {
+            sb << *_classicUpdate << "}";
+        } else {
+            sb << Value(*_pipeline).toString();
+        }
+
+        return sb.str();
+    }
+
+private:
+    Type _type = Type::kClassic;
+    boost::optional<BSONObj> _classicUpdate;
+    boost::optional<std::vector<BSONObj>> _pipeline;
+};
 
 }  // namespace write_ops
 }  // namespace mongo

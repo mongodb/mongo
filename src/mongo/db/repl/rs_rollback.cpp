@@ -1413,7 +1413,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                     UpdateRequest request(nss);
 
                     request.setQuery(pattern);
-                    request.setUpdates(idAndDoc.second);
+                    request.setUpdateModification(idAndDoc.second);
                     request.setGod();
                     request.setUpsert();
 

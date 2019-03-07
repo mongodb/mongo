@@ -96,8 +96,12 @@ protected:
 
     void introduceCollection(StringData collectionName) {
         NamespaceString fromNs("test", collectionName);
-        getExpCtx()->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
+        _resolvedNamespaces.insert({fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}});
+        getExpCtx()->setResolvedNamespaces(_resolvedNamespaces);
     }
+
+private:
+    StringMap<ExpressionContext::ResolvedNamespace> _resolvedNamespaces;
 };
 
 using namespace pipeline_metadata_tree;

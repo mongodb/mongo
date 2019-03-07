@@ -121,8 +121,11 @@ public:
         return Status::OK();
     }
 
-    Status checkAuthForUpdate(
-        OperationContext*, const NamespaceString&, const BSONObj&, const BSONObj&, bool) override {
+    Status checkAuthForUpdate(OperationContext*,
+                              const NamespaceString&,
+                              const BSONObj&,
+                              const write_ops::UpdateModification&,
+                              bool) override {
         return Status::OK();
     }
 

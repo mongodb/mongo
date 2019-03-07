@@ -50,7 +50,7 @@ TEST_F(ObjectReplaceNodeTest, Noop) {
     ObjectReplaceNode node(obj);
 
     mutablebson::Document doc(fromjson("{a: 1, b: 2}"));
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), doc);
@@ -63,7 +63,7 @@ TEST_F(ObjectReplaceNodeTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
     ObjectReplaceNode node(obj);
 
     mutablebson::Document doc(fromjson("{c: 1, d: 2}"));
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), doc);
@@ -76,7 +76,7 @@ TEST_F(ObjectReplaceNodeTest, ShouldPreserveIdOfExistingDocumentIfIdNotSpecified
     ObjectReplaceNode node(obj);
 
     mutablebson::Document doc(fromjson("{_id: 0, c: 1, d: 2}"));
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), doc);
@@ -90,7 +90,7 @@ TEST_F(ObjectReplaceNodeTest, ShouldSucceedWhenImmutableIdIsNotModified) {
 
     mutablebson::Document doc(fromjson("{_id: 0, c: 1, d: 2}"));
     addImmutablePath("_id");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1, b: 2}"), doc);
@@ -103,7 +103,7 @@ TEST_F(ObjectReplaceNodeTest, IdTimestampNotModified) {
     ObjectReplaceNode node(obj);
 
     mutablebson::Document doc(fromjson("{}"));
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: Timestamp(0,0)}"), doc);
@@ -116,7 +116,7 @@ TEST_F(ObjectReplaceNodeTest, NonIdTimestampsModified) {
     ObjectReplaceNode node(obj);
 
     mutablebson::Document doc(fromjson("{}"));
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
 
@@ -143,7 +143,7 @@ TEST_F(ObjectReplaceNodeTest, ComplexDoc) {
     ObjectReplaceNode node(obj);
 
     mutablebson::Document doc(fromjson("{a: 1, b: [0, 2, 2], e: []}"));
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], c: {d: 1}}"), doc);
@@ -157,7 +157,7 @@ TEST_F(ObjectReplaceNodeTest, CannotRemoveImmutablePath) {
 
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
+    ASSERT_THROWS_CODE_AND_WHAT(node.applyUpdate(getApplyParams(doc.root())),
                                 AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the 'a.b' (required and immutable) "
@@ -170,7 +170,7 @@ TEST_F(ObjectReplaceNodeTest, IdFieldIsNotRemoved) {
 
     mutablebson::Document doc(fromjson("{_id: 0, b: 1}"));
     addImmutablePath("_id");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0, a: 1}"), doc);
@@ -184,7 +184,7 @@ TEST_F(ObjectReplaceNodeTest, CannotReplaceImmutablePathWithArrayField) {
 
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
+    ASSERT_THROWS_CODE_AND_WHAT(node.applyUpdate(getApplyParams(doc.root())),
                                 AssertionException,
                                 ErrorCodes::NotSingleValueField,
                                 "After applying the update to the document, the (immutable) field "
@@ -197,7 +197,7 @@ TEST_F(ObjectReplaceNodeTest, CannotMakeImmutablePathArrayDescendant) {
 
     mutablebson::Document doc(fromjson("{_id: 0, a: {'0': 1}}"));
     addImmutablePath("a.0");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
+    ASSERT_THROWS_CODE_AND_WHAT(node.applyUpdate(getApplyParams(doc.root())),
                                 AssertionException,
                                 ErrorCodes::NotSingleValueField,
                                 "After applying the update to the document, the (immutable) field "
@@ -210,7 +210,7 @@ TEST_F(ObjectReplaceNodeTest, CannotModifyImmutablePath) {
 
     mutablebson::Document doc(fromjson("{_id: 0, a: {b: 1}}"));
     addImmutablePath("a.b");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
+    ASSERT_THROWS_CODE_AND_WHAT(node.applyUpdate(getApplyParams(doc.root())),
                                 AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the (immutable) field 'a.b' was found "
@@ -223,7 +223,7 @@ TEST_F(ObjectReplaceNodeTest, CannotModifyImmutableId) {
 
     mutablebson::Document doc(fromjson("{_id: 0}"));
     addImmutablePath("_id");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root())),
+    ASSERT_THROWS_CODE_AND_WHAT(node.applyUpdate(getApplyParams(doc.root())),
                                 AssertionException,
                                 ErrorCodes::ImmutableField,
                                 "After applying the update, the (immutable) field '_id' was found "
@@ -236,7 +236,7 @@ TEST_F(ObjectReplaceNodeTest, CanAddImmutableField) {
 
     mutablebson::Document doc(fromjson("{c: 1}"));
     addImmutablePath("a.b");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 1}}"), doc);
@@ -250,7 +250,7 @@ TEST_F(ObjectReplaceNodeTest, CanAddImmutableId) {
 
     mutablebson::Document doc(fromjson("{c: 1}"));
     addImmutablePath("_id");
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0}"), doc);
@@ -264,7 +264,7 @@ TEST_F(ObjectReplaceNodeTest, CannotCreateDollarPrefixedNameWhenValidateForStora
 
     mutablebson::Document doc(fromjson("{}"));
     ASSERT_THROWS_CODE_AND_WHAT(
-        node.apply(getApplyParams(doc.root())),
+        node.applyUpdate(getApplyParams(doc.root())),
         AssertionException,
         ErrorCodes::DollarPrefixedFieldName,
         "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
@@ -276,7 +276,7 @@ TEST_F(ObjectReplaceNodeTest, CanCreateDollarPrefixedNameWhenValidateForStorageI
 
     mutablebson::Document doc(fromjson("{}"));
     setValidateForStorage(false);
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: 1, $bad: 1}}"), doc);
@@ -290,7 +290,7 @@ TEST_F(ObjectReplaceNodeTest, NoLogBuilder) {
 
     mutablebson::Document doc(fromjson("{b: 1}"));
     setLogBuilderToNull();
-    auto result = node.apply(getApplyParams(doc.root()));
+    auto result = node.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: 1}"), doc);

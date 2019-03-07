@@ -110,7 +110,7 @@ public:
     Status checkAuthForUpdate(OperationContext* opCtx,
                               const NamespaceString& ns,
                               const BSONObj& query,
-                              const BSONObj& update,
+                              const write_ops::UpdateModification& update,
                               bool upsert) override;
 
     Status checkAuthForInsert(OperationContext* opCtx, const NamespaceString& ns) override;

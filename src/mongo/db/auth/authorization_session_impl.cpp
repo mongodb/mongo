@@ -364,7 +364,7 @@ Status AuthorizationSessionImpl::checkAuthForInsert(OperationContext* opCtx,
 Status AuthorizationSessionImpl::checkAuthForUpdate(OperationContext* opCtx,
                                                     const NamespaceString& ns,
                                                     const BSONObj& query,
-                                                    const BSONObj& update,
+                                                    const write_ops::UpdateModification& update,
                                                     bool upsert) {
     ActionSet required{ActionType::update};
     StringData operationType = "update"_sd;

@@ -56,7 +56,7 @@ auto updateRoundTrip(const char* json, const std::vector<std::string> filterName
     for (const auto& name : filterNames)
         filters[name] = nullptr;
     driver.parse(bson, filters);
-    return mongo::tojson(driver.serialize());
+    return mongo::tojson(driver.serialize().getDocument().toBson());
 }
 
 TEST(UpdateSerialization, DocumentReplacementSerializesExactly) {

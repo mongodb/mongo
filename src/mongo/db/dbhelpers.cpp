@@ -222,7 +222,7 @@ void Helpers::upsert(OperationContext* opCtx,
     UpdateRequest request(requestNs);
 
     request.setQuery(id);
-    request.setUpdates(o);
+    request.setUpdateModification(o);
     request.setUpsert();
     request.setFromMigration(fromMigrate);
 
@@ -235,7 +235,7 @@ void Helpers::putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj)
     const NamespaceString requestNs(ns);
     UpdateRequest request(requestNs);
 
-    request.setUpdates(obj);
+    request.setUpdateModification(obj);
     request.setUpsert();
 
     update(opCtx, context.db(), request);

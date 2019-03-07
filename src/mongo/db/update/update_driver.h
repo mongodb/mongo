@@ -37,9 +37,13 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/object_replace_node.h"
+#include "mongo/db/update/pipeline_executor.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update/update_object_node.h"
 #include "mongo/db/update_index_data.h"
@@ -51,13 +55,15 @@ class OperationContext;
 
 class UpdateDriver {
 public:
+    enum class UpdateType { kOperator, kReplacement, kPipeline };
+
     UpdateDriver(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Parses the 'updateExpr' update expression into the '_root' member variable. Uasserts
-     * if 'updateExpr' fails to parse.
+     * Parses the 'updateExpr' update expression into the '_updateExecutor' member variable.
+     * Uasserts if 'updateExpr' fails to parse.
      */
-    void parse(const BSONObj& updateExpr,
+    void parse(const write_ops::UpdateModification& updateExpr,
                const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& arrayFilters,
                const bool multi = false);
 
@@ -121,24 +127,39 @@ public:
      * implementing methods that operate on the nodes of the tree.
      */
     void visitRoot(UpdateNodeVisitor* visitor) {
-        _root->acceptVisitor(visitor);
+        _updateExecutor->acceptVisitor(visitor);
     }
 
     //
     // Accessors
     //
 
-    bool isDocReplacement() const;
-    static bool isDocReplacement(const BSONObj& updateExpr);
+    UpdateType type() const {
+        return _updateType;
+    }
 
-    bool modsAffectIndices() const;
-    void refreshIndexKeys(const UpdateIndexData* indexedFields);
+    static bool isDocReplacement(const write_ops::UpdateModification& updateMod);
 
-    bool logOp() const;
-    void setLogOp(bool logOp);
+    bool modsAffectIndices() const {
+        return _affectIndices;
+    }
+    void refreshIndexKeys(const UpdateIndexData* indexedFields) {
+        _indexedFields = indexedFields;
+    }
 
-    bool fromOplogApplication() const;
-    void setFromOplogApplication(bool fromOplogApplication);
+    bool logOp() const {
+        return _logOp;
+    }
+    void setLogOp(bool logOp) {
+        _logOp = logOp;
+    }
+
+    bool fromOplogApplication() const {
+        return _fromOplogApplication;
+    }
+    void setFromOplogApplication(bool fromOplogApplication) {
+        _fromOplogApplication = fromOplogApplication;
+    }
 
     mutablebson::Document& getDocument() {
         return _objDoc;
@@ -153,12 +174,20 @@ public:
     }
 
     /**
-     * Serialize the update expression to BSON. Output of this method is expected to, when parsed,
+     * Serialize the update expression to Value. Output of this method is expected to, when parsed,
      * produce a logically equivalent update expression.
      */
-    BSONObj serialize() const {
-        return _replacementMode ? static_cast<ObjectReplaceNode*>(_root.get())->serialize()
-                                : static_cast<UpdateObjectNode*>(_root.get())->serialize();
+    Value serialize() const {
+        switch (_updateType) {
+            case UpdateType::kReplacement:
+                return Value(static_cast<ObjectReplaceNode*>(_updateExecutor.get())->serialize());
+            case UpdateType::kPipeline:
+                return static_cast<PipelineExecutor*>(_updateExecutor.get())->serialize();
+            case UpdateType::kOperator:
+                return Value(static_cast<UpdateObjectNode*>(_updateExecutor.get())->serialize());
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
 
     /**
@@ -176,12 +205,9 @@ private:
     // immutable properties after parsing
     //
 
-    // Is this a full object replacement or do we have update modifiers in the '_root' UpdateNode
-    // tree?
-    bool _replacementMode = false;
+    UpdateType _updateType = UpdateType::kOperator;
 
-    // The root of the UpdateNode tree.
-    std::unique_ptr<UpdateNode> _root;
+    std::unique_ptr<UpdateExecutor> _updateExecutor;
 
     // What are the list of fields in the collection over which the update is going to be
     // applied that participate in indices?

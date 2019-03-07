@@ -110,7 +110,7 @@ void makeUpdateRequest(const OperationContext* opCtx,
                        UpdateRequest* requestOut) {
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
-    requestOut->setUpdates(args.getUpdateObj());
+    requestOut->setUpdateModification(args.getUpdateObj());
     requestOut->setSort(args.getSort());
     requestOut->setCollation(args.getCollation());
     requestOut->setArrayFilters(args.getArrayFilters());

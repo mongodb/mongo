@@ -39,6 +39,7 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/log_builder.h"
+#include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
@@ -63,39 +64,12 @@ class FieldRef;
  *               b /    \ c
  * SetNode: _val = 5    IncNode: _val = 1
  */
-class UpdateNode {
+class UpdateNode : public UpdateExecutor {
 public:
     enum class Context { kAll, kInsertOnly };
     enum class Type { Object, Array, Leaf, Replacement };
 
-    explicit UpdateNode(Type type, Context context = Context::kAll)
-        : context(context), type(type) {}
-    virtual ~UpdateNode() = default;
-
-    virtual std::unique_ptr<UpdateNode> clone() const = 0;
-
-    /**
-     * Set the collation on the node and all descendants. This is a noop if no leaf nodes require a
-     * collator. If setCollator() is called, it is required that the current collator of all leaf
-     * nodes is the simple collator (nullptr). The collator must outlive the modifier interface.
-     * This is used to override the collation after obtaining a collection lock if the update did
-     * not specify a collation and the collection has a non-simple default collation.
-     */
-    virtual void setCollator(const CollatorInterface* collator) = 0;
-
-    /**
-     * The parameters required by UpdateNode::apply.
-     */
-    struct ApplyParams {
-        ApplyParams(mutablebson::Element element, const FieldRefSet& immutablePaths)
-            : element(element), immutablePaths(immutablePaths) {}
-
-        // The element to update.
-        mutablebson::Element element;
-
-        // UpdateNode::apply uasserts if it modifies an immutable path.
-        const FieldRefSet& immutablePaths;
-
+    struct UpdateNodeApplyParams {
         // The path taken through the UpdateNode tree beyond where the path existed in the document.
         // For example, if the update is {$set: {'a.b.c': 5}}, and the document is {a: {}}, then at
         // the leaf node, 'pathToCreate'="b.c".
@@ -105,55 +79,21 @@ public:
         // For example, if the update is {$set: {'a.b.c': 5}}, and the document is {a: {}}, then at
         // the leaf node, 'pathTaken'="a".
         std::shared_ptr<FieldRef> pathTaken = std::make_shared<FieldRef>();
-
-        // If there was a positional ($) element in the update expression, 'matchedField' is the
-        // index of the array element that caused the query to match the document.
-        StringData matchedField;
-
-        // True if the update is being applied to a document to be inserted. $setOnInsert behaves as
-        // a no-op when this flag is false.
-        bool insert = false;
-
-        // This is provided because some modifiers may ignore certain errors when the update is from
-        // replication.
-        bool fromOplogApplication = false;
-
-        // If true, UpdateNode::apply ensures that modified elements do not violate depth or DBRef
-        // constraints.
-        bool validateForStorage = true;
-
-        // Used to determine whether indexes are affected.
-        const UpdateIndexData* indexData = nullptr;
-
-        // If provided, UpdateNode::apply will log the update here.
-        LogBuilder* logBuilder = nullptr;
-
-        // If provided, UpdateNode::apply will populate this with a path to each modified field.
-        FieldRefSetWithStorage* modifiedPaths = nullptr;
     };
 
-    /**
-     * The outputs of apply().
-     */
-    struct ApplyResult {
-        static ApplyResult noopResult() {
-            ApplyResult applyResult;
-            applyResult.indexesAffected = false;
-            applyResult.noop = true;
-            return applyResult;
-        }
+    explicit UpdateNode(Type type, Context context = Context::kAll)
+        : context(context), type(type) {}
+    virtual ~UpdateNode() = default;
 
-        bool indexesAffected = true;
-        bool noop = false;
-    };
+    virtual std::unique_ptr<UpdateNode> clone() const = 0;
 
-    /**
-     * Applies the update node to 'applyParams.element', creating the fields in
-     * 'applyParams.pathToCreate' if required by the leaves (i.e. the leaves are not all $unset).
-     * Returns an ApplyResult specifying whether the operation was a no-op and whether indexes are
-     * affected.
-     */
-    virtual ApplyResult apply(ApplyParams applyParams) const = 0;
+    ApplyResult applyUpdate(ApplyParams applyParams) const final {
+        UpdateNodeApplyParams updateNodeApplyParams;
+        return apply(applyParams, updateNodeApplyParams);
+    }
+
+    virtual ApplyResult apply(ApplyParams applyParams,
+                              UpdateNodeApplyParams updateNodeApplyParams) const = 0;
 
     /**
      * Creates a new node by merging the contents of two input nodes. The semantics of the merge
@@ -179,12 +119,6 @@ public:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const = 0;
-
-    /**
-     * This allows an arbitrary class to implement logic which gets dispatched to at runtime
-     * depending on the type of the UpdateNode.
-     */
-    virtual void acceptVisitor(UpdateNodeVisitor* visitor) = 0;
 
 public:
     const Context context;

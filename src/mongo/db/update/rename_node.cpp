@@ -162,7 +162,8 @@ Status RenameNode::init(BSONElement modExpr,
     return Status::OK();
 }
 
-UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
+UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
+                                              UpdateNodeApplyParams updateNodeApplyParams) const {
     // It would make sense to store fromFieldRef and toFieldRef as members during
     // RenameNode::init(), but FieldRef is not copyable.
     auto fromFieldRef = std::make_shared<FieldRef>(_val.fieldName());
@@ -214,8 +215,9 @@ UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
     // Check that our destination path does not contain an array. (If the rename will overwrite an
     // existing element, that element may be an array. Iff pathToCreate is empty, "element"
     // represents an element that we are going to overwrite.)
-    for (auto currentElement = applyParams.pathToCreate->empty() ? applyParams.element.parent()
-                                                                 : applyParams.element;
+    for (auto currentElement = updateNodeApplyParams.pathToCreate->empty()
+             ? applyParams.element.parent()
+             : applyParams.element;
          currentElement != document.root();
          currentElement = currentElement.parent()) {
         invariant(currentElement.ok());
@@ -237,15 +239,17 @@ UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
     // should call the init() method of a ModifierNode before calling its apply() method, but the
     // init() methods of SetElementNode and UnsetNode don't do anything, so we can skip them.
     SetElementNode setElement(fromElement);
-    auto setElementApplyResult = setElement.apply(applyParams);
+    auto setElementApplyResult = setElement.apply(applyParams, updateNodeApplyParams);
 
     ApplyParams unsetParams(applyParams);
     unsetParams.element = fromElement;
-    unsetParams.pathToCreate = std::make_shared<FieldRef>();
-    unsetParams.pathTaken = fromFieldRef;
+
+    UpdateNodeApplyParams unsetUpdateNodeApplyParams;
+    unsetUpdateNodeApplyParams.pathToCreate = std::make_shared<FieldRef>();
+    unsetUpdateNodeApplyParams.pathTaken = fromFieldRef;
 
     UnsetNode unsetElement;
-    auto unsetElementApplyResult = unsetElement.apply(unsetParams);
+    auto unsetElementApplyResult = unsetElement.apply(unsetParams, unsetUpdateNodeApplyParams);
 
     // Determine the final result based on the results of the $set and $unset.
     ApplyResult applyResult;

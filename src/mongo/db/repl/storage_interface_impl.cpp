@@ -907,7 +907,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         // the event it was specified as a UUID.
         UpdateRequest request(collection->ns());
         request.setQuery(query);
-        request.setUpdates(update);
+        request.setUpdateModification(update);
         request.setUpsert(true);
         invariant(!request.isMulti());  // This follows from using an exact _id query.
         invariant(!request.shouldReturnAnyDocs());
@@ -947,7 +947,7 @@ Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
                                           const TimestampedBSONObj& update) {
     UpdateRequest request(nss);
     request.setQuery({});
-    request.setUpdates(update.obj);
+    request.setUpdateModification(update.obj);
     request.setUpsert(true);
     return _updateWithQuery(opCtx, request, update.timestamp);
 }
@@ -958,7 +958,7 @@ Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
                                              const TimestampedBSONObj& update) {
     UpdateRequest request(nss);
     request.setQuery(query);
-    request.setUpdates(update.obj);
+    request.setUpdateModification(update.obj);
     invariant(!request.isUpsert());
     return _updateWithQuery(opCtx, request, update.timestamp);
 }
