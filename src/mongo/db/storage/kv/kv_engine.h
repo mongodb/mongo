@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 
@@ -307,9 +308,7 @@ public:
     /**
      * See `StorageEngine::setStableTimestamp`
      */
-    virtual void setStableTimestamp(Timestamp stableTimestamp,
-                                    boost::optional<Timestamp> maximumTruncationTimestamp,
-                                    bool force) {}
+    virtual void setStableTimestamp(Timestamp stableTimestamp, bool force) {}
 
     /**
      * See `StorageEngine::setInitialDataTimestamp`
@@ -320,6 +319,12 @@ public:
      * See `StorageEngine::setOldestTimestampFromStable`
      */
     virtual void setOldestTimestampFromStable() {}
+
+    /**
+     * See `StorageEngine::setOldestActiveTransactionTimestampCallback`
+     */
+    virtual void setOldestActiveTransactionTimestampCallback(
+        StorageEngine::OldestActiveTransactionTimestampCallback callback){};
 
     /**
      * See `StorageEngine::setOldestTimestamp`

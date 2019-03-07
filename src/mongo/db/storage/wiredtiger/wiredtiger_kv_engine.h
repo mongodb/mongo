@@ -39,6 +39,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -93,6 +94,9 @@ public:
     bool isEphemeral() const override {
         return _ephemeral;
     }
+
+    void setOldestActiveTransactionTimestampCallback(
+        StorageEngine::OldestActiveTransactionTimestampCallback callback) override;
 
     RecoveryUnit* newRecoveryUnit() override;
 
@@ -193,9 +197,7 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
-    void setStableTimestamp(Timestamp stableTimestamp,
-                            boost::optional<Timestamp> maximumTruncationTimestamp,
-                            bool force) override;
+    void setStableTimestamp(Timestamp stableTimestamp, bool force) override;
 
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
@@ -321,10 +323,11 @@ public:
 
     /**
      * Returns the minimum possible Timestamp value in the oplog that replication may need for
-     * recovery in the event of a rollback. This value gets updated on every `setStableTimestamp`
-     * call.
+     * recovery in the event of a rollback. This value depends on the timestamp passed to
+     * `setStableTimestamp` and on the set of active MongoDB transactions. Returns an error if it
+     * times out querying the active transctions.
      */
-    Timestamp getOplogNeededForRollback() const;
+    StatusWith<Timestamp> getOplogNeededForRollback() const;
 
     /**
      * Returns the minimum possible Timestamp value in the oplog that replication may need for
@@ -405,6 +408,10 @@ private:
 
     std::uint64_t _getCheckpointTimestamp() const;
 
+    mutable stdx::mutex _oldestActiveTransactionTimestampCallbackMutex;
+    StorageEngine::OldestActiveTransactionTimestampCallback
+        _oldestActiveTransactionTimestampCallback;
+
     WT_CONNECTION* _conn;
     WiredTigerFileVersion _fileVersion;
     WiredTigerEventHandler _eventHandler;
@@ -458,7 +465,6 @@ private:
     // Tracks the stable and oldest timestamps we've set on the storage engine.
     AtomicWord<std::uint64_t> _oldestTimestamp;
     AtomicWord<std::uint64_t> _stableTimestamp;
-    AtomicWord<std::uint64_t> _oplogNeededForRollback{Timestamp::min().asULL()};
 
     // Timestamp of data at startup. Used internally to advise checkpointing and recovery to a
     // timestamp. Provided by replication layer because WT does not persist timestamps.

@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
+
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -3819,6 +3821,93 @@ TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfAborted) {
     txnParticipant.abortActiveTransaction(opCtx());
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 }
+
+TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
+    auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+
+    auto insertTxnRecord = [&](unsigned i) {
+        Timestamp ts(1, i);
+        SessionTxnRecord record;
+        record.setStartOpTime(repl::OpTime(ts, 0));
+        record.setState(DurableTxnStateEnum::kPrepared);
+        record.setSessionId(makeLogicalSessionIdForTest());
+        record.setTxnNum(1);
+        record.setLastWriteOpTime(repl::OpTime(ts, 0));
+        record.setLastWriteDate(Date_t::now());
+
+        AutoGetOrCreateDb autoDb(opCtx(), nss.db(), MODE_X);
+        WriteUnitOfWork wuow(opCtx());
+        auto coll = autoDb.getDb()->getCollection(opCtx(), nss.ns());
+        ASSERT(coll);
+        OpDebug* const nullOpDebug = nullptr;
+        ASSERT_OK(
+            coll->insertDocument(opCtx(), InsertStatement(record.toBSON()), nullOpDebug, false));
+        wuow.commit();
+    };
+
+    auto deleteTxnRecord = [&](unsigned i) {
+        Timestamp ts(1, i);
+        AutoGetOrCreateDb autoDb(opCtx(), nss.db(), MODE_X);
+        WriteUnitOfWork wuow(opCtx());
+        auto coll = autoDb.getDb()->getCollection(opCtx(), nss.ns());
+        ASSERT(coll);
+        auto cursor = coll->getCursor(opCtx());
+        while (auto record = cursor->next()) {
+            auto bson = record.get().data.toBson();
+            if (bson["state"].String() != "prepared"_sd) {
+                continue;
+            }
+
+            if (bson["startOpTime"]["ts"].timestamp() == ts) {
+                coll->deleteDocument(opCtx(), kUninitializedStmtId, record->id, nullptr);
+                wuow.commit();
+                return;
+            }
+        }
+        FAIL(mongoutils::str::stream() << "No prepared transaction with start timestamp (1, " << i
+                                       << ")");
+    };
+
+    auto oldestActiveTransactionTS = [&]() {
+        return TransactionParticipant::getOldestActiveTimestamp(Timestamp()).getValue();
+    };
+
+    auto assertOldestActiveTS = [&](boost::optional<unsigned> i) {
+        if (i.has_value()) {
+            ASSERT_EQ(Timestamp(1, i.value()), oldestActiveTransactionTS());
+        } else {
+            ASSERT_EQ(boost::none, oldestActiveTransactionTS());
+        }
+    };
+
+    assertOldestActiveTS(boost::none);
+    insertTxnRecord(1);
+    assertOldestActiveTS(1);
+    insertTxnRecord(2);
+    assertOldestActiveTS(1);
+    deleteTxnRecord(1);
+    assertOldestActiveTS(2);
+    deleteTxnRecord(2);
+    assertOldestActiveTS(boost::none);
+
+    // Add a newer transaction, then an older one, to test that order doesn't matter.
+    insertTxnRecord(4);
+    insertTxnRecord(3);
+    assertOldestActiveTS(3);
+    deleteTxnRecord(4);
+    assertOldestActiveTS(3);
+    deleteTxnRecord(3);
+    assertOldestActiveTS(boost::none);
+};
+
+TEST_F(TxnParticipantTest, OldestActiveTransactionTimestampTimeout) {
+    // Block getOldestActiveTimestamp() by locking the config database.
+    auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+    AutoGetOrCreateDb autoDb(opCtx(), nss.db(), MODE_X);
+    auto statusWith = TransactionParticipant::getOldestActiveTimestamp(Timestamp());
+    ASSERT_FALSE(statusWith.isOK());
+    ASSERT_TRUE(ErrorCodes::isInterruption(statusWith.getStatus().code()));
+};
 
 }  // namespace
 }  // namespace mongo

@@ -132,6 +132,7 @@
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/system_index.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -522,9 +523,16 @@ ExitCode _initAndListen(int listenPort) {
 
         startFreeMonitoring(serviceContext);
 
+        auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
+        invariant(replCoord);
+        if (replCoord->isReplEnabled()) {
+            storageEngine->setOldestActiveTransactionTimestampCallback(
+                TransactionParticipant::getOldestActiveTimestamp);
+        }
+
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
-            if (!repl::ReplicationCoordinator::get(startupOpCtx.get())->isReplEnabled()) {
+            if (!replCoord->isReplEnabled()) {
                 if (ShardingState::get(startupOpCtx.get())->enabled()) {
                     uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
                 }
@@ -553,7 +561,7 @@ ExitCode _initAndListen(int listenPort) {
                                       stdx::make_unique<LogicalTimeValidator>(keyManager));
         }
 
-        repl::ReplicationCoordinator::get(startupOpCtx.get())->startup(startupOpCtx.get());
+        replCoord->startup(startupOpCtx.get());
         if (getReplSetMemberInStandaloneMode(serviceContext)) {
             log() << startupWarningsLog;
             log() << "** WARNING: mongod started without --replSet yet document(s) are present in "

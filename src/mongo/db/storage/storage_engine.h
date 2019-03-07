@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -56,6 +57,15 @@ class StorageEngineMetadata;
  */
 class StorageEngine {
 public:
+    /**
+     * When the storage engine needs to know how much oplog to preserve for the sake of active
+     * transactions, it executes a callback that returns either the oldest active transaction
+     * timestamp, or boost::none if there is no active transaction, or an error if it fails.
+     */
+    using OldestActiveTransactionTimestampResult = StatusWith<boost::optional<Timestamp>>;
+    using OldestActiveTransactionTimestampCallback =
+        std::function<OldestActiveTransactionTimestampResult(Timestamp stableTimestamp)>;
+
     /**
      * The interface for creating new instances of storage engines.
      *
@@ -416,19 +426,8 @@ public:
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint. This
      * timestamp must not decrease unless force=true is set, in which case we force the stable
      * timestamp, the oldest timestamp, and the commit timestamp backward.
-     *
-     * The maximumTruncationTimestamp (and newer) must not be truncated from the oplog in order to
-     * recover from the `stableTimestamp`.  `boost::none` implies there are no additional
-     * constraints to what may be truncated.
-     *
-     * For proper truncation of the oplog, this method requires min(stableTimestamp,
-     * maximumTruncationTimestamp) to be monotonically increasing (where `min(stableTimestamp,
-     * boost::none) => stableTimestamp`). Otherwise truncation can race and remove a document
-     * before a call to this method protects it.
      */
-    virtual void setStableTimestamp(Timestamp stableTimestamp,
-                                    boost::optional<Timestamp> maximumTruncationTimestamp,
-                                    bool force = false) {}
+    virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) {}
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
@@ -453,6 +452,14 @@ public:
      * through. Additionally, all future writes must be newer or equal to this value.
      */
     virtual void setOldestTimestamp(Timestamp timestamp) {}
+
+    /**
+     * Sets a callback which returns the timestamp of the oldest oplog entry involved in an
+     * active MongoDB transaction. The storage engine calls this function to determine how much
+     * oplog it must preserve.
+     */
+    virtual void setOldestActiveTransactionTimestampCallback(
+        OldestActiveTransactionTimestampCallback callback){};
 
     /**
      * Indicates whether the storage engine cache is under pressure.

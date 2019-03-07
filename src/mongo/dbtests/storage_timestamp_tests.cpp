@@ -432,8 +432,8 @@ public:
 
     void assertOldestActiveTxnTimestampEquals(const boost::optional<Timestamp>& ts,
                                               const Timestamp& atTs) {
-        OneOffRead oor(_opCtx, atTs);
-        ASSERT_EQ(TransactionParticipant::getOldestActiveTimestamp(_opCtx), ts);
+        auto oldest = TransactionParticipant::getOldestActiveTimestamp(atTs);
+        ASSERT_EQ(oldest, ts);
     }
 
     void assertHasStartOpTime() {

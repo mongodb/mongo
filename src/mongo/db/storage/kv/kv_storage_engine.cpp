@@ -716,10 +716,8 @@ void KVStorageEngine::setJournalListener(JournalListener* jl) {
     _engine->setJournalListener(jl);
 }
 
-void KVStorageEngine::setStableTimestamp(Timestamp stableTimestamp,
-                                         boost::optional<Timestamp> maximumTruncationTimestamp,
-                                         bool force) {
-    _engine->setStableTimestamp(stableTimestamp, maximumTruncationTimestamp, force);
+void KVStorageEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
+    _engine->setStableTimestamp(stableTimestamp, force);
 }
 
 void KVStorageEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
@@ -734,6 +732,11 @@ void KVStorageEngine::setOldestTimestampFromStable() {
 void KVStorageEngine::setOldestTimestamp(Timestamp newOldestTimestamp) {
     const bool force = true;
     _engine->setOldestTimestamp(newOldestTimestamp, force);
+}
+
+void KVStorageEngine::setOldestActiveTransactionTimestampCallback(
+    StorageEngine::OldestActiveTransactionTimestampCallback callback) {
+    _engine->setOldestActiveTransactionTimestampCallback(callback);
 }
 
 bool KVStorageEngine::isCacheUnderPressure(OperationContext* opCtx) const {

@@ -36,6 +36,7 @@
 
 #include "mongo/db/transaction_participant.h"
 
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -332,19 +333,63 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
     }
 }
 
-boost::optional<Timestamp> TransactionParticipant::getOldestActiveTimestamp(
-    OperationContext* opCtx) {
-    DBDirectClient client(opCtx);
-    Query q(BSON(SessionTxnRecord::kStateFieldName << "prepared"));
-    q.sort(SessionTxnRecord::kStartOpTimeFieldName.toString());
-    auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(), q);
-    if (result.isEmpty()) {
-        return boost::none;
-    }
+StorageEngine::OldestActiveTransactionTimestampResult
+TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
+    // Read from config.transactions at the stable timestamp for the oldest active transaction
+    // timestamp. Use a short timeout: another thread might have the global lock e.g. to shut down
+    // the server, and it both blocks this thread from querying config.transactions and waits for
+    // this thread to terminate.
+    auto client = getGlobalServiceContext()->makeClient("OldestActiveTxnTimestamp");
+    AlternativeClientRegion acr(client);
 
-    auto txnRecord =
-        SessionTxnRecord::parse(IDLParserErrorContext("parse oldest active txn record"), result);
-    return txnRecord.getStartOpTime()->getTimestamp();
+    try {
+        auto opCtx = cc().makeOperationContext();
+        auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+        auto deadline = Date_t::now() + Milliseconds(100);
+        Lock::DBLock dbLock(opCtx.get(), nss.db(), MODE_IS, deadline);
+        Lock::CollectionLock collLock(opCtx.get()->lockState(), nss.toString(), MODE_IS, deadline);
+
+        auto databaseHolder = DatabaseHolder::get(opCtx.get());
+        auto db = databaseHolder->getDb(opCtx.get(), nss.db());
+        if (!db) {
+            // There is no config database, so there cannot be any active transactions.
+            return boost::none;
+        }
+
+        auto collection = db->getCollection(opCtx.get(), nss);
+        if (!collection) {
+            return boost::none;
+        }
+
+        if (!stableTimestamp.isNull()) {
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                          stableTimestamp);
+        }
+
+        // Scan. We guess that occasional scans are cheaper than the write overhead of an index.
+        boost::optional<Timestamp> oldestTxnTimestamp;
+        auto cursor = collection->getCursor(opCtx.get());
+        while (auto record = cursor->next()) {
+            auto doc = record.get().data.toBson();
+            auto txnRecord = SessionTxnRecord::parse(
+                IDLParserErrorContext("parse oldest active txn record"), doc);
+            if (txnRecord.getState() != DurableTxnStateEnum::kPrepared) {
+                continue;
+            }
+
+            // A prepared transaction must have a start timestamp.
+            // TODO(SERVER-40013): Handle entries with state "prepared" and no "startTimestamp".
+            invariant(txnRecord.getStartOpTime());
+            auto ts = txnRecord.getStartOpTime()->getTimestamp();
+            if (!oldestTxnTimestamp || ts < oldestTxnTimestamp.value()) {
+                oldestTxnTimestamp = ts;
+            }
+        }
+
+        return oldestTxnTimestamp;
+    } catch (const DBException&) {
+        return exceptionToStatus();
+    }
 }
 
 const LogicalSessionId& TransactionParticipant::Observer::_sessionId() const {

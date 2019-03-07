@@ -48,6 +48,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/single_transaction_stats.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/transaction_metrics_observer.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -774,10 +775,12 @@ public:
 
 
     /**
-     * Returns the timestamp of the oldest oplog entry written across all open transactions.
-     * Returns boost::none if there are no active transactions.
+     * Returns the timestamp of the oldest oplog entry written across all open transactions, at the
+     * time of the stable timestamp. Returns boost::none if there are no active transactions, or an
+     * error if it fails.
      */
-    static boost::optional<Timestamp> getOldestActiveTimestamp(OperationContext* opCtx);
+    static StorageEngine::OldestActiveTransactionTimestampResult getOldestActiveTimestamp(
+        Timestamp stableTimestamp);
 
     /**
      * Append a no-op to the oplog, for cases where we haven't written in this unit of work but

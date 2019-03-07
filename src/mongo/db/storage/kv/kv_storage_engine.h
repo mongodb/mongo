@@ -146,15 +146,16 @@ public:
 
     virtual void cleanShutdown();
 
-    virtual void setStableTimestamp(Timestamp stableTimestamp,
-                                    boost::optional<Timestamp> maximumTruncationTimestamp,
-                                    bool force = false) override;
+    virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     virtual void setOldestTimestampFromStable() override;
 
     virtual void setOldestTimestamp(Timestamp newOldestTimestamp) override;
+
+    virtual void setOldestActiveTransactionTimestampCallback(
+        StorageEngine::OldestActiveTransactionTimestampCallback) override;
 
     virtual bool isCacheUnderPressure(OperationContext* opCtx) const override;
 

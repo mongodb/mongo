@@ -240,13 +240,30 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     _engine->setInitialDataTimestamp(Timestamp(1, 1));
     wiredTigerGlobalOptions.checkpointDelaySecs = 1;
 
+    // Simulate the callback that queries config.transactions for the oldest active transaction.
+    boost::optional<Timestamp> oldestActiveTxnTimestamp;
+    AtomicWord<bool> callbackShouldFail{false};
+    auto callback = [&](Timestamp stableTimestamp) {
+        using ResultType = StorageEngine::OldestActiveTransactionTimestampResult;
+        if (callbackShouldFail.load()) {
+            return ResultType(ErrorCodes::ExceededTimeLimit, "timeout");
+        }
+
+        return ResultType(oldestActiveTxnTimestamp);
+    };
+
+    _engine->setOldestActiveTransactionTimestampCallback(callback);
+
     // A method that will poll the WiredTigerKVEngine until it sees the amount of oplog necessary
     // for crash recovery exceeds the input.
     auto assertPinnedMovesSoon = [this](Timestamp newPinned) {
         // If the current oplog needed for rollback does not exceed the requested pinned out, we
         // cannot expect the CheckpointThread to eventually publish a sufficient crash recovery
         // value.
-        ASSERT_TRUE(_engine->getOplogNeededForRollback() >= newPinned);
+        auto needed = _engine->getOplogNeededForRollback();
+        if (needed.isOK()) {
+            ASSERT_TRUE(needed.getValue() >= newPinned);
+        }
 
         // Do 100 iterations that sleep for 100 milliseconds between polls. This will wait for up
         // to 10 seconds to observe an asynchronous update that iterates once per second.
@@ -264,17 +281,31 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
         FAIL("");
     };
 
-    _engine->setStableTimestamp(Timestamp(10, 1), boost::none, false);
+    oldestActiveTxnTimestamp = boost::none;
+    _engine->setStableTimestamp(Timestamp(10, 1), false);
     assertPinnedMovesSoon(Timestamp(10, 1));
 
-    _engine->setStableTimestamp(Timestamp(20, 1), Timestamp(15, 1), false);
+    oldestActiveTxnTimestamp = Timestamp(15, 1);
+    _engine->setStableTimestamp(Timestamp(20, 1), false);
     assertPinnedMovesSoon(Timestamp(15, 1));
 
-    _engine->setStableTimestamp(Timestamp(30, 1), Timestamp(19, 1), false);
+    oldestActiveTxnTimestamp = Timestamp(19, 1);
+    _engine->setStableTimestamp(Timestamp(30, 1), false);
     assertPinnedMovesSoon(Timestamp(19, 1));
 
-    _engine->setStableTimestamp(Timestamp(30, 1), boost::none, false);
+    oldestActiveTxnTimestamp = boost::none;
+    _engine->setStableTimestamp(Timestamp(30, 1), false);
     assertPinnedMovesSoon(Timestamp(30, 1));
+
+    callbackShouldFail.store(true);
+    ASSERT_NOT_OK(_engine->getOplogNeededForRollback());
+    _engine->setStableTimestamp(Timestamp(40, 1), false);
+    // Await a new checkpoint. Oplog needed for rollback does not advance.
+    sleepmillis(1100);
+    ASSERT_EQ(_engine->getOplogNeededForCrashRecovery().get(), Timestamp(30, 1));
+    _engine->setStableTimestamp(Timestamp(30, 1), false);
+    callbackShouldFail.store(false);
+    assertPinnedMovesSoon(Timestamp(40, 1));
 }
 
 std::unique_ptr<KVHarnessHelper> makeHelper() {

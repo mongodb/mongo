@@ -1423,7 +1423,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         log() << "Forcing the stable timestamp to the common point: "
               << fixUpInfo.commonPoint.getTimestamp();
         opCtx->getServiceContext()->getStorageEngine()->setStableTimestamp(
-            fixUpInfo.commonPoint.getTimestamp(), boost::none, force);
+            fixUpInfo.commonPoint.getTimestamp(), force);
 
         // We must not take a stable checkpoint until it is guaranteed to include all writes from
         // before the rollback (i.e. the stable timestamp is at least the local top of oplog). In
