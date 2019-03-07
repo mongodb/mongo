@@ -104,7 +104,7 @@ functions:
           fi
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
-          if [ "${is_patch|}" = "true" ]; then
+          if [ "${is_patch|false}" = "true" ]; then
             MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
           fi
 
@@ -229,7 +229,7 @@ functions:
           build_id: ${build_id}
           build_variant: ${build_variant}
           execution: ${execution}
-          is_patch: ${is_patch}
+          is_patch: ${is_patch|false}
           project: ${project}
           project_dir: ${project_dir}
           revision: ${revision}
