@@ -118,7 +118,7 @@
     jsTestLog("Session IDs and transaction numbers on sub-ops are not allowed");
     jsTestLog("doTxn should fail when inner transaction contains session id.");
     var lsid = {id: UUID()};
-    res = assert.commandFailedWithCode(
+    var res = assert.commandFailedWithCode(
         db.runCommand({
             doTxn: [{
                 op: "i",
