@@ -34,8 +34,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -119,45 +121,32 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                                                  const BSONObj& cmdObj,
                                                  const ExtensionsCallback& extensionsCallback,
                                                  bool isExplain) {
-    // Extract the key field.
-    BSONElement keyElt;
-    auto statusKey = bsonExtractTypedField(cmdObj, kKeyField, BSONType::String, &keyElt);
-    if (!statusKey.isOK()) {
-        return {statusKey};
+    IDLParserErrorContext ctx("distinct");
+
+    DistinctCommand parsedDistinct(nss);
+    try {
+        parsedDistinct = DistinctCommand::parse(ctx, cmdObj);
+    } catch (...) {
+        return exceptionToStatus();
     }
-    auto key = keyElt.valuestrsafe();
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
 
-    // Extract the query field. If the query field is nonexistent, an empty query is used.
-    if (BSONElement queryElt = cmdObj[kQueryField]) {
-        if (queryElt.type() == BSONType::Object) {
-            qr->setFilter(queryElt.embeddedObject());
-        } else if (queryElt.type() != BSONType::jstNULL) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << kQueryField << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::Object)
-                                        << " or "
-                                        << typeName(BSONType::jstNULL)
-                                        << ", found "
-                                        << typeName(queryElt.type()));
-        }
+    if (auto query = parsedDistinct.getQuery()) {
+        qr->setFilter(query.get());
     }
 
-    // Extract the collation field, if it exists.
-    if (BSONElement collationElt = cmdObj[kCollationField]) {
-        if (collationElt.type() != BSONType::Object) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << kCollationField
-                                        << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::Object)
-                                        << ", found "
-                                        << typeName(collationElt.type()));
-        }
-        qr->setCollation(collationElt.embeddedObject());
+    if (auto collation = parsedDistinct.getCollation()) {
+        qr->setCollation(collation.get());
     }
 
-    if (BSONElement readConcernElt = cmdObj[repl::ReadConcernArgs::kReadConcernFieldName]) {
+    if (auto comment = parsedDistinct.getComment()) {
+        qr->setComment(comment.get().toString());
+    }
+
+    // The IDL parser above does not handle generic command arguments. Since the underlying query
+    // request requires the following options, manually parse and verify them here.
+    if (auto readConcernElt = cmdObj[repl::ReadConcernArgs::kReadConcernFieldName]) {
         if (readConcernElt.type() != BSONType::Object) {
             return Status(ErrorCodes::TypeMismatch,
                           str::stream() << "\"" << repl::ReadConcernArgs::kReadConcernFieldName
@@ -169,19 +158,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         qr->setReadConcern(readConcernElt.embeddedObject());
     }
 
-    if (BSONElement commentElt = cmdObj[kCommentField]) {
-        if (commentElt.type() != BSONType::String) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << kCommentField
-                                        << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::String)
-                                        << ", found "
-                                        << typeName(commentElt.type()));
-        }
-        qr->setComment(commentElt.str());
-    }
-
-    if (BSONElement queryOptionsElt = cmdObj[QueryRequest::kUnwrappedReadPrefField]) {
+    if (auto queryOptionsElt = cmdObj[QueryRequest::kUnwrappedReadPrefField]) {
         if (queryOptionsElt.type() != BSONType::Object) {
             return Status(ErrorCodes::TypeMismatch,
                           str::stream() << "\"" << QueryRequest::kUnwrappedReadPrefField
@@ -193,7 +170,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         qr->setUnwrappedReadPref(queryOptionsElt.embeddedObject());
     }
 
-    if (BSONElement maxTimeMSElt = cmdObj[QueryRequest::cmdOptionMaxTimeMS]) {
+    if (auto maxTimeMSElt = cmdObj[QueryRequest::cmdOptionMaxTimeMS]) {
         auto maxTimeMS = QueryRequest::parseMaxTimeMS(maxTimeMSElt);
         if (!maxTimeMS.isOK()) {
             return maxTimeMS.getStatus();
@@ -213,7 +190,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         return cq.getStatus();
     }
 
-    return ParsedDistinct(std::move(cq.getValue()), std::move(key));
+    return ParsedDistinct(std::move(cq.getValue()), parsedDistinct.getKey().toString());
 }
 
 }  // namespace mongo

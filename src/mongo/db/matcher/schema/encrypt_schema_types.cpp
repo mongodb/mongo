@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/schema/encrypt_schema_types.h"
-#include "mongo/idl/idl_parser.h"
 
 namespace mongo {
 

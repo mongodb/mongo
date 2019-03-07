@@ -67,6 +67,16 @@ env.CppUnitTest(
     ]
 )
 
+env.Library(
+    target='distinct_command_idl',
+    source=[
+        env.Idlc('distinct_command.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
 # Shared mongod/mongos query code.
 env.Library(
     target="query_common",
@@ -80,6 +90,7 @@ env.Library(
         "collation/collator_factory_icu",
         "collation/collator_icu",
         "datetime/init_timezone_data",
+        "distinct_command_idl",
         "explain_options",
         "query_planner",
         "query_request",
