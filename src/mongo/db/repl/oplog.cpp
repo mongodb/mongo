@@ -365,13 +365,21 @@ void createIndexForApplyOps(OperationContext* opCtx,
         Lock::TempRelease release(opCtx->lockState());
         // TempRelease cannot fail because no recursive locks should be taken.
         invariant(!opCtx->lockState()->isLocked());
-
-        IndexBuilder* builder = new IndexBuilder(
-            indexSpec, constraints, replicatedWrites, opCtx->recoveryUnit()->getCommitTimestamp());
+        auto collUUID = *indexCollection->uuid();
+        auto indexBuildUUID = UUID::gen();
+        auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
+        // We don't pass in a commit quorum here because secondary nodes don't have any knowledge of
+        // it.
+        IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
+            /*commitQuorum=*/boost::none};
         // This spawns a new thread and returns immediately.
-        builder->go();
-        // Wait for thread to start and register itself
-        IndexBuilder::waitForBgIndexStarting();
+        MONGO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(
+            indexBuildsCoordinator->startIndexBuild(opCtx,
+                                                    collUUID,
+                                                    {indexSpec},
+                                                    indexBuildUUID,
+                                                    IndexBuildProtocol::kSinglePhase,
+                                                    indexBuildOptions));
     }
 
     opCtx->recoveryUnit()->abandonSnapshot();
