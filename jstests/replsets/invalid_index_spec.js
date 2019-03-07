@@ -43,13 +43,18 @@
 
     // fassert() calls std::abort(), which returns a different exit code for Windows vs. other
     // platforms.
-    const exitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
+    const exitCode = MongoRunner.EXIT_ABRUPT;
     replTest.stop(secondary, undefined, {allowedExitCode: exitCode});
 
-    const msg1 = "Fatal Assertion 50769";
-    const msg2 = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
+    // During the transition from the old code path in IndexBuilder to IndexBuildsCoordinator, we
+    // will accept the fatal assertion code from either component.
+    const msgIndexBuilder = "Fatal Assertion 50769";
+    const msgIndexBuildsCoordinator = "Fatal assertion 34437";
+    const msgIndexError = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
 
-    assert(rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2),
+    assert((rawMongoProgramOutput().match(msgIndexBuilder) ||
+            rawMongoProgramOutput().match(msgIndexBuildsCoordinator)) &&
+               rawMongoProgramOutput().match(msgIndexError),
            "Replication should have aborted on invalid index specification");
 
     replTest.stopSet();
