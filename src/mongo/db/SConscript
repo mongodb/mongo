@@ -1521,6 +1521,9 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/net/network',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/processinfo',
+    ],
 )
 
 env.Library(

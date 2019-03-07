@@ -289,6 +289,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     mse.dwLength = sizeof(mse);
     if (GlobalMemoryStatusEx(&mse)) {
         memSize = mse.ullTotalPhys;
+        memLimit = memSize;
     }
 
     // get OS version info
