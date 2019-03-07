@@ -340,7 +340,16 @@ connect = function(url, user, pass) {
         safeURL = url.substring(0, protocolPos + 3) + url.substring(atPos + 1);
     }
     chatty("connecting to: " + safeURL);
-    var m = new Mongo(url);
+    try {
+        var m = new Mongo(url);
+    } catch (e) {
+        if (url.indexOf(".mongodb.net") != -1) {
+            print("\n\n*** It looks like this is a MongoDB Atlas cluster. Please ensure that your" +
+                  " IP whitelist allows connections from your network.\n\n");
+        }
+
+        throw e;
+    }
     var db = m.getDB(m.defaultDB);
 
     if (user && pass) {
