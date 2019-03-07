@@ -23,8 +23,10 @@ __conn_compat_parse(WT_SESSION_IMPL *session,
 	 * release string.  We ignore the patch value, but allow it in
 	 * the string.
 	 */
+	/* NOLINTNEXTLINE(cert-err34-c) */
 	if (sscanf(cvalp->str,
 	    "%" SCNu16 ".%" SCNu16, majorp, minorp) != 2 &&
+	    /* NOLINTNEXTLINE(cert-err34-c) */
 	    sscanf(cvalp->str, "%" SCNu16 ".%" SCNu16 ".%" SCNu16,
 	    majorp, minorp, &unused_patch) != 3)
 		WT_RET_MSG(session, EINVAL,

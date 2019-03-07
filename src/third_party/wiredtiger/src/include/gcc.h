@@ -11,6 +11,7 @@
 
 /* GCC-specific attributes. */
 #define	WT_PACKED_STRUCT_BEGIN(name)					\
+	/* NOLINTNEXTLINE(misc-macro-parentheses) */	\
 	struct __attribute__ ((__packed__)) name {
 #define	WT_PACKED_STRUCT_END						\
 	};

@@ -340,6 +340,7 @@ __ckpt_load(WT_SESSION_IMPL *session,
 		goto format;
 	memcpy(timebuf, a.str, a.len);
 	timebuf[a.len] = '\0';
+	/* NOLINTNEXTLINE(cert-err34-c) */
 	if (sscanf(timebuf, "%" SCNuMAX, &ckpt->sec) != 1)
 		goto format;
 

@@ -193,7 +193,6 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	bool exist_backup, exist_incr, exist_isrc, exist_turtle;
 	bool load, loadTurtle;
 
-	metaconf = NULL;
 	load = loadTurtle = false;
 
 	/*
@@ -226,10 +225,12 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 		 * Failure to read means a bad turtle file. Remove it and create
 		 * a new turtle file.
 		 */
-		if (F_ISSET(S2C(session), WT_CONN_SALVAGE))
+		if (F_ISSET(S2C(session), WT_CONN_SALVAGE)) {
 			WT_WITH_TURTLE_LOCK(session,
-			    ret = __wt_turtle_read(session,
-			    WT_METAFILE_URI, &unused_value));
+			    ret = __wt_turtle_read(
+			    session, WT_METAFILE_URI, &unused_value));
+			__wt_free(session, unused_value);
+		}
 
 		if (ret != 0) {
 			WT_RET(__wt_remove_if_exists(
@@ -282,14 +283,12 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 		WT_RET(__metadata_config(session, &metaconf));
 		WT_WITH_TURTLE_LOCK(session, ret =
 		    __wt_turtle_update(session, WT_METAFILE_URI, metaconf));
-		WT_ERR(ret);
+		__wt_free(session, metaconf);
+		WT_RET(ret);
 	}
 
 	/* Remove the backup files, we'll never read them again. */
-	WT_ERR(__wt_backup_file_remove(session));
-
-err:	__wt_free(session, metaconf);
-	return (ret);
+	return (__wt_backup_file_remove(session));
 }
 
 /*

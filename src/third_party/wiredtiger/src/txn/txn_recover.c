@@ -440,6 +440,7 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 	/* If there is checkpoint logged for the file, apply everything. */
 	if (cval.type != WT_CONFIG_ITEM_STRUCT)
 		WT_INIT_LSN(&lsn);
+	/* NOLINTNEXTLINE(cert-err34-c) */
 	else if (sscanf(cval.str,
 	    "(%" SCNu32 ",%" SCNu32 ")", &lsnfile, &lsnoffset) == 2)
 		WT_SET_LSN(&lsn, lsnfile, lsnoffset);

@@ -283,7 +283,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 		    !ref->page_las->has_prepares &&
 		    !S2C(session)->txn_global.has_stable_timestamp &&
 		    __wt_txn_visible_all(session, ref->page_las->unstable_txn,
-		    ref->page_las->unstable_timestamp)) {
+		    ref->page_las->unstable_durable_timestamp)) {
 			page->modify->rec_max_txn = ref->page_las->max_txn;
 			page->modify->rec_max_timestamp =
 			    ref->page_las->max_timestamp;

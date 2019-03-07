@@ -426,16 +426,28 @@ __wt_las_page_skip_locked(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * versions of data and all the updates are in the past.
 	 */
 	if (ref->page_las->skew_newest &&
-	    txn->read_timestamp > ref->page_las->unstable_timestamp)
+	    txn->read_timestamp > ref->page_las->unstable_durable_timestamp)
 		return (true);
 
 	/*
 	 * Skip lookaside pages if reading as of a timestamp, we evicted old
 	 * versions of data and all the unstable updates are in the future.
 	 */
-	if (!ref->page_las->skew_newest &&
-	    txn->read_timestamp < ref->page_las->unstable_timestamp)
-		return (true);
+	if (!ref->page_las->skew_newest) {
+		/*
+		 * Skip lookaside pages during checkpoint if all the unstable
+		 * durable updates are in the future. Checking for just the
+		 * unstable updates during checkpoint would end up reading more
+		 * content from lookaside than necessary.
+		 */
+		if (WT_SESSION_IS_CHECKPOINT(session) &&
+		    txn->read_timestamp <
+		    ref->page_las->unstable_durable_timestamp)
+			return (true);
+
+		if (txn->read_timestamp < ref->page_las->unstable_timestamp)
+			return (true);
+	}
 
 	return (false);
 }
@@ -545,7 +557,7 @@ __las_insert_block_verbose(
 	double pct_dirty, pct_full;
 	uint64_t ckpt_gen_current, ckpt_gen_last;
 	uint32_t btree_id;
-	char ts_string[WT_TS_INT_STRING_SIZE];
+	char ts_string[2][WT_TS_INT_STRING_SIZE];
 
 	btree_id = btree->id;
 
@@ -571,19 +583,23 @@ __las_insert_block_verbose(
 		(void)__wt_eviction_dirty_needed(session, &pct_dirty);
 		__wt_timestamp_to_string(
 		    multi->page_las.unstable_timestamp,
-		    ts_string, sizeof(ts_string));
+		    ts_string[0], sizeof(ts_string));
+		__wt_timestamp_to_string(
+		    multi->page_las.unstable_durable_timestamp,
+		    ts_string[1], sizeof(ts_string));
 
 		__wt_verbose(session,
 		    WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,
 		    "Page reconciliation triggered lookaside write "
 		    "file ID %" PRIu32 ", page ID %" PRIu64 ". "
-		    "Max txn ID %" PRIu64 ", unstable timestamp %s, %s. "
+		    "Max txn ID %" PRIu64 ", unstable timestamp %s,"
+		    " unstable durable timestamp %s, %s. "
 		    "Entries now in lookaside file: %" PRId64 ", "
 		    "cache dirty: %2.3f%% , "
 		    "cache use: %2.3f%%",
 		    btree_id, multi->page_las.las_pageid,
 		    multi->page_las.max_txn,
-		    ts_string,
+		    ts_string[0], ts_string[1],
 		    multi->page_las.skew_newest ? "newest" : "not newest",
 		    WT_STAT_READ(conn->stats, cache_lookaside_entries),
 		    pct_dirty, pct_full);
@@ -1128,6 +1144,26 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			    session, saved_key, las_key.data, las_key.size));
 
 			/*
+			 * Never expect an entry with prepare locked state or
+			 * with durable timestamp as max timestamp or with
+			 * in-progress prepare state and non-zero durable
+			 * timestamp. In all other cases the durable timestamp
+			 * is higher or same as the las timestamp.
+			 */
+			WT_ASSERT(session,
+			    prepare_state != WT_PREPARE_LOCKED ||
+			    durable_timestamp != WT_TS_MAX ||
+			    (prepare_state != WT_PREPARE_INPROGRESS ||
+			    durable_timestamp == 0));
+
+			/*
+			 * FIXME Disable this assertion until fixed by WT-4598.
+			 * WT_ASSERT(session,
+			 *   (prepare_state == WT_PREPARE_INPROGRESS ||
+			 *   durable_timestamp >= las_timestamp));
+			 */
+
+			/*
 			 * There are several conditions that need to be met
 			 * before we choose to remove a key block:
 			 *  * The entries were written with skew newest.
@@ -1136,8 +1172,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			 *  * The entry wasn't from a prepared transaction.
 			 */
 			if (upd_type == WT_UPDATE_BIRTHMARK &&
-			    __wt_txn_visible_all(
-			    session, las_txnid, las_timestamp) &&
+			    __wt_txn_visible_all(session,
+			    las_txnid, durable_timestamp) &&
 			    prepare_state != WT_PREPARE_INPROGRESS)
 				removing_key_block = true;
 			else

@@ -47,6 +47,7 @@ static inline uint64_t
 __wt_bswap64(uint64_t v)
 {
 	return (
+	    /* NOLINTNEXTLINE(misc-redundant-expression) */
 	    ((v << 56) & 0xff00000000000000UL) |
 	    ((v << 40) & 0x00ff000000000000UL) |
 	    ((v << 24) & 0x0000ff0000000000UL) |

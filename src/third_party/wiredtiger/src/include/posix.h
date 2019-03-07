@@ -33,6 +33,7 @@ typedef struct {
 /*
  * Thread callbacks need to match the platform specific callback types
  */
+/* NOLINTNEXTLINE(misc-macro-parentheses) */
 #define	WT_THREAD_CALLBACK(x)	void* (x)
 #define	WT_THREAD_RET		void*
 #define	WT_THREAD_RET_VALUE	NULL

@@ -571,6 +571,7 @@ __wt_log_extract_lognum(
 		WT_RET_MSG(session, EINVAL,
 		    "unexpected usage: no id or no name");
 	if ((p = strrchr(name, '.')) == NULL ||
+	    /* NOLINTNEXTLINE(cert-err34-c) */
 	    sscanf(++p, "%" SCNu32, id) != 1)
 		WT_RET_MSG(session, WT_ERROR, "Bad log file name '%s'", name);
 	return (0);

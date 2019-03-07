@@ -306,7 +306,7 @@ static inline uint64_t CityHash64(const char *s, size_t len) {
 	if (len <= 32) {
 		if (len <= 16) {
 			return HashLen0to16(s, len);
-		} else {
+		} else { /* NOLINT(readability-else-after-return) */
 			return HashLen17to32(s, len);
 		}
 	} else if (len <= 64) {

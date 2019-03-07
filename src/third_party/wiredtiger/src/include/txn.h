@@ -98,6 +98,7 @@ struct __wt_txn_state {
 	volatile uint64_t id;
 	volatile uint64_t pinned_id;
 	volatile uint64_t metadata_pinned;
+	volatile bool is_allocating;
 
 	WT_CACHE_LINE_PAD_END
 };

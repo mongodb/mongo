@@ -41,7 +41,9 @@ __wt_timestamp_to_hex_string(wt_timestamp_t ts, char *hex_timestamp)
 		return;
 	}
 	if (ts == WT_TS_MAX) {
-		(void)strcpy(hex_timestamp, "ffffffffffffffff");
+#define	WT_TS_MAX_HEX_STRING	"ffffffffffffffff"
+		(void)memcpy(hex_timestamp,
+		    WT_TS_MAX_HEX_STRING, strlen(WT_TS_MAX_HEX_STRING) + 1);
 		return;
 	}
 
@@ -579,14 +581,15 @@ set:	__wt_writelock(session, &txn_global->rwlock);
 }
 
 /*
- * __wt_timestamp_validate --
- *	Validate a timestamp to be not older than the global oldest and global
- *	stable and running transaction commit timestamp and running transaction
- *	prepare timestamp.
+ * __wt_txn_commit_timestamp_validate --
+ *	Validate a timestamp to be not older than running transaction commit
+ *	timestamp and running transaction prepare timestamp. Validate a durable
+ *	timestamp to be not older than the global oldest and global stable
+ *	timestamp.
  */
 int
-__wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
-    wt_timestamp_t ts, WT_CONFIG_ITEM *cval, bool compare_stable)
+__wt_txn_commit_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
+    wt_timestamp_t ts, WT_CONFIG_ITEM *cval, bool durable_ts)
 {
 	WT_TXN *txn = &session->txn;
 	WT_TXN_GLOBAL *txn_global = &S2C(session)->txn_global;
@@ -609,14 +612,14 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
 	if (has_stable_ts)
 		stable_ts = txn_global->stable_timestamp;
 
-	if (has_oldest_ts && ts < oldest_ts) {
+	if (durable_ts && has_oldest_ts && ts < oldest_ts) {
 		__wt_timestamp_to_string(
 		    oldest_ts, ts_string[0], sizeof(ts_string[0]));
 		WT_RET_MSG(session, EINVAL,
 		    "%s timestamp %.*s older than oldest timestamp %s",
 		    name, (int)cval->len, cval->str, ts_string[0]);
 	}
-	if (compare_stable && has_stable_ts && ts < stable_ts) {
+	if (durable_ts && has_stable_ts && ts < stable_ts) {
 		__wt_timestamp_to_string(
 		    stable_ts, ts_string[0], sizeof(ts_string[0]));
 		WT_RET_MSG(session, EINVAL,
@@ -696,10 +699,10 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 		 * than stable timestamp.
 		 */
 		if (prepare)
-			WT_RET(__wt_timestamp_validate(
+			WT_RET(__wt_txn_commit_timestamp_validate(
 			    session, "commit", ts, &cval, false));
 		else
-			WT_RET(__wt_timestamp_validate(
+			WT_RET(__wt_txn_commit_timestamp_validate(
 			    session, "commit", ts, &cval, true));
 		txn->commit_timestamp = ts;
 		__wt_txn_set_commit_timestamp(session);
@@ -727,7 +730,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	 * is required.
 	 */
 	if (ret == 0 && cval.len != 0)
-		WT_RET(__wt_timestamp_validate(
+		WT_RET(__wt_txn_commit_timestamp_validate(
 		    session, "durable", txn->durable_timestamp, &cval, true));
 	/*
 	 * We allow setting the commit timestamp and durable timestamp after a

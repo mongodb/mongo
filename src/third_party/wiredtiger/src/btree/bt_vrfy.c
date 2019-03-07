@@ -96,6 +96,7 @@ __verify_config_offsets(
 		 * verify because that's where we "dump blocks" for debugging.)
 		 */
 		*quitp = true;
+		/* NOLINTNEXTLINE(cert-err34-c) */
 		if (v.len != 0 || sscanf(k.str, "%" SCNu64, &offset) != 1)
 			WT_RET_MSG(session, EINVAL,
 			    "unexpected dump offset format");

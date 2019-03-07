@@ -140,7 +140,7 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 
 	fd = 0;				/* -Wconditional-uninitialized */
 	WT_SYSCALL_RETRY((
-	    (fd = open(dir, O_RDONLY, 0444)) == -1 ? -1 : 0), ret);
+	    (fd = open(dir, O_RDONLY | O_CLOEXEC, 0444)) == -1 ? -1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "%s: directory-sync: open", dir);
 

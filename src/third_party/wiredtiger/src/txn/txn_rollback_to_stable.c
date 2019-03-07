@@ -68,7 +68,7 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 		 * which will fail the following check and cause them to never
 		 * be removed.
 		 */
-		if (rollback_timestamp < las_timestamp) {
+		if (rollback_timestamp < durable_timestamp) {
 			WT_ERR(cursor->remove(cursor));
 			WT_STAT_CONN_INCR(session, txn_rollback_las_removed);
 			--las_total;
@@ -250,7 +250,7 @@ __txn_abort_newer_updates(
 	local_read = false;
 	read_flags = WT_READ_WONT_NEED;
 	if (ref->page_las != NULL && ref->page_las->skew_newest &&
-	    rollback_timestamp < ref->page_las->unstable_timestamp) {
+	    rollback_timestamp < ref->page_las->unstable_durable_timestamp) {
 		/* Make sure get back a page with history, not limbo page */
 		WT_ASSERT(session,
 		    !F_ISSET(&session->txn, WT_TXN_HAS_SNAPSHOT));

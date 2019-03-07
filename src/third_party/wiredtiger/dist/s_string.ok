@@ -101,6 +101,7 @@ DUPLICATEV
 DataSet
 DbCursor
 DbEnv
+DeadStores
 Decrement
 Decrypt
 DeleteFileW
@@ -264,6 +265,8 @@ Mutex
 MySecret
 NEEDKEY
 NEEDVALUE
+NOLINT
+NOLINTNEXTLINE
 NOLL
 NOLOCK
 NONINFRINGEMENT
@@ -639,6 +642,7 @@ dbc
 dbs
 dcalloc
 ddd
+deadcode
 decile
 deciles
 decl
@@ -1102,6 +1106,7 @@ primary's
 printf
 printlog
 priv
+prog
 progname
 ps
 psp

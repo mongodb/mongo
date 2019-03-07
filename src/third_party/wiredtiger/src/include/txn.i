@@ -972,14 +972,16 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 	/*
 	 * Allocating transaction IDs involves several steps.
 	 *
-	 * Firstly, we do an atomic increment to allocate a unique ID.  The
-	 * field we increment is not used anywhere else.
+	 * Firstly, publish that this transaction is allocating its ID, then
+	 * publish the transaction ID as the current global ID.  Note that this
+	 * transaction ID might not be unique among threads and hence not valid
+	 * at this moment. The flag will notify other transactions that are
+	 * attempting to get their own snapshot for this transaction ID to
+	 * retry.
 	 *
-	 * Then we optionally publish the allocated ID into the global
-	 * transaction table.  It is critical that this becomes visible before
-	 * the global current value moves past our ID, or some concurrent
-	 * reader could get a snapshot that makes our changes visible before we
-	 * commit.
+	 * Then we do an atomic increment to allocate a unique ID. This will
+	 * give the valid ID to this transaction that we publish to the global
+	 * transaction table.
 	 *
 	 * We want the global value to lead the allocated values, so that any
 	 * allocated transaction ID eventually becomes globally visible.  When
@@ -991,21 +993,16 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 	 * for unlocked reads to be well defined, we must use an atomic
 	 * increment here.
 	 */
-	__wt_spin_lock(session, &txn_global->id_lock);
-	id = txn_global->current;
-
 	if (publish) {
+		WT_PUBLISH(txn_state->is_allocating, true);
+		WT_PUBLISH(txn_state->id, txn_global->current);
+		id = __wt_atomic_addv64(&txn_global->current, 1) - 1;
 		session->txn.id = id;
 		WT_PUBLISH(txn_state->id, id);
-	}
+		WT_PUBLISH(txn_state->is_allocating, false);
+	} else
+		id = __wt_atomic_addv64(&txn_global->current, 1) - 1;
 
-	/*
-	 * Even though we are in a spinlock, readers are not.  We rely on
-	 * atomic reads of the current ID to create snapshots, so for unlocked
-	 * reads to be well defined, we must use an atomic increment here.
-	 */
-	(void)__wt_atomic_addv64(&txn_global->current, 1);
-	__wt_spin_unlock(session, &txn_global->id_lock);
 	return (id);
 }
 
@@ -1193,7 +1190,14 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++)
-		if ((id = s->id) != WT_TXN_NONE && WT_TXNID_LT(id, txn->id))
+		/*
+		 * We are checking if the transaction is oldest one in the
+		 * system. It is safe to ignore any sessions that are
+		 * allocating transaction IDs, since we already have an ID,
+		 * they are guaranteed to be newer.
+		 */
+		if (!s->is_allocating && (id = s->id) != WT_TXN_NONE &&
+		    WT_TXNID_LT(id, txn->id))
 			return (false);
 
 	return (true);

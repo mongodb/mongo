@@ -306,6 +306,7 @@ __wt_capacity_throttle(WT_SESSION_IMPL *session, uint64_t bytes,
 
 	conn = S2C(session);
 	cap = &conn->capacity;
+	/* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
 	capacity = steal_capacity = 0;
 	reservation = steal = NULL;
 	switch (type) {
