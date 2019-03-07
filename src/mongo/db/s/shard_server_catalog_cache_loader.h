@@ -430,13 +430,13 @@ private:
      *
      * Only run on the shard primary.
      */
-    Status _ensureMajorityPrimaryAndScheduleCollAndChunksTask(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              collAndChunkTask task);
+    void _ensureMajorityPrimaryAndScheduleCollAndChunksTask(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            collAndChunkTask task);
 
-    Status _ensureMajorityPrimaryAndScheduleDbTask(OperationContext* opCtx,
-                                                   StringData dbName,
-                                                   DBTask task);
+    void _ensureMajorityPrimaryAndScheduleDbTask(OperationContext* opCtx,
+                                                 StringData dbName,
+                                                 DBTask task);
     /**
      * Schedules tasks in the 'nss' task list to execute until the task list is depleted.
      *
