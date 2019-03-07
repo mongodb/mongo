@@ -86,6 +86,7 @@ env.Library(
         'cluster_whats_my_uri_cmd.cpp',
         'cluster_write_cmd.cpp',
         'commands_public.cpp',
+        'document_shard_key_update_util.cpp',
         'kill_sessions_remote.cpp',
         'strategy.cpp',
         env.Idlc('cluster_multicast.idl')[0],
@@ -154,4 +155,15 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/saslauth',
     ],
+)
+
+env.CppUnitTest(
+    target='document_shard_key_update_test',
+    source=[
+        'document_shard_key_update_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'cluster_commands',
+    ]
 )
