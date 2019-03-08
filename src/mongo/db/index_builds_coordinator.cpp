@@ -282,7 +282,8 @@ void IndexBuildsCoordinator::interruptAllIndexBuilds(const std::string& reason) 
 
     // Wait for all the index builds to stop.
     for (auto& dbIt : _databaseIndexBuilds) {
-        dbIt.second->waitUntilNoIndexBuildsRemain(lk);
+        auto dbIndexBuildsSharedPtr = dbIt.second;
+        dbIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
     }
 }
 
@@ -301,7 +302,8 @@ void IndexBuildsCoordinator::abortCollectionIndexBuilds(const UUID& collectionUU
 
     collIndexBuildsIt->second->runOperationOnAllBuilds(
         lk, &_indexBuildsManager, abortIndexBuild, reason);
-    collIndexBuildsIt->second->waitUntilNoIndexBuildsRemain(lk);
+    auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
+    collIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
 }
 
 void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::string& reason) {
@@ -411,8 +413,8 @@ void IndexBuildsCoordinator::awaitNoBgOpInProgForNs(OperationContext* opCtx, Str
         return;
     }
 
-    auto collIndexBuildSharedPtr = collIndexBuildsIt->second;
-    collIndexBuildSharedPtr->waitUntilNoIndexBuildsRemain(lk);
+    auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
+    collIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
 }
 
 void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(StringData db) const {
@@ -423,7 +425,8 @@ void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(StringData db) const {
         return;
     }
 
-    dbIndexBuildsIt->second->waitUntilNoIndexBuildsRemain(lk);
+    auto dbIndexBuildsSharedPtr = dbIndexBuildsIt->second;
+    dbIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
 }
 
 void IndexBuildsCoordinator::onReplicaSetReconfig() {
