@@ -267,21 +267,15 @@ void createIndexForApplyOps(OperationContext* opCtx,
 // workaround.
 struct GetNextOpTimeClass {
     /**
-     * Allocates optimes for new entries in the oplog.  Returns a vector of OplogSlots, which
-     * contain the new optimes along with their terms and newly calculated hash fields.
+     * Allocates optimes for new entries in the oplog.  Returns an OplogSlot or a vector of
+     * OplogSlots, which contain the new optimes along with their terms and newly calculated hash
+     * fields.
      */
-    static MONGO_DECLARE_SHIM((OperationContext * opCtx, std::size_t count)->std::vector<OplogSlot>)
-        getNextOpTimes;
-};
-
-inline std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) {
-    return GetNextOpTimeClass::getNextOpTimes(opCtx, count);
+    static MONGO_DECLARE_SHIM((OperationContext * opCtx)->OplogSlot) getNextOpTime;
 };
 
 inline OplogSlot getNextOpTime(OperationContext* opCtx) {
-    auto slots = getNextOpTimes(opCtx, 1);
-    invariant(slots.size() == 1);
-    return slots.back();
+    return GetNextOpTimeClass::getNextOpTime(opCtx);
 }
 
 /**
@@ -296,6 +290,7 @@ inline OplogSlot getNextOpTime(OperationContext* opCtx) {
  * prepare generates an oplog entry in a separate unit of work.
  */
 OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx);
+std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count);
 
 }  // namespace repl
 }  // namespace mongo

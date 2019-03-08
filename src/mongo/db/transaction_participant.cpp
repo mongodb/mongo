@@ -551,8 +551,7 @@ void TransactionParticipant::Participant::_setSpeculativeTransactionReadTimestam
     o(lk).transactionMetricsObserver.onChooseReadTimestamp(timestamp);
 }
 
-TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx,
-                                                             int numSlotsToReserve)
+TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx)
     : _opCtx(opCtx) {
     // Stash the transaction on the OperationContext on the stack. At the end of this function it
     // will be unstashed onto the OperationContext.
@@ -560,7 +559,7 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
 
     // Begin a new WUOW and reserve a slot in the oplog.
     WriteUnitOfWork wuow(opCtx);
-    _oplogSlots = repl::getNextOpTimes(opCtx, numSlotsToReserve);
+    _oplogSlot = repl::getNextOpTime(opCtx);
 
     // Release the WUOW state since this WUOW is no longer in use.
     wuow.release();
@@ -937,13 +936,12 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         opCtx->checkForInterrupt();
         o(lk).txnState.transitionTo(TransactionState::kPrepared);
     }
-    std::vector<OplogSlot> reservedSlots;
+
     if (prepareOptime) {
         // On secondary, we just prepare the transaction and discard the buffered ops.
         prepareOplogSlot = OplogSlot(*prepareOptime, 0);
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).prepareOpTime = *prepareOptime;
-        reservedSlots.push_back(prepareOplogSlot);
     } else {
         // On primary, we reserve an optime, prepare the transaction and write the oplog entry.
         //
@@ -952,16 +950,8 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         // being prepared. When the OplogSlotReserver goes out of scope and is destroyed, the
         // storage-transaction it uses to keep the hole open will abort and the slot (and
         // corresponding oplog hole) will vanish.
-        if (!gUseMultipleOplogEntryFormatForTransactions) {
-            oplogSlotReserver.emplace(opCtx);
-        } else {
-            const auto numSlotsToReserve = retrieveCompletedTransactionOperations(opCtx).size();
-            // Reserve an extra slot here for the prepare oplog entry.
-            oplogSlotReserver.emplace(opCtx, numSlotsToReserve + 1);
-            invariant(oplogSlotReserver->getSlots().size() >= 1);
-        }
-        prepareOplogSlot = oplogSlotReserver->getLastSlot();
-        reservedSlots = oplogSlotReserver->getSlots();
+        oplogSlotReserver.emplace(opCtx);
+        prepareOplogSlot = oplogSlotReserver->getReservedOplogSlot();
         invariant(o().prepareOpTime.isNull(),
                   str::stream() << "This transaction has already reserved a prepareOpTime at: "
                                 << o().prepareOpTime.toString());
@@ -981,8 +971,9 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     }
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.opTime.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
+
     opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(
-        opCtx, reservedSlots, retrieveCompletedTransactionOperations(opCtx));
+        opCtx, prepareOplogSlot, retrieveCompletedTransactionOperations(opCtx));
 
     abortGuard.dismiss();
 
@@ -1158,7 +1149,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         if (opCtx->writesAreReplicated()) {
             invariant(!commitOplogEntryOpTime);
             oplogSlotReserver.emplace(opCtx);
-            commitOplogSlot = oplogSlotReserver->getLastSlot();
+            commitOplogSlot = oplogSlotReserver->getReservedOplogSlot();
             invariant(commitOplogSlot.opTime.getTimestamp() >= commitTimestamp,
                       str::stream() << "Commit oplog entry must be greater than or equal to commit "
                                        "timestamp due to causal consistency. commit timestamp: "
@@ -1343,7 +1334,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
     boost::optional<OplogSlot> abortOplogSlot;
     if (o().txnState.isPrepared() && opCtx->writesAreReplicated()) {
         oplogSlotReserver.emplace(opCtx);
-        abortOplogSlot = oplogSlotReserver->getLastSlot();
+        abortOplogSlot = oplogSlotReserver->getReservedOplogSlot();
     }
 
     // Clean up the transaction resources on the opCtx even if the transaction resources on the

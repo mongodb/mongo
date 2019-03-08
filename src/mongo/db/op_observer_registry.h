@@ -277,11 +277,11 @@ public:
     }
 
     void onTransactionPrepare(OperationContext* opCtx,
-                              const std::vector<OplogSlot>& reservedSlots,
+                              const OplogSlot& prepareOpTime,
                               std::vector<repl::ReplOperation>& statements) override {
         ReservedTimes times{opCtx};
         for (auto& observer : _observers) {
-            observer->onTransactionPrepare(opCtx, reservedSlots, statements);
+            observer->onTransactionPrepare(opCtx, prepareOpTime, statements);
         }
     }
 
