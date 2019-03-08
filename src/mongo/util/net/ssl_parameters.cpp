@@ -31,13 +31,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/authenticate.h"
+#include "mongo/util/net/ssl_parameters.h"
+
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/net/ssl_parameters.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 
 namespace mongo {
@@ -121,11 +121,6 @@ void TLSModeServerParameter::append(OperationContext*,
 }
 
 Status SSLModeServerParameter::setFromString(const std::string& strMode) {
-#ifndef MONGO_CONFIG_SSL
-    return {ErrorCodes::IllegalOperation,
-            "Unable to set sslMode, SSL support is not compiled into server"};
-#endif
-
     warning() << "Use of deprecared server parameter 'sslMode', please use 'tlsMode' instead.";
 
     auto swNewMode = checkTLSModeTransition(
@@ -138,64 +133,12 @@ Status SSLModeServerParameter::setFromString(const std::string& strMode) {
 }
 
 Status TLSModeServerParameter::setFromString(const std::string& strMode) {
-#ifndef MONGO_CONFIG_SSL
-    return {ErrorCodes::IllegalOperation,
-            "Unable to set tlsMode, TLS support is not compiled into server"};
-#endif
     auto swNewMode = checkTLSModeTransition(
         SSLParams::tlsModeFormat, SSLParams::tlsModeParse, "tlsMode", strMode);
     if (!swNewMode.isOK()) {
         return swNewMode.getStatus();
     }
     sslGlobalParams.sslMode.store(swNewMode.getValue());
-    return Status::OK();
-}
-
-
-void ClusterAuthModeServerParameter::append(OperationContext*,
-                                            BSONObjBuilder& builder,
-                                            const std::string& fieldName) {
-    builder.append(fieldName, clusterAuthModeFormat());
-}
-
-Status ClusterAuthModeServerParameter::setFromString(const std::string& strMode) {
-#ifndef MONGO_CONFIG_SSL
-    return {ErrorCodes::IllegalOperation,
-            "Unable to set clusterAuthMode, SSL support is not compiled into server"};
-#endif
-
-    auto swMode = clusterAuthModeParse(strMode);
-    if (!swMode.isOK()) {
-        return swMode.getStatus();
-    }
-
-    auto mode = swMode.getValue();
-    auto oldMode = serverGlobalParams.clusterAuthMode.load();
-    auto sslMode = sslGlobalParams.sslMode.load();
-    if ((mode == ServerGlobalParams::ClusterAuthMode_sendX509) &&
-        (oldMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile)) {
-        if (sslMode == SSLParams::SSLMode_disabled || sslMode == SSLParams::SSLMode_allowSSL) {
-            return {ErrorCodes::BadValue,
-                    "Illegal state transition for clusterAuthMode, need to enable SSL for outgoing "
-                    "connections"};
-        }
-        serverGlobalParams.clusterAuthMode.store(mode);
-#ifdef MONGO_CONFIG_SSL
-        auth::setInternalUserAuthParams(
-            BSON(saslCommandMechanismFieldName << "MONGODB-X509" << saslCommandUserDBFieldName
-                                               << "$external"));
-#endif
-    } else if ((mode == ServerGlobalParams::ClusterAuthMode_x509) &&
-               (oldMode == ServerGlobalParams::ClusterAuthMode_sendX509)) {
-        serverGlobalParams.clusterAuthMode.store(mode);
-    } else {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Illegal state transition for clusterAuthMode, change from "
-                              << clusterAuthModeFormat()
-                              << " to "
-                              << strMode};
-    }
-
     return Status::OK();
 }
 

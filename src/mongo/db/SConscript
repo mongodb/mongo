@@ -460,6 +460,7 @@ env.Library(
         "$BUILD_DIR/mongo/rpc/metadata",
         "$BUILD_DIR/mongo/rpc/rpc",
         "$BUILD_DIR/mongo/util/net/ssl_manager",
+        "$BUILD_DIR/mongo/util/net/ssl_parameters_auth",
         "auth/authorization_manager_global",
         "serverinit",
     ],
