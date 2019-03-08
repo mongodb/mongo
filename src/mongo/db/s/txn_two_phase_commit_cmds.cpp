@@ -111,14 +111,11 @@ public:
                 auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
                 auto prepareOpTime = txnParticipant.getPrepareOpTime();
 
-                // Ensure waiting for writeConcern of the prepare OpTime.
+                // Set the client optime to be prepareOpTime if it's not already later than
+                // prepareOpTime. This ensures that we wait for writeConcern and that prepareOpTime
+                // will be committed.
                 if (prepareOpTime > replClient.getLastOp()) {
-                    // In case this node has failed over, in which case the term will have
-                    // increased, set the Client's last OpTime to the larger of the system last
-                    // OpTime and the prepare OpTime.
-                    const auto systemLastOpTime =
-                        repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
-                    replClient.setLastOp(std::max(prepareOpTime, systemLastOpTime));
+                    replClient.setLastOp(prepareOpTime);
                 }
 
                 invariant(opCtx->recoveryUnit()->getPrepareTimestamp() ==
