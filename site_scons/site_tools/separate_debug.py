@@ -38,6 +38,7 @@ def _update_builder(env, builder, bitcode):
         path_function=old_path_function,
     )
 
+    base_action = builder.action
     if not isinstance(base_action, SCons.Action.ListAction):
         base_action = builder.action = SCons.Action.ListAction([base_action])
 
