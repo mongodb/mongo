@@ -411,7 +411,8 @@ void IndexBuildsCoordinator::awaitNoBgOpInProgForNs(OperationContext* opCtx, Str
         return;
     }
 
-    collIndexBuildsIt->second->waitUntilNoIndexBuildsRemain(lk);
+    auto collIndexBuildSharedPtr = collIndexBuildsIt->second;
+    collIndexBuildSharedPtr->waitUntilNoIndexBuildsRemain(lk);
 }
 
 void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(StringData db) const {
