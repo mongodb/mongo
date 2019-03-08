@@ -45,6 +45,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/query/internal_plans.h"
@@ -430,6 +431,9 @@ std::string IdempotencyTest::computeDataHash(Collection* collection) {
 }
 
 CollectionState IdempotencyTest::validate() {
+    // Allow in-progress indexes to complete before validating collection contents.
+    IndexBuildsCoordinator::get(_opCtx.get())->awaitNoBgOpInProgForNs(_opCtx.get(), nss);
+
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
     auto collection = autoColl.getCollection();
 
