@@ -75,7 +75,11 @@ constexpr auto kKeyFieldName = "key"_sd;
 StatusWith<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
     try {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return autoColl.getCollection()->uuid().get();
+        auto collection = autoColl.getCollection();
+        if (!collection) {
+            return {ErrorCodes::NamespaceNotFound, nss.ns()};
+        }
+        return collection->uuid().get();
     } catch (const DBException& ex) {
         invariant(ex.toStatus().code() == ErrorCodes::NamespaceNotFound);
         return ex.toStatus();
