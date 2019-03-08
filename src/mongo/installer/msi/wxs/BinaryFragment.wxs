@@ -112,6 +112,14 @@
           <File Id="f_snmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
                 DiskId="1" KeyPath="yes" />
         </Component>
+        <Component Id="c_mongocryptd" Guid="D243D194-B765-4DF8-BC67-8F4C329AD1B5">
+          <File Id="f_mongocryptd" Name="mongocryptd.exe" Source="$(var.EnterpriseToolBinarySource)\mongocryptd.exe"
+                DiskId ="1" KeyPath="yes"/>
+        </Component>
+        <Component Id="c_mongocryptdPdb" Guid="49950D1E-55B0-4146-AEDE-C60C6B086ABF">
+          <File Id="f_mongocryptdPdb" Name="mongocryptd.pdb" Source="$(var.EnterpriseToolBinarySource)\mongocryptd.pdb"
+                DiskId ="1" KeyPath="yes"/>
+        </Component>
       <?endif ?>
       <?if $(var.Edition) = Enterprise Or $(var.Edition) = SSL ?>
         <Component Id="c_ssleay" Guid="8879033A-F4F7-4879-A7F8-4D81355A47E3">

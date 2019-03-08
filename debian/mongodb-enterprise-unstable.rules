@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-TOOLS=bsondump mongocryptd mongodecrypt mongodump mongoexport mongofiles mongoimport mongoldap mongorestore mongostat mongotop
+TOOLS=bsondump mongodecrypt mongodump mongoexport mongofiles mongoimport mongoldap mongorestore mongostat mongotop
 
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1
@@ -88,6 +88,7 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
 	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/bin
 	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/bin
+	cp -v $(CURDIR)/bin/mongocryptd $(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/bin
 	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/bin
 	cp -v $(CURDIR)/bin/install_compass $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
 

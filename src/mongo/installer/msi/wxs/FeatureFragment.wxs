@@ -115,6 +115,15 @@
             <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
         </Feature>
+        <?if $(var.Edition) = Enterprise ?>
+        <Feature Id="MongoCryptD"
+                Title ="MongoCryptD"
+                Description="MongoDB Field Level Encryption Daemon"
+                Level ="1">
+          <ComponentRef Id="c_mongocryptd"/>
+          <ComponentRef Id="c_mongocryptdPdb"/>
+        </Feature>
+        <?endif ?>
       </Feature>
     </FeatureGroup>
 
