@@ -1,6 +1,6 @@
 /**
  * Tests mongoD-specific semantics of postBatchResumeToken for $changeStream aggregations.
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, uses_change_streams]
  */
 (function() {
     "use strict";

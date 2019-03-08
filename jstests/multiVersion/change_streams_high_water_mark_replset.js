@@ -1,6 +1,7 @@
 /**
  * Tests that high water mark and postBatchResumeTokens are handled correctly during upgrade from
  * and downgrade to both 3.6 and a pre-backport version of 4.0 on a single replica set.
+ * @tags: [uses_change_streams]
  */
 (function() {
     "use strict";

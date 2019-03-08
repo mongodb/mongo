@@ -1,7 +1,7 @@
 /**
  * Tests that single-collection high water mark tokens on a sharded cluster always contain the
  * collection's UUID, even if the collection is not present on all shards.
- * @tags: [requires_replication, requires_journaling]
+ * @tags: [requires_replication, requires_journaling, uses_change_streams]
  */
 (function() {
     "use strict";
