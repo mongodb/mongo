@@ -277,9 +277,9 @@ TEST_F(CollectionTest, ValidateError) {
     Collection* coll = agc.getCollection();
     RecordStore* rs = coll->getRecordStore();
 
-    std::string invalidBson = "\0\0\0\0\0";
-    const char* recordData = invalidBson.c_str();
-    auto statusWithId = rs->insertRecord(opCtx, recordData, 5, Timestamp::min());
+    auto invalidBson = "\0\0\0\0\0"_sd;
+    auto statusWithId =
+        rs->insertRecord(opCtx, invalidBson.rawData(), invalidBson.size(), Timestamp::min());
     ASSERT_OK(statusWithId.getStatus());
     checkValidate(coll, false, 1, 1, 1);
 }
