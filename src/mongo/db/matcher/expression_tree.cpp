@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_path.h"
+#include "mongo/db/matcher/expression_text_base.h"
 
 namespace mongo {
 
@@ -321,6 +322,14 @@ void NotMatchExpression::debugString(StringBuilder& debug, int level) const {
 boost::optional<StringData> NotMatchExpression::getPathIfNotWithSinglePathMatchExpressionTree(
     MatchExpression* exp) {
     if (auto pathMatch = dynamic_cast<PathMatchExpression*>(exp)) {
+        if (dynamic_cast<TextMatchExpressionBase*>(exp)) {
+            // While TextMatchExpressionBase derives from PathMatchExpression, text match
+            // expressions cannot be serialized in the same manner as other PathMatchExpression
+            // derivatives. This is because the path for a TextMatchExpression is embedded within
+            // the $text object, whereas for other PathMatchExpressions it is on the left-hand-side,
+            // for example {x: {$eq: 1}}.
+            return boost::none;
+        }
         return pathMatch->path();
     }
 
@@ -328,7 +337,7 @@ boost::optional<StringData> NotMatchExpression::getPathIfNotWithSinglePathMatchE
         boost::optional<StringData> path;
         for (size_t i = 0; i < exp->numChildren(); ++i) {
             auto pathMatchChild = dynamic_cast<PathMatchExpression*>(exp->getChild(i));
-            if (!pathMatchChild) {
+            if (!pathMatchChild || dynamic_cast<TextMatchExpressionBase*>(exp->getChild(i))) {
                 return boost::none;
             }
 
