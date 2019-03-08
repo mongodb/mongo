@@ -44,6 +44,9 @@ EVERGREEN_FILE = "etc/evergreen.yml"
 SELECTOR_FILE = "etc/burn_in_tests.yml"
 SUITE_FILES = ["with_server"]
 
+SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
+                        "multi_stmt_txn_passthrough", "parallel_fsm_workload_test")
+
 
 def parse_command_line():
     """Parse command line options."""
@@ -284,8 +287,10 @@ def create_executor_list(suites, exclude_suites):
     to run under that executor.
     """
 
+    test_membership = resmokelib.suitesconfig.create_test_membership_map(
+        test_kind=SUPPORTED_TEST_KINDS)
+
     memberships = collections.defaultdict(list)
-    test_membership = resmokelib.suitesconfig.create_test_membership_map()
     for suite in suites:
         for test in suite.tests:
             for executor in set(test_membership[test]) - set(exclude_suites):

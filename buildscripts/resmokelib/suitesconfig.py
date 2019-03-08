@@ -26,16 +26,24 @@ def get_named_suites():
 def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     """Return a dict keyed by test name containing all of the suites that will run that test.
 
-    If 'test_kind' is specified then only the mappings for that kind are returned.
-    Since this iterates through every available suite, it should only be run once.
+    If 'test_kind' is specified, then only the mappings for that kind of test are returned. Multiple
+    kinds of tests can be specified as an iterable (e.g. a tuple or list). This function parses the
+    definition of every available test suite, which is an expensive operation. It is therefore
+    desirable for it to only ever be called once.
     """
+
+    if test_kind is not None:
+        if isinstance(test_kind, basestring):
+            test_kind = [test_kind]
+
+        test_kind = frozenset(test_kind)
 
     test_membership = collections.defaultdict(list)
     suite_names = get_named_suites()
     for suite_name in suite_names:
         try:
             suite_config = _get_suite_config(suite_name)
-            if test_kind and suite_config.get("test_kind") != test_kind:
+            if test_kind and suite_config.get("test_kind") not in test_kind:
                 continue
             suite = _suite.Suite(suite_name, suite_config)
         except IOError as err:

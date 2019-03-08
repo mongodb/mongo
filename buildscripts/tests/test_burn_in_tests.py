@@ -639,6 +639,23 @@ class CreateExecutorList(unittest.TestCase):
         executor_list = _create_executor_list([], [])
         self.assertEqual(executor_list, collections.defaultdict(list))
 
+    @patch(RESMOKELIB + ".testing.suite.Suite")
+    @patch(RESMOKELIB + ".suitesconfig.get_named_suites")
+    def test_create_executor_list_runs_core_suite(self, mock_get_named_suites, mock_suite_class):
+        mock_get_named_suites.return_value = ["core"]
+
+        burn_in.create_executor_list([], [])
+        self.assertEqual(mock_suite_class.call_count, 1)
+
+    @patch(RESMOKELIB + ".testing.suite.Suite")
+    @patch(RESMOKELIB + ".suitesconfig.get_named_suites")
+    def test_create_executor_list_ignores_dbtest_suite(self, mock_get_named_suites,
+                                                       mock_suite_class):
+        mock_get_named_suites.return_value = ["dbtest"]
+
+        burn_in.create_executor_list([], [])
+        self.assertEqual(mock_suite_class.call_count, 0)
+
 
 def tasks_mock(  #pylint: disable=too-many-arguments
         tasks, generate_resmoke_tasks_command=None, get_vars_task_name=None, run_tests_command=None,
