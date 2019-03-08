@@ -330,7 +330,7 @@ public:
         Timer t;
         int x;
         ASSERT(!q.blockingPop(x, 5));
-        ASSERT(t.seconds() > 3 && t.seconds() < 9);
+        ASSERT(t.seconds() > 3);
     }
 };
 
