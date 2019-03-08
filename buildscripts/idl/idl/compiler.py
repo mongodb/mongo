@@ -64,6 +64,7 @@ class CompilerArgs(object):
         self.output_suffix = None  # type: unicode
 
         self.write_dependencies = False  # type: bool
+        self.write_dependencies_inline = False  # type: bool
 
 
 class CompilerImportResolver(parser.ImportResolverBase):
@@ -113,14 +114,17 @@ class CompilerImportResolver(parser.ImportResolverBase):
         return io.open(resolved_file_name, encoding='utf-8')
 
 
-def _write_dependencies(spec):
-    # type: (syntax.IDLSpec) -> None
+def _write_dependencies(spec, write_dependencies_inline):
+    # type: (syntax.IDLSpec, bool) -> None
     """Write a list of dependencies to standard out."""
     if not spec.imports:
         return
 
     dependencies = sorted(spec.imports.dependencies)
     for resolved_file_name in dependencies:
+        if write_dependencies_inline:
+            resolved_file_name = "import file:" + resolved_file_name
+
         print(resolved_file_name)
 
 
@@ -202,10 +206,12 @@ def compile_idl(args):
                                   CompilerImportResolver(args.import_directories))
 
         if not parsed_doc.errors:
-            # Stop compiling if we only need to scan import dependencies
-            if args.write_dependencies:
-                _write_dependencies(parsed_doc.spec)
-                return True
+            if args.write_dependencies or args.write_dependencies_inline:
+                _write_dependencies(parsed_doc.spec, args.write_dependencies_inline)
+
+                # Stop compiling if we only need to scan import dependencies
+                if args.write_dependencies:
+                    return True
 
             _update_import_includes(args, parsed_doc.spec, header_file_name)
 

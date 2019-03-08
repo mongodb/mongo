@@ -83,6 +83,7 @@ def generate(env):
     env['IDLCCOM'] = '$IDLC --include src --base_dir %s --target_arch $TARGET_ARCH --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES ' % (base_dir)
     env['IDLCSUFFIX'] = '.idl'
 
+    env['IDL_HAS_INLINE_DEPENDENCIES'] = True
 
 def exists(env):
     return True

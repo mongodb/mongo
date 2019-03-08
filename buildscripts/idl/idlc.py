@@ -59,6 +59,9 @@ def main():
     parser.add_argument('--write-dependencies', action='store_true',
                         help='only print out a list of dependent imports')
 
+    parser.add_argument('--write-dependencies-inline', action='store_true',
+                        help='print out a list of dependent imports during file generation')
+
     parser.add_argument('--target_arch', type=str,
                         help="IDL target archiecture (amd64, s390x). defaults to current machine")
 
@@ -78,6 +81,7 @@ def main():
     compiler_args.output_base_dir = args.base_dir
     compiler_args.output_suffix = "_gen"
     compiler_args.write_dependencies = args.write_dependencies
+    compiler_args.write_inpendencies_inline = args.write_dependencies_inline
 
     if (args.output is not None and args.header is None) or \
         (args.output is  None and args.header is not None):
