@@ -885,6 +885,49 @@ buildvariants:
     - name: crud_workloads
     - name: smoke_test
 
+- name: linux-1-node-replSet-ese-cbc
+  display_name: Linux 1-Node ReplSet ESE CBC
+  batchtime: 1440 # 24 hours
+  modules: *modules
+  expansions:
+    setup: single-replica-ese-cbc
+    cluster: single
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile-variant: -enterprise
+  run_on:
+      - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+  tasks:
+    - name: industry_benchmarks
+    - name: smoke_test
+
+- name: linux-1-node-replSet-ese-gcm
+  display_name: Linux 1-Node ReplSet ESE GCM
+  batchtime: 1440 # 24 hours
+  modules: *modules
+  expansions:
+    setup: single-replica-ese-gcm
+    cluster: single
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile-variant: -enterprise
+  run_on:
+      - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+  tasks:
+    - name: industry_benchmarks
+    - name: smoke_test
+
+
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
   batchtime: 10080 # 7 days
