@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 
 namespace mongo {
@@ -200,24 +201,34 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
-    auto sortItr = std::next(itr);
-    long long skipSum = 0;
-    while (sortItr != container->end()) {
-        auto nextStage = (*sortItr).get();
+    using SumType = long long;
+    // Just in case, since we're passing an address of a signed 64bit below.
+    static_assert(std::is_signed<SumType>::value && sizeof(SumType) == 8);
 
-        if (auto nextSkip = dynamic_cast<DocumentSourceSkip*>(nextStage)) {
-            skipSum += nextSkip->getSkip();
-            ++sortItr;
-        } else if (auto nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage)) {
-            nextLimit->setLimit(nextLimit->getLimit() + skipSum);
+    auto stageItr = std::next(itr);
+    SumType skipSum = 0;
+    while (stageItr != container->end()) {
+        auto nextStage = (*stageItr).get();
+        auto nextSkip = dynamic_cast<DocumentSourceSkip*>(nextStage);
+        auto nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage);
+        SumType safeSum = 0;
+
+        // The skip and limit values can be very large, so we need to make sure the sum doesn't
+        // overflow before applying an optimiztion to pull the limit into the sort stage.
+        if (nextSkip && !mongoSignedAddOverflow64(skipSum, nextSkip->getSkip(), &safeSum)) {
+            skipSum = safeSum;
+            ++stageItr;
+        } else if (nextLimit &&
+                   !mongoSignedAddOverflow64(nextLimit->getLimit(), skipSum, &safeSum)) {
+            nextLimit->setLimit(safeSum);
             setLimitSrc(nextLimit);
-            container->erase(sortItr);
-            sortItr = std::next(itr);
+            container->erase(stageItr);
+            stageItr = std::next(itr);
             skipSum = 0;
         } else if (!nextStage->constraints().canSwapWithLimitAndSample) {
             return std::next(itr);
         } else {
-            ++sortItr;
+            ++stageItr;
         }
     }
 

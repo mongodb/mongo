@@ -107,7 +107,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
     uassert(15972,
             str::stream() << "Argument to $skip must be a number not a " << typeName(elem.type()),
             elem.isNumber());
-    auto nToSkip = elem.numberLong();
+    auto nToSkip = elem.safeNumberLong();
     uassert(15956, "Argument to $skip cannot be negative", nToSkip >= 0);
 
     return DocumentSourceSkip::create(pExpCtx, nToSkip);

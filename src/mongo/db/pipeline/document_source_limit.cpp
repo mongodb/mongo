@@ -99,7 +99,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLimit::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(15957, "the limit must be specified as a number", elem.isNumber());
 
-    long long limit = elem.numberLong();
+    long long limit = elem.safeNumberLong();
     return DocumentSourceLimit::create(pExpCtx, limit);
 }
 }  // namespace mongo

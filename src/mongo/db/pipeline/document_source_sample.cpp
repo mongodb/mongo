@@ -102,8 +102,9 @@ intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
 
         if (fieldName == "size") {
             uassert(28746, "size argument to $sample must be a number", elem.isNumber());
-            uassert(28747, "size argument to $sample must not be negative", elem.numberLong() >= 0);
-            sample->_size = elem.numberLong();
+            auto size = elem.safeNumberLong();
+            uassert(28747, "size argument to $sample must not be negative", size >= 0);
+            sample->_size = size;
             sizeSpecified = true;
         } else {
             uasserted(28748, str::stream() << "unrecognized option to $sample: " << fieldName);
