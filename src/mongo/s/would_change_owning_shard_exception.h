@@ -40,33 +40,26 @@ namespace mongo {
  * shard. If the update is part of a multi statement transaction, we will attach the
  * query from the original update and the post image returned by the update stage. MongoS
  * will use these to delete the original doc and insert the new doc. If the update is a
- * retryable write, we will attach both the query and the update fields from the original
- * update command. MongoS will use these to start an internal transaction and re-run the
- * update command.
+ * retryable write, we will not attach any extra info and MongoS will start an internal
+ * transaction and re-send the original update command upon catching this error.
  */
 class WouldChangeOwningShardInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::WouldChangeOwningShard;
 
-    explicit WouldChangeOwningShardInfo(const BSONObj& originalQueryPredicate,
-                                        const boost::optional<BSONObj>& originalUpdate,
-                                        const boost::optional<BSONObj>& postImage)
-        : _originalQueryPredicate(originalQueryPredicate.getOwned()) {
-        invariant(!(originalUpdate && postImage));
-        invariant(originalUpdate || postImage);
+    explicit WouldChangeOwningShardInfo(const boost::optional<BSONObj>& originalQueryPredicate,
+                                        const boost::optional<BSONObj>& postImage) {
+        // Either both originalQueryPredicate and postImage should be set or neither should.
+        invariant((originalQueryPredicate && postImage) != (!originalQueryPredicate && !postImage));
 
-        if (originalUpdate)
-            _originalUpdate = originalUpdate->getOwned();
+        if (originalQueryPredicate)
+            _originalQueryPredicate = originalQueryPredicate->getOwned();
         if (postImage)
             _postImage = postImage->getOwned();
     }
 
     const auto& getOriginalQueryPredicate() const {
         return _originalQueryPredicate;
-    }
-
-    const auto& getOriginalUpdate() const {
-        return _originalUpdate;
     }
 
     const auto& getPostImage() const {
@@ -85,10 +78,7 @@ public:
 
 private:
     // the 'q' portion of the original update comamand
-    BSONObj _originalQueryPredicate;
-
-    // The 'u' portion of the original update command
-    boost::optional<BSONObj> _originalUpdate;
+    boost::optional<BSONObj> _originalQueryPredicate;
 
     // The post image returned by the update stage
     boost::optional<BSONObj> _postImage;

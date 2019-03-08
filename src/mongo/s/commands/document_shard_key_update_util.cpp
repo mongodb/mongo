@@ -43,7 +43,7 @@ namespace mongo {
 namespace {
 
 /**
- * Calls into the command execution stack to run the given command. Will blindly uassert on any
+ * Calls into the command execution stack to run the given commands. Will blindly uassert on any
  * error returned by a command.
  */
 void executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
@@ -116,7 +116,7 @@ void updateShardKeyForDocument(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const WouldChangeOwningShardInfo& documentKeyChangeInfo,
                                int stmtId) {
-    auto originalQueryPredicate = documentKeyChangeInfo.getOriginalQueryPredicate().getOwned();
+    auto originalQueryPredicate = documentKeyChangeInfo.getOriginalQueryPredicate()->getOwned();
 
     invariant(documentKeyChangeInfo.getPostImage());
     auto updatePostImage = documentKeyChangeInfo.getPostImage()->getOwned();
@@ -129,18 +129,40 @@ void updateShardKeyForDocument(OperationContext* opCtx,
     executeOperationsAsPartOfShardKeyUpdate(opCtx, deleteCmdObj, insertCmdObj, nss.db());
 }
 
+
+TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    invariant(txnRouter);
+
+    auto txnNumber = opCtx->getTxnNumber();
+    invariant(txnNumber);
+
+    txnRouter->beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
+
+    return txnRouter;
+}
+
+void commitShardKeyUpdateTransaction(OperationContext* opCtx,
+                                     TransactionRouter* txnRouter,
+                                     TxnNumber txnNumber) {
+    auto commitResponse = txnRouter->commitTransaction(opCtx, boost::none);
+}
+
 BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
                                       const BSONObj& originalQueryPredicate,
                                       const BSONObj& updatePostImage,
                                       int stmtId) {
-    return createShardKeyDeleteOp(nss, originalQueryPredicate, updatePostImage)
-        .toBSON(BSON("stmtId" << stmtId));
+    auto deleteOp = createShardKeyDeleteOp(nss, originalQueryPredicate, updatePostImage);
+    deleteOp.getWriteCommandBase().setStmtId(stmtId);
+    return deleteOp.toBSON({});
 }
 
 BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
                                       const BSONObj& updatePostImage,
                                       int stmtId) {
-    return createShardKeyInsertOp(nss, updatePostImage).toBSON(BSON("stmtId" << stmtId));
+    auto insertOp = createShardKeyInsertOp(nss, updatePostImage);
+    insertOp.getWriteCommandBase().setStmtId(stmtId);
+    return insertOp.toBSON({});
 }
 
 }  // namespace documentShardKeyUpdateUtil

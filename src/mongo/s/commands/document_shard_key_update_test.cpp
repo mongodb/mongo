@@ -67,6 +67,7 @@ TEST_F(DocumentShardKeyUpdateTest, constructShardKeyDeleteCmdObj) {
     ASSERT_EQ(predicate["_id"].Int(), 20);
 
     ASSERT_EQ(deleteCmdObj["delete"].String(), nss.coll());
+    ASSERT_EQ(deleteCmdObj["stmtId"].Int(), stmtId);
 }
 
 TEST_F(DocumentShardKeyUpdateTest, constructShardKeyInsertCmdObj) {
@@ -85,7 +86,7 @@ TEST_F(DocumentShardKeyUpdateTest, constructShardKeyInsertCmdObj) {
     ASSERT_EQ(insert["_id"].Int(), 20);
 
     ASSERT_EQ(insertCmdObj["insert"].String(), nss.coll());
+    ASSERT_EQ(insertCmdObj["stmtId"].Int(), stmtId);
 }
-
 }  // namespace
 }  // namespace mongo

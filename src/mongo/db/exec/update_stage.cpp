@@ -911,12 +911,12 @@ void UpdateStage::assertDocStillBelongsToNode(ScopedCollectionMetadata metadata,
     if (!metadata->keyBelongsToMe(newShardKey)) {
         // If this update is in a multi-stmt txn, attach the post image to the error. Otherwise,
         // attach the original update field.
-        boost::optional<BSONObj> originalUpdate{!txnParticipant.inMultiDocumentTransaction(),
-                                                _params.request->getUpdates()};
+        boost::optional<BSONObj> originalQuery{txnParticipant.inMultiDocumentTransaction(),
+                                               _params.request->getQuery()};
         boost::optional<BSONObj> postImg{txnParticipant.inMultiDocumentTransaction(),
                                          _doc.getObject()};
 
-        uasserted(WouldChangeOwningShardInfo(_params.request->getQuery(), originalUpdate, postImg),
+        uasserted(WouldChangeOwningShardInfo(originalQuery, postImg),
                   str::stream() << "This update would cause the doc to change owning shards");
     }
 }
