@@ -77,8 +77,12 @@ let ContinuousStepdown;
                 while (stopCounter.getCount() > 0) {
                     print("*** Stepping down " + primary);
 
-                    assert.commandWorked(primary.adminCommand(
-                        {replSetStepDown: options.stepdownDurationSecs, force: true}));
+                    // The command may fail if the node is no longer primary or is in the process of
+                    // stepping down.
+                    assert.commandWorkedOrFailedWithCode(
+                        primary.adminCommand(
+                            {replSetStepDown: options.stepdownDurationSecs, force: true}),
+                        [ErrorCodes.NotMaster, ErrorCodes.ConflictingOperationInProgress]);
 
                     // Wait for primary to get elected and allow the test to make some progress
                     // before attempting another stepdown.
