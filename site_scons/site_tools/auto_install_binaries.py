@@ -167,12 +167,24 @@ def generate(env):
         tags = set(normalized_tags)
 
         applied_role_tags = role_tags.intersection(tags)
+
+        if len(applied_role_tags) != 1:
+            env.FatalError("too many roles")
+
+        # The 'meta' tag is implicitly attached as a role.
+        applied_role_tags.add("meta")
+
         applied_component_tags = tags - applied_role_tags
 
-        # The 'all' tag is implicitly attached as a component, and the
-        # 'meta' tag is implicitly attached as a role.
-        applied_role_tags.add("meta")
+        if len(applied_component_tags) < 1:
+            env.FatalError("not enough components")
+
+        # The 'all' tag is implicitly attached as a component.
         applied_component_tags.add("all")
+
+        for s in source:
+            s.attributes.aib_applied_role_tags = applied_role_tags
+            s.attributes.aib_applied_component_tags = applied_component_tags
 
         for component_tag, role_tag in itertools.product(applied_component_tags, applied_role_tags):
             alias_name = 'install-' + component_tag
@@ -238,6 +250,7 @@ def generate(env):
         results = []
         install_sources = node.sources
         for install_source in install_sources:
+            is_role_tags = getattr(install_source, "aib_applied_role_tags", set())
             is_executor = install_source.get_executor()
             if not is_executor:
                 continue
@@ -245,6 +258,8 @@ def generate(env):
             for is_target in (is_targets or []):
                 grandchildren = is_target.children()
                 for grandchild in grandchildren:
+                    grandchild_role_tags = getattr(grandchild, "aib_applied_role_tags", set())
+                    
                     actions = getattr(grandchild.attributes, "aib_install_actions", None)
                     if actions:
                         results.extend(actions)
