@@ -77,6 +77,9 @@
             recurser(depth, limit, callback);
         }
     }
+    function assertMatch(m, l) {
+        assert(m.test(l), m + " didn't match \"" + l + "\"");
+    }
     tests.forEach(function(t) {
         let code = tojson(recurser);
         [1, 2, 10].forEach(function(depth) {
@@ -84,30 +87,28 @@
             assert.throws(startParallelShell(
                 code + ";\nrecurser(0," + depth + "," + tojson(t.callback) + ");", false, true));
             let output = rawMongoProgramOutput();
-            let lines = output.split("\n");
-            assert(/MongoDB shell version/.test(lines.shift()));
-            assert(/^\s*$/.test(lines.pop()));
-            assert(/exiting with code/.test(lines.pop()));
-
-            let m = new RegExp("\\\[js\\\] " + t.match + "$");
-            assert(m.test(lines.shift()));
+            let lines = output.split(/\s*\n/);
+            assertMatch(/MongoDB shell version/, lines.shift());
+            assertMatch(/^\s*$/, lines.pop());
+            assertMatch(/exiting with code/, lines.pop());
+            assertMatch(new RegExp("\\\[js\\\] " + t.match + "$"), lines.shift());
 
             if (t.stack == true) {
                 assert.eq(lines.length,
                           depth + 2);  // plus one for the shell and one for the callback
                 lines.forEach(function(l) {
-                    assert(/\@\(shell eval\):\d+:\d+/.test(l));
+                    assertMatch(/\@\(shell eval\):\d+:\d+/, l);
                 });
                 lines.pop();
                 lines.shift();
                 lines.forEach(function(l) {
-                    assert(/recurser\@/.test(l));
+                    assertMatch(/recurser\@/, l);
                 });
             } else if (t.stack == false) {
                 assert.eq(lines.length, 0);
             } else if (t.stack == undefined) {
                 assert.eq(lines.length, 1);
-                assert(/undefined/.test(lines.pop()));
+                assertMatch(/undefined/, lines.pop());
             }
         });
     });
