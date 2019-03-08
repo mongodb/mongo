@@ -37,7 +37,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/background.h"
 
 namespace mongo {
 
@@ -67,7 +66,7 @@ class OperationContext;
  * oplog entries associated with this index build.
  * The argument "initIndexTs" specifies the timestamp to be used to make the initial catalog write.
  */
-class IndexBuilder : public BackgroundJob {
+class IndexBuilder {
 public:
     /**
      * Indicates whether or not to ignore indexing constraints.
@@ -85,8 +84,6 @@ public:
                  Timestamp initIndexTs = Timestamp::min());
     virtual ~IndexBuilder();
 
-    virtual void run();
-
     /**
      * name of the builder, not the index
      */
@@ -96,13 +93,6 @@ public:
      * Instead of building the index in a background thread, build on the current thread.
      */
     Status buildInForeground(OperationContext* opCtx, Database* db) const;
-
-    /**
-     * Waits for a background index build to register itself.  This function must be called
-     * after starting a background index build via a BackgroundJob and before starting a
-     * subsequent one.
-     */
-    static void waitForBgIndexStarting();
 
     static bool canBuildInBackground();
 

@@ -345,7 +345,6 @@ mongod = env.Program(
         'db/index/index_access_method',
         'db/index_builds_coordinator_mongod',
         'db/index/index_descriptor',
-        'db/index_d',
         'db/initialize_snmp',
         'db/introspect',
         'db/keys_collection_client_direct',
