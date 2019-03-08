@@ -299,8 +299,8 @@ TEST(KVCatalogTest, Coll1) {
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(
-            catalog->newCollection(&opCtx, "a.b", CollectionOptions(), KVPrefix::kNotPrefixed));
+        ASSERT_OK(catalog->newCollection(
+            &opCtx, NamespaceString("a.b"), CollectionOptions(), KVPrefix::kNotPrefixed));
         ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent("a.b"));
         uow.commit();
     }
@@ -319,7 +319,9 @@ TEST(KVCatalogTest, Coll1) {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
         catalog->dropCollection(&opCtx, "a.b").transitional_ignore();
-        catalog->newCollection(&opCtx, "a.b", CollectionOptions(), KVPrefix::kNotPrefixed)
+        catalog
+            ->newCollection(
+                &opCtx, NamespaceString("a.b"), CollectionOptions(), KVPrefix::kNotPrefixed)
             .transitional_ignore();
         uow.commit();
     }
@@ -344,8 +346,8 @@ TEST(KVCatalogTest, Idx1) {
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(
-            catalog->newCollection(&opCtx, "a.b", CollectionOptions(), KVPrefix::kNotPrefixed));
+        ASSERT_OK(catalog->newCollection(
+            &opCtx, NamespaceString("a.b"), CollectionOptions(), KVPrefix::kNotPrefixed));
         ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent("a.b"));
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
         uow.commit();
@@ -428,8 +430,8 @@ TEST(KVCatalogTest, DirectoryPerDb1) {
     {  // collection
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(
-            catalog->newCollection(&opCtx, "a.b", CollectionOptions(), KVPrefix::kNotPrefixed));
+        ASSERT_OK(catalog->newCollection(
+            &opCtx, NamespaceString("a.b"), CollectionOptions(), KVPrefix::kNotPrefixed));
         ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "a/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
         uow.commit();
@@ -476,8 +478,8 @@ TEST(KVCatalogTest, Split1) {
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(
-            catalog->newCollection(&opCtx, "a.b", CollectionOptions(), KVPrefix::kNotPrefixed));
+        ASSERT_OK(catalog->newCollection(
+            &opCtx, NamespaceString("a.b"), CollectionOptions(), KVPrefix::kNotPrefixed));
         ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "collection/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
         uow.commit();
@@ -524,8 +526,8 @@ TEST(KVCatalogTest, DirectoryPerAndSplit1) {
     {
         MyOperationContext opCtx(engine);
         WriteUnitOfWork uow(&opCtx);
-        ASSERT_OK(
-            catalog->newCollection(&opCtx, "a.b", CollectionOptions(), KVPrefix::kNotPrefixed));
+        ASSERT_OK(catalog->newCollection(
+            &opCtx, NamespaceString("a.b"), CollectionOptions(), KVPrefix::kNotPrefixed));
         ASSERT_STRING_CONTAINS(catalog->getCollectionIdent("a.b"), "a/collection/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
         uow.commit();
@@ -578,7 +580,8 @@ TEST(KVCatalogTest, RestartForPrefixes) {
         {
             MyOperationContext opCtx(engine);
             WriteUnitOfWork uow(&opCtx);
-            ASSERT_OK(catalog->newCollection(&opCtx, "a.b", CollectionOptions(), abCollPrefix));
+            ASSERT_OK(catalog->newCollection(
+                &opCtx, NamespaceString("a.b"), CollectionOptions(), abCollPrefix));
             ASSERT_NOT_EQUALS("a.b", catalog->getCollectionIdent("a.b"));
             ASSERT_TRUE(catalog->isUserDataIdent(catalog->getCollectionIdent("a.b")));
             uow.commit();

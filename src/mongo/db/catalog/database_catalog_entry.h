@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -96,7 +97,7 @@ public:
                                         IndexCatalogEntry* index) = 0;
 
     virtual Status createCollection(OperationContext* opCtx,
-                                    StringData ns,
+                                    const NamespaceString& nss,
                                     const CollectionOptions& options,
                                     bool allocateDefaultSpace) = 0;
 

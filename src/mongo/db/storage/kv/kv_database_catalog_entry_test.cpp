@@ -39,6 +39,7 @@
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -50,22 +51,11 @@ TEST_F(ServiceContextTest, CreateCollectionValidNamespace) {
     storageEngine.finishInit();
     KVDatabaseCatalogEntryMock dbEntry("mydb", &storageEngine);
     OperationContextNoop ctx;
-    ASSERT_OK(dbEntry.createCollection(&ctx, "mydb.mycoll", CollectionOptions(), true));
+    ASSERT_OK(
+        dbEntry.createCollection(&ctx, NamespaceString("mydb.mycoll"), CollectionOptions(), true));
     std::list<std::string> collectionNamespaces;
     dbEntry.getCollectionNamespaces(&collectionNamespaces);
     ASSERT_FALSE(collectionNamespaces.empty());
-}
-
-TEST_F(ServiceContextTest, CreateCollectionEmptyNamespace) {
-    KVStorageEngine storageEngine(
-        new DevNullKVEngine(), KVStorageEngineOptions{}, kvDatabaseCatalogEntryMockFactory);
-    storageEngine.finishInit();
-    KVDatabaseCatalogEntryMock dbEntry("mydb", &storageEngine);
-    OperationContextNoop ctx;
-    ASSERT_NOT_OK(dbEntry.createCollection(&ctx, "", CollectionOptions(), true));
-    std::list<std::string> collectionNamespaces;
-    dbEntry.getCollectionNamespaces(&collectionNamespaces);
-    ASSERT_TRUE(collectionNamespaces.empty());
 }
 
 /**
@@ -93,11 +83,22 @@ TEST_F(ServiceContextTest, CreateCollectionInvalidRecordStore) {
     storageEngine.finishInit();
     KVDatabaseCatalogEntryMock dbEntry("fail", &storageEngine);
     OperationContextNoop ctx;
-    ASSERT_NOT_OK(dbEntry.createCollection(&ctx, "fail.me", CollectionOptions(), true));
+    ASSERT_NOT_OK(
+        dbEntry.createCollection(&ctx, NamespaceString("fail.me"), CollectionOptions(), true));
     std::list<std::string> collectionNamespaces;
     dbEntry.getCollectionNamespaces(&collectionNamespaces);
     ASSERT_TRUE(collectionNamespaces.empty());
 }
+
+DEATH_TEST_F(ServiceContextTest, CreateCollectionEmptyNamespace, "Invariant failure") {
+    KVStorageEngine storageEngine(
+        new DevNullKVEngine(), KVStorageEngineOptions{}, kvDatabaseCatalogEntryMockFactory);
+    storageEngine.finishInit();
+    KVDatabaseCatalogEntryMock dbEntry("mydb", &storageEngine);
+    OperationContextNoop ctx;
+    Status status = dbEntry.createCollection(&ctx, NamespaceString(""), CollectionOptions(), true);
+}
+
 
 }  // namespace
 }  // namespace mongo

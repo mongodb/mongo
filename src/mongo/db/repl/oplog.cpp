@@ -1434,26 +1434,17 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 collection);
         requestNss = collection->ns();
         dassert(opCtx->lockState()->isCollectionLockedForMode(
-                    requestNss.ns(), supportsDocLocking() ? MODE_IX : MODE_X),
-                requestNss.ns());
+            requestNss, supportsDocLocking() ? MODE_IX : MODE_X));
     } else {
         uassert(ErrorCodes::InvalidNamespace,
                 "'ns' must be of type String",
                 fieldNs.type() == BSONType::String);
         const StringData ns = fieldNs.valuestrsafe();
         requestNss = NamespaceString(ns);
-        if (nsIsFull(ns)) {
-            if (supportsDocLocking()) {
-                // WiredTiger, and others requires MODE_IX since the applier threads driving
-                // this allow writes to the same collection on any thread.
-                dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IX),
-                        requestNss.ns());
-            } else {
-                // mmapV1 ensures that all operations to the same collection are executed from
-                // the same worker thread, so it takes an exclusive lock (MODE_X)
-                dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_X), requestNss.ns());
-            }
-        }
+        invariant(requestNss.coll().size());
+        dassert(opCtx->lockState()->isCollectionLockedForMode(
+                    requestNss, supportsDocLocking() ? MODE_IX : MODE_X),
+                requestNss.ns());
         collection = db->getCollection(opCtx, requestNss);
     }
 

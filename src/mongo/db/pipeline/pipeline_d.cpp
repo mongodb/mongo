@@ -105,7 +105,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
     Collection* coll, OperationContext* opCtx, long long sampleSize, long long numRecords) {
     // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
     // function because double-locking forces any PlanExecutor we create to adopt a NO_YIELD policy.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns().ns(), MODE_IS));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
 
     static const double kMaxSampleRatioForRandCursor = 0.05;
     if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
@@ -305,7 +305,7 @@ void PipelineD::prepareCursorSource(Collection* collection,
     }
 
     // We are going to generate an input cursor, so we need to be holding the collection lock.
-    dassert(expCtx->opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IS));
+    dassert(expCtx->opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
 
     if (!sources.empty()) {
         auto sampleStage = dynamic_cast<DocumentSourceSample*>(sources.front().get());

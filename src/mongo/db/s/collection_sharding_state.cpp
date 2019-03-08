@@ -141,7 +141,7 @@ CollectionShardingState::CollectionShardingState(NamespaceString nss)
 CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     // Collection lock must be held to have a reference to the collection's sharding state
-    dassert(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IS));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
 
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
     return &collectionsMap->getOrCreate(nss);
@@ -266,17 +266,17 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
 }
 
 void CollectionShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx, CSRLock&) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase();
 }
 
 void CollectionShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx, CSRLock&) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
     _critSec.enterCriticalSectionCommitPhase();
 }
 
 void CollectionShardingState::exitCriticalSection(OperationContext* opCtx, CSRLock&) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
     _critSec.exitCriticalSection();
 }
 

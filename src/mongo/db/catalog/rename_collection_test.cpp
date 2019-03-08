@@ -455,7 +455,7 @@ void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const 
  * catalog. The caller must hold the appropriate locks from the lock manager.
  */
 Collection* _getCollection_inlock(OperationContext* opCtx, const NamespaceString& nss) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IS));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto* db = databaseHolder->getDb(opCtx, nss.db());
     if (!db) {

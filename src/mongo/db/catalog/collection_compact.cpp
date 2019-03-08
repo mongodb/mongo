@@ -45,7 +45,7 @@ namespace mongo {
 StatusWith<CompactStats> compactCollection(OperationContext* opCtx,
                                            Collection* collection,
                                            const CompactOptions* compactOptions) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns().toString(), MODE_X));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
 
     DisableDocumentValidation validationDisabler(opCtx);
 

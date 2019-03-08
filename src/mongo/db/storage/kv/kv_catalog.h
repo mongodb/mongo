@@ -66,7 +66,7 @@ public:
      * @return error or ident for instance
      */
     Status newCollection(OperationContext* opCtx,
-                         StringData ns,
+                         const NamespaceString& ns,
                          const CollectionOptions& options,
                          KVPrefix prefix);
 

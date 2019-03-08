@@ -69,7 +69,7 @@ CollectionInfoCacheImpl::~CollectionInfoCacheImpl() {
 
 const UpdateIndexData& CollectionInfoCacheImpl::getIndexKeys(OperationContext* opCtx) const {
     // This requires "some" lock, and MODE_IS is an expression for that, for now.
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_IS));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_IS));
     invariant(_keysComputed);
     return _indexedPaths;
 }
@@ -205,7 +205,7 @@ void CollectionInfoCacheImpl::updatePlanCacheIndexEntries(OperationContext* opCt
 
 void CollectionInfoCacheImpl::init(OperationContext* opCtx) {
     // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
     const bool includeUnfinishedIndexes = false;
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
@@ -220,7 +220,7 @@ void CollectionInfoCacheImpl::init(OperationContext* opCtx) {
 
 void CollectionInfoCacheImpl::addedIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
     // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
     invariant(desc);
 
     rebuildIndexData(opCtx);
@@ -230,7 +230,7 @@ void CollectionInfoCacheImpl::addedIndex(OperationContext* opCtx, const IndexDes
 
 void CollectionInfoCacheImpl::droppedIndex(OperationContext* opCtx, StringData indexName) {
     // Requires exclusive collection lock.
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
     rebuildIndexData(opCtx);
     _indexUsageTracker.unregisterIndex(indexName);

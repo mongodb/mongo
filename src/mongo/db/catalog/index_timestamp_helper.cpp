@@ -84,7 +84,7 @@ void IndexTimestampHelper::setGhostCommitTimestampForWrite(OperationContext* opC
     const auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
     // If a lock that blocks writes is held, there can be no uncommitted writes, so there is no
     // need to check snapshot visibility, especially if a caller is not reading with a timestamp.
-    invariant(mySnapshot || opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_S),
+    invariant(mySnapshot || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_S),
               "a write-blocking lock is required when applying a ghost timestamp without a read "
               "timestamp");
     invariant(!mySnapshot || *mySnapshot <= commitTimestamp,

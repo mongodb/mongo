@@ -1168,7 +1168,7 @@ TEST_F(DConcurrencyTestFixture, IsDbLockedForXMode) {
 }
 
 TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
-    const std::string ns("db1.coll");
+    const NamespaceString ns("db1.coll");
 
     auto opCtx = makeOperationContext();
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
@@ -1177,7 +1177,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
     Lock::DBLock dbLock(opCtx.get(), "db1", MODE_IS);
 
     {
-        Lock::CollectionLock collLock(lockState, ns, MODE_IS);
+        Lock::CollectionLock collLock(lockState, ns.ns(), MODE_IS);
 
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
         ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_IX));
@@ -1189,7 +1189,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
     }
 
     {
-        Lock::CollectionLock collLock(lockState, ns, MODE_S);
+        Lock::CollectionLock collLock(lockState, ns.ns(), MODE_S);
 
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
         ASSERT(!lockState->isCollectionLockedForMode(ns, MODE_IX));
@@ -1199,7 +1199,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
 }
 
 TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
-    const std::string ns("db1.coll");
+    const NamespaceString ns("db1.coll");
 
     auto opCtx = makeOperationContext();
     opCtx->swapLockState(stdx::make_unique<LockerImpl>());
@@ -1208,7 +1208,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
     Lock::DBLock dbLock(opCtx.get(), "db1", MODE_IX);
 
     {
-        Lock::CollectionLock collLock(lockState, ns, MODE_IX);
+        Lock::CollectionLock collLock(lockState, ns.ns(), MODE_IX);
 
         // TODO: This is TRUE because Lock::CollectionLock converts IX lock to X
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
@@ -1219,7 +1219,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
     }
 
     {
-        Lock::CollectionLock collLock(lockState, ns, MODE_X);
+        Lock::CollectionLock collLock(lockState, ns.ns(), MODE_X);
 
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IS));
         ASSERT(lockState->isCollectionLockedForMode(ns, MODE_IX));
@@ -1751,7 +1751,7 @@ TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
     Lock::DBLock DBL1(opctx1, "testdb"_sd, MODE_IX, Date_t::max());
     ASSERT(opctx1->lockState()->isDbLockedForMode("testdb"_sd, MODE_IX));
     Lock::CollectionLock CL1(opctx1->lockState(), "testdb.test"_sd, MODE_X, Date_t::max());
-    ASSERT(opctx1->lockState()->isCollectionLockedForMode("testdb.test"_sd, MODE_X));
+    ASSERT(opctx1->lockState()->isCollectionLockedForMode(NamespaceString("testdb.test"), MODE_X));
 
     Date_t t1 = Date_t::now();
     Lock::DBLock DBL2(opctx2, "testdb"_sd, MODE_IX, Date_t::max());

@@ -561,15 +561,14 @@ bool LockerImpl::isDbLockedForMode(StringData dbName, LockMode mode) const {
     return isLockHeldForMode(resIdDb, mode);
 }
 
-bool LockerImpl::isCollectionLockedForMode(StringData ns, LockMode mode) const {
-    invariant(nsIsFull(ns));
+bool LockerImpl::isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const {
+    invariant(nss.coll().size());
 
     if (isW())
         return true;
     if (isR() && isSharedLockMode(mode))
         return true;
 
-    const NamespaceString nss(ns);
     const ResourceId resIdDb(RESOURCE_DATABASE, nss.db());
 
     LockMode dbMode = getLockMode(resIdDb);
@@ -585,7 +584,7 @@ bool LockerImpl::isCollectionLockedForMode(StringData ns, LockMode mode) const {
             return isSharedLockMode(mode);
         case MODE_IX:
         case MODE_IS: {
-            const ResourceId resIdColl(RESOURCE_COLLECTION, ns);
+            const ResourceId resIdColl(RESOURCE_COLLECTION, nss.ns());
             return isLockHeldForMode(resIdColl, mode);
         } break;
         case LockModesCount:

@@ -73,7 +73,7 @@ public:
         : _opCtx(opCtx), _nss(nss) {}
 
     void commit(boost::optional<Timestamp>) override {
-        invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+        invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
 
         CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
 

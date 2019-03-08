@@ -226,30 +226,29 @@ RecordStore* KVDatabaseCatalogEntryBase::getRecordStore(StringData ns) const {
 }
 
 Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
-                                                    StringData ns,
+                                                    const NamespaceString& nss,
                                                     const CollectionOptions& options,
                                                     bool allocateDefaultSpace) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
-    if (ns.empty()) {
-        return Status(ErrorCodes::BadValue, "Collection namespace cannot be empty");
-    }
+    invariant(nss.coll().size() > 0);
 
-    if (_collections.count(ns.toString())) {
-        invariant(_collections[ns.toString()]);
+    if (_collections.count(nss.toString())) {
+        invariant(_collections[nss.toString()]);
         return Status(ErrorCodes::NamespaceExists, "collection already exists");
     }
 
-    KVPrefix prefix = KVPrefix::getNextPrefix(NamespaceString(ns));
+    KVPrefix prefix = KVPrefix::getNextPrefix(nss);
 
     // need to create it
-    Status status = _engine->getCatalog()->newCollection(opCtx, ns, options, prefix);
+    Status status = _engine->getCatalog()->newCollection(opCtx, nss, options, prefix);
     if (!status.isOK())
         return status;
 
-    string ident = _engine->getCatalog()->getCollectionIdent(ns);
+    string ident = _engine->getCatalog()->getCollectionIdent(nss.ns());
 
-    status = _engine->getEngine()->createGroupedRecordStore(opCtx, ns, ident, options, prefix);
+    status =
+        _engine->getEngine()->createGroupedRecordStore(opCtx, nss.ns(), ident, options, prefix);
     if (!status.isOK())
         return status;
 
@@ -263,13 +262,13 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
         }
     }
 
-    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns, ident));
+    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, nss.ns(), ident));
 
-    auto rs = _engine->getEngine()->getGroupedRecordStore(opCtx, ns, ident, options, prefix);
+    auto rs = _engine->getEngine()->getGroupedRecordStore(opCtx, nss.ns(), ident, options, prefix);
     invariant(rs);
 
-    _collections[ns.toString()] =
-        new KVCollectionCatalogEntry(_engine, _engine->getCatalog(), ns, ident, std::move(rs));
+    _collections[nss.toString()] = new KVCollectionCatalogEntry(
+        _engine, _engine->getCatalog(), nss.ns(), ident, std::move(rs));
 
     return Status::OK();
 }

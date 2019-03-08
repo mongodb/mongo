@@ -314,12 +314,12 @@ void IndexBuildInterceptor::_tryYield(OperationContext* opCtx) {
     // Never yield while holding locks that prevent writes to the collection: only yield while
     // holding intent locks. This check considers all locks in the hierarchy that would cover this
     // mode.
-    if (opCtx->lockState()->isCollectionLockedForMode(_indexCatalogEntry->ns(), MODE_S)) {
+    const NamespaceString nss(_indexCatalogEntry->ns());
+    if (opCtx->lockState()->isCollectionLockedForMode(nss, MODE_S)) {
         return;
     }
     DEV {
-        const NamespaceString nss(_indexCatalogEntry->ns());
-        invariant(!opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X));
+        invariant(!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
         invariant(!opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     }
 

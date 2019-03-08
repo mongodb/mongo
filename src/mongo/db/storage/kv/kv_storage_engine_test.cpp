@@ -70,7 +70,7 @@ public:
     StatusWith<std::string> createCollection(OperationContext* opCtx, NamespaceString ns) {
         AutoGetDb db(opCtx, ns.db(), LockMode::MODE_X);
         DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, ns.db());
-        auto ret = dbce->createCollection(opCtx, ns.ns(), CollectionOptions(), false);
+        auto ret = dbce->createCollection(opCtx, ns, CollectionOptions(), false);
         if (!ret.isOK()) {
             return ret;
         }

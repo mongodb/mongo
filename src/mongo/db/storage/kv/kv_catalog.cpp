@@ -407,28 +407,28 @@ void KVCatalog::getAllCollections(std::vector<std::string>* out) const {
 }
 
 Status KVCatalog::newCollection(OperationContext* opCtx,
-                                StringData ns,
+                                const NamespaceString& nss,
                                 const CollectionOptions& options,
                                 KVPrefix prefix) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
-    const string ident = _newUniqueIdent(ns, "collection");
+    const string ident = _newUniqueIdent(nss.ns(), "collection");
 
     stdx::lock_guard<stdx::mutex> lk(_identsLock);
-    Entry& old = _idents[ns.toString()];
+    Entry& old = _idents[nss.toString()];
     if (!old.ident.empty()) {
         return Status(ErrorCodes::NamespaceExists, "collection already exists");
     }
 
-    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
+    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, nss.ns()));
 
     BSONObj obj;
     {
         BSONObjBuilder b;
-        b.append("ns", ns);
+        b.append("ns", nss.ns());
         b.append("ident", ident);
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = ns.toString();
+        md.ns = nss.ns();
         md.options = options;
         md.prefix = prefix;
         b.append("md", md.toBSON());
@@ -439,7 +439,7 @@ Status KVCatalog::newCollection(OperationContext* opCtx,
         return res.getStatus();
 
     old = Entry(ident, res.getValue());
-    LOG(1) << "stored meta data for " << ns << " @ " << res.getValue();
+    LOG(1) << "stored meta data for " << nss.ns() << " @ " << res.getValue();
     return Status::OK();
 }
 

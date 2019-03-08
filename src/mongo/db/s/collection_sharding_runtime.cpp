@@ -90,7 +90,7 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
                                                      CollectionMetadata newMetadata) {
     invariant(!newMetadata.isSharded() || !isNamespaceAlwaysUnsharded(_nss),
               str::stream() << "Namespace " << _nss.ns() << " must never be sharded.");
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
     _metadataManager->setFilteringMetadata(std::move(newMetadata));
 }

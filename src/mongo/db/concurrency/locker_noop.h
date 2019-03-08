@@ -154,7 +154,7 @@ public:
         return true;
     }
 
-    virtual bool isCollectionLockedForMode(StringData ns, LockMode mode) const {
+    virtual bool isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const {
         return true;
     }
 

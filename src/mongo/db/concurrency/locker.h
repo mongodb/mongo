@@ -295,7 +295,7 @@ public:
     // hierarchy is properly locked and because of this they are very expensive to call.
     // Do not use them in performance critical code paths.
     virtual bool isDbLockedForMode(StringData dbName, LockMode mode) const = 0;
-    virtual bool isCollectionLockedForMode(StringData ns, LockMode mode) const = 0;
+    virtual bool isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const = 0;
 
     /**
      * Returns the resource that this locker is waiting/blocked on (if any). If the locker is
