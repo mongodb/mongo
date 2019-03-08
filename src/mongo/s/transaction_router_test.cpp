@@ -815,6 +815,29 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
     });
 
     future.timed_get(kFutureTimeout);
+
+    // Sending commit with a recovery token again should cause the router to use the recovery path
+    // again.
+
+    future = launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(hostAndPort1, request.target);
+        ASSERT_EQ("admin", request.dbname);
+
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+        auto participantElements = request.cmdObj["participants"].Array();
+        ASSERT_TRUE(participantElements.empty());
+
+        checkSessionDetails(request.cmdObj, lsid, txnNum, true);
+        checkWriteConcern(request.cmdObj, writeConcern);
+
+        return BSON("ok" << 1);
+    });
+
+    future.timed_get(kFutureTimeout);
 }
 
 TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
