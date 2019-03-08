@@ -225,9 +225,6 @@ Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,
 }
 
 void AsyncWorkScheduler::_notifyAllTasksComplete(WithLock) {
-    if (_shutdownStatus.isOK())
-        return;
-
     if (_activeOpContexts.empty() && _activeHandles.empty() && _childSchedulers.empty())
         _allListsEmptyCV.notify_all();
 }
