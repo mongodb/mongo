@@ -5950,7 +5950,7 @@ TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithDottedInputPath) 
 
 }  // namespace GetComputedPathsTest
 
-namespace ExpressionRegexFindTest {
+namespace ExpressionRegexTest {
 
 TEST(ExpressionRegexFindTest, BasicTest) {
     Value input(fromjson("{input: 'asdf', regex: '^as' }"));
@@ -5979,11 +5979,64 @@ TEST(ExpressionRegexFindTest, FailureCase) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ExpressionRegexFind regexF(expCtx);
     regexF.addOperand(ExpressionConstant::create(expCtx, input));
-    ASSERT_THROWS(regexF.evaluate(Document()), DBException);
+    ASSERT_THROWS_CODE(regexF.evaluate(Document()), DBException, 51105);
 }
 
+TEST(ExpressionRegexFindAllTest, MultipleMatches) {
+    Value input(fromjson("{input: 'a1b2c3', regex: '([a-c][1-3])' }"));
+    std::vector<Value> expectedOut = {Value(fromjson("{match: 'a1', idx:0, captures:['a1']}")),
+                                      Value(fromjson("{match: 'b2', idx:2, captures:['b2']}")),
+                                      Value(fromjson("{match: 'c3', idx:4, captures:['c3']}"))};
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexFindAll regexF(expCtx);
+    regexF.addOperand(ExpressionConstant::create(expCtx, input));
+    Value output = regexF.evaluate(Document());
+    ASSERT_VALUE_EQ(output, Value(expectedOut));
+}
 
-}  // namespace ExpressionRegexFindTest
+TEST(ExpressionRegexFindAllTest, NoMatch) {
+    Value input(fromjson("{input: 'a1b2c3', regex: 'ab' }"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexFindAll regexF(expCtx);
+    regexF.addOperand(ExpressionConstant::create(expCtx, input));
+    Value output = regexF.evaluate(Document());
+    ASSERT_VALUE_EQ(output, Value(std::vector<Value>()));
+}
+
+TEST(ExpressionRegexFindAllTest, FailureCase) {
+    Value input(fromjson("{input: 'FirstLine\\nSecondLine', regex: '[0-9'}"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexFindAll regexF(expCtx);
+    regexF.addOperand(ExpressionConstant::create(expCtx, input));
+    ASSERT_THROWS_CODE(regexF.evaluate(Document()), DBException, 51111);
+}
+
+TEST(ExpressionRegexFindAllTest, InvalidUTF8InInput) {
+    std::string inputField = "1234 ";
+    // Append an invalid UTF-8 character.
+    inputField += static_cast<char>(0xE5);
+    inputField += "  1234";
+    Value input(fromjson("{input: '" + inputField + "', regex: '[0-9]'}"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexFindAll regexF(expCtx);
+    regexF.addOperand(ExpressionConstant::create(expCtx, input));
+    // Verify no match if there is an invalid UTF-8 character in input.
+    ASSERT_VALUE_EQ(regexF.evaluate(Document()), Value(std::vector<Value>()));
+}
+
+TEST(ExpressionRegexFindAllTest, InvalidUTF8InRegex) {
+    std::string regexField = "1234 ";
+    // Append an invalid UTF-8 character.
+    regexField += static_cast<char>(0xE5);
+    Value input(fromjson("{input: '123456', regex: '" + regexField + "'}"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexFindAll regexF(expCtx);
+    regexF.addOperand(ExpressionConstant::create(expCtx, input));
+    // Verify that PCRE will error if REGEX is not a valid UTF-8.
+    ASSERT_THROWS_CODE(regexF.evaluate(Document()), DBException, 51111);
+}
+
+}  // namespace ExpressionRegexTest
 
 class All : public Suite {
 public:
