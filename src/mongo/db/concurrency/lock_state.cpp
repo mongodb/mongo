@@ -373,6 +373,23 @@ LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, 
 
     const LockResult result = lockBegin(opCtx, resourceIdGlobal, actualLockMode);
     invariant(result == LOCK_OK || result == LOCK_WAITING);
+
+    // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
+    // Testing-only.
+    if (result == LOCK_WAITING && MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
+        // Clean up the state on any failed lock attempts.
+        auto unlockOnErrorGuard = makeGuard([&] {
+            LockRequestsMap::Iterator it = _requests.find(resourceIdGlobal);
+            _unlockImpl(&it);
+        });
+
+        uassert(ErrorCodes::LockTimeout,
+                "Cannot immediately acquire global lock. Timing out due to failpoint.",
+                (actualLockMode == MODE_IS || actualLockMode == MODE_IX));
+
+        unlockOnErrorGuard.dismiss();
+    }
+
     return result;
 }
 

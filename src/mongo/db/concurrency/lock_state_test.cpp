@@ -121,6 +121,25 @@ TEST(LockerImpl, ConflictUpgradeWithTimeout) {
     locker2.unlockGlobal();
 }
 
+TEST(LockerImpl, FailPointInLockFailsGlobalNonIntentLocksIfTheyCannotBeImmediatelyGranted) {
+    LockerImpl locker1;
+    locker1.lockGlobal(MODE_IX);
+
+    {
+        FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
+
+        // MODE_S attempt.
+        LockerImpl locker2;
+        ASSERT_THROWS_CODE(locker2.lockGlobal(MODE_S), DBException, ErrorCodes::LockTimeout);
+
+        // MODE_X attempt.
+        LockerImpl locker3;
+        ASSERT_THROWS_CODE(locker3.lockGlobal(MODE_X), DBException, ErrorCodes::LockTimeout);
+    }
+
+    locker1.unlockGlobal();
+}
+
 TEST(LockerImpl, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediatelyGranted) {
     // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
     const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);

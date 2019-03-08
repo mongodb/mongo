@@ -1,7 +1,8 @@
 /**
  * Tests that using the "failNonIntentLocksIfWaitNeeded" failpoint allows us to immediately
  * fail DDL operations blocked behind prepare, as we know they will not be able to acquire locks
- * anyway. The DDL ops will fail here because they won't be able to get database MODE_X locks.
+ * anyway. The DDL ops will fail here because they won't be able to get a MODE_X lock on the
+ * global or database resources.
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
@@ -73,6 +74,12 @@
             ErrorCodes.LockTimeout);
         assert(testDB.getCollectionNames().includes(collToRenameFrom));
         assert(!testDB.getCollectionNames().includes(collToRenameTo));
+
+        assert.commandFailedWithCode(testDB.adminCommand({
+            renameCollection: testDB.getCollection(collToRenameFrom).getFullName(),
+            to: testDB.getSiblingDB('test2').getCollection(collToRenameTo).getFullName(),
+        }),
+                                     ErrorCodes.LockTimeout);
 
         // Attempt to add a new index to that collection.
         assert.commandFailedWithCode(
