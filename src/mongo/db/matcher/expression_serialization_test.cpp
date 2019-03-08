@@ -1377,6 +1377,22 @@ TEST(SerializeBasic, ExpressionTextSerializesCorrectly) {
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 }
 
+TEST(SerializeBasic, ExpressionNorWithTextSerializesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    Matcher original(fromjson("{$nor: [{$text: {$search: 'x'}}]}"),
+                     expCtx,
+                     ExtensionsCallbackNoop(),
+                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    Matcher reserialized(serialize(original.getMatchExpression()),
+                         expCtx,
+                         ExtensionsCallbackNoop(),
+                         MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{$nor: [{$text: {$search: 'x', $language: '', $caseSensitive: "
+                               "false, $diacriticSensitive: false}}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+}
+
 TEST(SerializeBasic, ExpressionTextWithDefaultLanguageSerializesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher original(fromjson("{$text: {$search: 'a', $caseSensitive: false}}"),
