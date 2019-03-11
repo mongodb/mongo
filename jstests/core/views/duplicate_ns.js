@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   assumes_superuser_permissions,
+//   requires_non_retryable_writes,
+// ]
 
 // Test the creation of view with a duplicate name to a collection.
 

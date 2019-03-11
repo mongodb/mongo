@@ -1,6 +1,9 @@
 /**
  * Tests some practical use cases of the $facet stage.
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   requires_spawning_own_processes,
+ * ]
  */
 (function() {
     "use strict";

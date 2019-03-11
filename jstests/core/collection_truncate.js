@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_commands, requires_collstats]
+// @tags: [
+//   requires_collstats,
+//   requires_non_retryable_commands,
+//   uses_testing_only_commands,
+// ]
 
 // SERVER-15033 truncate on a regular collection
 

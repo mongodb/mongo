@@ -1,4 +1,7 @@
 // SERVER-25942 Test that views are not validated in the case that only collections are queried.
+// @tags: [
+//   assumes_superuser_permissions,
+// ]
 (function() {
     'use strict';
     let mydb = db.getSiblingDB('list_collections_no_views');

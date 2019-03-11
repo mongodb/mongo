@@ -1,7 +1,10 @@
 /**
  * Tests the behavior of views when its backing collection is dropped, as well as the behavior of
  * system.views when views are dropped.
- * @tags: [requires_find_command]
+ * @tags: [
+ *   assumes_superuser_permissions,
+ *   requires_find_command,
+ * ]
  */
 (function() {
     "use strict";

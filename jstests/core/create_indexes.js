@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   assumes_superuser_permissions,
+ * ]
+ */
 (function() {
     'use strict';
 

@@ -5,6 +5,7 @@
 //   # parameter. The former operations may be routed to a secondary in the replica set, whereas the
 //   # latter must be routed to the primary.
 //   assumes_read_preference_unchanged,
+//   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
 // ]
 

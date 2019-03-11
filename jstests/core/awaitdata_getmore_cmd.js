@@ -5,8 +5,9 @@
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
-//   requires_getmore,
 //   requires_capped,
+//   requires_getmore,
+//   uses_multiple_connections,
 // ]
 
 (function() {

@@ -1,4 +1,7 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   does_not_support_stepdowns,
+//   uses_testing_only_commands,
+// ]
 //
 // Does not support stepdowns because if a stepdown were to occur between running find() and
 // calling killCursors on the cursor ID returned by find(), the killCursors might be sent to

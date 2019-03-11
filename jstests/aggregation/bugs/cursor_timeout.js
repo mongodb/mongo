@@ -2,6 +2,9 @@
  * Tests that an aggregation cursor is killed when it is timed out by the ClientCursorMonitor.
  *
  * This test was designed to reproduce SERVER-25585.
+ * @tags: [
+ *   requires_spawning_own_processes,
+ * ]
  */
 (function() {
     'use strict';

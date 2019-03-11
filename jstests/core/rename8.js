@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [
+//   assumes_superuser_permissions,
+//   requires_non_retryable_commands,
+// ]
 
 // SERVER-12591: prevent renaming to arbitrary system collections.
 

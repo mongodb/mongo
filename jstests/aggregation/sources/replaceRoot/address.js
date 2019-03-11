@@ -1,6 +1,9 @@
 /**
  * $replaceRoot can be used to extract parts of a document; here we test a simple address case.
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   requires_spawning_own_processes,
+ * ]
  */
 
 (function() {

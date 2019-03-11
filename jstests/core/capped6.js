@@ -5,9 +5,10 @@
 //   # documents using the captrunc command. The former operations may be routed to a secondary in
 //   # the replica set, whereas the latter must be routed to the primary.
 //   assumes_read_preference_unchanged,
-//   requires_non_retryable_commands,
-//   requires_fastcount,
 //   requires_capped,
+//   requires_fastcount,
+//   requires_non_retryable_commands,
+//   uses_testing_only_commands,
 // ]
 (function() {
     var coll = db.capped6;

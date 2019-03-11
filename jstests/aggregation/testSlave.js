@@ -1,5 +1,8 @@
 // This test just make sure that aggregation is possible on a secondary node.
-// @tags: [requires_replication]
+// @tags: [
+//   requires_replication,
+//   requires_spawning_own_processes,
+// ]
 var replTest = new ReplSetTest({name: 'aggTestSlave', nodes: 2});
 var nodes = replTest.startSet();
 replTest.initiate();

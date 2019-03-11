@@ -4,9 +4,10 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
+//   requires_fastcount,
 //   requires_getmore,
 //   requires_non_retryable_commands,
-//   requires_fastcount,
+//   uses_testing_only_commands,
 // ]
 
 // This file tests that commands namespace parsing rejects embedded null bytes.

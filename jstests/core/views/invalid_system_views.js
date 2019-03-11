@@ -3,11 +3,11 @@
  * collections.
  *
  * @tags: [
- *  requires_non_retryable_commands,
- *  requires_non_retryable_writes,
- *
- *  # applyOps uses the oplog that require replication support
- *  requires_replication,
+ *   assumes_superuser_permissions,
+ *   requires_non_retryable_commands,
+ *   requires_non_retryable_writes,
+ *   # applyOps uses the oplog that require replication support
+ *   requires_replication,
  * ]
  */
 

@@ -1,7 +1,10 @@
 /**
  * Verifies that the $collStats aggregation stage includes the shard and hostname for each output
  * document when run via mongoS, and that the former is absent when run on a non-shard mongoD.
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   requires_spawning_own_processes,
+ * ]
  */
 (function() {
     "use strict";

@@ -2,8 +2,9 @@
 // SERVER-16967 Make sure compact doesn't crash while collections are being dropped
 // in a different database.
 // @tags: [
-//     # compact command is not available on embedded
-//     incompatible_with_embedded
+//   # compact command is not available on embedded
+//   incompatible_with_embedded,
+//   uses_multiple_connections,
 // ]
 
 (function() {

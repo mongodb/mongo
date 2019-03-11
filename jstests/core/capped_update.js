@@ -2,7 +2,10 @@
  * Tests various update scenarios on capped collections:
  *  -- SERVER-20529: Ensure capped document sizes do not change
  *  -- SERVER-11983: Don't create _id field on capped updates
- * @tags: [requires_capped]
+ * @tags: [
+ *   requires_capped,
+ *   uses_testing_only_commands,
+ * ]
  */
 (function() {
     'use strict';

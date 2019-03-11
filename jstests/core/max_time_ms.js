@@ -5,11 +5,11 @@
 //   # failpoint. The former operations may be routed to a secondary in the replica set, whereas the
 //   # latter must be routed to the primary.
 //   assumes_read_preference_unchanged,
-//   requires_getmore,
 //   requires_fastcount,
-//
+//   requires_getmore,
 //   # Uses $where operator
 //   requires_scripting,
+//   uses_testing_only_commands,
 // ]
 
 var t = db.max_time_ms;

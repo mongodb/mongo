@@ -1,4 +1,7 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   does_not_support_stepdowns,
+//   uses_testing_only_commands,
+// ]
 
 // Test query stage merge sorting.
 t = db.stages_mergesort;
