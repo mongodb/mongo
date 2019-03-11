@@ -218,7 +218,7 @@ Status _applyOps(OperationContext* opCtx,
                         auto entry = uassertStatusOK(OplogEntry::parse(entryObj));
                         if (*opType == 'c') {
                             invariant(opCtx->lockState()->isW());
-                            uassertStatusOK(repl::applyCommand_inlock(
+                            uassertStatusOK(applyCommand_inlock(
                                 opCtx, opObj, entry, oplogApplicationMode, boost::none));
                             return Status::OK();
                         }

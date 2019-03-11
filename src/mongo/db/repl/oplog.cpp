@@ -913,7 +913,7 @@ struct ApplyOpMetadata {
     }
 };
 
-std::map<std::string, ApplyOpMetadata> opsMap = {
+const StringMap<ApplyOpMetadata> kOpsMap = {
     {"create",
      {[](OperationContext* opCtx,
          const char* ns,
@@ -1948,29 +1948,33 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
     bool done = false;
     while (!done) {
-        auto op = opsMap.find(o.firstElementFieldName());
-        if (op == opsMap.end()) {
+        auto op = kOpsMap.find(o.firstElementFieldName());
+        if (op == kOpsMap.end()) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "Invalid key '" << o.firstElementFieldName()
                                                     << "' found in field 'o'");
         }
-        ApplyOpMetadata curOpToApply = op->second;
-        Status status = Status::OK();
-        try {
-            // If 'writeTime' is not null, any writes in this scope will be given 'writeTime' as
-            // their timestamp at commit.
-            TimestampBlock tsBlock(opCtx, writeTime);
-            status = curOpToApply.applyFunc(opCtx,
-                                            nss.ns().c_str(),
-                                            fieldUI,
-                                            o,
-                                            opTime,
-                                            entry,
-                                            mode,
-                                            stableTimestampForRecovery);
-        } catch (...) {
-            status = exceptionToStatus();
-        }
+
+        const ApplyOpMetadata& curOpToApply = op->second;
+
+        Status status = [&] {
+            try {
+                // If 'writeTime' is not null, any writes in this scope will be given 'writeTime' as
+                // their timestamp at commit.
+                TimestampBlock tsBlock(opCtx, writeTime);
+                return curOpToApply.applyFunc(opCtx,
+                                              nss.ns().c_str(),
+                                              fieldUI,
+                                              o,
+                                              opTime,
+                                              entry,
+                                              mode,
+                                              stableTimestampForRecovery);
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+        }();
+
         switch (status.code()) {
             case ErrorCodes::WriteConflict: {
                 // Need to throw this up to a higher level where it will be caught and the
@@ -1999,12 +2003,13 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 opCtx->checkForInterrupt();
                 break;
             }
-            default:
+            default: {
                 if (!curOpToApply.acceptableErrors.count(status.code())) {
                     error() << "Failed command " << redact(o) << " on " << nss.db()
                             << " with status " << status << " during oplog application";
                     return status;
                 }
+            }
             // fallthrough
             case ErrorCodes::OK:
                 done = true;

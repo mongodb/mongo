@@ -44,22 +44,22 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
                                    ThreadPool* writerPool)
     : OplogApplier(executor, oplogBuffer, observer),
       _replCoord(replCoord),
-      _syncTail(std::make_unique<SyncTail>(
-          observer, consistencyMarkers, storageInterface, multiSyncApply, writerPool, options)),
+      _syncTail(
+          observer, consistencyMarkers, storageInterface, multiSyncApply, writerPool, options),
       _beginApplyingOpTime(options.beginApplyingOpTime) {
     invariant(!options.relaxUniqueIndexConstraints);
 }
 
 void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
-    _syncTail->oplogApplication(oplogBuffer, _replCoord);
+    _syncTail.oplogApplication(oplogBuffer, _replCoord);
 }
 
 void OplogApplierImpl::_shutdown() {
-    _syncTail->shutdown();
+    _syncTail.shutdown();
 }
 
 StatusWith<OpTime> OplogApplierImpl::_multiApply(OperationContext* opCtx, Operations ops) {
-    return _syncTail->multiApply(opCtx, std::move(ops));
+    return _syncTail.multiApply(opCtx, std::move(ops));
 }
 
 }  // namespace repl

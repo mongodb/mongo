@@ -264,6 +264,14 @@ private:
                             std::vector<MultiApplier::OperationPtrs>* writerVectors,
                             std::vector<MultiApplier::Operations>* derivedOps);
 
+    /**
+     * Doles out all the work to the writer pool threads. Does not modify writerVectors, but passes
+     * non-const pointers to inner vectors into func.
+     */
+    void _applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
+                   std::vector<Status>* statusVector,
+                   std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo);
+
     OplogApplier::Observer* const _observer;
     ReplicationConsistencyMarkers* const _consistencyMarkers;
     StorageInterface* const _storageInterface;

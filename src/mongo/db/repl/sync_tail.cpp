@@ -404,32 +404,6 @@ const OplogApplier::Options& SyncTail::getOptions() const {
 
 namespace {
 
-// Doles out all the work to the writer pool threads.
-// Does not modify writerVectors, but passes non-const pointers to inner vectors into func.
-void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
-              ThreadPool* writerPool,
-              const SyncTail::MultiSyncApplyFunc& func,
-              SyncTail* st,
-              std::vector<Status>* statusVector,
-              std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo) {
-    invariant(writerVectors.size() == statusVector->size());
-    for (size_t i = 0; i < writerVectors.size(); i++) {
-        if (!writerVectors[i].empty()) {
-            invariant(writerPool->schedule([
-                &func,
-                st,
-                &writer = writerVectors.at(i),
-                &status = statusVector->at(i),
-                &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
-            ] {
-                auto opCtx = cc().makeOperationContext();
-                status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
-                    [&] { return func(opCtx.get(), &writer, st, &workerMultikeyPathInfo); });
-            }));
-        }
-    }
-}
-
 // Schedules the writes to the oplog for 'ops' into threadPool. The caller must guarantee that 'ops'
 // stays valid until all scheduled work in the thread pool completes.
 void scheduleWritesToOplog(OperationContext* opCtx,
@@ -1297,6 +1271,27 @@ void SyncTail::_fillWriterVectors(OperationContext* opCtx,
     }
 }
 
+void SyncTail::_applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
+                         std::vector<Status>* statusVector,
+                         std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo) {
+    invariant(writerVectors.size() == statusVector->size());
+    for (size_t i = 0; i < writerVectors.size(); i++) {
+        if (writerVectors[i].empty())
+            continue;
+
+        invariant(_writerPool->schedule([
+            this,
+            &writer = writerVectors.at(i),
+            &status = statusVector->at(i),
+            &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
+        ] {
+            auto opCtx = cc().makeOperationContext();
+            status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+                [&] { return _applyFunc(opCtx.get(), &writer, this, &workerMultikeyPathInfo); });
+        }));
+    }
+}
+
 StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
     invariant(!ops.empty());
 
@@ -1353,7 +1348,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
 
         {
             std::vector<Status> statusVector(_writerPool->getStats().numThreads, Status::OK());
-            applyOps(writerVectors, _writerPool, _applyFunc, this, &statusVector, &multikeyVector);
+            _applyOps(writerVectors, &statusVector, &multikeyVector);
             _writerPool->waitForIdle();
 
             // If any of the statuses is not ok, return error.
