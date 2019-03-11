@@ -492,7 +492,7 @@ void shardCollection(OperationContext* opCtx,
         if (!requests.empty()) {
             auto responses = gatherResponses(opCtx,
                                              nss.db(),
-                                             ReadPreferenceSetting::get(opCtx),
+                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                              Shard::RetryPolicy::kIdempotent,
                                              requests);
 
