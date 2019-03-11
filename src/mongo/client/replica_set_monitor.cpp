@@ -47,7 +47,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/background.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
@@ -63,9 +62,6 @@ using std::numeric_limits;
 using std::set;
 using std::string;
 using std::vector;
-
-// Failpoint for disabling AsyncConfigChangeHook calls on updated RS nodes.
-MONGO_FAIL_POINT_DEFINE(failAsyncConfigChangeHook);
 
 // Failpoint for changing the default refresh period
 MONGO_FAIL_POINT_DEFINE(modifyReplicaSetMonitorDefaultRefreshPeriod);
@@ -94,10 +90,6 @@ const int64_t unknownLatency = numeric_limits<int64_t>::max();
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly, TagSet());
 const Milliseconds kExpeditedRefreshPeriod(500);
 AtomicWord<bool> areRefreshRetriesDisabledForTest{false};  // Only true in tests.
-
-// TODO: Move to ReplicaSetMonitorManager
-ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;
-ReplicaSetMonitor::ConfigChangeHook syncConfigChangeHook;
 
 //
 // Helpers for stl algorithms
@@ -190,7 +182,8 @@ Seconds ReplicaSetMonitor::getDefaultRefreshPeriod() {
 ReplicaSetMonitor::ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}
 
 ReplicaSetMonitor::ReplicaSetMonitor(const MongoURI& uri)
-    : ReplicaSetMonitor(std::make_shared<SetState>(uri, globalRSMonitorManager.getExecutor())) {}
+    : ReplicaSetMonitor(std::make_shared<SetState>(
+          uri, &globalRSMonitorManager.getNotifier(), globalRSMonitorManager.getExecutor())) {}
 
 void ReplicaSetMonitor::init() {
     if (areRefreshRetriesDisabledForTest.load()) {
@@ -198,25 +191,15 @@ void ReplicaSetMonitor::init() {
         warning() << "*** Not starting background refresh because refresh retries are disabled.";
         return;
     }
+
+    _state->init();
+
     stdx::lock_guard<stdx::mutex> lk(_state->mutex);
     _scheduleRefresh(_state->now(), lk);
 }
 
 ReplicaSetMonitor::~ReplicaSetMonitor() {
-    // need this lock because otherwise can get race with _scheduleRefresh()
-    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
-    if (!_refresherHandle || !_state->executor) {
-        return;
-    }
-
-    _state->currentScan.reset();
-    _state->executor->cancel(_refresherHandle);
-    // Note: calling _executor->wait(_refresherHandle); from the dispatcher thread will cause hang
-    // Its ok not to call it because the d-tor is called only when the last owning pointer goes out
-    // of scope, so as taskExecutor queue holds a weak pointer to RSM it will not be able to get a
-    // task to execute eliminating the need to call method "wait".
-    //
-    _refresherHandle = {};
+    _state->drop();
 }
 
 void ReplicaSetMonitor::_scheduleRefresh(Date_t when, WithLock) {
@@ -367,7 +350,9 @@ std::string ReplicaSetMonitor::getName() const {
 
 std::string ReplicaSetMonitor::getServerAddress() const {
     stdx::lock_guard<stdx::mutex> lk(_state->mutex);
-    return _state->getConfirmedServerAddress();
+    // We return our setUri until first confirmation
+    return _state->seedConnStr.isValid() ? _state->seedConnStr.toString()
+                                         : _state->setUri.connectionString().toString();
 }
 
 const MongoURI& ReplicaSetMonitor::getOriginalUri() const {
@@ -402,14 +387,8 @@ void ReplicaSetMonitor::remove(const string& name) {
     globalConnPool.removeHost(name);
 }
 
-void ReplicaSetMonitor::setAsynchronousConfigChangeHook(ConfigChangeHook hook) {
-    invariant(!asyncConfigChangeHook);
-    asyncConfigChangeHook = hook;
-}
-
-void ReplicaSetMonitor::setSynchronousConfigChangeHook(ConfigChangeHook hook) {
-    invariant(!syncConfigChangeHook);
-    syncConfigChangeHook = hook;
+ReplicaSetChangeNotifier& ReplicaSetMonitor::getNotifier() {
+    return globalRSMonitorManager.getNotifier();
 }
 
 // TODO move to correct order with non-statics before pushing
@@ -452,8 +431,6 @@ void ReplicaSetMonitor::shutdown() {
 
 void ReplicaSetMonitor::cleanup() {
     globalRSMonitorManager.removeAllMonitors();
-    asyncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();
-    syncConfigChangeHook = ReplicaSetMonitor::ConfigChangeHook();
 }
 
 void ReplicaSetMonitor::disableRefreshRetries_forTest() {
@@ -605,20 +582,20 @@ Refresher::NextStep Refresher::getNextStep() {
 
             // NOTE: we don't modify seedNodes or notify about set membership change in this
             // case since it hasn't been confirmed by a master.
-            const string oldAddr = _set->getUnconfirmedServerAddress();
             for (UnconfirmedReplies::iterator it = _scan->unconfirmedReplies.begin();
                  it != _scan->unconfirmedReplies.end();
                  ++it) {
                 _set->findOrCreateNode(it->first)->update(it->second);
             }
 
-            const string newAddr = _set->getUnconfirmedServerAddress();
-            if (oldAddr != newAddr && syncConfigChangeHook) {
-                // Run the syncConfigChangeHook because the ShardRegistry needs to know about any
-                // node we might talk to.  Don't run the asyncConfigChangeHook because we don't
-                // want to update the seed list stored on the config servers with unconfirmed hosts.
-                syncConfigChangeHook(_set->name, _set->getUnconfirmedServerAddress());
+            auto connStr = _set->possibleConnectionString();
+            if (connStr != _set->workingConnStr) {
+                _set->workingConnStr = std::move(connStr);
+                _set->notifier->onPossibleSet(_set->workingConnStr);
             }
+
+            // If at some point we care about lacking a primary, on it here
+            _set->lastSeenMaster = {};
         }
 
         if (_scan->foundAnyUpNodes) {
@@ -833,25 +810,22 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
         }
     }
 
-    if (reply.normalHosts != _set->seedNodes) {
-        const string oldAddr = _set->getConfirmedServerAddress();
+    bool changedHosts = reply.normalHosts != _set->seedNodes;
+    bool changedPrimary = reply.host != _set->lastSeenMaster;
+    if (changedHosts || changedPrimary) {
+        ++_set->seedGen;
         _set->seedNodes = reply.normalHosts;
+        _set->seedConnStr = _set->confirmedConnectionString();
 
         // LogLevel can be pretty low, since replica set reconfiguration should be pretty rare
         // and we want to record our changes
-        log() << "changing hosts to " << _set->getConfirmedServerAddress() << " from " << oldAddr;
+        log() << "Confirmed replica set for " << _set->name << " is " << _set->seedConnStr;
 
-        if (syncConfigChangeHook) {
-            syncConfigChangeHook(_set->name, _set->getConfirmedServerAddress());
-        }
-
-        if (asyncConfigChangeHook && !MONGO_FAIL_POINT(failAsyncConfigChangeHook)) {
-            // call from a separate thread to avoid blocking and holding lock while potentially
-            // going over the network
-            stdx::thread bg(asyncConfigChangeHook, _set->name, _set->getConfirmedServerAddress());
-            bg.detach();
-        }
+        _set->notifier->onConfirmedSet(_set->seedConnStr, reply.host);
     }
+
+    // Update our working string
+    _set->workingConnStr = _set->seedConnStr;
 
     // Update other nodes's information based on replies we've already seen
     for (UnconfirmedReplies::iterator it = _scan->unconfirmedReplies.begin();
@@ -870,7 +844,6 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
 
 void Refresher::receivedIsMasterBeforeFoundMaster(const IsMasterReply& reply) {
     invariant(!reply.isMaster);
-    // This function doesn't alter _set at all. It only modifies the work queue in _scan.
 
     // Add everyone this host claims is in the set to possibleNodes.
     _scan->possibleNodes.insert(reply.normalHosts.begin(), reply.normalHosts.end());
@@ -1013,9 +986,12 @@ void Node::update(const IsMasterReply& reply) {
     lastWriteDateUpdateTime = Date_t::now();
 }
 
-SetState::SetState(const MongoURI& uri, executor::TaskExecutor* executor)
+SetState::SetState(const MongoURI& uri,
+                   ReplicaSetChangeNotifier* notifier,
+                   executor::TaskExecutor* executor)
     : setUri(std::move(uri)),
       name(setUri.getSetName()),
+      notifier(notifier),
       executor(executor),
       seedNodes(setUri.getServers().begin(), setUri.getServers().end()),
       latencyThresholdMicros(serverGlobalParams.defaultLocalThresholdMillis * int64_t(1000)),
@@ -1223,33 +1199,21 @@ void SetState::updateNodeIfInNodes(const IsMasterReply& reply) {
     node->update(reply);
 }
 
-std::string SetState::getConfirmedServerAddress() const {
-    StringBuilder ss;
-    if (!name.empty())
-        ss << name << "/";
+ConnectionString SetState::confirmedConnectionString() const {
+    std::vector<HostAndPort> hosts(begin(seedNodes), end(seedNodes));
 
-    for (std::set<HostAndPort>::const_iterator it = seedNodes.begin(); it != seedNodes.end();
-         ++it) {
-        if (it != seedNodes.begin())
-            ss << ",";
-        it->append(ss);
-    }
-
-    return ss.str();
+    return ConnectionString::forReplicaSet(name, std::move(hosts));
 }
 
-std::string SetState::getUnconfirmedServerAddress() const {
-    StringBuilder ss;
-    if (!name.empty())
-        ss << name << "/";
+ConnectionString SetState::possibleConnectionString() const {
+    std::vector<HostAndPort> hosts;
+    hosts.reserve(nodes.size());
 
-    for (std::vector<Node>::const_iterator it = nodes.begin(); it != nodes.end(); ++it) {
-        if (it != nodes.begin())
-            ss << ",";
-        it->host.append(ss);
+    for (auto& node : nodes) {
+        hosts.push_back(node.host);
     }
 
-    return ss.str();
+    return ConnectionString::forReplicaSet(name, std::move(hosts));
 }
 
 void SetState::notify(bool finishedScan) {
@@ -1288,6 +1252,23 @@ Status SetState::makeUnsatisfedReadPrefError(const ReadPreferenceSetting& criter
                                 << name);
 }
 
+void SetState::init() {
+    notifier->onFoundSet(name);
+}
+
+void SetState::drop() {
+    {
+        stdx::lock_guard<stdx::mutex> lk(mutex);
+        currentScan.reset();
+        notify(/*finishedScan*/ true);
+    }
+
+    // No point in notifying if we never started
+    if (workingConnStr.isValid()) {
+        notifier->onDroppedSet(name);
+    }
+}
+
 void SetState::checkInvariants() const {
     bool foundMaster = false;
     for (size_t i = 0; i < nodes.size(); i++) {
@@ -1303,7 +1284,7 @@ void SetState::checkInvariants() const {
             foundMaster = true;
 
             // if we have a master it should be the same as lastSeenMaster
-            invariant(nodes[i].host == lastSeenMaster);
+            invariant(lastSeenMaster.empty() || nodes[i].host == lastSeenMaster);
         }
 
         // should never end up with negative latencies

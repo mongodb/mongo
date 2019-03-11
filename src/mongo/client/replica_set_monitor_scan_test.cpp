@@ -1613,5 +1613,365 @@ TEST_F(MinOpTimeTest, MinOpTimeIgnored) {
     ASSERT_EQUALS(notStale.host(), "c");
 }
 
+// -- ReplicaSetChangeNotifier/Listener tests --
+
+class Listener : public ReplicaSetChangeNotifier::Listener {
+public:
+    void logEvent(StringData name, const Key& key) {
+        log() << name << ": " << key;
+    }
+    void logEvent(StringData name, const State& state) {
+        log() << name << ": "
+              << "(" << state.generation << ") " << state.connStr << " | " << state.primary;
+    }
+
+    void onFoundSet(const Key& key) override {
+        lastFoundSetId = ++eventId;
+        logEvent("FoundSet", key);
+    }
+    void onPossibleSet(const State& state) override {
+        lastPossibleSetId = ++eventId;
+        logEvent("PossibleSet", state);
+        lastState = state;
+    }
+    void onConfirmedSet(const State& state) override {
+        lastConfirmedSetId = ++eventId;
+        logEvent("ConfirmedSet", state);
+        lastState = state;
+    }
+    void onDroppedSet(const Key& key) override {
+        lastDroppedSetId = ++eventId;
+        logEvent("DroppedSet", key);
+    }
+
+    int64_t eventId = -1;
+    int64_t lastFoundSetId = -1;
+    int64_t lastPossibleSetId = -1;
+    int64_t lastConfirmedSetId = -1;
+    int64_t lastDroppedSetId = -1;
+    State lastState;
+};
+
+class ChangeNotifierTest : public ReplicaSetMonitorTest {
+public:
+    ChangeNotifierTest() = default;
+    virtual ~ChangeNotifierTest() = default;
+
+    enum class NodeState {
+        kUnknown = 0,
+        kPrimary,
+        kSecondary,
+        kStandalone,
+    };
+
+    auto& listener() const {
+        return *static_cast<Listener*>(_listener.get());
+    }
+
+    void updateSet(std::map<HostAndPort, NodeState> replicaSet) {
+        auto refresher = Refresher(_state);
+        std::set<HostAndPort> seen;
+        HostAndPort primary;
+        std::set<HostAndPort> members;
+
+        BSONArrayBuilder arrayBuilder;
+        for (const auto & [ host, nodeState ] : replicaSet) {
+            if (nodeState == NodeState::kStandalone) {
+                continue;
+            }
+
+            if (nodeState == NodeState::kPrimary) {
+                primary = host;
+            }
+
+            members.insert(host);
+
+            arrayBuilder.append(StringData(host.host()));
+        }
+        auto bsonHosts = arrayBuilder.arr();
+
+        auto markIsMaster = [&](auto host, bool isMaster) {
+            refresher.receivedIsMaster(
+                host,
+                -1,
+                BSON("setName" << kSetName << "ismaster" << isMaster << "secondary" << !isMaster
+                               << "hosts"
+                               << bsonHosts
+                               << "ok"
+                               << true));
+
+        };
+
+        auto markFailed = [&](auto host) {
+            refresher.failedHost(host, {ErrorCodes::InternalError, "Test error"});
+        };
+
+        auto gen = listener().lastState.generation;
+
+        NextStep ns = refresher.getNextStep();
+        for (; ns.step != NextStep::DONE; ns = refresher.getNextStep()) {
+            ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
+            ASSERT(replicaSet.count(ns.host));
+            ASSERT(!seen.count(ns.host));
+            seen.insert(ns.host);
+
+            // mock a reply
+            switch (replicaSet[ns.host]) {
+                case NodeState::kStandalone: {
+                    markFailed(ns.host);
+                } break;
+                case NodeState::kPrimary: {
+                    markIsMaster(ns.host, true);
+                } break;
+                case NodeState::kSecondary: {
+                    markIsMaster(ns.host, false);
+                } break;
+                case NodeState::kUnknown:
+                    MONGO_UNREACHABLE;
+            };
+        }
+
+        // Verify that the listener received the right data
+        if (gen != listener().lastState.generation) {
+            // Our State is what the notifier thinks it should be
+            ASSERT_EQUALS(listener().lastState.connStr, listener().getCurrentState().connStr);
+            ASSERT_EQUALS(listener().lastState.primary, listener().getCurrentState().primary);
+            ASSERT_EQUALS(listener().lastState.generation, listener().getCurrentState().generation);
+
+            // Our State is what we'd expect
+            ASSERT_EQUALS(listener().lastState.connStr.getSetName(), kSetName);
+            ASSERT_EQUALS(listener().lastState.connStr.getServers().size(), members.size());
+            ASSERT_EQUALS(listener().lastState.primary, primary);
+        }
+
+        ASSERT_EQUALS(ns.step, NextStep::DONE);
+        ASSERT(ns.host.empty());
+    }
+
+protected:
+    decltype(_notifier)::ListenerHandle _listener = _notifier.makeListener<Listener>();
+
+    std::shared_ptr<SetState> _state = makeState(basicUri);
+};
+
+TEST_F(ChangeNotifierTest, NotifyNominal) {
+    auto currentId = -1;
+
+    // State exists. Signal: null
+    ASSERT_EQ(listener().lastFoundSetId, currentId);
+
+    // Initializing the state. Signal: FoundSet
+    _state->init();
+    ASSERT_EQ(listener().lastFoundSetId, ++currentId);
+
+    // 'a' claims to be primary. Signal: Confirmed
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kPrimary,
+        },
+        {
+            HostAndPort("b"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
+
+    // Getting another scan with the same details. Signal: null
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kPrimary,
+        },
+        {
+            HostAndPort("b"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().eventId, currentId);
+
+    // Dropped. Signal: Dropped
+    _state->drop();
+    ASSERT_EQ(listener().lastDroppedSetId, ++currentId);
+}
+
+TEST_F(ChangeNotifierTest, NotifyElections) {
+    auto currentId = -1;
+
+    // State exists. Signal: null
+    ASSERT_EQ(listener().lastFoundSetId, currentId);
+
+    // Initializing the state. Signal: FoundSet
+    _state->init();
+    ASSERT_EQ(listener().lastFoundSetId, ++currentId);
+
+    // 'a' claims to be primary. Signal: ConfirmedSet
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kPrimary,
+        },
+        {
+            HostAndPort("b"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
+
+    // 'b' claims to be primary. Signal: ConfirmedSet
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("b"), NodeState::kPrimary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
+
+    // All hosts tell us that they are not primary. Signal: null
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("b"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().eventId, currentId);
+
+    // 'a' claims to be primary again. Signal: ConfirmedSet
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kPrimary,
+        },
+        {
+            HostAndPort("b"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
+
+    // Dropped. Signal: Dropped
+    _state->drop();
+    ASSERT_EQ(listener().lastDroppedSetId, ++currentId);
+}
+
+TEST_F(ChangeNotifierTest, NotifyReconfig) {
+    auto currentId = -1;
+
+    // State exists. Signal: null
+    ASSERT_EQ(listener().lastFoundSetId, currentId);
+
+    // Initializing the state. Signal: FoundSet
+    _state->init();
+    ASSERT_EQ(listener().lastFoundSetId, ++currentId);
+
+    // Update the set with a full scan showing no primary. Signal: PossibleSet
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("b"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().eventId, ++currentId);
+
+    // Mark 'a' as removed. Signal: null
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kStandalone,
+        },
+        {
+            HostAndPort("b"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().eventId, currentId);
+
+    // Discover 'd' as secondary. Signal: PossibleSet
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("b"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("d"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().lastPossibleSetId, ++currentId);
+
+    // Mark 'b' as primary, no 'd'. Signal: ConfirmedSet
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("b"), NodeState::kPrimary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("d"), NodeState::kStandalone,
+        },
+    });
+    ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
+
+    // Mark 'a' as removed. Signal: ConfirmedSet
+    updateSet({
+        {
+            HostAndPort("a"), NodeState::kStandalone,
+        },
+        {
+            HostAndPort("b"), NodeState::kPrimary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
+
+    // Mark 'a' as secondary again. Signal: ConfirmedSet
+    updateSet({
+        {
+            HostAndPort("b"), NodeState::kPrimary,
+        },
+        {
+            HostAndPort("c"), NodeState::kSecondary,
+        },
+        {
+            HostAndPort("a"), NodeState::kSecondary,
+        },
+    });
+    ASSERT_EQ(listener().lastConfirmedSetId, ++currentId);
+
+    // Dropped. Signal: Dropped
+    _state->drop();
+    ASSERT_EQ(listener().lastDroppedSetId, ++currentId);
+}
+
 }  // namespace
 }  // namespace mongo

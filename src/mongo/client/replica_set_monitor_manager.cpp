@@ -224,4 +224,8 @@ TaskExecutor* ReplicaSetMonitorManager::getExecutor() {
     return _taskExecutor.get();
 }
 
+ReplicaSetChangeNotifier& ReplicaSetMonitorManager::getNotifier() {
+    return _notifier;
+}
+
 }  // namespace mongo

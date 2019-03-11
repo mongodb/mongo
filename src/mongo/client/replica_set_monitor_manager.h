@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
@@ -94,6 +95,8 @@ public:
      */
     executor::TaskExecutor* getExecutor();
 
+    ReplicaSetChangeNotifier& getNotifier();
+
 private:
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
@@ -102,6 +105,9 @@ private:
 
     // Executor for monitoring replica sets.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;
+
+    // Widget to notify listeners when a RSM notices a change
+    ReplicaSetChangeNotifier _notifier;
 
     // Needs to be after `_taskExecutor`, so that it will be destroyed before the `_taskExecutor`.
     ReplicaSetMonitorsMap _monitors;

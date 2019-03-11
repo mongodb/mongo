@@ -33,6 +33,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/unittest/unittest.h"
@@ -61,11 +62,15 @@ public:
 
     template <typename... Args>
     using StateIsConstructible =
-        std::enable_if_t<std::is_constructible_v<SetState, Args..., executor::TaskExecutor* const>>;
+        std::enable_if_t<std::is_constructible_v<SetState,
+                                                 Args...,
+                                                 ReplicaSetChangeNotifier* const,
+                                                 executor::TaskExecutor* const>>;
 
     template <typename... Args, typename = StateIsConstructible<Args...>>
     auto makeState(Args&&... args) {
-        return std::make_shared<SetState>(std::forward<Args>(args)..., nullptr);
+        return std::make_shared<ReplicaSetMonitor::SetState>(
+            std::forward<Args>(args)..., &_notifier, nullptr);
     }
 
     void setUp() override {}
@@ -74,6 +79,9 @@ public:
     static const std::vector<HostAndPort> basicSeeds;
     static const std::set<HostAndPort> basicSeedsSet;
     static const MongoURI basicUri;
+
+protected:
+    ReplicaSetChangeNotifier _notifier;
 };
 
 }  // namespace mongo

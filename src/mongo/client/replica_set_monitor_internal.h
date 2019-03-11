@@ -145,7 +145,7 @@ public:
         Promise<HostAndPort> promise;
     };
 
-    SetState(const MongoURI& uri, executor::TaskExecutor*);
+    SetState(const MongoURI& uri, ReplicaSetChangeNotifier*, executor::TaskExecutor*);
 
     bool isUsable() const;
 
@@ -173,13 +173,13 @@ public:
      * Returns the connection string of the nodes that are known the be in the set because we've
      * seen them in the isMaster reply of a PRIMARY.
      */
-    std::string getConfirmedServerAddress() const;
+    ConnectionString confirmedConnectionString() const;
 
     /**
      * Returns the connection string of the nodes that are believed to be in the set because we've
      * seen them in the isMaster reply of non-PRIMARY nodes in our seed list.
      */
-    std::string getUnconfirmedServerAddress() const;
+    ConnectionString possibleConnectionString() const;
 
     /**
      * Call this to notify waiters after a scan processes a valid reply or finishes.
@@ -193,6 +193,16 @@ public:
     Status makeUnsatisfedReadPrefError(const ReadPreferenceSetting& criteria) const;
 
     /**
+     *  Notifies all listeners that the ReplicaSet is in use.
+     */
+    void init();
+
+    /**
+     *  Resets the current scan and notifies all listeners that the ReplicaSet isn't in use.
+     */
+    void drop();
+
+    /**
      * Before unlocking, do DEV checkInvariants();
      */
     void checkInvariants() const;
@@ -200,17 +210,21 @@ public:
     const MongoURI setUri;  // URI passed to ctor -- THIS IS NOT UPDATED BY SCANS
     const std::string name;
 
+    ReplicaSetChangeNotifier* const notifier;
     executor::TaskExecutor* const executor;
 
     stdx::mutex mutex;  // You must hold this to access any member below.
 
     // For starting scans
     std::set<HostAndPort> seedNodes;  // updated whenever a master reports set membership changes
+    ConnectionString seedConnStr;     // The connection string from the last time we had valid seeds
+    int64_t seedGen = 0;
 
     bool isMocked = false;  // True if this set is using nodes from MockReplicaSet
 
     // For tracking scans
-    HostAndPort lastSeenMaster;  // Empty if we have never seen a master
+    // lastSeenMaster is empty if we have never seen a master or the last scan didn't have one
+    HostAndPort lastSeenMaster;
     int consecutiveFailedScans = 0;
     Nodes nodes;                      // maintained sorted and unique by host
     ConnectionString workingConnStr;  // The connection string from our last scan

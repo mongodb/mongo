@@ -779,12 +779,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         const auto configsvrConnStr =
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
-        status = ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
-            opCtx, configsvrConnStr);
-        if (!status.isOK()) {
-            warning() << "error encountered while trying to update config connection string to "
-                      << configsvrConnStr << causedBy(status);
-        }
+        ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(opCtx,
+                                                                                  configsvrConnStr);
 
         CatalogCacheLoader::get(_service).onStepUp();
         ChunkSplitter::get(_service).onStepUp();

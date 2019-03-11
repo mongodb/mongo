@@ -13,9 +13,11 @@
     assert.eq(db.foo.find({_id: 1}).next().x, 1);
 
     // prevent RSM on all nodes to update config shard
-    mongos.adminCommand({configureFailPoint: "failAsyncConfigChangeHook", mode: "alwaysOn"});
+    mongos.adminCommand(
+        {configureFailPoint: "failReplicaSetChangeConfigServerUpdateHook", mode: "alwaysOn"});
     rs.nodes.forEach(function(node) {
-        node.adminCommand({configureFailPoint: "failAsyncConfigChangeHook", mode: "alwaysOn"});
+        node.adminCommand(
+            {configureFailPoint: "failUpdateShardIdentityConfigString", mode: "alwaysOn"});
     });
 
     // add a node to shard rs
