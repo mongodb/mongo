@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog/type_shard_database.h"
 #include "mongo/s/client/shard_registry.h"
@@ -440,6 +441,16 @@ std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSinc
 void ShardServerCatalogCacheLoader::getDatabase(
     StringData dbName,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    // If the FCV version has not been fully upgraded to 4.0, fetch the database entries directly
+    // from the config server, regardless of whether the shard is running as a primary or secondary.
+    // This matches the behaviour of v3.6 and ensures that v4.0 secondaries do not ask a potentially
+    // v3.6 primary to flush its database cache (which is not supported)
+    if (serverGlobalParams.featureCompatibility.getVersion() <
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+        _configServerLoader->getDatabase(dbName, callbackFn);
+        return;
+    }
+
     long long currentTerm;
     bool isPrimary;
 

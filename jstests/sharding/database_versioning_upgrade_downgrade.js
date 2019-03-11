@@ -45,14 +45,14 @@
     // TODO (SERVER-34431): Remove this once the DatabaseShardingState is in a standalone map.
     assert.commandWorked(st.s.getDB(db1Name).runCommand({create: collName}));
 
-    // Force the shard database to refresh and ensure it writes a cache entry but does not cache the
-    // version in memory.
+    // Force the shard database to refresh and ensure it neither writes a cache entry, nor does it
+    // cache the version in memory
     assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushDatabaseCacheUpdates: db1Name}));
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), db1Name, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), db1Name, {});
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), db2Name, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), db2Name, {});
-    checkOnDiskDatabaseVersion(st.shard0, db1Name, db1EntryOriginal);
+    checkOnDiskDatabaseVersion(st.shard0, db1Name, undefined);
     checkOnDiskDatabaseVersion(st.shard0, db2Name, undefined);
 
     //
@@ -74,7 +74,7 @@
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), db1Name, {});
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), db2Name, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), db2Name, {});
-    checkOnDiskDatabaseVersion(st.shard0, db1Name, db1EntryOriginal);
+    checkOnDiskDatabaseVersion(st.shard0, db1Name, undefined);
     checkOnDiskDatabaseVersion(st.shard0, db2Name, undefined);
 
     // After receiving a versioned request for a database, the shard should refresh its in-memory
