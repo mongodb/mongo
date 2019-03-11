@@ -44,7 +44,7 @@ class JournalListener;
 
 class MobileKVEngine : public KVEngine {
 public:
-    MobileKVEngine(const std::string& path);
+    MobileKVEngine(const std::string& path, std::int32_t durabilityLevel);
 
     RecoveryUnit* newRecoveryUnit() override;
 

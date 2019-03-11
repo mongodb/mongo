@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -28,45 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
-#include "mongo/db/storage/mobile/mobile_kv_engine.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/util/options_parser/startup_option_init.h"
+
+#include <iostream>
+
+#include "mongo/db/storage/mobile/mobile_global_options.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/options_parser/startup_options.h"
+
+namespace moe = mongo::optionenvironment;
 
 namespace mongo {
-namespace {
 
-class MobileKVHarnessHelper : public KVHarnessHelper {
-public:
-    MobileKVHarnessHelper() : _dbPath("mobile_kv_engine_harness"), _mobileDurabilityLevel(1) {
-        _engine = stdx::make_unique<MobileKVEngine>(_dbPath.path(), _mobileDurabilityLevel);
+MONGO_STARTUP_OPTIONS_STORE(MobileOptions)(InitializerContext* context) {
+    Status ret = mobileGlobalOptions.store(moe::startupOptionsParsed);
+    if (!ret.isOK()) {
+        std::cerr << ret.toString() << std::endl;
+        std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;
+        ::_exit(EXIT_BADOPTIONS);
     }
-
-    virtual KVEngine* restartEngine() {
-        _engine.reset(new MobileKVEngine(_dbPath.path(), _mobileDurabilityLevel));
-        return _engine.get();
-    }
-
-    virtual KVEngine* getEngine() {
-        return _engine.get();
-    }
-
-private:
-    std::unique_ptr<MobileKVEngine> _engine;
-    unittest::TempDir _dbPath;
-    std::int32_t _mobileDurabilityLevel;
-};
-
-std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return stdx::make_unique<MobileKVHarnessHelper>();
-}
-
-MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
-    KVHarnessHelper::registerFactory(makeHelper);
     return Status::OK();
 }
-
-}  // namespace
 }  // namespace mongo

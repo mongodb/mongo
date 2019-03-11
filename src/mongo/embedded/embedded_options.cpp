@@ -34,6 +34,7 @@
 
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
+#include "mongo/db/storage/mobile/mobile_global_options.h"
 #include "mongo/db/storage/storage_options.h"
 
 #include <boost/filesystem.hpp>
@@ -114,6 +115,12 @@ Status storeOptions(const moe::Environment& params) {
     if (params.count("storage.dbPath")) {
         storageGlobalParams.dbpath = params["storage.dbPath"].as<string>();
     }
+
+    if (params.count("storage.mobile.durabilityLevel")) {
+        mobileGlobalOptions.mobileDurabilityLevel =
+            params["storage.mobile.durabilityLevel"].as<int>();
+    }
+
 #ifdef _WIN32
     if (storageGlobalParams.dbpath.size() > 1 &&
         storageGlobalParams.dbpath[storageGlobalParams.dbpath.size() - 1] == '/') {
