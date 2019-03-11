@@ -1,3 +1,6 @@
+/*
+ * @tags: [blacklist_from_ppc64le]
+ */
 var col = db.memoryTest;
 
 // test creating many collections to make sure no internal cache goes OOM
