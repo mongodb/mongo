@@ -34,6 +34,7 @@
 #include <iostream>
 
 #include "mongo/db/server_options_base.h"
+#include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -41,7 +42,12 @@
 
 namespace mongo {
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongosOptions)(InitializerContext* context) {
-    return addGeneralServerOptions(&moe::startupOptions);
+    auto status = addGeneralServerOptions(&moe::startupOptions);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return addNonGeneralServerOptions(&moe::startupOptions);
 }
 
 MONGO_INITIALIZER_GENERAL(MongosOptions,

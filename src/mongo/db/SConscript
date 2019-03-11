@@ -407,6 +407,7 @@ env.Library(
         'server_options_base.cpp',
         env.Idlc('server_options_base.idl')[0],
         env.Idlc('server_options_general.idl')[0],
+        env.Idlc('server_options_nongeneral.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

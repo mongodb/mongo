@@ -49,6 +49,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
+#include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -78,6 +79,7 @@ std::string storageDBPathDescription() {
 
 Status addMongodOptions(moe::OptionSection* options) try {
     uassertStatusOK(addGeneralServerOptions(options));
+    uassertStatusOK(addNonGeneralServerOptions(options));
     uassertStatusOK(addMongodGeneralOptions(options));
     uassertStatusOK(addMongodReplicationOptions(options));
     uassertStatusOK(addMongodShardingOptions(options));

@@ -69,15 +69,6 @@ configs:
         hidden: true
         default: 30
 
-    'net.bindIp':
-        description: 'Comma separated list of ip addresses to listen on - localhost by default'
-        short_name: bind_ip
-        arg_vartype: String
-    'net.bindIpAll':
-        description: 'Bind to all ip addresses'
-        short_name: bind_ip_all
-        arg_vartype: Switch
-        canonicalize: canonicalizeNetBindIpAll
     'net.ipv6':
         description: 'Enable IPv6 support (disabled by default)'
         short_name: ipv6
@@ -122,36 +113,6 @@ configs:
         description: 'Full path to time zone info directory, e.g. /usr/share/zoneinfo'
         short_name: timeZoneInfo
         arg_vartype: String
-    'security.keyFile':
-        description: 'Private key for cluster authentication'
-        short_name: keyFile
-        arg_vartype: String
-        conflicts: noauth
-    noauth:
-        description: 'Run without security'
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        conflicts:
-            - auth
-            - 'security.keyFile'
-            - 'security.transitionToAuth'
-            - clusterAuthMode
-    'security.transitionToAuth':
-        description: >-
-            For rolling access control upgrade. Attempt to authenticate over outgoing
-            connections and proceed regardless of success. Accept incoming connections
-            with or without authentication.
-        short_name: transitionToAuth
-        arg_vartype: Switch
-        conflicts: noauth
-    'security.clusterAuthMode':
-        description: >-
-            Authentication mode used for cluster authentication. Alternatives are
-            (keyFile|sendKeyFile|sendX509|x509)
-        short_name: clusterAuthMode
-        arg_vartype: String
-        validator:
-            callback: validateSecurityClusterAuthModeSetting
 
     nounixsocket:
         description: 'Disable listening on unix sockets'
@@ -208,14 +169,4 @@ configs:
         arg_vartype: Switch
         source: [ cli, ini ]
         hidden: true
-    'operationProfiling.slowOpThresholdMs':
-        description: 'Value of slow for profile and console log'
-        short_name: slowms
-        arg_vartype: Int
-        default: 100
-    'operationProfiling.slowOpSampleRate':
-        description: 'Fraction of slow ops to include in the profile and console log'
-        short_name: slowOpSampleRate
-        arg_vartype: Double
-        default: 1.0
 

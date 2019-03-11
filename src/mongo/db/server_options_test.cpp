@@ -51,6 +51,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
+#include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/logger/logger.h"
 #include "mongo/unittest/unittest.h"
@@ -570,7 +571,7 @@ TEST(SetupOptions, SlowMsCommandLineParamParsesSuccessfully) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -594,6 +595,7 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {
     moe::OptionSection options;
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -619,6 +621,7 @@ TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromYAMLConfigFile) {
     moe::OptionSection options;
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -645,7 +648,7 @@ TEST(SetupOptions, NonNumericSlowMsCommandLineOptionFailsToParse) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -661,7 +664,7 @@ TEST(SetupOptions, NonNumericSlowMsYAMLConfigOptionFailsToParse) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -681,7 +684,7 @@ TEST(SetupOptions, SampleRateCommandLineParamParsesSuccessfully) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -705,6 +708,7 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromINIConfigFile) {
     moe::OptionSection options;
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -730,6 +734,7 @@ TEST(SetupOptions, SampleRateParamInitializedSuccessfullyFromYAMLConfigFile) {
     moe::OptionSection options;
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -756,7 +761,7 @@ TEST(SetupOptions, NonNumericSampleRateCommandLineOptionFailsToParse) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -773,7 +778,7 @@ TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
     moe::OptionSection options;
 
 
-    ASSERT_OK(::mongo::addGeneralServerOptions(&options));
+    ASSERT_OK(::mongo::addNonGeneralServerOptions(&options));
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
