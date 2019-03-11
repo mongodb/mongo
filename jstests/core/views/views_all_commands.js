@@ -1,9 +1,10 @@
 // @tags: [
+//   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
+//   requires_fastcount,
 //   requires_getmore,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
-//   requires_fastcount,
 // ]
 
 /*

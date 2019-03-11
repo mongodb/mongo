@@ -1,5 +1,8 @@
 // SERVER-7781 $geoNear pipeline stage
-// @tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   requires_spawning_own_processes,
+// ]
 (function() {
     'use strict';
 

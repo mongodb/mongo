@@ -1,7 +1,10 @@
 // Tests the 'fullDocument' argument to the $changeStream stage.
 //
 // The $changeStream stage is not allowed within a $facet stage.
-// @tags: [do_not_wrap_aggregations_in_facets]
+// @tags: [
+//   do_not_wrap_aggregations_in_facets,
+//   uses_multiple_connections,
+// ]
 (function() {
     "use strict";
 

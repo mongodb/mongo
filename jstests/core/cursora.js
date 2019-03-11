@@ -1,10 +1,10 @@
 // @tags: [
-//     requires_getmore,
-//     requires_non_retryable_writes,
-//     requires_fastcount,
-//
-//     # Uses $where operator
-//     requires_scripting,
+//   requires_fastcount,
+//   requires_getmore,
+//   requires_non_retryable_writes,
+//   # Uses $where operator
+//   requires_scripting,
+//   uses_multiple_connections,
 // ]
 
 (function() {

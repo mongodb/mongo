@@ -1,4 +1,8 @@
-// @tags: [requires_profiling, creates_and_authenticates_user]
+// @tags: [
+//   assumes_superuser_permissions,
+//   creates_and_authenticates_user,
+//   requires_profiling,
+// ]
 // special db so that it can be run in parallel tests
 var stddb = db;
 var db = db.getSisterDB("profile3");

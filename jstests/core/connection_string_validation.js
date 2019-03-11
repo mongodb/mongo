@@ -1,4 +1,7 @@
 // Test validation of connection strings passed to the JavaScript "connect()" function.
+// @tags: [
+//   uses_multiple_connections,
+// ]
 // Related to SERVER-8030.
 
 port = "27017";

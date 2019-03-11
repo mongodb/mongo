@@ -1,5 +1,8 @@
 // Basic $lookup regression tests.
-// @tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   requires_spawning_own_processes,
+// ]
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 

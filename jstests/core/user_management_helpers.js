@@ -1,9 +1,10 @@
 // @tags: [
-//      assumes_write_concern_unchanged,
-//      creates_and_authenticates_user,
-//      requires_auth,
-//      requires_non_retryable_commands,
-//      ]
+//   assumes_superuser_permissions,
+//   assumes_write_concern_unchanged,
+//   creates_and_authenticates_user,
+//   requires_auth,
+//   requires_non_retryable_commands,
+// ]
 
 // This test is a basic sanity check of the shell helpers for manipulating user objects
 // It is not a comprehensive test of the functionality of the user manipulation commands

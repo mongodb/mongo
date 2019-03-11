@@ -1,4 +1,7 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   does_not_support_stepdowns,
+//   uses_testing_only_commands,
+// ]
 
 // Test basic query stage collection scan functionality.
 t = db.stages_collection_scan;

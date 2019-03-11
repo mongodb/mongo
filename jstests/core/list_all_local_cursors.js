@@ -1,5 +1,8 @@
 // $listLocalCursors relies on in-memory state, which may not survive failovers.
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   does_not_support_stepdowns,
+//   uses_testing_only_commands,
+// ]
 
 // Basic tests for the $listLocalCursors aggregation stage.
 

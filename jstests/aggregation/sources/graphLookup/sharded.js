@@ -1,6 +1,9 @@
 // In SERVER-23725, $graphLookup was introduced. In this file, we test that the expression behaves
 // correctly on a sharded collection.
-// @tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   requires_spawning_own_processes,
+// ]
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
 (function() {

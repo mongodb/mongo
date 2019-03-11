@@ -1,9 +1,9 @@
 // @tags: [
-//     requires_non_retryable_commands,
-//     requires_fastcount,
-//
-//     # applyOps uses the oplog that require replication support
-//     requires_replication,
+//   assumes_superuser_permissions,
+//   requires_fastcount,
+//   requires_non_retryable_commands,
+//   # applyOps uses the oplog that require replication support
+//   requires_replication,
 // ]
 
 (function() {

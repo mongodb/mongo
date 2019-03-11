@@ -1,4 +1,8 @@
-// @tags: [requires_getmore, requires_non_retryable_writes]
+// @tags: [
+//   requires_getmore,
+//   requires_non_retryable_writes,
+//   uses_multiple_connections,
+// ]
 
 // SERVER-2009 Count odd numbered entries while updating and deleting even numbered entries.
 

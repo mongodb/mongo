@@ -2,7 +2,10 @@
  * $addFields can be used to add fixed and computed fields to documents while preserving the
  * original document. Verify that using $addFields and adding computed fields in a $project yield
  * the same result.
- * @tags: [requires_sharding]
+ * @tags: [
+ *   requires_sharding,
+ *   requires_spawning_own_processes,
+ * ]
  */
 
 (function() {
