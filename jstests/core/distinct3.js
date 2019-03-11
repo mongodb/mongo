@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   uses_multiple_connections,
+// ]
 
 // Yield and delete test case for query optimizer cursor.  SERVER-4401
 

@@ -1,4 +1,7 @@
 // SERVER-7781 $geoNear pipeline stage
+// @tags: [
+//   requires_spawning_own_processes,
+// ]
 (function() {
     'use strict';
 

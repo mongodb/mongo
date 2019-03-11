@@ -6,6 +6,7 @@
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
 //   requires_getmore,
+//   uses_multiple_connections,
 // ]
 
 (function() {

@@ -6,7 +6,11 @@
 // starved frequently.
 // Note: this tag can be safely removed once PM-697 is complete and replaces distlocks with a
 // LockManager that has a fairness policy, which distlocks lack.
-// @tags: [assumes_against_mongod_not_mongos, requires_non_retryable_writes]
+// @tags: [
+//   assumes_against_mongod_not_mongos,
+//   requires_non_retryable_writes,
+//   uses_multiple_connections,
+// ]
 
 (function() {
     'use strict';

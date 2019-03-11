@@ -20,7 +20,10 @@
  * and will therefore invalidate the results of the test cases below, we tag this test to prevent it
  * running under the 'aggregation_facet_unwind' passthrough.
  *
- * @tags: [do_not_wrap_aggregations_in_facets]
+ * @tags: [
+ *   do_not_wrap_aggregations_in_facets,
+ *   requires_spawning_own_processes,
+ * ]
  */
 (function() {
     load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.

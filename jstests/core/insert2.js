@@ -1,6 +1,10 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_collstats]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   requires_collstats,
+//   uses_multiple_connections,
+// ]
 
 // Create a new connection object so it won't affect the global connection when we modify
 // it's settings.

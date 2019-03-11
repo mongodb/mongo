@@ -1,6 +1,9 @@
 // Tests the behavior of using fullDocument: "updateLookup" with a resumeToken, possibly from far
 // enough in the past that the document doesn't exist yet.
-// @tags: [uses_resume_after]
+// @tags: [
+//   uses_multiple_connections,
+//   uses_resume_after,
+// ]
 (function() {
     "use strict";
 

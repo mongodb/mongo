@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [
+//   assumes_superuser_permissions,
+//   requires_non_retryable_commands,
+// ]
 
 // SERVER-23326: Make applyOps atomic for CRUD operations
 (function() {

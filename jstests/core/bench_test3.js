@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   uses_multiple_connections,
+ * ]
+ */
 t = db.bench_test3;
 t.drop();
 

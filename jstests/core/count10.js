@@ -6,6 +6,7 @@
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
+//   uses_multiple_connections,
 // ]
 
 t = db.count10;

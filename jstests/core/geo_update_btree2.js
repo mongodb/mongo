@@ -1,4 +1,9 @@
-// @tags: [does_not_support_stepdowns, requires_getmore, requires_non_retryable_writes]
+// @tags: [
+//   assumes_superuser_permissions,
+//   does_not_support_stepdowns,
+//   requires_getmore,
+//   requires_non_retryable_writes,
+// ]
 
 // Tests whether the geospatial search is stable under btree updates
 //

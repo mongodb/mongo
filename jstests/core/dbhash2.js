@@ -1,4 +1,9 @@
 
+/**
+ * @tags: [
+ *   assumes_superuser_permissions,
+ * ]
+ */
 mydb = db.getSisterDB("config");
 
 t = mydb.foo;

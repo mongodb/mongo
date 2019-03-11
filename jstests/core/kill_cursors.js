@@ -1,4 +1,7 @@
-// @tags: [requires_getmore]
+// @tags: [
+//   requires_getmore,
+//   uses_testing_only_commands,
+// ]
 
 // Test the killCursors command.
 (function() {

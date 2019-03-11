@@ -1,11 +1,12 @@
 // Uses features that require featureCompatibilityVersion 3.6.
 // @tags: [
-//   requires_fcv36,
+//   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
+//   requires_fastcount,
+//   requires_fcv36,
 //   requires_getmore,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
-//   requires_fastcount,
 // ]
 
 /*

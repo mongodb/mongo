@@ -1,5 +1,8 @@
 /**
  * Tests some practical use cases of the $facet stage.
+ * @tags: [
+ *   requires_spawning_own_processes,
+ * ]
  */
 (function() {
     "use strict";
