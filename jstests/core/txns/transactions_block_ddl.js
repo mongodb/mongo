@@ -39,8 +39,10 @@
         sessionDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
         assert.commandWorked(sessionColl.createIndex({b: 1}, {name: "b_1"}));
 
+        jsTestLog("About to start tranasction");
         session.startTransaction();
         assert.commandWorked(sessionColl.insert({a: 5, b: 6}));
+        jsTestLog("Transaction started, running ddl operation " + ddlCmd);
         let thread = new ScopedThread(function(cmdDBName, ddlCmd) {
             return db.getSiblingDB(cmdDBName).runCommand(ddlCmd);
         }, cmdDBName, ddlCmd);
@@ -57,22 +59,24 @@
                 return "Failed to find DDL command in currentOp output: " +
                     tojson(testDB.currentOp().inprog);
             });
+        jsTestLog("Committing transaction");
         assert.commandWorked(session.commitTransaction_forTesting());
+        jsTestLog("Transaction committed, waiting for ddl operation to complete.");
         thread.join();
         assert.commandWorked(thread.returnData());
     }
 
-    // Test 'drop'.
+    jsTestLog("Testing that 'drop' blocks on transactions");
     const dropCmd = {drop: collName, writeConcern: {w: "majority"}};
     testTimeout(dbName, dropCmd);
     testSuccessOnTxnCommit(dbName, dropCmd, {"command.drop": collName});
 
-    // Test 'dropDatabase'.
+    jsTestLog("Testing that 'dropDatabase' blocks on transactions");
     const dropDatabaseCmd = {dropDatabase: 1, writeConcern: {w: "majority"}};
     testTimeout(dbName, dropDatabaseCmd);
     testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {"command.dropDatabase": 1});
 
-    // Test 'renameCollection' in the same database.
+    jsTestLog("Testing that 'renameCollection' within databases blocks on transactions");
     testDB.runCommand({drop: otherCollName, writeConcern: {w: "majority"}});
     const renameCollectionCmdSameDB = {
         renameCollection: sessionColl.getFullName(),
@@ -84,7 +88,7 @@
                            renameCollectionCmdSameDB,
                            {"command.renameCollection": sessionColl.getFullName()});
 
-    // Test 'renameCollection' across databases.
+    jsTestLog("Testing that 'renameCollection' across databases blocks on transactions");
     testDB.getSiblingDB(otherDBName)
         .runCommand({drop: otherCollName, writeConcern: {w: "majority"}});
     const renameCollectionCmdDifferentDB = {
@@ -97,7 +101,8 @@
                            renameCollectionCmdDifferentDB,
                            {"command.renameCollection": sessionColl.getFullName()});
 
-    // Test 'createIndexes'. The transaction will insert a document that has a field 'a'.
+    jsTestLog("Testing that 'createIndexes' blocks on transactions");
+    // The transaction will insert a document that has a field 'a'.
     const createIndexesCmd = {
         createIndexes: collName,
         indexes: [{key: {a: 1}, name: "a_1"}],
@@ -106,8 +111,9 @@
     testTimeout(dbName, createIndexesCmd);
     testSuccessOnTxnCommit(dbName, createIndexesCmd, {"command.createIndexes": collName});
 
-    // Test 'dropIndexes'. The setup creates an index on {b: 1} called 'b_1'. The transaction will
-    // insert a document that has a field 'b'.
+    jsTestLog("Testing that 'dropIndexes' blocks on transactions");
+    // The setup creates an index on {b: 1} called 'b_1'. The transaction will insert a document
+    // that has a field 'b'.
     const dropIndexesCmd = {dropIndexes: collName, index: "b_1", writeConcern: {w: "majority"}};
     testTimeout(dbName, dropIndexesCmd);
     testSuccessOnTxnCommit(dbName, dropIndexesCmd, {"command.dropIndexes": collName});
