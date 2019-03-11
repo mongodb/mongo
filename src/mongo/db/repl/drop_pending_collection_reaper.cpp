@@ -133,11 +133,30 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
 
 void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opCtx,
                                                            const OpTime& opTime) {
+
+    std::function<bool(const OpTime&)> shouldDrop = [&](const OpTime& dropOpTime) {
+        return dropOpTime <= opTime;
+    };
+
+    // With enableMajorityReadConcern=false, we can only drop collections that
+    // are older than both `opTime` and `checkpointTimestamp`.
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    if (!storageEngine->isEphemeral() && !storageEngine->supportsReadConcernMajority()) {
+        auto checkpointTimestamp = storageEngine->getLastStableRecoveryTimestamp();
+        // We don't need to compare terms because these timestamps (checkpoint, opTime and
+        // dropOpTime) all have been committed.
+        if (checkpointTimestamp && checkpointTimestamp < opTime.getTimestamp()) {
+            shouldDrop = [&](const OpTime& dropOpTime) {
+                return dropOpTime.getTimestamp() <= checkpointTimestamp;
+            };
+        }
+    }
+
     DropPendingNamespaces toDrop;
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         for (auto it = _dropPendingNamespaces.cbegin();
-             it != _dropPendingNamespaces.cend() && it->first <= opTime;
+             it != _dropPendingNamespaces.cend() && shouldDrop(it->first);
              ++it) {
             toDrop.insert(*it);
         }
