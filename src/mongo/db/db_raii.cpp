@@ -58,7 +58,10 @@ AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
     : _opCtx(opCtx), _lockType(lockType), _nss(nss) {
     if (!dbProfilingLevel && logMode == LogMode::kUpdateTopAndCurop) {
         // No profiling level was determined, attempt to read the profiling level from the Database
-        // object.
+        // object. Since we are only reading the in-memory profiling level out of the database
+        // object (which is configured on a per-node basis and not replicated or persisted), we
+        // never need to conflict with secondary batch application.
+        ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
         AutoGetDb autoDb(_opCtx, _nss.db(), MODE_IS, deadline);
         if (autoDb.getDb()) {
             dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
