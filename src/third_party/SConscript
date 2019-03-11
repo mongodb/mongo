@@ -30,9 +30,14 @@ thirdPartyEnvironmentModifications = {
 }
 
 if not use_system_version_of_library('tcmalloc'):
-    thirdPartyEnvironmentModifications['gperftools'] = {
-        'CPPPATH' : ['#/src/third_party/gperftools' + gperftoolsSuffix + '/src'],
-    }
+    # Only gperftools-2.5 is covered here. gperftools-2.7 does something different further
+    # down in the file. Its SConscript internally calculates a CPPPATH for its consumers.
+    if gperftoolsSuffix == '-2.5':
+        thirdPartyEnvironmentModifications['gperftools'] = {
+            'CPPPATH' : ['#/src/third_party/gperftools-2.5/src']
+        }
+    else:
+        thirdPartyEnvironmentModifications['gperftools'] = {}
 
 if not use_system_version_of_library('pcre'):
     thirdPartyEnvironmentModifications['pcre'] = {
@@ -143,11 +148,12 @@ def injectThirdParty(thisEnv, libraries=[], parts=[]):
     libraries = thisEnv.Flatten([libraries])
     parts = thisEnv.Flatten([parts])
     for lib in libraries:
+        mods = thirdPartyEnvironmentModifications[lib]
         if not parts:
-            thisEnv.PrependUnique(**thirdPartyEnvironmentModifications[lib])
+            thisEnv.PrependUnique(**mods)
         else:
             for part in parts:
-                thisEnv.PrependUnique({part : thirdPartyEnvironmentModifications[lib][part]})
+                thisEnv.PrependUnique({part : mods[part]})
 
 env.AddMethod(injectThirdParty, 'InjectThirdParty')
 
@@ -353,7 +359,7 @@ if "tom" in env["MONGO_CRYPTO"]:
         ])
 
 gperftoolsEnv = env
-if (gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]):
+if gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]:
     if use_system_version_of_library("tcmalloc"):
         gperftoolsEnv = env.Clone(
             SYSLIBDEPS=[
@@ -362,7 +368,16 @@ if (gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]):
     else:
         gperftoolsEnv = env.Clone()
         gperftoolsEnv.InjectThirdParty(libraries=['gperftools'])
-        gperftoolsEnv.SConscript('gperftools' + gperftoolsSuffix + '/SConscript', exports={ 'env' : gperftoolsEnv })
+        # Allow gperftools to determine its own consumer-side include/ dirs.
+        # Needed because those are in a platform-specific subdirectory.
+        mods = {}
+        gperftoolsEnv.SConscript(
+            'gperftools' + gperftoolsSuffix + '/SConscript',
+            exports={'env' : gperftoolsEnv, 'consumerMods' : mods})
+        # Propagate settings that were deposited into 'mods' by gperftools' SConscript.
+        for k,v in mods.items():
+            thirdPartyEnvironmentModifications['gperftools'][k] = v
+
         gperftoolsEnv = gperftoolsEnv.Clone(
             LIBDEPS_INTERFACE=[
                 'gperftools' + gperftoolsSuffix + '/tcmalloc_minimal',

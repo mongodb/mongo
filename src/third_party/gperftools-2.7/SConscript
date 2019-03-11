@@ -3,6 +3,7 @@
 Import("env")
 Import("has_option")
 Import("debugBuild")
+Import("consumerMods")
 
 env = env.Clone()
 
@@ -50,7 +51,7 @@ else:
         ]
 
     if not debugBuild:
-        files += ['src/tcmalloc.cc'],
+        files += ['src/tcmalloc.cc']
     else:
         files += ['src/debugallocation.cc']
 
@@ -74,8 +75,6 @@ if has_option('use-cpu-profiler'):
 
 env = conf.Finish()
 
-env.Append(CPPPATH=["build_" + env["TARGET_OS"] + "_" + env["TARGET_ARCH"]])
-
 env.Append(
     CPPDEFINES=["NO_HEAP_CHECK"],
 )
@@ -97,7 +96,11 @@ if not debugBuild:
 if (not debugBuild) or (not env['TARGET_ARCH'] in ['x86_64', 'i386']):
     env.Append(CPPDEFINES=["NO_TCMALLOC_SAMPLES"])
 
-env.Prepend( CPPPATH=["src/"] )
+env.Append(CPPPATH=["platform/${TARGET_OS}_${TARGET_ARCH}/internal/src",
+                    "dist/src"])
+
+# 'consumerMods' propagates to consumers that Inject (depend on) gperftools.
+consumerMods['CPPPATH'] = "#/src/third_party/gperftools-2.7/platform/${TARGET_OS}_${TARGET_ARCH}/include"
 
 def removeIfPresent(lst, item):
     try:
@@ -114,5 +117,5 @@ if env['TARGET_ARCH'] == 'ppc64le':
 
 env.Library(
     target='tcmalloc_minimal',
-    source=files,
+    source=[env.Dir('dist').File(f) for f in files]
 )
