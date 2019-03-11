@@ -1,3 +1,6 @@
+/*
+ * @tags: [blacklist_from_ppc64le]
+ */
 var col = db.memoryTest;
 
 var buildInfo = db.adminCommand("buildInfo");

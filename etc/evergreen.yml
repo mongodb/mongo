@@ -7852,7 +7852,7 @@ buildvariants:
     push_name: linux
     push_arch: ppc64le-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    test_flags: --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1,blacklist_from_ppc64le
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -10524,9 +10524,9 @@ buildvariants:
   batchtime: 1440 # 1 day
   stepback: false
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    test_flags: --excludeWithAnyTags=requires_mmapv1,blacklist_from_ppc64le
     resmoke_jobs_factor: 0.25
     has_packages: true
     packager_script: packager_enterprise.py
@@ -12138,7 +12138,7 @@ buildvariants:
   expansions:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling,uses_transactions
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling,uses_transactions,blacklist_from_ppc64le
     tooltags: "ssl sasl"
     resmoke_jobs_factor: 0.25
     build_mongoreplay: true
