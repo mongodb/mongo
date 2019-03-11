@@ -34,6 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/mobile/mobile_global_options.h"
 #include "mongo/db/storage/mobile/mobile_kv_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
@@ -53,7 +54,9 @@ public:
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
 
-        MobileKVEngine* kvEngine = new MobileKVEngine(params.dbpath);
+        MobileKVEngine* kvEngine =
+            new MobileKVEngine(params.dbpath, mobileGlobalOptions.mobileDurabilityLevel);
+
         return new KVStorageEngine(kvEngine, options);
     }
 

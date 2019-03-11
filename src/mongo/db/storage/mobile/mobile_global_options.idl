@@ -1,0 +1,52 @@
+# Copyright (C) 2019-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/storage/mobile/mobile_global_options.h"
+    configs:
+        section: 'Mobile options'
+        source: [ cli, ini, yaml ]
+
+configs:
+    # Mobile storage engine options
+    "storage.mobile.durabilityLevel":
+        description: >-
+            How often you want the Mobile SE to fsync data to disk. This is a trade-off between
+            durability guarantees and performance. This value maps directly to SQLite's synchronous
+            PRAGMA. The default value is 1 or NORMAL durability, where it's possible to have a
+            write rolled back if the device crashes or loses power (you are always safe from
+            application crashes). If write guarantees are more important than performance, set
+            this to 2 or 3. Conversely, if you are fine with somewhat ephemeral local data then
+            you can set this to 0.
+        short_name: mobileDurabilityLevel
+        cpp_varname: 'mobileDurabilityLevel'
+        arg_vartype: Int
+        default: 1
+        validator: {gte: 0, lte: 3}

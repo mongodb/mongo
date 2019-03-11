@@ -27,45 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
+#pragma once
 
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
-#include "mongo/db/storage/mobile/mobile_kv_engine.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/util/options_parser/environment.h"
 
 namespace mongo {
-namespace {
 
-class MobileKVHarnessHelper : public KVHarnessHelper {
+class MobileGlobalOptions {
 public:
-    MobileKVHarnessHelper() : _dbPath("mobile_kv_engine_harness"), _mobileDurabilityLevel(1) {
-        _engine = stdx::make_unique<MobileKVEngine>(_dbPath.path(), _mobileDurabilityLevel);
-    }
+    MobileGlobalOptions() : mobileDurabilityLevel(1){};
 
-    virtual KVEngine* restartEngine() {
-        _engine.reset(new MobileKVEngine(_dbPath.path(), _mobileDurabilityLevel));
-        return _engine.get();
-    }
+    Status store(const optionenvironment::Environment& params);
 
-    virtual KVEngine* getEngine() {
-        return _engine.get();
-    }
-
-private:
-    std::unique_ptr<MobileKVEngine> _engine;
-    unittest::TempDir _dbPath;
-    std::int32_t _mobileDurabilityLevel;
+    // This is used by the Mobile SE and allows users to set the value
+    // passed to SQLite's PRAGMA synchronous command
+    std::int32_t mobileDurabilityLevel;
 };
 
-std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return stdx::make_unique<MobileKVHarnessHelper>();
-}
+extern MobileGlobalOptions mobileGlobalOptions;
 
-MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
-    KVHarnessHelper::registerFactory(makeHelper);
-    return Status::OK();
-}
-
-}  // namespace
 }  // namespace mongo

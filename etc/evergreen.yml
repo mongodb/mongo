@@ -13015,7 +13015,7 @@ buildvariants:
     test_flags: >-
       --storageEngine=mobile
       --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling,requires_compact,requires_document_locking,requires_snapshot_read
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869
+      --excludeWithAnyTags=SERVER-32869
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --mobile-se=on
@@ -13093,7 +13093,7 @@ buildvariants:
     test_flags: >-
       --storageEngine=mobile
       --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling,requires_compact,requires_document_locking,requires_snapshot_read
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869
+      --excludeWithAnyTags=SERVER-32869
     compile_flags: >-
         -j$(grep -c ^processor /proc/cpuinfo)
         --mobile-se=on
@@ -13170,7 +13170,7 @@ buildvariants:
     test_flags: >-
       --storageEngine=mobile
       --excludeWithAnyTags=requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_capped,requires_profiling,requires_compact,requires_document_locking,requires_snapshot_read
-      --excludeWithAnyTags=SERVER-32709,SERVER-32869
+      --excludeWithAnyTags=SERVER-32869
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)

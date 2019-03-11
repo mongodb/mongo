@@ -27,45 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
-#include "mongo/db/storage/mobile/mobile_kv_engine.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/storage/mobile/mobile_global_options.h"
+
+#include "mongo/util/log.h"
+
+namespace moe = mongo::optionenvironment;
 
 namespace mongo {
-namespace {
 
-class MobileKVHarnessHelper : public KVHarnessHelper {
-public:
-    MobileKVHarnessHelper() : _dbPath("mobile_kv_engine_harness"), _mobileDurabilityLevel(1) {
-        _engine = stdx::make_unique<MobileKVEngine>(_dbPath.path(), _mobileDurabilityLevel);
+MobileGlobalOptions mobileGlobalOptions;
+
+Status MobileGlobalOptions::store(const moe::Environment& params) {
+    // Mobile storage engine options
+    if (params.count("storage.mobile.durabilityLevel")) {
+        mobileGlobalOptions.mobileDurabilityLevel =
+            params["storage.mobile.durabilityLevel"].as<int>();
     }
 
-    virtual KVEngine* restartEngine() {
-        _engine.reset(new MobileKVEngine(_dbPath.path(), _mobileDurabilityLevel));
-        return _engine.get();
-    }
-
-    virtual KVEngine* getEngine() {
-        return _engine.get();
-    }
-
-private:
-    std::unique_ptr<MobileKVEngine> _engine;
-    unittest::TempDir _dbPath;
-    std::int32_t _mobileDurabilityLevel;
-};
-
-std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return stdx::make_unique<MobileKVHarnessHelper>();
-}
-
-MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
-    KVHarnessHelper::registerFactory(makeHelper);
     return Status::OK();
 }
 
-}  // namespace
 }  // namespace mongo
