@@ -796,22 +796,29 @@ private:
      */
     class OplogSlotReserver {
     public:
-        OplogSlotReserver(OperationContext* opCtx);
+        OplogSlotReserver(OperationContext* opCtx, int numSlotsToReserve = 1);
         ~OplogSlotReserver();
 
         /**
-         * Returns the oplog slot reserved at construction.
+         * Returns the latest oplog slot reserved at construction.
          */
-        OplogSlot getReservedOplogSlot() const {
-            invariant(!_oplogSlot.opTime.isNull());
-            return _oplogSlot;
+        OplogSlot getLastSlot() {
+            invariant(!_oplogSlots.empty());
+            invariant(!_oplogSlots.back().opTime.isNull());
+            return getSlots().back();
+        }
+
+        std::vector<OplogSlot>& getSlots() {
+            invariant(!_oplogSlots.empty());
+            invariant(!_oplogSlots.back().opTime.isNull());
+            return _oplogSlots;
         }
 
     private:
         OperationContext* _opCtx;
         std::unique_ptr<Locker> _locker;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
-        OplogSlot _oplogSlot;
+        std::vector<OplogSlot> _oplogSlots;
     };
 
     friend std::ostream& operator<<(std::ostream& s, TransactionState txnState) {

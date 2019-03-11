@@ -2902,6 +2902,101 @@ protected:
     Timestamp firstOplogEntryTs, secondOplogEntryTs;
 };
 
+class PreparedMultiOplogEntryTransaction : public MultiDocumentTransactionTest {
+public:
+    PreparedMultiOplogEntryTransaction()
+        : MultiDocumentTransactionTest("preparedMultiOplogEntryTransaction") {
+        gUseMultipleOplogEntryFormatForTransactions = true;
+        const auto currentTime = _clock->getClusterTime();
+        firstOplogEntryTs = currentTime.addTicks(1).asTimestamp();
+        secondOplogEntryTs = currentTime.addTicks(2).asTimestamp();
+        prepareEntryTs = currentTime.addTicks(3).asTimestamp();
+        commitEntryTs = currentTime.addTicks(4).asTimestamp();
+    }
+
+    ~PreparedMultiOplogEntryTransaction() {
+        gUseMultipleOplogEntryFormatForTransactions = false;
+    }
+
+    void run() {
+        auto txnParticipant = TransactionParticipant::get(_opCtx);
+        ASSERT(txnParticipant);
+        unittest::log() << "PrepareTS: " << prepareEntryTs;
+        logTimestamps();
+
+        const auto prepareFilter = BSON("ts" << prepareEntryTs);
+        const auto commitFilter = BSON("ts" << commitEntryTs);
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+            auto coll = autoColl.getCollection();
+            assertDocumentAtTimestamp(coll, presentTs, BSONObj());
+            assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
+            assertDocumentAtTimestamp(coll, firstOplogEntryTs, BSONObj());
+            assertDocumentAtTimestamp(coll, secondOplogEntryTs, BSONObj());
+            assertDocumentAtTimestamp(coll, prepareEntryTs, BSONObj());
+            assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
+
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, beforeTxnTs, false);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, firstOplogEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, secondOplogEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, prepareEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, commitEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, nullTs, false);
+
+            assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, prepareEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, false);
+        }
+        txnParticipant.unstashTransactionResources(_opCtx, "insert");
+        const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX, LockMode::MODE_IX);
+            insertDocument(autoColl.getCollection(), InsertStatement(doc2));
+        }
+        txnParticipant.prepareTransaction(_opCtx, {});
+
+        txnParticipant.stashTransactionResources(_opCtx);
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS, LockMode::MODE_IS);
+            auto coll = autoColl.getCollection();
+            const BSONObj query1 = BSON("_id" << 1);
+            const BSONObj query2 = BSON("_id" << 2);
+            assertDocumentAtTimestamp(coll, presentTs, BSONObj());
+            assertDocumentAtTimestamp(coll, beforeTxnTs, BSONObj());
+            assertDocumentAtTimestamp(coll, prepareEntryTs, BSONObj());
+            assertDocumentAtTimestamp(coll, commitEntryTs, BSONObj());
+            assertDocumentAtTimestamp(coll, nullTs, BSONObj());
+
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, beforeTxnTs, false);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, prepareEntryTs, true);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, commitEntryTs, true);
+            assertOplogDocumentExistsAtTimestamp(prepareFilter, nullTs, true);
+
+            // We haven't committed the prepared transaction
+            assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, prepareEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, commitEntryTs, false);
+            assertOplogDocumentExistsAtTimestamp(commitFilter, nullTs, false);
+        }
+
+        // Temporary until SERVER-39442: abort the prepared transaction and clean up the resources.
+        txnParticipant.unstashTransactionResources(_opCtx, "abortTransaction");
+        txnParticipant.abortActiveTransaction(_opCtx);
+        txnParticipant.stashTransactionResources(_opCtx);
+
+        // TODO (SERVER-39442): Commit the prepared transaction and assert existence of oplogs at
+        // commitTimestamp.
+    }
+
+protected:
+    Timestamp firstOplogEntryTs, secondOplogEntryTs, prepareEntryTs;
+};
+
 class PreparedMultiDocumentTransaction : public MultiDocumentTransactionTest {
 public:
     PreparedMultiDocumentTransaction()
@@ -3145,6 +3240,7 @@ public:
         add<CreateCollectionWithSystemIndex>();
         add<MultiDocumentTransaction>();
         add<MultiOplogEntryTransaction>();
+        add<PreparedMultiOplogEntryTransaction>();
         add<PreparedMultiDocumentTransaction>();
         add<AbortedPreparedMultiDocumentTransaction>();
     }

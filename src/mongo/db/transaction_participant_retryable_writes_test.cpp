@@ -87,10 +87,10 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 class OpObserverMock : public OpObserverNoop {
 public:
     void onTransactionPrepare(OperationContext* opCtx,
-                              const OplogSlot& prepareOpTime,
+                              const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>& statements) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-        OpObserverNoop::onTransactionPrepare(opCtx, prepareOpTime, statements);
+        OpObserverNoop::onTransactionPrepare(opCtx, reservedSlots, statements);
 
         uassert(ErrorCodes::OperationFailed,
                 "onTransactionPrepare() failed",

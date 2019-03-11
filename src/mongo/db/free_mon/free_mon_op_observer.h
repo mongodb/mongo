@@ -167,7 +167,7 @@ public:
         const std::vector<repl::ReplOperation>& statements) noexcept final {}
 
     void onTransactionPrepare(OperationContext* opCtx,
-                              const OplogSlot& prepareOpTime,
+                              const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>& statements) final {}
 
     void onTransactionAbort(OperationContext* opCtx,

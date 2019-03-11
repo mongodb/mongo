@@ -145,8 +145,8 @@ public:
         Timestamp commitTimestamp,
         const std::vector<repl::ReplOperation>& statements) noexcept final;
     void onTransactionPrepare(OperationContext* opCtx,
-                              const OplogSlot& prepareOpTime,
-                              std::vector<repl::ReplOperation>& statments) final;
+                              const std::vector<OplogSlot>& reservedSlots,
+                              std::vector<repl::ReplOperation>& statements) final;
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final;
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
