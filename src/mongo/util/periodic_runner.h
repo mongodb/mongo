@@ -80,20 +80,36 @@ public:
          * Starts running the job
          */
         virtual void start() = 0;
+
         /**
          * Pauses the job temporarily so that it does not execute until
          * unpaused
          */
         virtual void pause() = 0;
+
         /**
          * Resumes a paused job so that it continues executing each interval
          */
         virtual void resume() = 0;
+
         /**
          * Stops the job, this function blocks until the job is stopped
          * Safe to invalidate the job callable after calling this.
          */
         virtual void stop() = 0;
+
+        /**
+         * Returns the current period for the job
+         */
+        virtual Milliseconds getPeriod() = 0;
+
+        /**
+         * Updates the period of the job.  This takes effect immediately by altering the current
+         * scheduling of the task.  I.e. if more than ms have passed since the last execution of the
+         * job, it is run immediately.  Otherwise the scheduling is adjusted forward or back by
+         * abs(new - old).
+         */
+        virtual void setPeriod(Milliseconds ms) = 0;
     };
 
     virtual ~PeriodicRunner();

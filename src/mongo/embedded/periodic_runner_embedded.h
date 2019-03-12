@@ -73,6 +73,8 @@ private:
         void pause();
         void resume();
         void stop();
+        Milliseconds getPeriod();
+        void setPeriod(Milliseconds ms);
 
         bool isAlive(WithLock lk);
 
@@ -110,6 +112,8 @@ private:
         void stop() override;
         void pause() override;
         void resume() override;
+        Milliseconds getPeriod() override;
+        void setPeriod(Milliseconds ms) override;
 
     private:
         std::weak_ptr<PeriodicJobImpl> _jobWeak;

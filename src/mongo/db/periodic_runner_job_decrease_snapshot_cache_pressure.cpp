@@ -52,26 +52,10 @@ void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* s
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    // PeriodicRunner does not currently support altering the period of a job. So we are giving this
-    // job a 1 second period on PeriodicRunner and incrementing a static variable 'seconds' on each
-    // run until we reach checkCachePressurePeriodSeconds, at which point we run the code and reset
-    // 'seconds'. Etc.
     PeriodicRunner::PeriodicJob job(
         "startPeriodicThreadToDecreaseSnapshotHistoryCachePressure",
         [](Client* client) {
             try {
-                static int seconds = 0;
-                int checkPressurePeriod =
-                    snapshotWindowParams.checkCachePressurePeriodSeconds.load();
-
-                invariant(checkPressurePeriod >= 1);
-
-                if (++seconds <= checkPressurePeriod) {
-                    return;
-                }
-
-                seconds = 0;
-
                 // The opCtx destructor handles unsetting itself from the Client.
                 // (The PeriodicRunnerASIO's Client must be reset before returning.)
                 auto opCtx = client->makeOperationContext();
@@ -85,9 +69,20 @@ void startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(ServiceContext* s
                 }
             }
         },
-        Seconds(1));
+        Seconds(snapshotWindowParams.checkCachePressurePeriodSeconds.load()));
 
-    periodicRunner->scheduleJob(std::move(job));
+    auto handle = periodicRunner->makeJob(std::move(job));
+    handle->start();
+
+    SnapshotWindowParams::observeCheckCachePressurePeriodSeconds
+        .addObserver([handle = std::move(handle)](const auto& secs) {
+            try {
+                handle->setPeriod(Seconds(secs));
+            } catch (const DBException& ex) {
+                log() << "Failed to update period of thread which checks snapshot cache pressure "
+                      << ex.toStatus();
+            }
+        });
 }
 
 }  // namespace mongo

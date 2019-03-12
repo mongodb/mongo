@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+    - "mongo/db/transaction_participant.h"
 
 server_parameters:
     maxTransactionLockRequestTimeoutMillis:
@@ -48,10 +50,11 @@ server_parameters:
             Lifetime given to each transaction.
             Transactions must eventually expire to preempt storage cache pressure immobilizing the system.
         set_at: [ startup, runtime ]
-        cpp_vartype: AtomicWord<std::int32_t>
+        cpp_vartype: AtomicWord<decltype(TransactionParticipant::observeTransactionLifetimeLimitSeconds)::Argument>
         cpp_varname: gTransactionLifetimeLimitSeconds
         validator:
             gte: 1
+        on_update: std::ref(TransactionParticipant::observeTransactionLifetimeLimitSeconds)
         default: 60
 
     useMultipleOplogEntryFormatForTransactions:

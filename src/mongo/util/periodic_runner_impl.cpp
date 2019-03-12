@@ -105,25 +105,34 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
     _thread = stdx::thread([this] {
         Client::initThread(_job.name, _serviceContext, nullptr);
         while (true) {
-            auto start = _clockSource->now();
-
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             // Wait until it's unpaused or canceled
             _condvar.wait(lk, [&] { return _execStatus != ExecutionStatus::PAUSED; });
             if (_execStatus == ExecutionStatus::CANCELED) {
-                break;
+                return;
             }
+
+            auto start = _clockSource->now();
 
             // Unlock while job is running so we can pause/cancel concurrently
             lk.unlock();
             _job.job(Client::getCurrent());
             lk.lock();
 
-            if (_clockSource->waitForConditionUntil(_condvar, lk, start + _job.interval, [&] {
-                    return _execStatus == ExecutionStatus::CANCELED;
-                })) {
-                break;
-            }
+            auto getDeadlineFromInterval = [&] { return start + _job.interval; };
+
+            do {
+                auto deadline = getDeadlineFromInterval();
+
+                if (_clockSource->waitForConditionUntil(_condvar, lk, deadline, [&] {
+                        return _execStatus == ExecutionStatus::CANCELED ||
+                            getDeadlineFromInterval() != deadline;
+                    })) {
+                    if (_execStatus == ExecutionStatus::CANCELED) {
+                        return;
+                    }
+                }
+            } while (_clockSource->now() < getDeadlineFromInterval());
         }
     });
     _execStatus = PeriodicJobImpl::ExecutionStatus::RUNNING;
@@ -162,6 +171,20 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
     _thread.join();
 }
 
+Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _job.interval;
+}
+
+void PeriodicRunnerImpl::PeriodicJobImpl::setPeriod(Milliseconds ms) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _job.interval = ms;
+
+    if (_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING) {
+        _condvar.notify_one();
+    }
+}
+
 namespace {
 
 template <typename T>
@@ -196,6 +219,16 @@ void PeriodicRunnerImpl::PeriodicJobHandleImpl::pause() {
 void PeriodicRunnerImpl::PeriodicJobHandleImpl::resume() {
     auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
     job->resume();
+}
+
+Milliseconds PeriodicRunnerImpl::PeriodicJobHandleImpl::getPeriod() {
+    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
+    return job->getPeriod();
+}
+
+void PeriodicRunnerImpl::PeriodicJobHandleImpl::setPeriod(Milliseconds ms) {
+    auto job = lockAndAssertExists(_jobWeak, kPeriodicJobHandleLifetimeErrMsg);
+    job->setPeriod(ms);
 }
 
 }  // namespace mongo

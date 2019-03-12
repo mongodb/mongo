@@ -43,6 +43,23 @@
 
 namespace mongo {
 
+namespace {
+
+using Argument = decltype(TransactionParticipant::observeTransactionLifetimeLimitSeconds)::Argument;
+
+// When setting the period for this job, we wait 500ms for every second, so that we abort
+// expired transactions every transactionLifetimeLimitSeconds/2
+Milliseconds getPeriod(const Argument& transactionLifetimeLimitSeconds) {
+    Milliseconds period(transactionLifetimeLimitSeconds * 500);
+
+    // Ensure: 1 <= period <= 60 seconds
+    period = (period < Seconds(1)) ? Milliseconds(Seconds(1)) : period;
+    period = (period > Seconds(60)) ? Milliseconds(Seconds(60)) : period;
+
+    return period;
+}
+}  // namespace
+
 void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContext) {
     // Enforce calling this function once, and only once.
     static bool firstCall = true;
@@ -52,32 +69,8 @@ void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContex
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    // We want this job period to be dynamic, to run every (transactionLifetimeLimitSeconds/2)
-    // seconds, where transactionLifetimeLimitSeconds is an adjustable server parameter, or within
-    // the 1 second to 1 minute range.
-    //
-    // PeriodicRunner does not currently support altering the period of a job. So we are giving this
-    // job a 1 second period on PeriodicRunner and incrementing a static variable 'seconds' on each
-    // run until we reach transactionLifetimeLimitSeconds/2, at which point we run the code and
-    // reset 'seconds'. Etc.
     PeriodicRunner::PeriodicJob job("startPeriodicThreadToAbortExpiredTransactions",
                                     [](Client* client) {
-                                        static int seconds = 0;
-                                        int lifetime = gTransactionLifetimeLimitSeconds.load();
-
-                                        invariant(lifetime >= 1);
-                                        int period = lifetime / 2;
-
-                                        // Ensure: 1 <= period <= 60 seconds
-                                        period = (period < 1) ? 1 : period;
-                                        period = (period > 60) ? 60 : period;
-
-                                        if (++seconds <= period) {
-                                            return;
-                                        }
-
-                                        seconds = 0;
-
                                         // The opCtx destructor handles unsetting itself from the
                                         // Client. (The PeriodicRunner's Client must be reset before
                                         // returning.)
@@ -92,9 +85,20 @@ void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContex
 
                                         killAllExpiredTransactions(opCtx.get());
                                     },
-                                    Seconds(1));
+                                    getPeriod(gTransactionLifetimeLimitSeconds.load()));
 
-    periodicRunner->scheduleJob(std::move(job));
+    auto handle = periodicRunner->makeJob(std::move(job));
+    handle->start();
+
+    TransactionParticipant::observeTransactionLifetimeLimitSeconds
+        .addObserver([handle = std::move(handle)](const Argument& secs) {
+            try {
+                handle->setPeriod(getPeriod(secs));
+            } catch (const DBException& ex) {
+                log() << "Failed to update period of thread which aborts expired transactions "
+                      << ex.toStatus();
+            }
+        });
 }
 
 }  // namespace mongo

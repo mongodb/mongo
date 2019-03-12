@@ -398,5 +398,75 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
     tearDown();
 }
 
+TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
+    size_t timesCalled = 0;
+
+    stdx::mutex mutex;
+    stdx::condition_variable cv;
+
+    // Add a job, ensure that it runs once
+    PeriodicRunner::PeriodicJob job("job",
+                                    [&](Client*) {
+                                        {
+                                            stdx::unique_lock<stdx::mutex> lk(mutex);
+                                            timesCalled++;
+                                        }
+                                        cv.notify_one();
+                                    },
+                                    Milliseconds(5));
+
+    auto handle = runner().makeJob(std::move(job));
+    handle->start();
+    // Wait for the first execution.
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&] { return timesCalled; });
+    }
+
+    handle->setPeriod(Milliseconds(10));
+    ASSERT_EQ(handle->getPeriod(), Milliseconds(10));
+
+    // if we change the period to a longer duration, that doesn't trigger a run
+    {
+        stdx::lock_guard<stdx::mutex> lk(mutex);
+        ASSERT_EQ(timesCalled, 1ul);
+    }
+
+    clockSource().advance(Milliseconds(5));
+
+    // We actually changed the period
+    {
+        stdx::lock_guard<stdx::mutex> lk(mutex);
+        ASSERT_EQ(timesCalled, 1ul);
+    }
+
+    clockSource().advance(Milliseconds(5));
+
+    // Now we hit the new cutoff
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&] { return timesCalled == 2ul; });
+    }
+
+    clockSource().advance(Milliseconds(5));
+
+    // Haven't hit it
+    {
+        stdx::lock_guard<stdx::mutex> lk(mutex);
+        ASSERT_EQ(timesCalled, 2ul);
+    }
+
+    handle->setPeriod(Milliseconds(4));
+    ASSERT_EQ(handle->getPeriod(), Milliseconds(4));
+
+    // shortening triggers the period
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&] { return timesCalled == 3ul; });
+    }
+
+    tearDown();
+}
+
 }  // namespace
 }  // namespace mongo

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
 
@@ -102,6 +103,9 @@ struct SnapshotWindowParams {
     // target window size setting must not be decreased too fast because time must be allowed for
     // the storage engine to attempt to act on the new setting.
     AtomicWord<int> checkCachePressurePeriodSeconds{5};
+
+    static inline MutableObeserverRegistry<decltype(checkCachePressurePeriodSeconds)::WordType>
+        observeCheckCachePressurePeriodSeconds;
 };
 
 extern SnapshotWindowParams snapshotWindowParams;
