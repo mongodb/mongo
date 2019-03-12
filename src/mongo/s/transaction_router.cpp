@@ -607,7 +607,7 @@ const LogicalSessionId& TransactionRouter::_sessionId() const {
     return owningSession->getSessionId();
 }
 
-Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx) {
+BSONObj TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     const auto citer = _participants.cbegin();
@@ -618,23 +618,24 @@ Shard::CommandResponse TransactionRouter::_commitSingleShardTransaction(Operatio
     auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
 
     LOG(0) << txnIdToString()
-           << " Committing single shard transaction, single participant: " << shardId;
+           << " Committing single-shard transaction, single participant: " << shardId;
 
     CommitTransaction commitCmd;
     commitCmd.setDbName(NamespaceString::kAdminDb);
 
     return uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        participant.attachTxnFieldsIfNeeded(
-            commitCmd.toBSON(
-                BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON())),
-            false),
-        Shard::RetryPolicy::kIdempotent));
+                               opCtx,
+                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                               "admin",
+                               participant.attachTxnFieldsIfNeeded(
+                                   commitCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                                         << opCtx->getWriteConcern().toBSON())),
+                                   false),
+                               Shard::RetryPolicy::kIdempotent))
+        .response;
 }
 
-Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
+BSONObj TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
     invariant(_coordinatorId);
     auto coordinatorIter = _participants.find(*_coordinatorId);
     invariant(coordinatorIter != _participants.end());
@@ -696,20 +697,22 @@ Shard::CommandResponse TransactionRouter::_commitMultiShardTransaction(Operation
     _initiatedTwoPhaseCommit = true;
 
     LOG(0) << txnIdToString()
-           << " Committing multi shard transaction, coordinator: " << *_coordinatorId;
+           << " Committing multi-shard transaction, coordinator: " << *_coordinatorId;
 
-    return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        coordinatorIter->second.attachTxnFieldsIfNeeded(
-            coordinateCommitCmd.toBSON(
-                BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON())),
-            false),
-        Shard::RetryPolicy::kIdempotent));
+    return uassertStatusOK(
+               coordinatorShard->runCommandWithFixedRetryAttempts(
+                   opCtx,
+                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                   "admin",
+                   coordinatorIter->second.attachTxnFieldsIfNeeded(
+                       coordinateCommitCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                                       << opCtx->getWriteConcern().toBSON())),
+                       false),
+                   Shard::RetryPolicy::kIdempotent))
+        .response;
 }
 
-Shard::CommandResponse TransactionRouter::commitTransaction(
+BSONObj TransactionRouter::commitTransaction(
     OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken) {
     if (_isRecoveringCommit) {
         uassert(50940,
@@ -725,7 +728,7 @@ Shard::CommandResponse TransactionRouter::commitTransaction(
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot commit without participants",
                 _txnNumber != kUninitializedTxnNumber);
-        return {boost::none, BSON("ok" << true), Status::OK(), Status::OK()};
+        return BSON("ok" << 1);
     }
 
     if (_participants.size() == 1) {
@@ -800,8 +803,8 @@ void TransactionRouter::appendRecoveryToken(BSONObjBuilder* builder) const {
     recoveryTokenBuilder.doneFast();
 }
 
-Shard::CommandResponse TransactionRouter::_commitWithRecoveryToken(
-    OperationContext* opCtx, const TxnRecoveryToken& recoveryToken) {
+BSONObj TransactionRouter::_commitWithRecoveryToken(OperationContext* opCtx,
+                                                    const TxnRecoveryToken& recoveryToken) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     const auto& coordinatorId = recoveryToken.getShardId();
 
@@ -823,11 +826,12 @@ Shard::CommandResponse TransactionRouter::_commitWithRecoveryToken(
 
     auto coordinatorShard = uassertStatusOK(shardRegistry->getShard(opCtx, coordinatorId));
     return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        coordinateCommitCmd,
-        Shard::RetryPolicy::kIdempotent));
+                               opCtx,
+                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                               "admin",
+                               coordinateCommitCmd,
+                               Shard::RetryPolicy::kIdempotent))
+        .response;
 }
 
 }  // namespace mongo

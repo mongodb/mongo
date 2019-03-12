@@ -234,8 +234,8 @@ public:
      * Commits the transaction. For transactions with multiple participants, this will initiate
      * the two phase commit procedure.
      */
-    Shard::CommandResponse commitTransaction(
-        OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken);
+    BSONObj commitTransaction(OperationContext* opCtx,
+                              const boost::optional<TxnRecoveryToken>& recoveryToken);
 
     /**
      * Sends abort to all participants and returns the responses from all shards.
@@ -281,15 +281,15 @@ private:
     /**
      * Run basic commit for transactions that touched a single shard.
      */
-    Shard::CommandResponse _commitSingleShardTransaction(OperationContext* opCtx);
+    BSONObj _commitSingleShardTransaction(OperationContext* opCtx);
 
-    Shard::CommandResponse _commitWithRecoveryToken(OperationContext* opCtx,
-                                                    const TxnRecoveryToken& recoveryToken);
+    BSONObj _commitWithRecoveryToken(OperationContext* opCtx,
+                                     const TxnRecoveryToken& recoveryToken);
 
     /**
      * Run two phase commit for transactions that touched multiple shards.
      */
-    Shard::CommandResponse _commitMultiShardTransaction(OperationContext* opCtx);
+    BSONObj _commitMultiShardTransaction(OperationContext* opCtx);
 
     /**
      * Sets the given logical time as the atClusterTime for the transaction to be the greater of the
