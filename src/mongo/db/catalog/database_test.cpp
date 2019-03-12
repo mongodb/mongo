@@ -128,13 +128,8 @@ TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPend
         db->setDropPending(_opCtx.get(), true);
         ASSERT_TRUE(db->isDropPending(_opCtx.get()));
 
-        ASSERT_THROWS_CODE_AND_WHAT(
-            db->setDropPending(_opCtx.get(), true),
-            AssertionException,
-            ErrorCodes::DatabaseDropPending,
-            (StringBuilder() << "Unable to drop database " << _nss.db()
-                             << " because it is already in the process of being dropped.")
-                .stringData());
+        db->setDropPending(_opCtx.get(), true);
+        ASSERT_TRUE(db->isDropPending(_opCtx.get()));
 
         db->setDropPending(_opCtx.get(), false);
         ASSERT_FALSE(db->isDropPending(_opCtx.get()));

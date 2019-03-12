@@ -370,10 +370,6 @@ Status DatabaseImpl::setProfilingLevel(OperationContext* opCtx, int newLevel) {
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
     if (dropPending) {
         invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
-        uassert(ErrorCodes::DatabaseDropPending,
-                str::stream() << "Unable to drop database " << name()
-                              << " because it is already in the process of being dropped.",
-                !_dropPending);
         _dropPending = true;
     } else {
         invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
