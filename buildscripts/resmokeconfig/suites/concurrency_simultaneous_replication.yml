@@ -23,17 +23,10 @@ selector:
   # the error response from the op being killed.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
 
-  # TODO: SERVER-38018 This workload implicitly aborts transactions, which may block on waiting for
-  # read concern if there is a concurrent dropDatabase waiting for the global X lock.
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands.js
   # This workload may restart running transactions on a different client, causing deadlock if
   # there is a concurrent dropDatabase waiting for the global X lock.
   # TODO: SERVER-37876
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-  # This workload starts and prepares many transactions, which can cause a deadlock when secondary
-  # application tries to acquire the global X lock.
-  # TODO: SERVER-37876
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
   exclude_with_any_tags:
   - requires_sharding
 
