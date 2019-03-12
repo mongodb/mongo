@@ -35,9 +35,12 @@
 
 namespace mongo {
 
-class DatabaseImpl final : public Database {
+class DatabaseImpl : public Database {
 public:
     explicit DatabaseImpl(StringData name, DatabaseCatalogEntry* dbEntry, uint64_t epoch);
+
+    // must call close first
+    ~DatabaseImpl();
 
     void init(OperationContext*) final;
 
@@ -158,7 +161,14 @@ public:
     }
 
 private:
-    class FinishDropChange;
+    /**
+     * Gets or creates collection instance from existing metadata,
+     * Returns NULL if invalid
+     *
+     * Note: This does not add the collection to _collections map, that must be done
+     * by the caller, who takes onership of the Collection*
+     */
+    Collection* _getOrCreateCollectionInstance(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection.
@@ -178,6 +188,10 @@ private:
                                  const NamespaceString& fullns,
                                  Collection* collection);
 
+    class AddCollectionChange;
+    class RemoveCollectionChange;
+    class RenameCollectionChange;
+
     const std::string _name;  // "dbname"
 
     DatabaseCatalogEntry* _dbEntry;  // not owned here
@@ -195,7 +209,8 @@ private:
     bool _dropPending = false;
 
     // Random number generator used to create unique collection namespaces suitable for temporary
-    // collections. Lazily created on first call to makeUniqueCollectionNamespace().
+    // collections.
+    // Lazily created on first call to makeUniqueCollectionNamespace().
     // This variable may only be read/written while the database is locked in MODE_X.
     std::unique_ptr<PseudoRandom> _uniqueCollectionNamespacePseudoRandom;
 

@@ -54,10 +54,7 @@ class OperationContext;
  */
 class Database : public Decorable<Database> {
 public:
-    // TODO(SERVER-39507): Remove the collection map from the Database object.
-    // Currently the map uses a bare pointer in addition to the unique_ptr in order to implement the
-    // current iterator interface, which requires returning a reference to the pointer.
-    using CollectionMap = StringMap<std::pair<std::unique_ptr<Collection>, Collection*>>;
+    typedef StringMap<Collection*> CollectionMap;
 
     /**
      * Creates the namespace 'ns' in the database 'db' according to 'options'. If
@@ -86,11 +83,11 @@ public:
         inline iterator(CollectionMap::const_iterator it) : _it(std::move(it)) {}
 
         inline reference operator*() const {
-            return _it->second.second;
+            return _it->second;
         }
 
         inline pointer operator->() const {
-            return &_it->second.second;
+            return &_it->second;
         }
 
         inline friend bool operator==(const iterator& lhs, const iterator& rhs) {
