@@ -716,6 +716,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setShardId(shard1);
+
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
@@ -746,7 +747,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.attachTxnFieldsIfNeeded(shard1, {});
     txnRouter.processParticipantResponse(shard1, kOkReadOnlyFalseResponse);
 
-    TxnRecoveryToken recoveryToken(shard1);
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setShardId(shard1);
+
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
@@ -781,6 +784,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setShardId(shard1);
+
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
@@ -829,6 +833,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     TxnRecoveryToken recoveryToken;
     recoveryToken.setShardId(shard1);
+
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
@@ -874,7 +879,9 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
 
-    TxnRecoveryToken recoveryToken(shard1);
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setShardId(shard1);
+
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
 
@@ -918,7 +925,9 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
     auto txnRouter = TransactionRouter::get(opCtx);
     txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
 
-    TxnRecoveryToken recoveryToken(shard1);
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setShardId(shard1);
+
     auto future =
         launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });
 
@@ -964,6 +973,27 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
     future.timed_get(kFutureTimeout);
 }
 
+TEST_F(TransactionRouterTest, CommitWithEmptyRecoveryToken) {
+    LogicalSessionId lsid(makeLogicalSessionIdForTest());
+    TxnNumber txnNum{3};
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    opCtx->setWriteConcern(writeConcern);
+
+    RouterOperationContextSession scopedSession(opCtx);
+    auto txnRouter = TransactionRouter::get(opCtx);
+    txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
+
+    TxnRecoveryToken recoveryToken;
+    ASSERT_THROWS_CODE(txnRouter->commitTransaction(operationContext(), recoveryToken),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+}
+
 TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
     LogicalSessionId lsid(makeLogicalSessionIdForTest());
     TxnNumber txnNum{3};
@@ -979,7 +1009,8 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
     auto txnRouter = TransactionRouter::get(opCtx);
     txnRouter->beginOrContinueTxn(opCtx, txnNum, TransactionRouter::TransactionActions::kCommit);
 
-    TxnRecoveryToken recoveryToken(ShardId("magicShard"));
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setShardId(ShardId("magicShard"));
 
     auto future =
         launchAsync([&] { txnRouter->commitTransaction(operationContext(), recoveryToken); });

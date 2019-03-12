@@ -20,6 +20,20 @@
     // transaction coordinator being canceled after a timeout happen in a reasonable amount of time.
     TestData.transactionLifetimeLimitSeconds = 15;
 
+    const startNewReadOnlyTransactionThroughMongos = function() {
+        let res = assert.commandWorked(testDB.runCommand({
+            find: 'user',
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            startTransaction: true
+        }));
+
+        assert.neq(null, res.recoveryToken);
+        assert.eq(null, res.recoveryToken.shardId);
+        return res.recoveryToken;
+    };
+
     const startNewSingleShardTransactionThroughMongos = function() {
         const updateDocumentOnShard0 = {
             q: {x: -1},
@@ -366,6 +380,51 @@
         assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     }());
+
+    (function() {
+        jsTest.log("try to recover decision for read-only transaction that's in progress");
+
+        txnNumber++;
+
+        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
+
+        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    })();
+
+    (function() {
+        jsTest.log("try to recover decision for read-only transaction that aborted");
+
+        txnNumber++;
+
+        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
+        assert.commandWorked(st.rs0.getPrimary().adminCommand({
+            abortTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false
+        }));
+
+        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    })();
+
+    (function() {
+        jsTest.log("try to recover decision for read-only transaction that committed");
+
+        txnNumber++;
+
+        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
+        assert.commandWorked(testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false
+        }));
+
+        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+                                     ErrorCodes.NoSuchTransaction);
+    })();
 
     st.stop();
 })();

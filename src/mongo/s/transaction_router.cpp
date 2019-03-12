@@ -866,15 +866,31 @@ void TransactionRouter::appendRecoveryToken(BSONObjBuilder* builder) const {
 
     BSONObjBuilder recoveryTokenBuilder(
         builder->subobjStart(CommitTransaction::kRecoveryTokenFieldName));
-    TxnRecoveryToken recoveryToken(*_coordinatorId);
+
+    TxnRecoveryToken recoveryToken;
+
+    // Only return a populated recovery token if the transaction has done a write (transactions that
+    // only did reads do not need to be recovered; they can just be retried).
+    for (const auto& participant : _participants) {
+        if (participant.second.readOnly == Participant::ReadOnly::kNotReadOnly) {
+            recoveryToken.setShardId(*_coordinatorId);
+            break;
+        }
+    }
+
     recoveryToken.serialize(&recoveryTokenBuilder);
     recoveryTokenBuilder.doneFast();
 }
 
 BSONObj TransactionRouter::_commitWithRecoveryToken(OperationContext* opCtx,
                                                     const TxnRecoveryToken& recoveryToken) {
+    uassert(ErrorCodes::NoSuchTransaction,
+            "Recovery token is empty, meaning the transaction only performed reads and can be "
+            "safely retried",
+            recoveryToken.getShardId());
+    const auto& coordinatorId = *recoveryToken.getShardId();
+
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    const auto& coordinatorId = recoveryToken.getShardId();
 
     auto coordinateCommitCmd = [&] {
         CoordinateCommitTransaction coordinateCommitCmd;

@@ -51,6 +51,7 @@ structs:
             shardId:
                 description: "The id of the shard that can make progress committing the transaction"
                 type: shard_id
+                optional: true
 
     CommitTransactionOplogObject:
         description: A document representing the 'o' field of a 'commitTransaction' oplog entry.
