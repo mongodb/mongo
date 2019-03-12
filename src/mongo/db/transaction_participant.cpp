@@ -340,7 +340,7 @@ boost::optional<Timestamp> TransactionParticipant::getOldestActiveTimestamp(
     OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     Query q(BSON(SessionTxnRecord::kStateFieldName << "prepared"));
-    q.sort(SessionTxnRecord::kStartTimestampFieldName.toString());
+    q.sort(SessionTxnRecord::kStartOpTimeFieldName.toString());
     auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(), q);
     if (result.isEmpty()) {
         return boost::none;
@@ -348,7 +348,7 @@ boost::optional<Timestamp> TransactionParticipant::getOldestActiveTimestamp(
 
     auto txnRecord =
         SessionTxnRecord::parse(IDLParserErrorContext("parse oldest active txn record"), result);
-    return txnRecord.getStartTimestamp();
+    return txnRecord.getStartOpTime()->getTimestamp();
 }
 
 const LogicalSessionId& TransactionParticipant::Observer::_sessionId() const {
@@ -1991,7 +1991,7 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
         newTxnRecord.setLastWriteDate(newLastWriteDate);
         newTxnRecord.setState(newState);
         if (newState == DurableTxnStateEnum::kPrepared) {
-            newTxnRecord.setStartTimestamp(o().prepareOpTime.getTimestamp());
+            newTxnRecord.setStartOpTime(o().prepareOpTime);
         }
 
         return newTxnRecord.toBSON();

@@ -76,7 +76,7 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
                 case repl::OplogEntry::CommandType::kApplyOps:
                     if (entry.shouldPrepare()) {
                         newTxnRecord.setState(DurableTxnStateEnum::kPrepared);
-                        newTxnRecord.setStartTimestamp(entry.getOpTime().getTimestamp());
+                        newTxnRecord.setStartOpTime(entry.getOpTime());
                     } else {
                         newTxnRecord.setState(DurableTxnStateEnum::kCommitted);
                     }

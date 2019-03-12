@@ -420,14 +420,14 @@ public:
         ASSERT_EQ(TransactionParticipant::getOldestActiveTimestamp(_opCtx), ts);
     }
 
-    void assertHasStartTimestamp() {
+    void assertHasStartOpTime() {
         auto txnDoc = _getTxnDoc();
-        ASSERT_TRUE(txnDoc.hasField(SessionTxnRecord::kStartTimestampFieldName));
+        ASSERT_TRUE(txnDoc.hasField(SessionTxnRecord::kStartOpTimeFieldName));
     }
 
-    void assertNoStartTimestamp() {
+    void assertNoStartOpTime() {
         auto txnDoc = _getTxnDoc();
-        ASSERT_FALSE(txnDoc.hasField(SessionTxnRecord::kStartTimestampFieldName));
+        ASSERT_FALSE(txnDoc.hasField(SessionTxnRecord::kStartOpTimeFieldName));
     }
 
     void setReplCoordAppliedOpTime(const repl::OpTime& opTime) {
@@ -2790,7 +2790,7 @@ public:
         txnParticipant.commitUnpreparedTransaction(_opCtx);
 
         txnParticipant.stashTransactionResources(_opCtx);
-        assertNoStartTimestamp();
+        assertNoStartOpTime();
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
             auto coll = autoColl.getCollection();
@@ -3215,7 +3215,7 @@ public:
         txnParticipant.prepareTransaction(_opCtx, {});
 
         txnParticipant.stashTransactionResources(_opCtx);
-        assertHasStartTimestamp();
+        assertHasStartOpTime();
         {
             const auto prepareFilter = BSON("ts" << prepareTs);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -3240,7 +3240,7 @@ public:
         txnParticipant.unstashTransactionResources(_opCtx, "commitTransaction");
 
         txnParticipant.commitPreparedTransaction(_opCtx, commitEntryTs, {});
-        assertNoStartTimestamp();
+        assertNoStartOpTime();
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
@@ -3312,7 +3312,7 @@ public:
         txnParticipant.prepareTransaction(_opCtx, {});
 
         txnParticipant.stashTransactionResources(_opCtx);
-        assertHasStartTimestamp();
+        assertHasStartOpTime();
         {
             const auto prepareFilter = BSON("ts" << prepareTs);
             assertOplogDocumentExistsAtTimestamp(prepareFilter, presentTs, false);
@@ -3337,7 +3337,7 @@ public:
         txnParticipant.unstashTransactionResources(_opCtx, "abortTransaction");
 
         txnParticipant.abortActiveTransaction(_opCtx);
-        assertNoStartTimestamp();
+        assertNoStartOpTime();
 
         txnParticipant.stashTransactionResources(_opCtx);
         {
