@@ -1,6 +1,6 @@
 /**
  * Tests that we can have unknown field names in the index spec passed to the createIndexes command
- * if 'ignoreUnknownIndexSpecFields: true' is set on the createIndexes command.
+ * if 'ignoreUnknownIndexOptions: true' is set on the createIndexes command.
  */
 (function() {
     "use strict";
@@ -15,21 +15,21 @@
     assert.commandFailedWithCode(db.runCommand({
         createIndexes: "unknown_field_names_create_indexes",
         indexes: [{key: {x: 1}, name: "myindex", someField: "someValue"}],
-        ignoreUnknownIndexSpecFields: false
+        ignoreUnknownIndexOptions: false
     }),
                                  ErrorCodes.InvalidIndexSpecificationOption);
 
     assert.commandFailedWithCode(db.runCommand({
         createIndexes: "unknown_field_names_create_indexes",
         indexes: [{key: {x: 1}, name: "myindex", someField: "someValue"}],
-        ignoreUnknownIndexSpecFields: "badValue"
+        ignoreUnknownIndexOptions: "badValue"
     }),
                                  ErrorCodes.TypeMismatch);
 
     assert.commandWorked(db.runCommand({
         createIndexes: "unknown_field_names_create_indexes",
         indexes: [{key: {x: 1}, name: "myindex", someField: "someValue"}],
-        ignoreUnknownIndexSpecFields: true
+        ignoreUnknownIndexOptions: true
     }));
 
     // Make sure 'someField' is not in the index spec.

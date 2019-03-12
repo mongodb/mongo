@@ -70,7 +70,7 @@ namespace {
 constexpr auto kIndexesFieldName = "indexes"_sd;
 constexpr auto kCommandName = "createIndexes"_sd;
 constexpr auto kCommitQuorumFieldName = "commitQuorum"_sd;
-constexpr auto kignoreUnknownIndexSpecFieldsName = "ignoreUnknownIndexSpecFields"_sd;
+constexpr auto kIgnoreUnknownIndexOptionsName = "ignoreUnknownIndexOptions"_sd;
 constexpr auto kTwoPhaseCommandName = "twoPhaseCreateIndexes"_sd;
 constexpr auto kCreateCollectionAutomaticallyFieldName = "createdCollectionAutomatically"_sd;
 constexpr auto kNumIndexesBeforeFieldName = "numIndexesBefore"_sd;
@@ -89,17 +89,16 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility) {
     bool hasIndexesField = false;
 
-    bool ignoreUnknownIndexSpecFields = false;
-    if (cmdObj.hasField(kignoreUnknownIndexSpecFieldsName)) {
-        auto ignoreUnknownIndexSpecFieldsElement =
-            cmdObj.getField(kignoreUnknownIndexSpecFieldsName);
-        if (ignoreUnknownIndexSpecFieldsElement.type() != BSONType::Bool) {
+    bool ignoreUnknownIndexOptions = false;
+    if (cmdObj.hasField(kIgnoreUnknownIndexOptionsName)) {
+        auto ignoreUnknownIndexOptionsElement = cmdObj.getField(kIgnoreUnknownIndexOptionsName);
+        if (ignoreUnknownIndexOptionsElement.type() != BSONType::Bool) {
             return {ErrorCodes::TypeMismatch,
-                    str::stream() << "The field '" << kignoreUnknownIndexSpecFieldsName
+                    str::stream() << "The field '" << kIgnoreUnknownIndexOptionsName
                                   << "' must be a boolean, but got "
-                                  << typeName(ignoreUnknownIndexSpecFieldsElement.type())};
+                                  << typeName(ignoreUnknownIndexOptionsElement.type())};
         }
-        ignoreUnknownIndexSpecFields = ignoreUnknownIndexSpecFieldsElement.boolean();
+        ignoreUnknownIndexOptions = ignoreUnknownIndexOptionsElement.boolean();
     }
 
     std::vector<BSONObj> indexSpecs;
@@ -123,7 +122,7 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
                 }
 
                 BSONObj parsedIndexSpec = indexesElem.Obj();
-                if (ignoreUnknownIndexSpecFields) {
+                if (ignoreUnknownIndexOptions) {
                     parsedIndexSpec = index_key_validate::removeUnknownFields(parsedIndexSpec);
                 }
 
@@ -158,7 +157,7 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
             hasIndexesField = true;
         } else if (kCommandName == cmdElemFieldName || kCommitQuorumFieldName == cmdElemFieldName ||
                    kTwoPhaseCommandName == cmdElemFieldName ||
-                   kignoreUnknownIndexSpecFieldsName == cmdElemFieldName ||
+                   kIgnoreUnknownIndexOptionsName == cmdElemFieldName ||
                    isGenericArgument(cmdElemFieldName)) {
             continue;
         } else {
