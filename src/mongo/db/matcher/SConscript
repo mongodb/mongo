@@ -40,6 +40,7 @@ env.Library(
         'expression_text_base.cpp',
         'expression_text_noop.cpp',
         'expression_tree.cpp',
+        'expression_type.cpp',
         'expression_where_base.cpp',
         'expression_where_noop.cpp',
         'expression_with_placeholder.cpp',

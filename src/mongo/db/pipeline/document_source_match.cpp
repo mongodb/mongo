@@ -271,7 +271,6 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::GEO_NEAR:
             case PathAcceptingKeyword::INTERNAL_EXPR_EQ:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
-            case PathAcceptingKeyword::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_EQ:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD:

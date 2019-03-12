@@ -36,7 +36,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 
@@ -576,139 +575,10 @@ TEST(InternalBinDataSubTypeMatchExpressionTest, InvalidSubTypeDoesNotParse) {
 TEST(InternalBinDataSubTypeMatchExpressionTest, InvalidNumericalSubTypeDoesNotParse) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query1 = BSON("a" << BSON("$_internalSchemaBinDataSubType" << 99));
-    auto query2 = BSON("a" << BSON("$_internalSchemaBinDataSubType" << 2.1));
+    auto query2 = BSON("a" << BSON("$_ internalSchemaBinDataSubType" << 2.1));
     auto statusWith1 = MatchExpressionParser::parse(query1, expCtx);
     auto statusWith2 = MatchExpressionParser::parse(query2, expCtx);
     ASSERT_NOT_OK(statusWith1.getStatus());
     ASSERT_NOT_OK(statusWith2.getStatus());
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatches) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-
-    BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                                  sizeof(FleBlobHeader),
-                                                  BinDataType::Encrypt));
-    ASSERT_TRUE(expr->matchesBSON(matchingDoc));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::NumberInt;
-
-    BSONObj notMatchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                                     sizeof(FleBlobHeader),
-                                                     BinDataType::Encrypt));
-    ASSERT_FALSE(expr->matchesBSON(notMatchingDoc));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonNumericalArgumentDoesNotParse) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_EQ(MatchExpressionParser::parse(BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                                            << "bar")),
-                                           expCtx)
-                  .getStatus(),
-              ErrorCodes::FailedToParse);
-    ASSERT_EQ(MatchExpressionParser::parse(BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                                            << "0")),
-                                           expCtx)
-                  .getStatus(),
-              ErrorCodes::FailedToParse);
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, InvalidNumericalArgumentDoesNotParse) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_EQ(MatchExpressionParser::parse(
-                  BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << 0.21)), expCtx)
-                  .getStatus(),
-              ErrorCodes::FailedToParse);
-    ASSERT_EQ(MatchExpressionParser::parse(
-                  BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << 13.3)), expCtx)
-                  .getStatus(),
-              ErrorCodes::FailedToParse);
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBsonTypeArgumentDoesNotParse) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_EQ(MatchExpressionParser::parse(BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                                            << (BSONType::JSTypeMax + 1))),
-                                           expCtx)
-                  .getStatus(),
-              ErrorCodes::FailedToParse);
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, IntentToEncryptFleBlobDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = FleBlobSubtype::IntentToEncrypt;
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-    BSONObj notMatch = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                               sizeof(FleBlobHeader),
-                                               BinDataType::Encrypt));
-
-    ASSERT_FALSE(expr->matchesBSON(notMatch));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, UnknownFleBlobTypeDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    FleBlobHeader blob;
-    blob.fleBlobSubtype = 6;
-    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
-    BSONObj notMatch = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
-                                               sizeof(FleBlobHeader),
-                                               BinDataType::Encrypt));
-    try {
-        expr->matchesBSON(notMatch);
-    } catch (...) {
-        ASSERT_EQ(exceptionToStatus().code(), 33118);
-    }
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, EmptyFleBlobDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Encrypt));
-    ASSERT_FALSE(expr->matchesBSON(notMatch));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonEncryptBinDataSubTypeDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    BSONObj notMatch = BSON("a" << BSONBinData("\x69\xb7", 2, BinDataGeneral));
-    ASSERT_FALSE(expr->matchesBSON(notMatch));
-}
-
-TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMatch) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
-    auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
-
-    BSONObj notMatch = BSON("a" << BSONArray());
-    ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
 }  // namespace mongo

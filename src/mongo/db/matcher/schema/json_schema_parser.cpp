@@ -1276,6 +1276,32 @@ Status translateScalarKeywords(StringMap<BSONElement>& keywordMap,
 }
 
 /**
+ * Parses the parameters to the 'encrypt' keyword. Returns an OK status if these parameters
+ * are valid, and a non-OK status otherwise."
+ */
+Status verifyEncryptOptions(BSONObj encryptObj) {
+    const IDLParserErrorContext encryptCtxt("encrypt");
+
+    // This checks the types of all the fields. Will throw on any parsing error.
+    EncryptionInfo encryptInfo;
+    try {
+        encryptInfo = EncryptionInfo::parse(encryptCtxt, encryptObj);
+    } catch (...) {
+        return exceptionToStatus();
+    }
+    auto typePointer = encryptInfo.getBsonType();
+    if (typePointer) {
+        auto it = kTypeAliasMap.find(typePointer.get());
+        if (it == kTypeAliasMap.end()) {
+            return {ErrorCodes::FailedToParse,
+                    "Invalid BSON type found in encrypt object: " + typePointer.get()};
+        }
+    }
+
+    return Status::OK();
+}
+
+/**
  * Parses JSON Schema encrypt keyword in 'keywordMap' and adds it to 'andExpr'. Returns a
  * non-OK status if an error occurs during parsing.
  */
@@ -1324,19 +1350,12 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
                                   << "' must be an object "};
         }
 
-        try {
-            // This checks the types of all the fields. Will throw on any parsing error.
-            const IDLParserErrorContext encryptCtxt("encrypt");
-            auto encryptInfo = EncryptionInfo::parse(encryptCtxt, encryptElt.embeddedObject());
-
-            andExpr->add(new InternalSchemaBinDataSubTypeExpression(path, BinDataType::Encrypt));
-
-            if (auto typeOptional = encryptInfo.getBsonType())
-                andExpr->add(new InternalSchemaBinDataEncryptedTypeExpression(
-                    path, typeFromName(typeOptional.get())));
-        } catch (const AssertionException&) {
-            return exceptionToStatus();
+        auto encryptStatus = verifyEncryptOptions(encryptElt.embeddedObject());
+        if (!encryptStatus.isOK()) {
+            return encryptStatus;
         }
+
+        andExpr->add(new InternalSchemaBinDataSubTypeExpression(path, BinDataType::Encrypt));
     }
 
     return Status::OK();
