@@ -1151,7 +1151,6 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
                           const CollatorInterface* collator,
                           size_t* indexOut) {
     invariant(indexOut);
-    bool isDottedField = str::contains(field, '.');
     int minFields = std::numeric_limits<int>::max();
     for (size_t i = 0; i < indices.size(); ++i) {
         // Skip indices with non-matching collator.
@@ -1164,10 +1163,6 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
         }
         // Skip partial indices.
         if (indices[i].filterExpr) {
-            continue;
-        }
-        // Skip multikey indices if we are projecting on a dotted field.
-        if (indices[i].multikey && isDottedField) {
             continue;
         }
         // Skip indices where the first key is not field.

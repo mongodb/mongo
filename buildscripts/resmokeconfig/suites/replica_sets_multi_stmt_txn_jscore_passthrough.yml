@@ -92,6 +92,7 @@ selector:
   - jstests/core/agg_hint.js
   - jstests/core/and.js
   - jstests/core/collation.js
+  - jstests/core/distinct_multikey_dotted_path.js
   - jstests/core/explain_shell_helpers.js
   - jstests/core/index_partial_read_ops.js
   - jstests/core/optimized_match_explain.js
