@@ -302,7 +302,7 @@ private:
      *         |
      *         |
      *         V
-     *   _getBeginFetchingTimestampCallback()
+     *   _getBeginFetchingOpTimeCallback()
      *         |
      *         |
      *         V
@@ -420,7 +420,7 @@ private:
      * serverStatus response, which refers to the optime of the oldest active transaction with an
      * oplog entry. It will be used as the beginFetchingTimestamp.
      */
-    void _getBeginFetchingOpTimeCallback(const executor::TaskExecutor::ResponseStatus& response,
+    void _getBeginFetchingOpTimeCallback(const StatusWith<Fetcher::QueryResponse>& result,
                                          std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
@@ -643,17 +643,18 @@ private:
     // Handle to currently scheduled _getNextApplierBatchCallback() task.
     executor::TaskExecutor::CallbackHandle _getNextApplierBatchHandle;  // (M)
 
-    std::unique_ptr<InitialSyncState> _initialSyncState;  // (M)
-    std::unique_ptr<OplogFetcher> _oplogFetcher;          // (S)
-    std::unique_ptr<Fetcher> _lastOplogEntryFetcher;      // (S)
-    std::unique_ptr<Fetcher> _fCVFetcher;                 // (S)
-    std::unique_ptr<MultiApplier> _applier;               // (M)
-    HostAndPort _syncSource;                              // (M)
-    OpTime _lastFetched;                                  // (MX)
-    OpTimeAndWallTime _lastApplied;                       // (MX)
-    std::unique_ptr<OplogBuffer> _oplogBuffer;            // (M)
-    std::unique_ptr<OplogApplier::Observer> _observer;    // (S)
-    std::unique_ptr<OplogApplier> _oplogApplier;          // (M)
+    std::unique_ptr<InitialSyncState> _initialSyncState;   // (M)
+    std::unique_ptr<OplogFetcher> _oplogFetcher;           // (S)
+    std::unique_ptr<Fetcher> _beginFetchingOpTimeFetcher;  // (S)
+    std::unique_ptr<Fetcher> _lastOplogEntryFetcher;       // (S)
+    std::unique_ptr<Fetcher> _fCVFetcher;                  // (S)
+    std::unique_ptr<MultiApplier> _applier;                // (M)
+    HostAndPort _syncSource;                               // (M)
+    OpTime _lastFetched;                                   // (MX)
+    OpTimeAndWallTime _lastApplied;                        // (MX)
+    std::unique_ptr<OplogBuffer> _oplogBuffer;             // (M)
+    std::unique_ptr<OplogApplier::Observer> _observer;     // (S)
+    std::unique_ptr<OplogApplier> _oplogApplier;           // (M)
 
     // Used to signal changes in _state.
     mutable stdx::condition_variable _stateCondition;

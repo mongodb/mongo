@@ -510,14 +510,6 @@ BSONObj makeRollbackCheckerResponse(int rollbackId) {
 }
 
 /**
- * Generates a serverStatus response with an 'oldestActiveOplogEntryOpTime' field.
- */
-BSONObj makeServerStatusResponse(OpTime oldestActiveTxnOpTime) {
-    return BSON("ok" << 1 << "transactions"
-                     << BSON("oldestActiveOplogEntryOpTime" << oldestActiveTxnOpTime));
-}
-
-/**
  * Generates a cursor response for a Fetcher to consume.
  */
 RemoteCommandResponse makeCursorResponse(CursorId cursorId,
@@ -1170,19 +1162,21 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughRollbackCheckerCallbackError
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 }
 
-TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampScheduleError) {
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingOpTimeScheduleError) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
-    // Getting the begin fetching timestamp is the only time a serverStatus command is sent, so we
-    // reject the serverStatus command and save the request for inspection at the end of this test
-    // case.
+    // We reject the 'find' command for the begin fetching optime and save the request for
+    // inspection at the end of this test case.
     executor::RemoteCommandRequest request;
-    _executorProxy->shouldFailScheduleRemoteCommandRequest =
-        [&request](const executor::RemoteCommandRequest& requestToSend) {
-            request = requestToSend;
-            return "serverStatus" == requestToSend.cmdObj.firstElement().fieldNameStringData();
-        };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest = [&request](
+        const executor::RemoteCommandRequest& requestToSend) {
+        request = requestToSend;
+        auto elem = requestToSend.cmdObj.firstElement();
+        return (
+            ("find" == elem.fieldNameStringData()) &&
+            (NamespaceString::kSessionTransactionsTableNamespace.coll() == elem.valueStringData()));
+    };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1201,11 +1195,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampSch
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 
     ASSERT_EQUALS(syncSource, request.target);
-    ASSERT_EQUALS(NamespaceString::kAdminDb, request.dbname);
-    assertRemoteCommandNameEquals("serverStatus", request);
+    ASSERT_EQUALS(NamespaceString::kConfigDb, request.dbname);
+    assertRemoteCommandNameEquals("find", request);
 }
 
-TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampCallbackError) {
+TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingOpTimeCallbackError) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -1221,9 +1215,9 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampCal
         net->runReadyNetworkOperations();
 
         assertRemoteCommandNameEquals(
-            "serverStatus",
+            "find",
             net->scheduleErrorResponse(
-                Status(ErrorCodes::OperationFailed, "serverStatus command failed at sync source")));
+                Status(ErrorCodes::OperationFailed, "find command failed at sync source")));
         net->runReadyNetworkOperations();
     }
 
@@ -1231,18 +1225,46 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetBeginFetchingTimestampCal
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 }
 
+TEST_F(InitialSyncerTest, InitialSyncerCancelsBeginFetchingOpTimeFetcherOnShutdown) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+    }
+
+    ASSERT_OK(initialSyncer->shutdown());
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied.getStatus());
+}
+
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherScheduleError) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
-    // The last oplog entry fetcher is the first component that sends a find command so we reject
-    // any find commands and save the request for inspection at the end of this test case.
+    // We reject the 'find' command on the oplog and save the request for inspection at the end of
+    // this test case.
     executor::RemoteCommandRequest request;
-    _executorProxy->shouldFailScheduleRemoteCommandRequest =
-        [&request](const executor::RemoteCommandRequest& requestToSend) {
-            request = requestToSend;
-            return "find" == requestToSend.cmdObj.firstElement().fieldNameStringData();
-        };
+    _executorProxy->shouldFailScheduleRemoteCommandRequest = [&request](
+        const executor::RemoteCommandRequest& requestToSend) {
+        request = requestToSend;
+        auto elem = requestToSend.cmdObj.firstElement();
+        return (("find" == elem.fieldNameStringData()) && ("oplog.rs" == elem.valueStringData()));
+    };
 
     HostAndPort syncSource("localhost", 12345);
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(syncSource);
@@ -1255,10 +1277,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherSchedul
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
     }
 
@@ -1286,10 +1309,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughLastOplogEntryFetcherCallbac
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         assertRemoteCommandNameEquals(
@@ -1317,10 +1341,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastOplogEntryFetcherOnShutdown) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         ASSERT_TRUE(net->hasReadyRequests());
@@ -1348,10 +1373,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1376,10 +1402,11 @@ TEST_F(InitialSyncerTest,
     // Base rollback ID.
     net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-    // Send an empty optime as the response to the serverStatus request, which will cause the
-    // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-    auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-    assertRemoteCommandNameEquals("serverStatus", request);
+    // Send an empty optime as the response to the beginFetchingOptime find request, which will
+    // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+    auto request = net->scheduleSuccessfulResponse(
+        makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+    assertRemoteCommandNameEquals("find", request);
     net->runReadyNetworkOperations();
 
     // Last oplog entry first attempt - retriable error.
@@ -1409,10 +1436,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1440,10 +1468,10 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1482,10 +1510,10 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1513,10 +1541,10 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1548,10 +1576,10 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsFCVFetcherOnShutdown) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1580,10 +1608,11 @@ TEST_F(InitialSyncerTest, InitialSyncerResendsFindCommandIfFCVFetcherReturnsRetr
     // Base rollback ID.
     net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-    // Send an empty optime as the response to the serverStatus request, which will cause the
-    // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-    auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-    assertRemoteCommandNameEquals("serverStatus", request);
+    // Send an empty optime as the response to the beginFetchingOptime find request, which will
+    // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+    auto request = net->scheduleSuccessfulResponse(
+        makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+    assertRemoteCommandNameEquals("find", request);
     net->runReadyNetworkOperations();
 
     // Last oplog entry.
@@ -1616,10 +1645,11 @@ void InitialSyncerTest::runInitialSyncWithBadFCVResponse(std::vector<BSONObj> do
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1684,10 +1714,11 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1735,10 +1766,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherScheduleError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1777,10 +1809,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1827,10 +1860,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1889,10 +1923,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -1949,10 +1984,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2014,10 +2050,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2059,10 +2096,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2101,10 +2139,11 @@ TEST_F(InitialSyncerTest, InitialSyncerIgnoresLocalDatabasesWhenCloningDatabases
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2169,10 +2208,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2243,10 +2283,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBothOplogFetcherAndDatabasesCloner
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2274,9 +2315,10 @@ TEST_F(InitialSyncerTest,
     bool first = true;
     _executorProxy->shouldFailScheduleRemoteCommandRequest =
         [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
-            if ("find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
-                requestToSend.cmdObj.hasField("sort") &&
-                1 == requestToSend.cmdObj.getIntField("limit")) {
+            auto elem = requestToSend.cmdObj.firstElement();
+            if (("find" == elem.fieldNameStringData()) && (requestToSend.cmdObj.hasField("sort")) &&
+                (1 == requestToSend.cmdObj.getIntField("limit")) &&
+                (NamespaceString::kRsOplogNamespace.coll().toString() == elem.valueStringData())) {
                 if (first) {
                     first = false;
                     return false;
@@ -2297,10 +2339,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2341,10 +2384,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2401,10 +2445,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2456,10 +2501,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2522,10 +2568,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2580,10 +2627,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2651,10 +2699,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2725,10 +2774,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2799,10 +2849,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2855,10 +2906,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2916,10 +2968,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnShutdown) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -2978,10 +3031,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsLastRollbackCheckerOnOplogFetcherC
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3045,10 +3099,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3103,10 +3158,11 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3196,10 +3252,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchScheduleE
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3258,10 +3315,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughSecondGetNextApplierBatchSch
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3320,10 +3378,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3384,10 +3443,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockErr
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3456,10 +3516,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3519,10 +3580,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierScheduleError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3598,10 +3660,11 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3652,10 +3715,11 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3712,10 +3776,11 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3811,10 +3876,11 @@ TEST_F(InitialSyncerTest,
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -3931,10 +3997,11 @@ TEST_F(
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -4029,10 +4096,11 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -4092,10 +4160,11 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -4143,13 +4212,15 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_EQUALS(when, net->runUntil(when));
 
         // Base rollback ID.
-        auto request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
-        assertRemoteCommandNameEquals("replSetGetRBID", request);
+        auto rbidRequest =
+            net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+        assertRemoteCommandNameEquals("replSetGetRBID", rbidRequest);
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto findRequest = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", findRequest);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
@@ -4364,10 +4435,11 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
         // Base rollback ID.
         net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
 
-        // Send an empty optime as the response to the serverStatus request, which will cause the
-        // beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(makeServerStatusResponse(OpTime()));
-        assertRemoteCommandNameEquals("serverStatus", request);
+        // Send an empty optime as the response to the beginFetchingOptime find request, which will
+        // cause the beginFetchingTimestamp to be the same as the beginApplyingTimestamp.
+        auto request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", request);
         net->runReadyNetworkOperations();
 
         // Last oplog entry.
