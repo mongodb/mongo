@@ -283,6 +283,12 @@ private:
      */
     BSONObj _commitSingleShardTransaction(OperationContext* opCtx);
 
+    /**
+     * Skips explicit commit and instead waits for participants' read Timestamps to reach the level
+     * of durability specified by the writeConcern on 'opCtx'.
+     */
+    BSONObj _commitReadOnlyTransaction(OperationContext* opCtx);
+
     BSONObj _commitWithRecoveryToken(OperationContext* opCtx,
                                      const TxnRecoveryToken& recoveryToken);
 

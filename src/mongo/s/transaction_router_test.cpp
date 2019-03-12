@@ -703,6 +703,38 @@ void checkWriteConcern(const BSONObj& cmdObj, const WriteConcernOptions& expecte
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
+       SendCommitDirectlyForSingleParticipantThatIsReadOnly) {
+    TxnNumber txnNum{3};
+
+    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setShardId(shard1);
+    auto future =
+        launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(hostAndPort1, request.target);
+        ASSERT_EQ("admin", request.dbname);
+
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "commitTransaction");
+
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
+
+        return BSON("ok" << 1);
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
        SendCommitDirectlyForSingleParticipantThatDidAWrite) {
     TxnNumber txnNum{3};
 
@@ -724,6 +756,98 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
+
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
+
+        return BSON("ok" << 1);
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       SendCommitDirectlyForMultipleParticipantsThatAreAllReadOnly) {
+    TxnNumber txnNum{3};
+
+    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(shard2, kOkReadOnlyTrueResponse);
+
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setShardId(shard1);
+    auto future =
+        launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
+
+    // The requests are scheduled in a nondeterministic order, since they are scheduled by iterating
+    // over the participant list, which is stored as a hash map. So, just check that all expected
+    // hosts and ports were targeted at the end.
+    std::set<HostAndPort> expectedHostAndPorts{hostAndPort1, hostAndPort2};
+    std::set<HostAndPort> seenHostAndPorts;
+    for (int i = 0; i < 2; i++) {
+        onCommand([&](const RemoteCommandRequest& request) {
+            seenHostAndPorts.insert(request.target);
+
+            ASSERT_EQ("admin", request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "commitTransaction");
+
+            // The shard with hostAndPort1 is expected to be the coordinator.
+            checkSessionDetails(
+                request.cmdObj, getSessionId(), txnNum, (request.target == hostAndPort1));
+
+            return kOkReadOnlyTrueResponse;
+        });
+    }
+
+    future.timed_get(kFutureTimeout);
+    ASSERT(expectedHostAndPorts == seenHostAndPorts);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       SendCoordinateCommitForMultipleParticipantsOnlyOneDidAWrite) {
+    TxnNumber txnNum{3};
+
+    auto& txnRouter(*TransactionRouter::get(operationContext()));
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(shard1, {});
+    txnRouter.attachTxnFieldsIfNeeded(shard2, {});
+    txnRouter.processParticipantResponse(shard1, kOkReadOnlyTrueResponse);
+    txnRouter.processParticipantResponse(shard2, kOkReadOnlyFalseResponse);
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setShardId(shard1);
+    auto future =
+        launchAsync([&] { txnRouter.commitTransaction(operationContext(), recoveryToken); });
+
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(hostAndPort1, request.target);
+        ASSERT_EQ("admin", request.dbname);
+
+        auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+        ASSERT_EQ(cmdName, "coordinateCommitTransaction");
+
+        std::set<std::string> expectedParticipants = {shard1.toString(), shard2.toString()};
+        auto participantElements = request.cmdObj["participants"].Array();
+        ASSERT_EQ(expectedParticipants.size(), participantElements.size());
+
+        for (const auto& element : participantElements) {
+            auto shardId = element["shardId"].valuestr();
+            ASSERT_EQ(1ull, expectedParticipants.count(shardId));
+            expectedParticipants.erase(shardId);
+        }
 
         checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true);
 

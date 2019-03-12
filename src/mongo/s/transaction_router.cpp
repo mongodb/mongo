@@ -42,9 +42,12 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -635,6 +638,55 @@ BSONObj TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx
         .response;
 }
 
+BSONObj TransactionRouter::_commitReadOnlyTransaction(OperationContext* opCtx) {
+    // Assemble requests.
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (const auto& participant : _participants) {
+        CommitTransaction commitCmd;
+        commitCmd.setDbName(NamespaceString::kAdminDb);
+        const auto commitCmdObj = commitCmd.toBSON(
+            BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
+        requests.emplace_back(participant.first, commitCmdObj);
+    }
+
+    LOG(0) << txnIdToString() << " Committing read-only transaction on " << requests.size()
+           << " shards";
+
+    // Send the requests.
+    MultiStatementTransactionRequestsSender ars(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        NamespaceString::kAdminDb,
+        requests,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kIdempotent);
+
+    // Receive the responses.
+    while (!ars.done()) {
+        auto response = ars.next();
+
+        uassertStatusOK(response.swResponse);
+        const auto result = response.swResponse.getValue().data;
+
+        // If any shard returned an error, return the error immediately.
+        const auto commandStatus = getStatusFromCommandResult(result);
+        if (!commandStatus.isOK()) {
+            return result;
+        }
+
+        // If any participant had a writeConcern error, return the participant's writeConcern
+        // error immediately.
+        const auto writeConcernStatus = getWriteConcernStatusFromCommandResult(result);
+        if (!writeConcernStatus.isOK()) {
+            return result;
+        }
+    }
+
+    // If all the responses were ok, return empty BSON, which the commitTransaction command will
+    // interpret as success.
+    return BSONObj();
+}
+
 BSONObj TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx) {
     invariant(_coordinatorId);
     auto coordinatorIter = _participants.find(*_coordinatorId);
@@ -731,8 +783,24 @@ BSONObj TransactionRouter::commitTransaction(
         return BSON("ok" << 1);
     }
 
+    bool allParticipantsReadOnly = true;
+    for (const auto& participant : _participants) {
+        uassert(ErrorCodes::NoSuchTransaction,
+                "Can't send commit unless all previous statements were successful",
+                participant.second.readOnly != Participant::ReadOnly::kUnset);
+        if (participant.second.readOnly == Participant::ReadOnly::kNotReadOnly) {
+            allParticipantsReadOnly = false;
+        }
+    }
+
+    // Make the single-shard commit path take precedence. The read-only optimization is only to skip
+    // two-phase commit for a read-only multi-shard transaction.
     if (_participants.size() == 1) {
         return _commitSingleShardTransaction(opCtx);
+    }
+
+    if (allParticipantsReadOnly) {
+        return _commitReadOnlyTransaction(opCtx);
     }
 
     return _commitMultiShardTransaction(opCtx);
