@@ -170,12 +170,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     invariant(opCtx->lockState()->isDbLockedForMode(name, MODE_X));
 
-    for (auto&& coll : *db) {
-        // It is the caller's responsibility to ensure that no index builds are active in the
-        // database.
-        invariant(!coll->getIndexCatalog()->haveAnyIndexesInProgress(),
-                  str::stream() << "An index is building on collection '" << coll->ns() << "'.");
-    }
+    BackgroundOperation::assertNoBgOpInProgForDb(name);
 
     audit::logDropDatabase(opCtx->getClient(), name);
 
@@ -237,13 +232,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
 
     std::set<std::string> dbs;
     for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
-        for (auto&& coll : *(i->second)) {
-            // It is the caller's responsibility to ensure that no index builds are active in the
-            // database.
-            invariant(!coll->getIndexCatalog()->haveAnyIndexesInProgress(),
-                      str::stream() << "An index is building on collection '" << coll->ns()
-                                    << "'.");
-        }
+        BackgroundOperation::assertNoBgOpInProgForDb(i->first);
         dbs.insert(i->first);
     }
 

@@ -1101,7 +1101,7 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto indexOp =
         buildIndex(fromjson("{loc: '2dsphere'}"), BSON("2dsphereIndexVersion" << 3), kUuid);
-    auto dropIndexOp = dropIndex("loc_index", kUuid);
+    auto dropIndexOp = dropIndex("loc_index");
     auto insertOp = insert(fromjson("{_id: 1, loc: 'hi'}"));
 
     auto ops = {indexOp, dropIndexOp, insertOp};
@@ -1174,7 +1174,7 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
 
     auto indexOp1 =
         buildIndex(fromjson("{x: 'text'}"), fromjson("{default_language: 'spanish'}"), kUuid);
-    auto dropIndexOp = dropIndex("x_index", kUuid);
+    auto dropIndexOp = dropIndex("x_index");
     auto indexOp2 =
         buildIndex(fromjson("{x: 'text'}"), fromjson("{default_language: 'english'}"), kUuid);
 
@@ -1209,7 +1209,7 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExi
 
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj(), kUuid);
-    auto dropIndexOp = dropIndex("x_index", kUuid);
+    auto dropIndexOp = dropIndex("x_index");
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 1}"));
 
     auto ops = {indexOp, dropIndexOp, insertOp};
@@ -1243,7 +1243,7 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenText
 
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
     auto indexOp = buildIndex(fromjson("{x: 'text'}"), fromjson("{language_override: 'y'}"), kUuid);
-    auto dropIndexOp = dropIndex("x_index", kUuid);
+    auto dropIndexOp = dropIndex("x_index");
     auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', y: 1}"));
 
     auto ops = {indexOp, dropIndexOp, insertOp};
@@ -1411,8 +1411,8 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
-    auto collModOp = makeCommandOplogEntry(nextOpTime(), nss, collModCmd, kUuid);
-    auto dropCollOp = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()), kUuid);
+    auto collModOp = makeCommandOplogEntry(nextOpTime(), nss, collModCmd);
+    auto dropCollOp = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
 
     auto ops = {collModOp, dropCollOp};
     testOpsAreIdempotent(ops);
@@ -1428,8 +1428,8 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
-    auto collModOp = makeCommandOplogEntry(nextOpTime(), nss, collModCmd, kUuid);
-    auto dropIndexOp = dropIndex("createdAt_index", kUuid);
+    auto collModOp = makeCommandOplogEntry(nextOpTime(), nss, collModCmd);
+    auto dropIndexOp = dropIndex("createdAt_index");
 
     auto ops = {collModOp, dropIndexOp};
     testOpsAreIdempotent(ops);

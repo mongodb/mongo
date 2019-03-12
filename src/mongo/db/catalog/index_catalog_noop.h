@@ -51,10 +51,6 @@ public:
         return false;
     }
 
-    bool haveAnyIndexesInProgress() const override {
-        return false;
-    }
-
     int numIndexesTotal(OperationContext* const opCtx) const override {
         return 0;
     }

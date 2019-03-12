@@ -39,7 +39,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -99,8 +98,6 @@ Status dropCollection(OperationContext* opCtx,
             int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
 
             BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
-            IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-                coll->uuid().get());
 
             Status s = systemCollectionMode ==
                     DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops

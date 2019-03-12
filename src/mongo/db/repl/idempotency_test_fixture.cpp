@@ -387,7 +387,7 @@ OplogEntry IdempotencyTest::update(IdType _id, const BSONObj& obj) {
 
 OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec,
                                        const BSONObj& options,
-                                       const UUID& uuid) {
+                                       UUID uuid) {
     BSONObjBuilder bob;
     bob.append("createIndexes", nss.coll());
     bob.append("v", 2);
@@ -397,9 +397,9 @@ OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec,
     return makeCommandOplogEntry(nextOpTime(), nss, bob.obj(), uuid);
 }
 
-OplogEntry IdempotencyTest::dropIndex(const std::string& indexName, const UUID& uuid) {
+OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
     auto cmd = BSON("dropIndexes" << nss.coll() << "index" << indexName);
-    return makeCommandOplogEntry(nextOpTime(), nss, cmd, uuid);
+    return makeCommandOplogEntry(nextOpTime(), nss, cmd);
 }
 
 std::string IdempotencyTest::computeDataHash(Collection* collection) {
@@ -431,19 +431,8 @@ std::string IdempotencyTest::computeDataHash(Collection* collection) {
 }
 
 CollectionState IdempotencyTest::validate() {
-    auto collUUID = [&]() -> OptionalCollectionUUID {
-        AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
-        if (auto collection = autoColl.getCollection()) {
-            return collection->uuid();
-        }
-        return boost::none;
-    }();
-
-    if (collUUID) {
-        // Allow in-progress indexes to complete before validating collection contents.
-        IndexBuildsCoordinator::get(_opCtx.get())
-            ->awaitNoIndexBuildInProgressForCollection(collUUID.get());
-    }
+    // Allow in-progress indexes to complete before validating collection contents.
+    IndexBuildsCoordinator::get(_opCtx.get())->awaitNoBgOpInProgForNs(_opCtx.get(), nss);
 
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
     auto collection = autoColl.getCollection();

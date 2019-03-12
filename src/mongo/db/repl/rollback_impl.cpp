@@ -43,7 +43,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
@@ -376,13 +375,10 @@ Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
     log() << "Waiting for all background operations to complete before starting rollback";
     for (auto db : dbNames) {
         auto numInProg = BackgroundOperation::numInProgForDb(db);
-        auto numInProgInCoordinator = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(db);
-        if (numInProg > 0 || numInProgInCoordinator > 0) {
-            LOG(1) << "Waiting for "
-                   << (numInProg > numInProgInCoordinator ? numInProg : numInProgInCoordinator)
+        if (numInProg > 0) {
+            LOG(1) << "Waiting for " << numInProg
                    << " background operations to complete on database '" << db << "'";
             BackgroundOperation::awaitNoBgOpInProgForDb(db);
-            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(db);
         }
 
         // Check for shutdown again.

@@ -45,7 +45,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
@@ -203,8 +202,6 @@ Status renameCollectionCommon(OperationContext* opCtx,
     }
 
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-        sourceColl->uuid().get());
 
     auto targetDB = databaseHolder->openDb(opCtx, target.db());
 
@@ -355,10 +352,6 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
             // No logOp necessary because the entire renameCollection command is one logOp.
             repl::UnreplicatedWritesBlock uwb(opCtx);
-
-            BackgroundOperation::assertNoBgOpInProgForNs(targetColl->ns().ns());
-            IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-                targetColl->uuid().get());
 
             status = targetDB->dropCollection(opCtx, targetColl->ns().ns(), renameOpTime);
             if (!status.isOK()) {

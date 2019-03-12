@@ -32,14 +32,12 @@
 
 #include "mongo/db/catalog/catalog_control.h"
 
-#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/util/log.h"
@@ -48,9 +46,6 @@ namespace mongo {
 namespace catalog {
 MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
-
-    BackgroundOperation::assertNoBgOpInProg();
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgress();
 
     MinVisibleTimestampMap minVisibleTimestampMap;
     std::vector<std::string> allDbs;

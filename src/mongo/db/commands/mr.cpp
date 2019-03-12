@@ -52,7 +52,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
@@ -177,20 +176,15 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
             [cleanupOpCtx, &tempNamespace] {
                 AutoGetDb autoDb(cleanupOpCtx, tempNamespace.db(), MODE_X);
                 if (auto db = autoDb.getDb()) {
-                    if (auto collection = db->getCollection(cleanupOpCtx, tempNamespace)) {
-                        uassert(ErrorCodes::PrimarySteppedDown,
-                                str::stream() << "no longer primary while dropping temporary "
-                                                 "collection for mapReduce: "
-                                              << tempNamespace.ns(),
-                                repl::ReplicationCoordinator::get(cleanupOpCtx)
-                                    ->canAcceptWritesFor(cleanupOpCtx, tempNamespace));
-                        BackgroundOperation::assertNoBgOpInProgForNs(tempNamespace.ns());
-                        IndexBuildsCoordinator::get(cleanupOpCtx)
-                            ->assertNoIndexBuildInProgForCollection(collection->uuid().get());
-                        WriteUnitOfWork wunit(cleanupOpCtx);
-                        uassertStatusOK(db->dropCollection(cleanupOpCtx, tempNamespace.ns()));
-                        wunit.commit();
-                    }
+                    WriteUnitOfWork wunit(cleanupOpCtx);
+                    uassert(ErrorCodes::PrimarySteppedDown,
+                            str::stream() << "no longer primary while dropping temporary "
+                                             "collection for mapReduce: "
+                                          << tempNamespace.ns(),
+                            repl::ReplicationCoordinator::get(cleanupOpCtx)
+                                ->canAcceptWritesFor(cleanupOpCtx, tempNamespace));
+                    uassertStatusOK(db->dropCollection(cleanupOpCtx, tempNamespace.ns()));
+                    wunit.commit();
                 }
             });
         // Always forget about temporary namespaces, so we don't cache lots of them
@@ -202,14 +196,9 @@ void dropTempCollections(OperationContext* cleanupOpCtx,
                 Lock::DBLock lk(cleanupOpCtx, incLong.db(), MODE_X);
                 auto databaseHolder = DatabaseHolder::get(cleanupOpCtx);
                 if (auto db = databaseHolder->getDb(cleanupOpCtx, incLong.ns())) {
-                    if (auto collection = db->getCollection(cleanupOpCtx, incLong)) {
-                        BackgroundOperation::assertNoBgOpInProgForNs(incLong.ns());
-                        IndexBuildsCoordinator::get(cleanupOpCtx)
-                            ->assertNoIndexBuildInProgForCollection(collection->uuid().get());
-                        WriteUnitOfWork wunit(cleanupOpCtx);
-                        uassertStatusOK(db->dropCollection(cleanupOpCtx, incLong.ns()));
-                        wunit.commit();
-                    }
+                    WriteUnitOfWork wunit(cleanupOpCtx);
+                    uassertStatusOK(db->dropCollection(cleanupOpCtx, incLong.ns()));
+                    wunit.commit();
                 }
             });
 

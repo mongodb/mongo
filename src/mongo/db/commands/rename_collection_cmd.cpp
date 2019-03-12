@@ -80,6 +80,14 @@ public:
         return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
+    static void dropCollection(OperationContext* opCtx, Database* db, StringData collName) {
+        WriteUnitOfWork wunit(opCtx);
+        if (db->dropCollection(opCtx, collName).isOK()) {
+            // ignoring failure case
+            wunit.commit();
+        }
+    }
+
     virtual bool errmsgRun(OperationContext* opCtx,
                            const string& dbname,
                            const BSONObj& cmdObj,

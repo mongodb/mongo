@@ -45,7 +45,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -96,8 +95,6 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     }
 
     BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
-    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-        collection->uuid().get());
 
     WriteUnitOfWork wuow(opCtx);
 
@@ -261,7 +258,6 @@ void convertToCapped(OperationContext* opCtx,
         ErrorCodes::NamespaceNotFound, str::stream() << "database " << dbname << " not found", db);
 
     BackgroundOperation::assertNoBgOpInProgForDb(dbname);
-    IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbname);
 
     // Generate a temporary collection name that will not collide with any existing collections.
     auto tmpNameResult =

@@ -315,9 +315,6 @@ public:
      * removes all documents as fast as possible
      * indexes before and after will be the same
      * as will other characteristics.
-     *
-     * The caller should hold a collection X lock and ensure there are no index builds in progress
-     * on the collection.
      */
     virtual Status truncate(OperationContext* const opCtx) = 0;
 
@@ -346,9 +343,6 @@ public:
      * collection.  The collection cannot be completely emptied using this
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
-     *
-     * The caller should hold a collection X lock and ensure there are no index builds in progress
-     * on the collection.
      */
     virtual void cappedTruncateAfter(OperationContext* const opCtx,
                                      RecordId end,

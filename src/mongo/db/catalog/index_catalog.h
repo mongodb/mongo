@@ -218,8 +218,6 @@ public:
 
     virtual bool haveAnyIndexes() const = 0;
 
-    virtual bool haveAnyIndexesInProgress() const = 0;
-
     virtual int numIndexesTotal(OperationContext* const opCtx) const = 0;
 
     virtual int numIndexesReady(OperationContext* const opCtx) const = 0;
@@ -303,9 +301,6 @@ public:
      * Use this method to notify the IndexCatalog that the spec for this index has changed.
      *
      * It is invalid to dereference 'oldDesc' after calling this method.
-     *
-     * The caller must hold the collection X lock and ensure no index builds are in progress
-     * on the collection.
      */
     virtual const IndexDescriptor* refreshEntry(OperationContext* const opCtx,
                                                 const IndexDescriptor* const oldDesc) = 0;
@@ -377,12 +372,6 @@ public:
                                 stdx::function<void(const IndexDescriptor*)> onDropFn) = 0;
     virtual void dropAllIndexes(OperationContext* opCtx, bool includingIdIndex) = 0;
 
-    /**
-     * Drops the index.
-     *
-     * The caller must hold the collection X lock and ensure no index builds are in progress on the
-     * collection.
-     */
     virtual Status dropIndex(OperationContext* const opCtx, const IndexDescriptor* const desc) = 0;
 
     /**

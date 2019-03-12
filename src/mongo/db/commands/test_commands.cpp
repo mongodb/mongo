@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/service_context.h"
@@ -169,10 +168,6 @@ public:
                 }
             }
         }
-
-        BackgroundOperation::assertNoBgOpInProgForNs(fullNs.ns());
-        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            collection->uuid().get());
 
         collection->cappedTruncateAfter(opCtx, end, inc);
 

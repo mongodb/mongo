@@ -1981,7 +1981,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 Lock::TempRelease release(opCtx->lockState());
 
                 BackgroundOperation::awaitNoBgOpInProgForDb(nss.db());
-                IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(nss.db());
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
                 break;
@@ -1993,16 +1992,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 invariant(cmd);
 
                 // TODO: This parse could be expensive and not worth it.
-                auto ns =
-                    cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns().toString();
-                auto swUUID = UUID::parse(fieldUI);
-                if (!swUUID.isOK()) {
-                    error() << "Failed command " << redact(o) << " on " << ns << " with status "
-                            << swUUID.getStatus() << "during oplog application. Expected a UUID.";
-                }
-                BackgroundOperation::awaitNoBgOpInProgForNs(ns);
-                IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
-                    swUUID.getValue());
+                BackgroundOperation::awaitNoBgOpInProgForNs(
+                    cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns().toString());
 
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
