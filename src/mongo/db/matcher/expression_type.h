@@ -34,6 +34,20 @@
 
 namespace mongo {
 
+/**
+ * Types of the encryption payload.
+ */
+enum FleBlobSubtype { IntentToEncrypt = 0, Deterministic = 1, Random = 2 };
+
+/**
+ * The structure represents how data is laid out in an encrypted payload.
+ */
+struct FleBlobHeader {
+    int8_t fleBlobSubtype;
+    int8_t keyUUID[16];
+    int8_t originalBsonType;
+};
+
 template <class T>
 class TypeMatchExpressionBase : public LeafMatchExpression {
 public:
@@ -165,8 +179,6 @@ public:
                               ElementPath::NonLeafArrayBehavior::kTraverse),
           _binDataSubType(binDataSubType) {}
 
-    virtual ~InternalSchemaBinDataSubTypeExpression() = default;
-
     StringData name() const {
         return kName;
     }
@@ -222,5 +234,101 @@ private:
     }
 
     BinDataType _binDataSubType;
+};
+
+/**
+ * Implements matching semantics for the JSON Schema keyword encrypt.bsonType. A document
+ * matches successfully if a field is encrypted and the encrypted payload indicates the
+ * original BSON element matches the specified type.
+ */
+class InternalSchemaBinDataEncryptedTypeExpression final : public LeafMatchExpression {
+public:
+    static constexpr StringData kName = "$_internalSchemaBinDataEncryptedType"_sd;
+
+    InternalSchemaBinDataEncryptedTypeExpression(StringData path, BSONType encryptedType)
+        : LeafMatchExpression(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE,
+                              path,
+                              ElementPath::LeafArrayBehavior::kNoTraversal,
+                              ElementPath::NonLeafArrayBehavior::kTraverse),
+          _encryptedType(encryptedType) {}
+
+    StringData name() const {
+        return kName;
+    }
+
+    bool matchesSingleElement(const BSONElement& elem,
+                              MatchDetails* details = nullptr) const final {
+        if (elem.type() != BSONType::BinData)
+            return false;
+        if (elem.binDataType() != BinDataType::Encrypt)
+            return false;
+
+        int binDataLen;
+        auto binData = elem.binData(binDataLen);
+        if (!binDataLen)
+            return false;
+
+        auto fleBlobSubType = binData[0];
+        switch (fleBlobSubType) {
+            case FleBlobSubtype::IntentToEncrypt:
+                return false;
+            case FleBlobSubtype::Deterministic:
+            case FleBlobSubtype::Random: {
+                // Verify the type of the encrypted data.
+                auto fleBlob = reinterpret_cast<const FleBlobHeader*>(binData);
+                return fleBlob->originalBsonType == _encryptedType;
+            }
+            default:
+                uasserted(33118,
+                          str::stream() << "unexpected subtype " << static_cast<int>(fleBlobSubType)
+                                        << " of encrypted binary data (0, 1 and 2 are allowed)");
+        }
+    }
+
+    std::unique_ptr<MatchExpression> shallowClone() const final {
+        auto expr =
+            stdx::make_unique<InternalSchemaBinDataEncryptedTypeExpression>(path(), _encryptedType);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        return std::move(expr);
+    }
+
+    void debugString(StringBuilder& debug, int level) const final {
+        _debugAddSpace(debug, level);
+        debug << path() << " " << name() << ": " << typeName(_encryptedType);
+
+        if (auto td = getTag()) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+        debug << "\n";
+    }
+
+    BSONObj getSerializedRightHandSide() const final {
+        BSONObjBuilder bob;
+        bob.append(name(), _encryptedType);
+        return bob.obj();
+    }
+
+    bool equivalent(const MatchExpression* other) const final {
+        if (matchType() != other->matchType())
+            return false;
+
+        auto realOther = static_cast<const InternalSchemaBinDataEncryptedTypeExpression*>(other);
+
+        if (path() != realOther->path()) {
+            return false;
+        }
+
+        return _encryptedType == realOther->_encryptedType;
+    }
+
+private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+
+    BSONType _encryptedType;
 };
 }  // namespace mongo

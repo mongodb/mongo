@@ -1871,6 +1871,23 @@ TEST(JSONSchemaParserTest, EncryptTranslatesCorrectly) {
         })"));
 }
 
+TEST(JSONSchemaParserTest, EncryptWithBsonTypeTranslatesCorrectly) {
+    BSONObj schema = fromjson("{properties: {foo: {encrypt: {bsonType: \"string\"}}}}");
+    auto result = JSONSchemaParser::parse(schema);
+    ASSERT_OK(result.getStatus());
+    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
+        {
+        $or:
+            [{foo: {$not: {$exists: true}}}, {
+                $and:
+                    [ {foo: {$_internalSchemaBinDataSubType: 6}},
+                    {foo: {$_internalSchemaBinDataEncryptedType: 2}},
+                    {foo: {$_internalSchemaType: [5]}}]
+            }]
+        })"));
+}
+
 TEST(JSONSchemaParserTest, TopLevelEncryptTranslatesCorrectly) {
     BSONObj schema = fromjson("{encrypt: {}}");
     auto result = JSONSchemaParser::parse(schema);
@@ -2004,7 +2021,7 @@ TEST(JSONSchemaParserTest, FailsToParseWithBadBSONType) {
     auto schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType"
                                                                             << "Stringx"))));
     auto result = JSONSchemaParser::parse(schema);
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 
     schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType" << 1))));
     result = JSONSchemaParser::parse(schema);
