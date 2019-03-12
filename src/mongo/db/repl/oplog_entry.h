@@ -140,7 +140,7 @@ public:
     BSONObj getOperationToApply() const;
 
     /**
-     * Returns the type of command of the oplog entry. Must be called on a command op.
+     * Returns the type of command of the oplog entry. If it is not a command, returns kNotCommand.
      */
     CommandType getCommandType() const;
 
