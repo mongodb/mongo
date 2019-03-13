@@ -29,6 +29,7 @@
     rst.startSet();
     let config = rst.getReplSetConfig();
     config.members[2].priority = 0;
+    config.settings = {chainingAllowed: false};
     rst.initiate(config);
 
     // Prior to 4.0, rollback imposed a 300 MB limit on the total size of documents to refetch from
