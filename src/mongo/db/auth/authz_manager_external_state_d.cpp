@@ -61,9 +61,6 @@ AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(AuthorizationMana
 
 class AuthzLock : public AuthzManagerExternalState::StateLock {
 public:
-    // TODO When SERVER-39289 is done, we should fassert if we are in an active storage engine
-    // transaction when the AuthzLock is first acquired. We do not want to mix authz database
-    // operations with user database operations.
     explicit AuthzLock(OperationContext* opCtx)
         : _lock(opCtx,
                 AuthorizationManager::usersCollectionNamespace.db(),
@@ -117,18 +114,6 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
         *result = found.getOwned();
         return Status::OK();
     }
-
-    // Calling findOne starts a storage engine transaction/snapshot if one hasn't been started
-    // already. Since we are not holding a lock on the authz collections between calls to
-    // findOne(), the minimum valid timestamp may change between calls and trying to re-use the
-    // old snapshot may cause an invariant in the storage engine.
-    //
-    // See SERVER-38071
-    const auto recoveryUnit = opCtx->recoveryUnit();
-    if (recoveryUnit) {
-        recoveryUnit->abandonSnapshot();
-    }
-
     return Status(ErrorCodes::NoMatchingDocument,
                   mongoutils::str::stream() << "No document in " << collectionName.ns()
                                             << " matches "
