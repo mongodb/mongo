@@ -139,6 +139,7 @@ namespace shell_utils {
 std::string dbConnect;
 
 static const char* argv0 = 0;
+EnterpriseShellCallback* enterpriseCallback = nullptr;
 
 void RecordMyLocation(const char* _argv0) {
     argv0 = _argv0;
@@ -377,6 +378,16 @@ void installShellUtils(Scope& scope) {
 #endif
 }
 
+void setEnterpriseShellCallback(EnterpriseShellCallback* callback) {
+    enterpriseCallback = callback;
+}
+
+void initializeEnterpriseScope(Scope& scope) {
+    if (enterpriseCallback != nullptr) {
+        enterpriseCallback(scope);
+    }
+}
+
 void initScope(Scope& scope) {
     // Need to define this method before JSFiles::utils is executed.
     scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
@@ -391,6 +402,8 @@ void initScope(Scope& scope) {
     scope.execSetup(JSFiles::servers_misc);
     scope.execSetup(JSFiles::replsettest);
     scope.execSetup(JSFiles::bridge);
+
+    initializeEnterpriseScope(scope);
 
     scope.injectNative("benchRun", BenchRunner::benchRunSync);
     scope.injectNative("benchRunSync", BenchRunner::benchRunSync);

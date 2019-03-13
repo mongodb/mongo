@@ -46,6 +46,7 @@ class DBClientBase;
 namespace shell_utils {
 
 extern std::string dbConnect;
+using EnterpriseShellCallback = void(Scope&);
 
 void RecordMyLocation(const char* _argv0);
 void installShellUtils(Scope& scope);
@@ -54,6 +55,8 @@ void initScope(Scope& scope);
 void onConnect(DBClientBase& c);
 
 boost::filesystem::path getHistoryFilePath();
+void setEnterpriseShellCallback(EnterpriseShellCallback* callback);
+
 
 BSONElement singleArg(const BSONObj& args);
 extern const BSONObj undefinedReturn;
