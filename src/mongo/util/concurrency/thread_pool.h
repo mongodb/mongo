@@ -201,7 +201,7 @@ private:
      * Executes one task from _pendingTasks. "lk" must own _mutex, and _pendingTasks must have at
      * least one entry.
      */
-    void _doOneTask(stdx::unique_lock<stdx::mutex>* lk);
+    void _doOneTask(stdx::unique_lock<stdx::mutex>* lk) noexcept;
 
     /**
      * Changes the lifecycle state (_state) of the pool and wakes up any threads waiting for a state

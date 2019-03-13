@@ -148,7 +148,7 @@ void NetworkInterfaceThreadPool::_consumeTasks(stdx::unique_lock<stdx::mutex> lk
     invariant(ret.isOK() || ErrorCodes::isShutdownError(ret.code()));
 }
 
-void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<stdx::mutex> lk) {
+void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<stdx::mutex> lk) noexcept {
     _consumeState = ConsumeState::kConsuming;
     const auto consumingTasksGuard = makeGuard([&] { _consumeState = ConsumeState::kNeutral; });
 
@@ -162,12 +162,7 @@ void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<stdx::mut
         const auto lkGuard = makeGuard([&] { lk.lock(); });
 
         for (auto&& task : tasks) {
-            try {
-                task();
-            } catch (...) {
-                severe() << "Exception escaped task in network interface thread pool";
-                std::terminate();
-            }
+            task();
         }
 
         tasks.clear();

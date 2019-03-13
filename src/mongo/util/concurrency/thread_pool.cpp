@@ -130,14 +130,8 @@ void ThreadPool::_shutdown_inlock() {
 }
 
 void ThreadPool::join() {
-    try {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        _join_inlock(&lk);
-    } catch (...) {
-        severe() << "Exception escaped join in thread pool " << _options.poolName << ": "
-                 << exceptionToStatus();
-        std::terminate();
-    }
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _join_inlock(&lk);
 }
 
 void ThreadPool::_join_inlock(stdx::unique_lock<stdx::mutex>* lk) {
@@ -244,13 +238,7 @@ void ThreadPool::_workerThreadBody(ThreadPool* pool, const std::string& threadNa
     pool->_options.onCreateThread(threadName);
     const auto poolName = pool->_options.poolName;
     LOG(1) << "starting thread in pool " << poolName;
-    try {
-        pool->_consumeTasks();
-    } catch (...) {
-        severe() << "Exception reached top of stack in thread pool " << poolName << ": "
-                 << exceptionToStatus();
-        std::terminate();
-    }
+    pool->_consumeTasks();
 
     // At this point, another thread may have destroyed "pool", if this thread chose to detach
     // itself and remove itself from pool->_threads before releasing pool->_mutex.  Do not access
@@ -337,24 +325,18 @@ void ThreadPool::_consumeTasks() {
     fassertFailedNoTrace(28703);
 }
 
-void ThreadPool::_doOneTask(stdx::unique_lock<stdx::mutex>* lk) {
+void ThreadPool::_doOneTask(stdx::unique_lock<stdx::mutex>* lk) noexcept {
     invariant(!_pendingTasks.empty());
-    try {
-        LOG(3) << "Executing a task on behalf of pool " << _options.poolName;
-        Task task = std::move(_pendingTasks.front());
-        _pendingTasks.pop_front();
-        --_numIdleThreads;
-        lk->unlock();
-        task();
-        lk->lock();
-        ++_numIdleThreads;
-        if (_pendingTasks.empty() && _threads.size() == _numIdleThreads) {
-            _poolIsIdle.notify_all();
-        }
-    } catch (...) {
-        severe() << "Exception escaped task in thread pool " << _options.poolName << ": "
-                 << exceptionToStatus();
-        std::terminate();
+    LOG(3) << "Executing a task on behalf of pool " << _options.poolName;
+    Task task = std::move(_pendingTasks.front());
+    _pendingTasks.pop_front();
+    --_numIdleThreads;
+    lk->unlock();
+    task();
+    lk->lock();
+    ++_numIdleThreads;
+    if (_pendingTasks.empty() && _threads.size() == _numIdleThreads) {
+        _poolIsIdle.notify_all();
     }
 }
 

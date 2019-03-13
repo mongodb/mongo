@@ -61,7 +61,7 @@ public:
 
 private:
     void _consumeTasks(stdx::unique_lock<stdx::mutex> lk);
-    void _consumeTasksInline(stdx::unique_lock<stdx::mutex> lk);
+    void _consumeTasksInline(stdx::unique_lock<stdx::mutex> lk) noexcept;
     void _dtorImpl();
 
     NetworkInterface* const _net;

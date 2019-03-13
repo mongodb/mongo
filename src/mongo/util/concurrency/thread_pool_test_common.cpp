@@ -151,11 +151,15 @@ COMMON_THREAD_POOL_DEATH_TEST(DieOnDoubleStartUp, "it has already started") {
     pool.startup();
 }
 
-COMMON_THREAD_POOL_DEATH_TEST(DieWhenExceptionBubblesUp, "Exception escaped task in") {
+namespace {
+constexpr auto kExceptionMessage = "No good very bad exception";
+}
+
+COMMON_THREAD_POOL_DEATH_TEST(DieWhenExceptionBubblesUp, kExceptionMessage) {
     auto& pool = getThreadPool();
     pool.startup();
     ASSERT_OK(pool.schedule([] {
-        uassertStatusOK(Status({ErrorCodes::BadValue, "No good very bad exception"}));
+        uassertStatusOK(Status({ErrorCodes::BadValue, kExceptionMessage}));
     }));
     pool.shutdown();
     pool.join();
