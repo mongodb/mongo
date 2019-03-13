@@ -226,9 +226,6 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
     {
         stdx::lock_guard<stdx::mutex> lk(service->_mutex);
         invariant(service->_clients.erase(client));
-        if (service->_clients.empty()) {
-            service->_clientsEmptyCondVar.notify_all();
-        }
     }
     onDestroy(client, service->_clientObservers);
     delete client;
@@ -341,14 +338,6 @@ void ServiceContext::registerKillOpListener(KillOpListenerInterface* listener) {
 void ServiceContext::waitForStartupComplete() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _startupCompleteCondVar.wait(lk, [this] { return _startupComplete; });
-}
-
-void ServiceContext::waitForClientsToFinish() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    for (const auto& client : _clients) {
-        log() << "Waiting for client " << client->desc() << " to exit";
-    }
-    _clientsEmptyCondVar.wait(lk, [this] { return _clients.empty(); });
 }
 
 void ServiceContext::notifyStartupComplete() {

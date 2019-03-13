@@ -421,14 +421,6 @@ public:
      */
     void waitForStartupComplete();
 
-    /**
-     * Wait for all clients to complete and unregister themselves. Shutting-down, unmanaged threads
-     * may potentially be unable to acquire the service context mutex before the service context
-     * itself does on destruction.
-     * Used for testing.
-     */
-    void waitForClientsToFinish();
-
     /*
      * Marks initialization as complete and all transport layers as started.
      */
@@ -569,7 +561,6 @@ private:
      */
     std::vector<ClientObserverHolder> _clientObservers;
     ClientSet _clients;
-    stdx::condition_variable _clientsEmptyCondVar;
 
     /**
      * The registered OpObserver.
