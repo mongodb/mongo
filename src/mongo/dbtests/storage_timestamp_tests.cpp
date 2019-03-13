@@ -48,6 +48,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer_registry.h"
@@ -1403,6 +1404,7 @@ public:
         ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
 
         _coordinatorMock->alwaysAllowWrites(false);
+        ASSERT_OK(_coordinatorMock->setFollowerMode({repl::MemberState::MS::RS_STARTUP2}));
 
         const LogicalTime pastTime = _clock->reserveTicks(1);
         const LogicalTime insertTime0 = _clock->reserveTicks(1);
@@ -1466,12 +1468,7 @@ public:
         repl::OplogApplier::Options options;
         options.allowNamespaceNotFoundErrorsOnCrudOps = true;
         options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
-        // TODO (SERVER-39982): The use of the skipWritesToOplog setting to build the indexes in
-        // the foreground should be considered a temporary fix.
-        // SERVER-39982 tracks the work for investigating whether it is possible to remove this
-        // temporary fix and only will remove it if it is possible, because we do not know the
-        // underlying cause of the failure yet.
-        options.skipWritesToOplog = true;
+
         repl::OplogApplierImpl oplogApplier(
             nullptr,  // task executor. not required for multiApply().
             nullptr,  // oplog buffer. not required for multiApply().
@@ -1484,9 +1481,24 @@ public:
         auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
+        // Wait for the index build to finish before making any assertions.
+        IndexBuildsCoordinator::get(_opCtx)->awaitNoBgOpInProgForNs(_opCtx, nss);
+
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
-        assertMultikeyPaths(
-            _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), false, {{}});
+
+        // It is not valid to read the multikey state earlier than the 'minimumVisibleTimestamp',
+        // so at least assert that it has been updated due to the index creation.
+        ASSERT_GT(autoColl.getCollection()->getMinimumVisibleSnapshot().get(),
+                  pastTime.asTimestamp());
+
+        // Reading the multikey state before 'insertTime0' is not valid or reliable to test. If the
+        // background index build intercepts and drains writes during inital sync, the index write
+        // and the write to the multikey path state will not be timestamped. This write is not
+        // timestamped because the lastApplied timestamp, which would normally be used on a primary
+        // or secondary, is not always available during initial sync.
+        // Additionally, it is not valid to read at a timestamp before inital sync completes, so
+        // these assertions below only make sense in the context of this unit test, but would
+        // otherwise not be exercised in any normal scenario.
         assertMultikeyPaths(
             _opCtx, autoColl.getCollection(), indexName, insertTime0.asTimestamp(), true, {{0}});
         assertMultikeyPaths(
