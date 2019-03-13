@@ -242,6 +242,7 @@ variables:
         system-resource-info.tgz
         ${report_file|src/report.json}
         ${archive_file|src/archive.json}
+  setup_group_can_fail_task: true
   setup_group:
   - func: "kill processes"
   - func: "cleanup environment"
@@ -1853,6 +1854,8 @@ functions:
         do
           kill_process "$process"
         done
+
+        exit 0
 
   "run kitchen":
     command: shell.exec
@@ -4234,7 +4237,7 @@ tasks:
 
           if [ "${is_release|false}" != "true" ]; then
               echo "Not a release build"
-              exit 0 
+              exit 0
           fi
 
           sed s/@VERSION@/1.13.0/g src/src/mongo/embedded/mongoc_embedded/mongo-embedded-c-driver.podspec.in | tee mongo-embedded-c-driver.podspec
@@ -6979,18 +6982,21 @@ task_groups:
   - dbtest
   - compile_all
 - name: embedded_sdk_build_and_test
+  setup_group_can_fail_task: true
   setup_group:
     - command: manifest.load
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
+    - func: "set up virtualenv"
+    - func: "set task expansion macros"
+    - func: "install pip requirements"
     - func: "generate compile expansions"
   teardown_group:
     - func: "scons cache pruning"
     - func: "umount shared scons directory"
   setup_task:
-    - func: "set up virtualenv"
     - func: "set task expansion macros"
     - func: "apply compile expansions"
   teardown_task:
