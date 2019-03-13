@@ -105,7 +105,8 @@ class TransactionCoordinatorDriverTest : public TransactionCoordinatorTestBase {
 protected:
     void setUp() override {
         TransactionCoordinatorTestBase::setUp();
-        _driver.emplace(getServiceContext());
+        _driver.emplace(getServiceContext(),
+                        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()));
     }
 
     void tearDown() override {

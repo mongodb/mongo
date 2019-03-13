@@ -91,7 +91,8 @@ class TransactionCoordinatorDriver {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorDriver);
 
 public:
-    TransactionCoordinatorDriver(ServiceContext* serviceContext);
+    TransactionCoordinatorDriver(ServiceContext* serviceContext,
+                                 std::unique_ptr<txn::AsyncWorkScheduler> scheduler);
     ~TransactionCoordinatorDriver();
 
     /**

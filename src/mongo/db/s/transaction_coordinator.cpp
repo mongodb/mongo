@@ -79,7 +79,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
       _lsid(lsid),
       _txnNumber(txnNumber),
       _scheduler(std::move(scheduler)),
-      _driver(serviceContext) {
+      _driver(serviceContext, _scheduler->makeChildScheduler()) {
     if (coordinateCommitDeadline) {
         _deadlineScheduler = _scheduler->makeChildScheduler();
         _deadlineScheduler
@@ -118,7 +118,7 @@ void TransactionCoordinator::runCommit(std::vector<ShardId> participantShards) {
         .then([this, participantShards](CoordinatorCommitDecision decision) {
             return _runPhaseTwo(participantShards, decision);
         })
-        .getAsync([this](Status s) { _handleCompletionStatus(s); });
+        .getAsync([this](Status s) { _handleCompletionError(s); });
 }
 
 void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument& doc) {
@@ -148,7 +148,7 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
         .then([this, participantShards](CoordinatorCommitDecision decision) {
             return _runPhaseTwo(participantShards, decision);
         })
-        .getAsync([this](Status s) { _handleCompletionStatus(s); });
+        .getAsync([this](Status s) { _handleCompletionError(s); });
 }
 
 Future<void> TransactionCoordinator::onCompletion() {
@@ -245,7 +245,7 @@ Future<void> TransactionCoordinator::_sendDecisionToParticipants(
     MONGO_UNREACHABLE;
 };
 
-void TransactionCoordinator::_handleCompletionStatus(Status s) {
+void TransactionCoordinator::_handleCompletionError(Status s) {
     if (s.isOK()) {
         return;
     }
@@ -259,6 +259,15 @@ void TransactionCoordinator::_handleCompletionStatus(Status s) {
     // propagate it to callers of runCommit
     if (!_decisionPromise.getFuture().isReady()) {
         invariant(_state == CoordinatorState::kPreparing);
+
+        // TransactionCoordinatorSteppingDown indicates the *sending* node (that is, *this* node) is
+        // stepping down. Active coordinator tasks are interrupted with this code instead of
+        // InterruptedDueToStepDown, because InterruptedDueToStepDown indicates the *receiving*
+        // node was stepping down.
+        if (s == ErrorCodes::TransactionCoordinatorSteppingDown) {
+            s = Status(ErrorCodes::InterruptedDueToStepDown, s.reason());
+        }
+
         _decisionPromise.setError(s == ErrorCodes::TransactionCoordinatorReachedAbortDecision
                                       ? Status{ErrorCodes::InterruptedDueToStepDown, s.reason()}
                                       : s);

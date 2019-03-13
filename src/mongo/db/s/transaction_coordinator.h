@@ -181,7 +181,7 @@ private:
     /**
      * Helper for handling errors that occur during either phase of commit coordination.
      */
-    void _handleCompletionStatus(Status s);
+    void _handleCompletionError(Status s);
 
     /**
      * Notifies all callers of onCompletion that the commit process has completed by fulfilling

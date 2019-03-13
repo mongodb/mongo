@@ -153,9 +153,9 @@ bool shouldRetryCommandAgainstShard(const ShardId& shardId,
 
 }  // namespace
 
-TransactionCoordinatorDriver::TransactionCoordinatorDriver(ServiceContext* serviceContext)
-    : _serviceContext(serviceContext),
-      _scheduler(std::make_unique<txn::AsyncWorkScheduler>(serviceContext)) {}
+TransactionCoordinatorDriver::TransactionCoordinatorDriver(
+    ServiceContext* serviceContext, std::unique_ptr<txn::AsyncWorkScheduler> scheduler)
+    : _serviceContext(serviceContext), _scheduler(std::move(scheduler)) {}
 
 TransactionCoordinatorDriver::~TransactionCoordinatorDriver() = default;
 
