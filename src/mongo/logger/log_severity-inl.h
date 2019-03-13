@@ -48,7 +48,9 @@ LogSeverity LogSeverity::Log() {
     return LogSeverity(0);
 }
 LogSeverity LogSeverity::Debug(int debugLevel) {
-    return LogSeverity(debugLevel);
+    // It would be appropriate to use std::max or std::clamp instead,
+    // but it seems better not to drag in all of <algorithm> here.
+    return LogSeverity(debugLevel > kMaxDebugLevel ? kMaxDebugLevel : debugLevel);
 }
 
 LogSeverity LogSeverity::cast(int ll) {

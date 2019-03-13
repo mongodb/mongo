@@ -92,7 +92,8 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
     getDateFormatter()(os, event.getDate());
     os << ' ';
 
-    os << event.getSeverity().toChar();
+    const auto severity = event.getSeverity();
+    os << severity.toStringDataCompact();
     os << ' ';
 
     LogComponent component = event.getComponent();

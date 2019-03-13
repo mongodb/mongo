@@ -393,18 +393,18 @@ TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogSeverity) {
     const auto ctx = "WHAT"_sd;
     const auto msg = "HUH"_sd;
     // Severe is indicated by (F)atal.
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Severe(), ctx, msg), " F ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Error(), ctx, msg), " E ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Warning(), ctx, msg), " W ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Info(), ctx, msg), " I ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Log(), ctx, msg), " I ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(0), ctx, msg), " I ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(1), ctx, msg), " D ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(2), ctx, msg), " D ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(3), ctx, msg), " D ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(4), ctx, msg), " D ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(5), ctx, msg), " D ");
-    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(100), ctx, msg), " D ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Severe(), ctx, msg), " F  ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Error(), ctx, msg), " E  ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Warning(), ctx, msg), " W  ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Info(), ctx, msg), " I  ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Log(), ctx, msg), " I  ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(0), ctx, msg), " I  ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(1), ctx, msg), " D1 ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(2), ctx, msg), " D2 ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(3), ctx, msg), " D3 ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(4), ctx, msg), " D4 ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(5), ctx, msg), " D5 ");
+    testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Debug(100), ctx, msg), " D5 ");
     // Unknown severity.
     testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Severe().moreSevere(), ctx, msg),
                        " U ");
@@ -418,7 +418,7 @@ TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogComponent) {
     for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
         LogComponent component = static_cast<LogComponent::Value>(i);
         testEncodedLogLine(MessageEventEphemeral(d, LogSeverity::Info(), component, ctx, msg),
-                           str::stream() << " I " << component.getNameForLog() << " [");
+                           str::stream() << " I  " << component.getNameForLog() << " [");
     }
 }
 
@@ -462,56 +462,60 @@ TEST_F(LogTestDetailsEncoder, LogFunctions) {
     // severe() - no component specified.
     severe() << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentDefault.getNameForLog()),
-                      std::string::npos);
+    ASSERT_NOT_EQUALS(
+        _logLines[0].find(str::stream() << " F  " << componentDefault.getNameForLog()),
+        std::string::npos);
 
     // severe() - with component.
     _logLines.clear();
     severe(componentA) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentA.getNameForLog()),
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F  " << componentA.getNameForLog()),
                       std::string::npos);
 
     // error() - no component specified.
     _logLines.clear();
     error() << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentDefault.getNameForLog()),
-                      std::string::npos);
+    ASSERT_NOT_EQUALS(
+        _logLines[0].find(str::stream() << " E  " << componentDefault.getNameForLog()),
+        std::string::npos);
 
     // error() - with component.
     _logLines.clear();
     error(componentA) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentA.getNameForLog()),
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E  " << componentA.getNameForLog()),
                       std::string::npos);
 
     // warning() - no component specified.
     _logLines.clear();
     warning() << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentDefault.getNameForLog()),
-                      std::string::npos);
+    ASSERT_NOT_EQUALS(
+        _logLines[0].find(str::stream() << " W  " << componentDefault.getNameForLog()),
+        std::string::npos);
 
     // warning() - with component.
     _logLines.clear();
     warning(componentA) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentA.getNameForLog()),
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W  " << componentA.getNameForLog()),
                       std::string::npos);
 
     // log() - no component specified.
     _logLines.clear();
     log() << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentDefault.getNameForLog()),
-                      std::string::npos);
+    ASSERT_NOT_EQUALS(
+        _logLines[0].find(str::stream() << " I  " << componentDefault.getNameForLog()),
+        std::string::npos);
 
     // log() - with component.
     _logLines.clear();
     log(componentA) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
-    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentA.getNameForLog()),
+    ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I  " << componentA.getNameForLog()),
                       std::string::npos);
 }
 

@@ -37,12 +37,18 @@ namespace mongo {
 namespace logger {
 
 namespace {
+
 constexpr auto unknownSeverityString = "UNKNOWN"_sd;
 constexpr auto severeSeverityString = "SEVERE"_sd;
 constexpr auto errorSeverityString = "ERROR"_sd;
 constexpr auto warningSeverityString = "warning"_sd;
 constexpr auto infoSeverityString = "info"_sd;
 constexpr auto debugSeverityString = "debug"_sd;
+
+constexpr StringData kDebugLevelStrings[LogSeverity::kMaxDebugLevel] = {
+    "D1"_sd, "D2"_sd, "D3"_sd, "D4"_sd, "D5"_sd,
+};
+
 }  // namespace
 
 StringData LogSeverity::toStringData() const {
@@ -61,24 +67,26 @@ StringData LogSeverity::toStringData() const {
     return unknownSeverityString;
 }
 
-char LogSeverity::toChar() const {
-    if (_severity > 0)
-        return 'D';
+StringData LogSeverity::toStringDataCompact() const {
+
+    if ((*this == LogSeverity::Log()) || (*this == LogSeverity::Info()))
+        return "I "_sd;
+
+    if ((_severity > 0) && (_severity <= kMaxDebugLevel))
+        return kDebugLevelStrings[_severity - 1];
+
+    if (*this == LogSeverity::Warning())
+        return "W "_sd;
+
+    if (*this == LogSeverity::Error())
+        return "E "_sd;
+
     // 'S' might be confused with "Success"
     // Return 'F' to imply Fatal instead.
     if (*this == LogSeverity::Severe())
-        return 'F';
-    if (*this == LogSeverity::Error())
-        return 'E';
-    if (*this == LogSeverity::Warning())
-        return 'W';
-    if (*this == LogSeverity::Info())
-        return 'I';
-    if (*this == LogSeverity::Log())
-        return 'I';
-    // Should not reach here - returning 'U' for Unknown severity
-    // to be consistent with toStringData().
-    return 'U';
+        return "F "_sd;
+
+    return "U "_sd;
 }
 
 std::ostream& operator<<(std::ostream& os, LogSeverity severity) {
