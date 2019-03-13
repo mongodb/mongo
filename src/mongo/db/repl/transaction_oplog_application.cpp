@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/transaction_oplog_application.h"
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -50,20 +51,21 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
     invariant(mode == repl::OplogApplication::Mode::kRecovering ||
               mode == repl::OplogApplication::Mode::kInitialSync);
 
-    // Since the TransactionHistoryIterator uses DBDirectClient, it cannot come with snapshot
-    // isolation.
-    invariant(!opCtx->recoveryUnit()->getPointInTimeReadTimestamp());
+    BSONObj prepareCmd;
+    {
+        // Traverse the oplog chain with its own snapshot and read timestamp.
+        ReadSourceScope readSourceScope(opCtx);
 
-    // Get the corresponding prepareTransaction oplog entry.
-    const auto prepareOpTime = entry.getPrevWriteOpTimeInTransaction();
-    invariant(prepareOpTime);
-    TransactionHistoryIterator iter(prepareOpTime.get());
-    invariant(iter.hasNext());
-    const auto prepareOplogEntry = iter.next(opCtx);
+        // Get the corresponding prepareTransaction oplog entry.
+        const auto prepareOpTime = entry.getPrevWriteOpTimeInTransaction();
+        invariant(prepareOpTime);
+        TransactionHistoryIterator iter(prepareOpTime.get());
+        invariant(iter.hasNext());
+        const auto prepareOplogEntry = iter.next(opCtx);
 
-    // Transform prepare command into a normal applyOps command.
-    const auto prepareCmd = prepareOplogEntry.getOperationToApply().removeField("prepare");
-
+        // Transform prepare command into a normal applyOps command.
+        prepareCmd = prepareOplogEntry.getOperationToApply().removeField("prepare");
+    }
     BSONObjBuilder resultWeDontCareAbout;
     return applyOps(
         opCtx, entry.getNss().db().toString(), prepareCmd, mode, &resultWeDontCareAbout);

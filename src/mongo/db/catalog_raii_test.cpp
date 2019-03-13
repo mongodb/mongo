@@ -33,12 +33,14 @@
 
 #include <string>
 
+#include "boost/optional/optional_io.hpp"
 #include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -210,6 +212,61 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
                                    Date_t());
         },
         Milliseconds(0));
+}
+
+using ReadSource = RecoveryUnit::ReadSource;
+
+class RecoveryUnitMock : public RecoveryUnitNoop {
+public:
+    void setTimestampReadSource(ReadSource source,
+                                boost::optional<Timestamp> provided = boost::none) override {
+        _source = source;
+        _timestamp = provided;
+    }
+    ReadSource getTimestampReadSource() const override {
+        return _source;
+    };
+    boost::optional<Timestamp> getPointInTimeReadTimestamp() override {
+        return _timestamp;
+    }
+
+private:
+    ReadSource _source = ReadSource::kUnset;
+    boost::optional<Timestamp> _timestamp;
+};
+
+class ReadSourceScopeTest : public ServiceContextTest {
+public:
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+protected:
+    void setUp() override;
+
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+void ReadSourceScopeTest::setUp() {
+    _opCtx = getClient()->makeOperationContext();
+    _opCtx->setRecoveryUnit(stdx::make_unique<RecoveryUnitMock>(),
+                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+}
+
+TEST_F(ReadSourceScopeTest, RestoreReadSource) {
+    opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kProvided, Timestamp(1, 2));
+    ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);
+    ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(), Timestamp(1, 2));
+    {
+        ReadSourceScope scope(opCtx());
+        ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kUnset);
+
+        opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kLastApplied);
+        ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kLastApplied);
+        ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(), boost::none);
+    }
+    ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);
+    ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(), Timestamp(1, 2));
 }
 
 }  // namespace

@@ -107,12 +107,8 @@ struct ActiveTransactionHistory {
 
 ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                                        const LogicalSessionId& lsid) {
-    // Since we are using DBDirectClient to read the transactions table and the oplog, we should
-    // never be reading from a snapshot, but directly from what is the latest on disk. This
-    // invariant guards against programming errors where the default read concern on the
-    // OperationContext could have been changed to something other than 'local'.
-    invariant(repl::ReadConcernArgs::get(opCtx).getLevel() ==
-              repl::ReadConcernLevel::kLocalReadConcern);
+    // Restore the current timestamp read source after fetching transaction history.
+    ReadSourceScope readSourceScope(opCtx);
 
     ActiveTransactionHistory result;
 

@@ -193,4 +193,24 @@ ConcealUUIDCatalogChangesBlock::~ConcealUUIDCatalogChangesBlock() {
     UUIDCatalog::get(_opCtx).onOpenCatalog(_opCtx);
 }
 
+ReadSourceScope::ReadSourceScope(OperationContext* opCtx)
+    : _opCtx(opCtx), _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()) {
+
+    if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
+        _originalReadTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+    }
+
+    _opCtx->recoveryUnit()->abandonSnapshot();
+    _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+}
+
+ReadSourceScope::~ReadSourceScope() {
+    _opCtx->recoveryUnit()->abandonSnapshot();
+    if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
+        _opCtx->recoveryUnit()->setTimestampReadSource(_originalReadSource, _originalReadTimestamp);
+    } else {
+        _opCtx->recoveryUnit()->setTimestampReadSource(_originalReadSource);
+    }
+}
+
 }  // namespace mongo

@@ -214,4 +214,21 @@ private:
     OperationContext* _opCtx;
 };
 
+/**
+ * RAII type to set and restore the timestamp read source on the recovery unit.
+ *
+ * Snapshot is abandoned in constructor and destructor, so it can only be used before
+ * the recovery unit becomes active or when the existing snapshot is no longer needed.
+ */
+class ReadSourceScope {
+public:
+    ReadSourceScope(OperationContext* opCtx);
+    ~ReadSourceScope();
+
+private:
+    OperationContext* _opCtx;
+    RecoveryUnit::ReadSource _originalReadSource;
+    Timestamp _originalReadTimestamp;
+};
+
 }  // namespace mongo
