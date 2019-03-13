@@ -34,8 +34,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/curop.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DECLARE(skipWriteConflictRetries);
 
 /**
  * This is thrown if during a write, two or more operations conflict with each other.
@@ -80,7 +83,7 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
     invariant(opCtx->lockState());
     invariant(opCtx->recoveryUnit());
 
-    if (opCtx->lockState()->inAWriteUnitOfWork()) {
+    if (opCtx->lockState()->inAWriteUnitOfWork() || MONGO_FAIL_POINT(skipWriteConflictRetries)) {
         return f();
     }
 

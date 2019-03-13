@@ -568,7 +568,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             // This result didn't have the data the caller wanted, try again.
         } else if (PlanStage::NEED_YIELD == code) {
             invariant(id == WorkingSet::INVALID_ID);
-            if (!_yieldPolicy->canAutoYield()) {
+            if (!_yieldPolicy->canAutoYield() || MONGO_FAIL_POINT(skipWriteConflictRetries)) {
                 throw WriteConflictException();
             }
 

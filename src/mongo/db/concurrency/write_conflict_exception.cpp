@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
+
 AtomicWord<bool> WriteConflictException::trace(false);
 
 WriteConflictException::WriteConflictException()

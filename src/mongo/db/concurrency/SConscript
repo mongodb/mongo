@@ -31,6 +31,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/log_and_backoff',
     ],
 )

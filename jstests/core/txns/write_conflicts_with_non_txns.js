@@ -57,10 +57,10 @@
     }
 
     /**
-     * A non-transactional (single document) write should block when trying to insert a document
-     * that conflicts with a previous write done by a running transaction, and should be allowed to
-     * continue after the transaction commits. If 'maxTimeMS' is specified, a single document write
-     * should timeout after the given time limit if there is a write conflict.
+     * A non-transactional (single document) write should keep retrying when attempting to insert a
+     * document that conflicts with a previous write done by a running transaction, and should be
+     * allowed to continue after the transaction commits. If 'maxTimeMS' is specified, a single
+     * document write should timeout after the given time limit if there is a write conflict.
      */
 
     jsTestLog("Start a multi-document transaction with a document insert.");
@@ -94,9 +94,9 @@
     assert.commandWorked(testColl.remove({}));
 
     /**
-     * A non-transactional (single document) write should block when trying to insert a document
-     * that conflicts with a previous write done by a running transaction, and should be allowed to
-     * continue and complete successfully after the transaction aborts.
+     * A non-transactional (single document) write should keep retrying when attempting to insert a
+     * document that conflicts with a previous write done by a running transaction, and should be
+     * allowed to continue and complete successfully after the transaction aborts.
      */
 
     jsTestLog("Start a multi-document transaction with a document insert.");
