@@ -120,35 +120,13 @@ bool checkIsLocalShard(ServiceContext* serviceContext, const ShardId& shardId) {
     MONGO_UNREACHABLE;  // Only sharded systems should use the two-phase commit path.
 }
 
-bool shouldRetryCommandAgainstShard(const ShardId& shardId,
-                                    bool isLocalShard,
-                                    const BSONObj& commandObj,
-                                    const Status responseStatus) {
-    bool shouldRetry = true;
-
-    if (isLocalShard && ErrorCodes::isNotMasterError(responseStatus.code())) {
-        // For the local shard, stop retrying if the response indicates the node is stepping down or
-        // has stepped down.
-        // Note: It is vital that the error reported by the local shard originated from the local
-        // shard (i.e., the local shard did not do any RPCs), otherwise this node will stop
-        // coordinating the commit, and no other node will step up to take its place.
-        shouldRetry = false;
-    }
-
-    // Otherwise, retry on errors until the prepare phase times out.
-    if (responseStatus.isOK()) {
-        shouldRetry = false;
-    }
-
-    if (responseStatus == ErrorCodes::TransactionCoordinatorSteppingDown ||
-        responseStatus == ErrorCodes::TransactionCoordinatorReachedAbortDecision) {
-        shouldRetry = false;
-    }
-
-    LOG(3) << "Coordinator " << (shouldRetry ? "retrying " : "not retrying ") << commandObj
-           << " against " << (isLocalShard ? "local " : "") << "shard " << shardId
-           << " because got response status " << responseStatus;
-    return shouldRetry;
+bool shouldRetryPersistingCoordinatorState(const Status& responseStatus) {
+    // Writes to the local node are expected to succeed if this node is still primary, so *only*
+    // retry if the write was explicitly interrupted (we do not allow a user to stop a commit
+    // coordination by issuing killOp, since that can stall resources across the cluster. However,
+    // the write may also fail if the coordinator document has been manually tampered with; in this
+    // case we do not retry, since the write is unlikely to succeed the second time.
+    return responseStatus == ErrorCodes::Interrupted;
 }
 
 }  // namespace
@@ -254,12 +232,7 @@ Future<void> TransactionCoordinatorDriver::persistParticipantList(
     const LogicalSessionId& lsid, TxnNumber txnNumber, std::vector<ShardId> participantList) {
     return txn::doWhile(*_scheduler,
                         boost::none /* no need for a backoff */,
-                        [](const Status& s) {
-                            // 'Interrupted' is the error code delivered for killOp sent by a user.
-                            // Note, we do not want to retry on other interruption errors, like
-                            // InterruptedDueToStepDown.
-                            return s.code() == ErrorCodes::Interrupted;
-                        },
+                        [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
                         [this, lsid, txnNumber, participantList] {
                             return _scheduler->scheduleWork(
                                 [lsid, txnNumber, participantList](OperationContext* opCtx) {
@@ -451,12 +424,7 @@ Future<void> TransactionCoordinatorDriver::persistDecision(
     return txn::doWhile(
         *_scheduler,
         boost::none /* no need for a backoff */,
-        [](const Status& s) {
-            // 'Interrupted' is the error code delivered for killOp sent by a user.
-            // Note, we do not want to retry on other interruption errors, like
-            // InterruptedDueToStepDown.
-            return s.code() == ErrorCodes::Interrupted;
-        },
+        [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
         [this, lsid, txnNumber, participantList, commitTimestamp] {
             return _scheduler->scheduleWork([lsid, txnNumber, participantList, commitTimestamp](
                 OperationContext* opCtx) {
@@ -571,12 +539,7 @@ Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSes
                                                                 TxnNumber txnNumber) {
     return txn::doWhile(*_scheduler,
                         boost::none /* no need for a backoff */,
-                        [](const Status& s) {
-                            // 'Interrupted' is the error code delivered for killOp sent by a user.
-                            // Note, we do not want to retry on other interruption errors, like
-                            // InterruptedDueToStepDown.
-                            return s.code() == ErrorCodes::Interrupted;
-                        },
+                        [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
                         [this, lsid, txnNumber] {
                             return _scheduler->scheduleWork(
                                 [lsid, txnNumber](OperationContext* opCtx) {
@@ -613,8 +576,12 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
         kExponentialBackoff,
         [ shardId, isLocalShard, commandObj = commandObj.getOwned() ](
             StatusWith<PrepareResponse> swPrepareResponse) {
-            return shouldRetryCommandAgainstShard(
-                shardId, isLocalShard, commandObj, swPrepareResponse.getStatus());
+            // *Always* retry until hearing a conclusive response or being told to stop via a
+            // coordinator-specific code.
+            return !swPrepareResponse.isOK() &&
+                swPrepareResponse.getStatus() != ErrorCodes::TransactionCoordinatorSteppingDown &&
+                swPrepareResponse.getStatus() !=
+                ErrorCodes::TransactionCoordinatorReachedAbortDecision;
         },
         [&scheduler, shardId, isLocalShard, commandObj = commandObj.getOwned() ] {
             LOG(3) << "Coordinator going to send command " << commandObj << " to "
@@ -690,7 +657,9 @@ Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
         scheduler,
         kExponentialBackoff,
         [ shardId, isLocalShard, commandObj = commandObj.getOwned() ](const Status& s) {
-            return shouldRetryCommandAgainstShard(shardId, isLocalShard, commandObj, s);
+            // *Always* retry until hearing a conclusive response or being told to stop via a
+            // coordinator-specific code.
+            return !s.isOK() && s != ErrorCodes::TransactionCoordinatorSteppingDown;
         },
         [&scheduler, shardId, isLocalShard, commandObj = commandObj.getOwned() ] {
             LOG(3) << "Coordinator going to send command " << commandObj << " to "
