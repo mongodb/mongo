@@ -2093,7 +2093,7 @@ private:
     boost::intrusive_ptr<Expression> _onNull;
 };
 
-class ExpressionRegexFind : public ExpressionFixedArity<ExpressionRegexFind, 1> {
+class ExpressionRegexFind final : public ExpressionFixedArity<ExpressionRegexFind, 1> {
 public:
     explicit ExpressionRegexFind(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionRegexFind, 1>(expCtx) {}
@@ -2106,6 +2106,15 @@ class ExpressionRegexFindAll final : public ExpressionFixedArity<ExpressionRegex
 public:
     explicit ExpressionRegexFindAll(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionRegexFindAll, 1>(expCtx) {}
+
+    Value evaluate(const Document& root) const final;
+    const char* getOpName() const final;
+};
+
+class ExpressionRegexMatch final : public ExpressionFixedArity<ExpressionRegexMatch, 1> {
+public:
+    explicit ExpressionRegexMatch(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionFixedArity<ExpressionRegexMatch, 1>(expCtx) {}
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;

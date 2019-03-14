@@ -5674,6 +5674,22 @@ public:
         }
     }
 
+    int execute(int startBytePos) {
+        int execResult = pcre_exec(_pcre,
+                                   0,
+                                   &_input.front(),
+                                   _input.size(),
+                                   startBytePos,
+                                   0,  // No need to overwrite the options set during pcre_compile.
+                                   &_capturesBuffer.front(),
+                                   _capturesBuffer.size());
+        // The 'execResult' will be '(_numCaptures + 1)' if there is a match, negative if there is
+        // no match, and zero if _capturesBuffer's capacity is not sufficient to hold all the
+        // results; the latter scenario should never actually occur.
+        invariant(execResult < 0 || execResult == _numCaptures + 1);
+        return execResult;
+    }
+
     /**
      * The function will match '_input' string based on the regex pattern present in '_pcre'. If
      * there is a match, the function will return a 'Value' object encapsulating the matched string,
@@ -5688,21 +5704,11 @@ public:
         // Use input as StringData throughout the function to avoid copying the string on 'substr'
         // calls.
         StringData input = _input;
-        int execResult = pcre_exec(_pcre,
-                                   0,
-                                   input.rawData(),
-                                   input.size(),
-                                   *startBytePos,
-                                   0,  // No need to overwrite the options set during pcre_compile.
-                                   &_capturesBuffer.front(),
-                                   _capturesBuffer.size());
+        int execResult = execute(*startBytePos);
         // No match.
         if (execResult < 0) {
             return Value(BSONNULL);
         }
-        // The 'execResult' will be zero if _capturesBuffer's size is not big enough to hold all
-        // the captures, which should never be the case.
-        invariant(execResult == _numCaptures + 1);
 
         // The first and second entries of the '_capturesBuffer' will have the start and limit
         // indices of the matched string, as byte offsets. '(limit - startIndex)' would be the
@@ -5903,6 +5909,17 @@ Value ExpressionRegexFindAll::evaluate(const Document& root) const {
 REGISTER_EXPRESSION(regexFindAll, ExpressionRegexFindAll::parse);
 const char* ExpressionRegexFindAll::getOpName() const {
     return "$regexFindAll";
+}
+
+Value ExpressionRegexMatch::evaluate(const Document& root) const {
+    RegexMatchHandler regex(vpOperand[0]->evaluate(root));
+    // Return output of execute only if regex is not nullish.
+    return regex.nullish() ? Value(false) : Value(regex.execute(0) > 0);
+}
+
+REGISTER_EXPRESSION(regexMatch, ExpressionRegexMatch::parse);
+const char* ExpressionRegexMatch::getOpName() const {
+    return "$regexMatch";
 }
 
 }  // namespace mongo

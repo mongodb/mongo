@@ -1,5 +1,5 @@
 /*
- * Tests for $regexFind and $regexFindAll aggregation expression.
+ * Tests for $regexFind, $regexFindAll and $regexMatch aggregation expressions.
  */
 (function() {
     'use strict';
@@ -27,35 +27,49 @@
     }
 
     /**
-     * This function validates the output against both $regexFind and $regexFindAll expressions.
+     * This function validates the output against $regexFind, $regexFindAll and $regexMatch
+     * expressions.
      */
     function testRegexFindAgg(inputObj, expectedOutputForFindAll) {
         testRegex("$regexFindAll", inputObj, expectedOutputForFindAll);
-
         // For each of the output document, get first element from "matches" array. This will
         // convert 'regexFindAll' output to 'regexFind' output.
         const expectedOutputForFind = expectedOutputForFindAll.map(
             (element) => ({matches: element.matches.length == 0 ? null : element.matches[0]}));
         testRegex("$regexFind", inputObj, expectedOutputForFind);
+
+        // For each of the output document, if there is at least one element in the array, then
+        // there is a match.
+        const expectedOutputForMatch =
+            expectedOutputForFindAll.map((element) => ({matches: element.matches.length != 0}));
+        testRegex("$regexMatch", inputObj, expectedOutputForMatch);
     }
 
     /**
-     * This function validates the output against both $regexFind and $regexFindAll expressions.
+     * This function validates the output against $regexFind, $regexFindAll and $regexMatch
+     * expressions.
      */
     function testRegexFindAggForKey(key, inputObj, expectedOutputForFindAll) {
         testRegexForKey("$regexFindAll", key, inputObj, expectedOutputForFindAll);
+
         const expectedOutputForFind =
             expectedOutputForFindAll.length == 0 ? null : expectedOutputForFindAll[0];
         testRegexForKey("$regexFind", key, inputObj, expectedOutputForFind);
+
+        const expectedOutputForMatch = expectedOutputForFindAll.length != 0;
+        testRegexForKey("$regexMatch", key, inputObj, expectedOutputForMatch);
     }
 
     /**
-     * This function validates the output against both $regexFind and $regexFindAll expressions.
+     * This function validates the output against $regexFind, $regexFindAll and $regexMatch
+     * expressions.
      */
     function testRegexAggException(inputObj, exceptionCode) {
         assertErrorCode(
             coll, [{"$project": {"matches": {"$regexFindAll": inputObj}}}], exceptionCode);
         assertErrorCode(coll, [{"$project": {"matches": {"$regexFind": inputObj}}}], exceptionCode);
+        assertErrorCode(
+            coll, [{"$project": {"matches": {"$regexMatch": inputObj}}}], exceptionCode);
     }
 
     (function testWithSingleMatch() {
@@ -349,6 +363,7 @@
         testRegexAggException({input: "$text", regex: "valid", options: 'a'}, 51108);
         // 'options' are case-sensitive.
         testRegexAggException({input: "$text", regex: "valid", options: "I"}, 51108);
+        testRegexAggException({options: "I"}, 51108);
         // Options specified in both 'regex' and 'options'.
         testRegexAggException({input: "$text", regex: /(m(p))/i, options: "i"}, 51107);
         testRegexAggException({input: "$text", regex: /(m(p))/i, options: "x"}, 51107);
@@ -399,7 +414,7 @@
         const expectedResults =
             [{"_id": 0, "information": "Company Name"}, {"_id": 1, "information": "REDACTED"}];
         // For $regexFindAll.
-        let result =
+        const resultFindAll =
             coll.aggregate([{
                     "$project": {
                         "information": {
@@ -415,24 +430,41 @@
                     }
                 }])
                 .toArray();
-        assert.eq(result, expectedResults);
-        // For $regexFind.
-        result =
+        assert.eq(resultFindAll, expectedResults);
+        // For $regexMatch.
+        const resultMatch =
             coll.aggregate([{
                     "$project": {
                         "information": {
                             "$cond": [
-                                {
-                                  "$eq":
-                                      [{"$regexFind": {input: "$level", regex: /public/i}}, null]
-                                },
-                                "REDACTED",
-                                "$info"
+                                {"$regexMatch": {input: "$level", regex: /public/i}},
+                                "$info",
+                                "REDACTED"
                             ]
                         }
                     }
                 }])
                 .toArray();
-        assert.eq(result, expectedResults);
+        // For $regexFind.
+        const resultFind =
+            coll.aggregate([{
+                    "$project": {
+                        "information": {
+                            "$cond": [
+                                {
+                                  "$ne":
+                                      [{"$regexFind": {input: "$level", regex: /public/i}}, null]
+                                },
+                                "$info",
+                                "REDACTED"
+                            ]
+                        }
+                    }
+                }])
+                .toArray();
+        // Validate that {$ne : [{$regexFind: ...}, null]} produces same result as
+        // {$regexMatch: ...}.
+        assert.eq(resultFind, resultMatch);
+        assert.eq(resultFind, expectedResults);
     })();
 }());

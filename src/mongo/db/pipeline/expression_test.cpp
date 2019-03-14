@@ -5975,7 +5975,6 @@ TEST(ExpressionRegexFindTest, ExtendedRegexOptions) {
 TEST(ExpressionRegexFindTest, FailureCase) {
     Value input(
         fromjson("{input: 'FirstLine\\nSecondLine', regex: {invalid : 'regex'} , options: 'mi'}"));
-    BSONObj expectedOut(fromjson("{match: 'Second', idx:10, captures:[]}"));
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ExpressionRegexFind regexF(expCtx);
     regexF.addOperand(ExpressionConstant::create(expCtx, input));
@@ -6034,6 +6033,32 @@ TEST(ExpressionRegexFindAllTest, InvalidUTF8InRegex) {
     regexF.addOperand(ExpressionConstant::create(expCtx, input));
     // Verify that PCRE will error if REGEX is not a valid UTF-8.
     ASSERT_THROWS_CODE(regexF.evaluate(Document()), DBException, 51111);
+}
+
+TEST(ExpressionRegexMatchTest, NoMatch) {
+    Value input(fromjson("{input: 'asdf', regex: '^sd' }"));
+    Value expectedOut(false);
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexMatch regexMatchExpr(expCtx);
+    regexMatchExpr.addOperand(ExpressionConstant::create(expCtx, input));
+    ASSERT_VALUE_EQ(regexMatchExpr.evaluate(Document()), expectedOut);
+}
+
+TEST(ExpressionRegexMatchTest, ExtendedRegexOptions) {
+    Value input(fromjson("{input: 'FirstLine\\nSecondLine', regex: '^second' , options: 'mi'}"));
+    Value expectedOut(true);
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexMatch regexMatchExpr(expCtx);
+    regexMatchExpr.addOperand(ExpressionConstant::create(expCtx, input));
+    ASSERT_VALUE_EQ(regexMatchExpr.evaluate(Document()), expectedOut);
+}
+
+TEST(ExpressionRegexMatchTest, FailureCase) {
+    Value input(fromjson("{regex: 'valid', input: {invalid : 'input'} , options: 'mi'}"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexMatch regexMatchExpr(expCtx);
+    regexMatchExpr.addOperand(ExpressionConstant::create(expCtx, input));
+    ASSERT_THROWS_CODE(regexMatchExpr.evaluate(Document()), DBException, 51104);
 }
 
 }  // namespace ExpressionRegexTest
