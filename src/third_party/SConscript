@@ -133,6 +133,12 @@ if not use_system_version_of_library('icu'):
                      '#/src/third_party/icu4c' + icuSuffix + '/source/i18n'],
     }
 
+if not use_system_version_of_library('kms-message'):
+    thirdPartyEnvironmentModifications['kms-message'] = {
+        'CPPPATH' : ['#/src/third_party/kms-message/src'],
+        'CPPDEFINES' :['KMS_MSG_STATIC']
+    }
+
 def injectThirdParty(thisEnv, libraries=[], parts=[]):
     libraries = thisEnv.Flatten([libraries])
     parts = thisEnv.Flatten([parts])
@@ -526,3 +532,24 @@ icuEnv.Library(
     source=[
         'shim_icu.cpp',
     ])
+
+if use_system_version_of_library("kms-message"):
+    kmsEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_KMS-MESSAGE_SYSLIBDEP'],
+        ])
+else:
+    kmsEnv = env.Clone()
+    kmsEnv.InjectThirdParty(libraries=['kms-message'])
+    kmsEnv.SConscript('kms-message/SConscript', exports={ 'env' : kmsEnv })
+    kmsEnv = kmsEnv.Clone(
+        LIBDEPS_INTERFACE=[
+            'kms-message/kms-message',
+        ])
+
+kmsEnv.Library(
+    target="shim_kms_message",
+    source=[
+        'shim_kms_message.cpp',
+    ])
+

@@ -400,6 +400,11 @@ add_option('use-system-mongo-c',
     type='choice',
 )
 
+add_option('use-system-kms-message',
+    help='use system version of kms-message library',
+    nargs=0,
+)
+
 add_option('use-system-all',
     help='use all system libraries',
     nargs=0,
