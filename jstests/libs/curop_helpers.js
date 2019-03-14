@@ -1,14 +1,14 @@
 // Wait until the current operation matches the filter.
 function waitForCurOpByFilter(db, filter) {
+    const adminDB = db.getSiblingDB("admin");
     assert.soon(
         () => {
-            return db.getSiblingDB("admin")
-                       .aggregate([{$currentOp: {}}, {$match: filter}])
-                       .itcount() == 1;
+            return adminDB.aggregate([{$currentOp: {}}, {$match: filter}]).itcount() == 1;
         },
         () => {
             return "Failed to find a matching op for filter \"" + tojson(filter) +
-                "\" in currentOp output: " + tojson(db.aggregate([{$currentOp: {}}]).toArray());
+                "\" in currentOp output: " +
+                tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
         });
 }
 

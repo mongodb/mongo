@@ -1806,19 +1806,21 @@ void ReplicationCoordinatorImpl::waitForStepDownAttempt_forTest() {
     }
 }
 
-void ReplicationCoordinatorImpl::_updateAndLogStatsOnStepDown(const KillOpContainer* koc) const {
-    userOpsRunning.increment(koc->getUserOpsRunning());
+void ReplicationCoordinatorImpl::_updateAndLogStatsOnStepDown(
+    const AutoGetRstlForStepUpStepDown* arsd) const {
+    userOpsRunning.increment(arsd->getUserOpsRunning());
 
     BSONObjBuilder bob;
     bob.appendNumber("userOpsKilled", userOpsKilled.get());
     bob.appendNumber("userOpsRunning", userOpsRunning.get());
 
-    log() << "Successfully stepped down from primary, stats: " << bob.obj();
+    log() << "Stepping down from primary, stats: " << bob.obj();
 }
 
-void ReplicationCoordinatorImpl::_killOperationsOnStepDown(const OperationContext* stepDownOpCtx,
-                                                           KillOpContainer* koc) {
-    ServiceContext* serviceCtx = stepDownOpCtx->getServiceContext();
+void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
+    AutoGetRstlForStepUpStepDown* arsc, ErrorCodes::Error reason) {
+    const OperationContext* rstlOpCtx = arsc->getOpCtx();
+    ServiceContext* serviceCtx = rstlOpCtx->getServiceContext();
     invariant(serviceCtx);
 
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
@@ -1829,27 +1831,42 @@ void ReplicationCoordinatorImpl::_killOperationsOnStepDown(const OperationContex
 
         OperationContext* toKill = client->getOperationContext();
 
-        // Don't kill the stepdown thread.
-        if (toKill && !toKill->isKillPending() && toKill->getOpID() != stepDownOpCtx->getOpID()) {
+        // Don't kill step up/step down thread.
+        if (toKill && !toKill->isKillPending() && toKill->getOpID() != rstlOpCtx->getOpID()) {
             auto locker = toKill->lockState();
             if (locker->wasGlobalLockTakenInModeConflictingWithWrites() ||
                 PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict()) {
-                serviceCtx->killOperation(lk, toKill, ErrorCodes::InterruptedDueToStepDown);
+                serviceCtx->killOperation(lk, toKill, reason);
                 userOpsKilled.increment();
             } else {
-                koc->incrUserOpsRunningBy();
+                arsc->incrUserOpsRunningBy();
             }
         }
     }
 }
 
-void ReplicationCoordinatorImpl::KillOpContainer::startKillOpThread() {
+ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpStepDown(
+    ReplicationCoordinatorImpl* repl, OperationContext* opCtx, Date_t deadline)
+    : _replCord(repl), _opCtx(opCtx) {
+    invariant(_replCord && _opCtx);
+
+    // Enqueues RSTL in X mode.
+    _rstlLock.emplace(_opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
+
+    ON_BLOCK_EXIT([&] { _stopAndWaitForKillOpThread(); });
+    _startKillOpThread();
+
+    // Wait for RSTL to be acquired.
+    _rstlLock->waitForLockUntil(deadline);
+};
+
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_startKillOpThread() {
     invariant(!_killOpThread);
-    _killOpThread = stdx::make_unique<stdx::thread>([this] { killOpThreadFn(); });
+    _killOpThread = stdx::make_unique<stdx::thread>([this] { _killOpThreadFn(); });
 }
 
-void ReplicationCoordinatorImpl::KillOpContainer::killOpThreadFn() {
-    Client::initThread("RstlKillOpthread");
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn() {
+    Client::initThread("RstlKillOpThread");
 
     invariant(!cc().isFromUserConnection());
 
@@ -1857,17 +1874,20 @@ void ReplicationCoordinatorImpl::KillOpContainer::killOpThreadFn() {
     auto uniqueOpCtx = cc().makeOperationContext();
     OperationContext* opCtx = uniqueOpCtx.get();
 
+    // TODO: SERVER-41216 should change the error code as InterruptedDueToReplStateChange.
+    // Set the reason for killing operations.
+    ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToStepDown;
+
     while (true) {
         // Reset the value before killing user operations as we only want to track the number
         // of operations that's running after step down.
         _userOpsRunning = 0;
-        _replCord->_killOperationsOnStepDown(_stepDownOpCtx, this);
+        _replCord->_killConflictingOpsOnStepUpAndStepDown(this, killReason);
 
         // Destroy all stashed transaction resources, in order to release locks.
         SessionKiller::Matcher matcherAllSessions(
             KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsAbortUnpreparedTransactions(
-            opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToStepDown);
+        killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions, killReason);
 
         // Operations (like batch insert) that have currently yielded the global lock during step
         // down can reacquire global lock in IX mode when this node steps back up after a brief
@@ -1887,7 +1907,7 @@ void ReplicationCoordinatorImpl::KillOpContainer::killOpThreadFn() {
     }
 }
 
-void ReplicationCoordinatorImpl::KillOpContainer::stopAndWaitForKillOpThread() {
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_stopAndWaitForKillOpThread() {
     if (!(_killOpThread && _killOpThread->joinable()))
         return;
 
@@ -1900,12 +1920,33 @@ void ReplicationCoordinatorImpl::KillOpContainer::stopAndWaitForKillOpThread() {
     _killOpThread.reset();
 }
 
-size_t ReplicationCoordinatorImpl::KillOpContainer::getUserOpsRunning() const {
+size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getUserOpsRunning() const {
     return _userOpsRunning;
 }
 
-void ReplicationCoordinatorImpl::KillOpContainer::incrUserOpsRunningBy(size_t val) {
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrUserOpsRunningBy(size_t val) {
     _userOpsRunning += val;
+}
+
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlRelease() {
+    _rstlLock->release();
+}
+
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlReacquire() {
+    // Ensure that we are not holding the RSTL lock in any mode.
+    invariant(!_opCtx->lockState()->isRSTLLocked());
+
+    // Since we have released the RSTL lock at this point, there can be some conflicting
+    // operations sneaked in here. We need to kill those operations to acquire the RSTL lock.
+    // Also, its ok to start "RstlKillOpthread" thread before RSTL lock enqueue as we kill
+    // operations in a loop.
+    ON_BLOCK_EXIT([&] { _stopAndWaitForKillOpThread(); });
+    _startKillOpThread();
+    _rstlLock->reacquire();
+}
+
+const OperationContext* ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getOpCtx() const {
+    return _opCtx;
 }
 
 void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
@@ -1922,22 +1963,11 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // from acquiring the global X lock unnecessarily.
     uassert(ErrorCodes::NotMaster, "not primary so can't step down", getMemberState().primary());
 
-    ReplicationStateTransitionLockGuard rstlLock(
-        opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
-
-    // Kill all write operations which are no longer safe to run on step down. Also, operations that
-    // have taken global lock in S mode will be killed to avoid 3-way deadlock between read,
-    // prepared transaction and step down thread.
-    KillOpContainer koc(this, opCtx);
-    koc.startKillOpThread();
-
-    {
-        auto rstlOnErrorGuard = makeGuard([&koc] { koc.stopAndWaitForKillOpThread(); });
-        // Using 'force' sets the default for the wait time to zero, which means the stepdown will
-        // fail if it does not acquire the lock immediately. In such a scenario, we use the
-        // stepDownUntil deadline instead.
-        rstlLock.waitForLockUntil(force ? stepDownUntil : waitUntil);
-    }
+    // Using 'force' sets the default for the wait time to zero, which means the stepdown will
+    // fail if it does not acquire the lock immediately. In such a scenario, we use the
+    // stepDownUntil deadline instead.
+    auto deadline = force ? stepDownUntil : waitUntil;
+    AutoGetRstlForStepUpStepDown arsd(this, opCtx, deadline);
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -2005,7 +2035,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
             // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
             // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
-            rstlLock.release();
+            arsd.rstlRelease();
             invariant(!opCtx->lockState()->isLocked());
 
             // Make sure we re-acquire the RSTL before returning so that we're always holding the
@@ -2015,28 +2045,22 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 // order rules.
                 lk.unlock();
 
+                // Need to re-acquire the RSTL before re-attempting stepdown. We use no timeout here
+                // even though that means the lock acquisition could take longer than the stepdown
+                // window. Since we'll need the RSTL no matter what to clean up a failed stepdown
+                // attempt, we might as well spend whatever time we need to acquire it now.  For
+                // the same reason, we also disable lock acquisition interruption, to guarantee that
+                // we get the lock eventually.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
                 // Since we have released the RSTL lock at this point, there can be some read
-                // operations holding global S lock sneaked in here. We need to kill those
-                // operations to avoid 3-way deadlock between read, prepared transaction and
-                // step down thread. Also, its ok to start "RstlKillOpthread" thread before RSTL
-                // lock enqueue. As a result, even if we miss marking write operations killed,
-                // it doesn't lead to problems like in SERVER-27534. Since any write operations
-                // that gets sneaked in here will fail as we have updated _canAcceptNonLocalWrites
-                // to false after our first successful RSTL lock acquisition.
-                koc.startKillOpThread();
-
-                // Need to re-acquire the RSTL before re-attempting stepdown.
-                // We use no timeout here even though that means the lock acquisition could take
-                // longer than the stepdown window. Since we'll need the RSTL no matter what to
-                // clean up a failed stepdown attempt, we might as well spend whatever time we need
-                // to acquire it now.  For the same reason, we also disable lock acquisition
-                // interruption, to guarantee that we get the lock eventually.
-                {
-                    auto rstlOnErrorGuard = makeGuard([&koc] { koc.stopAndWaitForKillOpThread(); });
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                    rstlLock.reacquire();
-                }
-
+                // operations sneaked in here, that might hold global lock in S mode or blocked on
+                // prepare conflict. We need to kill those operations to avoid 3-way deadlock
+                // between read, prepared transaction and step down thread. And, any write
+                // operations that gets sneaked in here will fail as we have updated
+                // _canAcceptNonLocalWrites to false after our first successful RSTL lock
+                // acquisition. So, we won't get into problems like SERVER-27534.
+                arsd.rstlReacquire();
                 lk.lock();
             });
 
@@ -2053,10 +2077,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
     // Yield locks for prepared transactions.
     yieldLocksForPreparedTransactions(opCtx);
+    _updateAndLogStatsOnStepDown(&arsd);
 
     onExitGuard.dismiss();
     updateMemberState();
-    _updateAndLogStatsOnStepDown(&koc);
 
     // Schedule work to (potentially) step back up once the stepdown period has ended.
     _scheduleWorkAt(stepDownUntil, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
@@ -2581,55 +2605,63 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
         return status;
     }
 
-    auto reconfigFinished = uassertStatusOK(_replExecutor->makeEvent());
-    uassertStatusOK(_replExecutor->scheduleWork([ =, f = args.force, v = myIndex.getValue() ](
-        const executor::TaskExecutor::CallbackArgs& cbData) {
-        _finishReplSetReconfig(cbData, newConfig, f, v, reconfigFinished);
-    }));
     configStateGuard.dismiss();
-    _replExecutor->waitForEvent(reconfigFinished);
+    _finishReplSetReconfig(opCtx, newConfig, args.force, myIndex.getValue());
     return Status::OK();
 }
 
-void ReplicationCoordinatorImpl::_finishReplSetReconfig(
-    const executor::TaskExecutor::CallbackArgs& cbData,
-    const ReplSetConfig& newConfig,
-    const bool isForceReconfig,
-    int myIndex,
-    const executor::TaskExecutor::EventHandle& finishedEvent) {
+void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
+                                                        const ReplSetConfig& newConfig,
+                                                        const bool isForceReconfig,
+                                                        int myIndex) {
+    // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
+    executor::TaskExecutor::EventHandle electionFinishedEvent;
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        electionFinishedEvent = _cancelElectionIfNeeded_inlock();
+    }
 
-    if (cbData.status == ErrorCodes::CallbackCanceled) {
-        return;
+    // If there is an election in-progress, there can be at most one. No new election can happen as
+    // we have already set our ReplicationCoordinatorImpl::_rsConfigState state to
+    // "kConfigReconfiguring" which prevents new elections from happening.
+    if (electionFinishedEvent) {
+        LOG(2) << "Waiting for election to complete before finishing reconfig to version "
+               << newConfig.getConfigVersion();
+        // Wait for the election to complete and the node's Role to be set to follower.
+        _replExecutor->waitForEvent(electionFinishedEvent);
     }
-    auto opCtx = cc().makeOperationContext();
-    boost::optional<ReplicationStateTransitionLockGuard> transitionGuard;
-    if (isForceReconfig) {
-        // Since it's a force reconfig, the primary node may not be electable after the
-        // configuration change.  In case we are that primary node, finish the reconfig under the
-        // RSTL, so that the step down occurs safely.
-        transitionGuard.emplace(opCtx.get(), MODE_X);
-    }
+
+    boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (isForceReconfig && _shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
+        _topCoord->prepareForUnconditionalStepDown();
+        lk.unlock();
+
+        // Primary node won't be electable or removed after the configuration change.
+        // So, finish the reconfig under RSTL, so that the step down occurs safely.
+        arsd.emplace(this, opCtx);
+
+        lk.lock();
+        if (_topCoord->isSteppingDownUnconditionally()) {
+            invariant(opCtx->lockState()->isRSTLExclusive());
+            log() << "stepping down from primary, because we received a new config";
+            yieldLocksForPreparedTransactions(opCtx);
+            _updateAndLogStatsOnStepDown(&arsd.get());
+        } else {
+            // Release the rstl lock as the node might have stepped down due to
+            // other unconditional step down code paths like learning new term via heartbeat &
+            // liveness timeout. And, no new election can happen as we have already set our
+            // ReplicationCoordinatorImpl::_rsConfigState state to "kConfigReconfiguring" which
+            // prevents new elections from happening. So, its safe to release the RSTL lock.
+            arsd.reset();
+        }
+    }
 
     invariant(_rsConfigState == kConfigReconfiguring);
     invariant(_rsConfig.isInitialized());
 
-    // Do not conduct an election during a reconfig, as the node may not be electable post-reconfig.
-    if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
-        // Wait for the election to complete and the node's Role to be set to follower.
-        _replExecutor
-            ->onEvent(electionFinishedEvent,
-                      [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                          _finishReplSetReconfig(
-                              cbData, newConfig, isForceReconfig, myIndex, finishedEvent);
-                      })
-            .status_with_transitional_ignore();
-        return;
-    }
-
     const ReplSetConfig oldConfig = _rsConfig;
-    const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndex);
+    const PostMemberStateUpdateAction action = _setCurrentRSConfig(lk, opCtx, newConfig, myIndex);
 
     // On a reconfig we drop all snapshots so we don't mistakenly read from the wrong one.
     // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
@@ -2637,10 +2669,9 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
 
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-    _replExecutor->signalEvent(finishedEvent);
 
     // Inform the index builds coordinator of the replica set reconfig.
-    IndexBuildsCoordinator::get(opCtx.get())->onReplicaSetReconfig();
+    IndexBuildsCoordinator::get(opCtx)->onReplicaSetReconfig();
 }
 
 Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCtx,
