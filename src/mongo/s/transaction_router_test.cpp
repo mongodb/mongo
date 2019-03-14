@@ -1614,7 +1614,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
 
         checkSessionDetails(request.cmdObj, lsid, txnNum, true);
 
-        return BSON("ok" << 1);
+        return kOkReadOnlyFalseResponse;
     });
 
     future.timed_get(kFutureTimeout);
@@ -1654,7 +1654,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortForMultipleParticipants) {
             checkSessionDetails(request.cmdObj, lsid, txnNum, target->second);
 
             targets.erase(request.target);
-            return BSON("ok" << 1);
+            return kOkReadOnlyFalseResponse;
         });
     }
 

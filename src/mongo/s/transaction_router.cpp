@@ -851,7 +851,9 @@ void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx,
 
     try {
         abortTransaction(opCtx, true /*isImplicit*/);
-    } catch (...) {
+    } catch (const DBException& ex) {
+        LOG(0) << txnIdToString() << " Implicitly aborting transaction failed "
+               << causedBy(ex.toStatus());
         // Ignore any exceptions.
     }
 }
