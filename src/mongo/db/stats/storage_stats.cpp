@@ -86,11 +86,13 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     recordStore->appendCustomStats(opCtx, result, scale);
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    result->append("nindexes", indexCatalog->numIndexesReady(opCtx));
+    result->append("nindexes", indexCatalog->numIndexesTotal(opCtx));
 
     BSONObjBuilder indexDetails;
+    std::vector<std::string> indexBuilds;
 
-    std::unique_ptr<IndexCatalog::IndexIterator> it = indexCatalog->getIndexIterator(opCtx, false);
+    std::unique_ptr<IndexCatalog::IndexIterator> it =
+        indexCatalog->getIndexIterator(opCtx, /*includeUnfinishedIndexes=*/true);
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* descriptor = entry->descriptor();
@@ -101,9 +103,14 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         if (iam->appendCustomStats(opCtx, &bob, scale)) {
             indexDetails.append(descriptor->indexName(), bob.obj());
         }
+
+        if (!entry->isReady(opCtx)) {
+            indexBuilds.push_back(descriptor->indexName());
+        }
     }
 
     result->append("indexDetails", indexDetails.obj());
+    result->append("indexBuilds", indexBuilds);
 
     BSONObjBuilder indexSizes;
     long long indexSize = collection->getIndexSize(opCtx, &indexSizes, scale);
