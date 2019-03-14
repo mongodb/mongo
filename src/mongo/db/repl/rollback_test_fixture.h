@@ -146,6 +146,11 @@ public:
         return true;
     }
 
+    boost::optional<Timestamp> getLastStableRecoveryTimestamp(
+        ServiceContext* serviceCtx) const override {
+        return _stableTimestamp;
+    }
+
     void setRecoverToTimestampStatus(Status status) {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _recoverToTimestampStatus = status;

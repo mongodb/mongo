@@ -384,7 +384,7 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         return curSecondary;
     };
 
-    this.restartNode = function(nodeId, signal, startOptions) {
+    this.restartNode = function(nodeId, signal, startOptions, allowedExitCode) {
         assert(signal === SIGKILL || signal === SIGTERM, `Received unknown signal: ${signal}`);
         assert.gte(nodeId, 0, "Invalid argument to RollbackTest.restartNode()");
 
@@ -408,7 +408,9 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         }
 
         let opts = {};
-        if (signal === SIGKILL) {
+        if (allowedExitCode !== undefined) {
+            opts = {allowedExitCode: allowedExitCode};
+        } else if (signal === SIGKILL) {
             opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
         }
 

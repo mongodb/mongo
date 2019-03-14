@@ -810,6 +810,8 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     OpTime commonPointOpTime = commonPointSW.getValue().getOpTime();
     OpTime lastCommittedOpTime = _replicationCoordinator->getLastCommittedOpTime();
     OpTime committedSnapshot = _replicationCoordinator->getCurrentCommittedSnapshotOpTime();
+    auto stableTimestamp =
+        _storageInterface->getLastStableRecoveryTimestamp(opCtx->getServiceContext());
 
     log() << "Rollback common point is " << commonPointOpTime;
 
@@ -820,6 +822,16 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     // Rollback common point should be >= the committed snapshot optime.
     invariant(commonPointOpTime.getTimestamp() >= committedSnapshot.getTimestamp());
     invariant(commonPointOpTime >= committedSnapshot);
+
+    // Rollback common point should be >= the stable timestamp.
+    invariant(stableTimestamp);
+    if (commonPointOpTime.getTimestamp() < *stableTimestamp) {
+        // This is an fassert rather than an invariant, since it can happen if the server was
+        // recently upgraded to enableMajorityReadConcern=true.
+        severe() << "Common point must be at least stable timestamp, common point: "
+                 << commonPointOpTime.getTimestamp() << ", stable timestamp: " << *stableTimestamp;
+        fassertFailedNoTrace(51121);
+    }
 
     return commonPointSW.getValue();
 }
