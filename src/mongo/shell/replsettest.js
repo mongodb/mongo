@@ -2250,14 +2250,14 @@ var ReplSetTest = function(opts) {
         }
 
         // If restarting a node, use its existing options as the defaults.
+        var baseOptions;
         if ((options && options.restart) || restart) {
-            const existingOpts =
-                _useBridge ? _unbridgedNodes[n].fullOptions : this.nodes[n].fullOptions;
-            options = Object.merge(existingOpts, options);
+            baseOptions = _useBridge ? _unbridgedNodes[n].fullOptions : this.nodes[n].fullOptions;
         } else {
-            options = Object.merge(defaults, options);
+            baseOptions = defaults;
         }
-        options = Object.merge(options, this.nodeOptions["n" + n]);
+        baseOptions = Object.merge(baseOptions, this.nodeOptions["n" + n]);
+        options = Object.merge(baseOptions, options);
         delete options.rsConfig;
 
         options.restart = options.restart || restart;

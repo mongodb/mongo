@@ -341,7 +341,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
         return curSecondary;
     };
 
-    this.restartNode = function(nodeId, signal) {
+    this.restartNode = function(nodeId, signal, startOptions, allowedExitCode) {
         assert(signal === SIGKILL || signal === SIGTERM, `Received unknown signal: ${signal}`);
         assert.gte(nodeId, 0, "Invalid argument to RollbackTest.restartNode()");
 
@@ -364,14 +364,16 @@ function RollbackTest(name = "RollbackTest", replSet) {
         }
 
         let opts = {};
-        if (signal === SIGKILL) {
+        if (allowedExitCode !== undefined) {
+            opts = {allowedExitCode: allowedExitCode};
+        } else if (signal === SIGKILL) {
             opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
         }
 
         log(`Stopping node ${hostName} with signal ${signal}`);
         rst.stop(nodeId, signal, opts, {forRestart: true});
         log(`Restarting node ${hostName}`);
-        rst.start(nodeId, {}, true /* restart */);
+        rst.start(nodeId, startOptions, true /* restart */);
 
         // Ensure that the primary is ready to take operations before continuing. If both nodes are
         // connected to the arbiter, the primary may switch.
