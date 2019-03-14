@@ -68,8 +68,8 @@ structs:
             prepared:
                 type: bool
                 optional: true
-                description: "Set to false for a commit for an unprepared transaction.  Implicit
-                              default is true, do not set explicitly to true"
+                description: "True if the transaction has been prepared. Set to false for a commit
+                              for an unprepared transaction."
 
     AbortTransactionOplogObject:
         description: A document representing the 'o' field of an 'abortTransaction' oplog entry.

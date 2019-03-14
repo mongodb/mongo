@@ -1277,6 +1277,9 @@ void OpObserverImpl::onPreparedTransactionCommit(
 
     CommitTransactionOplogObject cmdObj;
     cmdObj.setCommitTimestamp(commitTimestamp);
+    if (gUseMultipleOplogEntryFormatForTransactions) {
+        cmdObj.setPrepared(true);
+    }
     logCommitOrAbortForPreparedTransaction(
         opCtx, commitOplogEntryOpTime, cmdObj.toBSON(), DurableTxnStateEnum::kCommitted);
 }
