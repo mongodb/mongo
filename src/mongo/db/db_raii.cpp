@@ -39,7 +39,6 @@
 #include "mongo/db/db_raii_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/transaction_participant.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -331,9 +330,8 @@ OldClientContext::~OldClientContext() {
 LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<NamespaceString>& nss) {
     invariant(opCtx);
 
-    // Use IX locks for autocommit:false multi-statement transactions; otherwise, use IS locks.
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (txnParticipant && txnParticipant.inMultiDocumentTransaction()) {
+    // Use IX locks for multi-statement transactions; otherwise, use IS locks.
+    if (opCtx->getWriteUnitOfWork()) {
         uassert(51071,
                 "Cannot query system.views within a transaction",
                 !nss || !nss->isSystemDotViews());

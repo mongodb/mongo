@@ -709,6 +709,23 @@ env.Library(
     target='catalog_raii',
     source=[
         'catalog_raii.cpp',
+    ],
+    LIBDEPS=[
+        'catalog/collection',
+        'catalog/uuid_catalog',
+        'concurrency/lock_manager',
+        'namespace_string',
+        'views/views',
+    ],
+    LIBDEPS_PRIVATE=[
+        'catalog/database_holder',
+        's/sharding_api_d',
+    ]
+)
+
+env.Library(
+    target='transaction',
+    source=[
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
         'session_catalog_mongod.cpp',
@@ -721,30 +738,23 @@ env.Library(
         env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        'catalog/collection',
-        'catalog/database_holder',
-        'catalog/uuid_catalog',
-        'commands/test_commands_enabled',
         'commands/txn_cmd_request',
-        'concurrency/lock_manager',
-        'curop_failpoint_helpers',
-        'curop_metrics',
-        'dbdirectclient',
-        'index/index_access_method',
-        'namespace_string',
         'repl/oplog_entry',
         'repl/oplog_shim',
-        's/sharding_api_d',
         'session_catalog',
-        'stats/fill_locker_info',
-        'stats/top',
-        'views/views',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'catalog_raii',
         'commands/server_status',
+        'commands/test_commands_enabled',
+        'curop_failpoint_helpers',
+        'dbdirectclient',
+        'index/index_access_method',
+        'stats/fill_locker_info',
+        'stats/top',
         'update/update_driver',
     ]
 )
@@ -901,6 +911,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/command_can_run_here',
+        '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
@@ -1109,6 +1120,7 @@ env.Library(
         "$BUILD_DIR/mongo/s/grid",
         "catalog_raii",
         "curop",
+        "concurrency/write_conflict_exception",
         "repl/repl_coordinator_interface",
         "repl/speculative_majority_read_info",
         "s/sharding_api_d",
@@ -1248,6 +1260,7 @@ env.Library(
         'curop',
         'cursor_server_params',
         'db_raii',
+        'transaction',
         'dbdirectclient',
         'exec/scoped_timer',
         'exec/working_set',
