@@ -754,6 +754,7 @@ env.Library(
         'curop_failpoint_helpers',
         'dbdirectclient',
         'index/index_access_method',
+        'query_exec',
         'stats/fill_locker_info',
         'stats/top',
         'update/update_driver',

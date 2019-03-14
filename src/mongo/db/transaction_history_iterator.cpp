@@ -29,15 +29,68 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/logger/redaction.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Query the oplog for an entry with the given timestamp.
+ */
+BSONObj findOneOplogEntry(OperationContext* opCtx, const repl::OpTime& opTime) {
+    BSONObj oplogBSON;
+    invariant(!opTime.isNull());
+
+    auto qr = std::make_unique<QueryRequest>(NamespaceString::kRsOplogNamespace);
+    qr->setFilter(opTime.asQuery());
+    qr->setOplogReplay(true);  // QueryOption_OplogReplay
+
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx,
+                                                     std::move(qr),
+                                                     expCtx,
+                                                     ExtensionsCallbackNoop(),
+                                                     MatchExpressionParser::kBanAllSpecialFeatures);
+    invariant(statusWithCQ.isOK(),
+              str::stream() << "Failed to canonicalize oplog lookup"
+                            << causedBy(statusWithCQ.getStatus()));
+    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+    AutoGetCollectionForReadCommand ctx(opCtx,
+                                        NamespaceString::kRsOplogNamespace,
+                                        AutoGetCollection::ViewMode::kViewsForbidden,
+                                        Date_t::max(),
+                                        AutoStatsTracker::LogMode::kUpdateTop);
+
+    auto exec = uassertStatusOK(getExecutorFind(opCtx, ctx.getCollection(), std::move(cq)));
+
+    auto getNextResult = exec->getNext(&oplogBSON, nullptr);
+    uassert(ErrorCodes::IncompleteTransactionHistory,
+            str::stream() << "oplog no longer contains the complete write history of this "
+                             "transaction, log with opTime "
+                          << opTime.toBSON()
+                          << " cannot be found",
+            getNextResult != PlanExecutor::IS_EOF);
+    if (getNextResult != PlanExecutor::ADVANCED) {
+        uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(oplogBSON),
+                                   "PlanExecutor error in TransactionHistoryIterator");
+    }
+
+    return oplogBSON;
+}
+
+}  // namespace
 
 TransactionHistoryIterator::TransactionHistoryIterator(repl::OpTime startingOpTime)
     : _nextOpTime(std::move(startingOpTime)) {}
@@ -47,26 +100,13 @@ bool TransactionHistoryIterator::hasNext() const {
 }
 
 repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
-    invariant(hasNext());
-
-    DBDirectClient client(opCtx);
-    auto oplogBSON = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
-                                    _nextOpTime.asQuery(),
-                                    nullptr,
-                                    QueryOption_OplogReplay);
-
-    uassert(ErrorCodes::IncompleteTransactionHistory,
-            str::stream() << "oplog no longer contains the complete write history of this "
-                             "transaction, log with opTime "
-                          << _nextOpTime.toBSON()
-                          << " cannot be found",
-            !oplogBSON.isEmpty());
+    BSONObj oplogBSON = findOneOplogEntry(opCtx, _nextOpTime);
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogBSON));
     const auto& oplogPrevTsOption = oplogEntry.getPrevWriteOpTimeInTransaction();
     uassert(
         ErrorCodes::FailedToParse,
-        str::stream() << "Missing prevTs field on oplog entry of previous write in transcation: "
+        str::stream() << "Missing prevTs field on oplog entry of previous write in transaction: "
                       << redact(oplogBSON),
         oplogPrevTsOption);
 
