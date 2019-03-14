@@ -97,6 +97,8 @@ struct __wt_cache;
     typedef struct __wt_cache WT_CACHE;
 struct __wt_cache_pool;
     typedef struct __wt_cache_pool WT_CACHE_POOL;
+struct __wt_capacity;
+    typedef struct __wt_capacity WT_CAPACITY;
 struct __wt_cell;
     typedef struct __wt_cell WT_CELL;
 struct __wt_cell_unpack;
@@ -359,6 +361,7 @@ typedef uint64_t wt_timestamp_t;
 #include "btmem.h"
 #include "btree.h"
 #include "cache.h"
+#include "capacity.h"
 #include "compact.h"
 #include "config.h"
 #include "cursor.h"

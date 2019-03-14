@@ -863,6 +863,20 @@ static const char * const __stats_connection_desc[] = {
 	"cache: tracked dirty bytes in the cache",
 	"cache: tracked dirty pages in the cache",
 	"cache: unmodified pages evicted",
+	"capacity: background fsync file handles considered",
+	"capacity: background fsync file handles synced",
+	"capacity: background fsync time (msecs)",
+	"capacity: threshold to call fsync",
+	"capacity: throttled bytes read",
+	"capacity: throttled bytes written for checkpoint",
+	"capacity: throttled bytes written for eviction",
+	"capacity: throttled bytes written for log",
+	"capacity: throttled bytes written total",
+	"capacity: time waiting due to total capacity (usecs)",
+	"capacity: time waiting during checkpoint (usecs)",
+	"capacity: time waiting during eviction (usecs)",
+	"capacity: time waiting during logging (usecs)",
+	"capacity: time waiting during read (usecs)",
 	"connection: auto adjusting condition resets",
 	"connection: auto adjusting condition wait calls",
 	"connection: detected system time went backwards",
@@ -1272,6 +1286,20 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing cache_bytes_dirty */
 		/* not clearing cache_pages_dirty */
 	stats->cache_eviction_clean = 0;
+	stats->fsync_all_fh_total = 0;
+	stats->fsync_all_fh = 0;
+		/* not clearing fsync_all_time */
+	stats->capacity_threshold = 0;
+	stats->capacity_bytes_read = 0;
+	stats->capacity_bytes_ckpt = 0;
+	stats->capacity_bytes_evict = 0;
+	stats->capacity_bytes_log = 0;
+	stats->capacity_bytes_written = 0;
+	stats->capacity_time_total = 0;
+	stats->capacity_time_ckpt = 0;
+	stats->capacity_time_evict = 0;
+	stats->capacity_time_log = 0;
+	stats->capacity_time_read = 0;
 	stats->cond_auto_wait_reset = 0;
 	stats->cond_auto_wait = 0;
 	stats->time_travel = 0;
@@ -1727,6 +1755,21 @@ __wt_stat_connection_aggregate(
 	to->cache_bytes_dirty += WT_STAT_READ(from, cache_bytes_dirty);
 	to->cache_pages_dirty += WT_STAT_READ(from, cache_pages_dirty);
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
+	to->fsync_all_fh_total += WT_STAT_READ(from, fsync_all_fh_total);
+	to->fsync_all_fh += WT_STAT_READ(from, fsync_all_fh);
+	to->fsync_all_time += WT_STAT_READ(from, fsync_all_time);
+	to->capacity_threshold += WT_STAT_READ(from, capacity_threshold);
+	to->capacity_bytes_read += WT_STAT_READ(from, capacity_bytes_read);
+	to->capacity_bytes_ckpt += WT_STAT_READ(from, capacity_bytes_ckpt);
+	to->capacity_bytes_evict += WT_STAT_READ(from, capacity_bytes_evict);
+	to->capacity_bytes_log += WT_STAT_READ(from, capacity_bytes_log);
+	to->capacity_bytes_written +=
+	    WT_STAT_READ(from, capacity_bytes_written);
+	to->capacity_time_total += WT_STAT_READ(from, capacity_time_total);
+	to->capacity_time_ckpt += WT_STAT_READ(from, capacity_time_ckpt);
+	to->capacity_time_evict += WT_STAT_READ(from, capacity_time_evict);
+	to->capacity_time_log += WT_STAT_READ(from, capacity_time_log);
+	to->capacity_time_read += WT_STAT_READ(from, capacity_time_read);
 	to->cond_auto_wait_reset += WT_STAT_READ(from, cond_auto_wait_reset);
 	to->cond_auto_wait += WT_STAT_READ(from, cond_auto_wait);
 	to->time_travel += WT_STAT_READ(from, time_travel);

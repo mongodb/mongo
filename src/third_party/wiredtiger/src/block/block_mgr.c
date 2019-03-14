@@ -505,6 +505,8 @@ static int
 __bm_write(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf,
     uint8_t *addr, size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
 {
+	__wt_capacity_throttle(session, buf->size,
+	     checkpoint_io ? WT_THROTTLE_CKPT : WT_THROTTLE_EVICT);
 	return (__wt_block_write(session,
 	    bm->block, buf, addr, addr_sizep, data_checksum, checkpoint_io));
 }

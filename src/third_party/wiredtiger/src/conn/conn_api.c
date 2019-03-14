@@ -1051,6 +1051,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 
+	/* The default session is used to access data handles during close. */
+	F_CLR(session, WT_SESSION_NO_DATA_HANDLES);
+
 	WT_TRET(__wt_config_gets(session, cfg, "leak_memory", &cval));
 	if (cval.val != 0)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
@@ -2312,6 +2315,11 @@ wiredtiger_dummy_session_init(
 	 * use the WT_CONNECTION_IMPL's default session and its strerror method.
 	 */
 	session->iface.strerror = __wt_session_strerror;
+
+	/*
+	 * The dummy session should never be used to access data handles.
+	 */
+	F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 }
 
 /*
@@ -2760,6 +2768,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* Start the worker threads and run recovery. */
 	WT_ERR(__wt_connection_workers(session, cfg));
+
+	/*
+	 * The default session should not open data handles after this point:
+	 * since it can be shared between threads, relying on session->dhandle
+	 * is not safe.
+	 */
+	F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
 	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*connectionp = &conn->iface;

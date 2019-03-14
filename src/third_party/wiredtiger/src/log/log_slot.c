@@ -535,6 +535,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 		    (uint64_t)slot->slot_state, WT_LOG_SLOT_RESERVED)) {
 			rel = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
 			if (rel != 0)
+				/* Writes are not throttled. */
 				WT_RET(__wt_write(session, slot->slot_fh,
 				    slot->slot_start_offset, (size_t)rel,
 				    slot->slot_buf.mem));

@@ -519,6 +519,17 @@ connection_runtime_config = [
             interval in seconds at which to check for files that are
             inactive and close them''', min=1, max=100000),
         ]),
+    Config('io_capacity', '', r'''
+        control how many bytes per second are written and read. Exceeding
+        the capacity results in throttling.''',
+        type='category', subconfig=[
+        Config('total', '0', r'''
+            number of bytes per second available to all subsystems in total.
+            When set, decisions about what subsystems are throttled, and in
+            what proportion, are made internally. The minimum non-zero setting
+            is 1MB.''',
+            min='0', max='1TB'),
+        ]),
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management. The LSM
         manager is started automatically the first time an LSM tree is opened.
