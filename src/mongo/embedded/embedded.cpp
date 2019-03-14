@@ -278,23 +278,10 @@ ServiceContext* initialize(const char* yaml_config) {
                                                        repl::StorageInterface::get(serviceContext));
     }
 
-    auto swNonLocalDatabases = repairDatabasesAndCheckVersion(startupOpCtx.get());
-    if (!swNonLocalDatabases.isOK()) {
-        // SERVER-31611 introduced a return value to `repairDatabasesAndCheckVersion`. Previously,
-        // a failing condition would fassert. SERVER-31611 covers a case where the binary (3.6) is
-        // refusing to start up because it refuses acknowledgement of FCV 3.2 and requires the
-        // user to start up with an older binary. Thus shutting down the server must leave the
-        // datafiles in a state that the older binary can start up. This requires going through a
-        // clean shutdown.
-        //
-        // The invariant is *not* a statement that `repairDatabasesAndCheckVersion` must return
-        // `MustDowngrade`. Instead, it is meant as a guardrail to protect future developers from
-        // accidentally buying into this behavior. New errors that are returned from the method
-        // may or may not want to go through a clean shutdown, and they likely won't want the
-        // program to return an exit code of `EXIT_NEED_DOWNGRADE`.
-        severe(LogComponent::kControl) << "** IMPORTANT: "
-                                       << swNonLocalDatabases.getStatus().reason();
-        invariant(swNonLocalDatabases == ErrorCodes::MustDowngrade);
+    try {
+        repairDatabasesAndCheckVersion(startupOpCtx.get());
+    } catch (const ExceptionFor<ErrorCodes::MustDowngrade>& error) {
+        severe(LogComponent::kControl) << "** IMPORTANT: " << error.toStatus().reason();
         quickExit(EXIT_NEED_DOWNGRADE);
     }
 

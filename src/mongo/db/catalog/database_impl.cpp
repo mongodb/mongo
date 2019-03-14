@@ -100,19 +100,17 @@ std::unique_ptr<Collection> _createCollectionInstance(OperationContext* opCtx,
                                                       DatabaseCatalogEntry* dbEntry,
                                                       const NamespaceString& nss) {
 
-    std::unique_ptr<CollectionCatalogEntry> cce(dbEntry->getCollectionCatalogEntry(nss.ns()));
-    std::unique_ptr<RecordStore> rs(dbEntry->getRecordStore(nss.ns()));
+    auto cce = dbEntry->getCollectionCatalogEntry(nss.ns());
+    auto rs = dbEntry->getRecordStore(nss.ns());
     auto uuid = cce->getCollectionOptions(opCtx).uuid;
     invariant(rs,
               str::stream() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
                             << uuid);
-    // TODO(SERVER-40126): Add something like:
-    // uassert(ErrorCodes::MustDowngrade,
-    //        str::stream() << "Record store has no UUID. Collection: " << nss.ns(),
-    //        uuid);
+    uassert(ErrorCodes::MustDowngrade,
+            str::stream() << "Record store has no UUID for Collection " << nss.ns(),
+            uuid);
 
-    auto coll = std::make_unique<CollectionImpl>(
-        opCtx, nss.ns(), uuid, cce.release(), rs.release(), dbEntry);
+    auto coll = std::make_unique<CollectionImpl>(opCtx, nss.ns(), uuid, cce, rs, dbEntry);
     // We are not in a WUOW only when we are called from Database::init(). There is no need
     // to rollback UUIDCatalog changes because we are initializing existing collections.
     if (uuid) {

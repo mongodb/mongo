@@ -201,38 +201,40 @@ Status repairDatabase(OperationContext* opCtx,
     // Close the db and invalidate all current users and caches.
     auto databaseHolder = DatabaseHolder::get(opCtx);
     databaseHolder->close(opCtx, dbName);
-    ON_BLOCK_EXIT([databaseHolder, &dbName, &opCtx] {
-        try {
-            // Ensure that we don't trigger an exception when attempting to take locks.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-            // Open the db after everything finishes.
-            auto db = databaseHolder->openDb(opCtx, dbName);
-
-            // Set the minimum snapshot for all Collections in this db. This ensures that readers
-            // using majority readConcern level can only use the collections after their repaired
-            // versions are in the committed view.
-            auto clusterTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
-
-            for (auto&& collection : *db) {
-                collection->setMinimumVisibleSnapshot(clusterTime);
-            }
-
-            // Restore oplog Collection pointer cache.
-            repl::acquireOplogCollectionForLogging(opCtx);
-        } catch (...) {
-            severe() << "Unexpected exception encountered while reopening database after repair.";
-            std::terminate();  // Logs additional info about the specific error.
-        }
-    });
 
     auto status = repairCollections(opCtx, engine, dbName, onRecordStoreRepair);
     if (!status.isOK()) {
         severe() << "Failed to repair database " << dbName << ": " << status.reason();
-        return status;
     }
 
-    return Status::OK();
+    try {
+        // Ensure that we don't trigger an exception when attempting to take locks.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+        // Open the db after everything finishes.
+        auto db = databaseHolder->openDb(opCtx, dbName);
+
+        // Set the minimum snapshot for all Collections in this db. This ensures that readers
+        // using majority readConcern level can only use the collections after their repaired
+        // versions are in the committed view.
+        auto clusterTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
+
+        for (auto&& collection : *db) {
+            collection->setMinimumVisibleSnapshot(clusterTime);
+        }
+
+        // Restore oplog Collection pointer cache.
+        repl::acquireOplogCollectionForLogging(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::MustDowngrade>&) {
+        // openDb can throw an exception with a MustDowngrade status if a collection does not
+        // have a UUID.
+        throw;
+    } catch (...) {
+        severe() << "Unexpected exception encountered while reopening database after repair.";
+        std::terminate();  // Logs additional info about the specific error.
+    }
+
+    return status;
 }
 
 }  // namespace mongo
