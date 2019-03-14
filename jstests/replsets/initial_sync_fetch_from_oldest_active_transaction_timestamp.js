@@ -75,14 +75,22 @@
     // has copied {_id: 1} and {_id: 2}. This way we can insert more documents when initial sync is
     // paused and know that they won't be copied during collection cloning but instead must be
     // applied during oplog application.
-    secondary = replTest.restart(secondary, {
-        startClean: true,
-        setParameter: {
-            'failpoint.initialSyncHangDuringCollectionClone': tojson(
-                {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 2}}),
-            'numInitialSyncAttempts': 1
-        }
-    });
+    replTest.stop(secondary,
+                  // signal
+                  undefined,
+                  // Validation would encounter a prepare conflict on the open transaction.
+                  {skipValidation: true});
+    secondary = replTest.start(
+        secondary,
+        {
+          startClean: true,
+          setParameter: {
+              'failpoint.initialSyncHangDuringCollectionClone': tojson(
+                  {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 2}}),
+              'numInitialSyncAttempts': 1
+          }
+        },
+        true /* wait */);
 
     jsTestLog("Secondary was restarted");
 

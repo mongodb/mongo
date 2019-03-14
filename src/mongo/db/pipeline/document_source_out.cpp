@@ -305,7 +305,6 @@ intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
     // during lite parsing, we need to do it here as well in case mongos is stale or the command is
     // sent directly to the shard.
     if (mode == WriteModeEnum::kModeReplaceCollection) {
-        LocalReadConcernBlock readLocal(expCtx->opCtx);
         uassert(17017,
                 str::stream() << "$out with mode " << WriteMode_serializer(mode)
                               << " is not supported to an existing *sharded* output collection.",

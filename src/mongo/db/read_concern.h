@@ -43,16 +43,17 @@ class ReadConcernArgs;
 class SpeculativeMajorityReadInfo;
 }
 
-
 /**
  * Given the specified read concern arguments, performs checks that the read concern can actually be
  * satisfied given the current state of the server and if so calls into the replication subsystem to
  * perform the wait. If allowAfterClusterTime is false returns an error if afterClusterTime is
- * set on the readConcernArgs.
+ * set on the readConcernArgs. Both cmdName and readConcernArgs are used to determine whether or not
+ * prepare conflicts can be ignored.
  */
 extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
                            const repl::ReadConcernArgs& readConcernArgs,
-                           bool allowAfterClusterTime)
+                           bool allowAfterClusterTime,
+                           StringData cmdName)
                               ->Status) waitForReadConcern;
 
 /*

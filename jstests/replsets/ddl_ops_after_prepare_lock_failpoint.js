@@ -28,8 +28,8 @@
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
     // Also build an index (on the same collection) which we will later attempt to drop.
-    assert.commandWorked(
-        testDB.runCommand({createIndexes: collName, indexes: [{key: {"a": 1}, name: indexName}]}));
+    assert.commandWorked(testDB.runCommand(
+        {createIndexes: collName, indexes: [{key: {"num": 1}, name: indexName}]}));
 
     const session = primary.startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
@@ -104,9 +104,15 @@
     const docToRemove = docToUpdateTo;
 
     let testCRUDOps = (collConn) => {
+        // TODO: SERVER-40167 Having an extra document in the collection is necessary to avoid
+        // prepare conflicts when deleting documents.
+        assert.commandWorked(collConn.insert({num: 1}));
+
         assert.commandWorked(collConn.insert(docToInsert));
         assert.eq(100, collConn.findOne(docToInsert).num);
 
+        // This will not encounter a prepare conflict because there is an index on "num" that
+        // eliminates the need for using a collection scan.
         assert.commandWorked(collConn.update(docToUpdateFrom, docToUpdateTo));
         assert.eq(101, collConn.findOne(docToUpdateTo).num);
 

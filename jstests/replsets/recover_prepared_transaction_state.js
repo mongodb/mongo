@@ -66,6 +66,7 @@
 
     // Prepare another transaction on the second session.
     session2.startTransaction();
+
     assert.commandWorked(sessionColl2.insert({_id: 4}));
     assert.commandWorked(sessionColl2.update({_id: 2}, {$set: {b: 2}}));
     const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);

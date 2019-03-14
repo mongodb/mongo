@@ -34,7 +34,10 @@
 namespace mongo {
 
 MONGO_REGISTER_SHIM(waitForReadConcern)
-(OperationContext* opCtx, const repl::ReadConcernArgs& readConcernArgs, bool allowAfterClusterTime)
+(OperationContext* opCtx,
+ const repl::ReadConcernArgs& readConcernArgs,
+ bool allowAfterClusterTime,
+ StringData cmdName)
     ->Status {
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         return {ErrorCodes::NotImplemented, "linearizable read concern not supported on embedded"};

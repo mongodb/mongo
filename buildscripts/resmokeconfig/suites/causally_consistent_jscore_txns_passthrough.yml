@@ -12,6 +12,9 @@ selector:
   - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
   # These tests rely on having read concerns that don't use afterClusterTime.
   - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
+  # These tests rely on reads that cannot use an afterClusterTime read concern because the read
+  # happens after a transaction is prepared, but before it is committed.
+  - jstests/core/txns/prepare_conflict_aggregation_behavior.js
 
 executor:
   archive:

@@ -53,14 +53,22 @@
     // has copied {_id: 1} and {_id: 3}. This way we can try to commit the prepared transaction
     // while initial sync is paused and know that its operations won't be copied during collection
     // cloning. Instead, the commitTransaction oplog entry must be applied during oplog application.
-    secondary = replTest.restart(secondary, {
-        startClean: true,
-        setParameter: {
-            'failpoint.initialSyncHangDuringCollectionClone': tojson(
-                {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 2}}),
-            'numInitialSyncAttempts': 1
-        }
-    });
+    replTest.stop(secondary,
+                  // signal
+                  undefined,
+                  // Validation would encounter a prepare conflict on the open transaction.
+                  {skipValidation: true});
+    secondary = replTest.start(
+        secondary,
+        {
+          startClean: true,
+          setParameter: {
+              'failpoint.initialSyncHangDuringCollectionClone': tojson(
+                  {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 2}}),
+              'numInitialSyncAttempts': 1
+          }
+        },
+        true /* wait */);
 
     // Wait for failpoint to be reached so we know that collection cloning is paused.
     checkLog.contains(secondary, "initialSyncHangDuringCollectionClone fail point enabled");

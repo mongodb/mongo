@@ -124,12 +124,20 @@ public:
                   "This storage engine does not support prepared transactions");
     }
 
-
     /**
      * Sets whether or not to ignore prepared transactions if supported by this storage engine. When
-     * 'ignore' is true, allows reading data in prepared, but uncommitted transactions.
+     * 'ignore' is true, allows reading data from before prepared transactions, but will not show
+     * prepared data. This may not be called while a transaction is already open.
      */
     virtual void setIgnorePrepared(bool ignore) {}
+
+    /**
+     * Returns whether or not we are ignoring prepared conflicts. Defaults to false if prepared
+     * transactions are not supported by this storage engine.
+     */
+    virtual bool getIgnorePrepared() const {
+        return false;
+    }
 
     /**
      * Waits until all commits that happened before this call are durable in the journal. Returns

@@ -50,7 +50,7 @@ DocumentSourceOutReplaceColl::~DocumentSourceOutReplaceColl() {
             // not affect the dropCollection operation below.
             auto cleanupOpCtx = cc().makeOperationContext();
 
-            LocalReadConcernBlock readLocal(cleanupOpCtx.get());
+            OutStageWriteBlock writeBlock(cleanupOpCtx.get());
 
             // Reset the operation context back to original once dropCollection is done.
             ON_BLOCK_EXIT(
@@ -62,7 +62,7 @@ DocumentSourceOutReplaceColl::~DocumentSourceOutReplaceColl() {
 }
 
 void DocumentSourceOutReplaceColl::initializeWriteNs() {
-    LocalReadConcernBlock readLocal(pExpCtx->opCtx);
+    OutStageWriteBlock writeBlock(pExpCtx->opCtx);
 
     DBClientBase* conn = pExpCtx->mongoProcessInterface->directClient();
 
@@ -123,7 +123,7 @@ void DocumentSourceOutReplaceColl::initializeWriteNs() {
 };
 
 void DocumentSourceOutReplaceColl::finalize() {
-    LocalReadConcernBlock readLocal(pExpCtx->opCtx);
+    OutStageWriteBlock writeBlock(pExpCtx->opCtx);
 
     const auto& outputNs = getOutputNs();
     auto renameCommandObj =

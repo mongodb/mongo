@@ -750,8 +750,21 @@ Timestamp WiredTigerRecoveryUnit::getPrepareTimestamp() const {
 }
 
 void WiredTigerRecoveryUnit::setIgnorePrepared(bool value) {
-    _ignorePrepared = (value) ? WiredTigerBeginTxnBlock::IgnorePrepared::kIgnore
-                              : WiredTigerBeginTxnBlock::IgnorePrepared::kNoIgnore;
+    auto newValue = (value) ? WiredTigerBeginTxnBlock::IgnorePrepared::kIgnore
+                            : WiredTigerBeginTxnBlock::IgnorePrepared::kNoIgnore;
+
+    // If there is an open storage transaction, it is not valid to try to change the behavior of
+    // ignoring prepare conflicts, since that behavior is applied when the transaction is opened.
+    invariant(!_isActive(),
+              str::stream() << "Current state: " << toString(_state)
+                            << ". Invalid internal state while setting ignore_prepare to: "
+                            << value);
+
+    _ignorePrepared = newValue;
+}
+
+bool WiredTigerRecoveryUnit::getIgnorePrepared() const {
+    return _ignorePrepared == WiredTigerBeginTxnBlock::IgnorePrepared::kIgnore;
 }
 
 void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,

@@ -279,7 +279,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         auto const readConcernArgs = repl::ReadConcernArgs(
             replCoord->getMyLastAppliedOpTime(), repl::ReadConcernLevel::kLocalReadConcern);
 
-        uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, false));
+        uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, false, "moveChunk"));
     }
 
     Status startCloneStatus = _cloneDriver->startClone(opCtx);

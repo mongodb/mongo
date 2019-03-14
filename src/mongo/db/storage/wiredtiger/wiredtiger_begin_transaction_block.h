@@ -46,7 +46,8 @@ class WiredTigerBeginTxnBlock {
 public:
     // Whether or not to ignore prepared transactions.
     enum class IgnorePrepared {
-        kNoIgnore,  // Do not ignore prepared transactions and return prepare conflicts.
+        kNoIgnore,  // Enforce prepare conflicts when encountering updates from prepared
+                    // transactions.
         kIgnore     // Ignore prepare conflicts, but don't show prepared data.
     };
 
@@ -56,8 +57,7 @@ public:
         kRound     // Round the read timestamp up to the oldest timestamp when it is behind.
     };
 
-    WiredTigerBeginTxnBlock(WT_SESSION* session,
-                            IgnorePrepared ignorePrepared = IgnorePrepared::kIgnore);
+    WiredTigerBeginTxnBlock(WT_SESSION* session, IgnorePrepared ignorePrepared);
     WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config);
     ~WiredTigerBeginTxnBlock();
 

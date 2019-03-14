@@ -78,8 +78,14 @@
     // Restart the secondary with startClean set to true so that it goes through initial sync. Since
     // we won't be running any operations during collection cloning, the beginApplyingTimestamp and
     // stopTimestamp should be the same.
-    secondary = replTest.restart(secondary,
-                                 {startClean: true, setParameter: {'numInitialSyncAttempts': 1}});
+    replTest.stop(secondary,
+                  // signal
+                  undefined,
+                  // Validation would encounter a prepare conflict on the open transaction.
+                  {skipValidation: true});
+    secondary = replTest.start(secondary,
+                               {startClean: true, setParameter: {'numInitialSyncAttempts': 1}},
+                               true /* wait */);
     replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
 

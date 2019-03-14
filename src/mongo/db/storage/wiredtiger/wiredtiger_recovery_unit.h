@@ -137,6 +137,8 @@ public:
 
     void setIgnorePrepared(bool ignore) override;
 
+    bool getIgnorePrepared() const override;
+
     void setTimestampReadSource(ReadSource source,
                                 boost::optional<Timestamp> provided = boost::none) override;
 
@@ -302,10 +304,10 @@ private:
     // When 'true', data read from disk should not be kept in the storage engine cache.
     bool _readOnce = false;
 
-    // Ignoring prepared transactions will not return prepare conflicts and will not allow seeing
-    // prepared data.
+    // If set to kIgnore, updates from prepared transactions will not return prepare conflicts and
+    // will not allow seeing prepared data.
     WiredTigerBeginTxnBlock::IgnorePrepared _ignorePrepared{
-        WiredTigerBeginTxnBlock::IgnorePrepared::kIgnore};
+        WiredTigerBeginTxnBlock::IgnorePrepared::kNoIgnore};
     Timestamp _commitTimestamp;
     Timestamp _durableTimestamp;
     Timestamp _prepareTimestamp;

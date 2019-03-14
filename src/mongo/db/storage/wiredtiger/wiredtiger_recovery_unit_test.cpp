@@ -225,9 +225,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
-    // Transaction read that does not ignore prepare conflicts triggers WT_PREPARE_CONFLICT
+    // The transaction read default enforces prepare conflicts and triggers a WT_PREPARE_CONFLICT.
     ru2->beginUnitOfWork(clientAndCtx2.second.get());
-    ru2->setIgnorePrepared(false);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);
@@ -249,9 +248,10 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
-    // Transaction read default ignores prepare conflicts but should not be able to read
-    // data from the prepared transaction.
+    // A transaction that chooses to ignore prepare conflicts does not see the record instead of
+    // returning a prepare conflict.
     ru2->beginUnitOfWork(clientAndCtx2.second.get());
+    ru2->setIgnorePrepared(true);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);

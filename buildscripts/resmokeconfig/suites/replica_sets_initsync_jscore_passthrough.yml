@@ -46,6 +46,7 @@ selector:
   - jstests/core/txns/no_new_transactions_when_prepared_transaction_in_progress.js
   - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
   - jstests/core/txns/prepare_conflict.js
+  - jstests/core/txns/prepare_conflict_aggregation_behavior.js
   - jstests/core/txns/prepare_prepared_transaction.js
   - jstests/core/txns/prepared_transactions_do_not_block_non_conflicting_ddl.js
   - jstests/core/txns/statement_ids_accepted.js

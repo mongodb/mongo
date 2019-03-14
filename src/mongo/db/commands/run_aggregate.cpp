@@ -381,8 +381,9 @@ void _adjustChangeStreamReadConcern(OperationContext* opCtx) {
                 repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative);
         }
     }
+
     // Wait for read concern again since we changed the original read concern.
-    uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, true));
+    uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, true, "aggregate"));
 }
 
 }  // namespace

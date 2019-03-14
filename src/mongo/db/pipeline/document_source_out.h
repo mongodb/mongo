@@ -38,26 +38,31 @@ namespace mongo {
 
 /**
  * Manipulates the state of the OperationContext so that while this object is in scope, reads and
- * writes will use a local read concern and see the latest version of the data. Resets the
- * OperationContext back to its original state upon destruction.
+ * writes will use a local read concern and see the latest version of the data. It will also reset
+ * ignore_prepared on the recovery unit so that any reads or writes will block on a conflict with a
+ * prepared transaction. Resets the OperationContext back to its original state upon destruction.
  */
-class LocalReadConcernBlock {
+class OutStageWriteBlock {
     OperationContext* _opCtx;
     repl::ReadConcernArgs _originalArgs;
     RecoveryUnit::ReadSource _originalSource;
+    bool _originalIgnorePrepared;
 
 public:
-    LocalReadConcernBlock(OperationContext* opCtx) : _opCtx(opCtx) {
+    OutStageWriteBlock(OperationContext* opCtx) : _opCtx(opCtx) {
         _originalArgs = repl::ReadConcernArgs::get(_opCtx);
         _originalSource = _opCtx->recoveryUnit()->getTimestampReadSource();
+        _originalIgnorePrepared = _opCtx->recoveryUnit()->getIgnorePrepared();
 
         repl::ReadConcernArgs::get(_opCtx) = repl::ReadConcernArgs();
         _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::kUnset);
+        _opCtx->recoveryUnit()->setIgnorePrepared(false);
     }
 
-    ~LocalReadConcernBlock() {
+    ~OutStageWriteBlock() {
         repl::ReadConcernArgs::get(_opCtx) = _originalArgs;
         _opCtx->recoveryUnit()->setTimestampReadSource(_originalSource);
+        _opCtx->recoveryUnit()->setIgnorePrepared(_originalIgnorePrepared);
     }
 };
 
@@ -217,7 +222,7 @@ public:
      * Writes the documents in 'batch' to the write namespace.
      */
     virtual void spill(BatchedObjects&& batch) {
-        LocalReadConcernBlock readLocal(pExpCtx->opCtx);
+        OutStageWriteBlock writeBlock(pExpCtx->opCtx);
 
         pExpCtx->mongoProcessInterface->insert(
             pExpCtx, getWriteNs(), std::move(batch.objects), _writeConcern, _targetEpoch());
