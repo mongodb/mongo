@@ -268,9 +268,7 @@ void TransactionCoordinator::_handleCompletionError(Status s) {
             s = Status(ErrorCodes::InterruptedDueToStepDown, s.reason());
         }
 
-        _decisionPromise.setError(s == ErrorCodes::TransactionCoordinatorReachedAbortDecision
-                                      ? Status{ErrorCodes::InterruptedDueToStepDown, s.reason()}
-                                      : s);
+        _decisionPromise.setError(s);
     }
 
     _transitionToDone(std::move(lk));
