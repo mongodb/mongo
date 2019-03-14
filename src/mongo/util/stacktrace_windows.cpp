@@ -220,7 +220,7 @@ static void getsymbolAndOffset(HANDLE process,
     std::string symbolString(symbolInfo->Name);
     static const size_t bufferSize = 32;
     std::unique_ptr<char[]> symbolOffset(new char[bufferSize]);
-    _snprintf(symbolOffset.get(), bufferSize, "+0x%llux", displacement64);
+    _snprintf(symbolOffset.get(), bufferSize, "+0x%llx", displacement64);
     symbolString += symbolOffset.get();
     returnedSymbolAndOffset->swap(symbolString);
 }
