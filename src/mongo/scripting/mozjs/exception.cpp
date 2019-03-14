@@ -74,7 +74,7 @@ std::string currentJSStackToString(JSContext* cx) {
 Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {
     JS::RootedValue vp(cx);
     if (!JS_GetPendingException(cx, &vp))
-        return Status(altCode, altReason.rawData());
+        return Status(altCode, altReason);
 
     return jsExceptionToStatus(cx, vp, altCode, altReason);
 }
@@ -85,7 +85,7 @@ Status JSErrorReportToStatus(JSContext* cx,
                              StringData altReason) {
     JSStringWrapper jsstr(cx, mongoErrorReportToString(cx, report));
     if (!jsstr)
-        return Status(altCode, altReason.rawData());
+        return Status(altCode, altReason);
 
     ErrorCodes::Error error = altCode;
 
@@ -134,7 +134,7 @@ Status jsExceptionToStatus(JSContext* cx,
 
     JSErrorReport* report = JS_ErrorFromException(cx, obj);
     if (!report)
-        return Status(altCode, altReason.rawData());
+        return Status(altCode, altReason);
 
     return JSErrorReportToStatus(cx, report, altCode, altReason);
 }
