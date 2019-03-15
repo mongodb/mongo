@@ -12830,7 +12830,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     # Transactions are not supported on the MMAPv1 storage engine.
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions,requires_document_locking
+    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions,requires_document_locking,requires_majority_read_concern,uses_change_streams
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release
@@ -12945,7 +12945,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     # Transactions are not supported on the MMAPv1 storage engine.
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions,requires_document_locking
+    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions,requires_document_locking,requires_majority_read_concern,uses_change_streams
     platform_decompress: unzip
     exe: .exe
     tooltags: "ssl sasl"
@@ -13072,7 +13072,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     # Transactions are not supported on the MMAPv1 storage engine.
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions,requires_ssl_mongo_tools,requires_document_locking
+    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions,requires_ssl_mongo_tools,requires_document_locking,requires_majority_read_concern,uses_change_streams
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
       --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.11"
@@ -13165,7 +13165,7 @@ buildvariants:
     push_name: linux-duroff
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    test_flags: --nojournal --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,requires_journaling,uses_transactions,requires_document_locking
+    test_flags: --nojournal --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,requires_journaling,uses_transactions,requires_document_locking,requires_majority_read_concern,uses_change_streams
     scons_cache_scope: shared
     tooltags: ""
     build_mongoreplay: false
