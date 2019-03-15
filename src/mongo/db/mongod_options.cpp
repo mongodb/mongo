@@ -470,12 +470,29 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     repl::ReplSettings replSettings;
-    if (params.count("replication.replSetName")) {
-        replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
-    }
     if (params.count("replication.replSet")) {
         /* seed list of hosts for the repl set */
         replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
+    } else if (params.count("replication.replSetName")) {
+        // "replSetName" is previously removed if "replSet" and "replSetName" are both found to be
+        // set by the user. Therefore, we only need to check for it if "replSet" in not found.
+        replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
+    } else {
+        // If neither "replication.replSet" nor "replication.replSetName" is set, then we are in
+        // standalone mode.
+        //
+        // A standalone node does not use the oplog collection, so special truncation handling for
+        // the capped collection is unnecessary.
+        //
+        // A standalone node that will be reintroduced to its replica set must not allow oplog
+        // truncation while in standalone mode because oplog history needed for startup recovery as
+        // a replica set member could be deleted. Replication can need history older than the last
+        // checkpoint to support transactions.
+        //
+        // Note: we only use this to defer oplog collection truncation via OplogStones in WT. Non-WT
+        // storage engines will continue to perform regular capped collection handling for the oplog
+        // collection, regardless of this parameter setting.
+        storageGlobalParams.allowOplogTruncation = false;
     }
 
     if (params.count("replication.enableMajorityReadConcern")) {

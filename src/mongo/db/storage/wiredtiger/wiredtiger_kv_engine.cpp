@@ -1854,6 +1854,11 @@ boost::optional<Timestamp> WiredTigerKVEngine::getOplogNeededForCrashRecovery() 
 
 Timestamp WiredTigerKVEngine::getPinnedOplog() const {
     stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
+    if (!storageGlobalParams.allowOplogTruncation) {
+        // If oplog truncation is not allowed, then return the min timestamp so that no history is
+        // ever allowed to be deleted.
+        return Timestamp::min();
+    }
     if (_oplogPinnedByBackup) {
         // All the oplog since `_oplogPinnedByBackup` should remain intact during the backup.
         return _oplogPinnedByBackup.get();

@@ -109,6 +109,9 @@ struct StorageGlobalParams {
     // an existing underlying MongoDB database level resource if possible. This can improve
     // workloads that rely heavily on creating many collections within a database.
     bool groupCollections;
+
+    // Controls whether we allow the OplogStones mechanism to delete oplog history on WT.
+    bool allowOplogTruncation = true;
 };
 
 extern StorageGlobalParams storageGlobalParams;
