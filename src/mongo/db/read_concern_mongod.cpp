@@ -38,6 +38,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_concern_mongod_gen.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -300,9 +301,11 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
         // Handle speculative majority reads.
         if (readConcernArgs.getMajorityReadMechanism() ==
             repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative) {
-            // We read from a local snapshot, so there is no need to set an explicit read source.
-            // Mark down that we need to block after the command is done to satisfy majority read
-            // concern, though.
+            // For speculative majority reads, we utilize the "no overlap" read source as a means of
+            // always reading at the minimum of the all-committed and lastApplied timestamps. This
+            // allows for safe behavior on both primaries and secondaries, where the behavior of the
+            // all-committed and lastApplied timestamps differ significantly.
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
             auto& speculativeReadInfo = repl::SpeculativeMajorityReadInfo::get(opCtx);
             speculativeReadInfo.setIsSpeculativeRead();
             return Status::OK();
@@ -390,17 +393,19 @@ MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
     invariant(speculativeReadInfo.isSpeculativeRead());
 
     // Select the timestamp to wait on. A command may have selected a specific timestamp to wait on.
-    // If not, then we just wait on the most recent timestamp written on this node i.e. lastApplied.
+    // If not, then we use the timestamp selected by the read source.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     Timestamp waitTs;
-    auto lastAppliedTs = replCoord->getMyLastAppliedOpTime().getTimestamp();
     auto speculativeReadTimestamp = speculativeReadInfo.getSpeculativeReadTimestamp();
     if (speculativeReadTimestamp) {
-        // The timestamp provided must not be greater than the current lastApplied.
-        invariant(*speculativeReadTimestamp <= lastAppliedTs);
         waitTs = *speculativeReadTimestamp;
     } else {
-        waitTs = lastAppliedTs;
+        // Speculative majority reads are required to use the 'kNoOverlap' read source.
+        invariant(opCtx->recoveryUnit()->getTimestampReadSource() ==
+                  RecoveryUnit::ReadSource::kNoOverlap);
+        boost::optional<Timestamp> readTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+        invariant(readTs);
+        waitTs = *readTs;
     }
 
     // Block to make sure returned data is majority committed.

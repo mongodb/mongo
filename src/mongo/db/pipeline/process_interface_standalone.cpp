@@ -432,14 +432,17 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     }
 
     // Set the speculative read timestamp appropriately after we do a document lookup locally. We
-    // don't know exactly what timestamp the document reflects, we so set the speculative read
-    // timestamp to the most recent applied timestamp.
+    // set the speculative read timestamp based on the timestamp used by the transaction.
     repl::SpeculativeMajorityReadInfo& speculativeMajorityReadInfo =
         repl::SpeculativeMajorityReadInfo::get(expCtx->opCtx);
     if (speculativeMajorityReadInfo.isSpeculativeRead()) {
-        auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
-        speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(
-            replCoord->getMyLastAppliedOpTime().getTimestamp());
+        // Speculative majority reads are required to use the 'kNoOverlap' read source.
+        invariant(expCtx->opCtx->recoveryUnit()->getTimestampReadSource() ==
+                  RecoveryUnit::ReadSource::kNoOverlap);
+        boost::optional<Timestamp> readTs =
+            expCtx->opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+        invariant(readTs);
+        speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(*readTs);
     }
 
     return lookedUpDocument;

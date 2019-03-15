@@ -137,6 +137,8 @@ void validateTxnNumber(OperationContext* opCtx,
  */
 void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArgs) {
     const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
+
+    // Select the appropriate read source.
     if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
         rcArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
         switch (rcArgs.getMajorityReadMechanism()) {
@@ -148,11 +150,21 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
                 break;
             }
             case repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative: {
-                // Mark the operation as speculative.
+                // Mark the operation as speculative and select the correct read source.
                 repl::SpeculativeMajorityReadInfo::get(opCtx).setIsSpeculativeRead();
+                opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
                 break;
             }
         }
+    }
+
+    // For cursor commands that take locks internally, the read concern on the
+    // OperationContext may affect the timestamp read source selected by the storage engine.
+    // We place the cursor read concern onto the OperationContext so the lock acquisition
+    // respects the cursor's read concern.
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        repl::ReadConcernArgs::get(opCtx) = rcArgs;
     }
 }
 

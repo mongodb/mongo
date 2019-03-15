@@ -113,6 +113,10 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
+// Failpoint to block after a write and its oplog entry have been written to the storage engine and
+// are visible, but before we have advanced 'lastApplied' for the write.
+MONGO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);
+
 /**
  * This structure contains per-service-context state related to the oplog.
  */
@@ -524,6 +528,13 @@ void _logOpsInner(OperationContext* opCtx,
                           str::stream() << "Final OpTime: " << finalOpTime.toString()
                                         << ". Commit Time: "
                                         << commitTime->toString());
+            }
+
+            // Optionally hang before advancing lastApplied.
+            if (MONGO_FAIL_POINT(hangBeforeLogOpAdvancesLastApplied)) {
+                log() << "hangBeforeLogOpAdvancesLastApplied fail point enabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                                hangBeforeLogOpAdvancesLastApplied);
             }
 
             // Optimes on the primary should always represent consistent database states.
