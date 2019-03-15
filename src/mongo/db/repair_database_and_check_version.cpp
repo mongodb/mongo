@@ -324,6 +324,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     }
 
     bool repairVerifiedAllCollectionsHaveUUIDs = false;
+    bool skipUUIDAndFCVCheck = false;
 
     // Repair all databases first, so that we do not try to open them if they are in bad shape
     if (storageGlobalParams.repair) {
@@ -343,24 +344,28 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // requires UUIDs.
         Status uuidsStatus = ensureAllCollectionsHaveUUIDs(opCtx, dbNames);
         if (!uuidsStatus.isOK()) {
-            return uuidsStatus;
+            skipUUIDAndFCVCheck = true;
+            warning() << "Collection(s) are missing UUIDs, not restoring the FCV document if it's "
+                         "missing";
         }
         repairVerifiedAllCollectionsHaveUUIDs = true;
 
-        // Attempt to restore the featureCompatibilityVersion document if it is missing.
-        NamespaceString fcvNSS(NamespaceString::kServerConfigurationNamespace);
+        if (!skipUUIDAndFCVCheck) {
+            // Attempt to restore the featureCompatibilityVersion document if it is missing.
+            NamespaceString fcvNSS(NamespaceString::kServerConfigurationNamespace);
 
-        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, fcvNSS.db());
-        Collection* versionColl;
-        BSONObj featureCompatibilityVersion;
-        if (!db || !(versionColl = db->getCollection(opCtx, fcvNSS)) ||
-            !Helpers::findOne(opCtx,
-                              versionColl,
-                              BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
-                              featureCompatibilityVersion)) {
-            auto status = restoreMissingFeatureCompatibilityVersionDocument(opCtx, dbNames);
-            if (!status.isOK()) {
-                return status;
+            Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, fcvNSS.db());
+            Collection* versionColl;
+            BSONObj featureCompatibilityVersion;
+            if (!db || !(versionColl = db->getCollection(opCtx, fcvNSS)) ||
+                !Helpers::findOne(opCtx,
+                                  versionColl,
+                                  BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
+                                  featureCompatibilityVersion)) {
+                auto status = restoreMissingFeatureCompatibilityVersionDocument(opCtx, dbNames);
+                if (!status.isOK()) {
+                    return status;
+                }
             }
         }
     }
@@ -568,7 +573,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
 
     // Fail to start up if there is no featureCompatibilityVersion document and there are non-local
     // databases present.
-    if (!fcvDocumentExists && nonLocalDatabases) {
+    if (!fcvDocumentExists && nonLocalDatabases && !skipUUIDAndFCVCheck) {
         severe()
             << "Unable to start up mongod due to missing featureCompatibilityVersion document.";
         if (opCtx->getServiceContext()->getStorageEngine()->isMmapV1()) {

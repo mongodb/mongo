@@ -452,6 +452,11 @@ ExitCode _initAndListen(int listenPort) {
         exitCleanly(EXIT_NEED_DOWNGRADE);
     }
 
+    if (storageGlobalParams.upgrade) {
+        log() << "finished checking dbs";
+        exitCleanly(EXIT_CLEAN);
+    }
+
     // Assert that the in-memory featureCompatibilityVersion parameter has been explicitly set. If
     // we are part of a replica set and are started up with no data files, we do not set the
     // featureCompatibilityVersion until a primary is chosen. For this case, we expect the in-memory
@@ -459,11 +464,6 @@ ExitCode _initAndListen(int listenPort) {
     if (canCallFCVSetIfCleanStartup &&
         (!replSettings.usingReplSets() || swNonLocalDatabases.getValue())) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
-    }
-
-    if (storageGlobalParams.upgrade) {
-        log() << "finished checking dbs";
-        exitCleanly(EXIT_CLEAN);
     }
 
     // Start up health log writer thread.
