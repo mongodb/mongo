@@ -80,9 +80,14 @@ class TransportLayerASIO::BatonASIO : public NetworkingBaton {
     struct EventFDHolder {
         EventFDHolder() : fd(::eventfd(0, EFD_CLOEXEC)) {
             if (fd < 0) {
-                auto ewd = errnoWithDescription();
-                severe() << "error in eventfd: " << ewd;
-                fassertFailed(50833);
+                auto e = errno;
+                std::string reason = str::stream() << "error in creating eventfd: "
+                                                   << errnoWithDescription(e);
+
+                auto code = (e == EMFILE || e == ENFILE) ? ErrorCodes::TooManyFilesOpen
+                                                         : ErrorCodes::UnknownError;
+
+                uasserted(code, reason);
             }
         }
 
