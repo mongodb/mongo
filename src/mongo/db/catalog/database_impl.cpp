@@ -463,89 +463,55 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         return Status::OK();
     }
 
-    // Starting in 4.2, pending collection drops will be maintained in the storage engine and will
-    // no longer be visible at the catalog layer with 3.6-style <db>.system.drop.* namespaces.
-    auto supportsPendingDrops = serviceContext->getStorageEngine()->supportsPendingDrops();
-    auto collectionDropType = supportsPendingDrops ? OpObserver::CollectionDropType::kOnePhase
-                                                   : OpObserver::CollectionDropType::kTwoPhase;
+    // Replicated collections should be dropped in two phases.
 
-    // Replicated collections will be renamed with a special drop-pending namespace and dropped when
-    // the replica set optime reaches the drop optime.
-    if (dropOpTime.isNull()) {
-        // MMAPv1 requires that index namespaces are subject to the same length constraints as
-        // indexes in collections that are not in a drop-pending state. Therefore, we check if the
-        // drop-pending namespace is too long for any index names in the collection.
-        // These indexes are dropped regardless of the storage engine on the current node because we
-        // may still have nodes running MMAPv1 in the replica set.
-
-        // Compile a list of any indexes that would become too long following the drop-pending
-        // rename. In the case that this collection drop gets rolled back, this will incur a
-        // performance hit, since those indexes will have to be rebuilt from scratch, but data
-        // integrity is maintained.
-        std::vector<const IndexDescriptor*> indexesToDrop;
-        auto indexIter = collection->getIndexCatalog()->getIndexIterator(opCtx, true);
-
-        // Determine which index names are too long. Since we don't have the collection drop optime
-        // at this time, use the maximum optime to check the index names.
-        auto longDpns = fullns.makeDropPendingNamespace(repl::OpTime::max());
-        while (indexIter->more()) {
-            auto index = indexIter->next()->descriptor();
-            auto status = longDpns.checkLengthForRename(index->indexName().size());
-            if (!status.isOK()) {
-                indexesToDrop.push_back(index);
-            }
-        }
-
-        // Drop the offending indexes.
-        for (auto&& index : indexesToDrop) {
-            log() << "dropCollection: " << fullns << " (" << uuidString << ") - index namespace '"
-                  << index->indexNamespace()
-                  << "' would be too long after drop-pending rename. Dropping index immediately.";
-            // Log the operation before the drop so that each drop is timestamped at the same time
-            // as the oplog entry.
-            opObserver->onDropIndex(
-                opCtx, fullns, collection->uuid(), index->indexName(), index->infoObj());
-            fassert(40463, collection->getIndexCatalog()->dropIndex(opCtx, index));
-        }
-
-        // Log oplog entry for collection drop and proceed to complete rest of two phase drop
-        // process.
-        dropOpTime =
-            opObserver->onDropCollection(opCtx, fullns, uuid, numRecords, collectionDropType);
-
-        // The OpObserver should have written an entry to the oplog with a particular op time.
-        // After writing the oplog entry, all errors are fatal. See getNextOpTime() comments in
-        // oplog.cpp.
-        if (dropOpTime.isNull()) {
-            log() << "dropCollection: " << fullns << " (" << uuidString
-                  << ") - expected oplog entry to be written";
-            fassertFailed(40462);
-        }
-    } else {
-        // If we are provided with a valid 'dropOpTime', it means we are dropping this collection
-        // in the context of applying an oplog entry on a secondary.
-        // OpObserver::onDropCollection() should be returning a null OpTime because we should not be
-        // writing to the oplog.
-        auto opTime =
-            opObserver->onDropCollection(opCtx, fullns, uuid, numRecords, collectionDropType);
-        if (!opTime.isNull()) {
-            severe() << "dropCollection: " << fullns << " (" << uuidString
-                     << ") - unexpected oplog entry written to the oplog with optime " << opTime;
-            fassertFailed(40468);
-        }
-    }
-
-    if (supportsPendingDrops) {
+    // New two-phase drop: Starting in 4.2, pending collection drops will be maintained in the
+    // storage engine and will no longer be visible at the catalog layer with 3.6-style
+    // <db>.system.drop.* namespaces.
+    if (serviceContext->getStorageEngine()->supportsPendingDrops()) {
         auto commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
         log() << "dropCollection: " << fullns << " (" << uuidString
               << ") - storage engine will take ownership of drop-pending collection with optime "
               << dropOpTime << " and commit timestamp " << commitTimestamp;
-        return _finishDropCollection(opCtx, fullns, collection);
+        auto status = _finishDropCollection(opCtx, fullns, collection);
+        if (!status.isOK())
+            return status;
+
+        if (dropOpTime.isNull()) {
+            // Log oplog entry for collection drop and remove the UUID.
+            dropOpTime = opObserver->onDropCollection(
+                opCtx, fullns, uuid, numRecords, OpObserver::CollectionDropType::kOnePhase);
+            invariant(!dropOpTime.isNull());
+        } else {
+            // If we are provided with a valid 'dropOpTime', it means we are dropping this
+            // collection in the context of applying an oplog entry on a secondary.
+            auto opTime = opObserver->onDropCollection(
+                opCtx, fullns, uuid, numRecords, OpObserver::CollectionDropType::kOnePhase);
+            // OpObserver::onDropCollection should not be writing to the oplog on the secondary.
+            invariant(opTime.isNull());
+        }
+        return Status::OK();
     }
 
-    auto dpns = fullns.makeDropPendingNamespace(dropOpTime);
+    // Old two-phase drop: Replicated collections will be renamed with a special drop-pending
+    // namespace and dropped when the replica set optime reaches the drop optime.
+
+    if (dropOpTime.isNull()) {
+        // Log oplog entry for collection drop.
+        dropOpTime = opObserver->onDropCollection(
+            opCtx, fullns, uuid, numRecords, OpObserver::CollectionDropType::kTwoPhase);
+        invariant(!dropOpTime.isNull());
+    } else {
+        // If we are provided with a valid 'dropOpTime', it means we are dropping this
+        // collection in the context of applying an oplog entry on a secondary.
+        auto opTime = opObserver->onDropCollection(
+            opCtx, fullns, uuid, numRecords, OpObserver::CollectionDropType::kTwoPhase);
+        // OpObserver::onDropCollection should not be writing to the oplog on the secondary.
+        invariant(opTime.isNull());
+    }
 
     // Rename collection using drop-pending namespace generated from drop optime.
+    auto dpns = fullns.makeDropPendingNamespace(dropOpTime);
     const bool stayTemp = true;
     log() << "dropCollection: " << fullns << " (" << uuidString
           << ") - renaming to drop-pending collection: " << dpns << " with drop optime "
