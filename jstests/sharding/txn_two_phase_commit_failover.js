@@ -23,7 +23,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // coordinator fails over before writing the participant list and then checks that the
     // transaction is aborted on all participants, and the participants will only abort on reaching
     // the transaction timeout.
-    TestData.transactionLifetimeLimitSeconds = 15;
+    TestData.transactionLifetimeLimitSeconds = 30;
 
     let lsid = {id: UUID()};
     let txnNumber = 0;
