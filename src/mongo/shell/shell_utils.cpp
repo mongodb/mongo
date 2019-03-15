@@ -33,20 +33,6 @@
 
 #include "mongo/shell/shell_utils.h"
 
-#include <algorithm>
-#include <boost/filesystem.hpp>
-#include <memory>
-#include <set>
-#include <stdlib.h>
-#include <string>
-#include <vector>
-
-#ifndef _WIN32
-#include <pwd.h>
-#include <sys/types.h>
-#endif
-
-#include "mongo/base/shim.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/hasher.h"
@@ -56,73 +42,26 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
-#include <pwd.h>
-
-namespace mongo::shell_utils {
-namespace {
-boost::filesystem::path getUserDir() {
-#ifdef _WIN32
-    auto envp = getenv("USERPROFILE");
-    if (envp)
-        return envp;
-
-    return "./";
-#else
-    const auto homeDir = getenv("HOME");
-    if (homeDir)
-        return homeDir;
-
-    // The storage for these variables has to live until the value is captured into a std::string at
-    // the end of this function.  This is because getpwuid_r(3) doesn't use static storage, but
-    // storage provided by the caller.  As a fallback, reserve enough space to store 8 paths, on the
-    // theory that the pwent buffer probably needs about that many paths, to fully describe a user
-    // -- shell paths, home directory paths, etc.
-
-    const long pwentBufferSize = std::max<long>(sysconf(_SC_GETPW_R_SIZE_MAX), PATH_MAX * 8);
-
-    struct passwd pwent;
-    struct passwd* res;
-
-    std::vector<char> buffer(pwentBufferSize);
-
-    do {
-        if (!getpwuid_r(getuid(), &pwent, &buffer[0], buffer.size(), &res))
-            break;
-
-        if (errno != EINTR)
-            uasserted(mongo::ErrorCodes::InternalError,
-                      "Unable to get home directory for the current user.");
-    } while (errno == EINTR);
-
-    return pwent.pw_dir;
-#endif
-}
-
-}  // namespace
-}  // namespace mongo::shell_utils
-
-boost::filesystem::path mongo::shell_utils::getHistoryFilePath() {
-    static const auto& historyFile = *new boost::filesystem::path(getUserDir() / ".dbshell");
-
-    return historyFile;
-}
-
 
 namespace mongo {
+
+using std::set;
+using std::map;
+using std::string;
+
 namespace JSFiles {
 extern const JSFile servers;
 extern const JSFile shardingtest;
 extern const JSFile servers_misc;
 extern const JSFile replsettest;
 extern const JSFile bridge;
-}  // namespace JSFiles
+}
 
 MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
 (const BenchRunConfig& config)->std::unique_ptr<DBClientBase> {
@@ -137,10 +76,9 @@ MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
 
 namespace shell_utils {
 
-std::string dbConnect;
+std::string _dbConnect;
 
-static const char* argv0 = 0;
-
+const char* argv0 = 0;
 void RecordMyLocation(const char* _argv0) {
     argv0 = _argv0;
 }
@@ -157,6 +95,14 @@ const BSONObj undefinedReturn = makeUndefined();
 BSONElement singleArg(const BSONObj& args) {
     uassert(12597, "need to specify 1 argument", args.nFields() == 1);
     return args.firstElement();
+}
+
+const char* getUserDir() {
+#ifdef _WIN32
+    return getenv("USERPROFILE");
+#else
+    return getenv("HOME");
+#endif
 }
 
 // real methods
@@ -398,12 +344,12 @@ void initScope(Scope& scope) {
     scope.injectNative("benchStart", BenchRunner::benchStart);
     scope.injectNative("benchFinish", BenchRunner::benchFinish);
 
-    if (!dbConnect.empty()) {
-        uassert(12513, "connect failed", scope.exec(dbConnect, "(connect)", false, true, false));
+    if (!_dbConnect.empty()) {
+        uassert(12513, "connect failed", scope.exec(_dbConnect, "(connect)", false, true, false));
     }
 }
 
-Prompter::Prompter(const std::string& prompt) : _prompt(prompt), _confirmed() {}
+Prompter::Prompter(const string& prompt) : _prompt(prompt), _confirmed() {}
 
 bool Prompter::confirm() {
     if (_confirmed) {
@@ -426,7 +372,7 @@ ConnectionRegistry::ConnectionRegistry() = default;
 void ConnectionRegistry::registerConnection(DBClientBase& client) {
     BSONObj info;
     if (client.runCommand("admin", BSON("whatsmyuri" << 1), info)) {
-        std::string connstr = client.getServerAddress();
+        string connstr = client.getServerAddress();
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _connectionUris[connstr].insert(info["you"].str());
     }
@@ -435,21 +381,23 @@ void ConnectionRegistry::registerConnection(DBClientBase& client) {
 void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
     Prompter prompter("do you want to kill the current op(s) on the server?");
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    for (auto& connection : _connectionUris) {
-        auto status = ConnectionString::parse(connection.first);
+    for (map<string, set<string>>::const_iterator i = _connectionUris.begin();
+         i != _connectionUris.end();
+         ++i) {
+        auto status = ConnectionString::parse(i->first);
         if (!status.isOK()) {
             continue;
         }
 
         const ConnectionString cs(status.getValue());
 
-        std::string errmsg;
+        string errmsg;
         std::unique_ptr<DBClientBase> conn(cs.connect("MongoDB Shell", errmsg));
         if (!conn) {
             continue;
         }
 
-        const std::set<std::string>& uris = connection.second;
+        const set<string>& uris = i->second;
 
         BSONObj currentOpRes;
         conn->runPseudoCommand("admin", "currentOp", "$cmd.sys.inprog", {}, currentOpRes);
@@ -460,7 +408,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
         auto inprog = currentOpRes["inprog"].embeddedObject();
         for (const auto op : inprog) {
             // For sharded clusters, `client_s` is used instead and `client` is not present.
-            std::string client;
+            string client;
             if (auto elem = op["client"]) {
                 // mongod currentOp client
                 if (elem.type() != String) {
@@ -530,5 +478,5 @@ bool fileExists(const std::string& file) {
 
 
 stdx::mutex& mongoProgramOutputMutex(*(new stdx::mutex()));
-}  // namespace shell_utils
+}
 }  // namespace mongo
