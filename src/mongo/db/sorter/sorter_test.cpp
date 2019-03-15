@@ -483,6 +483,13 @@ class Limit : public Basic {
     }
 };
 
+template <uint64_t Limit>
+class LimitExtreme : public Basic {
+    virtual SortOptions adjustSortOptions(SortOptions opts) {
+        return opts.Limit(Limit);
+    }
+};
+
 class Dupes : public Basic {
     void addData(unowned_ptr<IWSorter> sorter) {
         sorter->add(1, -1);
@@ -590,6 +597,20 @@ public:
         add<SorterTests::LotsOfDataWithLimit<100, /*random=*/true>>();    // fits in mem
         add<SorterTests::LotsOfDataWithLimit<5000, /*random=*/false>>();  // spills
         add<SorterTests::LotsOfDataWithLimit<5000, /*random=*/true>>();   // spills
+        add<SorterTests::LimitExtreme<std::numeric_limits<uint32_t>::max()>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<uint32_t>::max() - 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<uint32_t>::max() + 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<uint32_t>::max() / 8 + 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<int32_t>::max()>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<int32_t>::max() - 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<int32_t>::max() / 8 + 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<uint64_t>::max()>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<uint64_t>::max() - 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<uint64_t>::max() + 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<uint64_t>::max() / 8 + 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<int64_t>::max()>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<int64_t>::max() - 1>>();
+        add<SorterTests::LimitExtreme<std::numeric_limits<int64_t>::max() / 8 + 1>>();
     }
 };
 

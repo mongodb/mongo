@@ -201,17 +201,13 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
-    using SumType = long long;
-    // Just in case, since we're passing an address of a signed 64bit below.
-    static_assert(std::is_signed<SumType>::value && sizeof(SumType) == 8);
-
     auto stageItr = std::next(itr);
-    SumType skipSum = 0;
+    int64_t skipSum = 0;
     while (stageItr != container->end()) {
         auto nextStage = (*stageItr).get();
         auto nextSkip = dynamic_cast<DocumentSourceSkip*>(nextStage);
         auto nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage);
-        SumType safeSum = 0;
+        int64_t safeSum = 0;
 
         // The skip and limit values can be very large, so we need to make sure the sum doesn't
         // overflow before applying an optimiztion to pull the limit into the sort stage.

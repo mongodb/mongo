@@ -657,24 +657,10 @@ public:
         }
 
         // Preallocate a fixed sized vector of the required size if we don't expect it to have a
-        // major impact on our memory budget. This is the common case with small limits. If the
-        // limit is really large, we need to take care when doing the check below. Both 'opts.limit'
-        // and 'sizeof(Data)' are unsigned long's, it's always clearly defined behaviour to multiply
-        // these two numbers, but the result may be wrapped around (truncated) due to modular
-        // arithmetics. So, the result of the multiplication may be < maxMemoryUsageBytes / 10, but
-        // 'opts.limit' may be still large enough to trigger an std::length_error exception and
-        // abnormally terminate the program. So, we'll check here if the multiply operation was safe
-        // and whether the limit fits into the maximum allowed vector size.
-        using MultiplicationType = size_t;
-        // Just in case, since we're passing an address of an unsigned 64bit below.
-        static_assert(std::is_unsigned<MultiplicationType>::value &&
-                      sizeof(MultiplicationType) == 8);
-
-        MultiplicationType requiredBytes;
-        auto isSafeMultiplication = mongoUnsignedMultiplyOverflow64(
-            sizeof(typename decltype(_data)::value_type), opts.limit, &requiredBytes);
-        if (isSafeMultiplication && requiredBytes < opts.maxMemoryUsageBytes / 10 &&
-            opts.limit <= _data.max_size()) {
+        // major impact on our memory budget. This is the common case with small limits.
+        if (opts.limit <
+            std::min((opts.maxMemoryUsageBytes / 10) / sizeof(typename decltype(_data)::value_type),
+                     _data.max_size())) {
             _data.reserve(opts.limit);
         }
     }
