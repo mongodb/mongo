@@ -916,5 +916,15 @@ TEST(Backoff, SleepBackoffTest) {
     ASSERT_EQUALS(backoff.getNextSleepMillis(20, resetAfterMillis + 1, 0), 1);  // reset expected
 }
 
+TEST(BasicNow, NowUpdatesLastNow) {
+    const auto then = Date_t::now();
+    ASSERT_EQ(then, Date_t::lastNowForTest());
+    sleepFor(Milliseconds(100));
+    ASSERT_EQ(then, Date_t::lastNowForTest());
+    const auto now = Date_t::now();
+    ASSERT_EQ(now, Date_t::lastNowForTest());
+    ASSERT_GT(now, then);
+}
+
 }  // namespace
 }  // namespace mongo

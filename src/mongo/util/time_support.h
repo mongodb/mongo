@@ -37,11 +37,14 @@
 #include <string>
 
 #include "mongo/base/status_with.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
+
+class BackgroundThreadClockSource;
 
 template <typename Allocator>
 class StringBuilderImpl;
@@ -230,10 +233,35 @@ public:
         return out;
     }
 
+    /**
+     * Only exposed for testing.  See lastNow()
+     */
+    static Date_t lastNowForTest() {
+        return lastNow();
+    }
+
 private:
     constexpr explicit Date_t(long long m) : millis(m) {}
 
     long long millis = 0;
+
+    friend class BackgroundThreadClockSource;
+
+    /**
+     * Returns the last time fetched from Date_t::now()
+     *
+     * Note that this is a private semi-implementation detail for BackgroundThreadClockSource.  Use
+     * svc->getFastClockSource()->now() over calling this method.
+     *
+     * If you think you have another use for it, please reconsider, or at least consider very
+     * carefully as correctly using it is complicated.
+     */
+    static Date_t lastNow() {
+        return fromMillisSinceEpoch(lastNowVal.loadRelaxed());
+    }
+
+    // Holds the last value returned from now()
+    static AtomicWord<long long> lastNowVal;
 };
 
 // uses ISO 8601 dates without trailing Z

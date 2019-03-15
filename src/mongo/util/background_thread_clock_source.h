@@ -44,10 +44,12 @@
 namespace mongo {
 
 /**
- * A clock source that uses a periodic timer to build a low-resolution, fast-to-read clock.
- * Essentially uses a background thread that repeatedly sleeps for X amount of milliseconds
- * and wakes up to store the current time. If nothing reads the time for a whole granularity, the
- * thread will sleep until it is needed again.
+ * A clock source that reads the Date_t lastNow time and uses a background thread to ensure
+ * Date_t::now is called at least every X amount of milliseconds.  If nothing reads the time for a
+ * whole granularity, the thread will sleep until it is needed again.
+ *
+ * Its now() returns Date_t::lastNow(), the passed in clock source is only used to control the
+ * sleeps for the background thread.
  */
 class BackgroundThreadClockSource final : public ClockSource {
     MONGO_DISALLOW_COPYING(BackgroundThreadClockSource);
@@ -59,23 +61,35 @@ public:
     Date_t now() override;
     Status setAlarm(Date_t when, unique_function<void()> action) override;
 
-    /**
-     * Doesn't count as a call to now() for determining whether this ClockSource is idle.
-     *
-     * Unlike now(), returns Date_t() if the thread is currently paused.
-     */
-    Date_t peekNowForTest() const {
-        return Date_t::fromMillisSinceEpoch(_current.load());
-    }
+    size_t timesPausedForTest();
 
 private:
-    Date_t _slowNow();
+    void _updateClockAndWakeTimerIfNeeded();
+    void _updateClock();
     void _startTimerThread();
-    int64_t _updateCurrent_inlock();
 
     const std::unique_ptr<ClockSource> _clockSource;
-    AtomicWord<long long> _current{0};       // 0 if _timer is paused due to idleness.
-    AtomicWord<bool> _timerWillPause{true};  // If true when _timer wakes up, it will pause.
+
+    // Expected transitions:
+    //
+    // Starting the clock source
+    //   _ -> kTimerPaused
+    //
+    // Timer thread has woken from its timed sleep
+    //   kTimerPaused
+    //   kReaderRead  -> kTimerWillPause
+    //
+    // Reader reads a time and the timer isn't paused
+    //   kTimerWillPause -> kReaderHasRead
+    //
+    // Reader wakes up the timer thread
+    //   kTimerPaused -> kReaderHasRead
+    enum States : uint8_t {
+        kReaderHasRead,
+        kTimerWillPause,
+        kTimerPaused,
+    };
+    AtomicWord<uint8_t> _state;
 
     const Milliseconds _granularity;
 
@@ -83,6 +97,10 @@ private:
     stdx::condition_variable _condition;
     bool _inShutdown = false;
     bool _started = false;
+    Date_t _lastUpdate;
+
+    // This is used exclusively for tests, to verify when we've actually gone to sleep
+    size_t _timesPaused = 0;
     stdx::thread _timer;
 };
 
