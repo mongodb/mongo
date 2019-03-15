@@ -65,8 +65,27 @@ extern "C" time_t timegm(struct tm* const tmp);
 
 namespace mongo {
 
+AtomicWord<long long> Date_t::lastNowVal;
+
 Date_t Date_t::now() {
-    return fromMillisSinceEpoch(curTimeMillis64());
+    int64_t curTime = curTimeMillis64();
+    int64_t oldLastNow = lastNowVal.loadRelaxed();
+
+    // If curTime is different than old last now, unconditionally try to cas it to the new value.
+    // This is an optimization to avoid performing stores for multiple clock reads in the same
+    // millisecond.
+    //
+    // It's important that this is a non-equality (rather than a >), so that we avoid stalling time
+    // if someone moves the system clock backwards.
+    if (curTime != oldLastNow) {
+        // If we fail to comp exchange, it means someone else concurrently called Date_t::now(), in
+        // which case it's likely their time is also recent.  It's important that we don't loop so
+        // that we avoid forcing time backwards if we have multiple callers at a millisecond
+        // boundary.
+        lastNowVal.compareAndSwap(oldLastNow, curTime);
+    }
+
+    return fromMillisSinceEpoch(curTime);
 }
 
 Date_t::Date_t(stdx::chrono::system_clock::time_point tp)

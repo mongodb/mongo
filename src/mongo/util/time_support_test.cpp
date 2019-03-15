@@ -893,5 +893,16 @@ TEST(DateTArithmetic, SubtractionOverflowThrows) {
                        ErrorCodes::DurationOverflow);
     ASSERT_THROWS_CODE(Date_t::max() - Milliseconds(-1), DBException, ErrorCodes::DurationOverflow);
 }
+
+TEST(BasicNow, NowUpdatesLastNow) {
+    const auto then = Date_t::now();
+    ASSERT_EQ(then, Date_t::lastNowForTest());
+    sleepFor(Milliseconds(100));
+    ASSERT_EQ(then, Date_t::lastNowForTest());
+    const auto now = Date_t::now();
+    ASSERT_EQ(now, Date_t::lastNowForTest());
+    ASSERT_GT(now, then);
+}
+
 }  // namespace
 }  // namespace mongo
