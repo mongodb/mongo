@@ -267,7 +267,7 @@ void ShardingTestFixture::setupShards(const std::vector<ShardType>& shards) {
 
     expectGetShards(shards);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) {

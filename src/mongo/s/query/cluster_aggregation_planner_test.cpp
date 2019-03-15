@@ -115,7 +115,7 @@ public:
             return response;
         }());
 
-        future.timed_get(kFutureTimeout).get();
+        future.default_timed_get().get();
     }
 
 private:
@@ -167,7 +167,7 @@ TEST_F(ClusterExchangeTest, SingleOutStageNotEligibleForExchangeIfOutputDatabase
     expectFindSendBSONObjVector(kConfigHostAndPort, []() { return std::vector<BSONObj>{}; }());
     expectFindSendBSONObjVector(kConfigHostAndPort, []() { return std::vector<BSONObj>{}; }());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 // If the output collection doesn't exist, we don't know how to distribute the output documents so
@@ -187,7 +187,7 @@ TEST_F(ClusterExchangeTest, SingleOutStageNotEligibleForExchangeIfOutputCollecti
     // Pretend there are no collections in this database.
     expectFindSendBSONObjVector(kConfigHostAndPort, std::vector<BSONObj>());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 // A $limit stage requires a single merger.
@@ -206,7 +206,7 @@ TEST_F(ClusterExchangeTest, LimitFollowedByOutStageIsNotEligibleForExchange) {
                                                                              mergePipe.get()));
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ClusterExchangeTest, GroupFollowedByOutIsEligbleForExchange) {
@@ -234,7 +234,7 @@ TEST_F(ClusterExchangeTest, GroupFollowedByOutIsEligbleForExchange) {
         ASSERT_BSONOBJ_EQ(boundaries[2], BSON("_id" << MAXKEY));
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
@@ -268,7 +268,7 @@ TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
         ASSERT_EQ(consumerIds[1], 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
@@ -301,7 +301,7 @@ TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
         ASSERT_EQ(consumerIds[1], 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
@@ -339,7 +339,7 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
         ASSERT_EQ(consumerIds[1], 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
@@ -379,7 +379,7 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
         ASSERT_EQ(consumerIds[1], 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ClusterExchangeTest, ProjectThroughDottedFieldDoesNotPreserveShardKey) {
@@ -407,7 +407,7 @@ TEST_F(ClusterExchangeTest, ProjectThroughDottedFieldDoesNotPreserveShardKey) {
         ASSERT_FALSE(exchangeSpec);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ClusterExchangeTest, WordCountUseCaseExample) {
@@ -446,7 +446,7 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExample) {
         ASSERT_EQ(consumerIds[1], 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
@@ -511,7 +511,7 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
         ASSERT_EQ(consumerIds[2], 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 // We'd like to test that a compound shard key pattern can be used. Strangely, the only case we can
@@ -595,7 +595,7 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
         }
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 }  // namespace
 }  // namespace mongo

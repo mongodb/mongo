@@ -35,8 +35,6 @@ namespace mongo {
 
 using executor::NetworkTestEnv;
 
-constexpr Seconds ShardingTestFixtureCommon::kFutureTimeout;
-
 ShardingTestFixtureCommon::ShardingTestFixtureCommon() = default;
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() = default;

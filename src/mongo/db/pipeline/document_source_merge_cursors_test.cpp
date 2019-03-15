@@ -265,7 +265,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToIterateCursorsUntilEOF) {
         return cursorResponseObj(expCtx->ns, kExhaustedCursorID, {BSON("x" << 1)});
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldNotKillCursorsIfTheyAreNotOwned) {
@@ -330,7 +330,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
         // anything except {ok: 1}.
         return BSON("ok" << 1);
     });
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
@@ -378,7 +378,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
                                   BSON("x" << 4 << "$sortKey" << BSON("" << 4))});
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 }  // namespace
 }  // namespace mongo

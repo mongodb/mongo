@@ -127,7 +127,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
         });
 
     // Now wait for the getCollection call to return
-    const auto collOpTimePair = future.timed_get(kFutureTimeout);
+    const auto collOpTimePair = future.default_timed_get();
     ASSERT_EQ(newOpTime, collOpTimePair.opTime);
     ASSERT_BSONOBJ_EQ(expectedColl.toBSON(), collOpTimePair.value.toBSON());
 }
@@ -144,7 +144,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionNotExisting) {
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     // Now wait for the getCollection call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetDatabaseInvalidName) {
@@ -193,7 +193,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
         return std::make_tuple(vector<BSONObj>{expectedDb.toBSON()}, builder.obj());
     });
 
-    const auto dbOpTimePair = future.timed_get(kFutureTimeout);
+    const auto dbOpTimePair = future.default_timed_get();
     ASSERT_EQ(newOpTime, dbOpTimePair.opTime);
     ASSERT_BSONOBJ_EQ(expectedDb.toBSON(), dbOpTimePair.value.toBSON());
 }
@@ -225,7 +225,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetrySuccess) {
         return vector<BSONObj>{expectedDb.toBSON()};
     });
 
-    const auto dbOpTimePair = future.timed_get(kFutureTimeout);
+    const auto dbOpTimePair = future.default_timed_get();
     ASSERT_BSONOBJ_EQ(expectedDb.toBSON(), dbOpTimePair.value.toBSON());
 }
 
@@ -247,7 +247,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
         return vector<BSONObj>{};
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetDatabaseNotExisting) {
@@ -262,7 +262,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseNotExisting) {
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
@@ -311,7 +311,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
         return vector<BSONObj>{s1.toBSON(), s2.toBSON(), s3.toBSON()};
     });
 
-    const vector<ShardType> actualShardsList = future.timed_get(kFutureTimeout);
+    const vector<ShardType> actualShardsList = future.default_timed_get();
     ASSERT_EQ(actualShardsList.size(), expectedShardsList.size());
 
     for (size_t i = 0; i < actualShardsList.size(); ++i) {
@@ -341,7 +341,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithInvalidShard) {
         };
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
@@ -413,7 +413,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
                                    builder.obj());
         });
 
-    const auto& chunks = future.timed_get(kFutureTimeout);
+    const auto& chunks = future.default_timed_get();
     ASSERT_BSONOBJ_EQ(chunkA.toConfigBSON(), chunks[0].toConfigBSON());
     ASSERT_BSONOBJ_EQ(chunkB.toConfigBSON(), chunks[1].toConfigBSON());
 }
@@ -460,7 +460,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
         return vector<BSONObj>{};
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
@@ -503,7 +503,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
         return vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()};
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, RunUserManagementReadCommand) {
@@ -538,7 +538,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementReadCommand) {
         return BSON("ok" << 1 << "users" << BSONArrayBuilder().arr());
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, RunUserManagementReadCommandUnsatisfiedReadPref) {
@@ -595,7 +595,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
     });
 
     // Now wait for the runUserManagementWriteCommand call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandInvalidWriteConcern) {
@@ -668,7 +668,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
     });
 
     // Now wait for the runUserManagementWriteCommand call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
@@ -698,7 +698,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
     }
 
     // Now wait for the runUserManagementWriteCommand call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuccess) {
@@ -756,7 +756,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuc
     });
 
     // Now wait for the runUserManagementWriteCommand call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
@@ -813,7 +813,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
         return std::make_tuple(vector<BSONObj>{coll1.toBSON(), coll2.toBSON()}, builder.obj());
     });
 
-    const auto& actualColls = future.timed_get(kFutureTimeout);
+    const auto& actualColls = future.default_timed_get();
     ASSERT_EQ(2U, actualColls.size());
     ASSERT_BSONOBJ_EQ(coll1.toBSON(), actualColls[0].toBSON());
     ASSERT_BSONOBJ_EQ(coll2.toBSON(), actualColls[1].toBSON());
@@ -862,7 +862,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
         return vector<BSONObj>{coll1.toBSON(), coll2.toBSON()};
     });
 
-    const auto& actualColls = future.timed_get(kFutureTimeout);
+    const auto& actualColls = future.default_timed_get();
     ASSERT_EQ(2U, actualColls.size());
     ASSERT_BSONOBJ_EQ(coll1.toBSON(), actualColls[0].toBSON());
     ASSERT_BSONOBJ_EQ(coll2.toBSON(), actualColls[1].toBSON());
@@ -911,7 +911,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         };
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
@@ -944,7 +944,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
         return vector<BSONObj>{dbt1.toBSON(), dbt2.toBSON()};
     });
 
-    const auto& actualDbNames = future.timed_get(kFutureTimeout);
+    const auto& actualDbNames = future.default_timed_get();
     ASSERT_EQ(2U, actualDbNames.size());
     ASSERT_EQ(dbt1.getName(), actualDbNames[0]);
     ASSERT_EQ(dbt2.getName(), actualDbNames[1]);
@@ -968,7 +968,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
         };
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
@@ -1013,7 +1013,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
         return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
     });
 
-    const auto& tags = future.timed_get(kFutureTimeout);
+    const auto& tags = future.default_timed_get();
     ASSERT_BSONOBJ_EQ(tagA.toBSON(), tags[0].toBSON());
     ASSERT_BSONOBJ_EQ(tagB.toBSON(), tags[1].toBSON());
 }
@@ -1032,7 +1032,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionNoTags) {
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
@@ -1061,7 +1061,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
         return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
@@ -1107,7 +1107,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
     });
 
     // Now wait for the updateDatabase call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentExceededTimeLimit) {
@@ -1143,7 +1143,7 @@ TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentExceededTimeLimit) {
     });
 
     // Now wait for the updateDatabase call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessful) {
@@ -1188,7 +1188,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessful) {
     });
 
     // Now wait for the applyChunkOpsDeprecated call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
@@ -1236,7 +1236,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
     });
 
     // Now wait for the applyChunkOpsDeprecated call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
@@ -1275,7 +1275,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
     onFindCommand([this](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     // Now wait for the applyChunkOpsDeprecated call to return
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry) {
@@ -1293,7 +1293,7 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry)
         });
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRetry) {
@@ -1319,7 +1319,7 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRet
         return vector<BSONObj>{dbType.toBSON()};
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ShardingCatalogClientTest, GetNewKeys) {
@@ -1367,7 +1367,7 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
         return vector<BSONObj>{key1.toBSON(), key2.toBSON()};
     });
 
-    const auto keyDocs = future.timed_get(kFutureTimeout);
+    const auto keyDocs = future.default_timed_get();
     ASSERT_EQ(2u, keyDocs.size());
 
     const auto& key1Result = keyDocs.front();
@@ -1420,7 +1420,7 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
         return vector<BSONObj>{};
     });
 
-    const auto keyDocs = future.timed_get(kFutureTimeout);
+    const auto keyDocs = future.default_timed_get();
     ASSERT_EQ(0u, keyDocs.size());
 }
 

@@ -154,7 +154,7 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
     expectFindSendBSONObjVector(kConfigHostAndPort, {collectionBSON});
     expectFindSendBSONObjVector(kConfigHostAndPort, initialChunks);
 
-    auto routingInfo = future.timed_get(kFutureTimeout);
+    auto routingInfo = future.default_timed_get();
     ASSERT(routingInfo->cm());
     ASSERT(routingInfo->db().primary());
 
@@ -221,7 +221,7 @@ CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChun
         return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
     }());
 
-    return future.timed_get(kFutureTimeout).get();
+    return future.default_timed_get().get();
 }
 
 }  // namespace mongo

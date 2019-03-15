@@ -140,7 +140,7 @@ TEST_F(DistLockCatalogTest, BasicPing) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, PingTargetError) {
@@ -172,7 +172,7 @@ TEST_F(DistLockCatalogTest, PingCommandError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, PingWriteError) {
@@ -190,7 +190,7 @@ TEST_F(DistLockCatalogTest, PingWriteError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, PingWriteConcernError) {
@@ -211,7 +211,7 @@ TEST_F(DistLockCatalogTest, PingWriteConcernError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, PingUnsupportedWriteConcernResponse) {
@@ -233,7 +233,7 @@ TEST_F(DistLockCatalogTest, PingUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, PingUnsupportedResponseFormat) {
@@ -247,7 +247,7 @@ TEST_F(DistLockCatalogTest, PingUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockNoOp) {
@@ -289,7 +289,7 @@ TEST_F(DistLockCatalogTest, GrabLockNoOp) {
         return fromjson("{ ok: 1, value: null }");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockWithNewDoc) {
@@ -353,7 +353,7 @@ TEST_F(DistLockCatalogTest, GrabLockWithNewDoc) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockWithBadLockDoc) {
@@ -386,7 +386,7 @@ TEST_F(DistLockCatalogTest, GrabLockWithBadLockDoc) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockTargetError) {
@@ -424,7 +424,7 @@ TEST_F(DistLockCatalogTest, GrabLockCommandError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockDupKeyError) {
@@ -441,7 +441,7 @@ TEST_F(DistLockCatalogTest, GrabLockDupKeyError) {
             {DuplicateKeyErrorInfo(BSON("x" << 1), BSON("" << 1)), "Mock duplicate key error"});
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockWriteError) {
@@ -461,7 +461,7 @@ TEST_F(DistLockCatalogTest, GrabLockWriteError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockWriteConcernError) {
@@ -484,7 +484,7 @@ TEST_F(DistLockCatalogTest, GrabLockWriteConcernError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockWriteConcernErrorBadType) {
@@ -505,7 +505,7 @@ TEST_F(DistLockCatalogTest, GrabLockWriteConcernErrorBadType) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockResponseMissingValueField) {
@@ -523,7 +523,7 @@ TEST_F(DistLockCatalogTest, GrabLockResponseMissingValueField) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockUnsupportedWriteConcernResponse) {
@@ -547,7 +547,7 @@ TEST_F(DistLockCatalogTest, GrabLockUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GrabLockUnsupportedResponseFormat) {
@@ -563,7 +563,7 @@ TEST_F(DistLockCatalogTest, GrabLockUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, OvertakeLockNoOp) {
@@ -612,7 +612,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockNoOp) {
         return fromjson("{ ok: 1, value: null }");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, OvertakeLockWithNewDoc) {
@@ -681,7 +681,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWithNewDoc) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, OvertakeLockWithBadLockDoc) {
@@ -716,7 +716,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWithBadLockDoc) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, OvertakeLockTargetError) {
@@ -757,7 +757,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockCommandError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, OvertakeLockWriteError) {
@@ -778,7 +778,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWriteError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, OvertakeLockWriteConcernError) {
@@ -802,7 +802,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockWriteConcernError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, OvertakeLockUnsupportedWriteConcernResponse) {
@@ -827,7 +827,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, OvertakeLockUnsupportedResponseFormat) {
@@ -844,7 +844,7 @@ TEST_F(DistLockCatalogTest, OvertakeLockUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, BasicUnlock) {
@@ -878,7 +878,7 @@ TEST_F(DistLockCatalogTest, BasicUnlock) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, BasicUnlockWithName) {
@@ -912,7 +912,7 @@ TEST_F(DistLockCatalogTest, BasicUnlockWithName) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockWithNoNewDoc) {
@@ -942,7 +942,7 @@ TEST_F(DistLockCatalogTest, UnlockWithNoNewDoc) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockWithNameWithNoNewDoc) {
@@ -972,7 +972,7 @@ TEST_F(DistLockCatalogTest, UnlockWithNameWithNoNewDoc) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockTargetError) {
@@ -1004,7 +1004,7 @@ TEST_F(DistLockCatalogTest, UnlockCommandError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockWriteError) {
@@ -1022,7 +1022,7 @@ TEST_F(DistLockCatalogTest, UnlockWriteError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockWriteConcernError) {
@@ -1055,7 +1055,7 @@ TEST_F(DistLockCatalogTest, UnlockWriteConcernError) {
         return writeConcernFailedResponse;
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockUnsupportedWriteConcernResponse) {
@@ -1077,7 +1077,7 @@ TEST_F(DistLockCatalogTest, UnlockUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockUnsupportedResponseFormat) {
@@ -1091,7 +1091,7 @@ TEST_F(DistLockCatalogTest, UnlockUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, BasicUnlockAll) {
@@ -1125,7 +1125,7 @@ TEST_F(DistLockCatalogTest, BasicUnlockAll) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockAllWriteFailed) {
@@ -1139,7 +1139,7 @@ TEST_F(DistLockCatalogTest, UnlockAllWriteFailed) {
                          << "something went wrong");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, UnlockAllNetworkError) {
@@ -1154,7 +1154,7 @@ TEST_F(DistLockCatalogTest, UnlockAllNetworkError) {
         });
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, BasicGetServerInfo) {
@@ -1183,7 +1183,7 @@ TEST_F(DistLockCatalogTest, BasicGetServerInfo) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetServerTargetError) {
@@ -1215,7 +1215,7 @@ TEST_F(DistLockCatalogTest, GetServerCommandError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetServerBadElectionId) {
@@ -1236,7 +1236,7 @@ TEST_F(DistLockCatalogTest, GetServerBadElectionId) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetServerBadLocalTime) {
@@ -1257,7 +1257,7 @@ TEST_F(DistLockCatalogTest, GetServerBadLocalTime) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetServerNoGLEStats) {
@@ -1274,7 +1274,7 @@ TEST_F(DistLockCatalogTest, GetServerNoGLEStats) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetServerNoElectionId) {
@@ -1295,7 +1295,7 @@ TEST_F(DistLockCatalogTest, GetServerNoElectionId) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetServerInvalidReplSubsectionShouldFail) {
@@ -1315,7 +1315,7 @@ TEST_F(DistLockCatalogTest, GetServerInvalidReplSubsectionShouldFail) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetServerNoElectionIdButMasterShouldFail) {
@@ -1336,7 +1336,7 @@ TEST_F(DistLockCatalogTest, GetServerNoElectionIdButMasterShouldFail) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, BasicStopPing) {
@@ -1368,7 +1368,7 @@ TEST_F(DistLockCatalogTest, BasicStopPing) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, StopPingTargetError) {
@@ -1400,7 +1400,7 @@ TEST_F(DistLockCatalogTest, StopPingCommandError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, StopPingWriteError) {
@@ -1418,7 +1418,7 @@ TEST_F(DistLockCatalogTest, StopPingWriteError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, StopPingWriteConcernError) {
@@ -1439,7 +1439,7 @@ TEST_F(DistLockCatalogTest, StopPingWriteConcernError) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, StopPingUnsupportedWriteConcernResponse) {
@@ -1461,7 +1461,7 @@ TEST_F(DistLockCatalogTest, StopPingUnsupportedWriteConcernResponse) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, StopPingUnsupportedResponseFormat) {
@@ -1475,7 +1475,7 @@ TEST_F(DistLockCatalogTest, StopPingUnsupportedResponseFormat) {
                          << "NaN");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, BasicGetPing) {
@@ -1512,7 +1512,7 @@ TEST_F(DistLockCatalogTest, BasicGetPing) {
         return result;
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetPingTargetError) {
@@ -1540,7 +1540,7 @@ TEST_F(DistLockCatalogTest, GetPingNotFound) {
         return std::vector<BSONObj>();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetPingUnsupportedFormat) {
@@ -1563,7 +1563,7 @@ TEST_F(DistLockCatalogTest, GetPingUnsupportedFormat) {
         return result;
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, BasicGetLockByTS) {
@@ -1598,7 +1598,7 @@ TEST_F(DistLockCatalogTest, BasicGetLockByTS) {
         return result;
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetLockByTSTargetError) {
@@ -1625,7 +1625,7 @@ TEST_F(DistLockCatalogTest, GetLockByTSNotFound) {
         return std::vector<BSONObj>();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetLockByTSUnsupportedFormat) {
@@ -1648,7 +1648,7 @@ TEST_F(DistLockCatalogTest, GetLockByTSUnsupportedFormat) {
         return result;
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, BasicGetLockByName) {
@@ -1685,7 +1685,7 @@ TEST_F(DistLockCatalogTest, BasicGetLockByName) {
         return result;
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetLockByNameTargetError) {
@@ -1713,7 +1713,7 @@ TEST_F(DistLockCatalogTest, GetLockByNameNotFound) {
         return std::vector<BSONObj>();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(DistLockCatalogTest, GetLockByNameUnsupportedFormat) {
@@ -1736,7 +1736,7 @@ TEST_F(DistLockCatalogTest, GetLockByNameUnsupportedFormat) {
         return result;
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 }  // namespace

@@ -129,7 +129,7 @@ void ClusterCommandTestFixture::runCommandSuccessful(BSONObj cmd, bool isTargete
         expectReturnsSuccess(i % numShards);
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 void ClusterCommandTestFixture::runTxnCommandOneError(BSONObj cmd,
@@ -155,7 +155,7 @@ void ClusterCommandTestFixture::runTxnCommandOneError(BSONObj cmd,
         expectReturnsSuccess(i % numShards);
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 void ClusterCommandTestFixture::runCommandInspectRequests(BSONObj cmd,
@@ -168,7 +168,7 @@ void ClusterCommandTestFixture::runCommandInspectRequests(BSONObj cmd,
         expectInspectRequest(i % numShards, cb);
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 void ClusterCommandTestFixture::expectAbortTransaction() {
@@ -212,7 +212,7 @@ void ClusterCommandTestFixture::runTxnCommandMaxErrors(BSONObj cmd,
         expectAbortTransaction();
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 void ClusterCommandTestFixture::testNoErrors(BSONObj targetedCmd, BSONObj scatterGatherCmd) {

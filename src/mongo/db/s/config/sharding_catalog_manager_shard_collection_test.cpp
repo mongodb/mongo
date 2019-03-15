@@ -204,7 +204,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_ForMapReduce_NoInitialSpli
     // TODO SERVER-29451: add hooks to the mock storage engine to expect reads and writes.
     expectSetShardVersion(shardHost, shard, kNamespace, boost::none /* expected ChunkVersion */);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     checkWrittenChunks(
         {ChunkType(kNamespace,
@@ -277,7 +277,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_ForMapReduce_WithInitialSp
     // TODO SERVER-29451: add hooks to the mock storage engine to expect reads and writes.
     expectSetShardVersion(shard0Host, shard0, kNamespace, boost::none /* expected ChunkVersion */);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     checkWrittenChunks({ChunkType(kNamespace,
                                   ChunkRange{keyPattern.getKeyPattern().globalMin(), splitPoint0},
@@ -342,7 +342,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_NoInitialSplitPoints_NoSpl
     // TODO SERVER-29451: add hooks to the mock storage engine to expect reads and writes.
     expectSetShardVersion(shardHost, shard, kNamespace, boost::none /* expected ChunkVersion */);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     checkWrittenChunks(
         {ChunkType(kNamespace,
@@ -399,7 +399,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_NoInitialSplitPoints_WithS
     // TODO SERVER-29451: add hooks to the mock storage engine to expect reads and writes.
     expectSetShardVersion(shardHost, shard, kNamespace, boost::none);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     checkWrittenChunks({ChunkType(kNamespace,
                                   ChunkRange{keyPattern.getKeyPattern().globalMin(), splitPoint0},
@@ -466,7 +466,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_WithInitialSplitPoints_NoS
     // TODO SERVER-29451: add hooks to the mock storage engine to expect reads and writes.
     expectSetShardVersion(shardHost, shard, kNamespace, boost::none);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     checkWrittenChunks({ChunkType(kNamespace,
                                   ChunkRange{keyPattern.getKeyPattern().globalMin(), splitPoint0},
@@ -558,7 +558,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
 
     expectSplitVector(connStr.getServers()[0], kShardKeyPattern, BSON_ARRAY(BSON("x" << 0)));
 
-    const auto& firstChunks = future.timed_get(kFutureTimeout);
+    const auto& firstChunks = future.default_timed_get();
     ASSERT_EQ(2U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[1].getShard());
@@ -592,7 +592,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromClient_ManyChun
                                                      false /* isEmpty */);
     });
 
-    const auto& firstChunks = future.timed_get(kFutureTimeout);
+    const auto& firstChunks = future.default_timed_get();
     ASSERT_EQ(2U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[1].getShard());
@@ -648,7 +648,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_SplitPoints_FromClient_ManyChunksD
                                                      true /* isEmpty */);
     });
 
-    const auto& firstChunks = future.timed_get(kFutureTimeout);
+    const auto& firstChunks = future.default_timed_get();
     ASSERT_EQ(3U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[0].getName(), firstChunks.chunks[0].getShard());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[1].getShard());
@@ -683,7 +683,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
                                                      true /* isEmpty */);
     });
 
-    const auto& firstChunks = future.timed_get(kFutureTimeout);
+    const auto& firstChunks = future.default_timed_get();
     ASSERT_EQ(1U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
 }

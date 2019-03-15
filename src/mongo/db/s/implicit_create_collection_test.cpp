@@ -76,7 +76,7 @@ TEST_F(ImplicitCreateTest, NormalCreate) {
 
     expectConfigCreate(kNs, Status::OK());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ImplicitCreateTest, CanCallOnCannotImplicitAgainAfterError) {
@@ -91,7 +91,7 @@ TEST_F(ImplicitCreateTest, CanCallOnCannotImplicitAgainAfterError) {
     // return a non retryable error (just for testing) so the handler won't retry.
     expectConfigCreate(kNs, {ErrorCodes::FailPointEnabled, "deliberate error"});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
 
     // Retry, but this time config server will return success
@@ -104,7 +104,7 @@ TEST_F(ImplicitCreateTest, CanCallOnCannotImplicitAgainAfterError) {
 
     expectConfigCreate(kNs, Status::OK());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(ImplicitCreateTest, ShouldNotCallConfigCreateIfCollectionExists) {
@@ -119,7 +119,7 @@ TEST_F(ImplicitCreateTest, ShouldNotCallConfigCreateIfCollectionExists) {
     // return a non retryable error (just for testing) so the handler won't retry.
     expectConfigCreate(kNs, {ErrorCodes::FailPointEnabled, "deliberate error"});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // Simulate config server successfully creating the collection despite returning error.
     DBDirectClient client(operationContext());
@@ -137,7 +137,7 @@ TEST_F(ImplicitCreateTest, ShouldNotCallConfigCreateIfCollectionExists) {
 
     // Not expecting this shard to send any remote command.
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 }  // unnamed namespace

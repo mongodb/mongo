@@ -100,7 +100,7 @@ TEST_F(EnableShardingTest, noDBExists) {
             })");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(EnableShardingTest, dbExistsWithDifferentCase) {

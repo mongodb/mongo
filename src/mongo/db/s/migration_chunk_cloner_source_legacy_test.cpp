@@ -214,7 +214,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
         });
 
         ASSERT_OK(cloner.startClone(operationContext()));
-        futureStartClone.timed_get(kFutureTimeout);
+        futureStartClone.default_timed_get();
     }
 
     // Ensure the initial clone documents are available
@@ -301,7 +301,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
     });
 
     ASSERT_OK(cloner.commitClone(operationContext()));
-    futureCommit.timed_get(kFutureTimeout);
+    futureCommit.default_timed_get();
 }
 
 TEST_F(MigrationChunkClonerSourceLegacyTest, CollectionNotFound) {
@@ -352,7 +352,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
 
         auto startCloneStatus = cloner.startClone(operationContext());
         ASSERT_EQ(ErrorCodes::NetworkTimeout, startCloneStatus.code());
-        futureStartClone.timed_get(kFutureTimeout);
+        futureStartClone.default_timed_get();
     }
 
     // Ensure that if the recipient tries to fetch some documents, the cloner won't crash

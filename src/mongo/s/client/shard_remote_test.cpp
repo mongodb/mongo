@@ -129,7 +129,7 @@ TEST_F(ShardRemoteTest, NetworkReplyWithLastCommittedOpTime) {
         return std::make_tuple(result, metadata);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // Verify the targeted shard has updated its lastCommittedOpTime.
     ASSERT_EQ(expectedTime,
@@ -156,7 +156,7 @@ TEST_F(ShardRemoteTest, NetworkReplyWithoutLastCommittedOpTime) {
         return std::make_tuple(result, metadata);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // Verify the targeted shard has not updated its lastCommittedOpTime.
     ASSERT_EQ(LogicalTime::kUninitialized,
@@ -193,7 +193,7 @@ TEST_F(ShardRemoteTest, ScatterGatherRepliesWithLastCommittedOpTime) {
         });
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // Verify all shards updated their lastCommittedOpTime.
     for (auto shardId : kTestShardIds) {

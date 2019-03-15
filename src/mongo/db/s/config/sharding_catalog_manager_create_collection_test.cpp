@@ -178,7 +178,7 @@ TEST_F(CreateCollectionTest, BaseCase) {
     auto uuid = UUID::gen();
     auto options = fromjson("{ capped: true, size: 256 }");
     expectListCollection(primaryHost, testNS.db().toString(), options, uuid);
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 }  // namespace

@@ -732,7 +732,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -765,7 +765,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -810,7 +810,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         });
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
     ASSERT(expectedHostAndPorts == seenHostAndPorts);
 }
 
@@ -859,7 +859,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -907,7 +907,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
@@ -947,7 +947,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // Sending commit with a recovery token again should cause the router to use the recovery path
     // again.
@@ -970,7 +970,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
         return BSON("ok" << 1);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTest, CommitWithEmptyRecoveryToken) {
@@ -1022,7 +1022,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
     // ShardRegistry will try to perform a reload since it doesn't know about the shard.
     expectGetShards({shardType});
 
-    ASSERT_THROWS_CODE(future.timed_get(kFutureTimeout), DBException, ErrorCodes::ShardNotFound);
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::ShardNotFound);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime) {
@@ -1055,7 +1055,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsResetAtClusterTime
     ASSERT(txnRouter.canContinueOnSnapshotError());
     auto future = launchAsync([&] { txnRouter.onSnapshotError(operationContext(), kDummyStatus); });
     expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1155,7 +1155,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SnapshotErrorsClearsAllParticipa
     ASSERT(txnRouter.canContinueOnSnapshotError());
     auto future = launchAsync([&] { txnRouter.onSnapshotError(operationContext(), kDummyStatus); });
     expectAbortTransactions({hostAndPort1, hostAndPort2}, getSessionId(), txnNum);
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1282,7 +1282,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     auto future = launchAsync(
         [&] { txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus); });
     expectAbortTransactions({hostAndPort1, hostAndPort2}, getSessionId(), txnNum);
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     ASSERT_FALSE(txnRouter.getCoordinatorId());
 
@@ -1333,7 +1333,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnlyNewlyCreatedParticipantsClea
     auto future = launchAsync(
         [&] { txnRouter.onStaleShardOrDbError(operationContext(), "find", kDummyStatus); });
     expectAbortTransactions({hostAndPort2, hostAndPort3}, getSessionId(), txnNum);
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // Shards 2 and 3 must start a transaction, but shard 1 must not.
     ASSERT_FALSE(txnRouter.attachTxnFieldsIfNeeded(shard1, {})["startTransaction"].trueValue());
@@ -1381,7 +1381,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     auto future =
         launchAsync([&] { txnRouter.onViewResolutionError(operationContext(), kViewNss); });
     expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
@@ -1471,7 +1471,7 @@ TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
         return kOkReadOnlyFalseResponse;
     });
 
-    auto response = future.timed_get(kFutureTimeout);
+    auto response = future.default_timed_get();
     ASSERT_FALSE(response.empty());
 }
 
@@ -1514,7 +1514,7 @@ TEST_F(TransactionRouterTest, AbortForMultipleParticipants) {
         });
     }
 
-    auto response = future.timed_get(kFutureTimeout);
+    auto response = future.default_timed_get();
     ASSERT_FALSE(response.empty());
 }
 
@@ -1539,7 +1539,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
     auto future =
         launchAsync([&] { txnRouter.onViewResolutionError(operationContext(), kViewNss); });
     expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // The only participant was the coordinator, so it should have been reset.
     ASSERT_FALSE(txnRouter.getCoordinatorId());
@@ -1561,7 +1561,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, OnViewResolutionErrorClearsAllNe
 
     future = launchAsync([&] { txnRouter.onViewResolutionError(operationContext(), kViewNss); });
     expectAbortTransactions({hostAndPort2}, getSessionId(), txnNum);
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // Only the new participant shard was reset.
     firstShardCmd = txnRouter.attachTxnFieldsIfNeeded(shard1, {});
@@ -1617,7 +1617,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
         return kOkReadOnlyFalseResponse;
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTest, ImplicitAbortForMultipleParticipants) {
@@ -1658,7 +1658,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortForMultipleParticipants) {
         });
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
@@ -1692,7 +1692,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
     });
 
     // Shouldn't throw.
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -1901,7 +1901,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum, noSuchTransactionError);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -1933,7 +1933,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum, retryableError);
     expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -1964,7 +1964,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     }();
     expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum, abortError);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 DEATH_TEST_F(TransactionRouterTestWithDefaultSession,

@@ -331,7 +331,7 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
     expectMoveChunkCommand(chunk2, kShardId3, Status::OK());
 
     // Run the MigrationManager code.
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
@@ -395,7 +395,7 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
     expectMoveChunkCommand(chunk2coll2, kShardId3, Status::OK());
 
     // Run the MigrationManager code.
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 // The MigrationManager should fail the migration if a host is not found for the source shard.
@@ -447,7 +447,7 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
     expectMoveChunkCommand(chunk1, kShardId1, Status::OK());
 
     // Run the MigrationManager code.
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 // TODO: Delete in 3.8
@@ -489,7 +489,7 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
     expectMoveChunkCommand(chunk1, kShardId1, BSON("ok" << 0 << "chunkTooBig" << true));
 
     // Run the MigrationManager code.
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(MigrationManagerTest, InterruptMigration) {
@@ -538,7 +538,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
     network()->exitNetwork();
 
     // Ensure that the previously scheduled migration is cancelled
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     // Ensure that no new migrations can be scheduled
     ASSERT_EQ(ErrorCodes::BalancerInterrupted,
@@ -613,7 +613,7 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     expectMoveChunkCommand(chunk1, kShardId1, Status::OK());
 
     // Run the MigrationManager code.
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(MigrationManagerTest, MigrationRecovery) {
@@ -668,7 +668,7 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
     expectMoveChunkCommand(chunk2, kShardId3, Status::OK());
 
     // Run the MigrationManager code.
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(MigrationManagerTest, FailMigrationRecovery) {
@@ -787,7 +787,7 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
                "RemoteCallErrorConversionToOperationFailedCheck generated error."));
 
     // Run the MigrationManager code.
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 }  // namespace

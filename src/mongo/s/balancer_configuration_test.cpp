@@ -104,7 +104,7 @@ TEST_F(BalancerConfigurationTestFixture, NoConfigurationDocuments) {
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     ASSERT(config.shouldBalance());
     ASSERT(config.shouldBalanceForAutoSplit());
@@ -125,7 +125,7 @@ TEST_F(BalancerConfigurationTestFixture, ChunkSizeSettingsDocumentOnly) {
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>(BSON("value" << 3)));
     expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     ASSERT(config.shouldBalance());
     ASSERT(config.shouldBalanceForAutoSplit());
@@ -147,7 +147,7 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     ASSERT(!config.shouldBalance());
     ASSERT(!config.shouldBalanceForAutoSplit());
@@ -169,7 +169,7 @@ TEST_F(BalancerConfigurationTestFixture, AutoSplitSettingsDocumentOnly) {
     expectSettingsQuery(AutoSplitSettingsType::kKey,
                         boost::optional<BSONObj>(BSON("enabled" << false)));
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     ASSERT(config.shouldBalance());
     ASSERT(config.shouldBalanceForAutoSplit());
@@ -193,7 +193,7 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentBalanceForAutoS
     expectSettingsQuery(AutoSplitSettingsType::kKey,
                         boost::optional<BSONObj>(BSON("enabled" << true)));
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 
     ASSERT(!config.shouldBalance());
     ASSERT(config.shouldBalanceForAutoSplit());

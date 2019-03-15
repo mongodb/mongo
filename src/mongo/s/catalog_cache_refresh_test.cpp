@@ -114,7 +114,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
                                     chunk4.toConfigBSON()};
     }());
 
-    auto routingInfo = future.timed_get(kFutureTimeout);
+    auto routingInfo = future.default_timed_get();
     ASSERT(routingInfo->cm());
     auto cm = routingInfo->cm();
 
@@ -144,7 +144,7 @@ TEST_F(CatalogCacheRefreshTest, DatabaseNotFound) {
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
 
     try {
-        auto routingInfo = future.timed_get(kFutureTimeout);
+        auto routingInfo = future.default_timed_get();
         auto cm = routingInfo->cm();
         auto primary = routingInfo->db().primary();
 
@@ -165,7 +165,7 @@ TEST_F(CatalogCacheRefreshTest, DatabaseBSONCorrupted) {
                                     << "This value should not be in a database config document")});
 
     try {
-        auto routingInfo = future.timed_get(kFutureTimeout);
+        auto routingInfo = future.default_timed_get();
         auto cm = routingInfo->cm();
         auto primary = routingInfo->db().primary();
 
@@ -184,7 +184,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionNotFound) {
     // Return an empty collection
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
 
-    auto routingInfo = future.timed_get(kFutureTimeout);
+    auto routingInfo = future.default_timed_get();
     ASSERT(!routingInfo->cm());
     ASSERT(routingInfo->db().primary());
     ASSERT_EQ(ShardId{"0"}, routingInfo->db().primaryId());
@@ -202,7 +202,7 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
               << "This value should not be in a collection config document")});
 
     try {
-        auto routingInfo = future.timed_get(kFutureTimeout);
+        auto routingInfo = future.default_timed_get();
         auto cm = routingInfo->cm();
         auto primary = routingInfo->db().primary();
 
@@ -233,7 +233,7 @@ TEST_F(CatalogCacheRefreshTest, NoChunksFoundForCollection) {
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
 
     try {
-        auto routingInfo = future.timed_get(kFutureTimeout);
+        auto routingInfo = future.default_timed_get();
         auto cm = routingInfo->cm();
         auto primary = routingInfo->db().primary();
 
@@ -267,7 +267,7 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
     }());
 
     try {
-        auto routingInfo = future.timed_get(kFutureTimeout);
+        auto routingInfo = future.default_timed_get();
         auto cm = routingInfo->cm();
         auto primary = routingInfo->db().primary();
 
@@ -322,7 +322,7 @@ TEST_F(CatalogCacheRefreshTest, IncompleteChunksFoundForCollection) {
     expectFindSendBSONObjVector(kConfigHostAndPort, incompleteChunks);
 
     try {
-        auto routingInfo = future.timed_get(kFutureTimeout);
+        auto routingInfo = future.default_timed_get();
         auto cm = routingInfo->cm();
         auto primary = routingInfo->db().primary();
 
@@ -369,7 +369,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoad) {
     expectFindSendBSONObjVector(kConfigHostAndPort, inconsistentChunks);
 
     try {
-        auto routingInfo = future.timed_get(kFutureTimeout);
+        auto routingInfo = future.default_timed_get();
         auto cm = routingInfo->cm();
         auto primary = routingInfo->db().primary();
 
@@ -453,7 +453,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
             chunk1.toConfigBSON(), chunk2.toConfigBSON(), chunk3.toConfigBSON()};
     });
 
-    auto routingInfo = future.timed_get(kFutureTimeout);
+    auto routingInfo = future.default_timed_get();
     ASSERT(routingInfo->cm());
     auto cm = routingInfo->cm();
 
@@ -500,7 +500,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
         return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
     });
 
-    auto routingInfo = future.timed_get(kFutureTimeout);
+    auto routingInfo = future.default_timed_get();
     ASSERT(routingInfo->cm());
     auto cm = routingInfo->cm();
 
@@ -543,7 +543,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
         return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
     });
 
-    auto routingInfo = future.timed_get(kFutureTimeout);
+    auto routingInfo = future.default_timed_get();
     ASSERT(routingInfo->cm());
     auto cm = routingInfo->cm();
 
@@ -582,7 +582,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMove) {
         return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
     }());
 
-    auto routingInfo = future.timed_get(kFutureTimeout);
+    auto routingInfo = future.default_timed_get();
     ASSERT(routingInfo->cm());
     auto cm = routingInfo->cm();
 
@@ -618,7 +618,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunk) {
         return std::vector<BSONObj>{chunk1.toConfigBSON()};
     }());
 
-    auto routingInfo = future.timed_get(kFutureTimeout);
+    auto routingInfo = future.default_timed_get();
     ASSERT(routingInfo->cm());
     auto cm = routingInfo->cm();
 

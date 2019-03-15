@@ -239,7 +239,7 @@ TEST_F(BatchWriteExecTest, SingleOp) {
 
     expectInsertsReturnSuccess(std::vector<BSONObj>{BSON("x" << 1)});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, MultiOpLarge) {
@@ -277,7 +277,7 @@ TEST_F(BatchWriteExecTest, MultiOpLarge) {
     expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 66576);
     expectInsertsReturnSuccess(docsToInsert.begin() + 66576, docsToInsert.end());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, SingleOpError) {
@@ -312,7 +312,7 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
 
     expectInsertsReturnError({BSON("x" << 1)}, errResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 //
@@ -347,7 +347,7 @@ TEST_F(BatchWriteExecTest, StaleOp) {
     expectInsertsReturnStaleVersionErrors(expected);
     expectInsertsReturnSuccess(expected);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, MultiStaleOp) {
@@ -381,7 +381,7 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
 
     expectInsertsReturnSuccess(expected);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, TooManyStaleOp) {
@@ -418,7 +418,7 @@ TEST_F(BatchWriteExecTest, TooManyStaleOp) {
         expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
@@ -461,7 +461,7 @@ TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
     expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 63791);
     expectInsertsReturnSuccess(docsToInsert.begin() + 63791, docsToInsert.end());
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
@@ -499,7 +499,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, retryableErrResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
@@ -536,7 +536,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, retryableErrResponse);
     expectInsertsReturnSuccess({BSON("x" << 1), BSON("x" << 2)});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
@@ -577,7 +577,7 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, nonRetryableErrResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
@@ -617,7 +617,7 @@ TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, nonRetryableErrResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 class BatchWriteExecTransactionTest : public BatchWriteExecTest {
@@ -699,7 +699,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_CommandError) {
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, failedResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteError) {
@@ -727,7 +727,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteError) {
     // Any write error works, using SSV for convenience.
     expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteErrorOrdered) {
@@ -755,7 +755,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteErrorOrdered) {
     // Any write error works, using SSV for convenience.
     expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteConcernError) {
@@ -809,7 +809,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_WriteConcernError) {
         return bob.obj();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 }  // namespace

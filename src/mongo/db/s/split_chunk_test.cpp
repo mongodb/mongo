@@ -254,7 +254,7 @@ TEST_F(SplitChunkTest, HashedKeyPatternNumberLongSplitKeys) {
     collResponse();
     chunkResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, HashedKeyPatternIntegerSplitKeys) {
@@ -292,7 +292,7 @@ TEST_F(SplitChunkTest, HashedKeyPatternIntegerSplitKeys) {
     chunkResponse();
     shardResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, HashedKeyPatternDoubleSplitKeys) {
@@ -330,7 +330,7 @@ TEST_F(SplitChunkTest, HashedKeyPatternDoubleSplitKeys) {
     chunkResponse();
     shardResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, HashedKeyPatternStringSplitKeys) {
@@ -374,7 +374,7 @@ TEST_F(SplitChunkTest, HashedKeyPatternStringSplitKeys) {
     chunkResponse();
     shardResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, ValidRangeKeyPatternSplitKeys) {
@@ -422,7 +422,7 @@ TEST_F(SplitChunkTest, ValidRangeKeyPatternSplitKeys) {
     collResponse();
     chunkResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, SplitChunkWithNoErrors) {
@@ -483,7 +483,7 @@ TEST_F(SplitChunkTest, SplitChunkWithNoErrors) {
     collResponse();
     chunkResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, AttemptSplitWithConfigsvrError) {
@@ -527,7 +527,7 @@ TEST_F(SplitChunkTest, AttemptSplitWithConfigsvrError) {
     collResponse();
     chunkResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, AttemptSplitOnNoDatabases) {
@@ -561,7 +561,7 @@ TEST_F(SplitChunkTest, AttemptSplitOnNoDatabases) {
     emptyResponse();
     emptyResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, AttemptSplitOnNoCollections) {
@@ -598,7 +598,7 @@ TEST_F(SplitChunkTest, AttemptSplitOnNoCollections) {
     emptyResponse();
     shardResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, AttemptSplitOnNoChunks) {
@@ -641,7 +641,7 @@ TEST_F(SplitChunkTest, AttemptSplitOnNoChunks) {
     collResponse();
     emptyResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, NoCollectionAfterSplit) {
@@ -685,7 +685,7 @@ TEST_F(SplitChunkTest, NoCollectionAfterSplit) {
     // Finally, give an empty response to a request regarding a find on the original collection.
     emptyResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(SplitChunkTest, NoChunksAfterSplit) {
@@ -735,7 +735,7 @@ TEST_F(SplitChunkTest, NoChunksAfterSplit) {
     collResponse();
     emptyResponse();
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 }  // namespace

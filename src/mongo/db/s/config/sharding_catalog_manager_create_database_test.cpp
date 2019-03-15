@@ -148,7 +148,7 @@ TEST_F(CreateDatabaseTest, createDatabaseSuccess) {
         return BSON("ok" << 1 << "totalSize" << 100);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(CreateDatabaseTest, createDatabaseDBExists) {

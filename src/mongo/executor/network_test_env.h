@@ -80,6 +80,9 @@ namespace executor {
  */
 class NetworkTestEnv {
 public:
+    // Common timeout for tests to use for any work scheduled through launchAsync to complete.
+    static constexpr Minutes kDefaulLaunchAsyncFutureTimeout{5};
+
     /**
      * Wraps a std::future but will cancel any pending network operations in its destructor if
      * the future wasn't successfully waited on in the main test thread.
@@ -127,6 +130,10 @@ public:
         template <class Period>
         T timed_get(const Duration<Period>& timeout_duration) {
             return timed_get(timeout_duration.toSystemDuration());
+        }
+
+        T default_timed_get() {
+            return timed_get(kDefaulLaunchAsyncFutureTimeout);
         }
 
     private:

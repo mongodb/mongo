@@ -111,7 +111,7 @@ TEST_F(InsertRetryTest, RetryOnInterruptedAndNetworkErrorSuccess) {
 
     expectInserts(kTestNamespace, {objToInsert});
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(InsertRetryTest, RetryOnNetworkErrorFails) {
@@ -146,7 +146,7 @@ TEST_F(InsertRetryTest, RetryOnNetworkErrorFails) {
         return Status(ErrorCodes::NetworkTimeout, "Network timeout");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
@@ -184,7 +184,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMatch) {
         return vector<BSONObj>{objToInsert};
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
@@ -222,7 +222,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorNotFound) {
         return vector<BSONObj>();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
@@ -261,7 +261,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterNetworkErrorMismatch) {
                                           << "TestValue has changed")};
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
@@ -316,7 +316,7 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
         return vector<BSONObj>{objToInsert};
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(UpdateRetryTest, Success) {
@@ -350,7 +350,7 @@ TEST_F(UpdateRetryTest, Success) {
         return response.toBSON();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(UpdateRetryTest, NotMasterErrorReturnedPersistently) {
@@ -380,7 +380,7 @@ TEST_F(UpdateRetryTest, NotMasterErrorReturnedPersistently) {
         });
     }
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(UpdateRetryTest, NotMasterReturnedFromTargeter) {
@@ -402,7 +402,7 @@ TEST_F(UpdateRetryTest, NotMasterReturnedFromTargeter) {
         ASSERT_EQUALS(ErrorCodes::NotMaster, status);
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(UpdateRetryTest, NotMasterOnceSuccessAfterRetry) {
@@ -456,7 +456,7 @@ TEST_F(UpdateRetryTest, NotMasterOnceSuccessAfterRetry) {
         return response.toBSON();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
@@ -506,7 +506,7 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
         return response.toBSON();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 TEST_F(UpdateRetryTest, WriteConcernFailure) {
@@ -563,7 +563,7 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
         return response.toBSON();
     });
 
-    future.timed_get(kFutureTimeout);
+    future.default_timed_get();
 }
 
 }  // namespace
