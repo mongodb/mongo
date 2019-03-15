@@ -1672,7 +1672,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         }
     }
 
-    auto clockSource = opCtx->getServiceContext()->getFastClockSource();
+    auto clockSource = opCtx->getServiceContext()->getPreciseClockSource();
     const auto wTimeoutDate = [&]() -> const Date_t {
         if (writeConcern.wDeadline != Date_t::max()) {
             return writeConcern.wDeadline;
