@@ -10,7 +10,7 @@
     const st =
         new ShardingTest({shards: 2, rs: {nodes: 1, setParameter: {writePeriodicNoops: false}}});
 
-    const mongosDB = st.s.getDB(jsTestName());
+    const mongosDB = st.s.startSession({causalConsistency: true}).getDatabase(jsTestName());
     const mongosColl = mongosDB.test;
 
     // Enable sharding on the test DB and ensure its primary is shard0.
@@ -39,14 +39,14 @@
     // bump the oplog timestamp. We expect however that they will be identical for most test runs,
     // so there is value in testing.
     let clusterTime = null, updateEvent = null;
-    for (let id of[-10, 10]) {
+    for (let x = 0; x < 2; ++x) {
         assert.soon(() => csCursor.hasNext());
         updateEvent = csCursor.next();
-        assert.eq(updateEvent.documentKey._id, id);
         clusterTime = (clusterTime || updateEvent.clusterTime);
         assert.gte(updateEvent.clusterTime, clusterTime);
         assert.eq(updateEvent.updateDescription.updatedFields.updated, 1);
     }
+    assert.soon(() => csCursor.hasNext());
 
     // Update both documents again, so that we will have something to observe after resuming.
     assert.commandWorked(mongosColl.update({}, {$set: {updatedYetAgain: 1}}, {multi: true}));
@@ -56,14 +56,14 @@
     // mongoS when resuming, rather than scanning all the way to the most recent point in its oplog.
     csCursor = mongosColl.watch([], {resumeAfter: updateEvent._id, cursor: {batchSize: 1}});
     clusterTime = updateEvent = null;
-    for (let id of[-10, 10]) {
+    for (let x = 0; x < 2; ++x) {
         assert.soon(() => csCursor.hasNext());
         updateEvent = csCursor.next();
-        assert.eq(updateEvent.documentKey._id, id);
         clusterTime = (clusterTime || updateEvent.clusterTime);
         assert.gte(updateEvent.clusterTime, clusterTime);
         assert.eq(updateEvent.updateDescription.updatedFields.updatedAgain, 1);
     }
+    assert.soon(() => csCursor.hasNext());
 
     st.stop();
 })();
