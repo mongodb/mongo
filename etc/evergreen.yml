@@ -10449,7 +10449,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: "10.2"
+    cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk appletvos --show-sdk-path)"
@@ -10481,7 +10481,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos_sim.vars
       FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
-    cdriver_cmake_osx_deployment_target: "10.2"
+    cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk appletvsimulator --show-sdk-path)"
@@ -10497,7 +10497,7 @@ buildvariants:
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-TV-1080p
-    ios_sim_runtime: tvOS-10-2
+    ios_sim_runtime: tvOS-11-0
     dump_scons_config_on_failure: true
   tasks:
   - name: embedded_sdk_build_and_test
