@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
+
+#include <memory>
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_btree_impl.h"

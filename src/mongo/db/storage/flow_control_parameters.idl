@@ -25,34 +25,19 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-
 global:
     cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/bson/bson_depth.h"
 
 server_parameters:
-    notablescan:
-        # NOT recommended for production use.
-        description: >-
-            Whether all queries must use indexes.
-            If true, MongoDB will not execute queries that require a table scan and will return an error.
+    enableFlowControl:
+        description: 'Enable flow control'
+        set_at: startup
+        cpp_vartype: 'bool'
+        cpp_varname: 'gFlowControlEnabled'
+        default: false
+    flowControlTargetLagSeconds:
+        description: 'Target majority lag threshold where flow control will become engaged.'
         set_at: [ startup, runtime ]
-        cpp_varname: 'storageGlobalParams.noTableScan'
-    syncdelay:
-        # In almost every situation you should not set this value and use the default setting.
-        description: >-
-            Interval in seconds between fsync operations where mongod flushes its
-            working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
-        set_at: [ startup, runtime ]
-        cpp_varname: 'storageGlobalParams.syncdelay'
-        validator:
-            gte: 0.0
-            lte: { expr: 'StorageGlobalParams::kMaxSyncdelaySecs' }
-    journalCommitInterval:
-        description: 'Number of milliseconds between journal commits'
-        set_at: runtime
-        cpp_varname: 'storageGlobalParams.journalCommitIntervalMs'
-        validator:
-            gte: 1
-            lte: { expr: 'StorageGlobalParams::kMaxJournalCommitIntervalMs' }
+        cpp_vartype: 'AtomicWord<std::int32_t>'
+        cpp_varname: 'gFlowControlTargetLagSeconds'
+        default: 10

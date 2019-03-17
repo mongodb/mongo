@@ -83,6 +83,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
+#include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_participant.h"
@@ -162,11 +163,20 @@ void _getNextOpTimes(OperationContext* opCtx,
         term = replCoord->getTerm();
     }
 
+    Timestamp ts;
+    // Provide a sample to FlowControl after the `oplogInfo.newOpMutex` is released.
+    ON_BLOCK_EXIT([opCtx, &ts, count] {
+        auto flowControl = FlowControl::get(opCtx);
+        if (flowControl) {
+            flowControl->sample(ts, count);
+        }
+    });
+
     // Allow the storage engine to start the transaction outside the critical section.
     opCtx->recoveryUnit()->preallocateSnapshot();
     stdx::lock_guard<stdx::mutex> lk(oplogInfo.newOpMutex);
 
-    auto ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
+    ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
     const bool orderedCommit = false;
 
     if (persist) {

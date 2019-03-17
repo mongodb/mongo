@@ -176,6 +176,8 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
+#include "mongo/db/storage/flow_control.h"
+
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_options.h"
 #endif
@@ -323,6 +325,9 @@ ExitCode _initAndListen(int listenPort) {
     auto runner = makePeriodicRunner(serviceContext);
     runner->startup();
     serviceContext->setPeriodicRunner(std::move(runner));
+    FlowControl::set(serviceContext,
+                     stdx::make_unique<FlowControl>(
+                         serviceContext, repl::ReplicationCoordinator::get(serviceContext)));
 
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
 

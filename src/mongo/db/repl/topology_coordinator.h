@@ -112,6 +112,11 @@ public:
     MemberState getMemberState() const;
 
     /**
+     * Returns the replica set's MemberData.
+     */
+    std::vector<MemberData> getMemberData() const;
+
+    /**
      * Returns whether this node should be allowed to accept writes.
      */
     bool canAcceptWrites() const;

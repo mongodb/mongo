@@ -92,6 +92,8 @@ public:
 
     repl::MemberState getMemberState() const override;
 
+    std::vector<repl::MemberData> getMemberData() const override;
+
     Status waitForMemberState(repl::MemberState, Milliseconds) override;
 
     Seconds getSlaveDelaySecs() const override;

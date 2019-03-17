@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,48 +27,41 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
-
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/util/log.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
-void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
-    try {
-        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit(boost::none);
-        }
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
-    }
+/**
+ * This class is fundamentally a semaphore, but allows a caller to increment by X in constant time.
+ *
+ * It's expected usage maybe differs from a classic resource management protocol. Typically a client
+ * would acquire a ticket when it begins an operation and release the ticket to the pool when the
+ * operation is completed.
+ *
+ * In the context of flow control, clients take a ticket and do not return them to the pool. There
+ * is an external client that calculates the maximum number of tickets that should be allotted for
+ * the next second. The consumers will call `getTicket` and the producer will call `refreshTo`.
+ */
+class FlowControlTicketholder {
+public:
+    FlowControlTicketholder(int startTickets) : _tickets(startTickets) {}
 
-    // This ensures that the journal listener gets called on each commit.
-    // SERVER-22575: Remove this once we add a generic mechanism to periodically wait
-    // for durability.
-    waitUntilDurable();
-}
+    static FlowControlTicketholder* get(ServiceContext* service);
+    static FlowControlTicketholder* get(ServiceContext& service);
+    static FlowControlTicketholder* get(OperationContext* ctx);
 
-void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
-    try {
-        for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
-             ++it) {
-            ChangePtr change = *it;
-            LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*change));
-            change->rollback();
-        }
-        _changes.clear();
-    } catch (...) {
-        std::terminate();
-    }
-}
+    static void set(ServiceContext* service, std::unique_ptr<FlowControlTicketholder> flowControl);
 
-Status EphemeralForTestRecoveryUnit::obtainMajorityCommittedSnapshot() {
-    return Status::OK();
-}
-}
+    void refreshTo(int numTickets);
+
+    void getTicket(OperationContext* opCtx);
+
+private:
+    stdx::mutex _mutex;
+    stdx::condition_variable _cv;
+    int _tickets;
+};
+
+}  // namespace mongo

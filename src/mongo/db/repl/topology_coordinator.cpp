@@ -2133,6 +2133,10 @@ MemberState TopologyCoordinator::getMemberState() const {
     return _followerMode;
 }
 
+std::vector<MemberData> TopologyCoordinator::getMemberData() const {
+    return _memberData;
+}
+
 bool TopologyCoordinator::canAcceptWrites() const {
     return _leaderMode == LeaderMode::kMaster;
 }

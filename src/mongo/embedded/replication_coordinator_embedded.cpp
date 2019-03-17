@@ -151,6 +151,10 @@ MemberState ReplicationCoordinatorEmbedded::getMemberState() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+std::vector<repl::MemberData> ReplicationCoordinatorEmbedded::getMemberData() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 Status ReplicationCoordinatorEmbedded::waitForMemberState(MemberState, Milliseconds) {
     UASSERT_NOT_IMPLEMENTED;
 }

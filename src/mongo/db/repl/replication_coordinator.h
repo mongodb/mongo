@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -733,6 +734,12 @@ public:
      * operation in their oplogs.  This implies such ops will never be rolled back.
      */
     virtual OpTime getLastCommittedOpTime() const = 0;
+
+    /**
+     * Returns a list of objects that contain this node's knowledge of the state of the members of
+     * the replica set.
+     */
+    virtual std::vector<MemberData> getMemberData() const = 0;
 
     /*
     * Handles an incoming replSetRequestVotes command.

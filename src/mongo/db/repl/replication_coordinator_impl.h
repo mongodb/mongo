@@ -110,6 +110,8 @@ public:
 
     virtual MemberState getMemberState() const override;
 
+    virtual std::vector<MemberData> getMemberData() const override;
+
     virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) override;
 
     virtual bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const override;

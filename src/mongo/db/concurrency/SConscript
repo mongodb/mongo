@@ -54,6 +54,19 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/third_party/shim_boost',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
+    ],
+)
+
+env.Library(
+    target='flow_control_ticketholder',
+    source=[
+        'flow_control_ticketholder.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
 )
 
 env.Benchmark(

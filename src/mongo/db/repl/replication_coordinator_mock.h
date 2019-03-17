@@ -232,6 +232,8 @@ public:
 
     virtual OpTime getLastCommittedOpTime() const;
 
+    virtual std::vector<MemberData> getMemberData() const override;
+
     virtual Status processReplSetRequestVotes(OperationContext* opCtx,
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response);

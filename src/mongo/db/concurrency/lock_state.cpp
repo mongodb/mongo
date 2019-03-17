@@ -35,8 +35,10 @@
 
 #include <vector>
 
+#include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/flow_control.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/new.h"
 #include "mongo/util/background.h"
@@ -735,6 +737,13 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     invariant(!inAWriteUnitOfWork());
     invariant(_modeForTicket == MODE_NONE);
 
+    if (opCtx && (state.globalMode == LockMode::MODE_IX)) {
+        auto ticketholder = FlowControlTicketholder::get(opCtx);
+        if (ticketholder) {
+            ticketholder->getTicket(opCtx);
+        }
+    }
+
     std::vector<OneLock>::const_iterator it = state.locks.begin();
     // If we locked the PBWM, it must be locked before the resourceIdGlobal and
     // resourceIdReplicationStateTransitionLock resources.
@@ -1003,5 +1012,4 @@ const ResourceId resourceIdParallelBatchWriterMode =
     ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_PARALLEL_BATCH_WRITER_MODE);
 const ResourceId resourceIdReplicationStateTransitionLock =
     ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_REPLICATION_STATE_TRANSITION_LOCK);
-
 }  // namespace mongo

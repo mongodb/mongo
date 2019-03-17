@@ -874,6 +874,11 @@ MemberState ReplicationCoordinatorImpl::getMemberState() const {
     return _getMemberState_inlock();
 }
 
+std::vector<MemberData> ReplicationCoordinatorImpl::getMemberData() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _topCoord->getMemberData();
+}
+
 MemberState ReplicationCoordinatorImpl::_getMemberState_inlock() const {
     return _memberState;
 }

@@ -103,6 +103,11 @@ MemberState ReplicationCoordinatorMock::getMemberState() const {
     return _memberState;
 }
 
+std::vector<MemberData> ReplicationCoordinatorMock::getMemberData() const {
+    MONGO_UNREACHABLE;
+    return {};
+}
+
 Status ReplicationCoordinatorMock::waitForMemberState(MemberState expectedState,
                                                       Milliseconds timeout) {
     MONGO_UNREACHABLE;
