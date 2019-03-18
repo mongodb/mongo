@@ -305,13 +305,13 @@ variables:
   tasks:
   - name: compile_all_run_unittests_TG
     requires:
-    - name: burn_in_tests_gen
+    - name: burn_in_tests
     distros:
     - windows-64-vs2017-compile
   - name: compile_benchmarks
     distros:
     - windows-64-vs2017-compile
-  - name: burn_in_tests_gen
+  - name: burn_in_tests
   - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation_wildcard_fuzzer_gen
   - name: audit
@@ -3317,7 +3317,7 @@ timeout:
 ##   - Non standard jstests, i.e., jstestfuzz
 ## Note that the task name supports glob patterns.
 test_lifecycle_excluded_tasks:
-- burn_in_tests*
+- burn_in_tests
 - compile*
 - benchmarks*
 - dbtest*
@@ -4613,10 +4613,6 @@ tasks:
         diff -w requirements.txt.python2.old requirements.txt.python2.new
         diff -w requirements.txt.python3.old requirements.txt.python3.new
 
-### This task is deprecated, but left in here in case of need to run burn_in_tests
-### instead of the generated task:
-###  - Rename burn_in_tests_gen task to burn_in_tests_gen_UNUSED
-###  - Rename burn_in_tests_gen to burn_in_tests on the build variants
 - <<: *task_template
   name: burn_in_tests
   depends_on:
@@ -4659,61 +4655,6 @@ tasks:
       task_path_suffix: /data/multiversion:$HOME
       resmoke_wrapper: $python buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
       resmoke_args: --repeatSuites=2
-###
-
-- name: burn_in_tests_gen
-  commands:
-  - func: "git get project"
-    # The repository is cloned in a directory distinct from src for the modified test detection
-    # because the extraction of the artifacts performed in the 'do setup' causes
-    # 'git diff --name-only' to see all tests as modified on Windows (git 1.9.5). See SERVER-30634.
-    vars:
-      git_project_directory: burn_in_tests_clonedir
-  - command: shell.exec
-    params:
-      working_dir: burn_in_tests_clonedir
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        mkdir ../src
-        ${activate_virtualenv}
-        $python -m pip install -r etc/pip/evgtest-requirements.txt
-        # If this is a scheduled build, we check for changes against the last scheduled commit.
-        if [ "${is_patch}" != "true" ]; then
-          burn_in_args="--checkEvergreen"
-        fi
-        # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
-        # is used to for finding the associated tasks from a different build varaint than the
-        # burn_in_tests_gen task executes on.
-        build_variant_opts="--buildVariant=${build_variant}"
-        if [ -n "${burn_in_tests_build_variant|}" ]; then
-          build_variant_opts="--buildVariant=${burn_in_tests_build_variant} --runBuildVariant=${build_variant}"
-        fi
-        # Increase the burn_in repetition from 2 to 1000 executions or 10 minutes
-        burn_in_args="$burn_in_args --repeatTestsMin=2 --repeatTestsMax=1000 --repeatTestsSecs=600"
-        # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --branch=${branch_name} $build_variant_opts --distro=${distro_id} --generateTasksFile=../src/burn_in_tests_gen.json --noExec $burn_in_args
-  - command: archive.targz_pack
-    params:
-      target: src/burn_in_tests_gen.tgz
-      source_dir: src
-      include:
-        - burn_in_tests_gen.json
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/burn_in_tests_gen.tgz
-      remote_file: ${project}/${build_variant}/${revision}/burn_in_tests_gen/burn_in_tests_gen-${build_id}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/gzip}
-      display_name: Burn_in_tests Task Config - Execution ${execution}
-  - command: generate.tasks
-    params:
-      files:
-        - src/burn_in_tests_gen.json
 
 - <<: *benchmark_template
   name: benchmarks_orphaned
@@ -7839,10 +7780,10 @@ buildvariants:
   # configurations to run the tests under. Do not add more tasks to this list.
   - name: compile_TG
     requires:
-    - name: burn_in_tests_gen
+    - name: burn_in_tests
     distros:
     - rhel62-large
-  - name: burn_in_tests_gen
+  - name: burn_in_tests
 
 - name: linux-64-lsm
   stepback: false
@@ -9510,14 +9451,14 @@ buildvariants:
   tasks:
   - name: compile_TG
     requires:
-    - name: burn_in_tests_gen
+    - name: burn_in_tests
     - name: verify_pip
     distros:
     - windows-64-vs2017-compile
   - name: compile_benchmarks
     distros:
     - windows-64-vs2017-compile
-  - name: burn_in_tests_gen
+  - name: burn_in_tests
   - name: verify_pip
   - name: audit
   - name: auth_audit_gen
@@ -10588,7 +10529,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     requires:
-    - name: burn_in_tests_gen
+    - name: burn_in_tests
     - name: verify_pip
     - name: lint
     distros:
@@ -10598,7 +10539,7 @@ buildvariants:
     - rhel62-large
   - name: lint
   - name: lint_yaml
-  - name: burn_in_tests_gen
+  - name: burn_in_tests
     distros:
     - rhel62-large
   - name: verify_pip
@@ -11008,10 +10949,10 @@ buildvariants:
   # not add more tasks to this list.
   - name: compile_TG
     requires:
-    - name: burn_in_tests_gen
+    - name: burn_in_tests
     distros:
     - rhel62-large
-  - name: burn_in_tests_gen
+  - name: burn_in_tests
 
 - name: enterprise-rhel-62-64-bit-coverage
   display_name: "~ Enterprise RHEL 6.2 DEBUG Code Coverage"
@@ -13057,10 +12998,10 @@ buildvariants:
     - rhel62-large
   - name: compile_TG
     requires:
-    - name: burn_in_tests_gen
+    - name: burn_in_tests
     distros:
     - rhel62-large
-  - name: burn_in_tests_gen
+  - name: burn_in_tests
   - name: jsCore
 
 - name: rhel-62-64-bit-mobile
@@ -13208,10 +13149,10 @@ buildvariants:
   # to this list.
   - name: compile_TG
     requires:
-    - name: burn_in_tests_gen
+    - name: burn_in_tests
     distros:
     - rhel62-large
-  - name: burn_in_tests_gen
+  - name: burn_in_tests
   - name: jsCore_mobile
 
 - name: macos-mobile
