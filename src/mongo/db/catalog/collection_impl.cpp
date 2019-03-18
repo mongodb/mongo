@@ -548,6 +548,12 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     return status;
 }
 
+void CollectionImpl::setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) {
+    if (!_minVisibleSnapshot || (newMinimumVisibleSnapshot > _minVisibleSnapshot.get())) {
+        _minVisibleSnapshot = newMinimumVisibleSnapshot;
+    }
+}
+
 bool CollectionImpl::haveCappedWaiters() {
     // Waiters keep a shared_ptr to '_cappedNotifier', so there are waiters if this CollectionImpl's
     // shared_ptr is not unique (use_count > 1).
