@@ -760,8 +760,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
     def gen_known_fields_declaration(self):
         # type: () -> None
-        """Generate a known fields vector for a command."""
-        self._writer.write_line("static const std::vector<StringData> _knownFields;")
+        """Generate all the known fields vectors for a command."""
+        self._writer.write_line("static const std::vector<StringData> _knownBSONFields;")
+        self._writer.write_line("static const std::vector<StringData> _knownOP_MSGFields;")
         self.write_empty_line()
 
     def gen_comparison_operators_declarations(self, struct):
@@ -1756,9 +1757,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # Append passthrough elements
         if isinstance(struct, ast.Command):
+            known_name = "_knownOP_MSGFields" if is_op_msg_request else "_knownBSONFields"
             self._writer.write_line(
-                "IDLParserErrorContext::appendGenericCommandArguments(commandPassthroughFields, _knownFields, builder);"
-            )
+                "IDLParserErrorContext::appendGenericCommandArguments(commandPassthroughFields, %s, builder);"
+                % (known_name))
             self._writer.write_empty_line()
 
     def gen_bson_serializer_method(self, struct):
@@ -1871,17 +1873,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         enum_type_info.gen_serializer_definition(self._writer)
         self._writer.write_empty_line()
 
-    def gen_known_fields_declaration(self, struct):
-        # type: (ast.Struct) -> None
-        """Generate the known fields declaration."""
-        if not isinstance(struct, ast.Command):
-            return
-
+    def _gen_known_fields_declaration(self, struct, name, include_op_msg_implicit):
+        # type: (ast.Struct, unicode, bool) -> None
+        """Generate the known fields declaration with specified name."""
         block_name = common.template_args(
-            'const std::vector<StringData> ${class_name}::_knownFields {',
+            'const std::vector<StringData> ${class_name}::_${name}Fields {', name=name,
             class_name=common.title_case(struct.cpp_name))
         with self._block(block_name, "};"):
-            sorted_fields = sorted([field for field in struct.fields], key=lambda f: f.cpp_name)
+            sorted_fields = sorted([
+                field for field in struct.fields
+                if (not field.serialize_op_msg_request_only or include_op_msg_implicit)
+            ], key=lambda f: f.cpp_name)
 
             for field in sorted_fields:
                 self._writer.write_line(
@@ -1892,6 +1894,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line(
                 common.template_args('${class_name}::kCommandName,', class_name=common.title_case(
                     struct.cpp_name)))
+
+    def gen_known_fields_declaration(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate the all the known fields declarations."""
+        if not isinstance(struct, ast.Command):
+            return
+
+        self._gen_known_fields_declaration(struct, "knownBSON", False)
+        self._gen_known_fields_declaration(struct, "knownOP_MSG", True)
 
     def _gen_server_parameter_specialized(self, param):
         # type: (ast.ServerParameter) -> None
