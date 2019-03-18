@@ -290,6 +290,8 @@ void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
         .status_with_transitional_ignore();
 }
 
+MONGO_FP_DECLARE(electionHangsBeforeUpdateMemberState);
+
 void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     LoseElectionGuardV1 lossGuard(this);
@@ -329,9 +331,16 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm) {
     _voteRequester.reset();
     auto electionFinishedEvent = _electionFinishedEvent;
 
-    lk.unlock();
-    _performPostMemberStateUpdateAction(kActionWinElection);
+    MONGO_FAIL_POINT_BLOCK(electionHangsBeforeUpdateMemberState, customWait) {
+        auto waitForMillis = Milliseconds(customWait.getData()["waitForMillis"].numberInt());
+        log() << "election succeeded - electionHangsBeforeUpdateMemberState fail point "
+                 "enabled, sleeping "
+              << waitForMillis;
+        sleepFor(waitForMillis);
+    }
 
+    _postWonElectionUpdateMemberState_inlock();
+    lk.unlock();
     _replExecutor->signalEvent(electionFinishedEvent);
     lossGuard.dismiss();
 }

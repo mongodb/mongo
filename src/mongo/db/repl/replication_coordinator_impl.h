@@ -814,9 +814,20 @@ private:
         OperationContext* opCtx);
 
     /**
-     * Performs a post member-state update action.  Do not call while holding _mutex.
+     * Performs a post member-state update action.  Do not call while holding _mutex. "action" must
+     * not be kActionWinElection, use _postWonElectionUpdateMemberState_inlock instead.
      */
     void _performPostMemberStateUpdateAction(PostMemberStateUpdateAction action);
+
+    /**
+     * Update state after winning an election.
+     */
+    void _postWonElectionUpdateMemberState_inlock();
+
+    /**
+     * Helper to select appropriate sync source after transitioning from a follower state.
+     */
+    void _onFollowerModeStateChange();
 
     /**
      * Begins an attempt to elect this node.

@@ -556,7 +556,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     if (localConfig.getReplSetName() != _settings.ourSetName()) {
         warning() << "Local replica set configuration document reports set name of "
                   << localConfig.getReplSetName() << ", but command line reports "
-                  << _settings.ourSetName() << "; waitng for reconfig or remote heartbeat";
+                  << _settings.ourSetName() << "; waiting for reconfig or remote heartbeat";
         myIndex = StatusWith<int>(-1);
     }
 
@@ -639,7 +639,12 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         _updateTerm_inlock(term);
     }
     LOG(1) << "Current term is now " << term;
-    _performPostMemberStateUpdateAction(action);
+    if (action == kActionWinElection) {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _postWonElectionUpdateMemberState_inlock();
+    } else {
+        _performPostMemberStateUpdateAction(action);
+    }
 
     if (!isArbiter) {
         _externalState->startThreads(_settings);
@@ -929,8 +934,13 @@ Status ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) 
 
     const PostMemberStateUpdateAction action =
         _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
-    lk.unlock();
-    _performPostMemberStateUpdateAction(action);
+
+    if (action == kActionWinElection) {
+        _postWonElectionUpdateMemberState_inlock();
+    } else {
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
+    }
 
     return Status::OK();
 }
@@ -1783,24 +1793,30 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         invariant(opCtx->lockState()->isW());
 
         auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx);
-        lk.unlock();
+        // Seems unlikely but handle kActionWinElection in case some surprising sequence leads here.
+        if (action == kActionWinElection) {
+            _postWonElectionUpdateMemberState_inlock();
+            lk.unlock();
+        } else {
+            lk.unlock();
 
-        if (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
-            log() << "stepping down from primary - "
-                     "stepdownHangBeforePerformingPostMemberStateUpdateActions fail point enabled. "
-                     "Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
-                mongo::sleepsecs(1);
-                {
-                    stdx::lock_guard<stdx::mutex> lock(_mutex);
-                    if (_inShutdown) {
-                        break;
+            if (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
+                log() << "stepping down from primary - "
+                         "stepdownHangBeforePerformingPostMemberStateUpdateActions fail point "
+                         "enabled. Blocking until fail point is disabled.";
+                while (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
+                    mongo::sleepsecs(1);
+                    {
+                        stdx::lock_guard<stdx::mutex> lock(_mutex);
+                        if (_inShutdown) {
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        _performPostMemberStateUpdateAction(action);
+            _performPostMemberStateUpdateAction(action);
+        }
     };
     ScopeGuard onExitGuard = MakeGuard([&] {
         abortFn();
@@ -1927,7 +1943,8 @@ void ReplicationCoordinatorImpl::_handleTimePassing(
     }();
 
     if (wonSingleNodeElection) {
-        _performPostMemberStateUpdateAction(kActionWinElection);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _postWonElectionUpdateMemberState_inlock();
     }
 }
 
@@ -2256,8 +2273,14 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
 
     const PostMemberStateUpdateAction action =
         _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
-    lk.unlock();
-    _performPostMemberStateUpdateAction(action);
+
+    if (action == kActionWinElection) {
+        _postWonElectionUpdateMemberState_inlock();
+    } else {
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
+    }
+
     return Status::OK();
 }
 
@@ -2505,13 +2528,20 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndex);
 
-    // On a reconfig we drop all snapshots so we don't mistakenely read from the wrong one.
+    // On a reconfig we drop all snapshots so we don't mistakenly read from the wrong one.
     // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
     _dropAllSnapshots_inlock();
 
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
-    _performPostMemberStateUpdateAction(action);
+    if (action == kActionWinElection) {
+        lk.lock();
+        _postWonElectionUpdateMemberState_inlock();
+        lk.unlock();
+    } else {
+        _performPostMemberStateUpdateAction(action);
+    }
+
     _replExecutor->signalEvent(finishedEvent);
 }
 
@@ -2619,8 +2649,12 @@ void ReplicationCoordinatorImpl::_finishReplSetInitiate(OperationContext* opCtx,
     invariant(_rsConfigState == kConfigInitiating);
     invariant(!_rsConfig.isInitialized());
     auto action = _setCurrentRSConfig_inlock(opCtx, newConfig, myIndex);
-    lk.unlock();
-    _performPostMemberStateUpdateAction(action);
+    if (action == kActionWinElection) {
+        _postWonElectionUpdateMemberState_inlock();
+    } else {
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
+    }
 }
 
 void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
@@ -2772,58 +2806,59 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
 
 void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
     PostMemberStateUpdateAction action) {
+    invariant(action != kActionWinElection);
     switch (action) {
         case kActionNone:
             break;
         case kActionFollowerModeStateChange:
-            // In follower mode, or sub-mode so ensure replication is active
-            _externalState->signalApplierToChooseNewSyncSource();
+            _onFollowerModeStateChange();
             break;
         case kActionCloseAllConnections:
             _externalState->closeConnections();
             _externalState->shardingOnStepDownHook();
             _externalState->stopNoopWriter();
             break;
-        case kActionWinElection: {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
-            if (isV1ElectionProtocol()) {
-                invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
-                _electionId = OID::fromTerm(_topCoord->getTerm());
-            } else {
-                _electionId = OID::gen();
-            }
-
-            auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
-            _topCoord->processWinElection(_electionId, ts);
-            const PostMemberStateUpdateAction nextAction =
-                _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
-            invariant(nextAction != kActionWinElection);
-            lk.unlock();
-            _performPostMemberStateUpdateAction(nextAction);
-            lk.lock();
-            if (!_getMemberState_inlock().primary()) {
-                break;
-            }
-            // Notify all secondaries of the election win.
-            _restartHeartbeats_inlock();
-            if (isV1ElectionProtocol()) {
-                invariant(!_catchupState);
-                _catchupState = stdx::make_unique<CatchupState>(this);
-                _catchupState->start_inlock();
-            } else {
-                _enterDrainMode_inlock();
-            }
-            break;
-        }
         case kActionStartSingleNodeElection:
-            // In protocol version 1, single node replset will run an election instead of
-            // kActionWinElection as in protocol version 0.
+            // In protocol version 1, single node replset will run an election instead of directly
+            // calling _postWonElectionUpdateMemberState_inlock as in protocol version 0.
             _startElectSelfV1(TopologyCoordinator::StartElectionReason::kElectionTimeout);
             break;
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);
             fassertFailed(26010);
     }
+}
+
+void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState_inlock() {
+    if (isV1ElectionProtocol()) {
+        invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
+        _electionId = OID::fromTerm(_topCoord->getTerm());
+    } else {
+        _electionId = OID::gen();
+    }
+
+    auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
+    _topCoord->processWinElection(_electionId, ts);
+    const PostMemberStateUpdateAction nextAction =
+        _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
+    invariant(nextAction == kActionFollowerModeStateChange,
+              str::stream() << "nextAction == " << static_cast<int>(nextAction));
+    invariant(_getMemberState_inlock().primary());
+    // Clear the sync source.
+    _onFollowerModeStateChange();
+    // Notify all secondaries of the election win.
+    _restartHeartbeats_inlock();
+    if (isV1ElectionProtocol()) {
+        invariant(!_catchupState);
+        _catchupState = stdx::make_unique<CatchupState>(this);
+        _catchupState->start_inlock();
+    } else {
+        _enterDrainMode_inlock();
+    }
+}
+
+void ReplicationCoordinatorImpl::_onFollowerModeStateChange() {
+    _externalState->signalApplierToChooseNewSyncSource();
 }
 
 void ReplicationCoordinatorImpl::CatchupState::start_inlock() {

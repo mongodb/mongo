@@ -36,6 +36,8 @@ selector:
   - jstests/replsets/catchup_takeover_two_nodes_ahead.js
   # electionTimeoutMillis is not available in PV0.
   - jstests/replsets/noop_writes_wait_for_write_concern_fcv.js
+  # Tests a race condition in PV1, requires a PV1-specific failpoint.
+  - jstests/replsets/reconfig_during_election.js
   # Election handoff is not supported in PV0, since it requires replSetStepUp.
   - jstests/replsets/election_handoff*.js
   # replSetGetStatus doesn't return read concern majority optime in PV0.
