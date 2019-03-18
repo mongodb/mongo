@@ -89,6 +89,11 @@ public:
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const final;
 
+    repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
+                                              repl::OpTime lookupTime) final {
+        MONGO_UNREACHABLE;
+    }
+
     DBClientBase* directClient() final {
         MONGO_UNREACHABLE;
     }

@@ -49,9 +49,11 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/transaction_history_iterator.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -132,27 +134,6 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
     // database or cluster, mark as independent of any collection if so.
     constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
     return constraints;
-}
-
-void DocumentSourceChangeStreamTransform::initializeTransactionContext(const Document& input) {
-    invariant(!_txnContext);
-
-    checkValueType(input["o"], "o", BSONType::Object);
-    Value applyOps = input.getNestedField("o.applyOps");
-
-    checkValueType(applyOps, "applyOps", BSONType::Array);
-    invariant(applyOps.getArrayLength() > 0);
-
-    Value lsid = input["lsid"];
-    checkValueType(lsid, "lsid", BSONType::Object);
-
-    Value txnNumber = input["txnNumber"];
-    checkValueType(txnNumber, "txnNumber", BSONType::NumberLong);
-
-    Value ts = input[repl::OplogEntry::kTimestampFieldName];
-    Timestamp clusterTime = ts.getTimestamp();
-
-    _txnContext.emplace(applyOps, clusterTime, lsid.getDocument(), txnNumber.getLong());
 }
 
 ResumeTokenData DocumentSourceChangeStreamTransform::getResumeToken(Value ts,
@@ -291,24 +272,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
             break;
         }
         case repl::OpTypeEnum::kCommand: {
-            if (!input.getNestedField("o.applyOps").missing()) {
-                // We should never see an applyOps inside of an applyOps that made it past the
-                // filter. This prevents more than one level of recursion.
-                invariant(!_txnContext);
-
-                initializeTransactionContext(input);
-
-                // Now call applyTransformation on the first relevant entry in the applyOps.
-                boost::optional<Document> nextDoc = extractNextApplyOpsEntry();
-                invariant(nextDoc);
-
-                return applyTransformation(*nextDoc);
-            } else if (!input.getNestedField("o.commitTransaction").missing()) {
-                // TODO SERVER-39675: Perform a lookup for the associated committed transaction
-                // operations. The current invalidate behavior is just a placeholder pending this
-                // work.
-                operationType = DocumentSourceChangeStream::kInvalidateOpType;
-            } else if (!input.getNestedField("o.drop").missing()) {
+            if (!input.getNestedField("o.drop").missing()) {
                 operationType = DocumentSourceChangeStream::kDropCollectionOpType;
 
                 // The "o.drop" field will contain the actual collection name.
@@ -444,6 +408,55 @@ DocumentSource::GetModPathsReturn DocumentSourceChangeStreamTransform::getModifi
     return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<string>{}, {}};
 }
 
+void DocumentSourceChangeStreamTransform::initializeTransactionContext(const Document& input) {
+    // The only two commands we will see here are an applyOps or a commit, which both mean we
+    // need to open a "transaction context" representing a group of updates that all occurred at
+    // once as part of a transaction. If we already have a transaction context open, that would
+    // mean we are looking at an applyOps or commit nested within an applyOps, which is not
+    // allowed in the oplog.
+    invariant(!_txnContext);
+
+    Value lsid = input["lsid"];
+    checkValueType(lsid, "lsid", BSONType::Object);
+
+    Value txnNumber = input["txnNumber"];
+    checkValueType(txnNumber, "txnNumber", BSONType::NumberLong);
+
+    Value ts = input[repl::OplogEntry::kTimestampFieldName];
+    Timestamp txnApplyTime = ts.getTimestamp();
+
+    auto commandObj = input["o"].getDocument();
+    Value applyOps = commandObj["applyOps"];
+    if (!applyOps.missing()) {
+        // An "applyOps" command represents an immediately-committed transaction. We place the
+        // operations within the "applyOps" array directly into the transaction context.
+        applyOps = input.getNestedField("o.applyOps");
+    } else {
+        invariant(!commandObj["commitTransaction"].missing());
+
+        // A "commit" command is the second part of a transaction that has been split up into
+        // two oplog entries. The lsid, txnNumber, and timestamp are in this entry, but the
+        // "applyOps" array is in a previous entry, which we must look up.
+        repl::OpTime opTime;
+        uassertStatusOK(bsonExtractOpTimeField(input.toBson(), "prevOpTime", &opTime));
+
+        auto applyOpsEntry =
+            pExpCtx->mongoProcessInterface->lookUpOplogEntryByOpTime(pExpCtx->opCtx, opTime);
+        invariant(applyOpsEntry.isCommand() &&
+                  (repl::OplogEntry::CommandType::kApplyOps == applyOpsEntry.getCommandType()));
+        invariant(applyOpsEntry.shouldPrepare());
+
+        auto bsonOp = applyOpsEntry.getOperationToApply();
+        invariant(BSONType::Array == bsonOp["applyOps"].type());
+        applyOps = Value(bsonOp["applyOps"]);
+    }
+
+    checkValueType(applyOps, "applyOps", BSONType::Array);
+    invariant(applyOps.getArrayLength() > 0);
+
+    _txnContext.emplace(applyOps, txnApplyTime, lsid.getDocument(), txnNumber.getLong());
+}
+
 DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::getNext() {
     pExpCtx->checkForInterrupt();
 
@@ -452,23 +465,45 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::getNext() {
             "stage must be the first stage in a pipeline",
             !pExpCtx->inMongos);
 
-    // If we're unwinding an 'applyOps' from a transaction, check if there are any documents we have
-    // stored that can be returned.
-    if (_txnContext) {
-        boost::optional<Document> next = extractNextApplyOpsEntry();
-        if (next) {
-            return applyTransformation(*next);
+    while (1) {
+        // If we're unwinding an 'applyOps' from a transaction, check if there are any documents we
+        // have stored that can be returned.
+        if (_txnContext) {
+            if (auto next = extractNextApplyOpsEntry()) {
+                return applyTransformation(*next);
+            }
         }
-    }
 
-    // Get the next input document.
-    auto input = pSource->getNext();
-    if (!input.isAdvanced()) {
-        return input;
-    }
+        // Get the next input document.
+        auto input = pSource->getNext();
+        if (!input.isAdvanced()) {
+            return input;
+        }
 
-    // Apply the transform and return the document with added fields.
-    return applyTransformation(input.releaseDocument());
+        auto doc = input.releaseDocument();
+
+        auto op = doc[repl::OplogEntry::kOpTypeFieldName];
+        auto opType =
+            repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op.getStringData());
+        auto commandVal = doc["o"];
+        if (opType != repl::OpTypeEnum::kCommand ||
+            (commandVal["applyOps"].missing() && commandVal["commitTransaction"].missing())) {
+            // We should never see an "abortTransaction" command at this point.
+            invariant(opType != repl::OpTypeEnum::kCommand ||
+                      commandVal["abortTransaction"].missing());
+
+            // This oplog entry represents a single change. Apply the transform to it and return the
+            // resulting document.
+            return applyTransformation(doc);
+        }
+
+        initializeTransactionContext(doc);
+
+        // Once we initialize the transaction context, we can loop back to the top in order to call
+        // 'extractNextApplyOpsEntry' on it. Note that is possible for the transaction context to be
+        // empty of any relevant operations, meaning that this loop may need to execute multiple
+        // times before it encounters a relevant change to return.
+    }
 }
 
 bool DocumentSourceChangeStreamTransform::isDocumentRelevant(const Document& d) {

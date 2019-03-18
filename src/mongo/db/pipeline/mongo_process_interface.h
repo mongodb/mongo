@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/storage/backup_cursor_state.h"
 #include "mongo/s/chunk_version.h"
@@ -100,6 +101,12 @@ public:
      * because DBDirectClient isn't linked into mongos.
      */
     virtual DBClientBase* directClient() = 0;
+
+    /**
+     * Query the oplog for an entry with a matching OpTime.
+     */
+    virtual repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
+                                                      repl::OpTime lookupTime) = 0;
 
     /**
      * Note that in some rare cases this could return a false negative but will never return a false

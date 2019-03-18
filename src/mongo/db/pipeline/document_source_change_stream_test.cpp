@@ -74,6 +74,8 @@ using DSChangeStream = DocumentSourceChangeStream;
 
 static const Timestamp kDefaultTs(100, 1);
 static const repl::OpTime kDefaultOpTime(kDefaultTs, 1);
+static const Timestamp kPreparedTransactionTs(99, 1);
+static const repl::OpTime kPreparedTransactionOpTime(kPreparedTransactionTs, 1);
 static const NamespaceString nss("unittests.change_stream");
 static const BSONObj kDefaultSpec = fromjson("{$changeStream: {}}");
 
@@ -84,17 +86,27 @@ public:
         : AggregationContextFixture(nsString) {}
 };
 
-// This is needed only for the "insert" tests.
 struct MockMongoInterface final : public StubMongoProcessInterface {
 
-    MockMongoInterface(std::vector<FieldPath> fields) : _fields(std::move(fields)) {}
+    MockMongoInterface(std::vector<FieldPath> fields,
+                       boost::optional<repl::OplogEntry> preparedTransaction = {})
+        : _fields(std::move(fields)), _preparedTransaction(preparedTransaction) {}
 
+    // For tests of "commitTransaction" commands.
+    repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
+                                              repl::OpTime lookupTime) final {
+        invariant(_preparedTransaction && (lookupTime == _preparedTransaction->getOpTime()));
+        return *_preparedTransaction;
+    }
+
+    // For "insert" tests.
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext*, const NamespaceString&, UUID) const final {
         return {_fields, false};
     }
 
     std::vector<FieldPath> _fields;
+    boost::optional<repl::OplogEntry> _preparedTransaction;
 };
 
 class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
@@ -115,11 +127,13 @@ public:
                              const boost::optional<Document> expectedDoc,
                              std::vector<FieldPath> docKeyFields = {},
                              const BSONObj& spec = kDefaultSpec,
-                             const boost::optional<Document> expectedInvalidate = {}) {
+                             const boost::optional<Document> expectedInvalidate = {},
+                             const boost::optional<repl::OplogEntry> preparedTransaction = {}) {
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.toBSON(), spec);
         auto closeCursor = stages.back();
 
-        getExpCtx()->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(docKeyFields);
+        getExpCtx()->mongoProcessInterface =
+            stdx::make_unique<MockMongoInterface>(docKeyFields, preparedTransaction);
 
         auto next = closeCursor->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -876,18 +890,68 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionApplyOpsEntriesAreIgnored) {
     ASSERT_EQ(results.size(), 0u);
 }
 
-// TODO SERVER-39675: This test should be replaced with one that validates a prepared transaction
-// event sequence.
-TEST_F(ChangeStreamStageTest, CommitTransactionReturnsInvalidate) {
-    OplogEntry oplogEntry = createCommand(BSON("commitTransaction" << 1));
-
-    Document expectedResult{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
+TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransaction) {
+    // Create an oplog entry representing a prepared transaction.
+    Document preparedApplyOps{
+        {"applyOps",
+         Value{std::vector<Document>{
+             Document{{"op", "i"_sd},
+                      {"ns", nss.ns()},
+                      {"ui", testUuid()},
+                      {"o", Value{Document{{"_id", 123}}}}},
+         }}},
+        {"prepare", true},
     };
 
-    checkTransformation(oplogEntry, expectedResult);
+    auto basePreparedTransaction = makeOplogEntry(OpTypeEnum::kCommand,
+                                                  nss.getCommandNS(),
+                                                  preparedApplyOps.toBson(),
+                                                  testUuid(),
+                                                  boost::none,  // fromMigrate
+                                                  boost::none,  // o2 field
+                                                  kPreparedTransactionOpTime);
+    BSONObjBuilder builder(basePreparedTransaction.toBSON());
+    builder.append("prepare", true);
+    auto preparedTransaction = uassertStatusOK(repl::OplogEntry::parse(builder.done()));
+
+    // Create an oplog entry representing the commit for the prepared transaction. The commit has a
+    // 'prevWriteOpTimeInTransaction' value that matches the 'preparedApplyOps' entry, which the
+    // MockMongoInterface will pretend is in the oplog.
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(1);
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    auto oplogEntry = repl::OplogEntry(
+        kDefaultOpTime,                   // optime
+        1LL,                              // hash
+        OpTypeEnum::kCommand,             // opType
+        nss.getCommandNS(),               // namespace
+        boost::none,                      // uuid
+        boost::none,                      // fromMigrate
+        repl::OplogEntry::kOplogVersion,  // version
+        BSON("commitTransaction" << 1),   // o
+        boost::none,                      // o2
+        sessionInfo,                      // sessionInfo
+        boost::none,                      // upsert
+        boost::none,                      // wall clock time
+        boost::none,                      // statement id
+        kPreparedTransactionOpTime,       // optime of previous write within same transaction
+        boost::none,                      // pre-image optime
+        boost::none);                     // post-image optime
+
+    // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
+    // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
+    Document expectedResult{
+        {DSChangeStream::kTxnNumberField, static_cast<int>(*sessionInfo.getTxnNumber())},
+        {DSChangeStream::kLsidField, Document{{sessionInfo.getSessionId()->toBSON()}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), BSONObj())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 123}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{}},
+    };
+
+    checkTransformation(oplogEntry, expectedResult, {}, kDefaultSpec, {}, preparedTransaction);
 }
 
 TEST_F(ChangeStreamStageTest, TransformApplyOps) {

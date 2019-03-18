@@ -54,6 +54,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
+                                              repl::OpTime lookupTime) override {
+        MONGO_UNREACHABLE;
+    }
+
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
         return false;
     }

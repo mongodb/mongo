@@ -284,6 +284,7 @@ error_code("TransactionCoordinatorReachedAbortDecision", 282)
 error_code("WouldChangeOwningShard", 283, extra="WouldChangeOwningShardInfo")
 error_code("ForTestingErrorExtraInfoWithExtraInfoInNamespace", 284, extra="nested::twice::NestedErrorExtraInfoExample")
 error_code("IndexBuildAlreadyInProgress", 285)
+error_code("ChangeStreamHistoryLost", 286)
 
 # Error codes 4000-8999 are reserved.
 
@@ -349,3 +350,5 @@ error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "MaxTimeMSExpired", 
 error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory", "MigrationConflict"])
 
 error_class("VoteAbortError", ["NoSuchTransaction", "TransactionTooOld"])
+
+error_class("NonRetryableChangeStreamError", ["ChangeStreamFatalError", "ChangeStreamHistoryLost"])
