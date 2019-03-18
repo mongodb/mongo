@@ -44,7 +44,8 @@ function authAndTest(mongo) {
         user: CLIENT_USER,
         roles: [
             {'role': 'userAdminAnyDatabase', 'db': 'admin'},
-            {'role': 'readWriteAnyDatabase', 'db': 'admin'}
+            {'role': 'readWriteAnyDatabase', 'db': 'admin'},
+            {'role': 'clusterMonitor', 'db': 'admin'},
         ]
     });
 
@@ -69,6 +70,14 @@ function authAndTest(mongo) {
            "runCommand authentication with valid client cert and user field failed");
     assert(external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509'}).ok,
            "runCommand authentication with valid client cert and no user field failed");
+
+    // Check that there's a "Successfully authenticated" message that includes the client IP
+    const log =
+        assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
+    const successRegex = new RegExp(`Successfully authenticated as principal ${CLIENT_USER} on ` +
+                                    `\\$external from client (?:\\d{1,3}\\.){3}\\d{1,3}:\\d+`);
+
+    assert(log.some((line) => successRegex.test(line)));
 
     // Check that we can add a user and read data
     test.createUser(
