@@ -51,42 +51,45 @@
 
     replSet.waitForAllIndexBuildsToFinish(testDB.getName(), collName);
 
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: "hangAfterIndexBuildSecondDrain", mode: "alwaysOn"}));
+    let awaitShell;
+    try {
+        assert.commandWorked(testDB.adminCommand(
+            {configureFailPoint: "hangAfterIndexBuildSecondDrain", mode: "alwaysOn"}));
 
-    // Starts parallel shell to run the command that will hang.
-    const awaitShell = startParallelShell(function() {
-        // Use the index builds coordinator for a two-phase index build.
-        assert.commandWorked(db.runCommand({
-            twoPhaseCreateIndexes: 'twoPhaseIndexBuild',
-            indexes: [{key: {a: 1}, name: 'a_1'}],
+        // Starts parallel shell to run the command that will hang.
+        awaitShell = startParallelShell(function() {
+            // Use the index builds coordinator for a two-phase index build.
+            assert.commandWorked(db.runCommand({
+                twoPhaseCreateIndexes: 'twoPhaseIndexBuild',
+                indexes: [{key: {a: 1}, name: 'a_1'}],
+                commitQuorum: "majority"
+            }));
+        }, testDB.getMongo().port);
+
+        checkLog.containsWithCount(replSet.getPrimary(), "Waiting for index build to complete", 5);
+
+        // Test setting various commit quorums on the index build in our two node replica set.
+        assert.commandFailed(testDB.runCommand(
+            {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 3}));
+        assert.commandFailed(testDB.runCommand({
+            setIndexCommitQuorum: 'twoPhaseIndexBuild',
+            indexNames: ['a_1'],
+            commitQuorum: "someTag"
+        }));
+
+        assert.commandWorked(testDB.runCommand(
+            {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 0}));
+        assert.commandWorked(testDB.runCommand(
+            {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 2}));
+        assert.commandWorked(testDB.runCommand({
+            setIndexCommitQuorum: 'twoPhaseIndexBuild',
+            indexNames: ['a_1'],
             commitQuorum: "majority"
         }));
-    }, testDB.getMongo().port);
-
-    checkLog.containsWithCount(replSet.getPrimary(), "Waiting for index build to complete", 5);
-
-    // Test setting various commit quorums on the index build in our two node replica set.
-    assert.commandFailed(testDB.runCommand(
-        {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 3}));
-    assert.commandFailed(testDB.runCommand({
-        setIndexCommitQuorum: 'twoPhaseIndexBuild',
-        indexNames: ['a_1'],
-        commitQuorum: "someTag"
-    }));
-
-    assert.commandWorked(testDB.runCommand(
-        {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 0}));
-    assert.commandWorked(testDB.runCommand(
-        {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 2}));
-    assert.commandWorked(testDB.runCommand({
-        setIndexCommitQuorum: 'twoPhaseIndexBuild',
-        indexNames: ['a_1'],
-        commitQuorum: "majority"
-    }));
-
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangAfterIndexBuildSecondDrain", mode: "off"}));
+    } finally {
+        assert.commandWorked(testDB.adminCommand(
+            {configureFailPoint: "hangAfterIndexBuildSecondDrain", mode: "off"}));
+    }
 
     // Wait for the parallel shell to complete.
     awaitShell();
