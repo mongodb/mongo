@@ -273,8 +273,7 @@ void ReplicationCoordinatorImpl::_onElectCmdRunnerComplete() {
     _freshnessChecker.reset(NULL);
     _electCmdRunner.reset(NULL);
     auto electionFinishedEvent = _electionFinishedEvent;
-    lk.unlock();
-    _performPostMemberStateUpdateAction(kActionWinElection);
+    _postWonElectionUpdateMemberState_inlock();
     _replExecutor->signalEvent(electionFinishedEvent);
 }
 

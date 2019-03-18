@@ -255,9 +255,13 @@ stdx::unique_lock<stdx::mutex> ReplicationCoordinatorImpl::_handleHeartbeatRespo
             if (_memberState != _topCoord->getMemberState()) {
                 const PostMemberStateUpdateAction postUpdateAction =
                     _updateMemberStateFromTopologyCoordinator_inlock(nullptr);
-                lock.unlock();
-                _performPostMemberStateUpdateAction(postUpdateAction);
-                lock.lock();
+                if (postUpdateAction == kActionWinElection) {
+                    _postWonElectionUpdateMemberState_inlock();
+                } else {
+                    lock.unlock();
+                    _performPostMemberStateUpdateAction(postUpdateAction);
+                    lock.lock();
+                }
             }
             break;
         case HeartbeatResponseAction::Reconfig:
@@ -414,8 +418,14 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
         invariant(result != TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
         _pendingTermUpdateDuringStepDown = boost::none;
     }
-    lk.unlock();
-    _performPostMemberStateUpdateAction(action);
+
+    if (action == kActionWinElection) {
+        _postWonElectionUpdateMemberState_inlock();
+    } else {
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
+    }
+
     _replExecutor->signalEvent(finishedEvent);
 }
 
@@ -628,9 +638,15 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndexValue);
+
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
-    _performPostMemberStateUpdateAction(action);
+    if (action == kActionWinElection) {
+        lk.lock();
+        _postWonElectionUpdateMemberState_inlock();
+    } else {
+        _performPostMemberStateUpdateAction(action);
+    }
 }
 
 void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(
