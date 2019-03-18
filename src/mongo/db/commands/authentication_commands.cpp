@@ -187,8 +187,7 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     if (!status.isOK()) {
         if (!serverGlobalParams.quiet.load()) {
             auto const client = opCtx->getClient();
-            log() << "Failed to authenticate " << user
-                  << (client->hasRemote() ? (" from client " + client->getRemote().toString()) : "")
+            log() << "Failed to authenticate " << user << " from client " << client->getRemote()
                   << " with mechanism " << mechanism << ": " << status;
         }
         if (status.code() == ErrorCodes::AuthenticationFailed) {
@@ -201,6 +200,12 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         return false;
     }
+
+    if (!serverGlobalParams.quiet.load()) {
+        log() << "Successfully authenticated as principal " << user.getUser() << " on "
+              << user.getDB() << " from client " << opCtx->getClient()->session()->remote();
+    }
+
     result.append("dbname", user.getDB());
     result.append("user", user.getUser());
     return true;
