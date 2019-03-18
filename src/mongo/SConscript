@@ -48,29 +48,10 @@ env.SConscript(
     ],
 )
 
-allocatorEnv = env.Clone()
-if allocatorEnv['MONGO_ALLOCATOR'] == 'tcmalloc':
-    allocatorEnv.Append(
-            CPPDEFINES=[
-                'MONGO_USE_GPERFTOOLS_TCMALLOC',
-            ]
-        )
-
-    if not use_system_version_of_library('tcmalloc'):
-        # Add in the include path for our vendored tcmalloc.
-        allocatorEnv.InjectThirdParty('gperftools')
-
-        # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
-        # level configure check, though its effects should still be scoped just to these files.
-
-    if not use_system_version_of_library('valgrind'):
-        # Include valgrind since tcmalloc disables itself while running under valgrind
-        allocatorEnv.InjectThirdParty('valgrind')
-
 # NOTE: This library does not really belong here. Its presence here is
 # temporary. Do not add to this library, do not remove from it, and do
 # not declare other libraries in this file.
-allocatorEnv.Library(
+env.Library(
     target='base',
     source=[
         'base/data_range.cpp',

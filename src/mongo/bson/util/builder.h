@@ -136,7 +136,7 @@ public:
     }
     void free() {
         if (_ptr != _buf)
-            mongoFree(_ptr);
+            ::free(_ptr);
         _ptr = _buf;
     }
 

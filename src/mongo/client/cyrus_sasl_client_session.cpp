@@ -83,10 +83,6 @@ void* saslOurRealloc(void* ptr, SaslAllocSize sz) {
     return mongoRealloc(ptr, sz);
 }
 
-void saslOurFree(void* ptr) {
-    mongoFree(ptr);
-}
-
 /*
  * Mutex functions to be used by the SASL library, if the client doesn't initialize the library
  * for us.
@@ -115,7 +111,7 @@ void saslMutexFree(void* mutex) {
  * unless the client application has previously initialized the SASL library.
  */
 MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexes)(InitializerContext*) {
-    sasl_set_alloc(saslOurMalloc, saslOurCalloc, saslOurRealloc, saslOurFree);
+    sasl_set_alloc(saslOurMalloc, saslOurCalloc, saslOurRealloc, free);
 
     sasl_set_mutex(saslMutexAlloc, saslMutexLock, saslMutexUnlock, saslMutexFree);
     return Status::OK();

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <atomic>
 #include <boost/intrusive_ptr.hpp>
 #include <stdlib.h>
 
@@ -115,11 +114,7 @@ public:
 #pragma warning(push)
 #pragma warning(disable : 4291)
     void operator delete(void* ptr) {
-        // Accessing ptr here is technically undefined behavior, but the toolchains we use + UBSAN
-        // are okay with it.
-        // TODO When we are on C++20, this should change and use a destroying delete function.
-        // See https://jira.mongodb.org/browse/SERVER-39506
-        mongoFree(ptr, bytesRequiredForSize(reinterpret_cast<RCString*>(ptr)->size()));
+        free(ptr);
     }
 #pragma warning(pop)
 
@@ -128,10 +123,6 @@ private:
     RCString(){};
     void* operator new(size_t objSize, size_t realSize) {
         return mongoMalloc(realSize);
-    }
-
-    static size_t bytesRequiredForSize(size_t size) {
-        return sizeof(RCString) + size + 1;
     }
 
     int _size;  // does NOT include trailing NUL byte.

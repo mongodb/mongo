@@ -33,18 +33,10 @@
 
 #include "mongo/util/signal_handlers_synchronous.h"
 
-#if defined(MONGO_USE_GPERFTOOLS_TCMALLOC)
-#include <gperftools/tcmalloc.h>
-#endif
-
 namespace mongo {
 
 void* mongoMalloc(size_t size) {
-#if defined(MONGO_USE_GPERFTOOLS_TCMALLOC)
-    void* x = tc_malloc(size);
-#else
     void* x = std::malloc(size);
-#endif
     if (x == NULL) {
         reportOutOfMemoryErrorAndExit();
     }
@@ -52,31 +44,11 @@ void* mongoMalloc(size_t size) {
 }
 
 void* mongoRealloc(void* ptr, size_t size) {
-#if defined(MONGO_USE_GPERFTOOLS_TCMALLOC)
-    void* x = tc_realloc(ptr, size);
-#else
     void* x = std::realloc(ptr, size);
-#endif
     if (x == NULL) {
         reportOutOfMemoryErrorAndExit();
     }
     return x;
-}
-
-void mongoFree(void* ptr) {
-#if defined(MONGO_USE_GPERFTOOLS_TCMALLOC)
-    tc_free(ptr);
-#else
-    std::free(ptr);
-#endif
-}
-
-void mongoFree(void* ptr, size_t size) {
-#if defined(MONGO_USE_GPERFTOOLS_TCMALLOC)
-    tc_free_sized(ptr, size);
-#else
-    std::free(ptr);
-#endif
 }
 
 }  // namespace mongo
