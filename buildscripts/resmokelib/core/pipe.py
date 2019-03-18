@@ -52,6 +52,11 @@ class LoggerPipe(threading.Thread):  # pylint: disable=too-many-instance-attribu
         with self.__pipe_out:
             # Avoid buffering the output from the pipe.
             for line in iter(self.__pipe_out.readline, b""):
+                # Replace null bytes in the output of the subprocess with a literal backslash ('\')
+                # followed by a literal zero ('0') so tools like grep don't treat resmoke.py's
+                # output as binary data.
+                line = line.replace(b"\0", b"\\0")
+
                 # Convert the output of the process from a bytestring to a UTF-8 string, and replace
                 # any characters that cannot be decoded with the official Unicode replacement
                 # character, U+FFFD. The log messages of MongoDB processes are not always valid
