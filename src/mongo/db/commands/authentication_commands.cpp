@@ -187,9 +187,10 @@ bool CmdAuthenticate::run(OperationContext* txn,
     Status status = _authenticate(txn, mechanism, user, cmdObj);
     audit::logAuthentication(Client::getCurrent(), mechanism, user, status.code());
     if (!status.isOK()) {
-        if (!serverGlobalParams.quiet) {
-            log() << "Failed to authenticate " << user << " with mechanism " << mechanism << ": "
-                  << status;
+        if (!serverGlobalParams.quiet.load()) {
+            auto const client = txn->getClient();
+            log() << "Failed to authenticate " << user << " from client " << client->getRemote()
+                  << " with mechanism " << mechanism << ": " << status;
         }
         if (status.code() == ErrorCodes::AuthenticationFailed) {
             // Statuses with code AuthenticationFailed may contain messages we do not wish to
@@ -201,6 +202,12 @@ bool CmdAuthenticate::run(OperationContext* txn,
         sleepmillis(saslGlobalParams.authFailedDelay);
         return false;
     }
+
+    if (!serverGlobalParams.quiet.load()) {
+        log() << "Successfully authenticated as principal " << user.getUser() << " on "
+              << user.getDB() << " from client " << txn->getClient()->session()->remote();
+    }
+
     result.append("dbname", user.getDB());
     result.append("user", user.getUser());
     return true;

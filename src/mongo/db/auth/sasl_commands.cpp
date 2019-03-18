@@ -202,7 +202,8 @@ Status doSaslStep(const Client* client,
 
         if (!serverGlobalParams.quiet) {
             log() << "Successfully authenticated as principal " << session->getPrincipalId()
-                  << " on " << session->getAuthenticationDatabase();
+                  << " on " << session->getAuthenticationDatabase() << " from client "
+                  << client->session()->remote();
         }
     }
     return Status::OK();
