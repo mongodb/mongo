@@ -100,6 +100,8 @@ bool NamespaceString::isLegalClientSystemNS() const {
     } else if (db() == "config") {
         if (ns() == "config.system.sessions")
             return true;
+        if (ns() == kIndexBuildEntryNamespace.ns())
+            return true;
     }
 
     if (ns() == "local.system.replset")
