@@ -929,6 +929,7 @@ shellHelper.show = function(what) {
             dbinfo.push({
                 name: x.name,
                 size: x.sizeOnDisk,
+                empty: x.empty,
                 size_str: sizeStr,
                 name_size: nameLength,
                 gb_digits: gbDigits
@@ -942,8 +943,10 @@ shellHelper.show = function(what) {
             var padding = Array(namePadding + sizePadding + 3).join(" ");
             if (db.size > 1) {
                 print(db.name + padding + db.size_str + "GB");
-            } else {
+            } else if (db.empty) {
                 print(db.name + padding + "(empty)");
+            } else {
+                print(db.name);
             }
         });
 
