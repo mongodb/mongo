@@ -84,7 +84,6 @@
 using namespace std::literals::string_literals;
 using namespace mongo;
 
-std::string historyFile;
 bool gotInterrupted = false;
 bool inMultiLine = false;
 static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
@@ -199,14 +198,7 @@ void completionHook(const char* text, linenoiseCompletions* lc) {
 }
 
 void shellHistoryInit() {
-    std::stringstream ss;
-    const char* h = shell_utils::getUserDir();
-    if (h)
-        ss << h << "/";
-    ss << ".dbshell";
-    historyFile = ss.str();
-
-    Status res = linenoiseHistoryLoad(historyFile.c_str());
+    Status res = linenoiseHistoryLoad(shell_utils::getHistoryFilePath().string().c_str());
     if (!res.isOK()) {
         error() << "Error loading history file: " << res;
     }
@@ -214,7 +206,7 @@ void shellHistoryInit() {
 }
 
 void shellHistoryDone() {
-    Status res = linenoiseHistorySave(historyFile.c_str());
+    Status res = linenoiseHistorySave(shell_utils::getHistoryFilePath().string().c_str());
     if (!res.isOK()) {
         error() << "Error saving history file: " << res;
     }
@@ -865,14 +857,14 @@ int _main(int argc, char* argv[], char** envp) {
         std::stringstream ss;
         ss << "DB.prototype._defaultAuthenticationMechanism = \"" << escape(authMechanisms.get())
            << "\";" << std::endl;
-        mongo::shell_utils::_dbConnect += ss.str();
+        mongo::shell_utils::dbConnect += ss.str();
     }
 
     if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
         std::stringstream ss;
         ss << "DB.prototype._defaultGssapiServiceName = \"" << escape(gssapiServiveName.get())
            << "\";" << std::endl;
-        mongo::shell_utils::_dbConnect += ss.str();
+        mongo::shell_utils::dbConnect += ss.str();
     }
 
     if (!shellGlobalParams.nodb) {  // connect to db
@@ -909,7 +901,7 @@ int _main(int argc, char* argv[], char** envp) {
             ss << "db = db.getMongo().startSession().getDatabase(db.getName());" << std::endl;
         }
 
-        mongo::shell_utils::_dbConnect += ss.str();
+        mongo::shell_utils::dbConnect += ss.str();
     }
 
     mongo::ScriptEngine::setConnectCallback(mongo::shell_utils::onConnect);
