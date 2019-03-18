@@ -17,10 +17,10 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:1.12.+'
+        classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:1.12.3'
         classpath 'com.android.tools.build:gradle:3.1.2'
         classpath 'digital.wup:android-maven-publish:3.6.2'
-        classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:latest.release'
+        classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:4.9.0'
         classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.12.0"
     }
 }
