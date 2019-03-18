@@ -87,6 +87,7 @@ namespace repl {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationBeforeCompletion);
+MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationAfterWritingOplogEntries);
 MONGO_FAIL_POINT_DEFINE(hangAfterRecordingOpApplicationStartTime);
 
 // The oplog entries applied
@@ -1406,6 +1407,15 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
 
         // Wait for writes to finish before applying ops.
         _writerPool->waitForIdle();
+
+        // Use this fail point to hold the PBWM lock after we have written the oplog entries but
+        // before we have applied them.
+        if (MONGO_FAIL_POINT(pauseBatchApplicationAfterWritingOplogEntries)) {
+            log() << "pauseBatchApplicationAfterWritingOplogEntries fail point enabled. Blocking "
+                     "until fail point is disabled.";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+                opCtx, pauseBatchApplicationAfterWritingOplogEntries);
+        }
 
         // Reset consistency markers in case the node fails while applying ops.
         if (!_options.skipWritesToOplog) {
