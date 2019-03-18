@@ -55,7 +55,11 @@ namespace mongo {
 class MobileSession;
 class SqliteStatement;
 
-MobileKVEngine::MobileKVEngine(const std::string& path, std::int32_t durabilityLevel) {
+MobileKVEngine::MobileKVEngine(const std::string& path,
+                               std::uint32_t durabilityLevel,
+                               std::uint32_t cacheSizeKB,
+                               std::uint32_t mmapSizeKB,
+                               std::uint32_t journalSizeLimitKB) {
     _initDBPath(path);
 
     // Initialize the database to be in WAL mode.
@@ -66,10 +70,36 @@ MobileKVEngine::MobileKVEngine(const std::string& path, std::int32_t durabilityL
     // Guarantees that sqlite3_close() will be called when the function returns.
     ON_BLOCK_EXIT([&initSession] { sqlite3_close(initSession); });
 
-    // Ensure SQLite is operating in the WAL mode.
+    // Set all of our SQLite pragmas (https://www.sqlite.org/pragma.html)
+    // These should generally improve behavior, performance, and resource usage
+    {
+        for (auto it :
+             {std::string("journal_mode = WAL"),
+              "synchronous = " + std::to_string(durabilityLevel),
+              std::string("fullfsync = 1"),
+              // Allow for periodic calls to purge deleted records and prune db size on disk
+              // Still requires manual vacuum calls using `PRAGMA incremental_vacuum(N);`
+              std::string("auto_vacuum = incremental"),
+              "cache_size = -" + std::to_string(cacheSizeKB),
+              "mmap_size = " + std::to_string(mmapSizeKB * 1024),
+              "journal_size_limit = " + std::to_string(journalSizeLimitKB * 1024)}) {
+            std::string execPragma = "PRAGMA " + it + ";";
+            char* errMsg = NULL;
+            std::int32_t status =
+                sqlite3_exec(initSession, execPragma.c_str(), NULL, NULL, &errMsg);
+            checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
+            sqlite3_free(errMsg);
+            LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE configuration: " << execPragma;
+        }
+
+        LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Completed all SQLite database configuration";
+    }
+
+    // Check and enforce WAL mode
+    // This is not something that we want to be configurable
     {
         sqlite3_stmt* stmt;
-        status = sqlite3_prepare_v2(initSession, "PRAGMA journal_mode=WAL;", -1, &stmt, NULL);
+        status = sqlite3_prepare_v2(initSession, "PRAGMA journal_mode;", -1, &stmt, NULL);
         checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
 
         status = sqlite3_step(stmt);
@@ -85,18 +115,8 @@ MobileKVEngine::MobileKVEngine(const std::string& path, std::int32_t durabilityL
         LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database opened in WAL mode";
     }
 
-    // Let's set and enforce the synchronous mode
-    // We allow the user to specify a value between 0 and 3
-    // using the mobileDurabilityLevel option
+    // Check and enforce the synchronous mode
     {
-        std::string synchronousPragma =
-            "PRAGMA synchronous = " + std::to_string(durabilityLevel) + ";";
-
-        char* errMsg = NULL;
-        status = sqlite3_exec(initSession, synchronousPragma.c_str(), NULL, NULL, &errMsg);
-        checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
-        sqlite3_free(errMsg);
-
         sqlite3_stmt* stmt;
         status = sqlite3_prepare_v2(initSession, "PRAGMA synchronous;", -1, &stmt, NULL);
         checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
@@ -105,25 +125,18 @@ MobileKVEngine::MobileKVEngine(const std::string& path, std::int32_t durabilityL
         checkStatus(status, SQLITE_ROW, "sqlite3_step");
 
         // Pragma returns current "synchronous" setting
-        int sync_val = sqlite3_column_int(stmt, 0);
+        std::uint32_t sync_val = sqlite3_column_int(stmt, 0);
         fassert(50869, sync_val == durabilityLevel);
         status = sqlite3_finalize(stmt);
         checkStatus(status, SQLITE_OK, "sqlite3_finalize");
 
         LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database has synchronous "
-                                  << "mode set to " << durabilityLevel;
+                                  << "set to: " << durabilityLevel;
     }
 
-    // Set and ensure SQLite is operating with F_FULLFSYNC on darwin kernels
+    // Check and enforce that we are using the F_FULLFSYNC fcntl on darwin kernels
+    // This prevents data corruption as fsync doesn't work as expected
     {
-        char* errMsg = NULL;
-        status = sqlite3_exec(initSession, "PRAGMA fullfsync = 1;", NULL, NULL, &errMsg);
-        checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
-        // When the error message is not NULL, it is allocated through sqlite3_malloc and must be
-        // freed before exiting the method. If the error message is NULL, sqlite3_free is a no-op.
-        sqlite3_free(errMsg);
-
-        // Confirm that the setting holds
         sqlite3_stmt* stmt;
         status = sqlite3_prepare_v2(initSession, "PRAGMA fullfsync;", -1, &stmt, NULL);
         checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
@@ -140,39 +153,6 @@ MobileKVEngine::MobileKVEngine(const std::string& path, std::int32_t durabilityL
         LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database is set to fsync "
                                   << "with F_FULLFSYNC if the platform supports it (currently"
                                   << " only darwin kernels). Value: " << fullfsync_val;
-    }
-
-    // Let's set additional non-critical settings that should improve performance and resource usage
-    {
-        // Allow for periodic calls to purge deleted records and prune db size on disk
-        // Still requires manual vacuum calls using `PRAGMA incremental_vacuum(N);`
-        char* errMsg = NULL;
-        status =
-            sqlite3_exec(initSession, "PRAGMA auto_vacuum = incremental;", NULL, NULL, &errMsg);
-        checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
-        sqlite3_free(errMsg);
-
-        // Set the cache size to 10MiB
-        // value is passed as "-<#ofKiB>"
-        errMsg = NULL;
-        status = sqlite3_exec(initSession, "PRAGMA cache_size = -10240;", NULL, NULL, &errMsg);
-        checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
-        sqlite3_free(errMsg);
-
-        // Enable memory mapping for the data and set the size at 50MiB
-        errMsg = NULL;
-        status = sqlite3_exec(initSession, "PRAGMA mmap_size = 52428800;", NULL, NULL, &errMsg);
-        checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
-        sqlite3_free(errMsg);
-
-        // Cap the WAL size at 5MiB so that it's regularly pruned
-        errMsg = NULL;
-        status =
-            sqlite3_exec(initSession, "PRAGMA journal_size_limit = 5242880;", NULL, NULL, &errMsg);
-        checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
-        sqlite3_free(errMsg);
-
-        LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Completed all SQLite database configuration";
     }
 
     _sessionPool.reset(new MobileSessionPool(_path));

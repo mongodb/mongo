@@ -47,6 +47,16 @@ Status MobileGlobalOptions::store(const moe::Environment& params) {
         mobileGlobalOptions.mobileDurabilityLevel =
             params["storage.mobile.durabilityLevel"].as<int>();
     }
+    if (params.count("storage.mobile.cacheSizeKB")) {
+        mobileGlobalOptions.mobileCacheSizeKB = params["storage.mobile.cacheSizeKB"].as<int>();
+    }
+    if (params.count("storage.mobile.mmapSizeKB")) {
+        mobileGlobalOptions.mobileMmapSizeKB = params["storage.mobile.mmapSizeKB"].as<int>();
+    }
+    if (params.count("storage.mobile.journalSizeLimitKB")) {
+        mobileGlobalOptions.mobileJournalSizeLimitKB =
+            params["storage.mobile.journalSizeLimitKB"].as<int>();
+    }
 
     return Status::OK();
 }

@@ -43,7 +43,11 @@ class JournalListener;
 
 class MobileKVEngine : public KVEngine {
 public:
-    MobileKVEngine(const std::string& path, std::int32_t durabilityLevel);
+    MobileKVEngine(const std::string& path,
+                   std::uint32_t durabilityLevel,
+                   std::uint32_t cacheSizeKB,
+                   std::uint32_t mmapSizeKB,
+                   std::uint32_t journalSizeLimitKB);
 
     RecoveryUnit* newRecoveryUnit() override;
 
@@ -135,6 +139,7 @@ public:
 private:
     mutable stdx::mutex _mutex;
     void _initDBPath(const std::string& path);
+    std::int32_t _setSQLitePragma(const std::string& pragma, sqlite3* session);
 
     std::unique_ptr<MobileSessionPool> _sessionPool;
 
@@ -143,4 +148,5 @@ private:
 
     std::string _path;
 };
+
 }  // namespace mongo

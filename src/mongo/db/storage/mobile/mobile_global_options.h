@@ -38,13 +38,12 @@ namespace mongo {
 
 class MobileGlobalOptions {
 public:
-    MobileGlobalOptions() : mobileDurabilityLevel(1){};
+    std::uint32_t mobileDurabilityLevel = 1;
+    std::uint32_t mobileCacheSizeKB = 10240;
+    std::uint32_t mobileMmapSizeKB = 51200;
+    std::uint32_t mobileJournalSizeLimitKB = 5120;
 
     Status store(const optionenvironment::Environment& params);
-
-    // This is used by the Mobile SE and allows users to set the value
-    // passed to SQLite's PRAGMA synchronous command
-    std::int32_t mobileDurabilityLevel;
 };
 
 extern MobileGlobalOptions mobileGlobalOptions;

@@ -33,6 +33,8 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/mongod_options_general_gen.h"
+#include "mongo/db/mongod_options_replication_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
 #include "mongo/embedded/embedded_options.h"
@@ -108,13 +110,13 @@ int mongoedMain(int argc, char* argv[], char** envp) {
         // Adding all options mongod we don't have to maintain a separate set for this executable,
         // some will be unused but that's fine as this is just an executable for testing purposes
         // anyway.
-        uassertStatusOK(addMongodOptions(&startupOptions));
+        uassertStatusOK(addMongodGeneralOptions(&startupOptions));
+        uassertStatusOK(addMongodReplicationOptions(&startupOptions));
+        uassertStatusOK(embedded::addOptions(&startupOptions));
         uassertStatusOK(
             embedded_integration_helpers::parseCommandLineOptions(argc, argv, startupOptions));
 
-        // Add embedded specific options that's not available in mongod here.
-        YAML::Emitter yaml;
-        serviceContext = embedded::initialize(yaml.c_str());
+        serviceContext = embedded::initialize("");
 
         // storeMongodOptions() triggers cmdline censoring, which must happen after initializers.
         uassertStatusOK(storeMongodOptions(optionenvironment::startupOptionsParsed));

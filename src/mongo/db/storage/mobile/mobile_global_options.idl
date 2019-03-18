@@ -31,22 +31,50 @@ global:
     cpp_includes:
         - "mongo/db/storage/mobile/mobile_global_options.h"
     configs:
-        section: 'Mobile options'
+        section: 'Mobile Storage Engine options'
         source: [ cli, ini, yaml ]
+        initializer:
+            register: addMobileStorageOptionDefinitions
 
 configs:
     # Mobile storage engine options
     "storage.mobile.durabilityLevel":
         description: >-
-            How often you want the Mobile SE to fsync data to disk. This is a trade-off between
-            durability guarantees and performance. This value maps directly to SQLite's synchronous
-            PRAGMA. The default value is 1 or NORMAL durability, where it's possible to have a
-            write rolled back if the device crashes or loses power (you are always safe from
-            application crashes). If write guarantees are more important than performance, set
-            this to 2 or 3. Conversely, if you are fine with somewhat ephemeral local data then
-            you can set this to 0.
-        short_name: mobileDurabilityLevel
-        cpp_varname: 'mobileDurabilityLevel'
+            How often you want fsync data to disk. This is a trade-off between
+            durability guarantees and performance. This value maps directly to
+            SQLite's synchronous PRAGMA. The default value is 1 or NORMAL
+            durability, where it's possible to have a write rolled back if the
+            device crashes or loses power (you are always safe from
+            application crashes). If write guarantees are more important than
+            performance, set this to 2 or 3. Conversely, if you are fine with
+            somewhat ephemeral local data then you can set this to 0.
         arg_vartype: Int
+        cpp_varname: 'mobileGlobalOptions.mobileDurabilityLevel'
+        short_name: mobileDurabilityLevel
         default: 1
         validator: {gte: 0, lte: 3}
+
+    "storage.mobile.cacheSizeKB":
+        description: 'The size of the cache in kilobytes.'
+        arg_vartype: Int
+        cpp_varname: 'mobileGlobalOptions.mobileCacheSizeKB'
+        short_name: mobileCacheSizeKB
+        default: 10240
+        validator: {gte: 0}
+
+    "storage.mobile.mmapSizeKB":
+        description: 'How much of the data can we memory map in kilobytes.'
+        arg_vartype: Int
+        cpp_varname: 'mobileGlobalOptions.mobileMmapSizeKB'
+        short_name: mobileMmapSizeKB
+        default: 51200
+        validator: {gte: 0}
+
+    "storage.mobile.journalSizeLimitKB":
+        description: 'Limit the size of the WAL to this amount in kilobytes.'
+        arg_vartype: Int
+        cpp_varname: 'mobileGlobalOptions.mobileJournalSizeLimitKB'
+        short_name: mobileJournalSizeLimitKB
+        default: 5120
+        validator: {gte: 0}
+

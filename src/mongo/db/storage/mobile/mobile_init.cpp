@@ -54,8 +54,11 @@ public:
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
 
-        MobileKVEngine* kvEngine =
-            new MobileKVEngine(params.dbpath, mobileGlobalOptions.mobileDurabilityLevel);
+        MobileKVEngine* kvEngine = new MobileKVEngine(params.dbpath,
+                                                      mobileGlobalOptions.mobileDurabilityLevel,
+                                                      mobileGlobalOptions.mobileCacheSizeKB,
+                                                      mobileGlobalOptions.mobileMmapSizeKB,
+                                                      mobileGlobalOptions.mobileJournalSizeLimitKB);
 
         return new KVStorageEngine(kvEngine, options);
     }

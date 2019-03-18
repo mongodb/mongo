@@ -39,12 +39,22 @@ namespace {
 
 class MobileKVHarnessHelper : public KVHarnessHelper {
 public:
-    MobileKVHarnessHelper() : _dbPath("mobile_kv_engine_harness"), _mobileDurabilityLevel(1) {
-        _engine = stdx::make_unique<MobileKVEngine>(_dbPath.path(), _mobileDurabilityLevel);
+    MobileKVHarnessHelper()
+        : _dbPath("mobile_kv_engine_harness"),
+          _mobileDurabilityLevel(1),
+          _cacheSizeKB(10240),
+          _mmapSizeKB(51200),
+          _journalSizeLimitKB(5120) {
+        _engine = stdx::make_unique<MobileKVEngine>(
+            _dbPath.path(), _mobileDurabilityLevel, _cacheSizeKB, _mmapSizeKB, _journalSizeLimitKB);
     }
 
     virtual KVEngine* restartEngine() {
-        _engine.reset(new MobileKVEngine(_dbPath.path(), _mobileDurabilityLevel));
+        _engine.reset(new MobileKVEngine(_dbPath.path(),
+                                         _mobileDurabilityLevel,
+                                         _cacheSizeKB,
+                                         _mmapSizeKB,
+                                         _journalSizeLimitKB));
         return _engine.get();
     }
 
@@ -55,7 +65,10 @@ public:
 private:
     std::unique_ptr<MobileKVEngine> _engine;
     unittest::TempDir _dbPath;
-    std::int32_t _mobileDurabilityLevel;
+    std::uint32_t _mobileDurabilityLevel;
+    std::uint32_t _cacheSizeKB;
+    std::uint32_t _mmapSizeKB;
+    std::uint32_t _journalSizeLimitKB;
 };
 
 std::unique_ptr<KVHarnessHelper> makeHelper() {
