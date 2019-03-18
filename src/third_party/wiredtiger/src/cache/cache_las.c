@@ -582,11 +582,9 @@ __las_insert_block_verbose(
 		(void)__wt_eviction_clean_needed(session, &pct_full);
 		(void)__wt_eviction_dirty_needed(session, &pct_dirty);
 		__wt_timestamp_to_string(
-		    multi->page_las.unstable_timestamp,
-		    ts_string[0], sizeof(ts_string));
+		    multi->page_las.unstable_timestamp, ts_string[0]);
 		__wt_timestamp_to_string(
-		    multi->page_las.unstable_durable_timestamp,
-		    ts_string[1], sizeof(ts_string));
+		    multi->page_las.unstable_durable_timestamp, ts_string[1]);
 
 		__wt_verbose(session,
 		    WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,

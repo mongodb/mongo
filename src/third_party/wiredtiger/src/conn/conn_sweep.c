@@ -18,7 +18,7 @@
  *	handles.
  */
 static void
-__sweep_mark(WT_SESSION_IMPL *session, time_t now)
+__sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -107,7 +107,7 @@ err:	__wt_writeunlock(session, &dhandle->rwlock);
  *	until we have reached the configured minimum number of handles.
  */
 static int
-__sweep_expire(WT_SESSION_IMPL *session, time_t now)
+__sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -127,8 +127,7 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
 		    dhandle->session_inuse != 0 ||
 		    dhandle->timeofdeath == 0 ||
-		    difftime(now, dhandle->timeofdeath) <=
-		    conn->sweep_idle_time)
+		    now - dhandle->timeofdeath <= conn->sweep_idle_time)
 			continue;
 
 		/*
@@ -277,7 +276,7 @@ __sweep_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	time_t last, now;
+	uint64_t last, now;
 	uint64_t last_las_sweep_id, min_sleep, oldest_id, sweep_interval;
 	u_int dead_handles;
 
@@ -340,7 +339,7 @@ __sweep_server(void *arg)
 		 * less frequently than the lookaside table by default and the
 		 * frequency is controlled by a user setting.
 		 */
-		if ((uint64_t)(now - last) < sweep_interval)
+		if (now - last < sweep_interval)
 			continue;
 		WT_STAT_CONN_INCR(session, dh_sweeps);
 		/*

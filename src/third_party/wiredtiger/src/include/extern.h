@@ -803,7 +803,7 @@ extern int __wt_thread_group_destroy(WT_SESSION_IMPL *session, WT_THREAD_GROUP *
 extern void __wt_thread_group_start_one(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, bool is_locked);
 extern void __wt_thread_group_stop_one(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group);
 extern void __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
-extern void __wt_seconds(WT_SESSION_IMPL *session, time_t *timep);
+extern void __wt_seconds(WT_SESSION_IMPL *session, uint64_t *secondsp) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern uint64_t __wt_clock_to_nsec(uint64_t end, uint64_t begin);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot(WT_SESSION_IMPL *session);
@@ -852,7 +852,7 @@ extern int __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session, const char *
 extern void __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_recover(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern void __wt_timestamp_to_string(wt_timestamp_t ts, char *ts_string, size_t len);
+extern void __wt_timestamp_to_string(wt_timestamp_t ts, char *ts_string);
 extern void __wt_timestamp_to_hex_string(wt_timestamp_t ts, char *hex_timestamp);
 extern void __wt_verbose_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t ts, const char *msg);
 extern int __wt_txn_parse_timestamp_raw(WT_SESSION_IMPL *session, const char *name, wt_timestamp_t *timestamp, WT_CONFIG_ITEM *cval) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

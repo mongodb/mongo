@@ -46,7 +46,7 @@ static void *thread_insert(void *);
 static void *thread_get(void *);
 
 #define	BLOOM		false
-#define	MAX_GAP		7.0
+#define	MAX_GAP		7
 #define	N_RECORDS	10000
 #define	N_INSERT	1000000
 #define	N_INSERT_THREAD	1
@@ -207,21 +207,21 @@ thread_insert(void *arg)
 	WT_CURSOR *maincur;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
-	double elapsed;
-	time_t prevtime, curtime; /* 1 second resolution is okay */
+	uint64_t curtime, elapsed, prevtime;	/* 1 second resolution enough */
 	int bal, i, flag, key, post;
 	const char *extra = S1024;
 
 	threadargs = (THREAD_ARGS *)arg;
 	opts = threadargs->testopts;
-	__wt_random_init_seed(NULL, &rnd);
-	(void)time(&prevtime);
 
 	testutil_check(opts->conn->open_session(
 	    opts->conn, NULL, NULL, &session));
 
-	testutil_check(session->open_cursor(session, opts->uri, NULL, NULL,
-	    &maincur));
+	__wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
+	__wt_seconds((WT_SESSION_IMPL *)session, &prevtime);
+
+	testutil_check(session->open_cursor(
+	    session, opts->uri, NULL, NULL, &maincur));
 
 	testutil_progress(opts, "insert start");
 	for (i = 0; i < N_INSERT; i++) {
@@ -252,11 +252,11 @@ thread_insert(void *arg)
 				fprintf(stderr, "*");
 			else
 				fprintf(stderr, ".");
-			(void)time(&curtime);
-			if ((elapsed = difftime(curtime, prevtime)) > MAX_GAP) {
+			__wt_seconds((WT_SESSION_IMPL *)session, &curtime);
+			if ((elapsed = curtime - prevtime) > MAX_GAP) {
 				testutil_progress(opts, "insert time gap");
 				fprintf(stderr, "\n"
-				    "GAP: %.0f secs after %d inserts\n",
+				    "GAP: %" PRIu64 " secs after %d inserts\n",
 				    elapsed, i);
 				threadargs->nfail++;
 			}
@@ -277,21 +277,21 @@ thread_get(void *arg)
 	THREAD_ARGS *threadargs;
 	WT_CURSOR *maincur, *postcur;
 	WT_SESSION *session;
-	double elapsed;
-	time_t prevtime, curtime; /* 1 second resolution is okay */
+	uint64_t curtime, elapsed, prevtime;	/* 1 second resolution enough */
 	int bal, bal2, flag, flag2, key, key2, post, post2;
 	char *extra;
 
 	threadargs = (THREAD_ARGS *)arg;
 	opts = threadargs->testopts;
 	sharedopts = threadargs->sharedopts;
-	(void)time(&prevtime);
 
 	testutil_check(opts->conn->open_session(
 	    opts->conn, NULL, NULL, &session));
-	testutil_check(session->open_cursor(session, opts->uri, NULL, NULL,
-	    &maincur));
 
+	__wt_seconds((WT_SESSION_IMPL *)session, &prevtime);
+
+	testutil_check(session->open_cursor(
+	    session, opts->uri, NULL, NULL, &maincur));
 	testutil_check(session->open_cursor(
 	    session, sharedopts->posturi, NULL, NULL, &postcur));
 
@@ -325,11 +325,11 @@ thread_get(void *arg)
 			fprintf(stderr, "G");
 		testutil_check(session->rollback_transaction(session, NULL));
 
-		(void)time(&curtime);
-		if ((elapsed = difftime(curtime, prevtime)) > MAX_GAP) {
+		__wt_seconds((WT_SESSION_IMPL *)session, &curtime);
+		if ((elapsed = curtime - prevtime) > MAX_GAP) {
 			testutil_progress(opts, "get time gap");
 			fprintf(stderr, "\n"
-			    "GAP: %.0f secs after %d gets\n",
+			    "GAP: %" PRIu64 " secs after %d gets\n",
 			    elapsed, threadargs->njoins);
 			threadargs->nfail++;
 		}

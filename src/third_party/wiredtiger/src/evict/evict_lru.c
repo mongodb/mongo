@@ -2291,13 +2291,11 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 	 * An internal session flags either the server itself or an eviction
 	 * worker thread.
 	 */
-	if (is_server) {
+	if (is_server)
 		WT_STAT_CONN_INCR(session, cache_eviction_server_evicting);
-		cache->server_evicts++;
-	} else if (F_ISSET(session, WT_SESSION_INTERNAL)) {
+	else if (F_ISSET(session, WT_SESSION_INTERNAL))
 		WT_STAT_CONN_INCR(session, cache_eviction_worker_evicting);
-		cache->worker_evicts++;
-	} else {
+	else {
 		if (__wt_page_is_modified(ref->page))
 			WT_STAT_CONN_INCR(session, cache_eviction_app_dirty);
 		WT_STAT_CONN_INCR(session, cache_eviction_app);

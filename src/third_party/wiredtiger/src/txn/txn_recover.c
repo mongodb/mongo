@@ -400,8 +400,7 @@ __recovery_set_checkpoint_timestamp(WT_RECOVERY *r)
 	if (WT_VERBOSE_ISSET(session,
 	    WT_VERB_RECOVERY | WT_VERB_RECOVERY_PROGRESS)) {
 		__wt_timestamp_to_string(
-		    conn->txn_global.recovery_timestamp,
-		    ts_string, sizeof(ts_string));
+		    conn->txn_global.recovery_timestamp, ts_string);
 		__wt_verbose(session,
 		    WT_VERB_RECOVERY | WT_VERB_RECOVERY_PROGRESS,
 		    "Set global recovery timestamp: %s", ts_string);

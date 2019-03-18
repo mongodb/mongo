@@ -49,12 +49,15 @@
 /* Generic option parsing structure shared by all test cases. */
 typedef struct {
 	char  *home;
-	char  *progress_file_name;
 	const char  *progname;
 	enum {	TABLE_COL=1,	/* Fixed-length column store */
 		TABLE_FIX=2,	/* Variable-length column store */
 		TABLE_ROW=3	/* Row-store */
 	} table_type;
+
+	FILE  *progress_fp;			/* Progress tracking file */
+	char  *progress_file_name;
+
 	bool	     preserve;			/* Don't remove files on exit */
 	bool	     verbose;			/* Run in verbose mode */
 	bool	     do_data_ops;		/* Have schema ops use data */

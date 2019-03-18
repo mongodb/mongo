@@ -39,7 +39,7 @@ static int __verify_dsk_row(
 		else							\
 			__wt_err(session, ret, __VA_ARGS__);		\
 	}								\
-	return ((ret) == 0 ? ret : WT_ERROR);				\
+	return ((ret) == 0 ? WT_ERROR : ret);				\
 } while (0)
 
 #define	WT_RET_VRFY(session, ...)					\

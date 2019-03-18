@@ -1500,14 +1500,10 @@ __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 		iso_tag = "WT_ISO_SNAPSHOT";
 		break;
 	}
-	__wt_timestamp_to_string(
-	    txn->commit_timestamp, ts_string[0], sizeof(ts_string[0]));
-	__wt_timestamp_to_string(
-	    txn->durable_timestamp, ts_string[1], sizeof(ts_string[1]));
-	__wt_timestamp_to_string(
-	    txn->first_commit_timestamp, ts_string[2], sizeof(ts_string[2]));
-	__wt_timestamp_to_string(
-	    txn->read_timestamp, ts_string[3], sizeof(ts_string[3]));
+	__wt_timestamp_to_string(txn->commit_timestamp, ts_string[0]);
+	__wt_timestamp_to_string(txn->durable_timestamp, ts_string[1]);
+	__wt_timestamp_to_string(txn->first_commit_timestamp, ts_string[2]);
+	__wt_timestamp_to_string(txn->read_timestamp, ts_string[3]);
 	WT_RET(__wt_msg(session,
 	    "mod count: %u"
 	    ", snap min: %" PRIu64
@@ -1558,17 +1554,13 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 	    "metadata_pinned ID: %" PRIu64, txn_global->metadata_pinned));
 	WT_RET(__wt_msg(session, "oldest ID: %" PRIu64, txn_global->oldest_id));
 
-	__wt_timestamp_to_string(
-	    txn_global->commit_timestamp, ts_string, sizeof(ts_string));
+	__wt_timestamp_to_string(txn_global->commit_timestamp, ts_string);
 	WT_RET(__wt_msg(session, "commit timestamp: %s", ts_string));
-	__wt_timestamp_to_string(
-	    txn_global->oldest_timestamp, ts_string, sizeof(ts_string));
+	__wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string);
 	WT_RET(__wt_msg(session, "oldest timestamp: %s", ts_string));
-	__wt_timestamp_to_string(
-	    txn_global->pinned_timestamp, ts_string, sizeof(ts_string));
+	__wt_timestamp_to_string(txn_global->pinned_timestamp, ts_string);
 	WT_RET(__wt_msg(session, "pinned timestamp: %s", ts_string));
-	__wt_timestamp_to_string(
-	    txn_global->stable_timestamp, ts_string, sizeof(ts_string));
+	__wt_timestamp_to_string(txn_global->stable_timestamp, ts_string);
 	WT_RET(__wt_msg(session, "stable timestamp: %s", ts_string));
 	WT_RET(__wt_msg(session, "has_commit_timestamp: %s",
 	    txn_global->has_commit_timestamp ? "yes" : "no"));
@@ -1618,7 +1610,7 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
 		    id, s->pinned_id, s->metadata_pinned,
 		    sess->name == NULL ?
 		    "EMPTY" : sess->name));
-		WT_RET(__wt_verbose_dump_txn_one(sess, &sess->txn));
+		WT_RET(__wt_verbose_dump_txn_one(session, &sess->txn));
 	}
 
 	return (0);

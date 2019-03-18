@@ -59,7 +59,7 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session)
 	WT_CURSOR *cursor, *cursor_tmp;
 	WT_CURSOR_LIST *cached_list;
 	WT_DECL_RET;
-	time_t now;
+	uint64_t now;
 	uint32_t position;
 	int i, t_ret, nbuckets, nexamined, nclosed;
 	bool productive;
@@ -72,7 +72,7 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session)
 	 * do it again.
 	 */
 	__wt_seconds(session, &now);
-	if (difftime(now, session->last_cursor_sweep) < 1)
+	if (now - session->last_cursor_sweep < 1)
 		return (0);
 	session->last_cursor_sweep = now;
 

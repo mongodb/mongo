@@ -84,7 +84,7 @@ struct __wt_data_handle {
 	uint32_t session_ref;		/* Sessions referencing this handle */
 	int32_t	 session_inuse;		/* Sessions using this handle */
 	uint32_t excl_ref;		/* Refs of handle by excl_session */
-	time_t	 timeofdeath;		/* Use count went to 0 */
+	uint64_t timeofdeath;		/* Use count went to 0 */
 	WT_SESSION_IMPL *excl_session;	/* Session with exclusive use, if any */
 
 	WT_DATA_SOURCE *dsrc;		/* Data source for this handle */

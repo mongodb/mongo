@@ -54,8 +54,5 @@ typedef unsigned long	u_long;
 typedef int ssize_t;
 #endif
 
-/* Provide a custom version of localtime_r */
-struct tm *localtime_r(const time_t* timer, struct tm* result);
-
 /* Windows does not provide fsync */
 #define	fsync	_commit

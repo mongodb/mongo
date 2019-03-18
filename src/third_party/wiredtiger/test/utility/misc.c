@@ -163,14 +163,16 @@ void
 testutil_progress(TEST_OPTS *opts, const char *message)
 {
 	FILE *fp;
-	time_t now;
+	uint64_t now;
 
-	if ((fp = fopen(opts->progress_file_name, "a")) == NULL)
-		testutil_die(errno, "fopen");
-	(void)time(&now);
-	fprintf(fp, "[%" PRIuMAX "] %s\n", (uintmax_t)now, message);
-	if (fclose(fp) != 0)
-		testutil_die(errno, "fclose");
+	if (opts->progress_fp == NULL)
+		testutil_assert((opts->progress_fp =
+		    fopen(opts->progress_file_name, "w")) != NULL);
+
+	fp = opts->progress_fp;
+	__wt_seconds(NULL, &now);
+	testutil_assert(fprintf(fp, "[%" PRIu64 "] %s\n", now, message) >= 0);
+	testutil_assert(fflush(fp) == 0);
 }
 
 /*
@@ -185,6 +187,9 @@ testutil_cleanup(TEST_OPTS *opts)
 
 	if (!opts->preserve)
 		testutil_clean_work_dir(opts->home);
+
+	if (opts->progress_fp != NULL)
+		testutil_assert(fclose(opts->progress_fp) == 0);
 
 	free(opts->uri);
 	free(opts->progress_file_name);

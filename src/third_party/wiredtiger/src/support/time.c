@@ -63,13 +63,18 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
  *	Return the seconds since the Epoch.
  */
 void
-__wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
+__wt_seconds(WT_SESSION_IMPL *session, uint64_t *secondsp)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	struct timespec t;
 
 	__wt_epoch(session, &t);
 
-	*timep = t.tv_sec;
+	/*
+	 * A time_t isn't guaranteed to fit into a uint64_t, but it's asserted
+	 * when WiredTiger builds.
+	 */
+	*secondsp = (uint64_t)t.tv_sec;
 }
 
 /*

@@ -70,7 +70,7 @@ struct __wt_ckpt {
 
 	int64_t	 order;			/* Checkpoint order */
 
-	uintmax_t sec;			/* Wall clock time */
+	uint64_t sec;                   /* Wall clock time */
 
 	uint64_t size;			/* Checkpoint size */
 

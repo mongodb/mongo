@@ -341,7 +341,7 @@ __ckpt_load(WT_SESSION_IMPL *session,
 	memcpy(timebuf, a.str, a.len);
 	timebuf[a.len] = '\0';
 	/* NOLINTNEXTLINE(cert-err34-c) */
-	if (sscanf(timebuf, "%" SCNuMAX, &ckpt->sec) != 1)
+	if (sscanf(timebuf, "%" SCNu64, &ckpt->sec) != 1)
 		goto format;
 
 	WT_RET(__wt_config_subgets(session, v, "size", &a));
@@ -385,7 +385,6 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 	WT_CKPT *ckpt;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	time_t secs;
 	int64_t maxorder;
 	const char *sep;
 
@@ -431,14 +430,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 			if (F_ISSET(ckpt, WT_CKPT_ADD))
 				ckpt->order = ++maxorder;
 
-			/*
-			 * XXX
-			 * Assumes a time_t fits into a uintmax_t, which isn't
-			 * guaranteed, a time_t has to be an arithmetic type,
-			 * but not an integral type.
-			 */
-			__wt_seconds(session, &secs);
-			ckpt->sec = (uintmax_t)secs;
+			__wt_seconds(session, &ckpt->sec);
 		}
 
 		__wt_timestamp_addr_check(session, ckpt->oldest_start_ts,
@@ -457,7 +449,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 		 */
 		WT_ERR(__wt_buf_catfmt(session, buf,
 		    "=(addr=\"%.*s\",order=%" PRId64
-		    ",time=%" PRId64
+		    ",time=%" PRIu64
 		    ",size=%" PRId64
 		    ",oldest_start_ts=%" PRId64
 		    ",newest_start_ts=%" PRId64
@@ -465,7 +457,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 		    ",write_gen=%" PRId64 ")",
 		    (int)ckpt->addr.size, (char *)ckpt->addr.data,
 		    ckpt->order,
-		    (int64_t)ckpt->sec,
+		    ckpt->sec,
 		    (int64_t)ckpt->size,
 		    (int64_t)ckpt->oldest_start_ts,
 		    (int64_t)ckpt->newest_start_ts,
