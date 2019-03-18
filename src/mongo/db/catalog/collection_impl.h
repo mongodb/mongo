@@ -356,9 +356,11 @@ public:
         return _minVisibleSnapshot;
     }
 
-    void setMinimumVisibleSnapshot(Timestamp name) final {
-        _minVisibleSnapshot = name;
-    }
+    /**
+     * Updates the minimum visible snapshot. The 'newMinimumVisibleSnapshot' is ignored if it would
+     * set the minimum visible snapshot backwards in time.
+     */
+    void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
 
     bool haveCappedWaiters() final;
 
