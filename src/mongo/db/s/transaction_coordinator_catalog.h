@@ -40,8 +40,8 @@
 namespace mongo {
 
 /**
- * A container for TransactionCoordinator objects, indexed by logical session id and transaction
- * number. It allows holding several coordinator objects per session.
+ * This class is a registry for all the active TransactionCoordinator objects, indexed by lsid and
+ * txnNumber. It supports holding several coordinator objects per session.
  */
 class TransactionCoordinatorCatalog {
     MONGO_DISALLOW_COPYING(TransactionCoordinatorCatalog);
@@ -61,11 +61,15 @@ public:
     void onStepDown();
 
     /**
-     * Inserts a coordinator into the catalog.
+     * Inserts a coordinator to be tracked by the catalog.
      *
-     * Note: Inserting a duplicate coordinator for the given session id and transaction number
-     * is not allowed and will lead to an invariant failure. Users of the catalog must ensure this
-     * does not take place.
+     * Duplicate lsid + txnNumber are not legal and will lead to invariant. The consumer of this
+     * class (TransactionCoordinatorService) guarantees this will not happen through the following
+     * means:
+     *  - At step-up recovery time - the catalog starts empty and the coordinators inserted are read
+     *    from the `config.coordinators` collection, which only contains unique entries
+     *  - At regular run time - the session check-out mechanism guarantees that calls to get,
+     *    followed by insert are atomic for the same lsid + txnNumber
      */
     void insert(OperationContext* opCtx,
                 const LogicalSessionId& lsid,
@@ -122,11 +126,9 @@ private:
     void _remove(const LogicalSessionId& lsid, TxnNumber txnNumber);
 
     /**
-     * Goes through the '_coordinatorsToCleanup' list and deletes entries from it. As a side-effect
-     * also unlocks the passed-in lock, so no other synchronized members of the class should be
-     * accessed after it is called.
+     * Goes through the '_coordinatorsToCleanup' list and deletes entries from it
      */
-    void _cleanupCompletedCoordinators(stdx::unique_lock<stdx::mutex>& ul);
+    void _cleanupCompletedCoordinators();
 
     /**
      * Constructs a string representation of all the coordinators registered on the catalog.

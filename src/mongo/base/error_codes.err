@@ -285,6 +285,8 @@ error_code("WouldChangeOwningShard", 283, extra="WouldChangeOwningShardInfo")
 error_code("ForTestingErrorExtraInfoWithExtraInfoInNamespace", 284, extra="nested::twice::NestedErrorExtraInfoExample")
 error_code("IndexBuildAlreadyInProgress", 285)
 error_code("ChangeStreamHistoryLost", 286)
+# The code below is for internal use only and must never be returned in a network response
+error_code("TransactionCoordinatorDeadlineTaskCanceled", 287)
 
 # Error codes 4000-8999 are reserved.
 

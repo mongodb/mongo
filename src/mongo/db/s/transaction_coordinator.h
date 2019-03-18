@@ -37,7 +37,12 @@
 namespace mongo {
 
 /**
- * Class responsible for coordinating two-phase commit across shards.
+ * State machine, which implements the two-phase commit protocol for a specific transaction,
+ * identified by lsid + txnNumber.
+ *
+ * The lifetime of a coordinator starts with a construction and ends with the `onCompletion()`
+ * future getting signaled. It is illegal to destroy a coordinator without waiting for
+ * `onCompletion()`.
  */
 class TransactionCoordinator {
     MONGO_DISALLOW_COPYING(TransactionCoordinator);
@@ -125,11 +130,9 @@ public:
     SharedSemiFuture<txn::CommitDecision> getDecision();
 
     /**
-     * Returns a future that will be signaled when the transaction has completely finished
-     * committing or aborting (i.e. when commit/abort acknowledgements have been received from all
-     * participants, or the coordinator commit process is aborted locally for some reason).
-     *
-     * Unlike runCommit, this will not kick off the commit process if it has not already begun.
+     * Returns a future which can be listened on for when all the asynchronous activity spawned by
+     * this coordinator has completed. It will always eventually be set and once set it is safe to
+     * dispose of the TransactionCoordinator object.
      */
     Future<void> onCompletion();
 

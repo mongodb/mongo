@@ -30,34 +30,27 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/transaction_coordinator_catalog.h"
-#include "mongo/s/shard_server_test_fixture.h"
+#include "mongo/db/s/transaction_coordinator_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-class TransactionCoordinatorCatalogTest : public ShardServerTestFixture {
+class TransactionCoordinatorCatalogTest : public TransactionCoordinatorTestFixture {
 protected:
     void setUp() override {
-        ShardServerTestFixture::setUp();
+        TransactionCoordinatorTestFixture::setUp();
 
         _coordinatorCatalog.emplace();
         _coordinatorCatalog->exitStepUp(Status::OK());
     }
 
     void tearDown() override {
-        // Make sure all of the coordinators are in a committed/aborted state before they are
-        // destroyed. Otherwise, the coordinator's destructor will invariant because it will still
-        // have outstanding futures that have not been completed (the one to remove itself from the
-        // catalog). This has the added benefit of testing whether it's okay to destroy
-        // the catalog while there are outstanding coordinators.
-        for (auto& coordinator : _coordinatorsForTest) {
-            coordinator->cancelIfCommitNotYetStarted();
-        }
-        _coordinatorsForTest.clear();
+        _coordinatorCatalog->onStepDown();
+        _coordinatorCatalog.reset();
 
-        ShardServerTestFixture::tearDown();
+        TransactionCoordinatorTestFixture::tearDown();
     }
 
     void createCoordinatorInCatalog(OperationContext* opCtx,
@@ -71,12 +64,9 @@ protected:
             boost::none);
 
         _coordinatorCatalog->insert(opCtx, lsid, txnNumber, newCoordinator);
-        _coordinatorsForTest.push_back(newCoordinator);
     }
 
     boost::optional<TransactionCoordinatorCatalog> _coordinatorCatalog;
-
-    std::vector<std::shared_ptr<TransactionCoordinator>> _coordinatorsForTest;
 };
 
 TEST_F(TransactionCoordinatorCatalogTest, GetOnSessionThatDoesNotExistReturnsNone) {
@@ -168,6 +158,31 @@ TEST_F(TransactionCoordinatorCatalogTest,
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);
 
     ASSERT_EQ(latestTxnNumAndCoordinator->first, txnNumber2);
+}
+
+TEST_F(TransactionCoordinatorCatalogTest, StepDownBeforeCoordinatorInsertedIntoCatalog) {
+    LogicalSessionId lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber = 1;
+
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    TransactionCoordinatorCatalog catalog;
+    catalog.exitStepUp(Status::OK());
+
+    auto coordinator = std::make_shared<TransactionCoordinator>(getServiceContext(),
+                                                                lsid,
+                                                                txnNumber,
+                                                                aws.makeChildScheduler(),
+                                                                network()->now() + Seconds{5});
+
+    aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Test step down"});
+    catalog.onStepDown();
+
+    advanceClockAndExecuteScheduledTasks();
+
+    catalog.insert(operationContext(), lsid, txnNumber, coordinator);
+    catalog.join();
+
+    coordinator->onCompletion().wait();
 }
 
 }  // namespace

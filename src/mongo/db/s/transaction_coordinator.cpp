@@ -83,9 +83,12 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
     if (coordinateCommitDeadline) {
         _deadlineScheduler = _scheduler->makeChildScheduler();
         _deadlineScheduler
-            ->scheduleWorkAt(*coordinateCommitDeadline,
-                             [this](OperationContext* opCtx) { cancelIfCommitNotYetStarted(); })
-            .getAsync([](const Status&) {});
+            ->scheduleWorkAt(*coordinateCommitDeadline, [](OperationContext* opCtx) {})
+            .getAsync([this](const Status& s) {
+                if (s == ErrorCodes::TransactionCoordinatorDeadlineTaskCanceled)
+                    return;
+                cancelIfCommitNotYetStarted();
+            });
     }
 }
 
@@ -183,8 +186,8 @@ void TransactionCoordinator::cancelIfCommitNotYetStarted() {
 
 void TransactionCoordinator::_cancelTimeoutWaitForCommitTask() {
     if (_deadlineScheduler) {
-        _deadlineScheduler->shutdown(
-            {ErrorCodes::CallbackCanceled, "Interrupting the commit received deadline task"});
+        _deadlineScheduler->shutdown({ErrorCodes::TransactionCoordinatorDeadlineTaskCanceled,
+                                      "Interrupting the commit received deadline task"});
     }
 }
 

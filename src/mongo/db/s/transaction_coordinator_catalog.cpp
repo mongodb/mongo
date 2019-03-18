@@ -78,8 +78,7 @@ void TransactionCoordinatorCatalog::onStepDown() {
         coordinator->cancelIfCommitNotYetStarted();
     }
 
-    ul.lock();
-    _cleanupCompletedCoordinators(ul);
+    _cleanupCompletedCoordinators();
 }
 
 void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
@@ -90,8 +89,9 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
     LOG(3) << "Inserting coordinator " << lsid.getId() << ':' << txnNumber
            << " into in-memory catalog";
 
+    auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(); });
+
     stdx::unique_lock<stdx::mutex> ul(_mutex);
-    auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(ul); });
     if (!forStepUp) {
         _waitForStepUpToComplete(ul, opCtx);
     }
@@ -105,17 +105,23 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
               "Cannot insert a TransactionCoordinator into the TransactionCoordinatorCatalog with "
               "the same session ID and transaction number as a previous coordinator");
 
-    // Schedule callback to remove coordinator from catalog when it either commits or aborts.
+    coordinatorsBySession[txnNumber] = coordinator;
+
+    // Schedule callback to remove the coordinator from the catalog when all its activities have
+    // completed. This needs to be done outside of the mutex, in case the coordinator completed
+    // early because of stepdown. Otherwise the continuation could execute on the same thread and
+    // recursively acquire the mutex.
+    ul.unlock();
+
     coordinator->onCompletion().getAsync(
         [this, lsid, txnNumber](Status) { _remove(lsid, txnNumber); });
-
-    coordinatorsBySession[txnNumber] = std::move(coordinator);
 }
 
 std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
     OperationContext* opCtx, const LogicalSessionId& lsid, TxnNumber txnNumber) {
+    _cleanupCompletedCoordinators();
+
     stdx::unique_lock<stdx::mutex> ul(_mutex);
-    auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(ul); });
     _waitForStepUpToComplete(ul, opCtx);
 
     std::shared_ptr<TransactionCoordinator> coordinatorToReturn;
@@ -149,8 +155,9 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
 boost::optional<std::pair<TxnNumber, std::shared_ptr<TransactionCoordinator>>>
 TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
                                                   const LogicalSessionId& lsid) {
+    _cleanupCompletedCoordinators();
+
     stdx::unique_lock<stdx::mutex> ul(_mutex);
-    auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(ul); });
     _waitForStepUpToComplete(ul, opCtx);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
@@ -242,9 +249,8 @@ void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<s
     uassertStatusOK(*_stepUpCompletionStatus);
 }
 
-void TransactionCoordinatorCatalog::_cleanupCompletedCoordinators(
-    stdx::unique_lock<stdx::mutex>& ul) {
-    invariant(ul.owns_lock());
+void TransactionCoordinatorCatalog::_cleanupCompletedCoordinators() {
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
     auto coordinatorsToCleanup = std::move(_coordinatorsToCleanup);
 
     // Ensure the destructors run outside of the lock in order to minimize the time this methods
