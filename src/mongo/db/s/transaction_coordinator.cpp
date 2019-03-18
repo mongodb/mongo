@@ -59,7 +59,7 @@ CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(
                                              result.maxPrepareTimestamp->getInc() + 1);
 
         LOG(3) << "Advancing cluster time to commit Timestamp " << decision.commitTimestamp.get()
-               << " of transaction " << txnNumber << " on session " << lsid.toBSON();
+               << " of transaction " << txnNumber << " on session " << lsid.getId();
 
         uassertStatusOK(LogicalClock::get(service)->advanceClusterTime(
             LogicalTime(result.maxPrepareTimestamp.get())));
@@ -158,7 +158,7 @@ Future<void> TransactionCoordinator::onCompletion() {
     }
 
     auto completionPromiseFuture = makePromiseFuture<void>();
-    _completionPromises.push_back(std::move(completionPromiseFuture.promise));
+    _completionPromises.emplace_back(std::move(completionPromiseFuture.promise));
 
     return std::move(completionPromiseFuture.future)
         .onError<ErrorCodes::TransactionCoordinatorSteppingDown>(
@@ -216,8 +216,7 @@ Future<void> TransactionCoordinator::_runPhaseTwo(const std::vector<ShardId>& pa
             return _driver.deleteCoordinatorDoc(_lsid, _txnNumber);
         })
         .then([this] {
-            LOG(3) << "Two-phase commit completed for session " << _lsid.toBSON()
-                   << ", transaction number " << _txnNumber;
+            LOG(3) << "Two-phase commit completed for " << _lsid.getId() << ':' << _txnNumber;
 
             stdx::unique_lock<stdx::mutex> ul(_mutex);
             _transitionToDone(std::move(ul));
@@ -252,8 +251,8 @@ void TransactionCoordinator::_handleCompletionError(Status s) {
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    LOG(3) << "Two-phase commit failed with error in state " << _state << " for transaction "
-           << _txnNumber << " on session " << _lsid.toBSON() << causedBy(s);
+    LOG(3) << "Two-phase commit failed with error in state " << _state << " for " << _lsid.getId()
+           << ':' << _txnNumber << causedBy(s);
 
     // If an error occurred prior to making a decision, set an error on the decision promise to
     // propagate it to callers of runCommit
@@ -265,7 +264,10 @@ void TransactionCoordinator::_handleCompletionError(Status s) {
         // InterruptedDueToStepDown, because InterruptedDueToStepDown indicates the *receiving*
         // node was stepping down.
         if (s == ErrorCodes::TransactionCoordinatorSteppingDown) {
-            s = Status(ErrorCodes::InterruptedDueToStepDown, s.reason());
+            s = Status(ErrorCodes::InterruptedDueToStepDown,
+                       str::stream() << "Coordinator " << _lsid.getId() << ':' << _txnNumber
+                                     << " stopping due to: "
+                                     << s.reason());
         }
 
         _decisionPromise.setError(s);

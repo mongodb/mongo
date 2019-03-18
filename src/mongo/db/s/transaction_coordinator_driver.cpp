@@ -142,8 +142,7 @@ void persistParticipantListBlocking(OperationContext* opCtx,
                                     const LogicalSessionId& lsid,
                                     TxnNumber txnNumber,
                                     const std::vector<ShardId>& participantList) {
-    LOG(0) << "Going to write participant list for lsid: " << lsid.toBSON()
-           << ", txnNumber: " << txnNumber;
+    LOG(0) << "Going to write participant list for " << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWritingParticipantList)) {
         LOG(0) << "Hit hangBeforeWritingParticipantList failpoint";
@@ -199,19 +198,18 @@ void persistParticipantListBlocking(OperationContext* opCtx,
         uasserted(51025,
                   str::stream() << "While attempting to write participant list "
                                 << buildParticipantListString(participantList)
-                                << " for lsid "
-                                << lsid.toBSON()
-                                << " and txnNumber "
+                                << " for "
+                                << lsid.getId()
+                                << ':'
                                 << txnNumber
-                                << ", found document for the (lsid, txnNumber) with a different "
-                                   "participant list. Current document for the (lsid, txnNumber): "
+                                << ", found document with a different participant list: "
                                 << doc);
     }
 
     // Throw any other error.
     uassertStatusOK(upsertStatus);
 
-    LOG(0) << "Wrote participant list for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+    LOG(0) << "Wrote participant list for " << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWaitingForParticipantListWriteConcern)) {
         LOG(0) << "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint";
@@ -309,8 +307,8 @@ void persistDecisionBlocking(OperationContext* opCtx,
                              TxnNumber txnNumber,
                              const std::vector<ShardId>& participantList,
                              const boost::optional<Timestamp>& commitTimestamp) {
-    LOG(0) << "Going to write decision " << (commitTimestamp ? "commit" : "abort")
-           << " for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+    LOG(0) << "Going to write decision " << (commitTimestamp ? "commit" : "abort") << " for "
+           << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWritingDecision)) {
         LOG(0) << "Hit hangBeforeWritingDecision failpoint";
@@ -387,19 +385,18 @@ void persistDecisionBlocking(OperationContext* opCtx,
         uasserted(51026,
                   str::stream() << "While attempting to write decision "
                                 << (commitTimestamp ? "'commit'" : "'abort'")
-                                << " for lsid "
-                                << lsid.toBSON()
-                                << " and txnNumber "
+                                << " for"
+                                << lsid.getId()
+                                << ':'
                                 << txnNumber
-                                << ", either failed to find document for this (lsid, txnNumber) or "
-                                   "document existed with a different participant list, different "
-                                   "decision, or different commitTimestamp. Current document for "
-                                   "the (lsid, txnNumber): "
+                                << ", either failed to find document for this lsid:txnNumber or "
+                                   "document existed with a different participant list, decision "
+                                   "or commitTimestamp: "
                                 << doc);
     }
 
-    LOG(0) << "Wrote decision " << (commitTimestamp ? "commit" : "abort")
-           << " for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+    LOG(0) << "Wrote decision " << (commitTimestamp ? "commit" : "abort") << " for " << lsid.getId()
+           << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWaitingForDecisionWriteConcern)) {
         LOG(0) << "Hit hangBeforeWaitingForDecisionWriteConcern failpoint";
@@ -473,8 +470,7 @@ namespace {
 void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                                   const LogicalSessionId& lsid,
                                   TxnNumber txnNumber) {
-    LOG(0) << "Going to delete coordinator doc for lsid: " << lsid.toBSON()
-           << ", txnNumber: " << txnNumber;
+    LOG(0) << "Going to delete coordinator doc for " << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeDeletingCoordinatorDoc)) {
         LOG(0) << "Hit hangBeforeDeletingCoordinatorDoc failpoint";
@@ -522,16 +518,14 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
             NamespaceString::kTransactionCoordinatorsNamespace.toString(),
             QUERY(TransactionCoordinatorDocument::kIdFieldName << sessionInfo.toBSON()));
         uasserted(51027,
-                  str::stream() << "While attempting to delete document for lsid " << lsid.toBSON()
-                                << " and txnNumber "
+                  str::stream() << "While attempting to delete document for " << lsid.getId() << ':'
                                 << txnNumber
-                                << ", either failed to find document for this (lsid, txnNumber) or "
-                                   "document existed without a decision. Current document for the "
-                                   "(lsid, txnNumber): "
+                                << ", either failed to find document for this lsid:txnNumber or "
+                                   "document existed without a decision: "
                                 << doc);
     }
 
-    LOG(0) << "Deleted coordinator doc for lsid: " << lsid.toBSON() << ", txnNumber: " << txnNumber;
+    LOG(0) << "Deleted coordinator doc for " << lsid.getId() << ':' << txnNumber;
 }
 }  // namespace
 

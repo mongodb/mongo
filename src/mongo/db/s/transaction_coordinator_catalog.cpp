@@ -87,6 +87,9 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
                                            TxnNumber txnNumber,
                                            std::shared_ptr<TransactionCoordinator> coordinator,
                                            bool forStepUp) {
+    LOG(3) << "Inserting coordinator " << lsid.getId() << ':' << txnNumber
+           << " into in-memory catalog";
+
     stdx::unique_lock<stdx::mutex> ul(_mutex);
     auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(ul); });
     if (!forStepUp) {
@@ -105,9 +108,6 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
     // Schedule callback to remove coordinator from catalog when it either commits or aborts.
     coordinator->onCompletion().getAsync(
         [this, lsid, txnNumber](Status) { _remove(lsid, txnNumber); });
-
-    LOG(3) << "Inserting coordinator for transaction " << txnNumber << " on session "
-           << lsid.toBSON() << " into in-memory catalog";
 
     coordinatorsBySession[txnNumber] = std::move(coordinator);
 }
@@ -170,10 +170,10 @@ TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
 }
 
 void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNumber txnNumber) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    LOG(3) << "Removing coordinator " << lsid.getId() << ':' << txnNumber
+           << " from in-memory catalog";
 
-    LOG(3) << "Removing coordinator for transaction " << txnNumber << " on session "
-           << lsid.toBSON() << " from in-memory catalog";
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -256,7 +256,7 @@ std::string TransactionCoordinatorCatalog::_toString(WithLock wl) const {
     StringBuilder ss;
     ss << "[";
     for (const auto& coordinatorsForSession : _coordinatorsBySession) {
-        ss << "\n" << coordinatorsForSession.first.toBSON() << ": ";
+        ss << "\n" << coordinatorsForSession.first.getId() << ": ";
         for (const auto& coordinator : coordinatorsForSession.second) {
             ss << coordinator.first << ",";
         }
