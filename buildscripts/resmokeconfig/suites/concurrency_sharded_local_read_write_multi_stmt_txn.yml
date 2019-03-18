@@ -136,7 +136,7 @@ selector:
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 
   ##
-  # Blacklists from concurrency_sharded_replication_multi_stmt_txn
+  # Blacklists from concurrency_sharded_multi_stmt_txn
   ##
 
   # Use updates that do not contain the shard key, so they are rejected before any commands are
