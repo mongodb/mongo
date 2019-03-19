@@ -19,7 +19,7 @@
 
     // Create collection we're using beforehand.
     let testDB = primary.getDB(dbName);
-    const testColl = testDB.getCollection(collName);
+    let testColl = testDB.getCollection(collName);
 
     assert.commandWorked(testDB.runCommand({create: collName}));
 
@@ -79,8 +79,6 @@
             primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'}));
     }
 
-    arrayEq(sessionColl1.find().toArray(), [{_id: 1}, {_id: 2}]);
-
     // Make sure there are two transactions in the transactions table.
     assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
 
@@ -88,9 +86,15 @@
     // Make sure we cannot see the insert from the second prepared transaction or the writes after
     // transitionToRollbackOperations.
     arrayEq(testColl.find().toArray(), [{_id: 1}, {_id: 2}]);
+    arrayEq(sessionColl1.find().toArray(), [{_id: 1}, {_id: 2}]);
+
+    assert.eq(testColl.count(), 2);
+    assert.eq(sessionColl1.count(), 2);
 
     // Get the correct members after the topology changes.
     primary = rollbackTest.getPrimary();
+    testDB = primary.getDB(dbName);
+    testColl = testDB.getCollection(collName);
     const rst = rollbackTest.getTestFixture();
     const secondaries = rst.getSecondaries();
 
@@ -107,8 +111,6 @@
     session1.startTransaction();
     assert.commandWorked(sessionColl1.insert({_id: 5}));
     const prepareTimestamp3 = PrepareHelpers.prepareTransaction(session1);
-    assert.commandWorked(
-        PrepareHelpers.commitTransactionAfterPrepareTS(session1, prepareTimestamp3));
     // Make sure we can successfully retry the commitTransaction command after rollback.
     assert.commandWorked(
         PrepareHelpers.commitTransactionAfterPrepareTS(session1, prepareTimestamp3));
@@ -127,6 +129,7 @@
 
     // Make sure we can see the insert after committing the prepared transaction.
     arrayEq(testColl.find().toArray(), [{_id: 1}, {_id: 2}, {_id: 5}]);
+    assert.eq(testColl.count(), 3);
 
     rollbackTest.stop();
 }());

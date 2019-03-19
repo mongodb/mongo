@@ -63,7 +63,6 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
     const SIGTERM = 15;
     const kNumDataBearingNodes = 3;
     const kElectableNodes = 2;
-    const dontCheckCollCounts = expectPreparedTxnsDuringRollback;
 
     let rst;
     let curPrimary;
@@ -169,10 +168,7 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         const name = rst.name;
         // We must check counts before we validate since validate fixes counts. We cannot check
         // counts if unclean shutdowns occur.
-        // TODO SERVER-39762: Once we fix collection counts when aborting a prepared
-        // transaction that was recovered during rollback, re-enable this check.
-        if (!dontCheckCollCounts &&
-            (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns)) {
+        if (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns) {
             rst.checkCollectionCounts(name);
         }
         rst.checkOplogs(name);
@@ -253,7 +249,10 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         // After the previous rollback (if any) has completed and await replication has finished,
         // the replica set should be in a consistent and "fresh" state. We now prepare for the next
         // rollback.
-        if (!dontCheckCollCounts) {
+        if (expectPreparedTxnsDuringRollback === true) {
+            print('Skipping data consistency checks because active prepared transactions are' +
+                  ' expected after rollback');
+        } else {
             checkDataConsistency();
         }
 
