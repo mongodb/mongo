@@ -5775,8 +5775,9 @@ private:
         // The first two-thirds of the vector is used to pass back captured substrings' start and
         // limit indexes. The remaining third of the vector is used as workspace by pcre_exec()
         // while matching capturing subpatterns, and is not available for passing back information.
-        // TODO: Evaluate the upper bound for this array and fail the request if numCaptures are
-        // higher than the limit (SERVER-37848).
+        // pcre_compile will error if there are too many capture groups in the pattern. As long as
+        // this memory is allocated after compile, the amount of memory allocated will not be too
+        // high.
         _capturesBuffer = std::vector<int>((1 + _numCaptures) * 3);
     }
 
@@ -5873,6 +5874,7 @@ Value ExpressionRegexFindAll::evaluate(const Document& root) const {
     }
     int startByteIndex = 0, startCodePointIndex = 0;
     StringData input = regex.getInput();
+    size_t totalDocSize = 0;
 
     // Using do...while loop because, when input is an empty string, we still want to see if there
     // is a match.
@@ -5881,6 +5883,11 @@ Value ExpressionRegexFindAll::evaluate(const Document& root) const {
         if (matchObj.getType() == BSONType::jstNULL) {
             break;
         }
+        totalDocSize += matchObj.getApproximateSize();
+        uassert(51151,
+                "The size of buffer to store $regexFindAll output exceeded the 64MB limit",
+                totalDocSize <= mongo::BufferMaxSize);
+
         output.push_back(matchObj);
         std::string matchStr = matchObj.getDocument().getField("match").getString();
         if (matchStr.empty()) {
