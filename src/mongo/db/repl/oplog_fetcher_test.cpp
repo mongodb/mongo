@@ -361,22 +361,6 @@ TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceIsNotAhead
 }
 
 TEST_F(OplogFetcherTest,
-       MetadataAndBatchAreProcessedWhenSyncSourceIsNotAheadButHasHigherLastOpCommitted) {
-    rpc::ReplSetMetadata replMetadata(1, OpTime(), OpTime(), 1, OID::gen(), -1, -1);
-    rpc::OplogQueryMetadata oqMetadata(remoteNewerOpTime, lastFetched.opTime, rbid, 2, 2);
-    BSONObjBuilder bob;
-    ASSERT_OK(replMetadata.writeToMetadata(&bob));
-    ASSERT_OK(oqMetadata.writeToMetadata(&bob));
-    auto metadataObj = bob.obj();
-
-    auto entry = makeNoopOplogEntry(lastFetched);
-    auto shutdownState =
-        processSingleBatch({makeCursorResponse(0, {entry}), metadataObj, Milliseconds(0)}, false);
-    ASSERT_OK(shutdownState->getStatus());
-    ASSERT(dataReplicatorExternalState->metadataWasProcessed);
-}
-
-TEST_F(OplogFetcherTest,
        MetadataAndBatchAreNotProcessedWhenSyncSourceIsBehindWithoutRequiringFresherSyncSource) {
     rpc::ReplSetMetadata replMetadata(1, OpTime(), OpTime(), 1, OID::gen(), -1, -1);
     rpc::OplogQueryMetadata oqMetadata(staleOpTime, staleOpTime, rbid, 2, 2);

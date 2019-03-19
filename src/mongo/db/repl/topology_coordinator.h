@@ -392,8 +392,8 @@ public:
         Date_t now, const std::string& ourSetName, const HostAndPort& target);
 
     /**
-     * Processes a heartbeat response from "target" that arrived around "now" with "lastOpCommitted"
-     * in the metadata, having spent "networkRoundTripTime" millis on the network.
+     * Processes a heartbeat response from "target" that arrived around "now", having
+     * spent "networkRoundTripTime" millis on the network.
      *
      * Updates internal topology coordinator state, and returns instructions about what action
      * to take next.
@@ -422,8 +422,7 @@ public:
         Date_t now,
         Milliseconds networkRoundTripTime,
         const HostAndPort& target,
-        const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
-        OpTime lastOpCommitted);
+        const StatusWith<ReplSetHeartbeatResponse>& hbResponse);
 
     /**
      *  Returns whether or not at least 'numNodes' have reached the given opTime.

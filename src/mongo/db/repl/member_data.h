@@ -76,9 +76,6 @@ public:
     OpTime getHeartbeatDurableOpTime() const {
         return _lastResponse.hasDurableOpTime() ? _lastResponse.getDurableOpTime() : OpTime();
     }
-    OpTime getHeartbeatLastOpCommitted() const {
-        return _lastOpCommitted;
-    }
     int getConfigVersion() const {
         return _lastResponse.getConfigVersion();
     }
@@ -146,10 +143,9 @@ public:
 
     /**
      * Sets values in this object from the results of a successful heartbeat command.
-     * 'lastOpCommitted' should be extracted from the heartbeat metadata.
      * Returns whether or not the optimes advanced as a result of this heartbeat response.
      */
-    bool setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse, OpTime lastOpCommitted);
+    bool setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse);
 
     /**
      * Sets values in this object from the results of a erroring/failed heartbeat command.
@@ -264,11 +260,6 @@ private:
 
     // Last known OpTime that the replica has applied, whether journaled or unjournaled.
     OpTime _lastAppliedOpTime;
-
-    // OpTime of the most recently committed op of which the node was aware, extracted from the
-    // heartbeat metadata. Note that only arbiters should update their knowledge of the commit point
-    // from heartbeat data.
-    OpTime _lastOpCommitted;
 
     // TODO(russotto): Since memberData is kept in config order, _configIndex
     // and _isSelf may not be necessary.

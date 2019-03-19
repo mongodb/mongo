@@ -273,13 +273,21 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         primary_client = self.nodes[0].mongo_client()
         self.auth(primary_client, self.auth_options)
 
-        # All nodes must be in primary/secondary state prior to this point. Perform a majority
-        # write to ensure there is a committed operation on the set. The commit point will
-        # propagate to all members and trigger a stable checkpoint on all persisted storage engines
-        # nodes.
+        # Algorithm precondition: All nodes must be in primary/secondary state.
+        #
+        # 1) Perform a majority write. This will guarantee the primary updates its commit point
+        #    to the value of this write.
+        #
+        # 2) Perform a second write. This will guarantee that all nodes will update their commit
+        #    point to a time that is >= the previous write. That will trigger a stable checkpoint
+        #    on all nodes.
+        # TODO(SERVER-33248): Remove this block. We should not need to prod the replica set to
+        # advance the commit point if the commit point being lagged is sufficient to choose a
+        # sync source.
         admin = primary_client.get_database(
             "admin", write_concern=pymongo.write_concern.WriteConcern(w="majority"))
-        admin.command("appendOplogNote", data={"await_stable_recovery_timestamp": 1})
+        admin.command("appendOplogNote", data={"await_stable_checkpoint": 1})
+        admin.command("appendOplogNote", data={"await_stable_checkpoint": 2})
 
         for node in self.nodes:
             self.logger.info("Waiting for node on port %d to have a stable checkpoint.", node.port)

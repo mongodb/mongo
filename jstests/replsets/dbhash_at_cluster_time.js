@@ -19,6 +19,17 @@
     const db = session.getDatabase("test");
     let txnNumber = 0;
 
+    // We force 'secondary' to sync from 'primary' using the "forceSyncSourceCandidate" failpoint to
+    // ensure that an intermittent connectivity issue doesn't lead to the secondary not advancing
+    // its belief of the majority commit point. This avoids any complications that would arise due
+    // to SERVER-33248.
+    assert.commandWorked(secondary.adminCommand({
+        configureFailPoint: "forceSyncSourceCandidate",
+        mode: "alwaysOn",
+        data: {hostAndPort: primary.host}
+    }));
+    rst.awaitSyncSource(secondary, primary);
+
     // We also prevent all nodes in the replica set from advancing oldest_timestamp. This ensures
     // that the snapshot associated with 'clusterTime' is retained for the duration of this test.
     rst.nodes.forEach(conn => {

@@ -47,6 +47,11 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                 continue;
             }
             var rs = this._rs[i].test;
+            // The noop writer needs to be enabled in case a sync source isn't set, so that
+            // awaitLastOpCommitted() is guaranteed to finish.
+            // SERVER-33248 for reference.
+            rs.getPrimary().adminCommand({setParameter: 1, periodicNoopIntervalSecs: 1});
+            rs.getPrimary().adminCommand({setParameter: 1, writePeriodicNoops: true});
             var keyFile = this._otherParams.keyFile;
             if (keyFile) {
                 authutil.asCluster(rs.nodes, keyFile, function() {
