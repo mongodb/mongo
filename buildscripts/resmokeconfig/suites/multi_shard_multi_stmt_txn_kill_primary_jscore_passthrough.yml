@@ -172,9 +172,6 @@ selector:
   - jstests/core/or4.js
   - jstests/core/temp_cleanup.js
 
-  # TODO: SERVER-38588 Hybrid index builds can miss documents during secondary replication.
-  - jstests/core/background_index_multikey.js
-
   ##
   ## Some aggregation stages don't support snapshot readconcern.
   ##
