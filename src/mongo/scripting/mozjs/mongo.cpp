@@ -88,6 +88,8 @@ const JSFunctionSpec MongoBase::methods[] = {
 
 const char* const MongoBase::className = "Mongo";
 
+EncryptedDBClientCallback* encryptedDBClientCallback = nullptr;
+
 const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
     MONGO_ATTACH_JS_FUNCTION(_forgetReplSet),
     MONGO_ATTACH_JS_FUNCTION(load),
@@ -198,6 +200,7 @@ void setHiddenMongo(JSContext* cx,
         setHiddenMongo(cx, value, args);
     }
 }
+
 }  // namespace
 
 void MongoBase::finalize(js::FreeOp* fop, JSObject* obj) {
@@ -747,6 +750,19 @@ void MongoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs a
     args.rval().setUndefined();
 }
 
+std::unique_ptr<DBClientBase> runEncryptedDBClientCallback(std::unique_ptr<DBClientBase> conn,
+                                                           JS::HandleValue arg,
+                                                           JSContext* cx) {
+    if (encryptedDBClientCallback != nullptr) {
+        return encryptedDBClientCallback(std::move(conn), arg, cx);
+    }
+    return conn;
+}
+
+void setEncryptedDBClientCallback(EncryptedDBClientCallback* callback) {
+    encryptedDBClientCallback = callback;
+}
+
 void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
@@ -767,6 +783,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     ScriptEngine::runConnectCallback(*conn);
+    conn = runEncryptedDBClientCallback(std::move(conn), args.get(1), cx);
 
     JS::RootedObject thisv(cx);
     scope->getProto<MongoExternalInfo>().newObject(&thisv);

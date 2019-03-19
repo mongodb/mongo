@@ -63,42 +63,7 @@ env.Library(
 
 if usemozjs:
     scriptingEnv = env.Clone()
-    scriptingEnv.InjectThirdParty(libraries=['mozjs'])
-
-    # TODO: get rid of all of this /FI and -include stuff and migrate to a shim
-    # header we include in all of our files.
-    if env.TargetOSIs('windows'):
-        scriptingEnv.Append(
-            CCFLAGS=[
-                '/FI', 'js-config.h',
-                '/FI', 'js/RequiredDefines.h',
-            ],
-            CPPDEFINES=[
-                '_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING',
-            ]
-        )
-    else:
-        scriptingEnv.Append(
-            CCFLAGS=[
-                '-include', 'js-config.h',
-                '-include', 'js/RequiredDefines.h',
-                '-Wno-invalid-offsetof',
-            ],
-            CXXFLAGS=[
-                '-Wno-non-virtual-dtor',
-            ],
-        )
-
-    scriptingEnv.Prepend(CPPDEFINES=[
-        'JS_USE_CUSTOM_ALLOCATOR',
-        'STATIC_JS_API=1',
-    ])
-
-    if get_option('spider-monkey-dbg') == "on":
-        scriptingEnv.Prepend(CPPDEFINES=[
-            'DEBUG',
-            'JS_DEBUG',
-        ])
+    scriptingEnv.InjectMozJS()
 
     scriptingEnv.JSHeader(
         target='mozjs/mongohelpers_js.cpp',

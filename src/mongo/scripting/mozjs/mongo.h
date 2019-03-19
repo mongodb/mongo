@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include "mongo/client/dbclient_base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {
 namespace mozjs {
+
+using EncryptedDBClientCallback = std::unique_ptr<DBClientBase>(std::unique_ptr<DBClientBase>,
+                                                                JS::HandleValue,
+                                                                JSContext*);
+void setEncryptedDBClientCallback(EncryptedDBClientCallback* callback);
 
 /**
  * Shared code for the "Mongo" javascript object.

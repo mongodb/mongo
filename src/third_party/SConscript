@@ -32,6 +32,44 @@ thirdPartyEnvironmentModifications = {
    }
 }
 
+def injectMozJS(thisEnv):
+    thisEnv.InjectThirdParty(libraries=['mozjs'])
+
+    if thisEnv.TargetOSIs('windows'):
+        thisEnv.Append(
+            CCFLAGS=[
+                '/FI', 'js-config.h',
+                '/FI', 'js/RequiredDefines.h',
+            ],
+            CPPDEFINES=[
+                '_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING',
+            ]
+        )
+    else:
+        thisEnv.Append(
+            CCFLAGS=[
+                '-include', 'js-config.h',
+                '-include', 'js/RequiredDefines.h',
+                '-Wno-invalid-offsetof',
+            ],
+            CXXFLAGS=[
+                '-Wno-non-virtual-dtor',
+            ],
+        )
+
+    thisEnv.Prepend(CPPDEFINES=[
+        'JS_USE_CUSTOM_ALLOCATOR',
+        'STATIC_JS_API=1',
+    ])
+
+    if get_option('spider-monkey-dbg') == "on":
+        thisEnv.Prepend(CPPDEFINES=[
+            'DEBUG',
+            'JS_DEBUG',
+        ])
+
+env.AddMethod(injectMozJS, 'InjectMozJS');
+
 if not use_system_version_of_library('tcmalloc'):
     # GPerftools does this slightly differently than the others.
     thirdPartyEnvironmentModifications['gperftools'] = {}

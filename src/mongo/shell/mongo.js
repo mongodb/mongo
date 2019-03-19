@@ -1,11 +1,6 @@
 // mongo.js
 
-// NOTE 'Mongo' may be defined here or in MongoJS.cpp.  Add code to init, not to this constructor.
-if (typeof Mongo == "undefined") {
-    Mongo = function(host) {
-        this.init(host);
-    };
-}
+// Defined in mongo.cpp
 
 if (!Mongo.prototype) {
     throw Error("Mongo.prototype not defined");
