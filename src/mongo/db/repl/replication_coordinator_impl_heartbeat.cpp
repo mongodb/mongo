@@ -176,7 +176,20 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             replMetadata = responseStatus;
         }
         if (replMetadata.isOK()) {
-            _advanceCommitPoint(lk, replMetadata.getValue().getLastOpCommitted());
+
+            // The majority commit point can be propagated through heartbeats as long as there are
+            // no 4.0 nodes in the replica set. If there are 4.0 nodes, propagating the majority
+            // commit point through heartbeats can cause a sync source cycle due to SERVER-33248.
+            // Note that FCV may not be initialized, since for a new replica set, the first primary
+            // initializes the FCV after it is elected.
+            // TODO SERVER-40211: Always propagate the majority commit point through heartbeats,
+            // regardless of FCV.
+            const auto isFCV42 = serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
+            if (_getMemberState_inlock().arbiter() || isFCV42) {
+                _advanceCommitPoint(lk, replMetadata.getValue().getLastOpCommitted());
+            }
 
             // Asynchronous stepdown could happen, but it will wait for _mutex and execute
             // after this function, so we cannot and don't need to wait for it to finish.
