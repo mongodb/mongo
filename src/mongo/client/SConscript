@@ -290,9 +290,10 @@ env.Library(
 env.CppUnitTest(
     target='replica_set_monitor_test',
     source=[
-        'replica_set_monitor_node_test.cpp',
+        'replica_set_monitor_test_fixture.cpp',
+        'replica_set_monitor_internal_test.cpp',
         'replica_set_monitor_read_preference_test.cpp',
-        'replica_set_monitor_test.cpp',
+        'replica_set_monitor_scan_test.cpp',
         'replica_set_monitor_test_concurrent.cpp',
     ],
     LIBDEPS=[

@@ -137,7 +137,7 @@ public:
         repl::OpTime opTime{};             // from isMasterReply
     };
 
-    typedef std::vector<Node> Nodes;
+    using Nodes = std::vector<Node>;
 
     struct Waiter {
         Date_t deadline;
@@ -145,15 +145,7 @@ public:
         Promise<HostAndPort> promise;
     };
 
-    /**
-     * seedNodes must not be empty
-     */
-    SetState(StringData name,
-             const std::set<HostAndPort>& seedNodes,
-             executor::TaskExecutor* = nullptr,
-             MongoURI uri = {});
-
-    SetState(const MongoURI& uri, executor::TaskExecutor* = nullptr);
+    SetState(const MongoURI& uri, executor::TaskExecutor*);
 
     bool isUsable() const;
 
@@ -205,26 +197,38 @@ public:
      */
     void checkInvariants() const;
 
-    stdx::mutex mutex;  // must hold this to access any other member or method (except name).
+    const MongoURI setUri;  // URI passed to ctor -- THIS IS NOT UPDATED BY SCANS
+    const std::string name;
 
-    const std::string name;  // safe to read outside lock since it is const
-    int consecutiveFailedScans;
+    executor::TaskExecutor* const executor;
+
+    stdx::mutex mutex;  // You must hold this to access any member below.
+
+    // For starting scans
     std::set<HostAndPort> seedNodes;  // updated whenever a master reports set membership changes
-    bool isMocked = false;            // True if this set is using nodes from MockReplicaSet
-    OID maxElectionId;                // largest election id observed by this ReplicaSetMonitor
-    int configVersion{0};             // version number of the replica set config.
-    HostAndPort lastSeenMaster;  // empty if we have never seen a master. can be same as current
-    Nodes nodes;                 // maintained sorted and unique by host
-    ScanStatePtr currentScan;    // NULL if no scan in progress
-    int64_t latencyThresholdMicros;
+
+    bool isMocked = false;  // True if this set is using nodes from MockReplicaSet
+
+    // For tracking scans
+    HostAndPort lastSeenMaster;  // Empty if we have never seen a master
+    int consecutiveFailedScans = 0;
+    Nodes nodes;                      // maintained sorted and unique by host
+    ConnectionString workingConnStr;  // The connection string from our last scan
+
+    // For tracking replies
+    OID maxElectionId;      // largest election id observed by this ReplicaSetMonitor
+    int configVersion = 0;  // version number of the replica set config.
+
+    // For matching hosts
+    int64_t latencyThresholdMicros = 0;
+    mutable int roundRobin = 0;  // used when useDeterministicHostSelection is true
     mutable PseudoRandom rand;   // only used for host selection to balance load
-    mutable int roundRobin;      // used when useDeterministicHostSelection is true
-    const MongoURI setUri;       // URI that may have constructed this
+
+    // For scheduling scans
     Seconds refreshPeriod;       // Normal refresh period when not expedited
     bool isExpedited = false;    // True when we are doing more frequent refreshes due to waiters
     stdx::list<Waiter> waiters;  // Everyone waiting for some ReadPreference to be satisfied
-
-    executor::TaskExecutor* const executor;
+    ScanStatePtr currentScan;    // NULL if no scan in progress
 };
 
 struct ReplicaSetMonitor::ScanState {

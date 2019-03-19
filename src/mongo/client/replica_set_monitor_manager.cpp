@@ -115,11 +115,9 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
         return monitor;
     }
 
-    const std::set<HostAndPort> servers(connStr.getServers().begin(), connStr.getServers().end());
-
     log() << "Starting new replica set monitor for " << connStr.toString();
 
-    auto newMonitor = std::make_shared<ReplicaSetMonitor>(setName, servers);
+    auto newMonitor = std::make_shared<ReplicaSetMonitor>(MongoURI(connStr));
     _monitors[setName] = newMonitor;
     newMonitor->init();
     return newMonitor;

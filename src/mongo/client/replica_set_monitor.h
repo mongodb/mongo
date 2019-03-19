@@ -256,7 +256,7 @@ public:
     /**
      * Allows tests to set initial conditions and introspect the current state.
      */
-    explicit ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}
+    explicit ReplicaSetMonitor(const SetStatePtr& initialState);
     ~ReplicaSetMonitor();
 
     /**

@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <random>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/connpool.h"
@@ -186,11 +187,10 @@ Seconds ReplicaSetMonitor::getDefaultRefreshPeriod() {
     return kDefaultRefreshPeriod;
 }
 
-ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds)
-    : _state(std::make_shared<SetState>(name, seeds, globalRSMonitorManager.getExecutor())) {}
+ReplicaSetMonitor::ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}
 
 ReplicaSetMonitor::ReplicaSetMonitor(const MongoURI& uri)
-    : _state(std::make_shared<SetState>(uri, globalRSMonitorManager.getExecutor())) {}
+    : ReplicaSetMonitor(std::make_shared<SetState>(uri, globalRSMonitorManager.getExecutor())) {}
 
 void ReplicaSetMonitor::init() {
     if (areRefreshRetriesDisabledForTest.load()) {
@@ -1013,19 +1013,14 @@ void Node::update(const IsMasterReply& reply) {
     lastWriteDateUpdateTime = Date_t::now();
 }
 
-SetState::SetState(StringData name,
-                   const std::set<HostAndPort>& seedNodes,
-                   executor::TaskExecutor* executor,
-                   MongoURI uri)
-    : name(name.toString()),
-      consecutiveFailedScans(0),
-      seedNodes(seedNodes),
+SetState::SetState(const MongoURI& uri, executor::TaskExecutor* executor)
+    : setUri(std::move(uri)),
+      name(setUri.getSetName()),
+      executor(executor),
+      seedNodes(setUri.getServers().begin(), setUri.getServers().end()),
       latencyThresholdMicros(serverGlobalParams.defaultLocalThresholdMillis * int64_t(1000)),
-      rand(int64_t(time(0))),
-      roundRobin(0),
-      setUri(std::move(uri)),
-      refreshPeriod(getDefaultRefreshPeriod()),
-      executor(executor) {
+      rand(std::random_device()()),
+      refreshPeriod(getDefaultRefreshPeriod()) {
     uassert(13642, "Replica set seed list can't be empty", !seedNodes.empty());
 
     if (name.empty())
@@ -1049,12 +1044,6 @@ SetState::SetState(StringData name,
 
     DEV checkInvariants();
 }
-
-SetState::SetState(const MongoURI& uri, executor::TaskExecutor* executor)
-    : SetState(uri.getSetName(),
-               std::set<HostAndPort>(uri.getServers().begin(), uri.getServers().end()),
-               executor,
-               uri) {}
 
 HostAndPort SetState::getMatchingHost(const ReadPreferenceSetting& criteria) const {
     switch (criteria.pref) {

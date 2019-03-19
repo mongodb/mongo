@@ -29,109 +29,104 @@
 
 #include "mongo/platform/basic.h"
 
-#include <set>
-#include <vector>
+#include "mongo/client/replica_set_monitor_test_fixture.h"
 
-#include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_internal.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-using std::set;
-using std::vector;
+class ReadPrefTest : public ReplicaSetMonitorTest {
+public:
+    ReadPrefTest() = default;
+    virtual ~ReadPrefTest() = default;
 
-// Pull nested types to top-level scope
-typedef ReplicaSetMonitor::SetState SetState;
-typedef SetState::Node Node;
+    HostAndPort selectNode(const SetState::Nodes& nodes,
+                           ReadPreference pref,
+                           const TagSet& tagSet,
+                           int latencyThresholdMillis,
+                           bool* isPrimarySelected) {
+        invariant(!nodes.empty());
 
-HostAndPort selectNode(const vector<Node>& nodes,
-                       ReadPreference pref,
-                       const TagSet& tagSet,
-                       int latencyThresholdMillis,
-                       bool* isPrimarySelected) {
-    invariant(!nodes.empty());
+        auto connStr = ConnectionString::forReplicaSet(kSetName, {nodes.front().host});
+        auto set = makeState(MongoURI(connStr));
+        set->nodes = nodes;
+        set->latencyThresholdMicros = latencyThresholdMillis * 1000;
 
-    set<HostAndPort> seeds;
-    seeds.insert(nodes.front().host);
+        ReadPreferenceSetting criteria(pref, tagSet);
+        HostAndPort out = set->getMatchingHost(criteria);
+        if (isPrimarySelected && !out.empty()) {
+            Node* node = set->findNode(out);
+            ASSERT(node);
+            *isPrimarySelected = node->isMaster;
+        }
 
-    SetState set("name", seeds);
-    set.nodes = nodes;
-    set.latencyThresholdMicros = latencyThresholdMillis * 1000;
-
-    ReadPreferenceSetting criteria(pref, tagSet);
-    HostAndPort out = set.getMatchingHost(criteria);
-    if (isPrimarySelected && !out.empty()) {
-        Node* node = set.findNode(out);
-        ASSERT(node);
-        *isPrimarySelected = node->isMaster;
+        return out;
     }
 
-    return out;
-}
+    auto getThreeMemberWithTags() {
+        SetState::Nodes nodes;
 
-vector<Node> getThreeMemberWithTags() {
-    vector<Node> nodes;
+        nodes.push_back(Node(HostAndPort("a")));
+        nodes.push_back(Node(HostAndPort("b")));
+        nodes.push_back(Node(HostAndPort("c")));
 
-    nodes.push_back(Node(HostAndPort("a")));
-    nodes.push_back(Node(HostAndPort("b")));
-    nodes.push_back(Node(HostAndPort("c")));
+        nodes[0].isUp = true;
+        nodes[1].isUp = true;
+        nodes[2].isUp = true;
 
-    nodes[0].isUp = true;
-    nodes[1].isUp = true;
-    nodes[2].isUp = true;
+        nodes[0].isMaster = false;
+        nodes[1].isMaster = true;
+        nodes[2].isMaster = false;
 
-    nodes[0].isMaster = false;
-    nodes[1].isMaster = true;
-    nodes[2].isMaster = false;
+        nodes[0].tags = BSON("dc"
+                             << "nyc"
+                             << "p"
+                             << "1");
+        nodes[1].tags = BSON("dc"
+                             << "sf");
+        nodes[2].tags = BSON("dc"
+                             << "nyc"
+                             << "p"
+                             << "2");
 
-    nodes[0].tags = BSON("dc"
-                         << "nyc"
-                         << "p"
-                         << "1");
-    nodes[1].tags = BSON("dc"
-                         << "sf");
-    nodes[2].tags = BSON("dc"
-                         << "nyc"
-                         << "p"
-                         << "2");
+        return nodes;
+    }
 
-    return nodes;
-}
+    BSONArray getDefaultTagSet() {
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append(BSONObj());
+        return arrayBuilder.arr();
+    }
 
-BSONArray getDefaultTagSet() {
-    BSONArrayBuilder arrayBuilder;
-    arrayBuilder.append(BSONObj());
-    return arrayBuilder.arr();
-}
+    BSONArray getP2TagSet() {
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append(BSON("p"
+                                 << "2"));
+        return arrayBuilder.arr();
+    }
 
-BSONArray getP2TagSet() {
-    BSONArrayBuilder arrayBuilder;
-    arrayBuilder.append(BSON("p"
-                             << "2"));
-    return arrayBuilder.arr();
-}
+    BSONArray getSingleNoMatchTag() {
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append(BSON("k"
+                                 << "x"));
+        return arrayBuilder.arr();
+    }
 
-BSONArray getSingleNoMatchTag() {
-    BSONArrayBuilder arrayBuilder;
-    arrayBuilder.append(BSON("k"
-                             << "x"));
-    return arrayBuilder.arr();
-}
+    BSONArray getMultiNoMatchTag() {
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append(BSON("mongo"
+                                 << "db"));
+        arrayBuilder.append(BSON("by"
+                                 << "10gen"));
+        return arrayBuilder.arr();
+    }
+};
 
-BSONArray getMultiNoMatchTag() {
-    BSONArrayBuilder arrayBuilder;
-    arrayBuilder.append(BSON("mongo"
-                             << "db"));
-    arrayBuilder.append(BSON("by"
-                             << "10gen"));
-    return arrayBuilder.arr();
-}
-
-TEST(ReplSetMonitorReadPref, PrimaryOnly) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PrimaryOnly) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     bool isPrimarySelected = false;
@@ -142,8 +137,8 @@ TEST(ReplSetMonitorReadPref, PrimaryOnly) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, PrimaryOnlyPriNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PrimaryOnlyPriNotOk) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -155,8 +150,8 @@ TEST(ReplSetMonitorReadPref, PrimaryOnlyPriNotOk) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, PrimaryMissing) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PrimaryMissing) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[1].isMaster = false;
@@ -168,8 +163,8 @@ TEST(ReplSetMonitorReadPref, PrimaryMissing) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, PriPrefWithPriOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PriPrefWithPriOk) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     bool isPrimarySelected = false;
@@ -180,8 +175,8 @@ TEST(ReplSetMonitorReadPref, PriPrefWithPriOk) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, PriPrefWithPriNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PriPrefWithPriNotOk) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -194,8 +189,8 @@ TEST(ReplSetMonitorReadPref, PriPrefWithPriNotOk) {
     ASSERT(host.host() == "a" || host.host() == "c");
 }
 
-TEST(ReplSetMonitorReadPref, SecOnly) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecOnly) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -208,8 +203,8 @@ TEST(ReplSetMonitorReadPref, SecOnly) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, SecOnlyOnlyPriOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecOnlyOnlyPriOk) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -222,8 +217,8 @@ TEST(ReplSetMonitorReadPref, SecOnlyOnlyPriOk) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, SecPref) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecPref) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -236,8 +231,8 @@ TEST(ReplSetMonitorReadPref, SecPref) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, SecPrefWithNoSecOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecPrefWithNoSecOk) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -251,8 +246,8 @@ TEST(ReplSetMonitorReadPref, SecPrefWithNoSecOk) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, SecPrefWithNoNodeOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecPrefWithNoNodeOk) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -266,8 +261,8 @@ TEST(ReplSetMonitorReadPref, SecPrefWithNoNodeOk) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, NearestAllLocal) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, NearestAllLocal) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[0].latencyMicros = 1 * 1000;
@@ -283,8 +278,8 @@ TEST(ReplSetMonitorReadPref, NearestAllLocal) {
     ASSERT_EQUALS(isPrimarySelected, host.host() == "b");
 }
 
-TEST(ReplSetMonitorReadPref, NearestOneLocal) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, NearestOneLocal) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
     nodes[0].latencyMicros = 10 * 1000;
@@ -299,8 +294,8 @@ TEST(ReplSetMonitorReadPref, NearestOneLocal) {
     ASSERT(!isPrimarySelected);
 }
 
-TEST(ReplSetMonitorReadPref, PriOnlyWithTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PriOnlyWithTagsNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getP2TagSet());
 
     bool isPrimarySelected = false;
@@ -312,8 +307,8 @@ TEST(ReplSetMonitorReadPref, PriOnlyWithTagsNoMatch) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTags) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PriPrefPriNotOkWithTags) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getP2TagSet());
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -326,8 +321,8 @@ TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTags) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, PriPrefPriOkWithTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PriPrefPriOkWithTagsNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getSingleNoMatchTag());
 
     bool isPrimarySelected = false;
@@ -338,8 +333,8 @@ TEST(ReplSetMonitorReadPref, PriPrefPriOkWithTagsNoMatch) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PriPrefPriNotOkWithTagsNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getSingleNoMatchTag());
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -351,8 +346,8 @@ TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTagsNoMatch) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, SecOnlyWithTags) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecOnlyWithTags) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getP2TagSet());
 
     bool isPrimarySelected;
@@ -363,8 +358,8 @@ TEST(ReplSetMonitorReadPref, SecOnlyWithTags) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, SecOnlyWithTagsMatchOnlyPri) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecOnlyWithTagsMatchOnlyPri) {
+    auto nodes = getThreeMemberWithTags();
 
     BSONArrayBuilder arrayBuilder;
     arrayBuilder.append(BSON("dc"
@@ -378,8 +373,8 @@ TEST(ReplSetMonitorReadPref, SecOnlyWithTagsMatchOnlyPri) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, SecPrefWithTags) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecPrefWithTags) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getP2TagSet());
 
     bool isPrimarySelected = false;
@@ -390,8 +385,8 @@ TEST(ReplSetMonitorReadPref, SecPrefWithTags) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, SecPrefSecNotOkWithTags) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecPrefSecNotOkWithTags) {
+    auto nodes = getThreeMemberWithTags();
 
     BSONArrayBuilder arrayBuilder;
     arrayBuilder.append(BSON("dc"
@@ -408,8 +403,8 @@ TEST(ReplSetMonitorReadPref, SecPrefSecNotOkWithTags) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, SecPrefPriOkWithTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecPrefPriOkWithTagsNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getSingleNoMatchTag());
 
     bool isPrimarySelected = false;
@@ -420,8 +415,8 @@ TEST(ReplSetMonitorReadPref, SecPrefPriOkWithTagsNoMatch) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, SecPrefPriNotOkWithTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecPrefPriNotOkWithTagsNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getSingleNoMatchTag());
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -433,8 +428,8 @@ TEST(ReplSetMonitorReadPref, SecPrefPriNotOkWithTagsNoMatch) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, SecPrefPriOkWithSecNotMatchTag) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, SecPrefPriOkWithSecNotMatchTag) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getSingleNoMatchTag());
 
     bool isPrimarySelected = false;
@@ -445,8 +440,8 @@ TEST(ReplSetMonitorReadPref, SecPrefPriOkWithSecNotMatchTag) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, NearestWithTags) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, NearestWithTags) {
+    auto nodes = getThreeMemberWithTags();
 
     BSONArrayBuilder arrayBuilder;
     arrayBuilder.append(BSON("p"
@@ -461,8 +456,8 @@ TEST(ReplSetMonitorReadPref, NearestWithTags) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, NearestWithTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, NearestWithTagsNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getSingleNoMatchTag());
 
     bool isPrimarySelected = false;
@@ -472,8 +467,8 @@ TEST(ReplSetMonitorReadPref, NearestWithTagsNoMatch) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, MultiPriOnlyTag) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, MultiPriOnlyTag) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
     bool isPrimarySelected = false;
@@ -484,8 +479,8 @@ TEST(ReplSetMonitorReadPref, MultiPriOnlyTag) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(ReplSetMonitorReadPref, MultiPriOnlyPriNotOkTag) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, MultiPriOnlyPriNotOkTag) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -497,8 +492,8 @@ TEST(ReplSetMonitorReadPref, MultiPriOnlyPriNotOkTag) {
     ASSERT(host.empty());
 }
 
-TEST(ReplSetMonitorReadPref, PriPrefPriOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(ReadPrefTest, PriPrefPriOk) {
+    auto nodes = getThreeMemberWithTags();
 
     BSONArrayBuilder arrayBuilder;
     arrayBuilder.append(BSON("p"
@@ -516,8 +511,11 @@ TEST(ReplSetMonitorReadPref, PriPrefPriOk) {
     ASSERT_EQUALS("b", host.host());
 }
 
-class MultiTags : public mongo::unittest::Test {
+class MultiTagsTest : public ReadPrefTest {
 public:
+    MultiTagsTest() = default;
+    virtual ~MultiTagsTest() = default;
+
     const TagSet& getMatchesFirstTagSet() {
         if (matchFirstTags.get() != NULL) {
             return *matchFirstTags;
@@ -593,8 +591,8 @@ private:
     std::unique_ptr<TagSet> matchPriTags;
 };
 
-TEST_F(MultiTags, MultiTagsMatchesFirst) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, MultiTagsTestMatchesFirst) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -609,8 +607,8 @@ TEST_F(MultiTags, MultiTagsMatchesFirst) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, PriPrefPriNotOkMatchesFirstNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesFirstNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -626,8 +624,8 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesFirstNotOk) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondTest) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesSecondTest) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -642,8 +640,8 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondTest) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondNotOkTest) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesSecondNotOkTest) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
     nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -659,8 +657,8 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondNotOkTest) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, PriPrefPriNotOkMatchesLastTest) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesLastTest) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -675,8 +673,8 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesLastTest) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, PriPrefPriNotOkMatchesLastNotOkTest) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, PriPrefPriNotOkMatchesLastNotOkTest) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -691,8 +689,8 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesLastNotOkTest) {
     ASSERT(host.empty());
 }
 
-TEST(MultiTags, PriPrefPriOkNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, PriPrefPriOkNoMatch) {
+    auto nodes = this->getThreeMemberWithTags();
 
     TagSet tags(getMultiNoMatchTag());
 
@@ -704,8 +702,8 @@ TEST(MultiTags, PriPrefPriOkNoMatch) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(MultiTags, PriPrefPriNotOkNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, PriPrefPriNotOkNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -717,8 +715,8 @@ TEST(MultiTags, PriPrefPriNotOkNoMatch) {
     ASSERT(host.empty());
 }
 
-TEST_F(MultiTags, SecOnlyMatchesFirstTest) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecOnlyMatchesFirstTest) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -731,8 +729,8 @@ TEST_F(MultiTags, SecOnlyMatchesFirstTest) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, SecOnlyMatchesFirstNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecOnlyMatchesFirstNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -747,8 +745,8 @@ TEST_F(MultiTags, SecOnlyMatchesFirstNotOk) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST_F(MultiTags, SecOnlyMatchesSecond) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecOnlyMatchesSecond) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -761,8 +759,8 @@ TEST_F(MultiTags, SecOnlyMatchesSecond) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST_F(MultiTags, SecOnlyMatchesSecondNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecOnlyMatchesSecondNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -777,8 +775,8 @@ TEST_F(MultiTags, SecOnlyMatchesSecondNotOk) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, SecOnlyMatchesLast) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecOnlyMatchesLast) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
@@ -788,8 +786,8 @@ TEST_F(MultiTags, SecOnlyMatchesLast) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, SecOnlyMatchesLastNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecOnlyMatchesLastNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -800,8 +798,8 @@ TEST_F(MultiTags, SecOnlyMatchesLastNotOk) {
     ASSERT(host.empty());
 }
 
-TEST_F(MultiTags, SecOnlyMultiTagsWithPriMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecOnlyMultiTagsTestWithPriMatch) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
@@ -811,8 +809,8 @@ TEST_F(MultiTags, SecOnlyMultiTagsWithPriMatch) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, SecOnlyMultiTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecOnlyMultiTagsTestNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
     bool isPrimarySelected = false;
@@ -822,8 +820,8 @@ TEST_F(MultiTags, SecOnlyMultiTagsNoMatch) {
     ASSERT(host.empty());
 }
 
-TEST_F(MultiTags, SecPrefMatchesFirst) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMatchesFirst) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -836,8 +834,8 @@ TEST_F(MultiTags, SecPrefMatchesFirst) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, SecPrefMatchesFirstNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMatchesFirstNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -852,8 +850,8 @@ TEST_F(MultiTags, SecPrefMatchesFirstNotOk) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST_F(MultiTags, SecPrefMatchesSecond) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMatchesSecond) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -866,8 +864,8 @@ TEST_F(MultiTags, SecPrefMatchesSecond) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST_F(MultiTags, SecPrefMatchesSecondNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMatchesSecondNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -882,8 +880,8 @@ TEST_F(MultiTags, SecPrefMatchesSecondNotOk) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, SecPrefMatchesLast) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMatchesLast) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -896,8 +894,8 @@ TEST_F(MultiTags, SecPrefMatchesLast) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, SecPrefMatchesLastNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMatchesLastNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -912,8 +910,8 @@ TEST_F(MultiTags, SecPrefMatchesLastNotOk) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST_F(MultiTags, SecPrefMultiTagsWithPriMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMultiTagsTestWithPriMatch) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -926,8 +924,8 @@ TEST_F(MultiTags, SecPrefMultiTagsWithPriMatch) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST(MultiTags, SecPrefMultiTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMultiTagsTestNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
     bool isPrimarySelected = false;
@@ -938,8 +936,8 @@ TEST(MultiTags, SecPrefMultiTagsNoMatch) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(MultiTags, SecPrefMultiTagsNoMatchPriNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, SecPrefMultiTagsTestNoMatchPriNotOk) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
     nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
@@ -951,8 +949,8 @@ TEST(MultiTags, SecPrefMultiTagsNoMatchPriNotOk) {
     ASSERT(host.empty());
 }
 
-TEST_F(MultiTags, NearestMatchesFirst) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, NearestMatchesFirst) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
@@ -962,8 +960,8 @@ TEST_F(MultiTags, NearestMatchesFirst) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST(MultiTags, NearestMatchesFirstNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, NearestMatchesFirstNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     BSONArrayBuilder arrayBuilder;
     arrayBuilder.append(BSON("p"
@@ -983,8 +981,8 @@ TEST(MultiTags, NearestMatchesFirstNotOk) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST_F(MultiTags, NearestMatchesSecond) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, NearestMatchesSecond) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
@@ -994,8 +992,8 @@ TEST_F(MultiTags, NearestMatchesSecond) {
     ASSERT_EQUALS("c", host.host());
 }
 
-TEST_F(MultiTags, NearestMatchesSecondNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, NearestMatchesSecondNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     BSONArrayBuilder arrayBuilder;
     arrayBuilder.append(BSON("z"
@@ -1017,8 +1015,8 @@ TEST_F(MultiTags, NearestMatchesSecondNotOk) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST_F(MultiTags, NearestMatchesLast) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, NearestMatchesLast) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
@@ -1028,8 +1026,8 @@ TEST_F(MultiTags, NearestMatchesLast) {
     ASSERT_EQUALS("a", host.host());
 }
 
-TEST_F(MultiTags, NeatestMatchesLastNotOk) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, NeatestMatchesLastNotOk) {
+    auto nodes = getThreeMemberWithTags();
 
     nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
@@ -1040,8 +1038,8 @@ TEST_F(MultiTags, NeatestMatchesLastNotOk) {
     ASSERT(host.empty());
 }
 
-TEST_F(MultiTags, NearestMultiTagsWithPriMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, NearestMultiTagsTestWithPriMatch) {
+    auto nodes = getThreeMemberWithTags();
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
@@ -1051,8 +1049,8 @@ TEST_F(MultiTags, NearestMultiTagsWithPriMatch) {
     ASSERT_EQUALS("b", host.host());
 }
 
-TEST(MultiTags, NearestMultiTagsNoMatch) {
-    vector<Node> nodes = getThreeMemberWithTags();
+TEST_F(MultiTagsTest, NearestMultiTagsTestNoMatch) {
+    auto nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
     bool isPrimarySelected = false;
@@ -1062,7 +1060,7 @@ TEST(MultiTags, NearestMultiTagsNoMatch) {
     ASSERT(host.empty());
 }
 
-TEST(TagSet, DefaultConstructorMatchesAll) {
+TEST_F(MultiTagsTest, DefaultConstructorMatchesAll) {
     TagSet tags;
     ASSERT_BSONOBJ_EQ(tags.getTagBSON(), BSON_ARRAY(BSONObj()));
 }
