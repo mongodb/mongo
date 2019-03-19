@@ -36,6 +36,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/fail_point_service.h"
@@ -114,8 +115,8 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
 
     return _targetHostAsync(shardId, readPref)
         .then([ this, shardId, commandObj = commandObj.getOwned(), readPref ](
-            HostAndPort shardHostAndPort) mutable {
-            executor::RemoteCommandRequest request(shardHostAndPort,
+            HostAndShard hostAndShard) mutable {
+            executor::RemoteCommandRequest request(hostAndShard.hostTargeted,
                                                    NamespaceString::kAdminDb.toString(),
                                                    commandObj,
                                                    readPref.toContainingBSON(),
@@ -131,11 +132,22 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                     this,
                     commandObj = std::move(commandObj),
                     shardId = std::move(shardId),
+                    hostTargeted = std::move(hostAndShard.hostTargeted),
+                    shard = std::move(hostAndShard.shard),
                     promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))
                 ](const RemoteCommandCallbackArgs& args) mutable noexcept {
                     auto status = args.response.status;
+                    shard->updateReplSetMonitor(hostTargeted, status);
+
                     // Only consider actual failures to send the command as errors.
                     if (status.isOK()) {
+                        auto commandStatus = getStatusFromCommandResult(args.response.data);
+                        shard->updateReplSetMonitor(hostTargeted, commandStatus);
+
+                        auto writeConcernStatus =
+                            getWriteConcernStatusFromCommandResult(args.response.data);
+                        shard->updateReplSetMonitor(hostTargeted, writeConcernStatus);
+
                         promise->emplaceValue(std::move(args.response));
                     } else {
                         promise->setError([&] {
@@ -205,8 +217,8 @@ void AsyncWorkScheduler::join() {
     });
 }
 
-Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,
-                                                         const ReadPreferenceSetting& readPref) {
+Future<AsyncWorkScheduler::HostAndShard> AsyncWorkScheduler::_targetHostAsync(
+    const ShardId& shardId, const ReadPreferenceSetting& readPref) {
     return scheduleWork([shardId, readPref](OperationContext* opCtx) {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
@@ -216,8 +228,10 @@ Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,
             MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingRemoteHost);
         }
 
-        // TODO (SERVER-35678): Return a SemiFuture<HostAndPort> rather than using a blocking call
-        return shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx);
+        // TODO (SERVER-35678): Return a SemiFuture<HostAndShard> rather than using a blocking call
+        return HostAndShard{
+            shard->getTargeter()->findHostWithMaxWait(readPref, Seconds(20)).get(opCtx),
+            std::move(shard)};
     });
 }
 

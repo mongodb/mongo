@@ -34,6 +34,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/future.h"
@@ -163,11 +164,18 @@ public:
 private:
     using ChildIteratorsList = std::list<AsyncWorkScheduler*>;
 
+    // A targeted host and the shard object used to target it. The shard object is passed through
+    // resolved so the caller can avoid a potentially blocking "ShardRegistry::getShard" call.
+    struct HostAndShard {
+        HostAndPort hostTargeted;
+        std::shared_ptr<Shard> shard;
+    };
+
     /**
-     * Finds the host and port for a shard.
+     * Finds the host and port for a shard id, returning it and the shard object used for targeting.
      */
-    Future<HostAndPort> _targetHostAsync(const ShardId& shardId,
-                                         const ReadPreferenceSetting& readPref);
+    Future<HostAndShard> _targetHostAsync(const ShardId& shardId,
+                                          const ReadPreferenceSetting& readPref);
 
     /**
      * Returns true when all the registered child schedulers, op contexts and handles have joined.
