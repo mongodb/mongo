@@ -221,7 +221,6 @@ protected:
     }
 
     void assertKillCusorsCmdHasCursorId(const BSONObj& killCmd, CursorId cursorId) {
-        std::cout << "CHARLIE: " << killCmd;
         ASSERT_TRUE(killCmd.hasElement("killCursors"));
         ASSERT_EQ(killCmd["cursors"].type(), BSONType::Array);
 
