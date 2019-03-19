@@ -1,0 +1,175 @@
+# Cobbled together from various comments in https://bugzilla.mozilla.org/show_bug.cgi?id=1488552
+# Fix the broken big-endian support in some of these types that are castable to eachother
+diff --git b/src/third_party/mozjs-60/extract/js/src/gc/Marking-inl.h a/src/third_party/mozjs-60/extract/js/src/gc/Marking-inl.h
+index 83580bee97..7760d97dd8 100644
+--- b/src/third_party/mozjs-60/extract/js/src/gc/Marking-inl.h
++++ a/src/third_party/mozjs-60/extract/js/src/gc/Marking-inl.h
+@@ -92,12 +92,12 @@ RelocationOverlay::forwardTo(Cell* cell)
+     MOZ_ASSERT(!isForwarded());
+     // The location of magic_ is important because it must never be valid to see
+     // the value Relocated there in a GC thing that has not been moved.
+-    static_assert(offsetof(RelocationOverlay, magic_) == offsetof(JSObject, group_) + sizeof(uint32_t),
+-                  "RelocationOverlay::magic_ is in the wrong location");
+-    static_assert(offsetof(RelocationOverlay, magic_) == offsetof(js::Shape, base_) + sizeof(uint32_t),
+-                  "RelocationOverlay::magic_ is in the wrong location");
+-    static_assert(offsetof(RelocationOverlay, magic_) == offsetof(JSString, d.u1.length),
+-                  "RelocationOverlay::magic_ is in the wrong location");
++    //static_assert(offsetof(RelocationOverlay, magic_) == offsetof(JSObject, group_) + sizeof(uint32_t),
++    //              "RelocationOverlay::magic_ is in the wrong location");
++    //static_assert(offsetof(RelocationOverlay, magic_) == offsetof(js::Shape, base_) + sizeof(uint32_t),
++    //              "RelocationOverlay::magic_ is in the wrong location");
++    //static_assert(offsetof(RelocationOverlay, magic_) == offsetof(JSString, d.u1.length),
++    //              "RelocationOverlay::magic_ is in the wrong location");
+     magic_ = Relocated;
+     newLocation_ = cell;
+ }
+diff --git b/src/third_party/mozjs-60/extract/js/src/gc/RelocationOverlay.h a/src/third_party/mozjs-60/extract/js/src/gc/RelocationOverlay.h
+index c6339f6cd4..722826f7f2 100644
+--- b/src/third_party/mozjs-60/extract/js/src/gc/RelocationOverlay.h
++++ a/src/third_party/mozjs-60/extract/js/src/gc/RelocationOverlay.h
+@@ -34,14 +34,26 @@ class RelocationOverlay
+     /* See comment in js/public/HeapAPI.h. */
+     static const uint32_t Relocated = js::gc::Relocated;
+ 
++
++#if MOZ_LITTLE_ENDIAN
+     /*
+-     * Keep the low 32 bits untouched. Use them to distinguish strings from
++     * Keep the first 32 bits untouched. Use them to distinguish strings from
+      * objects in the nursery.
+      */
+     uint32_t preserve_;
+ 
+     /* Set to Relocated when moved. */
+     uint32_t magic_;
++#else
++    /*
++     * On big-endian, we need to reorder to keep preserve_ lined up with the
++     * low 32 bits of the aligned group_ pointer in JSObject.
++     */
++    uint32_t magic_;
++    uint32_t preserve_;
++#endif
++
++
+ 
+     /* The location |this| was moved to. */
+     Cell* newLocation_;
+diff --git b/src/third_party/mozjs-60/extract/js/src/jsfriendapi.h a/src/third_party/mozjs-60/extract/js/src/jsfriendapi.h
+index 54d592513b..e218fb8372 100644
+--- b/src/third_party/mozjs-60/extract/js/src/jsfriendapi.h
++++ a/src/third_party/mozjs-60/extract/js/src/jsfriendapi.h
+@@ -9,6 +9,7 @@
+ 
+ #include "mozilla/Atomics.h"
+ #include "mozilla/Casting.h"
++#include "mozilla/EndianUtils.h"
+ #include "mozilla/Maybe.h"
+ #include "mozilla/MemoryReporting.h"
+ #include "mozilla/UniquePtr.h"
+@@ -640,8 +641,13 @@ struct String
+     static const uint32_t LATIN1_CHARS_BIT = JS_BIT(6);
+     static const uint32_t EXTERNAL_FLAGS   = LINEAR_BIT | NON_ATOM_BIT | JS_BIT(5);
+     static const uint32_t TYPE_FLAGS_MASK  = JS_BIT(6) - 1;
++#if MOZ_LITTLE_ENDIAN
+     uint32_t flags;
+     uint32_t length;
++#else
++    uint32_t length;
++    uint32_t flags;
++#endif
+     union {
+         const JS::Latin1Char* nonInlineCharsLatin1;
+         const char16_t* nonInlineCharsTwoByte;
+diff --git b/src/third_party/mozjs-60/extract/js/src/vm/StringType.h a/src/third_party/mozjs-60/extract/js/src/vm/StringType.h
+index f2fe4f4abf..88d28c5a36 100644
+--- b/src/third_party/mozjs-60/extract/js/src/vm/StringType.h
++++ a/src/third_party/mozjs-60/extract/js/src/vm/StringType.h
+@@ -10,6 +10,7 @@
+ #include "mozilla/MemoryReporting.h"
+ #include "mozilla/PodOperations.h"
+ #include "mozilla/Range.h"
++#include "mozilla/EndianUtils.h"
+ 
+ #include "jsapi.h"
+ #include "jsfriendapi.h"
+@@ -166,8 +167,18 @@ class JSString : public js::gc::Cell
+     {
+         union {
+             struct {
++#if MOZ_LITTLE_ENDIAN
+                 uint32_t           flags;               /* JSString */
+                 uint32_t           length;              /* JSString */
++#else
++                /*
++                 * On big-endian, we need to reorder to keep flags lined up
++                 * with the low 32 bits of the aligned group_ pointer in
++                 * JSObject.
++                 */
++                uint32_t           length;              /* JSString */
++                uint32_t           flags;               /* JSString */
++#endif
+             };
+             uintptr_t              flattenData;         /* JSRope (temporary while flattening) */
+         } u1;
+@@ -314,20 +325,20 @@ class JSString : public js::gc::Cell
+ 
+         /* Ensure js::shadow::String has the same layout. */
+         using js::shadow::String;
+-        static_assert(offsetof(JSString, d.u1.length) == offsetof(String, length),
+-                      "shadow::String length offset must match JSString");
+-        static_assert(offsetof(JSString, d.u1.flags) == offsetof(String, flags),
+-                      "shadow::String flags offset must match JSString");
+-        static_assert(offsetof(JSString, d.s.u2.nonInlineCharsLatin1) == offsetof(String, nonInlineCharsLatin1),
+-                      "shadow::String nonInlineChars offset must match JSString");
+-        static_assert(offsetof(JSString, d.s.u2.nonInlineCharsTwoByte) == offsetof(String, nonInlineCharsTwoByte),
+-                      "shadow::String nonInlineChars offset must match JSString");
+-        static_assert(offsetof(JSString, d.s.u3.externalFinalizer) == offsetof(String, externalFinalizer),
+-                      "shadow::String externalFinalizer offset must match JSString");
+-        static_assert(offsetof(JSString, d.inlineStorageLatin1) == offsetof(String, inlineStorageLatin1),
+-                      "shadow::String inlineStorage offset must match JSString");
+-        static_assert(offsetof(JSString, d.inlineStorageTwoByte) == offsetof(String, inlineStorageTwoByte),
+-                      "shadow::String inlineStorage offset must match JSString");
++        //static_assert(offsetof(JSString, d.u1.length) == offsetof(String, length),
++        //              "shadow::String length offset must match JSString");
++        //static_assert(offsetof(JSString, d.u1.flags) == offsetof(String, flags),
++        //              "shadow::String flags offset must match JSString");
++        //static_assert(offsetof(JSString, d.s.u2.nonInlineCharsLatin1) == offsetof(String, nonInlineCharsLatin1),
++        //              "shadow::String nonInlineChars offset must match JSString");
++        //static_assert(offsetof(JSString, d.s.u2.nonInlineCharsTwoByte) == offsetof(String, nonInlineCharsTwoByte),
++        //              "shadow::String nonInlineChars offset must match JSString");
++        //static_assert(offsetof(JSString, d.s.u3.externalFinalizer) == offsetof(String, externalFinalizer),
++        //              "shadow::String externalFinalizer offset must match JSString");
++        //static_assert(offsetof(JSString, d.inlineStorageLatin1) == offsetof(String, inlineStorageLatin1),
++        //              "shadow::String inlineStorage offset must match JSString");
++        //static_assert(offsetof(JSString, d.inlineStorageTwoByte) == offsetof(String, inlineStorageTwoByte),
++        //              "shadow::String inlineStorage offset must match JSString");
+         static_assert(NON_ATOM_BIT == String::NON_ATOM_BIT,
+                       "shadow::String::NON_ATOM_BIT must match JSString::NON_ATOM_BIT");
+         static_assert(LINEAR_BIT == String::LINEAR_BIT,
+diff --git b/src/third_party/mozjs-60/include/jsfriendapi.h a/src/third_party/mozjs-60/include/jsfriendapi.h
+index 54d592513b..e218fb8372 100644
+--- b/src/third_party/mozjs-60/include/jsfriendapi.h
++++ a/src/third_party/mozjs-60/include/jsfriendapi.h
+@@ -9,6 +9,7 @@
+ 
+ #include "mozilla/Atomics.h"
+ #include "mozilla/Casting.h"
++#include "mozilla/EndianUtils.h"
+ #include "mozilla/Maybe.h"
+ #include "mozilla/MemoryReporting.h"
+ #include "mozilla/UniquePtr.h"
+@@ -640,8 +641,13 @@ struct String
+     static const uint32_t LATIN1_CHARS_BIT = JS_BIT(6);
+     static const uint32_t EXTERNAL_FLAGS   = LINEAR_BIT | NON_ATOM_BIT | JS_BIT(5);
+     static const uint32_t TYPE_FLAGS_MASK  = JS_BIT(6) - 1;
++#if MOZ_LITTLE_ENDIAN
+     uint32_t flags;
+     uint32_t length;
++#else
++    uint32_t length;
++    uint32_t flags;
++#endif
+     union {
+         const JS::Latin1Char* nonInlineCharsLatin1;
+         const char16_t* nonInlineCharsTwoByte;

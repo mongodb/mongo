@@ -1,0 +1,24 @@
+# We compile MongoDB with UNICODE but Mozilla does not so we need to explicitly select the ANSI
+# version of GetModuleHandle
+diff --git b/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp a/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp
+index da690fe0b5..9762232f62 100644
+--- b/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp
++++ a/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp
+@@ -27,8 +27,6 @@
+ #include <mmsystem.h> /* for timeBegin/EndPeriod */
+ #include <stdlib.h>   /* for _set_invalid_parameter_handler */
+ 
+-#include "prinit.h"
+-
+ #endif
+ 
+ #ifdef XP_UNIX
+@@ -133,7 +131,7 @@ PRMJ_NowInit()
+     InitializeCriticalSectionAndSpinCount(&calibration.data_lock, DataLockSpinCount);
+ 
+     // Windows 8 has a new API function we can use.
+-    if (HMODULE h = GetModuleHandle("kernel32.dll")) {
++    if (HMODULE h = GetModuleHandleA("kernel32.dll")) {
+         pGetSystemTimePreciseAsFileTime =
+             (void (WINAPI*)(LPFILETIME))GetProcAddress(h, "GetSystemTimePreciseAsFileTime");
+     }

@@ -113,7 +113,7 @@ done
 
 # this is all of the EXPORTS.mozilla files from the moz.build's
 mkdir -p include/mozilla
-for i in 'Alignment.h' 'AllocPolicy.h' 'AlreadyAddRefed.h' 'Array.h' 'ArrayUtils.h' 'Assertions.h' 'Atomics.h' 'Attributes.h' 'BinarySearch.h' 'BloomFilter.h' 'BufferList.h' 'Casting.h' 'ChaosMode.h' 'Char16.h' 'CheckedInt.h' 'Compiler.h' 'Compression.h' 'DebugOnly.h' 'DefineEnum.h' 'DoublyLinkedList.h' 'EndianUtils.h' 'EnumeratedArray.h' 'EnumeratedRange.h' 'EnumSet.h' 'EnumTypeTraits.h' 'FastBernoulliTrial.h' 'FloatingPoint.h' 'FStream.h' 'GuardObjects.h' 'HashFunctions.h' 'IndexSequence.h' 'IntegerPrintfMacros.h' 'IntegerRange.h' 'IntegerTypeTraits.h' 'JSONWriter.h' 'Likely.h' 'LinkedList.h' 'MacroArgs.h' 'MacroForEach.h' 'MathAlgorithms.h' 'Maybe.h' 'MaybeOneOf.h' 'MemoryChecking.h' 'MemoryReporting.h' 'Move.h' 'NotNull.h' 'NullPtr.h' 'Opaque.h' 'OperatorNewExtensions.h' 'Pair.h' 'Path.h' 'PodOperations.h' 'Poison.h' 'Range.h' 'RangedArray.h' 'RangedPtr.h' 'ReentrancyGuard.h' 'RefCounted.h' 'RefCountType.h' 'RefPtr.h' 'Result.h' 'ResultExtensions.h' 'ReverseIterator.h' 'RollingMean.h' 'Saturate.h' 'Scoped.h' 'ScopeExit.h' 'SegmentedVector.h' 'SHA1.h' 'SmallPointerArray.h' 'Span.h' 'SplayTree.h' 'Sprintf.h' 'StaticAnalysisFunctions.h' 'TaggedAnonymousMemory.h' 'TemplateLib.h' 'TextUtils.h' 'ThreadLocal.h' 'ThreadSafeWeakPtr.h' 'ToString.h' 'Tuple.h' 'TypedEnumBits.h' 'Types.h' 'TypeTraits.h' 'UniquePtr.h' 'UniquePtrExtensions.h' 'Unused.h' 'Variant.h' 'Vector.h' 'WeakPtr.h' 'WrappingOperations.h' 'XorShift128PlusRNG.h' ; do
+for i in 'Alignment.h' 'AllocPolicy.h' 'AlreadyAddRefed.h' 'Array.h' 'ArrayUtils.h' 'Assertions.h' 'Atomics.h' 'Attributes.h' 'BinarySearch.h' 'BloomFilter.h' 'BufferList.h' 'Casting.h' 'ChaosMode.h' 'Char16.h' 'CheckedInt.h' 'Compiler.h' 'Compression.h' 'DebugOnly.h' 'DefineEnum.h' 'DoublyLinkedList.h' 'EndianUtils.h' 'EnumeratedArray.h' 'EnumeratedRange.h' 'EnumSet.h' 'EnumTypeTraits.h' 'FastBernoulliTrial.h' 'FloatingPoint.h' 'FStream.h' 'GuardObjects.h' 'HashFunctions.h' 'IndexSequence.h' 'IntegerPrintfMacros.h' 'IntegerRange.h' 'IntegerTypeTraits.h' 'JSONWriter.h' 'Likely.h' 'LinkedList.h' 'MacroArgs.h' 'MacroForEach.h' 'MathAlgorithms.h' 'Maybe.h' 'MaybeOneOf.h' 'MemoryChecking.h' 'MemoryReporting.h' 'Move.h' 'NotNull.h' 'NullPtr.h' 'Opaque.h' 'OperatorNewExtensions.h' 'Pair.h' 'Path.h' 'PodOperations.h' 'Poison.h' 'Range.h' 'RangedArray.h' 'RangedPtr.h' 'ReentrancyGuard.h' 'RefCounted.h' 'RefCountType.h' 'RefPtr.h' 'Result.h' 'ResultExtensions.h' 'ReverseIterator.h' 'RollingMean.h' 'Saturate.h' 'Scoped.h' 'ScopeExit.h' 'SegmentedVector.h' 'SHA1.h' 'SmallPointerArray.h' 'Span.h' 'SplayTree.h' 'Sprintf.h' 'StaticAnalysisFunctions.h' 'TaggedAnonymousMemory.h' 'TemplateLib.h' 'TextUtils.h' 'ThreadLocal.h' 'ThreadSafeWeakPtr.h' 'ToString.h' 'Tuple.h' 'TypedEnumBits.h' 'Types.h' 'TypeTraits.h' 'UniquePtr.h' 'UniquePtrExtensions.h' 'Unused.h' 'Variant.h' 'Vector.h' 'WeakPtr.h' 'WrappingOperations.h' 'XorShift128PlusRNG.h' 'WindowsVersion.h' ; do
     cp extract/mfbt/$i include/mozilla
 done
 
@@ -135,6 +135,86 @@ cp mozilla-release/modules/fdlibm/src/* extract/modules/fdlibm/
 cp mozilla-release/mozglue/misc/*.h include
 mkdir -p extract/mozglue/misc
 cp mozilla-release/mozglue/misc/*.cpp extract/mozglue/misc
+cp mozilla-release/mozglue/misc/StackWalk_windows.h include/mozilla/
 
 mkdir -p include/vtune
 touch include/vtune/VTuneWrapper.h
+
+xargs rm -r<<__XARGS_RM__
+extract/js/src/backend.FasterMakeBackend.in
+extract/js/src/backend.RecursiveMakeBackend.in
+extract/js/src/build/js-config.in
+extract/js/src/build/js.pc.in
+extract/js/src/build/Makefile.in
+extract/js/src/build/symverscript.in
+extract/js/src/build/unix/
+extract/js/src/.cargo/
+extract/js/src/config.statusd/
+extract/js/src/configure.d
+extract/js/src/devtools/gctrace/Makefile
+extract/js/src/devtools/rootAnalysis/Makefile.in
+extract/js/src/devtools/vprof/manifest.mk
+extract/js/src/dist/bin/
+extract/js/src/dist/include/double-conversion/
+extract/js/src/dist/include/fdlibm.h
+extract/js/src/dist/include/js/
+extract/js/src/dist/include/jsapi.h
+extract/js/src/dist/include/js-config.h
+extract/js/src/dist/include/jsfriendapi.h
+extract/js/src/dist/include/js.msg
+extract/js/src/dist/include/jsperf.h
+extract/js/src/dist/include/jspubtd.h
+extract/js/src/dist/include/jstypes.h
+extract/js/src/dist/include/malloc_decls.h
+extract/js/src/dist/include/mozilla/
+extract/js/src/dist/include/mozjemalloc_types.h
+extract/js/src/dist/include/mozmemory.h
+extract/js/src/dist/include/mozmemory_wrap.h
+extract/js/src/dist/system_wrappers/
+extract/js/src/faster/
+extract/js/src/install_dist_bin.track
+extract/js/src/install_dist_include.track
+extract/js/src/install_dist_private.track
+extract/js/src/install_dist_public.track
+extract/js/src/install__tests.track
+extract/js/src/js/
+extract/js/src/js-confdefs.h.in
+extract/js/src/js-config.h.in
+extract/js/src/memory/backend.mk
+extract/js/src/memory/build/
+extract/js/src/memory/fallible/
+extract/js/src/memory/Makefile
+extract/js/src/memory/mozalloc/
+extract/js/src/mfbt/backend.mk
+extract/js/src/mfbt/.deps/
+extract/js/src/mfbt/libmfbt.a.desc
+extract/js/src/mfbt/Makefile
+extract/js/src/mfbt/Unified_cpp_mfbt1.cpp
+extract/js/src/modules/fdlibm/backend.mk
+extract/js/src/modules/fdlibm/Makefile
+extract/js/src/modules/fdlibm/src/backend.mk
+extract/js/src/modules/fdlibm/src/.deps/
+extract/js/src/modules/fdlibm/src/libmodules_fdlibm_src.a.desc
+extract/js/src/modules/fdlibm/src/Makefile
+extract/js/src/mozglue/backend.mk
+extract/js/src/mozglue/build/backend.mk
+extract/js/src/mozglue/build/libmozglue.a
+extract/js/src/mozglue/build/libmozglue.a.desc
+extract/js/src/mozglue/build/Makefile
+extract/js/src/mozglue/Makefile
+extract/js/src/mozglue/misc/backend.mk
+extract/js/src/mozglue/misc/.deps/
+extract/js/src/mozglue/misc/libmozglue_misc.a.desc
+extract/js/src/mozglue/misc/Makefile
+extract/js/src/mozinfo.json
+extract/js/src/old-configure.in
+extract/js/src/old-configure.vars
+extract/js/src/taskcluster/
+extract/js/src/testing/
+extract/js/src/_tests/mozbase/
+extract/js/src/third_party/
+extract/js/src/wasm/Makefile
+__XARGS_RM__
+
+patch -p4 < patches/big-endian-fixes.patch
+patch -p4 < patches/windows-Time.cpp-GetModuleHandle.patch
