@@ -1515,14 +1515,14 @@ TEST(PlanCacheTest, ComputeKeyMatchInDependsOnPresenceOfRegexAndFlags) {
                    "ina_re/ims/");
 
     // Test that $not-$in-$regex similarly records the presence and flags of any regexes.
-    testComputeKey("{a: {$not: {$in: [1, 'foo']}}}", "{}", "{}", "nt[ina]");
-    testComputeKey("{a: {$not: {$in: [1, /foo/]}}}", "{}", "{}", "nt[ina_re]");
+    testComputeKey("{a: {$not: {$in: [1, 'foo']}}}", "{}", "{}", "nt<1>[ina]");
+    testComputeKey("{a: {$not: {$in: [1, /foo/]}}}", "{}", "{}", "nt<1>[ina_re]");
     testComputeKey(
-        "{a: {$not: {$in: [1, /foo/i, /bar/i, /baz/msi]}}}", "{}", "{}", "nt[ina_re/ims/]");
+        "{a: {$not: {$in: [1, /foo/i, /bar/i, /baz/msi]}}}", "{}", "{}", "nt<1>[ina_re/ims/]");
 
     // Test that a $not-$in containing a single regex is unwrapped to $not-$regex.
-    testComputeKey("{a: {$not: {$in: [/foo/]}}}", "{}", "{}", "nt[rea]");
-    testComputeKey("{a: {$not: {$in: [/foo/i]}}}", "{}", "{}", "nt[rea/i/]");
+    testComputeKey("{a: {$not: {$in: [/foo/]}}}", "{}", "{}", "nt<1>[rea]");
+    testComputeKey("{a: {$not: {$in: [/foo/i]}}}", "{}", "{}", "nt<1>[rea/i/]");
 }
 
 // When a sparse index is present, computeKey() should generate different keys depending on
@@ -1629,6 +1629,134 @@ TEST(PlanCacheTest, ComputeKeyCollationIndex) {
     // the index.
     ASSERT_EQ(planCache.computeKey(*inNoStrings),
               planCache.computeKey(*inContainsStringHasCollation));
+}
+
+/**
+ * Check that the given plan cache key has the discriminators in the given order.
+ */
+bool hasDiscriminators(const std::string& key, const std::vector<std::string>& discriminators) {
+    size_t pos = 0;
+    for (auto&& discriminator : discriminators) {
+        size_t foundPos = key.find(discriminator, pos);
+        if (foundPos == std::string::npos) {
+            return false;
+        }
+        pos = foundPos + discriminator.size();
+    }
+
+    // Return whether the key has any more discriminators.
+    return key.find("<", pos) == std::string::npos;
+}
+
+TEST(PlanCacheTest, ComputeKeyNotEqualsArray) {
+    PlanCache planCache;
+    unique_ptr<CanonicalQuery> cqNeArray(canonicalize("{a: {$ne: [1]}}"));
+    unique_ptr<CanonicalQuery> cqNeScalar(canonicalize("{a: {$ne: 123}}"));
+
+    const PlanCacheKey noIndexNeArrayKey = planCache.computeKey(*cqNeArray);
+    const PlanCacheKey noIndexNeScalarKey = planCache.computeKey(*cqNeScalar);
+    ASSERT_TRUE(hasDiscriminators(noIndexNeArrayKey, {"<0>"}));
+    ASSERT_TRUE(hasDiscriminators(noIndexNeScalarKey, {"<1>"}));
+    ASSERT_NE(noIndexNeScalarKey, noIndexNeArrayKey);
+
+    // Create a normal btree index. It will have a discriminator.
+    IndexEntry entry(BSON("a" << 1),
+                     false,    // multikey
+                     false,    // sparse
+                     false,    // unique
+                     "",       // name
+                     nullptr,  // filterExpr
+                     BSONObj());
+    planCache.notifyOfIndexEntries({entry});
+
+    const PlanCacheKey withIndexNeArrayKey = planCache.computeKey(*cqNeArray);
+    const PlanCacheKey withIndexNeScalarKey = planCache.computeKey(*cqNeScalar);
+
+    ASSERT_NE(noIndexNeArrayKey, withIndexNeArrayKey);
+
+    // There will be one discriminator for the $not and another for the leaf node ({$eq: 123}).
+    // Both will be <1>.
+    ASSERT_TRUE(hasDiscriminators(withIndexNeScalarKey, {"<1>", "<1>"}));
+
+    // There will be one discriminator for the $not and another for the leaf node ({$eq: [1]}).
+    // Since the index can support equality to an array, the second discriminator will have a value
+    // of '1'.
+    ASSERT_TRUE(hasDiscriminators(withIndexNeArrayKey, {"<0>", "<1>"}));
+}
+
+TEST(PlanCacheTest, ComputeKeyNinArray) {
+    PlanCache planCache;
+    unique_ptr<CanonicalQuery> cqNinArray(canonicalize("{a: {$nin: [123, [1]]}}"));
+    unique_ptr<CanonicalQuery> cqNinScalar(canonicalize("{a: {$nin: [123, 456]}}"));
+
+    const PlanCacheKey noIndexNinArrayKey = planCache.computeKey(*cqNinArray);
+    const PlanCacheKey noIndexNinScalarKey = planCache.computeKey(*cqNinScalar);
+    ASSERT_TRUE(hasDiscriminators(noIndexNinArrayKey, {"<0>"}));
+    ASSERT_TRUE(hasDiscriminators(noIndexNinScalarKey, {"<1>"}));
+    ASSERT_NE(noIndexNinScalarKey, noIndexNinArrayKey);
+
+    // Create a normal btree index. It will have a discriminator.
+    IndexEntry entry(BSON("a" << 1),
+                     false,    // multikey
+                     false,    // sparse
+                     false,    // unique
+                     "",       // name
+                     nullptr,  // filterExpr
+                     BSONObj());
+    planCache.notifyOfIndexEntries({entry});
+
+    const PlanCacheKey withIndexNinArrayKey = planCache.computeKey(*cqNinArray);
+    const PlanCacheKey withIndexNinScalarKey = planCache.computeKey(*cqNinScalar);
+
+    // The index discriminators should have changed.
+    ASSERT_NE(noIndexNinArrayKey, withIndexNinArrayKey);
+
+    // Both cache keys have two discriminators: one for the $not and one for the $in. The query
+    // which has an array inside the $in won't be able to use the index, and should have a <0>
+    // associated with the $not.
+    ASSERT_TRUE(hasDiscriminators(withIndexNinScalarKey, {"<1>", "<1>"}));
+    ASSERT_TRUE(hasDiscriminators(withIndexNinArrayKey, {"<0>", "<1>"}));
+}
+
+TEST(PlanCacheTest, ComputeNeArrayInOrStagePreserversOrder) {
+    PlanCache planCache;
+    unique_ptr<CanonicalQuery> cqNeA(canonicalize("{$or: [{a: {$ne: 5}}, {a: {$ne: [12]}}]}"));
+    unique_ptr<CanonicalQuery> cqNeB(canonicalize("{$or: [{a: {$ne: [12]}}, {a: {$ne: 5}}]}"));
+
+    const PlanCacheKey keyA = planCache.computeKey(*cqNeA);
+    const PlanCacheKey keyB = planCache.computeKey(*cqNeB);
+    ASSERT_NE(keyA, keyB);
+
+    // Create a normal btree index. It will have a discriminator.
+    IndexEntry entry(BSON("a" << 1),
+                     false,    // multikey
+                     false,    // sparse
+                     false,    // unique
+                     "",       // name
+                     nullptr,  // filterExpr
+                     BSONObj());
+    planCache.notifyOfIndexEntries({entry});
+
+    const PlanCacheKey keyAWithIndex = planCache.computeKey(*cqNeA);
+    const PlanCacheKey keyBWithIndex = planCache.computeKey(*cqNeB);
+
+    ASSERT_NE(keyAWithIndex, keyBWithIndex);
+    ASSERT_TRUE(hasDiscriminators(keyAWithIndex,
+                                  {
+                                      "<1>",  // $ne
+                                      "<1>",  // 5
+
+                                      "<0>",  // $ne
+                                      "<1>"   // [12]
+                                  }));
+    ASSERT_TRUE(hasDiscriminators(keyBWithIndex,
+                                  {
+                                      "<0>",  // $ne
+                                      "<1>",  // [12]
+
+                                      "<1>",  // $ne
+                                      "<1>"   // 5
+                                  }));
 }
 
 }  // namespace

@@ -47,6 +47,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/util/assert_util.h"
@@ -635,14 +636,22 @@ void PlanCache::encodeKeyForMatch(const MatchExpression* tree, StringBuilder* ke
     }
 
     // Encode indexability.
-    const IndexToDiscriminatorMap& discriminators =
-        _indexabilityState.getDiscriminators(tree->path());
-    if (!discriminators.empty()) {
-        *keyBuilder << kEncodeDiscriminatorsBegin;
-        // For each discriminator on this path, append the character '0' or '1'.
-        for (auto&& indexAndDiscriminatorPair : discriminators) {
-            *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
+    if (!tree->path().empty()) {
+        const IndexToDiscriminatorMap& discriminators =
+            _indexabilityState.getDiscriminators(tree->path());
+        if (!discriminators.empty()) {
+            *keyBuilder << kEncodeDiscriminatorsBegin;
+            // For each discriminator on this path, append the character '0' or '1'.
+            for (auto&& indexAndDiscriminatorPair : discriminators) {
+                *keyBuilder << indexAndDiscriminatorPair.second.isMatchCompatibleWithIndex(tree);
+            }
+            *keyBuilder << kEncodeDiscriminatorsEnd;
         }
+    } else if (tree->matchType() == MatchExpression::MatchType::NOT) {
+        // If the node is not compatible with any type of index, add a single '0' discriminator
+        // here. Otherwise add a '1'.
+        *keyBuilder << kEncodeDiscriminatorsBegin;
+        *keyBuilder << QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex(tree);
         *keyBuilder << kEncodeDiscriminatorsEnd;
     }
 

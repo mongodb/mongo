@@ -137,6 +137,13 @@ public:
      */
     static bool indexedFieldHasMultikeyComponents(StringData indexedField, const IndexEntry& index);
 
+    /**
+     * Some types of matches are not supported by any type of index. If this function returns
+     * false, then 'queryExpr' is definitely not supported for any type of index. If the function
+     * returns true then 'queryExpr' may (or may not) be supported by some index.
+     */
+    static bool logicalNodeMayBeSupportedByAnIndex(const MatchExpression* queryExpr);
+
 private:
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove

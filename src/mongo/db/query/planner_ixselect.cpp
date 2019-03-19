@@ -73,7 +73,7 @@ bool elemMatchValueCompatible(const BSONElement& elt,
 
 // Can't index negations of {$eq: <Array>} or {$in: [<Array>, ...]}. Note that we could
 // use the index in principle, though we would need to generate special bounds.
-bool isNotEqualsArrayOrNotInArray(const MatchExpression* me) {
+bool isEqualsArrayOrNotInArray(const MatchExpression* me) {
     const auto type = me->matchType();
     if (type == MatchExpression::EQ) {
         return static_cast<const ComparisonMatchExpression*>(me)->getData().type() ==
@@ -297,7 +297,7 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
 
             // Can't index negations of {$eq: <Array>} or {$in: [<Array>, ...]}. Note that we could
             // use the index in principle, though we would need to generate special bounds.
-            if (isNotEqualsArrayOrNotInArray(child)) {
+            if (isEqualsArrayOrNotInArray(child)) {
                 return false;
             }
 
@@ -934,6 +934,11 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsTo2dsphereIndices(
         // Remove bad assignments from this index.
         stripInvalidAssignmentsTo2dsphereIndex(node, i);
     }
+}
+
+bool QueryPlannerIXSelect::logicalNodeMayBeSupportedByAnIndex(const MatchExpression* queryExpr) {
+    return !(queryExpr->matchType() == MatchExpression::NOT &&
+             isEqualsArrayOrNotInArray(queryExpr->getChild(0)));
 }
 
 }  // namespace mongo
