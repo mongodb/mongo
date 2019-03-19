@@ -114,8 +114,13 @@ class WindowsDumper(object):
         # Use the shell api to get the variable instead
         root_dir = shell.SHGetFolderPath(0, shellcon.CSIDL_PROGRAM_FILESX86, None, 0)
 
-        for idx in range(0, 2):
-            dbg_path = os.path.join(root_dir, "Windows Kits", "8." + str(idx), "Debuggers", "x64")
+        # Construct the debugger search paths in most-recent order
+        debugger_paths = [os.path.join(root_dir, "Windows Kits", "10", "Debuggers", "x64")]
+        for idx in reversed(range(0, 2)):
+            debugger_paths.append(
+                os.path.join(root_dir, "Windows Kits", "8." + str(idx), "Debuggers", "x64"))
+
+        for dbg_path in debugger_paths:
             logger.info("Checking for debugger in %s", dbg_path)
             if os.path.exists(dbg_path):
                 return os.path.join(dbg_path, debugger)
