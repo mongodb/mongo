@@ -232,6 +232,12 @@ void TransactionRouter::processParticipantResponse(const ShardId& shardId,
     auto participant = getParticipant(shardId);
     invariant(participant, "Participant should exist if processing participant response");
 
+    if (_commitType != CommitType::kNotInitiated) {
+        // Do not update a participant's transaction metadata after commit has been initiated, since
+        // a participant's state is partially reset on commit.
+        return;
+    }
+
     auto commandStatus = getStatusFromCommandResult(responseObj);
     if (!commandStatus.isOK()) {
         return;
@@ -591,7 +597,7 @@ void TransactionRouter::beginOrContinueTxn(OperationContext* opCtx,
     _participants.clear();
     _coordinatorId.reset();
     _atClusterTime.reset();
-    _initiatedTwoPhaseCommit = false;
+    _commitType = CommitType::kNotInitiated;
 
     // TODO SERVER-37115: Parse statement ids from the client and remember the statement id of the
     // command that started the transaction, if one was included.
@@ -619,6 +625,8 @@ BSONObj TransactionRouter::_commitSingleShardTransaction(OperationContext* opCtx
     const auto& participant = citer->second;
 
     auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+
+    _commitType = CommitType::kDirectCommit;
 
     LOG(0) << txnIdToString()
            << " Committing single-shard transaction, single participant: " << shardId;
@@ -648,6 +656,8 @@ BSONObj TransactionRouter::_commitReadOnlyTransaction(OperationContext* opCtx) {
             BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
         requests.emplace_back(participant.first, commitCmdObj);
     }
+
+    _commitType = CommitType::kDirectCommit;
 
     LOG(0) << txnIdToString() << " Committing read-only transaction on " << requests.size()
            << " shards";
@@ -709,7 +719,7 @@ BSONObj TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx)
 
         coordinatorShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-        if (!_initiatedTwoPhaseCommit) {
+        if (_commitType == CommitType::kNotInitiated) {
             SharedTransactionOptions options;
             options.txnNumber = _txnNumber;
             // Intentionally leave atClusterTime blank since we don't care and to minimize
@@ -746,7 +756,7 @@ BSONObj TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx)
     coordinateCommitCmd.setDbName("admin");
     coordinateCommitCmd.setParticipants(participantList);
 
-    _initiatedTwoPhaseCommit = true;
+    _commitType = CommitType::kTwoPhaseCommit;
 
     LOG(0) << txnIdToString()
            << " Committing multi-shard transaction, coordinator: " << *_coordinatorId;
@@ -840,9 +850,10 @@ void TransactionRouter::implicitlyAbortTransaction(OperationContext* opCtx,
         return;
     }
 
-    if (_initiatedTwoPhaseCommit) {
-        LOG(0) << txnIdToString() << " Router not sending implicit abortTransaction because "
-                                     "already initiated two phase commit for the transaction";
+    if (_commitType == CommitType::kTwoPhaseCommit ||
+        _commitType == CommitType::kRecoverWithToken) {
+        LOG(0) << txnIdToString() << " Router not sending implicit abortTransaction because commit "
+                                     "may have been handed off to the coordinator";
         return;
     }
 
@@ -908,7 +919,7 @@ BSONObj TransactionRouter::_commitWithRecoveryToken(OperationContext* opCtx,
         return coordinatorParticipant->attachTxnFieldsIfNeeded(rawCoordinateCommit, false);
     }();
 
-    _initiatedTwoPhaseCommit = true;
+    _commitType = CommitType::kRecoverWithToken;
 
     auto coordinatorShard = uassertStatusOK(shardRegistry->getShard(opCtx, coordinatorId));
     return uassertStatusOK(coordinatorShard->runCommandWithFixedRetryAttempts(

@@ -284,28 +284,25 @@
             });
 
             // Run commit.
+            const commitCmd = failureMode.getCommitCommand(lsid, txnNumber);
             failureMode.beforeCommit();
-            const res = st.s.adminCommand(failureMode.getCommitCommand(lsid, txnNumber));
-            print(`Response for ${failureModeName} for ${type}: ` + tojson(res));
+            const commitRes = st.s.adminCommand(commitCmd);
+            failureMode.checkCommitResult(commitRes);
 
-            // Check the commit response.
-            failureMode.checkCommitResult(res);
+            // Re-running commit should return the same response.
+            const commitRetryRes = st.s.adminCommand(commitCmd);
+            failureMode.checkCommitResult(commitRetryRes);
 
             if (type.includes("SingleShard")) {
-                assert.eq(1,
-                          rawMongoProgramOutput()
-                              .match(new RegExp('Committing single-shard transaction'))
-                              .length);
+                assert.eq(
+                    2,
+                    rawMongoProgramOutput().match(/Committing single-shard transaction/g).length);
             } else if (type.includes("readOnly")) {
-                assert.eq(1,
-                          rawMongoProgramOutput()
-                              .match(new RegExp('Committing read-only transaction'))
-                              .length);
+                assert.eq(
+                    2, rawMongoProgramOutput().match(/Committing read-only transaction/g).length);
             } else if (type.includes("MultiShard")) {
-                assert.eq(1,
-                          rawMongoProgramOutput()
-                              .match(new RegExp('Committing multi-shard transaction'))
-                              .length);
+                assert.eq(
+                    2, rawMongoProgramOutput().match(/Committing multi-shard transaction/g).length);
             } else {
                 assert(false, `Unknown transaction type: ${type}`);
             }
