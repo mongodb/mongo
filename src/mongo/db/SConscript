@@ -135,6 +135,7 @@ env.CppUnitTest(
         'repl/oplog_interface_local',
         'repl/replmocks',
         'service_context_d_test_fixture',
+        'transaction',
     ],
 )
 
@@ -889,6 +890,7 @@ env.Library(
         "$BUILD_DIR/mongo/s/grid",
     ],
     LIBDEPS_PRIVATE=[
+        'transaction',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
     ],
 )
@@ -907,6 +909,7 @@ env.Library(
         'lasterror',
         'query_exec',
         'snapshot_window_util',
+        'transaction',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
@@ -1260,7 +1263,6 @@ env.Library(
         'curop',
         'cursor_server_params',
         'db_raii',
-        'transaction',
         'dbdirectclient',
         'exec/scoped_timer',
         'exec/working_set',
@@ -1284,6 +1286,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'commands/server_status_core',
         'kill_sessions',
+        'transaction',
     ],
 )
 
@@ -1659,6 +1662,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'session_catalog',
+        'transaction'
     ],
 )
 
@@ -1670,6 +1674,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'kill_sessions_local',
         '$BUILD_DIR/mongo/util/periodic_runner',
+        'transaction',
     ],
 )
 
@@ -2098,11 +2103,12 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/op_observer',
-        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/util/clock_source_mock',
+        'auth/authmocks',
+        'op_observer',
         'query_exec',
+        'repl/mock_repl_coord_server_fixture',
+        'transaction',
     ],
 )
 

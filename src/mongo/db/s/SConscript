@@ -79,6 +79,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/storage/remove_saver',
+        '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         'chunk_splitter',

@@ -317,6 +317,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/session_catalog',
         '$BUILD_DIR/mongo/db/storage/backup_cursor_hooks',
+        '$BUILD_DIR/mongo/db/transaction',
     ],
 )
 
@@ -326,6 +327,7 @@ env.Library(
         'process_interface_shardsvr.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/s/sharding_api',
         'process_interface_standalone',
         'sharded_agg_helpers',
