@@ -1,4 +1,4 @@
-// Tests that save style updates correctly change immutable fields
+// Tests that updates can't change immutable fields (used in sharded system)
 (function() {
     'use strict';
 

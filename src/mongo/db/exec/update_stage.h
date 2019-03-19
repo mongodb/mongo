@@ -198,15 +198,12 @@ private:
     StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
 
     /**
-     * Checks that the updated doc has all required shard key fields and throws if it does not.
-     *
-     * Also checks if the updated doc still belongs to this node and throws if it does not. If the
-     * doc no longer belongs to this shard, this means that one or more shard key field values have
-     * been updated to a value belonging to a chunk that is not owned by this shard. We cannot apply
-     * this update atomically.
+     * Checks if the updated doc still belongs to this node and throws if it does not. This means
+     * that one or more shard key field values have been updated causing this doc to belong to
+     * a chunk that is not owned by this shard. We cannot apply this update atomically.
      */
-    void assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
-        ScopedCollectionMetadata metadata, const Snapshotted<BSONObj>& oldObj);
+    void assertDocStillBelongsToNode(ScopedCollectionMetadata metadata,
+                                     const Snapshotted<BSONObj>& oldObj);
 
     UpdateStageParams _params;
 
