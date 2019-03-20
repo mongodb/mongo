@@ -51,9 +51,9 @@ RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expre
 
     if (auto matchTree = rewriteExpr._rewriteExpression(expression)) {
         matchExpression = std::move(matchTree);
-        LOG(5) << "Post-rewrite MatchExpression: " << matchExpression->toString();
+        LOG(5) << "Post-rewrite MatchExpression: " << matchExpression->debugString();
         matchExpression = MatchExpression::optimize(std::move(matchExpression));
-        LOG(5) << "Post-rewrite/post-optimized MatchExpression: " << matchExpression->toString();
+        LOG(5) << "Post-rewrite/post-optimized MatchExpression: " << matchExpression->debugString();
     }
 
     return {std::move(matchExpression), std::move(rewriteExpr._matchExprElemStorage)};

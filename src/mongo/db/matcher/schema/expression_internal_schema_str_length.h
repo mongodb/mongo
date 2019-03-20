@@ -58,7 +58,7 @@ public:
         return getComparator()(len);
     };
 
-    void debugString(StringBuilder& debug, int level) const final;
+    void debugString(StringBuilder& debug, int indentationLevel) const final;
 
     BSONObj getSerializedRightHandSide() const final;
 

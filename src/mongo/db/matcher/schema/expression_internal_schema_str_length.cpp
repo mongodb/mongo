@@ -41,8 +41,9 @@ InternalSchemaStrLengthMatchExpression::InternalSchemaStrLengthMatchExpression(M
                                                                                StringData name)
     : LeafMatchExpression(type, path), _name(name), _strLen(strLen) {}
 
-void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug,
+                                                         int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " " << _name << " " << _strLen << "\n";
 
     MatchExpression::TagData* td = getTag();

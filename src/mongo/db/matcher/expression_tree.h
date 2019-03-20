@@ -93,7 +93,7 @@ public:
     }
 
 protected:
-    void _debugList(StringBuilder& debug, int level) const;
+    void _debugList(StringBuilder& debug, int indentationLevel) const;
 
     void _listToBSON(BSONArrayBuilder* out) const;
 
@@ -125,7 +125,7 @@ public:
         return std::move(self);
     }
 
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
     virtual void serialize(BSONObjBuilder* out) const;
 
@@ -154,7 +154,7 @@ public:
         return std::move(self);
     }
 
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
     virtual void serialize(BSONObjBuilder* out) const;
 
@@ -183,7 +183,7 @@ public:
         return std::move(self);
     }
 
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
     virtual void serialize(BSONObjBuilder* out) const;
 };
@@ -209,7 +209,7 @@ public:
         return !_exp->matchesSingleElement(elt, details);
     }
 
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
     virtual void serialize(BSONObjBuilder* out) const;
 

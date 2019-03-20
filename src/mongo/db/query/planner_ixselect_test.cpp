@@ -174,7 +174,7 @@ void findRelevantTaggedNodePathsAndIndices(MatchExpression* root,
         RelevantTag* r = dynamic_cast<RelevantTag*>(tag);
         if (!r) {
             mongoutils::str::stream ss;
-            ss << "tag is not instance of RelevantTag. tree: " << root->toString()
+            ss << "tag is not instance of RelevantTag. tree: " << root->debugString()
                << "; tag: " << buf.str();
             FAIL(ss);
         }

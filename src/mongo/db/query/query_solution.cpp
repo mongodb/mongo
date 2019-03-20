@@ -205,7 +205,7 @@ void TextNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     *ss << "indexPrefix = " << indexPrefix.toString() << '\n';
     if (NULL != filter) {
         addIndent(ss, indent + 1);
-        *ss << " filter = " << filter->toString();
+        *ss << " filter = " << filter->debugString();
     }
     addCommon(ss, indent);
 }
@@ -235,7 +235,7 @@ void CollectionScanNode::appendToString(mongoutils::str::stream* ss, int indent)
     *ss << "ns = " << name << '\n';
     if (NULL != filter) {
         addIndent(ss, indent + 1);
-        *ss << "filter = " << filter->toString();
+        *ss << "filter = " << filter->debugString();
     }
     addCommon(ss, indent);
 }
@@ -267,7 +267,7 @@ void AndHashNode::appendToString(mongoutils::str::stream* ss, int indent) const 
     *ss << "AND_HASH\n";
     if (NULL != filter) {
         addIndent(ss, indent + 1);
-        *ss << " filter = " << filter->toString() << '\n';
+        *ss << " filter = " << filter->debugString() << '\n';
     }
     addCommon(ss, indent);
     for (size_t i = 0; i < children.size(); ++i) {
@@ -371,7 +371,7 @@ void OrNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     *ss << "OR\n";
     if (NULL != filter) {
         addIndent(ss, indent + 1);
-        *ss << " filter = " << filter->toString() << '\n';
+        *ss << " filter = " << filter->debugString() << '\n';
     }
     addCommon(ss, indent);
     for (size_t i = 0; i < children.size(); ++i) {
@@ -432,7 +432,7 @@ void MergeSortNode::appendToString(mongoutils::str::stream* ss, int indent) cons
     *ss << "MERGE_SORT\n";
     if (NULL != filter) {
         addIndent(ss, indent + 1);
-        *ss << " filter = " << filter->toString() << '\n';
+        *ss << " filter = " << filter->debugString() << '\n';
     }
     addCommon(ss, indent);
     for (size_t i = 0; i < children.size(); ++i) {
@@ -531,7 +531,7 @@ void IndexScanNode::appendToString(mongoutils::str::stream* ss, int indent) cons
     *ss << "keyPattern = " << index.keyPattern << '\n';
     if (NULL != filter) {
         addIndent(ss, indent + 1);
-        *ss << "filter = " << filter->toString();
+        *ss << "filter = " << filter->debugString();
     }
     addIndent(ss, indent + 1);
     *ss << "direction = " << direction << '\n';
@@ -1043,7 +1043,7 @@ void GeoNear2DNode::appendToString(mongoutils::str::stream* ss, int indent) cons
     *ss << "nearQuery = " << nq->toString() << '\n';
     if (NULL != filter) {
         addIndent(ss, indent + 1);
-        *ss << " filter = " << filter->toString();
+        *ss << " filter = " << filter->debugString();
     }
 }
 
@@ -1077,7 +1077,7 @@ void GeoNear2DSphereNode::appendToString(mongoutils::str::stream* ss, int indent
     *ss << "nearQuery = " << nq->toString() << '\n';
     if (NULL != filter) {
         addIndent(ss, indent + 1);
-        *ss << " filter = " << filter->toString();
+        *ss << " filter = " << filter->debugString();
     }
 }
 

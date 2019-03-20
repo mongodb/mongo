@@ -66,11 +66,11 @@ bool InternalSchemaAllElemMatchFromIndexMatchExpression::equivalent(
 }
 
 void InternalSchemaAllElemMatchFromIndexMatchExpression::debugString(StringBuilder& debug,
-                                                                     int level) const {
-    _debugAddSpace(debug, level);
+                                                                     int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << kName << "\n";
     debug << " index: " << _index << ", query:\n";
-    _expression->getFilter()->debugString(debug, level + 1);
+    _expression->getFilter()->debugString(debug, indentationLevel + 1);
 }
 
 BSONObj InternalSchemaAllElemMatchFromIndexMatchExpression::getSerializedRightHandSide() const {

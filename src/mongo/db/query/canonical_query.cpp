@@ -441,7 +441,7 @@ std::string CanonicalQuery::toString() const {
     }
 
     // The expression tree puts an endl on for us.
-    ss << "Tree: " << _root->toString();
+    ss << "Tree: " << _root->debugString();
     ss << "Sort: " << _qr->getSort().toString() << '\n';
     ss << "Proj: " << _qr->getProj().toString() << '\n';
     if (!_qr->getCollation().isEmpty()) {

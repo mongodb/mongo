@@ -53,8 +53,9 @@ bool InternalSchemaEqMatchExpression::matchesSingleElement(const BSONElement& el
     return _eltCmp.evaluate(_rhsElem == elem);
 }
 
-void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug,
+                                                  int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " " << kName << " " << _rhsElem.toString(false);
 
     auto td = getTag();

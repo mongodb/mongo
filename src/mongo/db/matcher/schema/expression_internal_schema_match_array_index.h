@@ -45,7 +45,7 @@ public:
     InternalSchemaMatchArrayIndexMatchExpression(
         StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression);
 
-    void debugString(StringBuilder& debug, int level) const final;
+    void debugString(StringBuilder& debug, int indentationLevel) const final;
 
     bool equivalent(const MatchExpression* expr) const final;
 

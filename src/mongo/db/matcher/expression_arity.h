@@ -53,8 +53,8 @@ public:
 
     virtual ~FixedArityMatchExpression() = default;
 
-    void debugString(StringBuilder& debug, int level) const final {
-        _debugAddSpace(debug, level);
+    void debugString(StringBuilder& debug, int indentationLevel) const final {
+        _debugAddSpace(debug, indentationLevel);
 
         BSONObjBuilder builder;
         serialize(&builder);

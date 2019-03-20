@@ -371,8 +371,8 @@ bool GeoMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
     }
 }
 
-void GeoMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
     serialize(&builder);
@@ -433,8 +433,8 @@ bool GeoNearMatchExpression::matchesSingleElement(const BSONElement& e,
     return true;
 }
 
-void GeoNearMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << "GEONEAR " << _query->toString();
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {

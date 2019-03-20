@@ -66,10 +66,11 @@ bool InternalSchemaXorMatchExpression::matchesSingleElement(const BSONElement& e
     return found;
 }
 
-void InternalSchemaXorMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void InternalSchemaXorMatchExpression::debugString(StringBuilder& debug,
+                                                   int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << kName + "\n";
-    _debugList(debug, level);
+    _debugList(debug, indentationLevel);
 }
 
 void InternalSchemaXorMatchExpression::serialize(BSONObjBuilder* out) const {

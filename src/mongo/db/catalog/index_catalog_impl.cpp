@@ -361,7 +361,7 @@ Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) 
         default:
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream() << "unsupported expression in partial index: "
-                                        << expression->toString());
+                                        << expression->debugString());
     }
 }
 }  // namespace

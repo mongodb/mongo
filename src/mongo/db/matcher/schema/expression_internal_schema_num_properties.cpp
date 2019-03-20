@@ -34,8 +34,8 @@
 namespace mongo {
 
 void InternalSchemaNumPropertiesMatchExpression::debugString(StringBuilder& debug,
-                                                             int level) const {
-    _debugAddSpace(debug, level);
+                                                             int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     BSONObjBuilder builder;
     serialize(&builder);
     debug << builder.obj().toString() << "\n";

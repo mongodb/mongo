@@ -54,8 +54,8 @@ InternalSchemaAllowedPropertiesMatchExpression::InternalSchemaAllowedPropertiesM
 }
 
 void InternalSchemaAllowedPropertiesMatchExpression::debugString(StringBuilder& debug,
-                                                                 int level) const {
-    _debugAddSpace(debug, level);
+                                                                 int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
     serialize(&builder);

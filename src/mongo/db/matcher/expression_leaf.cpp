@@ -73,8 +73,8 @@ bool ComparisonMatchExpressionBase::equivalent(const MatchExpression* other) con
     return path() == realOther->path() && eltCmp.evaluate(_rhs == realOther->_rhs);
 }
 
-void ComparisonMatchExpressionBase::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void ComparisonMatchExpressionBase::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " " << name();
     debug << " " << _rhs.toString(false);
 
@@ -258,8 +258,8 @@ bool RegexMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetai
     }
 }
 
-void RegexMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " regex /" << _regex << "/" << _flags;
 
     MatchExpression::TagData* td = getTag();
@@ -302,8 +302,8 @@ bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
     return e.numberLong() % _divisor == _remainder;
 }
 
-void ModMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " mod " << _divisor << " % x == " << _remainder;
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
@@ -336,8 +336,8 @@ bool ExistsMatchExpression::matchesSingleElement(const BSONElement& e,
     return !e.eoo();
 }
 
-void ExistsMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void ExistsMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " exists";
     MatchExpression::TagData* td = getTag();
     if (NULL != td) {
@@ -400,8 +400,8 @@ bool InMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails*
     return false;
 }
 
-void InMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void InMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " $in ";
     debug << "[ ";
     for (auto&& equality : _equalitySet) {
@@ -721,8 +721,8 @@ bool BitTestMatchExpression::matchesSingleElement(const BSONElement& e,
     return performBitTest(eValue);
 }
 
-void BitTestMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void BitTestMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
 
     debug << path() << " ";
 

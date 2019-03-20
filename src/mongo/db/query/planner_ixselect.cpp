@@ -574,7 +574,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
     } else if (IndexNames::GEO_HAYSTACK == indexedFieldType) {
         return false;
     } else {
-        warning() << "Unknown indexing for node " << node->toString() << " and field "
+        warning() << "Unknown indexing for node " << node->debugString() << " and field "
                   << keyPatternElt.toString();
         verify(0);
     }

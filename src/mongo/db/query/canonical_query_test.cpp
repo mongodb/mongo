@@ -74,8 +74,8 @@ void assertEquivalent(const char* queryStr,
     }
     mongoutils::str::stream ss;
     ss << "Match expressions are not equivalent."
-       << "\nOriginal query: " << queryStr << "\nExpected: " << expected->toString()
-       << "\nActual: " << actual->toString();
+       << "\nOriginal query: " << queryStr << "\nExpected: " << expected->debugString()
+       << "\nActual: " << actual->debugString();
     FAIL(ss);
 }
 
@@ -87,8 +87,8 @@ void assertNotEquivalent(const char* queryStr,
     }
     mongoutils::str::stream ss;
     ss << "Match expressions are equivalent."
-       << "\nOriginal query: " << queryStr << "\nExpected: " << expected->toString()
-       << "\nActual: " << actual->toString();
+       << "\nOriginal query: " << queryStr << "\nExpected: " << expected->debugString()
+       << "\nActual: " << actual->debugString();
     FAIL(ss);
 }
 

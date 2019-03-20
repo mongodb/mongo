@@ -51,9 +51,9 @@ void ListOfMatchExpression::add(MatchExpression* e) {
 }
 
 
-void ListOfMatchExpression::_debugList(StringBuilder& debug, int level) const {
+void ListOfMatchExpression::_debugList(StringBuilder& debug, int indentationLevel) const {
     for (unsigned i = 0; i < _expressions.size(); i++)
-        _expressions[i]->debugString(debug, level + 1);
+        _expressions[i]->debugString(debug, indentationLevel + 1);
 }
 
 void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out) const {
@@ -215,10 +215,10 @@ bool AndMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
 }
 
 
-void AndMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void AndMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << "$and\n";
-    _debugList(debug, level);
+    _debugList(debug, indentationLevel);
 }
 
 void AndMatchExpression::serialize(BSONObjBuilder* out) const {
@@ -258,10 +258,10 @@ bool OrMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails*
 }
 
 
-void OrMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void OrMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << "$or\n";
-    _debugList(debug, level);
+    _debugList(debug, indentationLevel);
 }
 
 void OrMatchExpression::serialize(BSONObjBuilder* out) const {
@@ -300,10 +300,10 @@ bool NorMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
     return true;
 }
 
-void NorMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void NorMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << "$nor\n";
-    _debugList(debug, level);
+    _debugList(debug, indentationLevel);
 }
 
 void NorMatchExpression::serialize(BSONObjBuilder* out) const {
@@ -313,10 +313,10 @@ void NorMatchExpression::serialize(BSONObjBuilder* out) const {
 
 // -------
 
-void NotMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void NotMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << "$not\n";
-    _exp->debugString(debug, level + 1);
+    _exp->debugString(debug, indentationLevel + 1);
 }
 
 boost::optional<StringData> NotMatchExpression::getPathIfNotWithSinglePathMatchExpressionTree(

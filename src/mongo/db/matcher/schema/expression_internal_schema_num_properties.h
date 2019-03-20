@@ -59,7 +59,7 @@ public:
         return nullptr;
     }
 
-    void debugString(StringBuilder& debug, int level) const final;
+    void debugString(StringBuilder& debug, int indentationLevel) const final;
 
     void serialize(BSONObjBuilder* out) const final;
 

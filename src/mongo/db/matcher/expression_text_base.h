@@ -68,7 +68,7 @@ public:
     // Methods inherited from MatchExpression.
     //
 
-    void debugString(StringBuilder& debug, int level = 0) const final;
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
     void serialize(BSONObjBuilder* out) const final;
 

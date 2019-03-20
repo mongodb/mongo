@@ -51,10 +51,11 @@ bool InternalSchemaObjectMatchExpression::matchesSingleElement(const BSONElement
     return _sub->matchesBSON(elem.Obj());
 }
 
-void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,
+                                                      int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << kName << "\n";
-    _sub->debugString(debug, level + 1);
+    _sub->debugString(debug, indentationLevel + 1);
 }
 
 BSONObj InternalSchemaObjectMatchExpression::getSerializedRightHandSide() const {

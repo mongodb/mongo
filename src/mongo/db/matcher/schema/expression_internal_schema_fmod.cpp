@@ -61,8 +61,9 @@ bool InternalSchemaFmodMatchExpression::matchesSingleElement(const BSONElement& 
     return false;
 }
 
-void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
+                                                    int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " fmod: divisor: " << _divisor.toString()
           << " remainder: " << _remainder.toString();
     MatchExpression::TagData* td = getTag();

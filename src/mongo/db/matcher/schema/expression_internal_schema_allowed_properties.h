@@ -115,7 +115,7 @@ public:
         std::vector<PatternSchema> patternProperties,
         std::unique_ptr<ExpressionWithPlaceholder> otherwise);
 
-    void debugString(StringBuilder& debug, int level) const final;
+    void debugString(StringBuilder& debug, int indentationLevel) const final;
 
     bool equivalent(const MatchExpression* expr) const final;
 

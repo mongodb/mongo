@@ -34,8 +34,9 @@
 namespace mongo {
 constexpr StringData InternalSchemaUniqueItemsMatchExpression::kName;
 
-void InternalSchemaUniqueItemsMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void InternalSchemaUniqueItemsMatchExpression::debugString(StringBuilder& debug,
+                                                           int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
 
     BSONObjBuilder builder;
     serialize(&builder);

@@ -58,8 +58,8 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
-    void debugString(StringBuilder& debug, int level = 0) const final {
-        _debugAddSpace(debug, level);
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
+        _debugAddSpace(debug, indentationLevel);
         debug << "$expr " << _expression->serialize(false).toString();
     }
 

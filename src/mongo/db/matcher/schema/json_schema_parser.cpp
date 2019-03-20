@@ -1583,7 +1583,8 @@ StatusWithMatchExpression JSONSchemaParser::parse(BSONObj schema, bool ignoreUnk
     try {
         auto translation = _parse(""_sd, schema, ignoreUnknownKeywords);
         if (shouldLog(logger::LogSeverity::Debug(5)) && translation.isOK()) {
-            LOG(5) << "Translated schema match expression: " << translation.getValue()->toString();
+            LOG(5) << "Translated schema match expression: "
+                   << translation.getValue()->debugString();
         }
         return translation;
     } catch (const DBException& ex) {

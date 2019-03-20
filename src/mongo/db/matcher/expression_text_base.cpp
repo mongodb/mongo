@@ -41,9 +41,9 @@ const bool TextMatchExpressionBase::kDiacriticSensitiveDefault = false;
 TextMatchExpressionBase::TextMatchExpressionBase(StringData path)
     : LeafMatchExpression(TEXT, path) {}
 
-void TextMatchExpressionBase::debugString(StringBuilder& debug, int level) const {
+void TextMatchExpressionBase::debugString(StringBuilder& debug, int indentationLevel) const {
     const fts::FTSQuery& ftsQuery = getFTSQuery();
-    _debugAddSpace(debug, level);
+    _debugAddSpace(debug, indentationLevel);
     debug << "TEXT : query=" << ftsQuery.getQuery() << ", language=" << ftsQuery.getLanguage()
           << ", caseSensitive=" << ftsQuery.getCaseSensitive()
           << ", diacriticSensitive=" << ftsQuery.getDiacriticSensitive() << ", tag=";

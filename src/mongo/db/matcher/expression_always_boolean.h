@@ -53,8 +53,8 @@ public:
         return _value;
     }
 
-    void debugString(StringBuilder& debug, int level = 0) const final {
-        _debugAddSpace(debug, level);
+    void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
+        _debugAddSpace(debug, indentationLevel);
         debug << name() << ": 1\n";
     }
 

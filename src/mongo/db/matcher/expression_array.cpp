@@ -87,8 +87,8 @@ bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
     return false;
 }
 
-void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " $elemMatch (obj)";
 
     MatchExpression::TagData* td = getTag();
@@ -97,7 +97,7 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int level
         td->debugString(&debug);
     }
     debug << "\n";
-    _sub->debugString(debug, level + 1);
+    _sub->debugString(debug, indentationLevel + 1);
 }
 
 BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide() const {
@@ -160,8 +160,8 @@ bool ElemMatchValueMatchExpression::_arrayElementMatchesAll(const BSONElement& e
     return true;
 }
 
-void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " $elemMatch (value)";
 
     MatchExpression::TagData* td = getTag();
@@ -171,7 +171,7 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int level)
     }
     debug << "\n";
     for (unsigned i = 0; i < _subs.size(); i++) {
-        _subs[i]->debugString(debug, level + 1);
+        _subs[i]->debugString(debug, indentationLevel + 1);
     }
 }
 
@@ -213,8 +213,8 @@ bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* det
     return anArray.nFields() == _size;
 }
 
-void SizeMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " $size : " << _size << "\n";
 
     MatchExpression::TagData* td = getTag();

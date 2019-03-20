@@ -308,11 +308,12 @@ string PlanEnumerator::NodeAssignment::toString() const {
                 ss << "\t\tidx[" << oie.index << "]\n";
 
                 for (size_t k = 0; k < oie.preds.size(); ++k) {
-                    ss << "\t\t\tpos " << oie.positions[k] << " pred " << oie.preds[k]->toString();
+                    ss << "\t\t\tpos " << oie.positions[k] << " pred "
+                       << oie.preds[k]->debugString();
                 }
 
                 for (auto&& pushdown : oie.orPushdowns) {
-                    ss << "\t\torPushdownPred: " << pushdown.first->toString();
+                    ss << "\t\torPushdownPred: " << pushdown.first->debugString();
                 }
             }
         }

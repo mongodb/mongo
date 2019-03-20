@@ -71,7 +71,7 @@ public:
         return true;
     }
 
-    void debugString(StringBuilder& builder, int level) const final;
+    void debugString(StringBuilder& builder, int indentationLevel) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 

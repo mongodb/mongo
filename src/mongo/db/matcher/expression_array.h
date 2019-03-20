@@ -84,7 +84,7 @@ public:
         return std::move(e);
     }
 
-    virtual void debugString(StringBuilder& debug, int level) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
     BSONObj getSerializedRightHandSide() const final;
 
@@ -139,7 +139,7 @@ public:
         return std::move(e);
     }
 
-    virtual void debugString(StringBuilder& debug, int level) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
     BSONObj getSerializedRightHandSide() const final;
 
@@ -190,7 +190,7 @@ public:
 
     virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
 
-    virtual void debugString(StringBuilder& debug, int level) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
     BSONObj getSerializedRightHandSide() const final;
 

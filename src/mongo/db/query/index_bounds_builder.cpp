@@ -739,7 +739,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         }
     } else {
         warning() << "Planner error, trying to build bounds for expression: "
-                  << redact(expr->toString());
+                  << redact(expr->debugString());
         verify(0);
     }
 }

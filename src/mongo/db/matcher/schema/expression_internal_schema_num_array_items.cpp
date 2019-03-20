@@ -38,8 +38,8 @@ InternalSchemaNumArrayItemsMatchExpression::InternalSchemaNumArrayItemsMatchExpr
     : ArrayMatchingMatchExpression(type, path), _name(name), _numItems(numItems) {}
 
 void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debug,
-                                                             int level) const {
-    _debugAddSpace(debug, level);
+                                                             int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << path() << " " << _name << " " << _numItems << "\n";
 
     MatchExpression::TagData* td = getTag();

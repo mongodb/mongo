@@ -52,7 +52,7 @@ public:
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final;
 
-    void debugString(StringBuilder& debug, int level) const final;
+    void debugString(StringBuilder& debug, int indentationLevel) const final;
 
     BSONObj getSerializedRightHandSide() const final;
 

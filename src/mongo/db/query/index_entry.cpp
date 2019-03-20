@@ -54,7 +54,7 @@ std::string IndexEntry::toString() const {
     sb << " name: '" << identifier << "'";
 
     if (filterExpr) {
-        sb << " filterExpr: " << filterExpr->toString();
+        sb << " filterExpr: " << filterExpr->debugString();
     }
 
     if (!infoObj.isEmpty()) {

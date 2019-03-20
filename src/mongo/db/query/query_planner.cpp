@@ -478,7 +478,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 
     LOG(5) << "Tagging the match expression according to cache data: " << endl
            << "Filter:" << endl
-           << redact(clone->toString()) << "Cache data:" << endl
+           << redact(clone->debugString()) << "Cache data:" << endl
            << redact(winnerCacheData.toString());
 
     stdx::unordered_set<string> fields;
@@ -504,7 +504,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     // The MatchExpression tree is in canonical order. We must order the nodes for access planning.
     prepareForAccessPlanning(clone.get());
 
-    LOG(5) << "Tagged tree:" << endl << redact(clone->toString());
+    LOG(5) << "Tagged tree:" << endl << redact(clone->debugString());
 
     // Use the cached index assignments to build solnRoot.
     std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
@@ -726,7 +726,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // query.root() is now annotated with RelevantTag(s).
-    LOG(5) << "Rated tree:" << endl << redact(query.root()->toString());
+    LOG(5) << "Rated tree:" << endl << redact(query.root()->debugString());
 
     // If there is a GEO_NEAR it must have an index it can use directly.
     const MatchExpression* gnNode = NULL;
@@ -740,7 +740,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             return Status(ErrorCodes::BadValue, "unable to find index for $geoNear query");
         }
 
-        LOG(5) << "Rated tree after geonear processing:" << redact(query.root()->toString());
+        LOG(5) << "Rated tree after geonear processing:" << redact(query.root()->debugString());
     }
 
     // Likewise, if there is a TEXT it must have an index it can use directly.
@@ -776,7 +776,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         // assigned to it.
         invariant(1 == tag->first.size() + tag->notFirst.size());
 
-        LOG(5) << "Rated tree after text processing:" << redact(query.root()->toString());
+        LOG(5) << "Rated tree after text processing:" << redact(query.root()->debugString());
     }
 
     // If we have any relevant indices, we try to create indexed plans.
@@ -793,7 +793,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         unique_ptr<MatchExpression> nextTaggedTree;
         while ((nextTaggedTree = isp.getNext()) && (out.size() < params.maxIndexedSolutions)) {
             LOG(5) << "About to build solntree from tagged tree:" << endl
-                   << redact(nextTaggedTree->toString());
+                   << redact(nextTaggedTree->debugString());
 
             // Store the plan cache index tree before calling prepareForAccessingPlanning(), so that
             // the PlanCacheIndexTree has the same sort as the MatchExpression used to generate the

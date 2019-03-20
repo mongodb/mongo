@@ -40,18 +40,22 @@ namespace mongo {
  */
 MONGO_FAIL_POINT_DEFINE(disableMatchExpressionOptimization);
 
-using std::string;
-
 MatchExpression::MatchExpression(MatchType type) : _matchType(type) {}
 
-string MatchExpression::toString() const {
+std::string MatchExpression::toString() const {
     BSONObjBuilder bob;
     serialize(&bob);
     return bob.obj().toString();
 }
 
-void MatchExpression::_debugAddSpace(StringBuilder& debug, int level) const {
-    for (int i = 0; i < level; i++)
+std::string MatchExpression::debugString() const {
+    StringBuilder builder;
+    debugString(builder, 0);
+    return builder.str();
+}
+
+void MatchExpression::_debugAddSpace(StringBuilder& debug, int indentationLevel) const {
+    for (int i = 0; i < indentationLevel; i++)
         debug << "    ";
 }
 

@@ -79,8 +79,8 @@ public:
         return _typeSet.hasType(elem.type());
     }
 
-    void debugString(StringBuilder& debug, int level) const final {
-        _debugAddSpace(debug, level);
+    void debugString(StringBuilder& debug, int indentationLevel) const final {
+        _debugAddSpace(debug, indentationLevel);
         debug << path() << " " << name() << ": " << _typeSet.toBSONArray().toString();
 
         MatchExpression::TagData* td = getTag();
@@ -197,8 +197,8 @@ public:
         return std::move(expr);
     }
 
-    void debugString(StringBuilder& debug, int level) const final {
-        _debugAddSpace(debug, level);
+    void debugString(StringBuilder& debug, int indentationLevel) const final {
+        _debugAddSpace(debug, indentationLevel);
         debug << path() << " " << name() << ": " << typeName(_binDataSubType);
 
         MatchExpression::TagData* td = getTag();
@@ -294,8 +294,8 @@ public:
         return std::move(expr);
     }
 
-    void debugString(StringBuilder& debug, int level) const final {
-        _debugAddSpace(debug, level);
+    void debugString(StringBuilder& debug, int indentationLevel) const final {
+        _debugAddSpace(debug, indentationLevel);
         debug << path() << " " << name() << ": " << typeName(_encryptedType);
 
         if (auto td = getTag()) {

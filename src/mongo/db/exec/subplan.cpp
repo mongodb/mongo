@@ -126,7 +126,7 @@ Status SubplanStage::planSubqueries() {
         auto statusWithCQ = CanonicalQuery::canonicalize(getOpCtx(), *_query, orChild);
         if (!statusWithCQ.isOK()) {
             mongoutils::str::stream ss;
-            ss << "Can't canonicalize subchild " << orChild->toString() << " "
+            ss << "Can't canonicalize subchild " << orChild->debugString() << " "
                << statusWithCQ.getStatus().reason();
             return Status(ErrorCodes::BadValue, ss);
         }
@@ -195,13 +195,13 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
     if (NULL == branchCacheData) {
         // For example, we don't cache things for 2d indices.
         mongoutils::str::stream ss;
-        ss << "No cache data for subchild " << orChild->toString();
+        ss << "No cache data for subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
 
     if (SolutionCacheData::USE_INDEX_TAGS_SOLN != branchCacheData->solnType) {
         mongoutils::str::stream ss;
-        ss << "No indexed cache data for subchild " << orChild->toString();
+        ss << "No indexed cache data for subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
 
@@ -211,7 +211,7 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
 
     if (!tagStatus.isOK()) {
         mongoutils::str::stream ss;
-        ss << "Failed to extract indices from subchild " << orChild->toString();
+        ss << "Failed to extract indices from subchild " << orChild->debugString();
         return Status(ErrorCodes::BadValue, ss);
     }
 
@@ -302,13 +302,13 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
             // for 2d indices.
             if (NULL == bestSoln->cacheData.get()) {
                 mongoutils::str::stream ss;
-                ss << "No cache data for subchild " << orChild->toString();
+                ss << "No cache data for subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
 
             if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
                 mongoutils::str::stream ss;
-                ss << "No indexed cache data for subchild " << orChild->toString();
+                ss << "No indexed cache data for subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
 
@@ -318,7 +318,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
             if (!tagStatus.isOK()) {
                 mongoutils::str::stream ss;
-                ss << "Failed to extract indices from subchild " << orChild->toString();
+                ss << "Failed to extract indices from subchild " << orChild->debugString();
                 return Status(ErrorCodes::BadValue, ss);
             }
 

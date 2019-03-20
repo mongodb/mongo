@@ -40,8 +40,9 @@ bool InternalSchemaRootDocEqMatchExpression::matches(const MatchableDocument* do
     return _objCmp.evaluate(doc->toBSON() == _rhsObj);
 }
 
-void InternalSchemaRootDocEqMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
+void InternalSchemaRootDocEqMatchExpression::debugString(StringBuilder& debug,
+                                                         int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
     debug << kName << " " << _rhsObj.toString();
 
     auto td = getTag();

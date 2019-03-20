@@ -86,7 +86,7 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
     BSONObj getSerializedRightHandSide() const final;
 
@@ -177,7 +177,7 @@ public:
      */
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
+    virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
 
     BSONObj getSerializedRightHandSide() const final;
 
