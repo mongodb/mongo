@@ -464,10 +464,10 @@ private:
 };
 
 class Limit : public Basic {
-    virtual SortOptions adjustSortOptions(SortOptions opts) {
+    SortOptions adjustSortOptions(SortOptions opts) override {
         return opts.Limit(5);
     }
-    void addData(unowned_ptr<IWSorter> sorter) {
+    void addData(unowned_ptr<IWSorter> sorter) override {
         sorter->add(0, 0);
         sorter->add(3, -3);
         sorter->add(4, -4);
@@ -475,17 +475,17 @@ class Limit : public Basic {
         sorter->add(1, -1);
         sorter->add(-1, 1);
     }
-    virtual std::shared_ptr<IWIterator> correct() {
+    std::shared_ptr<IWIterator> correct() override {
         return make_shared<IntIterator>(-1, 4);
     }
-    virtual std::shared_ptr<IWIterator> correctReverse() {
+    std::shared_ptr<IWIterator> correctReverse() override {
         return make_shared<IntIterator>(4, -1, -1);
     }
 };
 
 template <uint64_t Limit>
 class LimitExtreme : public Basic {
-    virtual SortOptions adjustSortOptions(SortOptions opts) {
+    SortOptions adjustSortOptions(SortOptions opts) override {
         return opts.Limit(Limit);
     }
 };
@@ -503,11 +503,11 @@ class Dupes : public Basic {
         sorter->add(2, -2);
         sorter->add(3, -3);
     }
-    virtual std::shared_ptr<IWIterator> correct() {
+    std::shared_ptr<IWIterator> correct() override {
         const int array[] = {-1, -1, -1, 0, 1, 1, 1, 2, 2, 3};
         return makeInMemIterator(array);
     }
-    virtual std::shared_ptr<IWIterator> correctReverse() {
+    std::shared_ptr<IWIterator> correctReverse() override {
         const int array[] = {3, 2, 2, 1, 1, 1, 0, -1, -1, -1};
         return makeInMemIterator(array);
     }
@@ -524,7 +524,7 @@ public:
             std::shuffle(_array.get(), _array.get() + NUM_ITEMS, _random.urbg());
     }
 
-    SortOptions adjustSortOptions(SortOptions opts) {
+    SortOptions adjustSortOptions(SortOptions opts) override {
         // Make sure we use a reasonable number of files when we spill
         MONGO_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 50);
         MONGO_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500);
@@ -532,15 +532,15 @@ public:
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
     }
 
-    void addData(unowned_ptr<IWSorter> sorter) {
+    void addData(unowned_ptr<IWSorter> sorter) override {
         for (int i = 0; i < NUM_ITEMS; i++)
             sorter->add(_array[i], -_array[i]);
     }
 
-    virtual std::shared_ptr<IWIterator> correct() {
+    std::shared_ptr<IWIterator> correct() override {
         return make_shared<IntIterator>(0, NUM_ITEMS);
     }
-    virtual std::shared_ptr<IWIterator> correctReverse() {
+    std::shared_ptr<IWIterator> correctReverse() override {
         return make_shared<IntIterator>(NUM_ITEMS - 1, -1, -1);
     }
 
@@ -568,21 +568,24 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed().Limit(Limit);
     }
-    virtual std::shared_ptr<IWIterator> correct() {
+    std::shared_ptr<IWIterator> correct() override {
         return make_shared<LimitIterator>(Limit, Parent::correct());
     }
-    virtual std::shared_ptr<IWIterator> correctReverse() {
+    std::shared_ptr<IWIterator> correctReverse() override {
         return make_shared<LimitIterator>(Limit, Parent::correctReverse());
     }
     enum { MEM_LIMIT = 32 * 1024 };
 };
-}
+}  // namespace SorterTests
 
 class SorterSuite : public mongo::unittest::Suite {
 public:
     SorterSuite() : Suite("sorter") {}
 
-    void setupTests() {
+    template <typename T>
+    static constexpr uint64_t kMaxAsU64 = std::numeric_limits<T>::max();
+
+    void setupTests() override {
         add<InMemIterTests>();
         add<SortedFileWriterAndFileIteratorTests>();
         add<MergeIteratorTests>();
@@ -597,22 +600,24 @@ public:
         add<SorterTests::LotsOfDataWithLimit<100, /*random=*/true>>();    // fits in mem
         add<SorterTests::LotsOfDataWithLimit<5000, /*random=*/false>>();  // spills
         add<SorterTests::LotsOfDataWithLimit<5000, /*random=*/true>>();   // spills
-        add<SorterTests::LimitExtreme<std::numeric_limits<uint32_t>::max()>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<uint32_t>::max() - 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<uint32_t>::max() + 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<uint32_t>::max() / 8 + 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<int32_t>::max()>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<int32_t>::max() - 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<int32_t>::max() / 8 + 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<uint64_t>::max()>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<uint64_t>::max() - 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<uint64_t>::max() + 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<uint64_t>::max() / 8 + 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<int64_t>::max()>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<int64_t>::max() - 1>>();
-        add<SorterTests::LimitExtreme<std::numeric_limits<int64_t>::max() / 8 + 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<uint32_t>>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<uint32_t> - 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<uint32_t> + 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<uint32_t> / 8 + 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<int32_t>>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<int32_t> - 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<int32_t> + 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<int32_t> / 8 + 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<uint64_t>>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<uint64_t> - 1>>();
+        add<SorterTests::LimitExtreme<0>>();  // kMaxAsU64<uint64_t> + 1
+        add<SorterTests::LimitExtreme<kMaxAsU64<uint64_t> / 8 + 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<int64_t>>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> - 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> + 1>>();
+        add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> / 8 + 1>>();
     }
 };
 
 mongo::unittest::SuiteInstance<SorterSuite> extSortTests;
-}
+}  // namespace mongo

@@ -6013,7 +6013,7 @@ TEST(ExpressionRegexFindAllTest, FailureCase) {
 TEST(ExpressionRegexFindAllTest, InvalidUTF8InInput) {
     std::string inputField = "1234 ";
     // Append an invalid UTF-8 character.
-    inputField += static_cast<char>(0xE5);
+    inputField += '\xe5';
     inputField += "  1234";
     Value input(fromjson("{input: '" + inputField + "', regex: '[0-9]'}"));
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -6026,7 +6026,7 @@ TEST(ExpressionRegexFindAllTest, InvalidUTF8InInput) {
 TEST(ExpressionRegexFindAllTest, InvalidUTF8InRegex) {
     std::string regexField = "1234 ";
     // Append an invalid UTF-8 character.
-    regexField += static_cast<char>(0xE5);
+    regexField += '\xe5';
     Value input(fromjson("{input: '123456', regex: '" + regexField + "'}"));
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ExpressionRegexFindAll regexF(expCtx);
