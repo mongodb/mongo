@@ -38,6 +38,7 @@ import string
 from typing import Mapping
 
 COMMAND_NAMESPACE_CONCATENATE_WITH_DB = "concatenate_with_db"
+COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID = "concatenate_with_db_or_uuid"
 COMMAND_NAMESPACE_IGNORED = "ignored"
 COMMAND_NAMESPACE_TYPE = "type"
 

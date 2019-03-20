@@ -153,9 +153,14 @@ public:
     MONGO_COMPILER_NORETURN void throwBadEnumValue(int enumValue) const;
 
     /**
-     * Equivalent to Command::parseNsCollectionRequired
+     * Equivalent to CommandHelpers::parseNsCollectionRequired
      */
     static NamespaceString parseNSCollectionRequired(StringData dbName, const BSONElement& element);
+
+    /**
+     * Equivalent to CommandHelpers::parseNsOrUUID
+     */
+    static NamespaceStringOrUUID parseNsOrUUID(StringData dbname, const BSONElement& element);
 
     /**
      * Take all the well known command generic arguments from commandPassthroughFields, but ignore

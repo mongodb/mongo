@@ -1265,6 +1265,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_constructor(self, struct, constructor, default_init):
         # type: (ast.Struct, struct_types.MethodInfo, bool) -> None
         """Generate the C++ constructor definition."""
+        # pylint: disable=too-many-branches
 
         initializers = ['_%s(std::move(%s))' % (arg.name, arg.name) for arg in constructor.args]
 
@@ -1285,6 +1286,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if [arg for arg in constructor.args if arg.name == 'nss']:
             if [field for field in struct.fields if field.serialize_op_msg_request_only]:
                 initializers.append('_dbName(nss.db().toString())')
+                initializes_db_name = True
+        elif [arg for arg in constructor.args if arg.name == 'nssOrUUID']:
+            if [field for field in struct.fields if field.serialize_op_msg_request_only]:
+                initializers.append(
+                    '_dbName(nssOrUUID.uuid() ? nssOrUUID.dbname() : nssOrUUID.nss().get().db().toString())'
+                )
                 initializes_db_name = True
 
         # Serialize has fields third
@@ -1436,10 +1443,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                                 (cpp_type_info.get_storage_type()))
                     self._writer.write_line('%s object(localCmdType);' %
                                             (common.title_case(struct.cpp_name)))
-                elif struct.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB:
+                elif struct.namespace in (common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB,
+                                          common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID):
                     self._writer.write_line('NamespaceString localNS;')
                     self._writer.write_line('%s object(localNS);' %
                                             (common.title_case(struct.cpp_name)))
+                else:
+                    assert "Missing case"
             else:
                 self._writer.write_line('%s object;' % common.title_case(struct.cpp_name))
 

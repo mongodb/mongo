@@ -610,6 +610,13 @@ commands:
             field1: int
             field2: string
 
+    BasicConcatenateWithDbOrUUIDCommand:
+        description: UnitTest for a basic concatenate_with_db_or_uuid command
+        namespace: concatenate_with_db_or_uuid
+        fields:
+            field1: int
+            field2: string
+
     KnownFieldCommand:
         description: UnitTest for a command that has a field that is special known generic command field
         namespace: concatenate_with_db

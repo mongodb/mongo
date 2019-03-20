@@ -533,10 +533,9 @@ def _parse_command(ctxt, spec, name, node):
             "generate_comparison_operators": _RuleDesc("bool_scalar"),
         })
 
-    # TODO: support the first argument as UUID depending on outcome of Catalog Versioning changes.
     valid_commands = [
         common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB, common.COMMAND_NAMESPACE_IGNORED,
-        common.COMMAND_NAMESPACE_TYPE
+        common.COMMAND_NAMESPACE_TYPE, common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID
     ]
 
     if command.namespace:
