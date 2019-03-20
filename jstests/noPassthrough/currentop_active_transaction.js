@@ -104,8 +104,6 @@
     // This will make the transaction hang.
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: 'hangAfterSettingPrepareStartTime', mode: 'alwaysOn'}));
-    assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
 
     let timeBeforeTransactionStarts = new ISODate();
     let isPrepared = true;
@@ -150,8 +148,8 @@
     res = assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 1}]}));
 
     // This will make the transaction hang.
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'alwaysOn'}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: 'hangDuringBatchUpdate', mode: 'alwaysOn'}));
 
     timeBeforeTransactionStarts = new ISODate();
     isPrepared = false;
@@ -186,8 +184,8 @@
                          timeBeforeCurrentOp);
 
     // Now the transaction can proceed.
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'off'}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: 'hangDuringBatchUpdate', mode: 'off'}));
     joinTransaction();
 
     rst.stopSet();

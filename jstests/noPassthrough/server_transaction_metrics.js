@@ -192,10 +192,8 @@
     // inactive counters while operation is running inside a transaction.
     jsTest.log(
         "Start a transaction that will hang in the middle of an operation due to a fail point.");
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'alwaysOn'}));
     assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+        testDB.adminCommand({configureFailPoint: 'hangDuringBatchUpdate', mode: 'alwaysOn'}));
 
     const transactionFn = function() {
         const collName = 'server_transactions_metrics';
@@ -226,8 +224,8 @@
         initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
 
     // Now the transaction can proceed.
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'setInterruptOnlyPlansCheckForInterruptHang', mode: 'off'}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: 'hangDuringBatchUpdate', mode: 'off'}));
     transactionProcess();
     newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     verifyServerStatusFields(newStatus);
