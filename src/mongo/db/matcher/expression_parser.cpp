@@ -464,7 +464,8 @@ StatusWithMatchExpression parseJSONSchema(StringData name,
         return {Status(ErrorCodes::TypeMismatch, "$jsonSchema must be an object")};
     }
 
-    return JSONSchemaParser::parse(elem.Obj(), internalQueryIgnoreUnknownJSONSchemaKeywords.load());
+    return JSONSchemaParser::parse(
+        expCtx, elem.Obj(), internalQueryIgnoreUnknownJSONSchemaKeywords.load());
 }
 
 template <class T>
