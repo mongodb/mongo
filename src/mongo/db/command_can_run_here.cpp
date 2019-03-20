@@ -32,7 +32,6 @@
 #include "mongo/db/command_can_run_here.h"
 
 #include "mongo/client/read_preference.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/assert_util.h"
 
@@ -47,7 +46,7 @@ bool commandCanRunHere(OperationContext* opCtx,
         return true;  // primary: always ok
     if (!opCtx->writesAreReplicated())
         return true;  // standalone: always ok
-    if (inMultiDocumentTransaction && !getTestCommandsEnabled())
+    if (inMultiDocumentTransaction)
         return false;  // Transactions are not allowed on secondaries.
     switch (command->secondaryAllowed(opCtx->getServiceContext())) {
         case Command::AllowedOnSecondary::kAlways:
