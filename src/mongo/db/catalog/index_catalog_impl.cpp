@@ -688,8 +688,9 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                             << " already exists with different options: "
                                             << desc->infoObj());
 
-            return Status(ErrorCodes::IndexAlreadyExists,
-                          str::stream() << "index already exists with different name: " << name);
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream()
+                              << "Index with the same options but a diferent name already exists.");
         }
     }
 
