@@ -633,9 +633,11 @@ void execCommandDatabase(OperationContext* opCtx,
         // Session ids are forwarded in requests, so commands that require roundtrips between
         // servers may result in a deadlock when a server tries to check out a session it is already
         // using to service an earlier operation in the command's chain. To avoid this, only check
-        // out sessions for commands that require them (i.e. write commands).
-        OperationContextSession sessionTxnState(
-            opCtx, cmdWhitelist.find(command->getName()) != cmdWhitelist.cend());
+        // out sessions with provided txnNumber for commands that require them (i.e. write
+        // commands).
+        bool checkoutSession =
+            opCtx->getTxnNumber() && (cmdWhitelist.find(command->getName()) != cmdWhitelist.cend());
+        OperationContextSession sessionTxnState(opCtx, checkoutSession);
 
         ImpersonationSessionGuard guard(opCtx);
         uassertStatusOK(Command::checkAuthorization(command, opCtx, request));
