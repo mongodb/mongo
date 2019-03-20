@@ -5677,7 +5677,7 @@ public:
     int execute(int startBytePos) {
         int execResult = pcre_exec(_pcre,
                                    0,
-                                   &_input.front(),
+                                   _input.c_str(),
                                    _input.size(),
                                    startBytePos,
                                    0,  // No need to overwrite the options set during pcre_compile.
