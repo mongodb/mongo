@@ -177,6 +177,10 @@ public:
         return *_resolvedIntrospectionPipeline;
     }
 
+    auto& getResolvedIntrospectionPipeline() {
+        return *_resolvedIntrospectionPipeline;
+    }
+
     const Variables& getVariables_forTest() {
         return _variables;
     }
