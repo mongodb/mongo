@@ -78,9 +78,7 @@ static Value serializeConstant(Value val) {
 
 string Expression::removeFieldPrefix(const string& prefixedField) {
     uassert(16419,
-            str::stream() << "field path must not contain embedded null characters"
-                          << prefixedField.find("\0")
-                          << ",",
+            str::stream() << "field path must not contain embedded null characters",
             prefixedField.find('\0') == string::npos);
 
     const char* pPrefixedField = prefixedField.c_str();
