@@ -1285,7 +1285,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'commands/server_status_core',
         'kill_sessions',
-        'transaction',
     ],
 )
 

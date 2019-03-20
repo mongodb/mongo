@@ -48,7 +48,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/transaction_participant.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -916,20 +915,15 @@ void UpdateStage::assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
             !_params.request->isMulti());
 
     // An update to a shard key value must either be a retryable write or run in a transaction.
-    const auto txnParticipant = TransactionParticipant::get(getOpCtx());
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Must run update to shard key field "
                           << " in a multi-statement transaction or"
                              " with retryWrites: true.",
-            txnParticipant);
+            getOpCtx()->getTxnNumber());
 
-    if (!metadata->keyBelongsToMe(newShardKey)) {
-        // If this update is in a multi-stmt txn, attach the post image to the error.
-        boost::optional<BSONObj> postImg{txnParticipant.inMultiDocumentTransaction(), newObj};
-
-        uasserted(WouldChangeOwningShardInfo(oldObj.value(), postImg),
-                  str::stream() << "This update would cause the doc to change owning shards");
-    }
+    uassert(WouldChangeOwningShardInfo(oldObj.value(), newObj),
+            str::stream() << "This update would cause the doc to change owning shards",
+            metadata->keyBelongsToMe(newShardKey));
 }
 
 }  // namespace mongo
