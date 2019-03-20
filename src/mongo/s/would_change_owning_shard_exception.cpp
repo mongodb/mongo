@@ -38,14 +38,14 @@ namespace mongo {
 namespace {
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(WouldChangeOwningShardInfo);
-constexpr StringData kOriginalQueryPredicate = "originalQueryPredicate"_sd;
+
+constexpr StringData kPreImage = "preImage"_sd;
 constexpr StringData kPostImage = "postImage"_sd;
 
 }  // namespace
 
 void WouldChangeOwningShardInfo::serialize(BSONObjBuilder* bob) const {
-    if (_originalQueryPredicate)
-        bob->append(kOriginalQueryPredicate, _originalQueryPredicate.get());
+    bob->append(kPreImage, _preImage);
     if (_postImage)
         bob->append(kPostImage, _postImage.get());
 }
@@ -55,14 +55,12 @@ std::shared_ptr<const ErrorExtraInfo> WouldChangeOwningShardInfo::parse(const BS
 }
 
 WouldChangeOwningShardInfo WouldChangeOwningShardInfo::parseFromCommandError(const BSONObj& obj) {
-    boost::optional<BSONObj> originalQueryPredicate = boost::none;
+    boost::optional<BSONObj> originalUpdate = boost::none;
     boost::optional<BSONObj> postImage = boost::none;
-    if (obj[kOriginalQueryPredicate])
-        originalQueryPredicate = obj[kOriginalQueryPredicate].Obj().getOwned();
     if (obj[kPostImage])
         postImage = obj[kPostImage].Obj().getOwned();
 
-    return WouldChangeOwningShardInfo(originalQueryPredicate, postImage);
+    return WouldChangeOwningShardInfo(obj[kPreImage].Obj().getOwned(), postImage);
 }
 
 }  // namespace mongo

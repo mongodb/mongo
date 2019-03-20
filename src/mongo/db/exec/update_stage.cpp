@@ -924,11 +924,10 @@ void UpdateStage::assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
             txnParticipant);
 
     if (!metadata->keyBelongsToMe(newShardKey)) {
-        boost::optional<BSONObj> originalQuery{txnParticipant.inMultiDocumentTransaction(),
-                                               _params.request->getQuery()};
+        // If this update is in a multi-stmt txn, attach the post image to the error.
         boost::optional<BSONObj> postImg{txnParticipant.inMultiDocumentTransaction(), newObj};
 
-        uasserted(WouldChangeOwningShardInfo(originalQuery, postImg),
+        uasserted(WouldChangeOwningShardInfo(oldObj.value(), postImg),
                   str::stream() << "This update would cause the doc to change owning shards");
     }
 }

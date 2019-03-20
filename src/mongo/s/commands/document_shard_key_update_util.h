@@ -56,12 +56,11 @@ namespace documentShardKeyUpdateUtil {
 
 /**
  * Coordinating method and external point of entry for updating a document's shard key. This method
- * creates the necessary delete and insert operations. It will then run each operation using the
- * ClusterWriter.
+ * creates the necessary extra operations. It will then run each operation using the ClusterWriter.
  * If any statement throws, an exception will leave this method, and must be handled by external
  * callers.
  */
-void updateShardKeyForDocument(OperationContext* opCtx,
+bool updateShardKeyForDocument(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const WouldChangeOwningShardInfo& documentKeyChangeInfo,
                                int stmtId);
@@ -74,8 +73,7 @@ TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx);
 
 /**
  * Commits the transaction on this session. This method is called to commit the transaction started
- * when
- * WouldChangeOwningShard is thrown for a write that is not in a transaction already.
+ * when WouldChangeOwningShard is thrown for a write that is not in a transaction already.
  */
 void commitShardKeyUpdateTransaction(OperationContext* opCtx,
                                      TransactionRouter* txnRouter,
@@ -89,8 +87,7 @@ void commitShardKeyUpdateTransaction(OperationContext* opCtx,
  * intermediary test coverage.
  */
 BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
-                                      const BSONObj& originalQueryPredicate,
-                                      const BSONObj& updatePostImage,
+                                      const BSONObj& updatePreImage,
                                       int stmtId);
 
 /*

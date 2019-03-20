@@ -38,28 +38,23 @@ namespace mongo {
 /**
  * This error is thrown when an update would cause a document to be owned by a different
  * shard. If the update is part of a multi statement transaction, we will attach the
- * query from the original update and the post image returned by the update stage. MongoS
- * will use these to delete the original doc and insert the new doc. If the update is a
- * retryable write, we will not attach any extra info and MongoS will start an internal
- * transaction and re-send the original update command upon catching this error.
+ * pre image and the post image returned by the update stage. MongoS will use these to delete
+ * the original doc and insert the new doc. If the update is a retryable write, we will attach
+ * only the pre image.
  */
 class WouldChangeOwningShardInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::WouldChangeOwningShard;
 
-    explicit WouldChangeOwningShardInfo(const boost::optional<BSONObj>& originalQueryPredicate,
-                                        const boost::optional<BSONObj>& postImage) {
-        // Either both originalQueryPredicate and postImage should be set or neither should.
-        invariant((originalQueryPredicate && postImage) != (!originalQueryPredicate && !postImage));
-
-        if (originalQueryPredicate)
-            _originalQueryPredicate = originalQueryPredicate->getOwned();
+    explicit WouldChangeOwningShardInfo(const BSONObj& preImage,
+                                        const boost::optional<BSONObj>& postImage)
+        : _preImage(preImage.getOwned()) {
         if (postImage)
             _postImage = postImage->getOwned();
     }
 
-    const auto& getOriginalQueryPredicate() const {
-        return _originalQueryPredicate;
+    const auto& getPreImage() const {
+        return _preImage;
     }
 
     const auto& getPostImage() const {
@@ -77,8 +72,8 @@ public:
     static WouldChangeOwningShardInfo parseFromCommandError(const BSONObj& commandError);
 
 private:
-    // the 'q' portion of the original update comamand
-    boost::optional<BSONObj> _originalQueryPredicate;
+    // The pre image of the document
+    BSONObj _preImage;
 
     // The post image returned by the update stage
     boost::optional<BSONObj> _postImage;

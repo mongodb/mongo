@@ -42,11 +42,13 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
+#include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/timer.h"
 
@@ -74,6 +76,51 @@ BSONObj getShardKey(OperationContext* opCtx, const ChunkManager& chunkMgr, const
             "Query for sharded findAndModify must contain the shard key",
             !shardKey.isEmpty());
     return shardKey;
+}
+
+void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
+                                                      const NamespaceString nss,
+                                                      Status responseStatus,
+                                                      const BSONObj& cmdObj,
+                                                      BSONObjBuilder* result) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+
+    BSONObjBuilder extraInfoBuilder;
+    responseStatus.extraInfo()->serialize(&extraInfoBuilder);
+    auto extraInfo = extraInfoBuilder.obj();
+    auto wouldChangeOwningShardExtraInfo =
+        WouldChangeOwningShardInfo::parseFromCommandError(extraInfo);
+
+    if (isRetryableWrite) {
+        // TODO: SERVER-39843 Start txn and resend command
+        uasserted(ErrorCodes::ImmutableField,
+                  "After applying the update, an immutable field was found to have been altered.");
+    }
+
+    try {
+        auto matchedDoc = documentShardKeyUpdateUtil::updateShardKeyForDocument(
+            opCtx, nss, wouldChangeOwningShardExtraInfo, cmdObj.getIntField("stmtId"));
+
+        BSONObjBuilder lastErrorObjBuilder(result->subobjStart("lastErrorObject"));
+        lastErrorObjBuilder.appendNumber("n", matchedDoc ? 1 : 0);
+        lastErrorObjBuilder.appendBool("updatedExisting", matchedDoc ? true : false);
+        lastErrorObjBuilder.doneFast();
+
+        if (matchedDoc) {
+            result->append("value",
+                           cmdObj.getBoolField("new")
+                               ? wouldChangeOwningShardExtraInfo.getPostImage().get()
+                               : wouldChangeOwningShardExtraInfo.getPreImage());
+        } else {
+            result->appendNull("value");
+        }
+        result->append("ok", 1.0);
+    } catch (const DBException& e) {
+        auto status = e.toStatus();
+        if (!isRetryableWrite)
+            uassertStatusOK(status.withContext("findAndModify"));
+    }
 }
 
 class FindAndModifyCmd : public BasicCommand {
@@ -233,6 +280,12 @@ private:
             ErrorCodes::isSnapshotError(responseStatus.code())) {
             // Command code traps this exception and re-runs
             uassertStatusOK(responseStatus.withContext("findAndModify"));
+        }
+
+        if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
+            updateShardKeyValueOnWouldChangeOwningShardError(
+                opCtx, nss, responseStatus, cmdObj, result);
+            return;
         }
 
         // First append the properly constructed writeConcernError. It will then be skipped in

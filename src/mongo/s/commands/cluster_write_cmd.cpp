@@ -168,7 +168,7 @@ bool updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
         }
 
         try {
-            documentShardKeyUpdateUtil::updateShardKeyForDocument(
+            auto matchedDoc = documentShardKeyUpdateUtil::updateShardKeyForDocument(
                 opCtx,
                 request.getNS(),
                 wouldChangeOwningShardExtraInfo,
@@ -177,6 +177,9 @@ bool updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
             // If we get here, the batch size is 1 and we have successfully deleted the old doc and
             // inserted the new one, so it is safe to unset the error details.
             response.unsetErrDetails();
+            if (!matchedDoc)
+                return false;
+
             response.setN(response.getN() + 1);
             response.setNModified(response.getNModified() + 1);
 

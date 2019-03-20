@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/commands/document_shard_key_update_util.h"
@@ -37,16 +37,17 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/cluster_write.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Calls into the command execution stack to run the given commands. Will blindly uassert on any
+ * Calls into the command execution stack to run the given command. Will blindly uassert on any
  * error returned by a command.
  */
-void executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
+bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
                                              const BSONObj& deleteCmdObj,
                                              const BSONObj& insertCmdObj,
                                              const StringData db) {
@@ -59,7 +60,7 @@ void executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
     uassertStatusOK(deleteResponse.toStatus());
     // If we do not delete any document, this is essentially equivalent to not matching a doc.
     if (deleteResponse.getN() != 1)
-        return;
+        return false;
 
     auto insertOpMsg = OpMsgRequest::fromDBAndBody(db, insertCmdObj);
     auto insertRequest = BatchedCommandRequest::parseInsert(insertOpMsg);
@@ -72,22 +73,38 @@ void executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
             "Document not successfully inserted while changing shard key for namespace " +
                 insertRequest.getNS().toString(),
             insertResponse.getN() == 1);
+
+    return true;
+}
+
+TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    invariant(txnRouter);
+
+    auto txnNumber = opCtx->getTxnNumber();
+    invariant(txnNumber);
+
+    txnRouter->beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
+
+    return txnRouter;
+}
+
+void commitShardKeyUpdateTransaction(OperationContext* opCtx,
+                                     TransactionRouter* txnRouter,
+                                     TxnNumber txnNumber) {
+    auto commitResponse = txnRouter->commitTransaction(opCtx, boost::none);
 }
 
 /**
  * Creates the delete op that will be used to delete the pre-image document. Will also attach the
- * original document _id retrieved from the 'updatePostImage'.
+ * original document _id retrieved from 'updatePreImage'.
  */
 write_ops::Delete createShardKeyDeleteOp(const NamespaceString& nss,
-                                         const BSONObj& originalQueryPredicate,
-                                         const BSONObj& updatePostImage) {
-    BSONObjBuilder fullPredicateBuilder(originalQueryPredicate);
-    fullPredicateBuilder.append(updatePostImage["_id"]);
-
+                                         const BSONObj& updatePreImage) {
     write_ops::Delete deleteOp(nss);
     deleteOp.setDeletes({[&] {
         write_ops::DeleteOpEntry entry;
-        entry.setQ(fullPredicateBuilder.obj());
+        entry.setQ(updatePreImage);
         entry.setMulti(false);
         return entry;
     }()});
@@ -109,47 +126,25 @@ write_ops::Insert createShardKeyInsertOp(const NamespaceString& nss,
 
 namespace documentShardKeyUpdateUtil {
 
-void updateShardKeyForDocument(OperationContext* opCtx,
+bool updateShardKeyForDocument(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const WouldChangeOwningShardInfo& documentKeyChangeInfo,
                                int stmtId) {
-    auto originalQueryPredicate = documentKeyChangeInfo.getOriginalQueryPredicate()->getOwned();
-
+    auto updatePreImage = documentKeyChangeInfo.getPreImage().getOwned();
     invariant(documentKeyChangeInfo.getPostImage());
     auto updatePostImage = documentKeyChangeInfo.getPostImage()->getOwned();
 
-    auto deleteCmdObj =
-        constructShardKeyDeleteCmdObj(nss, originalQueryPredicate, updatePostImage, stmtId);
+    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage, stmtId);
 
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, stmtId);
 
-    executeOperationsAsPartOfShardKeyUpdate(opCtx, deleteCmdObj, insertCmdObj, nss.db());
-}
-
-
-TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx) {
-    auto txnRouter = TransactionRouter::get(opCtx);
-    invariant(txnRouter);
-
-    auto txnNumber = opCtx->getTxnNumber();
-    invariant(txnNumber);
-
-    txnRouter->beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
-
-    return txnRouter;
-}
-
-void commitShardKeyUpdateTransaction(OperationContext* opCtx,
-                                     TransactionRouter* txnRouter,
-                                     TxnNumber txnNumber) {
-    auto commitResponse = txnRouter->commitTransaction(opCtx, boost::none);
+    return executeOperationsAsPartOfShardKeyUpdate(opCtx, deleteCmdObj, insertCmdObj, nss.db());
 }
 
 BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
-                                      const BSONObj& originalQueryPredicate,
-                                      const BSONObj& updatePostImage,
+                                      const BSONObj& updatePreImage,
                                       int stmtId) {
-    auto deleteOp = createShardKeyDeleteOp(nss, originalQueryPredicate, updatePostImage);
+    auto deleteOp = createShardKeyDeleteOp(nss, updatePreImage);
     // TODO SERVER-40181: Do not set the stmtId once we remove stmtIds from txn oplog entries
     deleteOp.getWriteCommandBase().setStmtId(stmtId);
     return deleteOp.toBSON({});
