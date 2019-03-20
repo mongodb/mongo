@@ -463,6 +463,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: cursor_manager
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "cursor_manager"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: mixed_workloads
   priority: 5
   commands:
@@ -852,6 +862,7 @@ buildvariants:
     - name: industry_benchmarks
     - name: crud_workloads
     - name: jasper_smoke
+    - name: cursor_manager
     - name: insert_remove
     - name: mixed_workloads
     - name: misc_workloads
