@@ -145,13 +145,12 @@ public:
     /**
      * Callback function to report last applied optime of initial sync.
      */
-    typedef stdx::function<void(const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied)>
-        OnCompletionFn;
+    typedef stdx::function<void(const StatusWith<OpTimeAndWallTime>& lastApplied)> OnCompletionFn;
 
     /**
      * Callback completion guard for initial syncer.
      */
-    using OnCompletionGuard = CallbackCompletionGuard<StatusWith<std::tuple<OpTime, Date_t>>>;
+    using OnCompletionGuard = CallbackCompletionGuard<StatusWith<OpTimeAndWallTime>>;
 
     using StartCollectionClonerFn = DatabaseCloner::StartCollectionClonerFn;
 
@@ -371,7 +370,7 @@ private:
      * Tears down internal state before reporting final status to caller.
      */
     void _tearDown_inlock(OperationContext* opCtx,
-                          const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied);
+                          const StatusWith<OpTimeAndWallTime>& lastApplied);
 
     /**
      * Callback to start a single initial sync attempt.
@@ -472,7 +471,7 @@ private:
      * Callback for MultiApplier completion.
      */
     void _multiApplierCallback(const Status& status,
-                               std::tuple<OpTime, Date_t> lastApplied,
+                               OpTimeAndWallTime lastApplied,
                                std::uint32_t numApplied,
                                std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
@@ -498,12 +497,12 @@ private:
      * Reports result of current initial sync attempt. May schedule another initial sync attempt
      * depending on shutdown state and whether we've exhausted all initial sync retries.
      */
-    void _finishInitialSyncAttempt(const StatusWith<std::tuple<OpTime, Date_t>>& lastApplied);
+    void _finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime>& lastApplied);
 
     /**
      * Invokes completion callback and transitions state to State::kComplete.
      */
-    void _finishCallback(StatusWith<std::tuple<OpTime, Date_t>> lastApplied);
+    void _finishCallback(StatusWith<OpTimeAndWallTime> lastApplied);
 
     // Obtains a valid sync source from the sync source selector.
     // Returns error if a sync source cannot be found.
@@ -650,7 +649,7 @@ private:
     std::unique_ptr<MultiApplier> _applier;               // (M)
     HostAndPort _syncSource;                              // (M)
     OpTime _lastFetched;                                  // (MX)
-    std::tuple<OpTime, Date_t> _lastApplied;              // (MX)
+    OpTimeAndWallTime _lastApplied;                       // (MX)
     std::unique_ptr<OplogBuffer> _oplogBuffer;            // (M)
     std::unique_ptr<OplogApplier::Observer> _observer;    // (S)
     std::unique_ptr<OplogApplier> _oplogApplier;          // (M)

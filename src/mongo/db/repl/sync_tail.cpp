@@ -189,11 +189,11 @@ void ApplyBatchFinalizerForJournal::_run() {
     Client::initThread("ApplyBatchFinalizerForJournal");
 
     while (true) {
-        OpTimeAndWallTime latestOpTimeAndWallTime = std::make_tuple(OpTime(), Date_t::min());
+        OpTimeAndWallTime latestOpTimeAndWallTime = {OpTime(), Date_t::min()};
 
         {
             stdx::unique_lock<stdx::mutex> lock(_mutex);
-            while (std::get<0>(_latestOpTimeAndWallTime).isNull() && !_shutdownSignaled) {
+            while (_latestOpTimeAndWallTime.opTime.isNull() && !_shutdownSignaled) {
                 _cond.wait(lock);
             }
 
@@ -202,7 +202,7 @@ void ApplyBatchFinalizerForJournal::_run() {
             }
 
             latestOpTimeAndWallTime = _latestOpTimeAndWallTime;
-            _latestOpTimeAndWallTime = std::make_tuple(OpTime(), Date_t::min());
+            _latestOpTimeAndWallTime = {OpTime(), Date_t::min()};
         }
 
         auto opCtx = cc().makeOperationContext();
@@ -805,8 +805,7 @@ void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
             : ReplicationCoordinator::DataConsistency::Inconsistent;
         // Wall clock time is non-optional post 3.6.
         invariant(lastWallTimeInBatch);
-        finalizer->record(std::make_tuple(lastOpTimeInBatch, lastWallTimeInBatch.get()),
-                          consistency);
+        finalizer->record({lastOpTimeInBatch, lastWallTimeInBatch.get()}, consistency);
     }
 }
 

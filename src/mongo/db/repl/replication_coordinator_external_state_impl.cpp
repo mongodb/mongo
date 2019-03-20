@@ -372,7 +372,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
     auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
     if (_replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull() &&
         loadLastOpTimeAndWallTimeResult.isOK() &&
-        std::get<0>(loadLastOpTimeAndWallTimeResult.getValue()) ==
+        loadLastOpTimeAndWallTimeResult.getValue().opTime ==
             _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
         // Clear the appliedThrough marker to indicate we are consistent with the top of the
         // oplog. We record this update at the 'lastAppliedOpTime'. If there are any outstanding
@@ -485,7 +485,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     });
     const auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
     fassert(28665, loadLastOpTimeAndWallTimeResult);
-    auto opTimeToReturn = std::get<0>(loadLastOpTimeAndWallTimeResult.getValue());
+    auto opTimeToReturn = loadLastOpTimeAndWallTimeResult.getValue().opTime;
 
 
     _shardingOnTransitionToPrimaryHook(opCtx);
@@ -627,8 +627,8 @@ bool ReplicationCoordinatorExternalStateImpl::oplogExists(OperationContext* opCt
     return oplog.getCollection() != nullptr;
 }
 
-StatusWith<std::tuple<OpTime, Date_t>>
-ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(OperationContext* opCtx) {
+StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(
+    OperationContext* opCtx) {
     // TODO: handle WriteConflictExceptions below
     try {
         // If we are doing an initial sync do not read from the oplog.
@@ -643,14 +643,14 @@ ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(OperationCont
                     return Helpers::getLast(
                         opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
                 })) {
-            return StatusWith<std::tuple<OpTime, Date_t>>(
-                ErrorCodes::NoMatchingDocument,
-                str::stream() << "Did not find any entries in "
-                              << NamespaceString::kRsOplogNamespace.ns());
+            return StatusWith<OpTimeAndWallTime>(ErrorCodes::NoMatchingDocument,
+                                                 str::stream()
+                                                     << "Did not find any entries in "
+                                                     << NamespaceString::kRsOplogNamespace.ns());
         }
         BSONElement tsElement = oplogEntry[tsFieldName];
         if (tsElement.eoo()) {
-            return StatusWith<std::tuple<OpTime, Date_t>>(
+            return StatusWith<OpTimeAndWallTime>(
                 ErrorCodes::NoSuchKey,
                 str::stream() << "Most recent entry in " << NamespaceString::kRsOplogNamespace.ns()
                               << " missing \""
@@ -658,7 +658,7 @@ ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(OperationCont
                               << "\" field");
         }
         if (tsElement.type() != bsonTimestamp) {
-            return StatusWith<std::tuple<OpTime, Date_t>>(
+            return StatusWith<OpTimeAndWallTime>(
                 ErrorCodes::TypeMismatch,
                 str::stream() << "Expected type of \"" << tsFieldName << "\" in most recent "
                               << NamespaceString::kRsOplogNamespace.ns()
@@ -674,9 +674,10 @@ ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(OperationCont
         if (!wallTimeStatus.isOK()) {
             return wallTimeStatus.getStatus();
         }
-        return std::make_tuple(opTimeStatus.getValue(), wallTimeStatus.getValue());
+        OpTimeAndWallTime parseResult = {opTimeStatus.getValue(), wallTimeStatus.getValue()};
+        return parseResult;
     } catch (const DBException& ex) {
-        return StatusWith<std::tuple<OpTime, Date_t>>(ex.toStatus());
+        return StatusWith<OpTimeAndWallTime>(ex.toStatus());
     }
 }
 

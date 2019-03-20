@@ -53,6 +53,7 @@ namespace mongo {
 
 using std::string;
 using repl::OpTime;
+using repl::OpTimeAndWallTime;
 
 static TimerStats gleWtimeStats;
 static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime", &gleWtimeStats);

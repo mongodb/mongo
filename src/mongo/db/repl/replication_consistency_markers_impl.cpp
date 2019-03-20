@@ -145,7 +145,7 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     OpTimeAndWallTime opTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
-    const auto time = std::get<0>(opTimeAndWallTime);
+    const auto time = opTimeAndWallTime.opTime;
     TimestampedBSONObj update;
     update.obj = BSON("$unset" << kInitialSyncFlag << "$set"
                                << BSON(MinValidDocument::kMinValidTimestampFieldName

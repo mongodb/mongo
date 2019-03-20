@@ -875,11 +875,10 @@ private:
      * Callback that finishes the work started in _startLoadLocalConfig and sets _rsConfigState
      * to kConfigSteady, so that we can begin processing heartbeats and reconfigs.
      */
-    void _finishLoadLocalConfig(
-        const executor::TaskExecutor::CallbackArgs& cbData,
-        const ReplSetConfig& localConfig,
-        const StatusWith<std::tuple<OpTime, Date_t>>& lastOpTimeAndWallTimeStatus,
-        const StatusWith<LastVote>& lastVoteStatus);
+    void _finishLoadLocalConfig(const executor::TaskExecutor::CallbackArgs& cbData,
+                                const ReplSetConfig& localConfig,
+                                const StatusWith<OpTimeAndWallTime>& lastOpTimeAndWallTimeStatus,
+                                const StatusWith<LastVote>& lastVoteStatus);
 
     /**
      * Start replicating data, and does an initial sync if needed first.

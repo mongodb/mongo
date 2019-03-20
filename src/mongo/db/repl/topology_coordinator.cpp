@@ -958,14 +958,13 @@ OpTime TopologyCoordinator::getMyLastAppliedOpTime() const {
 }
 
 OpTimeAndWallTime TopologyCoordinator::getMyLastAppliedOpTimeAndWallTime() const {
-    return std::make_tuple(_selfMemberData().getLastAppliedOpTime(),
-                           _selfMemberData().getLastAppliedWallTime());
+    return {_selfMemberData().getLastAppliedOpTime(), _selfMemberData().getLastAppliedWallTime()};
 }
 
 void TopologyCoordinator::setMyLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
                                                             Date_t now,
                                                             bool isRollbackAllowed) {
-    auto opTime = std::get<0>(opTimeAndWallTime);
+    auto opTime = opTimeAndWallTime.opTime;
     auto& myMemberData = _selfMemberData();
     auto myLastAppliedOpTime = myMemberData.getLastAppliedOpTime();
 
@@ -986,14 +985,13 @@ OpTime TopologyCoordinator::getMyLastDurableOpTime() const {
 }
 
 OpTimeAndWallTime TopologyCoordinator::getMyLastDurableOpTimeAndWallTime() const {
-    return std::tuple(_selfMemberData().getLastDurableOpTime(),
-                      _selfMemberData().getLastDurableWallTime());
+    return {_selfMemberData().getLastDurableOpTime(), _selfMemberData().getLastDurableWallTime()};
 }
 
 void TopologyCoordinator::setMyLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,
                                                             Date_t now,
                                                             bool isRollbackAllowed) {
-    auto opTime = std::get<0>(opTimeAndWallTime);
+    auto opTime = opTimeAndWallTime.opTime;
     auto& myMemberData = _selfMemberData();
     invariant(isRollbackAllowed || opTime >= myMemberData.getLastDurableOpTime());
     myMemberData.setLastDurableOpTimeAndWallTime(opTimeAndWallTime, now);
@@ -1423,9 +1421,9 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const MemberState myState = getMemberState();
     const Date_t now = rsStatusArgs.now;
     const OpTime lastOpApplied = getMyLastAppliedOpTime();
-    const Date_t lastOpAppliedWall = std::get<1>(getMyLastAppliedOpTimeAndWallTime());
+    const Date_t lastOpAppliedWall = getMyLastAppliedOpTimeAndWallTime().wallTime;
     const OpTime lastOpDurable = getMyLastDurableOpTime();
-    const Date_t lastOpDurableWall = std::get<1>(getMyLastDurableOpTimeAndWallTime());
+    const Date_t lastOpDurableWall = getMyLastDurableOpTimeAndWallTime().wallTime;
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
     const boost::optional<Timestamp>& lastStableRecoveryTimestamp =
         rsStatusArgs.lastStableRecoveryTimestamp;

@@ -188,8 +188,7 @@ public:
      * Gets the last optime, and corresponding wall clock time, of an operation performed on this
      * host, from stable storage.
      */
-    virtual StatusWith<std::tuple<OpTime, Date_t>> loadLastOpTimeAndWallTime(
-        OperationContext* opCtx) = 0;
+    virtual StatusWith<OpTimeAndWallTime> loadLastOpTimeAndWallTime(OperationContext* opCtx) = 0;
 
     /**
      * Returns the HostAndPort of the remote client connected to us that initiated the operation

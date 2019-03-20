@@ -169,11 +169,12 @@ bool ReplicationCoordinatorExternalStateMock::oplogExists(OperationContext* opCt
     return true;
 }
 
-StatusWith<std::tuple<OpTime, Date_t>>
-ReplicationCoordinatorExternalStateMock::loadLastOpTimeAndWallTime(OperationContext* opCtx) {
+StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateMock::loadLastOpTimeAndWallTime(
+    OperationContext* opCtx) {
     if (_lastOpTime.getStatus().isOK()) {
         if (_lastWallTime.getStatus().isOK()) {
-            return std::make_tuple(_lastOpTime.getValue(), _lastWallTime.getValue());
+            OpTimeAndWallTime result = {_lastOpTime.getValue(), _lastWallTime.getValue()};
+            return result;
         } else {
             return _lastWallTime.getStatus();
         }

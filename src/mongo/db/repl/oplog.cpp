@@ -551,8 +551,7 @@ void _logOpsInner(OperationContext* opCtx,
 
             // Optimes on the primary should always represent consistent database states.
             replCoord->setMyLastAppliedOpTimeAndWallTimeForward(
-                std::make_tuple(finalOpTime, wallTime),
-                ReplicationCoordinator::DataConsistency::Consistent);
+                {finalOpTime, wallTime}, ReplicationCoordinator::DataConsistency::Consistent);
 
             // We set the last op on the client to 'finalOpTime', because that contains the
             // timestamp of the operation that the client actually performed.

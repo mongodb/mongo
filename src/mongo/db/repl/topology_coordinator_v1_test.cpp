@@ -117,8 +117,7 @@ protected:
     }
 
     void setMyOpTime(const OpTime& opTime, const Date_t wallTime = Date_t::min()) {
-        getTopoCoord().setMyLastAppliedOpTimeAndWallTime(
-            std::make_tuple(opTime, wallTime), now(), false);
+        getTopoCoord().setMyLastAppliedOpTimeAndWallTime({opTime, wallTime}, now(), false);
     }
 
     void topoCoordSetMyLastAppliedOpTime(const OpTime& opTime,
@@ -126,7 +125,7 @@ protected:
                                          bool isRollbackAllowed,
                                          const Date_t wallTime = Date_t::min()) {
         getTopoCoord().setMyLastAppliedOpTimeAndWallTime(
-            std::make_tuple(opTime, wallTime), now, isRollbackAllowed);
+            {opTime, wallTime}, now, isRollbackAllowed);
     }
 
     void topoCoordSetMyLastDurableOpTime(const OpTime& opTime,
@@ -134,7 +133,7 @@ protected:
                                          bool isRollbackAllowed,
                                          const Date_t wallTime = Date_t::min()) {
         getTopoCoord().setMyLastDurableOpTimeAndWallTime(
-            std::make_tuple(opTime, wallTime), now, isRollbackAllowed);
+            {opTime, wallTime}, now, isRollbackAllowed);
     }
 
     void setSelfMemberState(const MemberState& newState) {

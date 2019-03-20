@@ -37,8 +37,6 @@
 namespace mongo {
 namespace repl {
 
-using OpTimeAndWallTime = std::tuple<OpTime, Date_t>;
-
 /**
  * This class contains the data from heartbeat responses and replSetUpdatePosition commands for one
  * member of a replica set.

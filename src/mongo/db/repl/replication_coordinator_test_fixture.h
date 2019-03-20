@@ -106,23 +106,22 @@ protected:
     }
 
     void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
-        getReplCoord()->setMyLastAppliedOpTimeAndWallTime(std::make_tuple(opTime, wallTime));
+        getReplCoord()->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
     }
 
     void replCoordSetMyLastAppliedOpTimeForward(const OpTime& opTime,
                                                 ReplicationCoordinator::DataConsistency consistency,
                                                 Date_t wallTime = Date_t::min()) {
-        getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward(std::make_tuple(opTime, wallTime),
-                                                                 consistency);
+        getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward({opTime, wallTime}, consistency);
     }
 
     void replCoordSetMyLastDurableOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
-        getReplCoord()->setMyLastDurableOpTimeAndWallTime(std::make_tuple(opTime, wallTime));
+        getReplCoord()->setMyLastDurableOpTimeAndWallTime({opTime, wallTime});
     }
 
     void replCoordSetMyLastDurableOpTimeForward(const OpTime& opTime,
                                                 Date_t wallTime = Date_t::min()) {
-        getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward(std::make_tuple(opTime, wallTime));
+        getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward({opTime, wallTime});
     }
 
     /**

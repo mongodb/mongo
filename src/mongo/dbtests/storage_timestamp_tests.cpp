@@ -448,7 +448,7 @@ public:
 
     void setReplCoordAppliedOpTime(const repl::OpTime& opTime, Date_t wallTime = Date_t::min()) {
         repl::ReplicationCoordinator::get(getGlobalServiceContext())
-            ->setMyLastAppliedOpTimeAndWallTime(std::make_tuple(opTime, wallTime));
+            ->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
         ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
                       ->updateTerm(_opCtx, opTime.getTerm()));
     }

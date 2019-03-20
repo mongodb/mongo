@@ -103,6 +103,10 @@ std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {
     return out << opTime.toString();
 }
 
+std::ostream& operator<<(std::ostream& out, const OpTimeAndWallTime& opTime) {
+    return out << opTime.opTime.toString() << ", " << opTime.wallTime.toString();
+}
+
 void OpTime::appendAsQuery(BSONObjBuilder* builder) const {
     builder->append(kTimestampFieldName, _timestamp);
     if (_term == kUninitializedTerm) {

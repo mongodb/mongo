@@ -66,11 +66,11 @@ class ReplSetMetadata;
 }  // namespace rpc
 
 namespace repl {
-using OpTimeAndWallTime = std::tuple<OpTime, Date_t>;
 
 class BackgroundSync;
 class IsMasterResponse;
 class OpTime;
+struct OpTimeAndWallTime;
 class ReadConcernArgs;
 class ReplSetConfig;
 class ReplSetHeartbeatArgsV1;

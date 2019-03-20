@@ -159,8 +159,12 @@ private:
     Timestamp _timestamp;
     long long _term = kInitialTerm;
 };
-using OpTimeAndWallTime = std::tuple<OpTime, Date_t>;
 
+struct OpTimeAndWallTime {
+    OpTime opTime;
+    Date_t wallTime;
+};
+std::ostream& operator<<(std::ostream& out, const OpTimeAndWallTime& opTime);
 }  // namespace repl
 
 /**
