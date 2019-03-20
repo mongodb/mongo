@@ -52,12 +52,10 @@ public:
 
 TEST_F(DocumentShardKeyUpdateTest, constructShardKeyDeleteCmdObj) {
     NamespaceString nss("test.foo");
-    BSONObj originalQueryPredicate = BSON("x" << 4);
-    BSONObj updatePostImage = BSON("x" << 4 << "y" << 3 << "_id" << 20);
+    BSONObj updatePreImage = BSON("x" << 4 << "y" << 3 << "_id" << 20);
     int stmtId = 1;
 
-    auto deleteCmdObj =
-        constructShardKeyDeleteCmdObj(nss, originalQueryPredicate, updatePostImage, stmtId);
+    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage, stmtId);
 
     auto deletesObj = deleteCmdObj["deletes"].Array();
     ASSERT_EQ(deletesObj.size(), 1U);
