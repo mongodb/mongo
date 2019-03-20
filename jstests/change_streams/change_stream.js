@@ -186,7 +186,7 @@
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     let t2cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t2});
     assert.writeOK(db.t2.insert({_id: 100, c: 1}));
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: []});
+    cst.assertNoChange(cursor);
     expected = {
         documentKey: {_id: 100},
         fullDocument: {_id: 100, c: 1},
@@ -208,8 +208,8 @@
     const dne2cursor =
         cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.dne2});
     assert.writeOK(db.t2.insert({_id: 101, renameCollection: "test.dne1", to: "test.dne2"}));
-    cst.assertNextChangesEqual({cursor: dne1cursor, expectedChanges: []});
-    cst.assertNextChangesEqual({cursor: dne2cursor, expectedChanges: []});
+    cst.assertNoChange(dne1cursor);
+    cst.assertNoChange(dne2cursor);
 
     if (!isMongos) {
         jsTestLog("Ensuring attempt to read with legacy operations fails.");

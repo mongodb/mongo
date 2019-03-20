@@ -32,6 +32,7 @@ selector:
   - jstests/sharding/aggregation_internal_parameters.js
   - jstests/sharding/agg_error_reports_shard_host_and_port.js
   - jstests/sharding/change_stream_metadata_notifications.js
+  - jstests/sharding/change_stream_transaction_sharded.js
   - jstests/sharding/change_streams.js
   - jstests/sharding/collation_lookup.js
   - jstests/sharding/collation_targeting.js
