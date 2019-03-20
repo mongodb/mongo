@@ -1103,16 +1103,27 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
         o(lk).txnState.transitionTo(TransactionState::kCommittingWithoutPrepare);
     }
 
-    _commitStorageTransaction(opCtx);
-    invariant(o().txnState.isCommittingWithoutPrepare(),
-              str::stream() << "Current State: " << o().txnState);
+    try {
+        // Once entering "committing without prepare" we cannot throw an exception.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        _commitStorageTransaction(opCtx);
+        invariant(o().txnState.isCommittingWithoutPrepare(),
+                  str::stream() << "Current State: " << o().txnState);
+
+        _finishCommitTransaction(opCtx);
+    } catch (...) {
+        // It is illegal for committing a transaction to fail for any reason, other than an
+        // invalid command, so we crash instead.
+        severe() << "Caught exception during commit of unprepared transaction "
+                 << opCtx->getTxnNumber() << " on " << _sessionId().toBSON() << ": "
+                 << exceptionToStatus();
+        std::terminate();
+    }
 
     if (needsNoopWrite) {
         performNoopWrite(
             opCtx, str::stream() << "read-only transaction with writeConcern " << wc.toBSON());
     }
-
-    _finishCommitTransaction(opCtx);
 }
 
 void TransactionParticipant::Participant::commitPreparedTransaction(
@@ -1145,8 +1156,9 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     }
 
     try {
-        opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
+        // Once entering "committing with prepare" we cannot throw an exception.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
 
         // On secondary, we generate a fake empty oplog slot, since it's not used by opObserver.
         OplogSlot commitOplogSlot;

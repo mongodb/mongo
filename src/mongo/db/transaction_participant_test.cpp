@@ -3094,6 +3094,8 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
     setupAdditiveMetrics(metricValue, opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    txnParticipant.addTransactionOperation(opCtx(), operation);
 
     serverGlobalParams.slowMS = 10;
     tickSource->advance(Microseconds(11 * 1000));
