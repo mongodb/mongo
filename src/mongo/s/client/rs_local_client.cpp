@@ -71,7 +71,7 @@ repl::OpTime RSLocalClient::_getLastOpTime() {
 }
 
 StatusWith<Shard::CommandResponse> RSLocalClient::runCommandOnce(OperationContext* opCtx,
-                                                                 const std::string& dbName,
+                                                                 StringData dbName,
                                                                  const BSONObj& cmdObj) {
     const auto currentOpTimeFromClient =
         repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();

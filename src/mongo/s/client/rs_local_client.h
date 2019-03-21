@@ -53,7 +53,7 @@ public:
      * response and write concern error (if present).
      */
     StatusWith<Shard::CommandResponse> runCommandOnce(OperationContext* opCtx,
-                                                      const std::string& dbName,
+                                                      StringData dbName,
                                                       const BSONObj& cmdObj);
 
     /**

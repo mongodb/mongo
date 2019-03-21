@@ -92,8 +92,7 @@ class TransactionCoordinatorDriver {
 
 public:
     TransactionCoordinatorDriver(ServiceContext* serviceContext,
-                                 std::unique_ptr<txn::AsyncWorkScheduler> scheduler);
-    ~TransactionCoordinatorDriver();
+                                 txn::AsyncWorkScheduler& scheduler);
 
     /**
      * Upserts a document of the form:
@@ -232,7 +231,7 @@ public:
 private:
     ServiceContext* _serviceContext;
 
-    std::unique_ptr<txn::AsyncWorkScheduler> _scheduler;
+    txn::AsyncWorkScheduler& _scheduler;
 };
 
 }  // namespace mongo

@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/client/shard_remote.h"
-#include "mongo/s/client/shard_remote_gen.h"
 
 #include <algorithm>
 #include <string>
@@ -51,14 +50,13 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/s/client/shard_remote_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-using std::string;
 
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
@@ -67,6 +65,7 @@ using rpc::TrackingMetadata;
 using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
 
 namespace {
+
 // Include kReplSetMetadataFieldName in a request to get the shard's ReplSetMetadata in the
 // response.
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
@@ -183,7 +182,7 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
 
 StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* opCtx,
                                                             const ReadPreferenceSetting& readPref,
-                                                            const string& dbName,
+                                                            StringData dbName,
                                                             Milliseconds maxTimeMSOverride,
                                                             const BSONObj& cmdObj) {
     RemoteCommandResponse response =
@@ -245,7 +244,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
 StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const string& dbName,
+    StringData dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj) {
     const auto host = _targeter->findHost(opCtx, readPref);
@@ -303,7 +302,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
 
     Fetcher fetcher(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
                     host.getValue(),
-                    dbName,
+                    dbName.toString(),
                     cmdObj,
                     fetcherCallback,
                     _appendMetadataForCommand(opCtx, readPref),
@@ -401,7 +400,7 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
 StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
+    StringData dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj,
     const TaskExecutor::RemoteCommandCallbackFn& cb) {
@@ -424,7 +423,7 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
 
     const RemoteCommandRequest request(
         asyncHandle.hostTargetted,
-        dbName,
+        dbName.toString(),
         appendMaxTimeToCmdObj(requestTimeout, cmdObj),
         _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
         opCtx,

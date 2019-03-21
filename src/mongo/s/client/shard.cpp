@@ -41,9 +41,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::string;
-
 namespace {
 
 const int kOnErrorNumRetries = 3;
@@ -76,7 +73,7 @@ Status Shard::CommandResponse::processBatchWriteResponse(
     StatusWith<Shard::CommandResponse> swResponse, BatchedCommandResponse* batchResponse) {
     auto status = getEffectiveStatus(swResponse);
     if (status.isOK()) {
-        string errmsg;
+        std::string errmsg;
         if (!batchResponse->parseBSON(swResponse.getValue().response, &errmsg)) {
             status = Status(ErrorCodes::FailedToParse,
                             str::stream() << "Failed to parse write response: " << errmsg);
@@ -202,8 +199,7 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
                                                    const Milliseconds maxTimeMS,
                                                    const BatchedCommandRequest& batchRequest,
                                                    RetryPolicy retryPolicy) {
-    const std::string dbname = batchRequest.getNS().db().toString();
-
+    const StringData dbname = batchRequest.getNS().db();
     const BSONObj cmdObj = batchRequest.toBSON();
 
     for (int retry = 1; retry <= kOnErrorNumRetries; ++retry) {

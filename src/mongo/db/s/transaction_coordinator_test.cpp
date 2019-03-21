@@ -105,8 +105,8 @@ class TransactionCoordinatorDriverTest : public TransactionCoordinatorTestBase {
 protected:
     void setUp() override {
         TransactionCoordinatorTestBase::setUp();
-        _driver.emplace(getServiceContext(),
-                        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()));
+        _aws.emplace(getServiceContext());
+        _driver.emplace(getServiceContext(), *_aws);
     }
 
     void tearDown() override {
@@ -114,6 +114,7 @@ protected:
         TransactionCoordinatorTestBase::tearDown();
     }
 
+    boost::optional<txn::AsyncWorkScheduler> _aws;
     boost::optional<TransactionCoordinatorDriver> _driver;
 };
 
@@ -818,6 +819,15 @@ TEST_F(TransactionCoordinatorTest,
     ASSERT_EQ(static_cast<int>(commitDecision), static_cast<int>(txn::CommitDecision::kCommit));
 
     coordinator.onCompletion().get();
+}
+
+TEST_F(TransactionCoordinatorTest, AbandonNewlyCreatedCoordinator) {
+    TransactionCoordinator coordinator(
+        getServiceContext(),
+        _lsid,
+        _txnNumber,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        network()->now() + Seconds{30});
 }
 
 }  // namespace

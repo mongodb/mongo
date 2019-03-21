@@ -105,7 +105,7 @@ bool ShardLocal::isRetriableError(ErrorCodes::Error code, RetryPolicy options) {
 
 StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opCtx,
                                                            const ReadPreferenceSetting& unused,
-                                                           const std::string& dbName,
+                                                           StringData dbName,
                                                            Milliseconds maxTimeMSOverrideUnused,
                                                            const BSONObj& cmdObj) {
     return _rsLocalClient.runCommandOnce(opCtx, dbName, cmdObj);
@@ -114,7 +114,7 @@ StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opC
 StatusWith<Shard::QueryResponse> ShardLocal::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const std::string& dbName,
+    StringData dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj) {
     MONGO_UNREACHABLE;

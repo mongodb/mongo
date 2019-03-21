@@ -152,14 +152,14 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
     }
 
     // The admin database is always hosted on the config server.
-    if (dbName == "admin") {
+    if (dbName == NamespaceString::kAdminDb) {
         DatabaseType dbt(
             dbName, ShardRegistry::kConfigServerShardId, false, databaseVersion::makeFixed());
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 
     // The config database's primary shard is always config, and it is always sharded.
-    if (dbName == "config") {
+    if (dbName == NamespaceString::kConfigDb) {
         DatabaseType dbt(
             dbName, ShardRegistry::kConfigServerShardId, true, databaseVersion::makeFixed());
         return repl::OpTimeWith<DatabaseType>(dbt);
@@ -219,7 +219,7 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
     const std::string& dbName,
     const ReadPreferenceSetting& readPref,
     repl::ReadConcernLevel readConcernLevel) {
-    dassert(dbName != "admin" && dbName != "config");
+    invariant(dbName != NamespaceString::kAdminDb && dbName != NamespaceString::kConfigDb);
 
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               readPref,

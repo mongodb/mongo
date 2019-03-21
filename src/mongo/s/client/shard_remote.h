@@ -102,14 +102,14 @@ private:
 
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& readPref,
-                                                   const std::string& dbname,
+                                                   StringData dbName,
                                                    Milliseconds maxTimeMSOverride,
                                                    const BSONObj& cmdObj) final;
 
     StatusWith<Shard::QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const std::string& dbName,
+        StringData dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) final;
 
@@ -125,7 +125,7 @@ private:
     StatusWith<AsyncCmdHandle> _scheduleCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const std::string& dbName,
+        StringData dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj,
         const executor::TaskExecutor::RemoteCommandCallbackFn& cb);

@@ -110,16 +110,6 @@ std::string buildParticipantListString(const std::vector<ShardId>& participantLi
     return ss.str();
 }
 
-bool checkIsLocalShard(ServiceContext* serviceContext, const ShardId& shardId) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return shardId == ShardRegistry::kConfigServerShardId;
-    }
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        return shardId == ShardingState::get(serviceContext)->shardId();
-    }
-    MONGO_UNREACHABLE;  // Only sharded systems should use the two-phase commit path.
-}
-
 bool shouldRetryPersistingCoordinatorState(const Status& responseStatus) {
     // Writes to the local node are expected to succeed if this node is still primary, so *only*
     // retry if the write was explicitly interrupted (we do not allow a user to stop a commit
@@ -131,11 +121,9 @@ bool shouldRetryPersistingCoordinatorState(const Status& responseStatus) {
 
 }  // namespace
 
-TransactionCoordinatorDriver::TransactionCoordinatorDriver(
-    ServiceContext* serviceContext, std::unique_ptr<txn::AsyncWorkScheduler> scheduler)
-    : _serviceContext(serviceContext), _scheduler(std::move(scheduler)) {}
-
-TransactionCoordinatorDriver::~TransactionCoordinatorDriver() = default;
+TransactionCoordinatorDriver::TransactionCoordinatorDriver(ServiceContext* serviceContext,
+                                                           txn::AsyncWorkScheduler& scheduler)
+    : _serviceContext(serviceContext), _scheduler(scheduler) {}
 
 namespace {
 void persistParticipantListBlocking(OperationContext* opCtx,
@@ -228,11 +216,11 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
 Future<void> TransactionCoordinatorDriver::persistParticipantList(
     const LogicalSessionId& lsid, TxnNumber txnNumber, std::vector<ShardId> participantList) {
-    return txn::doWhile(*_scheduler,
+    return txn::doWhile(_scheduler,
                         boost::none /* no need for a backoff */,
                         [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
                         [this, lsid, txnNumber, participantList] {
-                            return _scheduler->scheduleWork(
+                            return _scheduler.scheduleWork(
                                 [lsid, txnNumber, participantList](OperationContext* opCtx) {
                                     persistParticipantListBlocking(
                                         opCtx, lsid, txnNumber, participantList);
@@ -255,7 +243,7 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
 
     // Send prepare to all participants asynchronously and collect their future responses in a
     // vector of responses.
-    auto prepareScheduler = _scheduler->makeChildScheduler();
+    auto prepareScheduler = _scheduler.makeChildScheduler();
 
     for (const auto& participant : participantShards) {
         responses.push_back(sendPrepareToShard(*prepareScheduler, participant, prepareObj));
@@ -419,11 +407,11 @@ Future<void> TransactionCoordinatorDriver::persistDecision(
     std::vector<ShardId> participantList,
     const boost::optional<Timestamp>& commitTimestamp) {
     return txn::doWhile(
-        *_scheduler,
+        _scheduler,
         boost::none /* no need for a backoff */,
         [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
         [this, lsid, txnNumber, participantList, commitTimestamp] {
-            return _scheduler->scheduleWork([lsid, txnNumber, participantList, commitTimestamp](
+            return _scheduler.scheduleWork([lsid, txnNumber, participantList, commitTimestamp](
                 OperationContext* opCtx) {
                 persistDecisionBlocking(opCtx, lsid, txnNumber, participantList, commitTimestamp);
             });
@@ -444,7 +432,7 @@ Future<void> TransactionCoordinatorDriver::sendCommit(const std::vector<ShardId>
 
     std::vector<Future<void>> responses;
     for (const auto& participant : participantShards) {
-        responses.push_back(sendDecisionToParticipantShard(*_scheduler, participant, commitObj));
+        responses.push_back(sendDecisionToParticipantShard(_scheduler, participant, commitObj));
     }
     return txn::whenAll(responses);
 }
@@ -461,7 +449,7 @@ Future<void> TransactionCoordinatorDriver::sendAbort(const std::vector<ShardId>&
 
     std::vector<Future<void>> responses;
     for (const auto& participant : participantShards) {
-        responses.push_back(sendDecisionToParticipantShard(*_scheduler, participant, abortObj));
+        responses.push_back(sendDecisionToParticipantShard(_scheduler, participant, abortObj));
     }
     return txn::whenAll(responses);
 }
@@ -531,11 +519,11 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
 Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSessionId& lsid,
                                                                 TxnNumber txnNumber) {
-    return txn::doWhile(*_scheduler,
+    return txn::doWhile(_scheduler,
                         boost::none /* no need for a backoff */,
                         [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
                         [this, lsid, txnNumber] {
-                            return _scheduler->scheduleWork(
+                            return _scheduler.scheduleWork(
                                 [lsid, txnNumber](OperationContext* opCtx) {
                                     deleteCoordinatorDocBlocking(opCtx, lsid, txnNumber);
                                 });
@@ -563,7 +551,7 @@ std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAl
 
 Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
     txn::AsyncWorkScheduler& scheduler, const ShardId& shardId, const BSONObj& commandObj) {
-    const bool isLocalShard = checkIsLocalShard(_serviceContext, shardId);
+    const bool isLocalShard = (shardId == txn::getLocalShardId(_serviceContext));
 
     auto f = txn::doWhile(
         scheduler,
@@ -645,7 +633,7 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
 
 Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
     txn::AsyncWorkScheduler& scheduler, const ShardId& shardId, const BSONObj& commandObj) {
-    const bool isLocalShard = checkIsLocalShard(_serviceContext, shardId);
+    const bool isLocalShard = (shardId == txn::getLocalShardId(_serviceContext));
 
     return txn::doWhile(
         scheduler,

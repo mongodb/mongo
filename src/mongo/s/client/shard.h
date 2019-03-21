@@ -294,14 +294,14 @@ private:
      */
     virtual StatusWith<CommandResponse> _runCommand(OperationContext* opCtx,
                                                     const ReadPreferenceSetting& readPref,
-                                                    const std::string& dbname,
+                                                    StringData dbname,
                                                     Milliseconds maxTimeMSOverride,
                                                     const BSONObj& cmdObj) = 0;
 
     virtual StatusWith<QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const std::string& dbName,
+        StringData dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) = 0;
 

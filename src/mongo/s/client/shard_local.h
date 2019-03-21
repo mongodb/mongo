@@ -74,14 +74,14 @@ public:
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& unused,
-                                                   const std::string& dbName,
+                                                   StringData dbName,
                                                    Milliseconds maxTimeMSOverrideUnused,
                                                    const BSONObj& cmdObj) final;
 
     StatusWith<Shard::QueryResponse> _runExhaustiveCursorCommand(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,
-        const std::string& dbName,
+        StringData dbName,
         Milliseconds maxTimeMSOverride,
         const BSONObj& cmdObj) final;
 

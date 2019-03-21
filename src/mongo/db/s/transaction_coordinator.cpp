@@ -79,7 +79,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
       _lsid(lsid),
       _txnNumber(txnNumber),
       _scheduler(std::move(scheduler)),
-      _driver(serviceContext, _scheduler->makeChildScheduler()) {
+      _driver(serviceContext, *_scheduler) {
     if (coordinateCommitDeadline) {
         _deadlineScheduler = _scheduler->makeChildScheduler();
         _deadlineScheduler
@@ -93,10 +93,11 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
 }
 
 TransactionCoordinator::~TransactionCoordinator() {
-    _cancelTimeoutWaitForCommitTask();
+    cancelIfCommitNotYetStarted();
 
+    // Wait for all scheduled asynchronous activity to complete
     if (_deadlineScheduler)
-        _deadlineScheduler.reset();
+        _deadlineScheduler->join();
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_state == TransactionCoordinator::CoordinatorState::kDone);
@@ -231,13 +232,11 @@ Future<void> TransactionCoordinator::_sendDecisionToParticipants(
     invariant(_state == CoordinatorState::kPreparing);
     _decisionPromise.emplaceValue(decision.decision);
 
-    // Send the decision to all participants.
     switch (decision.decision) {
         case txn::CommitDecision::kCommit:
             _state = CoordinatorState::kCommitting;
-            invariant(decision.commitTimestamp);
             return _driver.sendCommit(
-                participantShards, _lsid, _txnNumber, decision.commitTimestamp.get());
+                participantShards, _lsid, _txnNumber, *decision.commitTimestamp);
         case txn::CommitDecision::kAbort:
             _state = CoordinatorState::kAborting;
             return _driver.sendAbort(participantShards, _lsid, _txnNumber);
