@@ -3491,13 +3491,16 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     }
 }
 
-void ReplicationCoordinatorImpl::advanceCommitPoint(const OpTime& committedOpTime) {
+void ReplicationCoordinatorImpl::advanceCommitPoint(const OpTime& committedOpTime,
+                                                    bool fromSyncSource) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _advanceCommitPoint(lk, committedOpTime);
+    _advanceCommitPoint(lk, committedOpTime, fromSyncSource);
 }
 
-void ReplicationCoordinatorImpl::_advanceCommitPoint(WithLock lk, const OpTime& committedOpTime) {
-    if (_topCoord->advanceLastCommittedOpTime(committedOpTime)) {
+void ReplicationCoordinatorImpl::_advanceCommitPoint(WithLock lk,
+                                                     const OpTime& committedOpTime,
+                                                     bool fromSyncSource) {
+    if (_topCoord->advanceLastCommittedOpTime(committedOpTime, fromSyncSource)) {
         if (_getMemberState_inlock().arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.

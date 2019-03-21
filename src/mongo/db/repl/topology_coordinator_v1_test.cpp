@@ -1649,7 +1649,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     makeSelfPrimary(electionTime);
     topoCoordSetMyLastAppliedOpTime(oplogProgress, startupTime, false);
     topoCoordSetMyLastDurableOpTime(oplogDurable, startupTime, false);
-    getTopoCoord().advanceLastCommittedOpTime(lastCommittedOpTime);
+    getTopoCoord().advanceLastCommittedOpTime(lastCommittedOpTime, false);
 
     // Now node 0 is down, node 1 is up, and for node 2 we have no heartbeat data yet.
     BSONObjBuilder statusBuilder;

@@ -86,11 +86,9 @@ public:
 
     /**
      * Forwards the parsed metadata in the query results to the replication system.
-     *
-     * TODO (SERVER-27668): Make OplogQueryMetadata non-optional in mongodb 3.8.
      */
     virtual void processMetadata(const rpc::ReplSetMetadata& replMetadata,
-                                 boost::optional<rpc::OplogQueryMetadata> oqMetadata) = 0;
+                                 rpc::OplogQueryMetadata oqMetadata) = 0;
 
     /**
      * Evaluates quality of sync source. Accepts the current sync source; the last optime on this

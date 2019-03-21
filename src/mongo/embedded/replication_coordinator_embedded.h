@@ -175,7 +175,7 @@ public:
 
     void processReplSetMetadata(const rpc::ReplSetMetadata&) override;
 
-    void advanceCommitPoint(const repl::OpTime& committedOpTime) override;
+    void advanceCommitPoint(const repl::OpTime& committedOpTime, bool fromSyncSource) override;
 
     void cancelAndRescheduleElectionTimeout() override;
 

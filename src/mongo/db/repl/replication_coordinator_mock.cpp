@@ -325,7 +325,8 @@ void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result)
 
 void ReplicationCoordinatorMock::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {}
 
-void ReplicationCoordinatorMock::advanceCommitPoint(const OpTime& committedOptime) {}
+void ReplicationCoordinatorMock::advanceCommitPoint(const OpTime& committedOptime,
+                                                    bool fromSyncSource) {}
 
 void ReplicationCoordinatorMock::cancelAndRescheduleElectionTimeout() {}
 

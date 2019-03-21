@@ -77,21 +77,17 @@ OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOp
     return {_replicationCoordinator->getTerm(), _replicationCoordinator->getLastCommittedOpTime()};
 }
 
-void DataReplicatorExternalStateImpl::processMetadata(
-    const rpc::ReplSetMetadata& replMetadata, boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
+void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata& replMetadata,
+                                                      rpc::OplogQueryMetadata oqMetadata) {
     OpTime newCommitPoint;
-    // If OplogQueryMetadata was provided, use its values, otherwise use the ones in
-    // ReplSetMetadata.
-    if (oqMetadata) {
-        newCommitPoint = oqMetadata->getLastOpCommitted();
-    } else {
-        newCommitPoint = replMetadata.getLastOpCommitted();
-    }
-    _replicationCoordinator->advanceCommitPoint(newCommitPoint);
+    newCommitPoint = oqMetadata.getLastOpCommitted();
+
+    const bool fromSyncSource = true;
+    _replicationCoordinator->advanceCommitPoint(newCommitPoint, fromSyncSource);
 
     _replicationCoordinator->processReplSetMetadata(replMetadata);
 
-    if ((oqMetadata && (oqMetadata->getPrimaryIndex() != rpc::OplogQueryMetadata::kNoPrimary)) ||
+    if ((oqMetadata.getPrimaryIndex() != rpc::OplogQueryMetadata::kNoPrimary) ||
         (replMetadata.getPrimaryIndex() != rpc::ReplSetMetadata::kNoPrimary)) {
         _replicationCoordinator->cancelAndRescheduleElectionTimeout();
     }

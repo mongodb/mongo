@@ -2407,24 +2407,16 @@ bool TopologyCoordinator::updateLastCommittedOpTime() {
     // need the majority to have this OpTime
     OpTime committedOpTime =
         votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getWriteMajority()];
-    return advanceLastCommittedOpTime(committedOpTime);
+
+    const bool fromSyncSource = false;
+    return advanceLastCommittedOpTime(committedOpTime, fromSyncSource);
 }
 
-bool TopologyCoordinator::advanceLastCommittedOpTime(const OpTime& committedOpTime) {
+bool TopologyCoordinator::advanceLastCommittedOpTime(OpTime committedOpTime, bool fromSyncSource) {
     if (_selfIndex == -1) {
         // The config hasn't been installed or we are not in the config. This could happen
         // on heartbeats before installing a config.
         return false;
-    }
-
-    if (committedOpTime == _lastCommittedOpTime) {
-        return false;  // Hasn't changed, so ignore it.
-    }
-
-    if (committedOpTime < _lastCommittedOpTime) {
-        LOG(1) << "Ignoring older committed snapshot optime: " << committedOpTime
-               << ", currentCommittedOpTime: " << _lastCommittedOpTime;
-        return false;  // This may have come from an out-of-order heartbeat. Ignore it.
     }
 
     // This check is performed to ensure primaries do not commit an OpTime from a previous term.
@@ -2435,12 +2427,26 @@ bool TopologyCoordinator::advanceLastCommittedOpTime(const OpTime& committedOpTi
     }
 
     // Arbiters don't have data so they always advance their commit point via heartbeats.
-    // Otherwise, only update the commit point if it's on the same oplog branch as our last applied.
     if (!_selfConfig().isArbiter() &&
         getMyLastAppliedOpTime().getTerm() != committedOpTime.getTerm()) {
-        LOG(1) << "Ignoring commit point with different term than my lastApplied, since it may "
-                  "not be on the same oplog branch as mine. optime: "
-               << committedOpTime << ", my last applied: " << getMyLastAppliedOpTime();
+        if (fromSyncSource) {
+            committedOpTime = std::min(committedOpTime, getMyLastAppliedOpTime());
+        } else {
+            LOG(1) << "Ignoring commit point with different term than my lastApplied, since it "
+                      "may "
+                      "not be on the same oplog branch as mine. optime: "
+                   << committedOpTime << ", my last applied: " << getMyLastAppliedOpTime();
+            return false;
+        }
+    }
+
+    if (committedOpTime == _lastCommittedOpTime) {
+        return false;  // Hasn't changed, so ignore it.
+    }
+
+    if (committedOpTime < _lastCommittedOpTime) {
+        LOG(1) << "Ignoring older committed snapshot optime: " << committedOpTime
+               << ", currentCommittedOpTime: " << _lastCommittedOpTime;
         return false;
     }
 

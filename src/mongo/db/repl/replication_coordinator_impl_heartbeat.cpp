@@ -188,7 +188,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
                 serverGlobalParams.featureCompatibility.getVersion() ==
                     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42;
             if (_getMemberState_inlock().arbiter() || isFCV42) {
-                _advanceCommitPoint(lk, replMetadata.getValue().getLastOpCommitted());
+                // The node that sent the heartbeat is not guaranteed to be our sync source.
+                const bool fromSyncSource = false;
+                _advanceCommitPoint(
+                    lk, replMetadata.getValue().getLastOpCommitted(), fromSyncSource);
             }
 
             // Asynchronous stepdown could happen, but it will wait for _mutex and execute

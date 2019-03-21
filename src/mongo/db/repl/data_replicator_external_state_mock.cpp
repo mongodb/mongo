@@ -78,12 +78,10 @@ OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOp
     return {currentTerm, lastCommittedOpTime};
 }
 
-void DataReplicatorExternalStateMock::processMetadata(
-    const rpc::ReplSetMetadata& replMetadata, boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
+void DataReplicatorExternalStateMock::processMetadata(const rpc::ReplSetMetadata& replMetadata,
+                                                      rpc::OplogQueryMetadata oqMetadata) {
     replMetadataProcessed = replMetadata;
-    if (oqMetadata) {
-        oqMetadataProcessed = oqMetadata.get();
-    }
+    oqMetadataProcessed = oqMetadata.get();
     metadataWasProcessed = true;
 }
 

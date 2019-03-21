@@ -615,9 +615,12 @@ public:
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) = 0;
 
     /**
-     * This updates the node's notion of the commit point.
+     * This updates the node's notion of the commit point. We ignore 'committedOptime' if it has a
+     * different term than our lastApplied, unless 'fromSyncSource'=true, which guarantees we are on
+     * the same branch of history as 'committedOptime', so we update our commit point to
+     * min(committedOptime, lastApplied).
      */
-    virtual void advanceCommitPoint(const OpTime& committedOptime) = 0;
+    virtual void advanceCommitPoint(const OpTime& committedOptime, bool fromSyncSource) = 0;
 
     /**
      * Elections under protocol version 1 are triggered by a timer.

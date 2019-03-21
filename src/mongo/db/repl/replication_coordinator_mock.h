@@ -189,7 +189,7 @@ public:
 
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
 
-    virtual void advanceCommitPoint(const OpTime& committedOptime) override;
+    virtual void advanceCommitPoint(const OpTime& committedOptime, bool fromSyncSource) override;
 
     virtual void cancelAndRescheduleElectionTimeout() override;
 

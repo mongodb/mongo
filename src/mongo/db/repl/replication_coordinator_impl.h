@@ -219,7 +219,7 @@ public:
 
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
 
-    virtual void advanceCommitPoint(const OpTime& committedOpTime) override;
+    virtual void advanceCommitPoint(const OpTime& committedOpTime, bool fromSyncSource) override;
 
     virtual void cancelAndRescheduleElectionTimeout() override;
 
@@ -1063,10 +1063,13 @@ private:
         stdx::unique_lock<stdx::mutex> lock);
 
     /**
-     * Updates the last committed OpTime to be "committedOpTime" if it is more recent than the
-     * current last committed OpTime.
+     * Updates the last committed OpTime to be 'committedOpTime' if it is more recent than the
+     * current last committed OpTime. We ignore 'committedOpTime' if it has a different term than
+     * our lastApplied, unless 'fromSyncSource'=true, which guarantees we are on the same branch of
+     * history as 'committedOpTime', so we update our commit point to min(committedOpTime,
+     * lastApplied).
      */
-    void _advanceCommitPoint(WithLock lk, const OpTime& committedOpTime);
+    void _advanceCommitPoint(WithLock lk, const OpTime& committedOpTime, bool fromSyncSource);
 
     /**
      * Scan the memberData and determine the highest last applied or last

@@ -233,10 +233,13 @@ public:
     bool updateLastCommittedOpTime();
 
     /**
-     * Updates _lastCommittedOpTime to be "committedOpTime" if it is more recent than the
-     * current last committed OpTime.  Returns true if _lastCommittedOpTime is changed.
+     * Updates _lastCommittedOpTime to be 'committedOpTime' if it is more recent than the current
+     * last committed OpTime.  Returns true if _lastCommittedOpTime is changed. We ignore
+     * 'committedOpTime' if it has a different term than our lastApplied, unless
+     * 'fromSyncSource'=true, which guarantees we are on the same branch of history as
+     * 'committedOpTime', so we update our commit point to min(committedOpTime, lastApplied).
      */
-    bool advanceLastCommittedOpTime(const OpTime& committedOpTime);
+    bool advanceLastCommittedOpTime(OpTime committedOpTime, bool fromSyncSource);
 
     /**
      * Returns the OpTime of the latest majority-committed op known to this server.

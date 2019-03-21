@@ -52,7 +52,7 @@ public:
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
     void processMetadata(const rpc::ReplSetMetadata& replMetadata,
-                         boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
+                         rpc::OplogQueryMetadata oqMetadata) override;
 
     bool shouldStopFetching(const HostAndPort& source,
                             const rpc::ReplSetMetadata& replMetadata,
