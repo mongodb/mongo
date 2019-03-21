@@ -1,0 +1,76 @@
+#adapted from https://hg.mozilla.org/mozilla-central/rev/da05e40ae372
+diff --git a/src/third_party/mozjs-60/extract/js/src/jsapi.cpp b/src/third_party/mozjs-60/extract/js/src/jsapi.cpp
+index d071cb1137..ede42f4bab 100644
+--- a/src/third_party/mozjs-60/extract/js/src/jsapi.cpp
++++ b/src/third_party/mozjs-60/extract/js/src/jsapi.cpp
+@@ -1556,16 +1556,14 @@ JS_GetGCParameter(JSContext* cx, JSGCParamKey key)
+     return cx->runtime()->gc.getParameter(key, lock);
+ }
+ 
+-static const size_t NumGCConfigs = 14;
+-struct JSGCConfig {
+-    JSGCParamKey key;
+-    uint32_t value;
+-};
+-
+ JS_PUBLIC_API(void)
+ JS_SetGCParametersBasedOnAvailableMemory(JSContext* cx, uint32_t availMem)
+ {
+-    static const JSGCConfig minimal[NumGCConfigs] = {
++    struct JSGCConfig {
++      JSGCParamKey key;
++      uint32_t value;
++    };
++    static const JSGCConfig minimal[] = {
+         {JSGC_MAX_MALLOC_BYTES, 6 * 1024 * 1024},
+         {JSGC_SLICE_TIME_BUDGET, 30},
+         {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1500},
+@@ -1581,29 +1579,26 @@ JS_SetGCParametersBasedOnAvailableMemory(JSContext* cx, uint32_t availMem)
+         {JSGC_MODE, JSGC_MODE_INCREMENTAL}
+     };
+ 
+-    const JSGCConfig* config = minimal;
+-    if (availMem > 512) {
+-        static const JSGCConfig nominal[NumGCConfigs] = {
+-            {JSGC_MAX_MALLOC_BYTES, 6 * 1024 * 1024},
+-            {JSGC_SLICE_TIME_BUDGET, 30},
+-            {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1000},
+-            {JSGC_HIGH_FREQUENCY_HIGH_LIMIT, 500},
+-            {JSGC_HIGH_FREQUENCY_LOW_LIMIT, 100},
+-            {JSGC_HIGH_FREQUENCY_HEAP_GROWTH_MAX, 300},
+-            {JSGC_HIGH_FREQUENCY_HEAP_GROWTH_MIN, 150},
+-            {JSGC_LOW_FREQUENCY_HEAP_GROWTH, 150},
+-            {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1500},
+-            {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1500},
+-            {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1500},
+-            {JSGC_ALLOCATION_THRESHOLD, 30},
+-            {JSGC_MODE, JSGC_MODE_ZONE}
+-        };
+-
+-        config = nominal;
+-    }
++    static const JSGCConfig nominal[] = {
++        {JSGC_MAX_MALLOC_BYTES, 6 * 1024 * 1024},
++        {JSGC_SLICE_TIME_BUDGET, 30},
++        {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1000},
++        {JSGC_HIGH_FREQUENCY_HIGH_LIMIT, 500},
++        {JSGC_HIGH_FREQUENCY_LOW_LIMIT, 100},
++        {JSGC_HIGH_FREQUENCY_HEAP_GROWTH_MAX, 300},
++        {JSGC_HIGH_FREQUENCY_HEAP_GROWTH_MIN, 150},
++        {JSGC_LOW_FREQUENCY_HEAP_GROWTH, 150},
++        {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1500},
++        {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1500},
++        {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1500},
++        {JSGC_ALLOCATION_THRESHOLD, 30},
++        {JSGC_MODE, JSGC_MODE_ZONE}
++    };
+ 
+-    for (size_t i = 0; i < NumGCConfigs; i++)
+-        JS_SetGCParameter(cx, config[i].key, config[i].value);
++    const auto& configSet = availMem > 512 ? nominal : minimal;
++    for (const auto& config : configSet) {
++        JS_SetGCParameter(cx, config.key, config.value);
++    }
+ }
+ 
+ 
