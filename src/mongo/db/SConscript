@@ -1004,7 +1004,6 @@ env.Library(
         "query_exec",
         "service_context",
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
         "$BUILD_DIR/mongo/db/catalog/index_build_entry_idl",
         "$BUILD_DIR/mongo/db/matcher/expressions_mongod_only",

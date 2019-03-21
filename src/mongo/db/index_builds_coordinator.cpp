@@ -68,25 +68,6 @@ constexpr auto kUniqueFieldName = "unique"_sd;
 constexpr auto kKeyFieldName = "key"_sd;
 
 /**
- * Returns the collection UUID for the given 'nss', or a NamespaceNotFound error.
- *
- * Momentarily takes the collection IS lock for 'nss' to access the collection UUID.
- */
-StatusWith<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
-    try {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto collection = autoColl.getCollection();
-        if (!collection) {
-            return {ErrorCodes::NamespaceNotFound, nss.ns()};
-        }
-        return collection->uuid().get();
-    } catch (const DBException& ex) {
-        invariant(ex.toStatus().code() == ErrorCodes::NamespaceNotFound);
-        return ex.toStatus();
-    }
-}
-
-/**
  * Checks if unique index specification is compatible with sharding configuration.
  */
 void checkShardKeyRestrictions(OperationContext* opCtx,
@@ -282,6 +263,8 @@ void IndexBuildsCoordinator::interruptAllIndexBuilds(const std::string& reason) 
 
     // Wait for all the index builds to stop.
     for (auto& dbIt : _databaseIndexBuilds) {
+        // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that
+        // the object does not destruct while we are waiting, causing a use-after-free memory error.
         auto dbIndexBuildsSharedPtr = dbIt.second;
         dbIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
     }
@@ -302,6 +285,8 @@ void IndexBuildsCoordinator::abortCollectionIndexBuilds(const UUID& collectionUU
 
     collIndexBuildsIt->second->runOperationOnAllBuilds(
         lk, &_indexBuildsManager, abortIndexBuild, reason);
+    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
+    // object does not destruct while we are waiting, causing a use-after-free memory error.
     auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
     collIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
 }
@@ -319,6 +304,9 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(StringData db, const std::
     }
 
     dbIndexBuilds->runOperationOnAllBuilds(lk, &_indexBuildsManager, abortIndexBuild, reason);
+
+    // 'dbIndexBuilds' is a shared ptr, so it can be safely waited upon without destructing before
+    // waitUntilNoIndexBuildsRemain() returns, which would cause a use-after-free memory error.
     dbIndexBuilds->waitUntilNoIndexBuildsRemain(lk);
 }
 
@@ -381,6 +369,15 @@ bool IndexBuildsCoordinator::inProgForDb(StringData db) const {
     return _databaseIndexBuilds.find(db) != _databaseIndexBuilds.end();
 }
 
+void IndexBuildsCoordinator::assertNoIndexBuildInProgress() const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
+            mongoutils::str::stream() << "cannot perform operation: there are currently "
+                                      << _allIndexBuilds.size()
+                                      << " index builds running.",
+            _allIndexBuilds.size() == 0);
+}
+
 void IndexBuildsCoordinator::assertNoIndexBuildInProgForCollection(
     const UUID& collectionUUID) const {
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
@@ -398,21 +395,17 @@ void IndexBuildsCoordinator::assertNoBgOpInProgForDb(StringData db) const {
             !inProgForDb(db));
 }
 
-void IndexBuildsCoordinator::awaitNoBgOpInProgForNs(OperationContext* opCtx, StringData ns) const {
-    auto statusWithCollectionUUID = getCollectionUUID(opCtx, NamespaceString(ns));
-    if (!statusWithCollectionUUID.isOK()) {
-        // The collection does not exist, so there are no index builds on it.
-        invariant(statusWithCollectionUUID.getStatus().code() == ErrorCodes::NamespaceNotFound);
-        return;
-    }
-
+void IndexBuildsCoordinator::awaitNoIndexBuildInProgressForCollection(
+    const UUID& collectionUUID) const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    auto collIndexBuildsIt = _collectionIndexBuilds.find(statusWithCollectionUUID.getValue());
+    auto collIndexBuildsIt = _collectionIndexBuilds.find(collectionUUID);
     if (collIndexBuildsIt == _collectionIndexBuilds.end()) {
         return;
     }
 
+    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
+    // object does not destruct while we are waiting, causing a use-after-free memory error.
     auto collIndexBuildsSharedPtr = collIndexBuildsIt->second;
     collIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
 }
@@ -421,10 +414,12 @@ void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(StringData db) const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto dbIndexBuildsIt = _databaseIndexBuilds.find(db);
-    if (dbIndexBuildsIt != _databaseIndexBuilds.end()) {
+    if (dbIndexBuildsIt == _databaseIndexBuilds.end()) {
         return;
     }
 
+    // Take a shared ptr, rather than accessing the Tracker through the map's iterator, so that the
+    // object does not destruct while we are waiting, causing a use-after-free memory error.
     auto dbIndexBuildsSharedPtr = dbIndexBuildsIt->second;
     dbIndexBuildsSharedPtr->waitUntilNoIndexBuildsRemain(lk);
 }

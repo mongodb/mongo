@@ -80,6 +80,9 @@ public:
      *
      * If we are applying a 'drop' oplog entry on a secondary, 'dropOpTime' will contain the optime
      * of the oplog entry.
+     *
+     * The caller should hold a DB X lock and ensure there are no index builds in progress on the
+     * collection.
      */
     Status dropCollection(OperationContext* opCtx,
                           StringData fullns,
@@ -119,6 +122,9 @@ public:
      * Renames the fully qualified namespace 'fromNS' to the fully qualified namespace 'toNS'.
      * Illegal to call unless both 'fromNS' and 'toNS' are within this database. Returns an error if
      * 'toNS' already exists or 'fromNS' does not exist.
+     *
+     * The caller should hold a DB X lock and ensure there are no index builds in progress on either
+     * the 'fromNS' or the 'toNS'.
      */
     Status renameCollection(OperationContext* opCtx,
                             StringData fromNS,

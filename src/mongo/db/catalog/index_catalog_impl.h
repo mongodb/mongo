@@ -67,6 +67,7 @@ public:
     // ---- accessors -----
 
     bool haveAnyIndexes() const override;
+    bool haveAnyIndexesInProgress() const override;
     int numIndexesTotal(OperationContext* opCtx) const override;
     int numIndexesReady(OperationContext* opCtx) const override;
     int numIndexesInProgress(OperationContext* opCtx) const {
@@ -154,6 +155,9 @@ public:
      * Use this method to notify the IndexCatalog that the spec for this index has changed.
      *
      * It is invalid to dereference 'oldDesc' after calling this method.
+     *
+     * The caller must hold the collection X lock and ensure no index builds are in progress
+     * on the collection.
      */
     const IndexDescriptor* refreshEntry(OperationContext* opCtx,
                                         const IndexDescriptor* oldDesc) override;
@@ -201,6 +205,12 @@ public:
                         stdx::function<void(const IndexDescriptor*)> onDropFn) override;
     void dropAllIndexes(OperationContext* opCtx, bool includingIdIndex) override;
 
+    /**
+     * Drops the index.
+     *
+     * The caller must hold the collection X lock and ensure no index builds are in progress on the
+     * collection.
+     */
     Status dropIndex(OperationContext* opCtx, const IndexDescriptor* desc) override;
 
     /**

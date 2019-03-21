@@ -633,6 +633,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'drop_pending_collection_reaper',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )

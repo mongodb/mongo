@@ -136,6 +136,17 @@ bool BackgroundOperation::inProgForNs(StringData ns) {
     return nsInProg.find(ns) != nsInProg.end();
 }
 
+void BackgroundOperation::assertNoBgOpInProg() {
+    for (auto& db : dbsInProg) {
+        uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
+                mongoutils::str::stream()
+                    << "cannot perform operation: a background operation is currently running for "
+                       "database "
+                    << db.first,
+                !inProgForDb(db.first));
+    }
+}
+
 void BackgroundOperation::assertNoBgOpInProgForDb(StringData db) {
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
             mongoutils::str::stream()

@@ -263,6 +263,11 @@ public:
     bool inProgForDb(StringData db) const;
 
     /**
+     * Uasserts if any index builds are in progress on any database.
+     */
+    void assertNoIndexBuildInProgress() const;
+
+    /**
      * Uasserts if any index builds is in progress on the specified collection.
      */
     void assertNoIndexBuildInProgForCollection(const UUID& collectionUUID) const;
@@ -274,13 +279,8 @@ public:
 
     /**
      * Waits for all index builds on a specified collection to finish.
-     *
-     * Momentarily takes the collection IS lock for 'ns', to fetch the collection UUID.
      */
-    void awaitNoBgOpInProgForNs(OperationContext* opCtx, StringData ns) const;
-    void awaitNoBgOpInProgForNs(OperationContext* opCtx, const NamespaceString& ns) const {
-        awaitNoBgOpInProgForNs(opCtx, ns.ns());
-    }
+    void awaitNoIndexBuildInProgressForCollection(const UUID& collectionUUID) const;
 
     /**
      * Waits for all index builds on a specified database to finish.

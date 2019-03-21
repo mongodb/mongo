@@ -741,7 +741,10 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
                                       stdx::function<void(const IndexDescriptor*)> onDropFn) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
 
-    BackgroundOperation::assertNoBgOpInProgForNs(_collection->ns().ns());
+    uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
+            mongoutils::str::stream()
+                << "cannot perform operation: an index build is currently running",
+            !haveAnyIndexesInProgress());
 
     // make sure nothing in progress
     massert(17348,
@@ -814,8 +817,7 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx, bool includingIdI
 
 Status IndexCatalogImpl::dropIndex(OperationContext* opCtx, const IndexDescriptor* desc) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
-    BackgroundOperation::assertNoBgOpInProgForNs(_collection->ns().ns());
-    invariant(_buildingIndexes.size() == 0);
+    invariant(!haveAnyIndexesInProgress());
 
     IndexCatalogEntry* entry = _readyIndexes.find(desc);
 
@@ -959,6 +961,10 @@ void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
 
 bool IndexCatalogImpl::haveAnyIndexes() const {
     return _readyIndexes.size() > 0 || _buildingIndexes.size() > 0;
+}
+
+bool IndexCatalogImpl::haveAnyIndexesInProgress() const {
+    return _buildingIndexes.size() > 0;
 }
 
 int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
@@ -1125,7 +1131,6 @@ std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getAllRe
 const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
                                                       const IndexDescriptor* oldDesc) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
-    invariant(!BackgroundOperation::inProgForNs(_collection->ns()));
     invariant(_buildingIndexes.size() == 0);
 
     const std::string indexName = oldDesc->indexName();
