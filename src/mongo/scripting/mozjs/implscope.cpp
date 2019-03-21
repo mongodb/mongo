@@ -80,8 +80,10 @@ const double kInterruptGCThreshold = 0.8;
 
 /**
  * The number of bytes to allocate after which garbage collection is run
+ * The default is quite low and doesn't seem to directly correlate with
+ * malloc'd bytes. We bound JS heap usage by JSHeapLimit independent of this GC limit.
  */
-const int kMaxBytesBeforeGC = 8 * 1024 * 1024;
+const int kMaxBytesBeforeGC = 0xffffffff;
 
 /**
  * The size, in bytes, of each "stack chunk". 8192 is the recommended amount
@@ -372,8 +374,6 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
 
         // The memory limit is in megabytes
         JS_SetGCParametersBasedOnAvailableMemory(_context.get(), engine->getJSHeapLimitMB());
-        // TODO SERVER-39152 apply the mozilla patch to stop overriding JSGC_MAX_BYTES
-        JS_SetGCParameter(_context.get(), JSGC_MAX_BYTES, 0xffffffff);
     }
 }
 
@@ -425,11 +425,6 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _timestampProto(_context),
       _uriProto(_context) {
     kCurrentScope = this;
-
-    // The default is quite low and doesn't seem to directly correlate with
-    // malloc'd bytes.  Set it to MAX_INT here and catching things in the
-    // jscustomallocator.cpp
-    JS_SetGCParameter(_context, JSGC_MAX_BYTES, 0xffffffff);
 
     JS_AddInterruptCallback(_context, _interruptCallback);
     JS_SetGCCallback(_context, _gcCallback, this);
