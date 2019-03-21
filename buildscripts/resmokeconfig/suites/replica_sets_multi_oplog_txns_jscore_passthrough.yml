@@ -1,14 +1,12 @@
+# This test suite is intended to exercise the primary and secondary behavior for transactions
+# using the multiple oplog entries format.
+
 test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/**/*.js
+  - jstests/core/txns/*.js
   exclude_files:
-  # These tests are not expected to pass with replica-sets:
-  - jstests/core/dbadmin.js
-  - jstests/core/opcounters_write_cmd.js
-  - jstests/core/read_after_optime.js
-  - jstests/core/capped_update.js
   # These tests change the featureCompatibilityVersion which makes it so transactions aren't
   # supported.
   - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
@@ -17,13 +15,13 @@ selector:
   - jstests/core/txns/abort_expired_transaction.js
   - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
   - jstests/core/txns/kill_op_on_txn_expiry.js
-  # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
-  # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
-  # server parameter.
-  - jstests/core/set_param1.js
   # TODO SERVER-40068: Attempting to kill a session while multiple transactions have been started on
   # the server may lead to deadlock.
   - jstests/core/txns/kill_sessions_kills_transaction.js
+  exclude_with_any_tags:
+  # TODO SERVER-39444: Exclude prepared transactions until they are supported with the new multiple
+  # transactions oplog entry format.
+  - uses_prepare_transaction
 
 executor:
   archive:
@@ -50,6 +48,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        useMultipleOplogEntryFormatForTransactions: true
         # TODO SERVER-39321: Remove the following block now that SERVER-35377 has been resolved.
         #
         # When running tests that intentionally trigger a DuplicateKeyError, we somehow end up
