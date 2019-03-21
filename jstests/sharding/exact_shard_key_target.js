@@ -48,15 +48,6 @@ assert.eq(1,
               st.shard1.getCollection(coll.toString()).count({updated: true}));
 
 //
-// Successive upserts (save()-style)
-coll.remove({});
-assert.writeOK(coll.update({_id: 1}, {_id: 1, a: {b: 1}}, {upsert: true}));
-assert.writeOK(coll.update({_id: 1}, {_id: 1, a: {b: 1}}, {upsert: true}));
-assert.eq(1,
-          st.shard0.getCollection(coll.toString()).count() +
-              st.shard1.getCollection(coll.toString()).count());
-
-//
 // Successive upserts (replacement-style)
 coll.remove({});
 assert.writeOK(coll.update({a: {b: 1}}, {a: {b: 1}}, {upsert: true}));

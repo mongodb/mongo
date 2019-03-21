@@ -152,16 +152,48 @@
     assert.writeOK(collHashed.update({hash: /abcde.*/}, {$set: {updated: true}}, {multi: true}));
     assert.eq(collHashed.find().itcount(), collHashed.find({updated: true}).itcount());
 
+    collSharded.remove({});
+    collCompound.remove({});
+    collNested.remove({});
+
+    //
+    //
+    // Op-style updates with regex should fail on sharded collections.
+    // Query clause is targeted, and regex in query clause is ambiguous.
+    assert.commandFailedWithCode(
+        collSharded.update({a: /abcde-1/}, {"$set": {b: 1}}, {upsert: false}),
+        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        collSharded.update({a: /abcde-[1-2]/}, {"$set": {b: 1}}, {upsert: false}),
+        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        collNested.update({a: {b: /abcde-1/}}, {"$set": {"a.b": /abcde-1/, b: 1}}, {upsert: false}),
+        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        collNested.update({"a.b": /abcde.*/}, {"$set": {b: 1}}, {upsert: false}),
+        ErrorCodes.InvalidOptions);
+
+    //
+    //
+    // Replacement style updates with regex should work on sharded collections.
+    // If query clause is ambiguous, we fallback to using update clause for targeting.
+    assert.commandWorked(collSharded.update({a: /abcde.*/}, {a: /abcde.*/, b: 1}, {upsert: false}));
+    assert.commandWorked(collSharded.update({a: /abcde-1/}, {a: /abcde-1/, b: 1}, {upsert: false}));
+    assert.commandWorked(
+        collNested.update({a: {b: /abcde.*/}}, {a: {b: /abcde.*/}}, {upsert: false}));
+    assert.commandWorked(
+        collNested.update({'a.b': /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: false}));
+
     //
     //
     // Upsert with op-style regex should fail on sharded collections
     // Query clause is targeted, and regex in query clause is ambiguous
-    collSharded.remove({});
-    collCompound.remove({});
-    collNested.remove({});
+
+    // The queries will also be interpreted as regex based prefix search and cannot target a single
+    // shard.
     assert.writeError(collSharded.update({a: /abcde.*/}, {$set: {a: /abcde.*/}}, {upsert: true}));
     assert.writeError(
-        collCompound.update({a: /abcde.*/}, {$set: {a: /abcde.*/, b: 1}}, {upsert: true}));
+        collCompound.update({a: /abcde-1/}, {$set: {a: /abcde.*/, b: 1}}, {upsert: true}));
     // Exact regex in query never equality
     assert.writeError(
         collNested.update({'a.b': /abcde.*/}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
@@ -172,16 +204,21 @@
 
     //
     //
-    // Upsert by replacement-style regex should succeed on sharded collections
-    // Replacement clause is targeted, and regex is unambiguously a value
-    collSharded.remove({});
-    collCompound.remove({});
-    collNested.remove({});
-    assert.writeOK(collSharded.update({a: /abcde.*/}, {a: /abcde.*/}, {upsert: true}));
-    assert.writeOK(collCompound.update({a: /abcde.*/}, {a: /abcde.*/, b: 1}, {upsert: true}));
-    assert.writeOK(collNested.update({'a.b': /abcde.*/}, {a: {b: /abcde.*/}}, {upsert: true}));
-    assert.writeOK(collNested.update({a: {b: /abcde.*/}}, {a: {b: /abcde.*/}}, {upsert: true}));
-    assert.writeOK(collNested.update({c: 1}, {a: {b: /abcde.*/}}, {upsert: true}));
+    // Upsert by replacement-style regex should fail on sharded collections
+    // Query clause is targeted, and regex in query clause is ambiguous
+    assert.commandFailedWithCode(collSharded.update({a: /abcde.*/}, {a: /abcde.*/}, {upsert: true}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        collCompound.update({a: /abcde.*/}, {a: /abcde.*/, b: 1}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        collNested.update({'a.b': /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        collNested.update({a: {b: /abcde.*/}}, {a: {b: /abcde.*/}}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(collNested.update({c: 1}, {a: {b: /abcde.*/}}, {upsert: true}),
+                                 ErrorCodes.ShardKeyNotFound);
 
     //
     //

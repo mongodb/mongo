@@ -23,24 +23,22 @@
         coll = db.getCollection(collName);
         coll.insert({_id: 1, key: 1});
 
-        // these are both upserts
-        coll.save({_id: 2, key: 2});
-        coll.update({_id: 3, key: 3}, {$set: {foo: 'bar'}}, {upsert: true});
+        // Replacment and Opstyle upserts.
+        assert.commandWorked(coll.update({_id: 2, key: 2}, {key: 2, foo: 'bar'}, {upsert: true}));
+        assert.commandWorked(coll.update({_id: 3, key: 3}, {$set: {foo: 'bar'}}, {upsert: true}));
 
         assert.eq(coll.count(), 3, "count A");
         assert.eq(coll.findOne({_id: 3}).key, 3, "findOne 3 key A");
         assert.eq(coll.findOne({_id: 3}).foo, 'bar', "findOne 3 foo A");
 
-        // update existing using save()
-        coll.save({_id: 1, key: 1, other: 1});
-
         // update existing using update()
-        coll.update({_id: 2}, {key: 2, other: 2});
-        coll.update({_id: 3}, {key: 3, other: 3});
+        assert.commandWorked(coll.update({_id: 1}, {key: 1, other: 1}));
+        assert.commandWorked(coll.update({_id: 2}, {key: 2, other: 2}));
+        assert.commandWorked(coll.update({_id: 3}, {key: 3, other: 3}));
 
         // do a replacement-style update which queries the shard key and keeps it constant
-        coll.save({_id: 4, key: 4});
-        coll.update({key: 4}, {key: 4, other: 4});
+        assert.commandWorked(coll.update({key: 4}, {_id: 4, key: 4}, {upsert: true}));
+        assert.commandWorked(coll.update({key: 4}, {key: 4, other: 4}));
         assert.eq(coll.find({key: 4, other: 4}).count(), 1, 'replacement update error');
         coll.remove({_id: 4});
 

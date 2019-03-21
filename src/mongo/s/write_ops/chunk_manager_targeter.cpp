@@ -148,6 +148,12 @@ StatusWith<BSONObj> getUpdateExpr(OperationContext* opCtx,
     } else if (auto idElt = idFromQuery.getValue()[kIdFieldName]) {
         updateExpr = updateExpr.addField(idElt);
     }
+    // Confirm that the finalized replacement shard key is valid.
+    auto skStatus =
+        ShardKeyPattern::checkShardKeySize(shardKeyPattern.extractShardKeyFromDoc(updateExpr));
+    if (!skStatus.isOK()) {
+        return skStatus;
+    }
 
     return updateExpr;
 }
@@ -406,22 +412,13 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::targetInsert(OperationContext* o
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const {
     //
-    // Update targeting may use either the query or the update.  This is to support save-style
-    // updates, of the form:
-    //
-    // coll.update({ _id : xxx }, { _id : xxx, shardKey : 1, foo : bar }, { upsert : true })
-    //
-    // Because drivers do not know the shard key, they can't pull the shard key automatically
-    // into the query doc, and to correctly support upsert we must target a single shard.
-    //
-    // The rule is simple - If the update is replacement style (no '$set' or pipeline), we target
-    // using the update. If the update is not replacement style, we target using the query. Because
-    // mongoD will automatically propagate '_id' from an existing document, and will extract it from
-    // an exact-match in the query in the case of an upsert, we augment the replacement doc with the
+    // The rule is simple; we always attempt to target using the query first. If the update is
+    // replacement-style and the query targets more than one shard, we fall back to targeting using
+    // the replacement document, since it must always contain a full shard key. Upserts should have
+    // full shard key in the query and we always use query for targeting. Because mongoD will
+    // automatically propagate '_id' from an existing document, and will extract it from an
+    // exact-match in the query in the case of an upsert, we augment the replacement doc with the
     // query's '_id' for targeting purposes, if it exists.
-    //
-    // Once we have determined the correct component to target on, we attempt to extract an exact
-    // shard key from it. If one is present, we target using it.
     //
     const auto updateType = getUpdateExprType(updateDoc);
     if (!updateType.isOK()) {
@@ -449,39 +446,61 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
         return updateExpr.getStatus();
     }
 
-    // We first attempt to target by exact match on the shard key.
-    const auto swTarget = _targetUpdateByShardKey(
-        opCtx, updateType.getValue(), query, collation, updateExpr.getValue(), isUpsert);
-
-    // Return the status if we were successful in targeting by shard key. If this is an upsert, then
-    // we return the status regardless of whether or not we succeeded, since an upsert must always
-    // target an exact shard key or fail. If this is *not* an upsert and we were unable to target an
-    // exact shard key, then we proceed to try other means of targeting the update.
-    if (isUpsert || swTarget.isOK()) {
-        return swTarget;
-    }
-
-    // If we could not target by shard key, attempt to route the update by query or replacement doc.
-    auto shardEndPoints = (updateType.getValue() == UpdateType::kOpStyle
-                               ? _targetQuery(opCtx, query, collation)
-                               : _targetDoc(opCtx, updateExpr.getValue(), collation));
-
-    // Single (non-multi) updates must target a single shard, or an exact _id.
-    if (!updateDoc.getMulti() && shardEndPoints.isOK() && shardEndPoints.getValue().size() > 1) {
-        if (!isExactIdQuery(opCtx, getNS(), query, collation, _routingInfo->cm().get())) {
-            return {ErrorCodes::InvalidOptions,
-                    str::stream() << "A {multi:false} update on a sharded collection must either "
-                                     "contain an exact match on _id (and have the collection "
-                                     "default collation) or must target a single shard (and have "
-                                     "the simple collation), but this update targeted "
-                                  << shardEndPoints.getValue().size()
-                                  << " shards. Update request: "
-                                  << updateDoc.toBSON()
-                                  << ", shard key pattern: "
-                                  << shardKeyPattern.toString()};
+    // Utility function to target an update by shard key, and to handle any potential error results.
+    const auto targetByShardKey = [&collation, this](
+        StatusWith<BSONObj> shardKey, StringData msg) -> StatusWith<std::vector<ShardEndpoint>> {
+        if (!shardKey.isOK()) {
+            return shardKey.getStatus().withContext(msg);
         }
+        if (shardKey.getValue().isEmpty()) {
+            return {ErrorCodes::ShardKeyNotFound,
+                    str::stream() << msg << " :: could not extract exact shard key"};
+        }
+        auto swEndPoint = _targetShardKey(shardKey.getValue(), collation, 0);
+        if (!swEndPoint.isOK()) {
+            return swEndPoint.getStatus().withContext(msg);
+        }
+        return {{swEndPoint.getValue()}};
+    };
+
+    // If this is an upsert, then the query must contain an exact match on the shard key. If we were
+    // to target based on the replacement doc, it could result in an insertion even if a document
+    // matching the query exists on another shard.
+    if (isUpsert) {
+        return targetByShardKey(shardKeyPattern.extractShardKeyFromQuery(opCtx, query),
+                                "Failed to target upsert by query");
     }
 
+    // We first try to target based on the update's query. It is always valid to forward any update
+    // or upsert to a single shard, so return immediately if we are able to target a single shard.
+    auto shardEndPoints = _targetQuery(opCtx, query, collation);
+    if (!shardEndPoints.isOK() || shardEndPoints.getValue().size() == 1) {
+        return shardEndPoints;
+    }
+
+    // Replacement-style updates must always target a single shard. If we were unable to do so using
+    // the query, we attempt to extract the shard key from the replacement and target based on it.
+    if (updateType == UpdateType::kReplacement) {
+        return targetByShardKey(shardKeyPattern.extractShardKeyFromDoc(updateExpr.getValue()),
+                                "Failed to target update by replacement document");
+    }
+
+    // If we are here then this is an op-style update and we were not able to target a single shard.
+    // Non-multi updates must target a single shard or an exact _id.
+    if (!updateDoc.getMulti() &&
+        !isExactIdQuery(opCtx, getNS(), query, collation, _routingInfo->cm().get())) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "A {multi:false} update on a sharded collection must either "
+                                 "contain an exact match on _id or must target a single shard but "
+                                 "this update targeted _id (and have the collection default "
+                                 "collation) or must target a single shard (and have the simple "
+                                 "collation), but this update targeted "
+                              << shardEndPoints.getValue().size()
+                              << " shards. Update request: "
+                              << updateDoc.toBSON()
+                              << ", shard key pattern: "
+                              << shardKeyPattern.toString()};
+    }
     return shardEndPoints;
 }
 
@@ -512,10 +531,9 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
 
     // Target the shard key or delete query
     if (!shardKey.isEmpty()) {
-        try {
-            return std::vector<ShardEndpoint>{_targetShardKey(shardKey, collation, 0)};
-        } catch (const DBException&) {
-            // This delete is potentially not constrained to a single shard
+        auto swEndpoint = _targetShardKey(shardKey, collation, 0);
+        if (swEndpoint.isOK()) {
+            return {{swEndpoint.getValue()}};
         }
     }
 
@@ -555,58 +573,6 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
     return _targetQuery(opCtx, deleteDoc.getQ(), collation);
 }
 
-StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetUpdateByShardKey(
-    OperationContext* opCtx,
-    const UpdateType updateType,
-    const BSONObj query,
-    const BSONObj collation,
-    const BSONObj updateExpr,
-    const bool isUpsert) const {
-    // This method should only ever be called on a sharded collection with a valid updateType.
-    invariant(updateType != UpdateType::kUnknown);
-    invariant(_routingInfo->cm());
-
-    const auto& shardKeyPattern = _routingInfo->cm()->getShardKeyPattern();
-
-    // Attempt to extract the shard key from the query (for an op-style update) or the update
-    // expression document (for a replacement-style update).
-    const auto shardKey =
-        (updateType == UpdateType::kOpStyle ? shardKeyPattern.extractShardKeyFromQuery(opCtx, query)
-                                            : shardKeyPattern.extractShardKeyFromDoc(updateExpr));
-    if (!shardKey.isOK()) {
-        return shardKey.getStatus();
-    }
-
-    // Attempt to dispatch the update by routing on the extracted shard key.
-    if (!shardKey.getValue().isEmpty()) {
-        // Verify that the shard key does not exceed the maximum permitted size.
-        const auto shardKeySizeStatus = ShardKeyPattern::checkShardKeySize(shardKey.getValue());
-        if (!shardKeySizeStatus.isOK()) {
-            return shardKeySizeStatus;
-        }
-        try {
-            const long long estimatedDataSize = query.objsize() + updateExpr.objsize();
-            return std::vector<ShardEndpoint>{
-                _targetShardKey(shardKey.getValue(), collation, estimatedDataSize)};
-        } catch (const DBException& ex) {
-            // The update is potentially not constrained to a single shard. If this is an upsert,
-            // then we do not return the error here; we provide a more descriptive message below.
-            if (!isUpsert)
-                return ex.toStatus();
-        }
-    }
-    return {
-        ErrorCodes::ShardKeyNotFound,
-        str::stream()
-            << (isUpsert
-                    ? "Sharded upserts must contain the shard key and have the simple collation. "
-                    : "Could not extract an exact shard key value. ")
-            << "Update request: "
-            << BSON("q" << query << "u" << updateExpr)
-            << ", shard key pattern: "
-            << shardKeyPattern.toString()};
-}
-
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetDoc(
     OperationContext* opCtx, const BSONObj& doc, const BSONObj& collation) const {
     // NOTE: This is weird and fragile, but it's the way our language works right now - documents
@@ -643,12 +609,16 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
     return endpoints;
 }
 
-ShardEndpoint ChunkManagerTargeter::_targetShardKey(const BSONObj& shardKey,
-                                                    const BSONObj& collation,
-                                                    long long estDataSize) const {
-    const auto chunk = _routingInfo->cm()->findIntersectingChunk(shardKey, collation);
-
-    return {chunk.getShardId(), _routingInfo->cm()->getVersion(chunk.getShardId())};
+StatusWith<ShardEndpoint> ChunkManagerTargeter::_targetShardKey(const BSONObj& shardKey,
+                                                                const BSONObj& collation,
+                                                                long long estDataSize) const {
+    try {
+        auto chunk = _routingInfo->cm()->findIntersectingChunk(shardKey, collation);
+        return {{chunk.getShardId(), _routingInfo->cm()->getVersion(chunk.getShardId())}};
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+    MONGO_UNREACHABLE;
 }
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetCollection() const {
@@ -671,7 +641,6 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetCollection() 
                                                 : ChunkVersion::UNSHARDED();
         endpoints.emplace_back(std::move(shardId), version);
     }
-
     return endpoints;
 }
 

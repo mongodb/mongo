@@ -154,7 +154,7 @@ function runUpdateCmdFail(
 
     let updatedVal = update["$set"] ? update["$set"] : update;
     assert.eq(1, st.s.getDB(kDbName).foo.find(query).itcount());
-    if (!update["$unset"]) {
+    if (!update["$unset"] && Object.keys(update).length != 0) {
         assert.eq(0, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
     }
 }
@@ -173,7 +173,7 @@ function runFindAndModifyCmdFail(st, kDbName, session, sessionDB, inTxn, query, 
     }
     let updatedVal = update["$set"] ? update["$set"] : update;
     assert.eq(1, st.s.getDB(kDbName).foo.find(query).itcount());
-    if (!update["$unset"]) {
+    if (!update["$unset"] && Object.keys(update).length != 0) {
         assert.eq(0, st.s.getDB(kDbName).foo.find(updatedVal).itcount());
     }
 }
@@ -686,23 +686,23 @@ function assertCanUpdatePrimitiveShardKeyHashedChangeShards(
     assert.gte(docsOnShard0.length, 2);
     assert.gte(docsOnShard1.length, 2);
 
-    // TODO SERVER-39158: Add replacement tests as well. Can change second test to be replacement
-    // rather than modify.
-
     // Since we now know that the value of x in each of docsOnShard0[1] and docsOnShard1[1] will be
     // hashed to map to shard0 and shard1 respectively, we can delete these documents and then use
     // them as values to change the shard key to.
     st.s.getDB(kDbName).foo.remove({"x": docsOnShard0[1].x});
     st.s.getDB(kDbName).foo.remove({"x": docsOnShard1[1].x});
     let queries = [{"x": docsOnShard0[0].x}, {"x": docsOnShard1[0].x}];
-    let updates = [{"$set": {"x": docsOnShard1[1].x}}, {"$set": {"x": docsOnShard0[1].x}}];
+    let updates = [{"$set": {"x": docsOnShard1[1].x}}, {"x": docsOnShard0[1].x}];
 
     // Non-upsert case. The first update will move a doc from shard0 to shard1 and the second will
     // move a doc from shard1 to shard 0.
     let upsert = false;
+
+    // Op-style modify
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
     assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, false);
 
+    // Replacement style modify
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
     assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, true);
 
@@ -714,8 +714,12 @@ function assertCanUpdatePrimitiveShardKeyHashedChangeShards(
     st.s.getDB(kDbName).foo.remove({"x": docsOnShard1[1].x});
 
     upsert = true;
+
+    // Op-style upsert
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[0], updates[0], upsert);
     assertHashedShardKeyUpdateCorrect(st, kDbName, queries[0], updates[0], upsert, false);
+
+    // Modify style upsert
     assertUpdateSucceeds(st, session, sessionDB, inTxn, queries[1], updates[1], upsert);
     assertHashedShardKeyUpdateCorrect(st, kDbName, queries[1], updates[1], upsert, true);
 

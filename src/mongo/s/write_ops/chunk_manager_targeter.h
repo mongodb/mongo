@@ -117,19 +117,6 @@ private:
     Status _refreshNow(OperationContext* opCtx);
 
     /**
-     * Attempts to route an update operation by extracting an exact shard key from the given query
-     * and/or update expression. Should only be called on sharded collections, and with a valid
-     * updateType. Returns not-OK if the user's query is invalid, if the extracted shard key exceeds
-     * the maximum allowed length, or if the update could not be targeted by exact shard key.
-     */
-    StatusWith<std::vector<ShardEndpoint>> _targetUpdateByShardKey(OperationContext* opCtx,
-                                                                   const UpdateType updateType,
-                                                                   const BSONObj query,
-                                                                   const BSONObj collation,
-                                                                   const BSONObj updateExpr,
-                                                                   const bool isUpsert) const;
-
-    /**
      * Returns a vector of ShardEndpoints where a document might need to be placed.
      *
      * Returns !OK with message if replacement could not be targeted
@@ -159,9 +146,9 @@ private:
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
-    ShardEndpoint _targetShardKey(const BSONObj& shardKey,
-                                  const BSONObj& collation,
-                                  long long estDataSize) const;
+    StatusWith<ShardEndpoint> _targetShardKey(const BSONObj& shardKey,
+                                              const BSONObj& collation,
+                                              long long estDataSize) const;
 
     // Full namespace of the collection for this targeter
     const NamespaceString _nss;

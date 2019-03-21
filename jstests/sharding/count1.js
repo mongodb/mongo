@@ -38,12 +38,12 @@
 
     assert.eq(1, s.config.chunks.count({"ns": "test.foo"}), "sanity check A");
 
-    db.foo.save({_id: 1, name: "eliot"});
-    db.foo.save({_id: 2, name: "sara"});
-    db.foo.save({_id: 3, name: "bob"});
-    db.foo.save({_id: 4, name: "joe"});
-    db.foo.save({_id: 5, name: "mark"});
-    db.foo.save({_id: 6, name: "allan"});
+    assert.commandWorked(db.foo.insert({_id: 1, name: "eliot"}));
+    assert.commandWorked(db.foo.insert({_id: 2, name: "sara"}));
+    assert.commandWorked(db.foo.insert({_id: 3, name: "bob"}));
+    assert.commandWorked(db.foo.insert({_id: 4, name: "joe"}));
+    assert.commandWorked(db.foo.insert({_id: 5, name: "mark"}));
+    assert.commandWorked(db.foo.insert({_id: 6, name: "allan"}));
 
     assert.eq(6, db.foo.find().count(), "basic count");
 
@@ -153,7 +153,7 @@
 
     // part 6
     for (var i = 0; i < 10; i++) {
-        db.foo.save({_id: 7 + i, name: "zzz" + i});
+        assert.commandWorked(db.foo.insert({_id: 7 + i, name: "zzz" + i}));
     }
 
     assert.eq(10, db.foo.find({name: {$gt: "z"}}).itcount(), "LSF1");

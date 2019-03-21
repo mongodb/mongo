@@ -103,14 +103,11 @@
 
     poolStats("after checking itcount");
 
-    // --- test save support ---
+    // --- Verify that modify & save style updates doesn't work on sharded clusters ---
 
     var o = db.data.findOne();
     o.x = 16;
-    db.data.save(o);
-    o = db.data.findOne({_id: o._id});
-    assert.eq(16, o.x, "x1 - did save fail? " + tojson(o));
-
+    assert.commandFailedWithCode(db.data.save(o), ErrorCodes.ShardKeyNotFound);
     poolStats("at end");
 
     print(summary);

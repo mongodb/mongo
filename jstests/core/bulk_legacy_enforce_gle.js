@@ -24,7 +24,7 @@
 
     coll.drop();
     let bulk = coll.initializeUnorderedBulkOp();
-    bulk.find({none: 1}).upsert().updateOne({_id: 1});
+    bulk.find({_id: 1}).upsert().updateOne({_id: 1});
     assert.writeOK(bulk.execute());
     let gle = assert.gleOK(db.runCommand({getLastError: 1}));
     assert.eq(1, gle.n, tojson(gle));
@@ -48,7 +48,7 @@
     bulk = coll.initializeUnorderedBulkOp();
     bulk.find({none: 1}).upsert().updateOne({_id: 1});
     bulk.find({none: 1}).upsert().updateOne({_id: 1});
-    bulk.find({none: 1}).upsert().updateOne({_id: 0});
+    bulk.find({_id: 0}).upsert().updateOne({_id: 0});
     let res = assert.throws(function() {
         bulk.execute();
     });
@@ -62,9 +62,9 @@
     assert(coll.drop());
     insertDocument({_id: 1});
     bulk = coll.initializeUnorderedBulkOp();
-    bulk.find({none: 1}).upsert().updateOne({_id: 0});
+    bulk.find({_id: 0}).upsert().updateOne({_id: 0});
     bulk.find({none: 1}).upsert().updateOne({_id: 1});
-    bulk.find({none: 1}).upsert().updateOne({_id: 2});
+    bulk.find({_id: 2}).upsert().updateOne({_id: 2});
     res = assert.throws(function() {
         bulk.execute();
     });
@@ -79,8 +79,8 @@
     assert(coll.drop());
     insertDocument({_id: 2});
     bulk = coll.initializeUnorderedBulkOp();
-    bulk.find({none: 1}).upsert().updateOne({_id: 0});
-    bulk.find({none: 1}).upsert().updateOne({_id: 1});
+    bulk.find({_id: 0}).upsert().updateOne({_id: 0});
+    bulk.find({_id: 1}).upsert().updateOne({_id: 1});
     bulk.find({none: 1}).upsert().updateOne({_id: 2});
     res = assert.throws(function() {
         bulk.execute();
@@ -95,8 +95,8 @@
     assert(coll.drop());
     insertDocument({_id: 2});
     bulk = coll.initializeUnorderedBulkOp();
-    bulk.find({none: 1}).upsert().updateOne({_id: 0});
-    bulk.find({none: 1}).upsert().updateOne({_id: 1});
+    bulk.find({_id: 0}).upsert().updateOne({_id: 0});
+    bulk.find({_id: 1}).upsert().updateOne({_id: 1});
     bulk.find({none: 1}).upsert().updateOne({_id: 2});
     res = assert.throws(function() {
         bulk.execute();
@@ -111,8 +111,8 @@
     assert(coll.drop());
     insertDocument({_id: 2});
     bulk = coll.initializeUnorderedBulkOp();
-    bulk.find({none: 1}).upsert().updateOne({_id: 0});
-    bulk.find({none: 1}).upsert().updateOne({_id: 1});
+    bulk.find({_id: 0}).upsert().updateOne({_id: 0});
+    bulk.find({_id: 1}).upsert().updateOne({_id: 1});
     bulk.find({none: 1}).upsert().updateOne({_id: 2});
     res = assert.throws(function() {
         bulk.execute();

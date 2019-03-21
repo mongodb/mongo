@@ -64,9 +64,8 @@
         // Assert that updating the shard key when the doc would move shards fails for both modify
         // and replacement updates.
         assert.writeError(sessionDB.foo.update({x: 80}, {$set: {x: 3}}));
-        // TODO: SERVER-39158. Currently, this update will not fail but will not update the doc.
-        // After SERVER-39158 is finished, this should fail.
-        assert.commandWorked(sessionDB.foo.update({x: 80}, {x: 3}));
+        assert.commandFailedWithCode(sessionDB.foo.update({x: 80}, {x: 3}),
+                                     [ErrorCodes.ImmutableField, ErrorCodes.InvalidOptions]);
         assert.eq(1, mongos.getDB(kDbName).foo.find({x: 80}).itcount());
         assert.eq(0, mongos.getDB(kDbName).foo.find({x: 3}).itcount());
 

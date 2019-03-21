@@ -199,12 +199,6 @@ private:
     StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
 
     /**
-     * Called when update modifies shard key fields. Checks that the updated doc has all required
-     * shard key fields and throws if it does not.
-     */
-    void assertNewDocHasValidShardKeyOptions(const ScopedCollectionMetadata& metadata);
-
-    /**
      * Checks that the updated doc has all required shard key fields and throws if it does not.
      *
      * Also checks if the updated doc still belongs to this node and throws if it does not. If the

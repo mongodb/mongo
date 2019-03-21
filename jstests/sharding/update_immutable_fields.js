@@ -58,12 +58,18 @@
     assert.writeOK(shard0Coll.update({_id: 1}, {a: 1}));
 
     // Update existing doc ($set), same shard key value
-    assert.writeOK(shard0Coll.update({_id: 1}, {$set: {a: 1}}));
+    assert.commandWorked(shard0Coll.update({_id: 1}, {$set: {a: 1}}));
 
-    // Error due to mutating the shard key (replacement)
-    assert.writeError(shard0Coll.update({_id: 1}, {b: 1}));
+    // Error when trying to update a shard key outside of a transaction.
+    assert.commandFailedWithCode(shard0Coll.update({_id: 1, a: 1}, {_id: 1, a: 2}),
+                                 ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(shard0Coll.update({_id: 1, a: 1}, {"$set": {a: 2}}),
+                                 ErrorCodes.IllegalOperation);
 
-    // Error due to mutating the shard key ($set)
+    // Error when unsetting shard key.
+    assert.writeError(shard0Coll.update({_id: 1}, {b: 3}));
+
+    // Error when unsetting shard key ($set).
     assert.writeError(shard0Coll.update({_id: 1}, {$unset: {a: 1}}));
 
     // Error due to removing all the embedded fields.

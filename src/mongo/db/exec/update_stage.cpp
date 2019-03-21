@@ -608,10 +608,17 @@ void UpdateStage::doInsert() {
             auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
 
             if (!metadata->keyBelongsToMe(newShardKey)) {
-                assertNewDocHasValidShardKeyOptions(metadata);
+                // An attempt to upsert a document with a shard key value that belongs on another
+                // shard must either be a retryable write or inside a transaction.
+                uassert(ErrorCodes::IllegalOperation,
+                        "The upsert document could not be inserted onto the shard targeted by the "
+                        "query, since its shard key belongs on a different shard. Cross-shard "
+                        "upserts are only allowed when running in a transaction or with "
+                        "retryWrites: true.",
+                        getOpCtx()->getTxnNumber());
                 uasserted(
                     WouldChangeOwningShardInfo(request->getQuery(), newObj, true /* upsert */),
-                    str::stream() << "The document we are inserting belongs on a different shard");
+                    "The document we are inserting belongs on a different shard");
             }
         }
     }
@@ -931,33 +938,6 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     return NEED_YIELD;
 }
 
-void UpdateStage::assertNewDocHasValidShardKeyOptions(const ScopedCollectionMetadata& metadata) {
-    // Assert that the updated doc has all shard key fields and none are arrays or array
-    // descendants.
-    FieldRefSet shardKeyPaths;
-    const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
-    shardKeyPaths.fillFrom(transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
-    assertRequiredPathsPresent(_doc, shardKeyPaths);
-
-    // TODO SERVER-39158: Add validation that the query has all shard key fields
-
-    // We do not allow updates to the shard key when 'multi' is true.
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "Multi-update operations are not allowed when updating the"
-                          << " shard key field.",
-            !_params.request->isMulti());
-
-    // If this node is a replica set primary node, an attempted update to the shard key value must
-    // either be a retryable write or inside a transaction.
-    //
-    // If this node is a replica set secondary node, we can skip validation.
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Must run update to shard key field "
-                          << " in a multi-statement transaction or"
-                             " with retryWrites: true.",
-            getOpCtx()->getTxnNumber() || !getOpCtx()->writesAreReplicated());
-}
-
 bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata metadata,
                                                    const Snapshotted<BSONObj>& oldObj) {
     auto newObj = _doc.getObject();
@@ -971,7 +951,42 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata meta
         return false;
     }
 
-    assertNewDocHasValidShardKeyOptions(metadata);
+    FieldRefSet shardKeyPaths;
+    const auto& shardKeyPathsVector = metadata->getKeyPatternFields();
+    shardKeyPaths.fillFrom(transitional_tools_do_not_use::unspool_vector(shardKeyPathsVector));
+
+    // Assert that the updated doc has all shard key fields and none are arrays or array
+    // descendants.
+    assertRequiredPathsPresent(_doc, shardKeyPaths);
+
+    // We do not allow modifying shard key value without specifying the full shard key in the query.
+    // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
+    // But if we are here, we already know that the shard key is not _id, since we have an assertion
+    // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
+    // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
+    // shard key fields.
+    pathsupport::EqualityMatches equalities;
+    uassert(31025,
+            "Shard key update is not allowed without specifying the full shard key in the query",
+            _params.canonicalQuery &&
+                pathsupport::extractFullEqualityMatches(
+                    *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
+                    .isOK() &&
+                equalities.size() == shardKeyPathsVector.size());
+
+    // We do not allow updates to the shard key when 'multi' is true.
+    uassert(ErrorCodes::InvalidOptions,
+            "Multi-update operations are not allowed when updating the shard key field.",
+            !_params.request->isMulti());
+
+    // If this node is a replica set primary node, an attempted update to the shard key value must
+    // either be a retryable write or inside a transaction.
+    // If this node is a replica set secondary node, we can skip validation.
+    uassert(ErrorCodes::IllegalOperation,
+            "Must run update to shard key field in a multi-statement transaction or with "
+            "retryWrites: true.",
+            getOpCtx()->getTxnNumber() || !getOpCtx()->writesAreReplicated());
+
     if (!metadata->keyBelongsToMe(newShardKey)) {
         if (MONGO_FAIL_POINT(hangBeforeThrowWouldChangeOwningShard)) {
             log() << "Hit hangBeforeThrowWouldChangeOwningShard failpoint";
@@ -980,7 +995,7 @@ bool UpdateStage::checkUpdateChangesShardKeyFields(ScopedCollectionMetadata meta
         }
 
         uasserted(WouldChangeOwningShardInfo(oldObj.value(), newObj, false /* upsert */),
-                  str::stream() << "This update would cause the doc to change owning shards");
+                  "This update would cause the doc to change owning shards");
     }
 
     // We passed all checks, so we will return that this update changes the shard key field, and

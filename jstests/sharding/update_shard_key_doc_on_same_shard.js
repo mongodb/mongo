@@ -201,6 +201,9 @@
         st, kDbName, ns, session, sessionDB, false, {"x": 300}, {"x": 600});
     assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
         st, kDbName, ns, session, sessionDB, false, false, {"x": 300, "y": 80}, {"x": 600});
+    // Shard key fields are missing in query.
+    assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
+        st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"x": 600, "y": 80, "a": 2});
     assertCannotUpdateSKToArray(
         st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"x": [300]});
 
@@ -355,6 +358,9 @@
         st, kDbName, ns, session, sessionDB, false, true, {"_id.a": 300}, {"_id": {"a": 600}});
     assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
         st, kDbName, ns, session, sessionDB, false, true, {"x": 300, "y": 80}, {"x": 600});
+    // Shard key fields are missing in query.
+    assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
+        st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"x": 600, "y": 80, "a": 2});
     assertCannotUpdateSKToArray(
         st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"x": [300]});
 
@@ -532,6 +538,10 @@
         st, kDbName, ns, session, sessionDB, true, {"x": 300}, {"x": 600});
     assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
         st, kDbName, ns, session, sessionDB, true, false, {"x": 300, "y": 80}, {"x": 600});
+    // Shard key fields are missing in query.
+    assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
+        st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"x": 600, "y": 80, "a": 2});
+
     assertCannotUpdateSKToArray(
         st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"x": [300]});
 
@@ -685,7 +695,10 @@
     assertCannotUpdate_idDottedPath(
         st, kDbName, ns, session, sessionDB, true, true, {"_id.a": 300}, {"_id": {"a": 600}});
     assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
-        st, kDbName, ns, session, sessionDB, true, false, {"x": 300, "y": 80}, {"x": 600});
+        st, kDbName, ns, session, sessionDB, true, true, {"x": 300, "y": 80}, {"x": 600});
+    // Shard key fields are missing in query.
+    assertCannotDoReplacementUpdateWhereShardKeyMissingFields(
+        st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"x": 600, "y": 80, "a": 2});
     assertCannotUpdateSKToArray(
         st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"x": [300]});
 

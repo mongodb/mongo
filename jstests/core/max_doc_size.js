@@ -24,15 +24,16 @@
     assert.eq(coll.find({}).itcount(), 1);
 
     coll.drop();
+    const objectId = new ObjectId();
     assert.commandWorked(db.runCommand({
         update: coll.getName(),
         ordered: true,
-        updates: [{q: {a: 1}, u: {_id: new ObjectId(), x: maxStr}, upsert: true}]
+        updates: [{q: {_id: objectId}, u: {_id: objectId, x: maxStr}, upsert: true}]
     }));
     assert.eq(coll.find({}).itcount(), 1);
 
     coll.drop();
-    const objectId = new ObjectId();
+
     assert.commandWorked(coll.insert({_id: objectId}));
     assert.commandWorked(db.runCommand({
         update: coll.getName(),
@@ -56,7 +57,7 @@
     assert.commandFailedWithCode(db.runCommand({
         update: coll.getName(),
         ordered: true,
-        updates: [{q: {a: 1}, u: {_id: new ObjectId(), x: largerThanMaxString}, upsert: true}]
+        updates: [{q: {_id: objectId}, u: {_id: objectId, x: largerThanMaxString}, upsert: true}]
     }),
                                  17420);
 

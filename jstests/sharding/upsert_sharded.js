@@ -51,16 +51,28 @@
     assert.eq(1, upsertedXVal({$and: [{x: {$eq: 1}}]}, {$set: {a: 1}}));
     assert.eq(1, upsertedXVal({$or: [{x: {$eq: 1}}]}, {$set: {a: 1}}));
 
-    // shard key not extracted
-    assert.writeError(upsertedResult({}, {$set: {a: 1, x: 1}}));
-    assert.writeError(upsertedResult({x: {$gt: 1}}, {$set: {a: 1, x: 1}}));
+    // Missing shard key in query.
+    assert.commandFailedWithCode(upsertedResult({}, {$set: {a: 1, x: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
 
-    // Shard key type errors
-    assert.writeError(upsertedResult({x: undefined}, {$set: {a: 1}}));
-    assert.writeError(upsertedResult({x: [1, 2]}, {$set: {a: 1}}));
-    assert.writeError(upsertedResult({x: {$eq: {$gt: 5}}}, {$set: {a: 1}}));
-    // Regex shard key is not extracted from queries, even exact matches
-    assert.writeError(upsertedResult({x: {$eq: /abc/}}, {$set: {a: 1}}));
+    // Missing equality match on shard key in query.
+    assert.commandFailedWithCode(upsertedResult({x: {$gt: 10}}, {$set: {a: 1, x: 5}}),
+                                 ErrorCodes.ShardKeyNotFound);
+
+    // Regex shard key value in query is ambigious and cannot be extracted for an equality match.
+    assert.commandFailedWithCode(
+        upsertedResult({x: {$eq: /abc*/}}, {$set: {a: 1, x: "regexValue"}}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult({x: {$eq: /abc/}}, {$set: {a: 1, x: /abc/}}),
+                                 ErrorCodes.ShardKeyNotFound);
+
+    // Shard key in query not extractable.
+    assert.commandFailedWithCode(upsertedResult({x: undefined}, {$set: {a: 1}}),
+                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(upsertedResult({x: [1, 2]}, {$set: {a: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult({x: {$eq: {$gt: 5}}}, {$set: {a: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
 
     // nested field extraction always fails with non-nested key - like _id, we require setting the
     // elements directly
