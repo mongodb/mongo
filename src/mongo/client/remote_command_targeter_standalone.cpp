@@ -43,7 +43,7 @@ ConnectionString RemoteCommandTargeterStandalone::connectionString() {
     return ConnectionString(_hostAndPort);
 }
 
-SharedSemiFuture<HostAndPort> RemoteCommandTargeterStandalone::findHostWithMaxWait(
+SemiFuture<HostAndPort> RemoteCommandTargeterStandalone::findHostWithMaxWait(
     const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
     return _hostAndPort;
 }

@@ -186,7 +186,7 @@ private:
     std::shared_ptr<NetworkInterface> _net;
 
     // The thread pool that executes scheduled work items.
-    std::unique_ptr<ThreadPoolInterface> _pool;
+    std::shared_ptr<ThreadPoolInterface> _pool;
 
     // Mutex guarding all remaining fields.
     mutable stdx::mutex _mutex;

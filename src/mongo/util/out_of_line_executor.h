@@ -30,8 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/future.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
 
@@ -39,37 +38,22 @@ namespace mongo {
  * Provides the minimal api for a simple out of line executor that can run non-cancellable
  * callbacks.
  *
- * Adds in a minimal amount of support for futures.
- *
  * The contract for scheduling work on an executor is that it never blocks the caller.  It doesn't
  * necessarily need to offer forward progress guarantees, but actual calls to schedule() should not
  * deadlock.
+ *
+ * If you manage the lifetime of your executor using a shared_ptr, you can begin a chain of
+ * execution like this:
+ *      ExecutorFuture(myExec)
+ *          .then([] { return doThing1(); })
+ *          .then([] { return doThing2(); })
+ *          ...
  */
 class OutOfLineExecutor {
 public:
     using Task = unique_function<void(Status)>;
 
 public:
-    /**
-     * Invokes the callback on the executor, as in schedule(), returning a future with its result.
-     * That future may be ready by the time the caller returns, which means that continuations
-     * chained on the returned future may be invoked on the caller of execute's stack.
-     */
-    template <typename Callback>
-    Future<FutureContinuationResult<Callback>> execute(Callback&& cb) {
-        auto[promise, future] = makePromiseFuture<FutureContinuationResult<Callback>>();
-
-        schedule([ cb = std::forward<Callback>(cb), p = std::move(promise) ](auto status) mutable {
-            if (!status.isOK()) {
-                p.setError(status);
-                return;
-            }
-            p.setWith(std::move(cb));
-        });
-
-        return std::move(future);
-    }
-
     /**
      * Delegates invocation of the Task to this executor
      *
@@ -89,5 +73,7 @@ public:
 protected:
     ~OutOfLineExecutor() noexcept {}
 };
+
+using ExecutorPtr = std::shared_ptr<OutOfLineExecutor>;
 
 }  // namespace mongo

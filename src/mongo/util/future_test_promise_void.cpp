@@ -41,16 +41,18 @@ namespace mongo {
 namespace {
 
 TEST(Promise_void, Success_setFrom) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](Future<void>&& fut) {
-                            auto pf = makePromiseFuture<void>();
-                            pf.promise.setFrom(std::move(fut));
-                            ASSERT_OK(std::move(pf.future).getNoThrow());
-                        });
+    FUTURE_SUCCESS_TEST<kNoExecutorFuture_needsPromiseSetFrom>(
+        [] {},
+        [](/*Future<void>*/ auto&& fut) {
+            // This intentionally doesn't work with ExecutorFuture.
+            auto pf = makePromiseFuture<void>();
+            pf.promise.setFrom(std::move(fut));
+            ASSERT_OK(std::move(pf.future).getNoThrow());
+        });
 }
 
 TEST(Promise_void, Fail_setFrom) {
-    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+    FUTURE_FAIL_TEST<void, kNoExecutorFuture_needsPromiseSetFrom>([](/*Future<void>*/ auto&& fut) {
         auto pf = makePromiseFuture<void>();
         pf.promise.setFrom(std::move(fut));
         ASSERT_THROWS_failStatus(std::move(pf.future).get());
@@ -82,16 +84,17 @@ TEST(Promise_void, Fail_setWith_Status) {
 }
 
 TEST(Promise_void, Success_setWith_Future) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](Future<void>&& fut) {
-                            auto pf = makePromiseFuture<void>();
-                            pf.promise.setWith([&] { return std::move(fut); });
-                            ASSERT_OK(std::move(pf.future).getNoThrow());
-                        });
+    FUTURE_SUCCESS_TEST<kNoExecutorFuture_needsPromiseSetFrom>(
+        [] {},
+        [](/*Future<void>*/ auto&& fut) {
+            auto pf = makePromiseFuture<void>();
+            pf.promise.setWith([&] { return std::move(fut); });
+            ASSERT_OK(std::move(pf.future).getNoThrow());
+        });
 }
 
 TEST(Promise_void, Fail_setWith_Future) {
-    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+    FUTURE_FAIL_TEST<void, kNoExecutorFuture_needsPromiseSetFrom>([](/*Future<void>*/ auto&& fut) {
         auto pf = makePromiseFuture<void>();
         pf.promise.setWith([&] { return std::move(fut); });
         ASSERT_THROWS_failStatus(std::move(pf.future).get());

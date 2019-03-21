@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,33 +29,8 @@
 
 #pragma once
 
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/util/net/hostandport.h"
-
-namespace mongo {
-
-/**
- * Implements a standalone instance remote command targeter, which always returns the same
- * host regardless of the read preferences.
- */
-class RemoteCommandTargeterStandalone final : public RemoteCommandTargeter {
-public:
-    explicit RemoteCommandTargeterStandalone(const HostAndPort& hostAndPort);
-
-    ConnectionString connectionString() override;
-
-    StatusWith<HostAndPort> findHost(OperationContext* opCtx,
-                                     const ReadPreferenceSetting& readPref) override;
-
-    SemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                Milliseconds maxWait) override;
-
-    void markHostNotMaster(const HostAndPort& host, const Status& status) override;
-
-    void markHostUnreachable(const HostAndPort& host, const Status& status) override;
-
-private:
-    const HostAndPort _hostAndPort;
-};
-
-}  // namespace mongo
+// Terrible hack to work around clang-format being out of date.
+// TODO sed this away and delete this file when we upgrade clang-format.
+#define IF_CONSTEXPR \
+    if               \
+    constexpr

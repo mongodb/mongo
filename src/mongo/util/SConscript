@@ -728,9 +728,10 @@ env.CppUnitTest(
     target='future_test',
     source=[
         # This list of targets is reverse speed order, to facilitate better ninja performance.
-        'future_test_future_move_only.cpp',
-        'future_test_future_int.cpp',
         'future_test_future_void.cpp',
+        'future_test_future_int.cpp',
+        'future_test_future_move_only.cpp',
+        'future_test_executor_future.cpp',
         'future_test_edge_cases.cpp',
         'future_test_promise_int.cpp',
         'future_test_promise_void.cpp',

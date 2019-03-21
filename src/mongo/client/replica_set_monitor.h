@@ -93,8 +93,8 @@ public:
      * Known errors are:
      *  FailedToSatisfyReadPreference, if node cannot be found, which matches the read preference.
      */
-    SharedSemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
-                                                   Milliseconds maxWait = kDefaultFindHostTimeout);
+    SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
+                                             Milliseconds maxWait = kDefaultFindHostTimeout);
 
     /**
      * Returns the host we think is the current master or uasserts.

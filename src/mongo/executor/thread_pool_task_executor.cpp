@@ -598,7 +598,7 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
     if (MONGO_FAIL_POINT(scheduleIntoPoolSpinsUntilThreadPoolShutsDown)) {
         scheduleIntoPoolSpinsUntilThreadPoolShutsDown.setMode(FailPoint::off);
 
-        auto checkStatus = [&] { return _pool->execute([] {}).getNoThrow(); };
+        auto checkStatus = [&] { return ExecutorFuture(_pool).then([] {}).getNoThrow(); };
         while (!ErrorCodes::isCancelationError(checkStatus().code())) {
             sleepmillis(100);
         }

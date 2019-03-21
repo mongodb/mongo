@@ -58,7 +58,7 @@ StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* op
     return _findHostReturnValue;
 }
 
-SharedSemiFuture<HostAndPort> RemoteCommandTargeterMock::findHostWithMaxWait(
+SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHostWithMaxWait(
     const ReadPreferenceSetting& readPref, Milliseconds maxTime) {
 
     return _findHostReturnValue;

@@ -41,6 +41,40 @@
 
 namespace mongo {
 
+enum DoExecutorFuture : bool {
+    // Force exemptions to say *why* they shouldn't test ExecutorFuture to ensure that if the
+    // reason stops applying (eg, if we implement ExecutorFuture::tap()) we can delete the enum
+    // value and recover the test coverage.
+    kNoExecutorFuture_needsTap = false,
+    kNoExecutorFuture_needsPromiseSetFrom = false,
+    kDoExecutorFuture = true,
+};
+
+class InlineCountingExecutor final : public OutOfLineExecutor {
+public:
+    void schedule(Task task) noexcept override {
+        task(Status::OK());
+        tasksRun.fetchAndAdd(1);
+    }
+
+    static auto make() {
+        return std::make_shared<InlineCountingExecutor>();
+    }
+
+    AtomicWord<int32_t> tasksRun{0};
+};
+
+class RejectingExecutor final : public OutOfLineExecutor {
+public:
+    void schedule(Task task) noexcept override {
+        task(Status(ErrorCodes::ShutdownInProgress, ""));
+    }
+
+    static auto make() {
+        return std::make_shared<RejectingExecutor>();
+    }
+};
+
 template <typename T, typename Func>
 void completePromise(Promise<T>* promise, Func&& func) {
     promise->emplaceValue(func());
@@ -88,7 +122,8 @@ inline Status failStatus() {
 
 // Tests a Future completed by completionExpr using testFunc. The Future will be completed in
 // various ways to maximize test coverage.
-template <typename CompletionFunc,
+template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture,
+          typename CompletionFunc,
           typename TestFunc,
           typename = std::enable_if_t<!std::is_void<std::result_of_t<CompletionFunc()>>::value>>
 void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test) {
@@ -105,9 +140,15 @@ void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test)
     {  // async future
         test(async([&] { return completion(); }));
     }
+
+    IF_CONSTEXPR(doExecutorFuture) {  // immediate executor future
+        auto exec = InlineCountingExecutor::make();
+        test(Future<CompletionType>::makeReady(completion()).thenRunOn(exec));
+    }
 }
 
-template <typename CompletionFunc,
+template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture,
+          typename CompletionFunc,
           typename TestFunc,
           typename = std::enable_if_t<std::is_void<std::result_of_t<CompletionFunc()>>::value>,
           typename = void>
@@ -127,9 +168,17 @@ void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test)
     {  // async future
         test(async([&] { return completion(); }));
     }
+
+    IF_CONSTEXPR(doExecutorFuture) {  // immediate executor future
+        completion();
+        auto exec = InlineCountingExecutor::make();
+        test(Future<CompletionType>::makeReady().thenRunOn(exec));
+    }
 }
 
-template <typename CompletionType, typename TestFunc>
+template <typename CompletionType,
+          DoExecutorFuture doExecutorFuture = kDoExecutorFuture,
+          typename TestFunc>
 void FUTURE_FAIL_TEST(const TestFunc& test) {
     {  // immediate future
         test(Future<CompletionType>::makeReady(failStatus()));
@@ -145,6 +194,10 @@ void FUTURE_FAIL_TEST(const TestFunc& test) {
             uassertStatusOK(failStatus());
             MONGO_UNREACHABLE;
         }));
+    }
+    IF_CONSTEXPR(doExecutorFuture) {  // immediate executor future
+        auto exec = InlineCountingExecutor::make();
+        test(Future<CompletionType>::makeReady(failStatus()).thenRunOn(exec));
     }
 }
 }  // namespace mongo

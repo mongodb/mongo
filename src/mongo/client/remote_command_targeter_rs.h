@@ -56,8 +56,8 @@ public:
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                      const ReadPreferenceSetting& readPref) override;
 
-    SharedSemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
-                                                      Milliseconds maxWait) override;
+    SemiFuture<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                Milliseconds maxWait) override;
 
     void markHostNotMaster(const HostAndPort& host, const Status& status) override;
 
