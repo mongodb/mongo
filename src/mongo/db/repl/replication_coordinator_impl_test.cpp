@@ -4939,7 +4939,7 @@ TEST_F(ReplCoordTest, LastCommittedOpTimeOnlyUpdatedFromHeartbeatInFCV42) {
 
     auto lastAppliedOpTime = OpTime({11, 1}, 2);
     auto commitPoint = OpTime({15, 1}, 2);
-    getReplCoord()->setMyLastAppliedOpTime(lastAppliedOpTime);
+    replCoordSetMyLastAppliedOpTime(lastAppliedOpTime);
 
     // Node 1 is the current primary.
     rpc::ReplSetMetadata metadata(2,            // term
