@@ -3296,6 +3296,7 @@ post:
   - func: "save disk statistics"
   - func: "save system resource information"
   - func: "print OOM messages"
+  - func: "umount shared scons directory"
   - func: "cleanup FUSE watchdog"
   - func: "cleanup environment"
 
@@ -3341,7 +3342,7 @@ tasks:
     - func: "build new tools"
     - func: "scons compile"
       vars:
-        targets: core tools integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
+        targets: core tools dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
         task_compile_flags: >-
           --use-new-tools
           --build-mongoreplay="${build_mongoreplay}"
@@ -3385,7 +3386,6 @@ tasks:
           # If strip is on the path (everywhere except windows) then we should strip the test binaries
           # before tarring them up
           if [ -x ${strip_path|/usr/bin/strip} ]; then
-            cat build/integration_tests.txt | xargs ${strip_command|/usr/bin/strip}
             ${strip_command|/usr/bin/strip} mongobridge
             ${strip_command|/usr/bin/strip} wt
           fi
@@ -3460,8 +3460,6 @@ tasks:
           - "./etc/repo_config.yaml"
           - "./etc/test_lifecycle.yml"
           - "./etc/test_retrial.yml"
-          - "./build/integration_tests/**"
-          - "./build/integration_tests.txt"
           - "./build/**.gcno"
           - "repo/**"
           - "src/mongo/util/options_parser/test_config_files/**"
@@ -5498,7 +5496,16 @@ tasks:
 - <<: *task_template
   name: integration_tests_standalone
   commands:
+  - func: "git get project"
   - func: "do setup"
+  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
+  - func: "apply compile expansions"
+  - func: "scons compile"
+    vars:
+      targets: integration_tests
+      bypass_compile: false
+      task_compile_flags: >-
+        --detect-odr-violations
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_standalone --storageEngine=wiredTiger
@@ -5506,7 +5513,16 @@ tasks:
 - <<: *task_template
   name: integration_tests_standalone_audit
   commands:
+  - func: "git get project"
   - func: "do setup"
+  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
+  - func: "apply compile expansions"
+  - func: "scons compile"
+    vars:
+      targets: integration_tests
+      bypass_compile: false
+      task_compile_flags: >-
+        --detect-odr-violations
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_standalone_audit --storageEngine=wiredTiger
@@ -5514,7 +5530,16 @@ tasks:
 - <<: *task_template
   name: integration_tests_replset
   commands:
+  - func: "git get project"
   - func: "do setup"
+  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
+  - func: "apply compile expansions"
+  - func: "scons compile"
+    vars:
+      targets: integration_tests
+      bypass_compile: false
+      task_compile_flags: >-
+        --detect-odr-violations
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_replset --storageEngine=wiredTiger
@@ -5522,7 +5547,16 @@ tasks:
 - <<: *task_template
   name: integration_tests_sharded
   commands:
+  - func: "git get project"
   - func: "do setup"
+  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
+  - func: "apply compile expansions"
+  - func: "scons compile"
+    vars:
+      targets: integration_tests
+      bypass_compile: false
+      task_compile_flags: >-
+        --detect-odr-violations
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_sharded --storageEngine=wiredTiger
@@ -7517,8 +7551,14 @@ buildvariants:
     distros:
     - rhel62-large
   - name: integration_tests_standalone
+    distros:
+    - rhel62-large
   - name: integration_tests_replset
+    distros:
+    - rhel62-large
   - name: integration_tests_sharded
+    distros:
+    - rhel62-large
   - name: jsCore
   - name: jsCore_txns
   - name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
@@ -8695,8 +8735,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - ubuntu1604-zseries-large
   - name: integration_tests_sharded
+    distros:
+    - ubuntu1604-zseries-large
   - name: integration_tests_standalone
+    distros:
+    - ubuntu1604-zseries-large
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_compatibility
@@ -8853,8 +8899,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - ubuntu1804-zseries-build
   - name: integration_tests_sharded
+    distros:
+    - ubuntu1804-zseries-build
   - name: integration_tests_standalone
+    distros:
+    - ubuntu1804-zseries-build
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_compatibility
@@ -9355,8 +9407,14 @@ buildvariants:
   - name: failpoints
   - name: free_monitoring
   - name: integration_tests_standalone
+    distros:
+    - windows-64-vs2017-compile
   - name: integration_tests_replset
+    distros:
+    - windows-64-vs2017-compile
   - name: integration_tests_sharded
+    distros:
+    - windows-64-vs2017-compile
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -10660,9 +10718,17 @@ buildvariants:
   - name: gle_auth_write_cmd
   - name: idl_tests
   - name: integration_tests_replset
+    distros:
+    - rhel62-large
   - name: integration_tests_sharded
+    distros:
+    - rhel62-large
   - name: integration_tests_standalone
+    distros:
+    - rhel62-large
   - name: integration_tests_standalone_audit
+    distros:
+    - rhel62-large
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_auth
@@ -10880,9 +10946,17 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - rhel62-large
   - name: integration_tests_sharded
+    distros:
+    - rhel62-large
   - name: integration_tests_standalone
+    distros:
+    - rhel62-large
   - name: integration_tests_standalone_audit
+    distros:
+    - rhel62-large
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_auth
@@ -11580,8 +11654,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - rhel71-power8-build
   - name: integration_tests_sharded
+    distros:
+    - rhel71-power8-build
   - name: integration_tests_standalone
+    distros:
+    - rhel71-power8-build
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_compatibility
@@ -11703,8 +11783,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - rhel72-zseries-build
   - name: integration_tests_sharded
+    distros:
+    - rhel72-zseries-build
   - name: integration_tests_standalone
+    distros:
+    - rhel72-zseries-build
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_compatibility
@@ -11820,7 +11906,11 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - rhel67-zseries-build
   - name: integration_tests_standalone
+    distros:
+    - rhel67-zseries-build
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_auth
@@ -12257,8 +12347,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - suse12-zseries-build
   - name: integration_tests_sharded
+    distros:
+    - suse12-zseries-build
   - name: integration_tests_standalone
+    distros:
+    - suse12-zseries-build
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_compatibility
@@ -12909,8 +13005,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - rhel62-large
   - name: integration_tests_sharded
+    distros:
+    - rhel62-large
   - name: integration_tests_standalone
+    distros:
+    - rhel62-large
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -13085,6 +13187,8 @@ buildvariants:
   - name: failpoints_auth
   - name: generate_benchrun_embedded_files
   - name: integration_tests_standalone
+    distros:
+    - rhel62-large
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -13273,8 +13377,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
   - name: integration_tests_standalone
+    distros:
+    - rhel62-large
   - name: integration_tests_replset
+    distros:
+    - rhel62-large
   - name: integration_tests_sharded
+    distros:
+    - rhel62-large
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: jsCore
@@ -13364,8 +13474,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - rhel71-power8-build
   - name: integration_tests_sharded
+    distros:
+    - rhel71-power8-build
   - name: integration_tests_standalone
+    distros:
+    - rhel71-power8-build
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -13469,8 +13585,14 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+    distros:
+    - rhel72-zseries-build
   - name: integration_tests_sharded
+    distros:
+    - rhel72-zseries-build
   - name: integration_tests_standalone
+    distros:
+    - rhel72-zseries-build
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility

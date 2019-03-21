@@ -271,7 +271,6 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
                     executable_name("mongoebench"),
                     executable_name("mongoed"),
                     executable_name("wt"),
-                    "build/integration_tests.txt",
                 ]
                 with tarfile.open(filename, "r:gz") as tar:
                     # The repo/ directory contains files needed by the package task. May
@@ -279,8 +278,7 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
                     # if we did not bypass compile.
                     subdir = [
                         tarinfo for tarinfo in tar.getmembers()
-                        if tarinfo.name.startswith("build/integration_tests/")
-                        or tarinfo.name.startswith("repo/") or tarinfo.name in extract_files
+                        if tarinfo.name.startswith("repo/") or tarinfo.name in extract_files
                     ]
                     print("Extracting the following files from {0}...\n{1}".format(
                         filename, "\n".join(tarinfo.name for tarinfo in subdir)))
