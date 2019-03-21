@@ -1045,7 +1045,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
 
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
     // our election in onTransitionToPrimary(), above.
-    _updateLastCommittedOpTime(lk);
+    _updateLastCommittedOpTimeAndWallTime(lk);
 
     // Update _canAcceptNonLocalWrites
     _updateMemberStateFromTopologyCoordinator(lk, opCtx);
@@ -1187,7 +1187,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
     // If we are using applied times to calculate the commit level, update it now.
     if (!_rsConfig.getWriteConcernMajorityShouldJournal()) {
-        _updateLastCommittedOpTime(lk);
+        _updateLastCommittedOpTimeAndWallTime(lk);
     }
 
     // Signal anyone waiting on optime changes.
@@ -1237,7 +1237,7 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
     // If we are using durable times to calculate the commit level, update it now.
     if (_rsConfig.getWriteConcernMajorityShouldJournal()) {
-        _updateLastCommittedOpTime(lk);
+        _updateLastCommittedOpTimeAndWallTime(lk);
     }
 }
 
@@ -1523,10 +1523,15 @@ Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(getReplicationMode() == modeReplSet);
 
-    const UpdatePositionArgs::UpdateInfo update(OpTime(), opTime, cfgVer, memberId);
+    const UpdatePositionArgs::UpdateInfo update(OpTime(),
+                                                Date_t::min(),
+                                                opTime,
+                                                Date_t::min() + Seconds(opTime.getSecs()),
+                                                cfgVer,
+                                                memberId);
     long long configVersion;
     const auto status = _setLastOptime(lock, update, &configVersion);
-    _updateLastCommittedOpTime(lock);
+    _updateLastCommittedOpTimeAndWallTime(lock);
     return status;
 }
 
@@ -1536,10 +1541,15 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(getReplicationMode() == modeReplSet);
 
-    const UpdatePositionArgs::UpdateInfo update(opTime, OpTime(), cfgVer, memberId);
+    const UpdatePositionArgs::UpdateInfo update(opTime,
+                                                Date_t::min() + Seconds(opTime.getSecs()),
+                                                OpTime(),
+                                                Date_t::min(),
+                                                cfgVer,
+                                                memberId);
     long long configVersion;
     const auto status = _setLastOptime(lock, update, &configVersion);
-    _updateLastCommittedOpTime(lock);
+    _updateLastCommittedOpTimeAndWallTime(lock);
     return status;
 }
 
@@ -1552,7 +1562,7 @@ Status ReplicationCoordinatorImpl::_setLastOptime(WithLock lk,
     const bool advancedOpTime = result.getValue();
     // Only update committed optime if the remote optimes increased.
     if (advancedOpTime) {
-        _updateLastCommittedOpTime(lk);
+        _updateLastCommittedOpTimeAndWallTime(lk);
     }
 
     _cancelAndRescheduleLivenessUpdate_inlock(args.memberId);
@@ -3092,7 +3102,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         // nodes in the set will contact us.
         _startHeartbeats_inlock();
     }
-    _updateLastCommittedOpTime(lk);
+    _updateLastCommittedOpTimeAndWallTime(lk);
 
     return action;
 }
@@ -3320,8 +3330,8 @@ bool ReplicationCoordinatorImpl::shouldChangeSyncSource(
         currentSource, replMetadata, oqMetadata, _replExecutor->now());
 }
 
-void ReplicationCoordinatorImpl::_updateLastCommittedOpTime(WithLock lk) {
-    if (_topCoord->updateLastCommittedOpTime()) {
+void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock lk) {
+    if (_topCoord->updateLastCommittedOpTimeAndWallTime()) {
         _setStableTimestampForStorage(lk);
     }
     // Wake up any threads waiting for replication that now have their replication
@@ -3490,32 +3500,37 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     }
 }
 
-void ReplicationCoordinatorImpl::advanceCommitPoint(const OpTime& committedOpTime,
-                                                    bool fromSyncSource) {
+void ReplicationCoordinatorImpl::advanceCommitPoint(
+    const OpTimeAndWallTime& committedOpTimeAndWallTime, bool fromSyncSource) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _advanceCommitPoint(lk, committedOpTime, fromSyncSource);
+    _advanceCommitPoint(lk, committedOpTimeAndWallTime, fromSyncSource);
 }
 
-void ReplicationCoordinatorImpl::_advanceCommitPoint(WithLock lk,
-                                                     const OpTime& committedOpTime,
-                                                     bool fromSyncSource) {
-    if (_topCoord->advanceLastCommittedOpTime(committedOpTime, fromSyncSource)) {
+void ReplicationCoordinatorImpl::_advanceCommitPoint(
+    WithLock lk, const OpTimeAndWallTime& committedOpTimeAndWallTime, bool fromSyncSource) {
+    if (_topCoord->advanceLastCommittedOpTimeAndWallTime(committedOpTimeAndWallTime,
+                                                         fromSyncSource)) {
         if (_getMemberState_inlock().arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.
             _setMyLastAppliedOpTimeAndWallTime(
-                lk, {committedOpTime, Date_t::min()}, false, DataConsistency::Consistent);
+                lk, committedOpTimeAndWallTime, false, DataConsistency::Consistent);
         }
 
         _setStableTimestampForStorage(lk);
         // Even if we have no new snapshot, we need to notify waiters that the commit point moved.
-        _externalState->notifyOplogMetadataWaiters(committedOpTime);
+        _externalState->notifyOplogMetadataWaiters(committedOpTimeAndWallTime.opTime);
     }
 }
 
 OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _topCoord->getLastCommittedOpTime();
+}
+
+OpTimeAndWallTime ReplicationCoordinatorImpl::getLastCommittedOpTimeAndWallTime() const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return _topCoord->getLastCommittedOpTimeAndWallTime();
 }
 
 Status ReplicationCoordinatorImpl::processReplSetRequestVotes(

@@ -119,7 +119,13 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
 
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-            ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
+            ReplSetMetadata metadata(10,
+                                     {newOpTime, Date_t::min() + Seconds(newOpTime.getSecs())},
+                                     newOpTime,
+                                     100,
+                                     OID(),
+                                     30,
+                                     -1);
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder).transitional_ignore();
 
@@ -186,7 +192,13 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
+        ReplSetMetadata metadata(10,
+                                 {newOpTime, Date_t::min() + Seconds(newOpTime.getSecs())},
+                                 newOpTime,
+                                 100,
+                                 OID(),
+                                 30,
+                                 -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder).transitional_ignore();
 
@@ -405,7 +417,13 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
 
             checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-            ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
+            ReplSetMetadata metadata(10,
+                                     {newOpTime, Date_t::min() + Seconds(newOpTime.getSecs())},
+                                     newOpTime,
+                                     100,
+                                     OID(),
+                                     30,
+                                     -1);
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder).transitional_ignore();
 
@@ -806,7 +824,13 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
+        ReplSetMetadata metadata(10,
+                                 {newOpTime, Date_t::min() + Seconds(newOpTime.getSecs())},
+                                 newOpTime,
+                                 100,
+                                 OID(),
+                                 30,
+                                 -1);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder).transitional_ignore();
 

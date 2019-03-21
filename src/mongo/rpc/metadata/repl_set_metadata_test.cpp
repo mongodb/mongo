@@ -38,17 +38,21 @@ namespace rpc {
 namespace {
 
 using repl::OpTime;
+using repl::OpTimeAndWallTime;
 
 TEST(ReplResponseMetadataTest, ReplicaSetIdNotSet) {
-    ASSERT_FALSE(ReplSetMetadata(3, OpTime(), OpTime(), 6, OID(), 12, -1).hasReplicaSetId());
+    ASSERT_FALSE(
+        ReplSetMetadata(3, OpTimeAndWallTime(), OpTime(), 6, OID(), 12, -1).hasReplicaSetId());
 }
 
 TEST(ReplResponseMetadataTest, Roundtrip) {
     OpTime opTime(Timestamp(1234, 100), 5);
     OpTime opTime2(Timestamp(7777, 100), 6);
-    ReplSetMetadata metadata(3, opTime, opTime2, 6, OID::gen(), 12, -1);
+    Date_t committedWallTime = Date_t::min() + Seconds(opTime.getSecs());
+    ReplSetMetadata metadata(3, {opTime, committedWallTime}, opTime2, 6, OID::gen(), 12, -1);
 
-    ASSERT_EQ(opTime, metadata.getLastOpCommitted());
+    ASSERT_EQ(opTime, metadata.getLastOpCommitted().opTime);
+    ASSERT_EQ(committedWallTime, metadata.getLastOpCommitted().wallTime);
     ASSERT_EQ(opTime2, metadata.getLastOpVisible());
     ASSERT_TRUE(metadata.hasReplicaSetId());
 
@@ -59,6 +63,8 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
         BSON(kReplSetMetadataFieldName
              << BSON("term" << 3 << "lastOpCommitted"
                             << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
+                            << "lastCommittedWall"
+                            << committedWallTime
                             << "lastOpVisible"
                             << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
                             << "configVersion"
@@ -73,12 +79,13 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     BSONObj serializedObj = builder.obj();
     ASSERT_BSONOBJ_EQ(expectedObj, serializedObj);
 
-    auto cloneStatus = ReplSetMetadata::readFromMetadata(serializedObj);
+    auto cloneStatus = ReplSetMetadata::readFromMetadata(serializedObj, /*requireWallTime*/ true);
     ASSERT_OK(cloneStatus.getStatus());
 
     const auto& clonedMetadata = cloneStatus.getValue();
-    ASSERT_EQ(opTime, clonedMetadata.getLastOpCommitted());
+    ASSERT_EQ(opTime, clonedMetadata.getLastOpCommitted().opTime);
     ASSERT_EQ(opTime2, clonedMetadata.getLastOpVisible());
+    ASSERT_EQ(committedWallTime, clonedMetadata.getLastOpCommitted().wallTime);
     ASSERT_EQ(metadata.getConfigVersion(), clonedMetadata.getConfigVersion());
     ASSERT_EQ(metadata.getReplicaSetId(), clonedMetadata.getReplicaSetId());
 
@@ -94,7 +101,7 @@ TEST(ReplResponseMetadataTest, MetadataCanBeConstructedWhenMissingOplogQueryMeta
     BSONObj obj(BSON(kReplSetMetadataFieldName
                      << BSON("term" << 3 << "configVersion" << 6 << "replicaSetId" << id)));
 
-    auto status = ReplSetMetadata::readFromMetadata(obj);
+    auto status = ReplSetMetadata::readFromMetadata(obj, /*requireWallTime*/ true);
     ASSERT_OK(status.getStatus());
 
     const auto& metadata = status.getValue();

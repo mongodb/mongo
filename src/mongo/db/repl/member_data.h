@@ -172,21 +172,10 @@ public:
     }
 
     /**
-     * Sets the last applied op time (not the heartbeat applied op time) and updates the
-     * lastUpdate time.
-     */
-    void setLastAppliedOpTime(OpTime opTime, Date_t now);
-
-    /**
      * Performs setLastAppliedOpTime and also sets the wall clock time corresponding to the last
      * applied opTime. Should only be used on the current node.
      */
     void setLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now);
-
-    /**
-     * Sets the last durable op time (not the heartbeat durable op time)
-     */
-    void setLastDurableOpTime(OpTime opTime, Date_t now);
 
     /**
      * Performs setLastDurableOpTime and also sets the wall clock time corresponding to the last
@@ -194,15 +183,10 @@ public:
      */
     void setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now);
 
-
     /**
      * Sets the last applied op time (not the heartbeat applied op time) iff the new optime is
      * later than the current optime, and updates the lastUpdate time.  Returns true if the
      * optime was advanced.
-     */
-    bool advanceLastAppliedOpTime(OpTime opTime, Date_t now);
-
-    /**
      * Performs advanceLastAppliedOpTime and also sets the wall clock time corresponding to the last
      * applied opTime. Should only be used on the current node.
      */
@@ -212,10 +196,6 @@ public:
      * Sets the last durable op time (not the heartbeat applied op time) iff the new optime is
      * later than the current optime, and updates the lastUpdate time.  Returns true if the
      * optime was advanced.
-     */
-    bool advanceLastDurableOpTime(OpTime opTime, Date_t now);
-
-    /**
      * Performs advanceLastDurableOpTime and also sets the wall clock time corresponding to the last
      * durable opTime. Should only be used on the current node.
      */

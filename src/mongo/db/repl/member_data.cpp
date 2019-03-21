@@ -43,7 +43,7 @@ namespace repl {
 MemberData::MemberData() : _health(-1), _authIssue(false), _configIndex(-1), _isSelf(false) {
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
-    _lastResponse.setAppliedOpTime(OpTime());
+    _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
 }
 
 bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) {
@@ -65,7 +65,7 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
         hbResponse.setElectionTime(_lastResponse.getElectionTime());
     }
     if (!hbResponse.hasAppliedOpTime()) {
-        hbResponse.setAppliedOpTime(_lastResponse.getAppliedOpTime());
+        hbResponse.setAppliedOpTimeAndWallTime(_lastResponse.getAppliedOpTimeAndWallTime());
     }
     // Log if the state changes
     if (_lastResponse.getState() != hbResponse.getState()) {
@@ -73,9 +73,13 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
               << hbResponse.getState().toString() << rsLog;
     }
 
-    bool opTimeAdvanced = advanceLastAppliedOpTime(hbResponse.getAppliedOpTime(), now);
-    auto durableOpTime = hbResponse.hasDurableOpTime() ? hbResponse.getDurableOpTime() : OpTime();
-    opTimeAdvanced = advanceLastDurableOpTime(durableOpTime, now) || opTimeAdvanced;
+    bool opTimeAdvanced =
+        advanceLastAppliedOpTimeAndWallTime(hbResponse.getAppliedOpTimeAndWallTime(), now);
+    auto durableOpTimeAndWallTime = hbResponse.hasDurableOpTime()
+        ? hbResponse.getDurableOpTimeAndWallTime()
+        : OpTimeAndWallTime();
+    opTimeAdvanced =
+        advanceLastDurableOpTimeAndWallTime(durableOpTimeAndWallTime, now) || opTimeAdvanced;
     _lastResponse = std::move(hbResponse);
     return opTimeAdvanced;
 }
@@ -95,7 +99,7 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
     _lastResponse = ReplSetHeartbeatResponse();
     _lastResponse.setState(MemberState::RS_DOWN);
     _lastResponse.setElectionTime(Timestamp());
-    _lastResponse.setAppliedOpTime(OpTime());
+    _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
     _lastResponse.setSyncingTo(HostAndPort());
 
     // The _lastAppliedOpTime/_lastDurableOpTime fields don't get cleared merely by missing a
@@ -118,7 +122,7 @@ void MemberData::setAuthIssue(Date_t now) {
     _lastResponse = ReplSetHeartbeatResponse();
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
-    _lastResponse.setAppliedOpTime(OpTime());
+    _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
     _lastResponse.setSyncingTo(HostAndPort());
 }
 
@@ -127,10 +131,6 @@ void MemberData::setLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
     _lastUpdateStale = false;
     _lastAppliedOpTime = opTime.opTime;
     _lastAppliedWallTime = opTime.wallTime;
-}
-
-void MemberData::setLastAppliedOpTime(OpTime opTime, Date_t now) {
-    setLastAppliedOpTimeAndWallTime({opTime, Date_t::min()}, now);
 }
 
 void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
@@ -150,10 +150,6 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
     }
 }
 
-void MemberData::setLastDurableOpTime(OpTime opTime, Date_t now) {
-    setLastDurableOpTimeAndWallTime({opTime, Date_t::min()}, now);
-}
-
 bool MemberData::advanceLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
     _lastUpdate = now;
     _lastUpdateStale = false;
@@ -162,10 +158,6 @@ bool MemberData::advanceLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, D
         return true;
     }
     return false;
-}
-
-bool MemberData::advanceLastAppliedOpTime(OpTime opTime, Date_t now) {
-    return advanceLastAppliedOpTimeAndWallTime({opTime, Date_t::min()}, now);
 }
 
 bool MemberData::advanceLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
@@ -177,10 +169,6 @@ bool MemberData::advanceLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, D
         return true;
     }
     return false;
-}
-
-bool MemberData::advanceLastDurableOpTime(OpTime opTime, Date_t now) {
-    return advanceLastDurableOpTimeAndWallTime({opTime, Date_t::min()}, now);
 }
 
 }  // namespace repl

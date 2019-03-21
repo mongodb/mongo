@@ -175,7 +175,8 @@ public:
 
     void processReplSetMetadata(const rpc::ReplSetMetadata&) override;
 
-    void advanceCommitPoint(const repl::OpTime& committedOpTime, bool fromSyncSource) override;
+    void advanceCommitPoint(const repl::OpTimeAndWallTime& committedOpTimeAndWallTime,
+                            bool fromSyncSource) override;
 
     void cancelAndRescheduleElectionTimeout() override;
 
@@ -211,6 +212,8 @@ public:
                                 boost::optional<rpc::OplogQueryMetadata>) override;
 
     repl::OpTime getLastCommittedOpTime() const override;
+
+    repl::OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const override;
 
     Status processReplSetRequestVotes(OperationContext*,
                                       const repl::ReplSetRequestVotesArgs&,

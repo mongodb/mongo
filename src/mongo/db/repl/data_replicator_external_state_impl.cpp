@@ -79,8 +79,7 @@ OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOp
 
 void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata& replMetadata,
                                                       rpc::OplogQueryMetadata oqMetadata) {
-    OpTime newCommitPoint;
-    newCommitPoint = oqMetadata.getLastOpCommitted();
+    OpTimeAndWallTime newCommitPoint = oqMetadata.getLastOpCommitted();
 
     const bool fromSyncSource = true;
     _replicationCoordinator->advanceCommitPoint(newCommitPoint, fromSyncSource);

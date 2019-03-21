@@ -400,11 +400,16 @@ bool ReplicationCoordinatorEmbedded::shouldChangeSyncSource(
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::advanceCommitPoint(const OpTime&, bool fromSyncSource) {
+void ReplicationCoordinatorEmbedded::advanceCommitPoint(const OpTimeAndWallTime&,
+                                                        bool fromSyncSource) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
 OpTime ReplicationCoordinatorEmbedded::getLastCommittedOpTime() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+OpTimeAndWallTime ReplicationCoordinatorEmbedded::getLastCommittedOpTimeAndWallTime() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 

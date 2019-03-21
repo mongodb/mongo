@@ -229,7 +229,19 @@ StatusWith<boost::optional<rpc::OplogQueryMetadata>> parseOplogQueryMetadata(
         queryResponse.otherFields.metadata.hasElement(rpc::kOplogQueryMetadataFieldName);
     if (receivedOplogQueryMetadata) {
         const auto& metadataObj = queryResponse.otherFields.metadata;
-        auto metadataResult = rpc::OplogQueryMetadata::readFromMetadata(metadataObj);
+        // Wall clock times are required in OplogQueryMetadata when FCV is 4.2. Arbiters trivially
+        // have FCV equal to 4.2, so they are excluded from this check.
+        bool isArbiter = hasGlobalServiceContext() &&
+            repl::ReplicationCoordinator::get(getGlobalServiceContext()) &&
+            repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState() ==
+                MemberState::RS_ARBITER;
+        bool requireWallTime =
+            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+             serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
+             !isArbiter);
+        auto metadataResult =
+            rpc::OplogQueryMetadata::readFromMetadata(metadataObj, requireWallTime);
         if (!metadataResult.isOK()) {
             return metadataResult.getStatus();
         }
@@ -469,7 +481,18 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
         queryResponse.otherFields.metadata.hasElement(rpc::kReplSetMetadataFieldName);
     if (receivedReplMetadata) {
         const auto& metadataObj = queryResponse.otherFields.metadata;
-        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
+        // Wall clock times are required in ReplSetMetadata when FCV is 4.2. Arbiters trivially
+        // have FCV equal to 4.2, so they are excluded from this check.
+        bool isArbiter = hasGlobalServiceContext() &&
+            repl::ReplicationCoordinator::get(getGlobalServiceContext()) &&
+            repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState() ==
+                MemberState::RS_ARBITER;
+        bool requireWallTime =
+            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+             serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
+             !isArbiter);
+        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(metadataObj, requireWallTime);
         if (!metadataResult.isOK()) {
             error() << "invalid replication metadata from sync source " << _getSource() << ": "
                     << metadataResult.getStatus() << ": " << metadataObj;

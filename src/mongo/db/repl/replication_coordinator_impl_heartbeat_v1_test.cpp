@@ -126,8 +126,8 @@ TEST_F(ReplCoordHBV1Test,
     hbResp.setConfig(rsConfig);
     // The smallest valid optime in PV1.
     OpTime opTime(Timestamp(), 0);
-    hbResp.setAppliedOpTime(opTime);
-    hbResp.setDurableOpTime(opTime);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t::min()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t::min()});
     BSONObjBuilder responseBuilder;
     responseBuilder << "ok" << 1;
     hbResp.addToBSON(&responseBuilder);
@@ -200,8 +200,8 @@ TEST_F(ReplCoordHBV1Test,
     hbResp.setConfig(rsConfig);
     // The smallest valid optime in PV1.
     OpTime opTime(Timestamp(), 0);
-    hbResp.setAppliedOpTime(opTime);
-    hbResp.setDurableOpTime(opTime);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t::min()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t::min()});
     BSONObjBuilder responseBuilder;
     responseBuilder << "ok" << 1;
     hbResp.addToBSON(&responseBuilder);
@@ -274,8 +274,8 @@ TEST_F(ReplCoordHBV1Test,
     hbResp.setConfig(rsConfig);
     // The smallest valid optime in PV1.
     OpTime opTime(Timestamp(), 0);
-    hbResp.setAppliedOpTime(opTime);
-    hbResp.setDurableOpTime(opTime);
+    hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t::min()});
+    hbResp.setDurableOpTimeAndWallTime({opTime, Date_t::min()});
     BSONObjBuilder responseBuilder;
     responseBuilder << "ok" << 1;
     hbResp.addToBSON(&responseBuilder);
@@ -386,15 +386,20 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
         hbResp.setSetName(rsConfig.getReplSetName());
         hbResp.setState(MemberState::RS_PRIMARY);
         hbResp.setConfigVersion(rsConfig.getConfigVersion());
-        hbResp.setAppliedOpTime(opTime);
-        hbResp.setDurableOpTime(opTime);
+        hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t::min()});
+        hbResp.setDurableOpTimeAndWallTime({opTime, Date_t::min()});
 
         BSONObjBuilder responseBuilder;
         responseBuilder << "ok" << 1;
         hbResp.addToBSON(&responseBuilder);
 
-        rpc::ReplSetMetadata metadata(
-            opTime.getTerm(), opTime, opTime, rsConfig.getConfigVersion(), unexpectedId, 1, -1);
+        rpc::ReplSetMetadata metadata(opTime.getTerm(),
+                                      {opTime, Date_t::min()},
+                                      opTime,
+                                      rsConfig.getConfigVersion(),
+                                      unexpectedId,
+                                      1,
+                                      -1);
         uassertStatusOK(metadata.writeToMetadata(&responseBuilder));
 
         heartbeatResponse = makeResponseStatus(responseBuilder.obj());

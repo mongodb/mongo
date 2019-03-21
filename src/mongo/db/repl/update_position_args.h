@@ -48,18 +48,24 @@ public:
     static const char kCommandFieldName[];
     static const char kUpdateArrayFieldName[];
     static const char kAppliedOpTimeFieldName[];
+    static const char kAppliedWallTimeFieldName[];
     static const char kDurableOpTimeFieldName[];
+    static const char kDurableWallTimeFieldName[];
     static const char kMemberIdFieldName[];
     static const char kConfigVersionFieldName[];
 
     struct UpdateInfo {
         UpdateInfo(const OpTime& applied,
+                   const Date_t& appliedWall,
                    const OpTime& durable,
+                   const Date_t& durableWall,
                    long long aCfgver,
                    long long aMemberId);
 
         OpTime appliedOpTime;
+        Date_t appliedWallTime;
         OpTime durableOpTime;
+        Date_t durableWallTime;
         long long cfgver;
         long long memberId;
     };
@@ -69,7 +75,7 @@ public:
     /**
      * Initializes this UpdatePositionArgs from the contents of "argsObj".
      */
-    Status initialize(const BSONObj& argsObj);
+    Status initialize(const BSONObj& argsObj, bool requireWallTime);
 
     /**
      * Gets a begin iterator over the UpdateInfos stored in this UpdatePositionArgs.

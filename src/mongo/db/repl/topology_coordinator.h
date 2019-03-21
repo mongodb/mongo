@@ -230,7 +230,7 @@ public:
      * the config getWriteConcernMajorityShouldJournal is set.
      * Returns true if the _lastCommittedOpTime was changed.
      */
-    bool updateLastCommittedOpTime();
+    bool updateLastCommittedOpTimeAndWallTime();
 
     /**
      * Updates _lastCommittedOpTime to be 'committedOpTime' if it is more recent than the current
@@ -239,12 +239,15 @@ public:
      * 'fromSyncSource'=true, which guarantees we are on the same branch of history as
      * 'committedOpTime', so we update our commit point to min(committedOpTime, lastApplied).
      */
-    bool advanceLastCommittedOpTime(OpTime committedOpTime, bool fromSyncSource);
+    bool advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTime committedOpTimeAndWallTime,
+                                               bool fromSyncSource);
 
     /**
      * Returns the OpTime of the latest majority-committed op known to this server.
      */
     OpTime getLastCommittedOpTime() const;
+
+    OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const;
 
     /**
      * Returns true if it's safe to transition to LeaderMode::kMaster.
@@ -935,7 +938,7 @@ private:
     Date_t _electionSleepUntil;
 
     // OpTime of the latest committed operation.
-    OpTime _lastCommittedOpTime;
+    OpTimeAndWallTime _lastCommittedOpTimeAndWallTime;
 
     // OpTime representing our transition to PRIMARY and the start of our term.
     // _lastCommittedOpTime cannot be set to an earlier OpTime.

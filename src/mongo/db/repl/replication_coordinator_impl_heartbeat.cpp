@@ -151,9 +151,17 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     BSONObj resp;
     if (responseStatus.isOK()) {
         resp = cbData.response.data;
-        responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
+        // Wall clock times are required in ReplSetHeartbeatResponse when FCV is 4.2. Arbiters
+        // trivially have FCV equal to 4.2, so they are excluded from this check.
+        bool isArbiter = _topCoord->getMemberState() == MemberState::RS_ARBITER;
+        bool requireWallTime =
+            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+             serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
+             !isArbiter);
+        responseStatus = hbResponse.initialize(resp, _topCoord->getTerm(), requireWallTime);
         StatusWith<rpc::ReplSetMetadata> replMetadata =
-            rpc::ReplSetMetadata::readFromMetadata(cbData.response.data);
+            rpc::ReplSetMetadata::readFromMetadata(cbData.response.data, requireWallTime);
 
         LOG_FOR_HEARTBEATS(2) << "Received response to heartbeat (requestId: " << cbData.request.id
                               << ") from " << target << ", " << resp;
@@ -229,7 +237,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         hbStatusResponse.getValue().hasState() &&
         hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY &&
         action.getAdvancedOpTime()) {
-        _updateLastCommittedOpTime(lk);
+        _updateLastCommittedOpTimeAndWallTime(lk);
     }
 
     // Abort catchup if we have caught up to the latest known optime after heartbeat refreshing.

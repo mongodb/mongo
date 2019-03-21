@@ -239,8 +239,9 @@ executor::RemoteCommandResponse makeHeartbeatResponse(const ReplSetConfig& rsCon
     hbResp.setConfigVersion(configVersion);
     // The smallest valid optime in PV1.
     OpTime opTime(Timestamp(), 0);
-    hbResp.setAppliedOpTime(opTime);
-    hbResp.setDurableOpTime(opTime);
+    Date_t wallTime = Date_t::min();
+    hbResp.setAppliedOpTimeAndWallTime({opTime, wallTime});
+    hbResp.setDurableOpTimeAndWallTime({opTime, wallTime});
     auto bob = BSONObjBuilder(hbResp.toBSON());
     bob.appendElements(extraFields);
     return RemoteCommandResponse(bob.obj(), duration_cast<Milliseconds>(millis));
@@ -469,8 +470,9 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
                                                         << request.target.toString();
         if (request.target == incompatibleHost) {
             OpTime opTime{Timestamp{10, 10}, 10};
+            Date_t wallTime = Date_t::min();
             rpc::ReplSetMetadata metadata(opTime.getTerm(),
-                                          opTime,
+                                          {opTime, wallTime},
                                           opTime,
                                           rsConfig.getConfigVersion(),
                                           unexpectedId,

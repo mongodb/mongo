@@ -39,12 +39,14 @@ namespace mongo {
 namespace rpc {
 
 using repl::OpTime;
+using repl::OpTimeAndWallTime;
 
 const char kReplSetMetadataFieldName[] = "$replData";
 
 namespace {
 
 const char kLastOpCommittedFieldName[] = "lastOpCommitted";
+const char kLastCommittedWallFieldName[] = "lastCommittedWall";
 const char kLastOpVisibleFieldName[] = "lastOpVisible";
 const char kConfigVersionFieldName[] = "configVersion";
 const char kReplicaSetIdFieldName[] = "replicaSetId";
@@ -57,7 +59,7 @@ const char kTermFieldName[] = "term";
 const int ReplSetMetadata::kNoPrimary;
 
 ReplSetMetadata::ReplSetMetadata(long long term,
-                                 OpTime committedOpTime,
+                                 OpTimeAndWallTime committedOpTime,
                                  OpTime visibleOpTime,
                                  long long configVersion,
                                  OID id,
@@ -71,7 +73,8 @@ ReplSetMetadata::ReplSetMetadata(long long term,
       _currentPrimaryIndex(currentPrimaryIndex),
       _currentSyncSourceIndex(currentSyncSourceIndex) {}
 
-StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& metadataObj) {
+StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& metadataObj,
+                                                              bool requireWallTime) {
     BSONElement replMetadataElement;
 
     Status status = bsonExtractTypedField(
@@ -108,16 +111,31 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     if (!status.isOK())
         return status;
 
-    repl::OpTime lastOpCommitted;
-    status = bsonExtractOpTimeField(replMetadataObj, kLastOpCommittedFieldName, &lastOpCommitted);
+    repl::OpTimeAndWallTime lastOpCommitted;
+    auto lastCommittedStatus = bsonExtractOpTimeField(
+        replMetadataObj, kLastOpCommittedFieldName, &(lastOpCommitted.opTime));
     // We check for NoSuchKey because these fields will be removed in SERVER-27668.
-    if (!status.isOK() && status != ErrorCodes::NoSuchKey)
-        return status;
+    if (!lastCommittedStatus.isOK() && lastCommittedStatus != ErrorCodes::NoSuchKey)
+        return lastCommittedStatus;
 
     repl::OpTime lastOpVisible;
     status = bsonExtractOpTimeField(replMetadataObj, kLastOpVisibleFieldName, &lastOpVisible);
     if (!status.isOK() && status != ErrorCodes::NoSuchKey)
         return status;
+
+    BSONElement wallClockTimeElement;
+    status = bsonExtractTypedField(
+        replMetadataObj, kLastCommittedWallFieldName, BSONType::Date, &wallClockTimeElement);
+
+    // Last committed OpTime is optional, so if last committed OpTime is missing, do not check for
+    // last committed wall clock time. Last committed wall clock time is also only required if
+    // FCV is 4.2.
+    if (!status.isOK() && lastCommittedStatus != ErrorCodes::NoSuchKey &&
+        (status != ErrorCodes::NoSuchKey || requireWallTime))
+        return status;
+    if (status.isOK()) {
+        lastOpCommitted.wallTime = wallClockTimeElement.Date();
+    }
 
     return ReplSetMetadata(
         term, lastOpCommitted, lastOpVisible, configVersion, id, primaryIndex, syncSourceIndex);
@@ -126,7 +144,8 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
 Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     BSONObjBuilder replMetadataBuilder(builder->subobjStart(kReplSetMetadataFieldName));
     replMetadataBuilder.append(kTermFieldName, _currentTerm);
-    _lastOpCommitted.append(&replMetadataBuilder, kLastOpCommittedFieldName);
+    _lastOpCommitted.opTime.append(&replMetadataBuilder, kLastOpCommittedFieldName);
+    replMetadataBuilder.appendDate(kLastCommittedWallFieldName, _lastOpCommitted.wallTime);
     _lastOpVisible.append(&replMetadataBuilder, kLastOpVisibleFieldName);
     replMetadataBuilder.append(kConfigVersionFieldName, _configVersion);
     replMetadataBuilder.append(kReplicaSetIdFieldName, _replicaSetId);

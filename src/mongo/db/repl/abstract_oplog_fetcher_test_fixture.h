@@ -94,6 +94,7 @@ protected:
 
     // The last OpTime fetched by the oplog fetcher.
     OpTime lastFetched;
+    Date_t lastFetchedWall;
 };
 }  // namespace repl
 }  // namespace mango

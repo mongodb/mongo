@@ -162,7 +162,17 @@ private:
 
 struct OpTimeAndWallTime {
     OpTime opTime;
-    Date_t wallTime;
+    Date_t wallTime = Date_t::min();
+    inline bool operator==(const OpTimeAndWallTime& rhs) const {
+        return opTime == rhs.opTime && wallTime == rhs.wallTime;
+    }
+    inline bool operator<(const OpTimeAndWallTime& rhs) const {
+        // Wall clock time ordering should not matter for calculations of the commit point.
+        return opTime < rhs.opTime;
+    }
+    std::string toString() const {
+        return opTime.toString() + ", " + wallTime.toString();
+    }
 };
 std::ostream& operator<<(std::ostream& out, const OpTimeAndWallTime& opTime);
 }  // namespace repl

@@ -112,6 +112,7 @@ void AbstractOplogFetcherTest::setUp() {
     launchExecutorThread();
 
     lastFetched = {{123, 0}, 1};
+    lastFetchedWall = Date_t::min() + Seconds(lastFetched.getSecs());
 }
 
 executor::RemoteCommandRequest AbstractOplogFetcherTest::processNetworkResponse(

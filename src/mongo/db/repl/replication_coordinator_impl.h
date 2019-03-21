@@ -219,7 +219,8 @@ public:
 
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
 
-    virtual void advanceCommitPoint(const OpTime& committedOpTime, bool fromSyncSource) override;
+    virtual void advanceCommitPoint(const OpTimeAndWallTime& committedOpTimeAndWallTime,
+                                    bool fromSyncSource) override;
 
     virtual void cancelAndRescheduleElectionTimeout() override;
 
@@ -270,6 +271,7 @@ public:
         boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
 
     virtual OpTime getLastCommittedOpTime() const override;
+    virtual OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const override;
 
     virtual Status processReplSetRequestVotes(OperationContext* opCtx,
                                               const ReplSetRequestVotesArgs& args,
@@ -1068,8 +1070,11 @@ private:
      * our lastApplied, unless 'fromSyncSource'=true, which guarantees we are on the same branch of
      * history as 'committedOpTime', so we update our commit point to min(committedOpTime,
      * lastApplied).
+     * Also updates corresponding wall clock time.
      */
-    void _advanceCommitPoint(WithLock lk, const OpTime& committedOpTime, bool fromSyncSource);
+    void _advanceCommitPoint(WithLock lk,
+                             const OpTimeAndWallTime& committedOpTimeAndWallTime,
+                             bool fromSyncSource);
 
     /**
      * Scan the memberData and determine the highest last applied or last
@@ -1080,7 +1085,7 @@ private:
      * Whether the last applied or last durable op time is used depends on whether
      * the config getWriteConcernMajorityShouldJournal is set.
      */
-    void _updateLastCommittedOpTime(WithLock lk);
+    void _updateLastCommittedOpTimeAndWallTime(WithLock lk);
 
     /**
      * Callback that attempts to set the current term in topology coordinator and

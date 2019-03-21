@@ -54,7 +54,7 @@ public:
 
     ReplSetMetadata() = default;
     ReplSetMetadata(long long term,
-                    repl::OpTime committedOpTime,
+                    repl::OpTimeAndWallTime committedOpTime,
                     repl::OpTime visibleOpTime,
                     long long configVersion,
                     OID replicaSetId,
@@ -72,8 +72,10 @@ public:
      *     primaryIndex: 0,
      *     syncSourceIndex: 0
      * }
+     * requireWallTime is only false if FCV is less than 4.2 or the wall clock time is not read from
+     * this particular ReplSetMetadata instance.
      */
-    static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc);
+    static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc, bool requireWallTime);
     Status writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
@@ -86,7 +88,7 @@ public:
     /**
      * Returns the OpTime of the most recently committed op of which the sender was aware.
      */
-    repl::OpTime getLastOpCommitted() const {
+    repl::OpTimeAndWallTime getLastOpCommitted() const {
         return _lastOpCommitted;
     }
 
@@ -140,7 +142,7 @@ public:
     std::string toString() const;
 
 private:
-    repl::OpTime _lastOpCommitted;
+    repl::OpTimeAndWallTime _lastOpCommitted;
     repl::OpTime _lastOpVisible;
     long long _currentTerm = -1;
     long long _configVersion = -1;

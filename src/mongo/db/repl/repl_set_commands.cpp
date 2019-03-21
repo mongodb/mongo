@@ -578,7 +578,16 @@ public:
         if (cmdObj.hasField("handshake"))
             return true;
 
-        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(cmdObj);
+        // Wall clock times are required in ReplSetMetadata when FCV is 4.2. Arbiters trivially
+        // have FCV equal to 4.2, so they are excluded from this check.
+        bool isArbiter = replCoord->getMemberState() == MemberState::RS_ARBITER;
+        bool requireWallTime =
+            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+             serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
+             !isArbiter);
+
+        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(cmdObj, requireWallTime);
         if (metadataResult.isOK()) {
             // New style update position command has metadata, which may inform the
             // upstream of a higher term.
@@ -592,7 +601,13 @@ public:
 
         UpdatePositionArgs args;
 
-        status = args.initialize(cmdObj);
+        // re-check requireWallTime
+        requireWallTime =
+            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+             serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
+             !isArbiter);
+        status = args.initialize(cmdObj, requireWallTime);
         if (status.isOK()) {
             status = replCoord->processReplSetUpdatePosition(args, &configVersion);
 

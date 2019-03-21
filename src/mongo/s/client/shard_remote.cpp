@@ -272,8 +272,9 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
         const auto& data = dataStatus.getValue();
 
         if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
-            auto replParseStatus =
-                rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
+            // Sharding users of ReplSetMetadata do not require the wall clock time field to be set
+            auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(
+                data.otherFields.metadata, /*requireWallTime*/ false);
             if (!replParseStatus.isOK()) {
                 status = replParseStatus.getStatus();
                 response.docs.clear();
@@ -281,7 +282,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
             }
 
             const auto& replSetMetadata = replParseStatus.getValue();
-            response.opTime = replSetMetadata.getLastOpCommitted();
+            response.opTime = replSetMetadata.getLastOpCommitted().opTime;
         }
 
         for (const BSONObj& doc : data.documents) {

@@ -52,6 +52,7 @@ class ReplicationCoordinatorExternalStateMock;
 class ReplicationCoordinatorImpl;
 class StorageInterfaceMock;
 class TopologyCoordinator;
+class UpdatePositionArgs;
 
 using executor::NetworkInterfaceMock;
 
@@ -105,23 +106,55 @@ protected:
         return _repl.get();
     }
 
+    Status updatePositionArgsInitialize(UpdatePositionArgs& args,
+                                        const BSONObj& argsObj,
+                                        bool requireWallTime = true) {
+        return args.initialize(argsObj, requireWallTime);
+    }
+
+    StatusWith<rpc::ReplSetMetadata> replReadFromMetadata(const BSONObj& doc,
+                                                          bool requireWallTime = true) {
+        return rpc::ReplSetMetadata::readFromMetadata(doc, requireWallTime);
+    }
+
     void replCoordSetMyLastAppliedOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
+        if (wallTime == Date_t::min()) {
+            wallTime = wallTime + Seconds(opTime.getSecs());
+        }
         getReplCoord()->setMyLastAppliedOpTimeAndWallTime({opTime, wallTime});
     }
 
     void replCoordSetMyLastAppliedOpTimeForward(const OpTime& opTime,
                                                 ReplicationCoordinator::DataConsistency consistency,
                                                 Date_t wallTime = Date_t::min()) {
+        if (wallTime == Date_t::min()) {
+            wallTime = wallTime + Seconds(opTime.getSecs());
+        }
         getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward({opTime, wallTime}, consistency);
     }
 
     void replCoordSetMyLastDurableOpTime(const OpTime& opTime, Date_t wallTime = Date_t::min()) {
+        if (wallTime == Date_t::min()) {
+            wallTime = wallTime + Seconds(opTime.getSecs());
+        }
         getReplCoord()->setMyLastDurableOpTimeAndWallTime({opTime, wallTime});
     }
 
     void replCoordSetMyLastDurableOpTimeForward(const OpTime& opTime,
                                                 Date_t wallTime = Date_t::min()) {
+        if (wallTime == Date_t::min()) {
+            wallTime = wallTime + Seconds(opTime.getSecs());
+        }
         getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward({opTime, wallTime});
+    }
+
+    void replCoordAdvanceCommitPoint(const OpTime& opTime,
+                                     Date_t wallTime = Date_t::min(),
+                                     bool fromSyncSource = false) {
+        if (wallTime == Date_t::min()) {
+            wallTime = wallTime + Seconds(opTime.getSecs());
+        }
+        getReplCoord()->advanceCommitPoint({opTime, wallTime}, fromSyncSource);
     }
 
     /**

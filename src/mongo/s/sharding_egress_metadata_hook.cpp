@@ -90,7 +90,9 @@ Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId
         if (shard->isConfig()) {
             // Config servers return the config opTime as part of their own metadata.
             if (metadataObj.hasField(rpc::kReplSetMetadataFieldName)) {
-                auto parseStatus = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
+                // Sharding users of ReplSetMetadata do not use the wall clock time field.
+                auto parseStatus =
+                    rpc::ReplSetMetadata::readFromMetadata(metadataObj, /*requireWallTime*/ false);
                 if (!parseStatus.isOK()) {
                     return parseStatus.getStatus();
                 }
@@ -103,7 +105,7 @@ Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId
                 // is safe to use.
                 const auto& replMetadata = parseStatus.getValue();
                 auto opTime = replMetadata.getLastOpCommitted();
-                grid->advanceConfigOpTime(opTime);
+                grid->advanceConfigOpTime(opTime.opTime);
             }
         } else {
             // Regular shards return the config opTime as part of ConfigServerMetadata.

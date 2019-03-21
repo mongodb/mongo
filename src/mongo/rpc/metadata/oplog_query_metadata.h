@@ -53,7 +53,7 @@ public:
     static const int kNoPrimary = -1;
 
     OplogQueryMetadata() = default;
-    OplogQueryMetadata(repl::OpTime lastOpCommitted,
+    OplogQueryMetadata(repl::OpTimeAndWallTime lastOpCommitted,
                        repl::OpTime lastOpApplied,
                        int rbid,
                        int currentPrimaryIndex,
@@ -63,19 +63,23 @@ public:
      * format:
      * {
      *     lastOpCommitted: {ts: Timestamp(0, 0), term: 0},
+     *     lastCommittedWall: ISODate("2018-07-25T19:21:22.449Z")
      *     lastOpApplied: {ts: Timestamp(0, 0), term: 0},
      *     rbid: 0
      *     primaryIndex: 0,
      *     syncSourceIndex: 0
      * }
+     * requireWallTime is only false if FCV is less than 4.2 or the wall clock time is not read from
+     * this particular OplogQueryMetadata instance.
      */
-    static StatusWith<OplogQueryMetadata> readFromMetadata(const BSONObj& doc);
+    static StatusWith<OplogQueryMetadata> readFromMetadata(const BSONObj& doc,
+                                                           bool requireWallTime);
     Status writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
      * Returns the OpTime of the most recently committed op of which the sender was aware.
      */
-    repl::OpTime getLastOpCommitted() const {
+    repl::OpTimeAndWallTime getLastOpCommitted() const {
         return _lastOpCommitted;
     }
 
@@ -115,7 +119,7 @@ public:
     std::string toString() const;
 
 private:
-    repl::OpTime _lastOpCommitted;
+    repl::OpTimeAndWallTime _lastOpCommitted;
     repl::OpTime _lastOpApplied;
     int _rbid = -1;
     int _currentPrimaryIndex = kNoPrimary;
