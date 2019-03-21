@@ -53,8 +53,20 @@
             sessionDB.runCommand(writeCmd),
             "expected write in transaction not to be retried on closed connection, cmd: " +
                 tojson(writeCmd) + ", sharded: " + isSharded);
-        assert(ErrorCodes.isNetworkError(res.code),
-               "expected network error, got: " + tojson(res.code));
+
+        let confirmIsNetworkError = function(response) {
+            if (response.hasOwnProperty('writeErrors')) {
+                assert.neq(null, res.writeErrors[0]);
+                assert(ErrorCodes.isNetworkError(res.writeErrors[0].code),
+                       "expected network error, got: " + tojson(res.code));
+            } else {
+                assert.eq('findAndModify', writeCmdName);
+                assert(ErrorCodes.isNetworkError(res.code),
+                       "expected network error, got: " + tojson(res.code));
+            }
+        };
+
+        confirmIsNetworkError(res);
         assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
 

@@ -89,7 +89,7 @@ enum WriteOpState {
  */
 class WriteOp {
 public:
-    WriteOp(BatchItemRef itemRef) : _itemRef(std::move(itemRef)) {}
+    WriteOp(BatchItemRef itemRef, bool inTxn) : _itemRef(std::move(itemRef)), _inTxn(inTxn) {}
 
     /**
      * Returns the write item for this operation
@@ -176,6 +176,9 @@ private:
 
     // filled when state == _Error
     std::unique_ptr<WriteErrorDetail> _error;
+
+    // Whether this write is part of a transaction.
+    const bool _inTxn;
 };
 
 /**

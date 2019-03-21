@@ -41,8 +41,6 @@ selector:
   # attached to statements in a transaction beyond the first one.
   - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
 
-  # TODO SERVER-39175: Mongos doesn't correctly report write errors in transactions
-  - jstests/core/txns/multi_statement_transaction_write_error.js
   exclude_with_any_tags:
   # Prepare is not a command on mongos.
   - uses_prepare_transaction

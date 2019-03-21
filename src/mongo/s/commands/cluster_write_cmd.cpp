@@ -384,6 +384,13 @@ private:
         CurOp::get(opCtx)->debug().nShards =
             stats.getTargetedShards().size() + (updatedShardKey ? 1 : 0);
 
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            auto writeCmdStatus = response.toStatus();
+            if (!writeCmdStatus.isOK()) {
+                txnRouter->implicitlyAbortTransaction(opCtx, writeCmdStatus);
+            }
+        }
+
         result.appendElements(response.toBSON());
         return response.getOk();
     }

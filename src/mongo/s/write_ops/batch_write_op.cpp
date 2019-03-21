@@ -242,11 +242,14 @@ void trackErrors(const ShardEndpoint& endpoint,
 }  // namespace
 
 BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest)
-    : _opCtx(opCtx), _clientRequest(clientRequest), _batchTxnNum(_opCtx->getTxnNumber()) {
+    : _opCtx(opCtx),
+      _clientRequest(clientRequest),
+      _batchTxnNum(_opCtx->getTxnNumber()),
+      _inTransaction(TransactionRouter::get(opCtx) != nullptr) {
     _writeOps.reserve(_clientRequest.sizeWriteOps());
 
     for (size_t i = 0; i < _clientRequest.sizeWriteOps(); ++i) {
-        _writeOps.emplace_back(BatchItemRef(&_clientRequest, i));
+        _writeOps.emplace_back(BatchItemRef(&_clientRequest, i), _inTransaction);
     }
 }
 
@@ -318,17 +321,17 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         Status targetStatus = writeOp.targetWrites(_opCtx, targeter, &writes);
 
         if (!targetStatus.isOK()) {
-            // Throw any error encountered during a transaction, since the whole batch must fail.
-            if (TransactionRouter::get(_opCtx)) {
-                forgetTargetedBatchesOnTransactionAbortingError();
-                uassertStatusOK(targetStatus.withContext(
-                    str::stream() << "Encountered targeting error during a transaction"));
-            }
-
             WriteErrorDetail targetError;
             buildTargetError(targetStatus, &targetError);
 
-            if (!recordTargetErrors) {
+            if (TransactionRouter::get(_opCtx)) {
+                writeOp.setOpError(targetError);
+                ++numTargetErrors;
+                // Abandon the rest of the batch when in transaction since we are going to
+                // abort the entire transaction.
+
+                return targetStatus;
+            } else if (!recordTargetErrors) {
                 // Cancel current batch state with an error
                 _cancelBatches(targetError, std::move(batchMap));
                 return targetStatus;
@@ -707,7 +710,9 @@ bool BatchWriteOp::isFinished() {
 }
 
 void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
-    dassert(isFinished());
+    // Note: we aggresively abandon the batch when encountering errors during transactions, so
+    // it can be in a state that is not "finished" even for unordered batches.
+    dassert(_inTransaction || isFinished());
 
     // Result is OK
     batchResp->setStatus(Status::OK());

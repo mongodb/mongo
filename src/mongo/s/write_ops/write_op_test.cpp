@@ -75,7 +75,7 @@ TEST(WriteOpTests, BasicError) {
         return insertOp;
     }());
 
-    WriteOp writeOp(BatchItemRef(&request, 0));
+    WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     const auto error(buildError(ErrorCodes::UnknownError, BSON("data" << 12345), "some message"));
@@ -102,7 +102,7 @@ TEST(WriteOpTests, TargetSingle) {
 
     // Do single-target write op
 
-    WriteOp writeOp(BatchItemRef(&request, 0));
+    WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
@@ -137,7 +137,7 @@ TEST(WriteOpTests, TargetMultiOneShard) {
         return deleteOp;
     }());
 
-    WriteOp writeOp(BatchItemRef(&request, 0));
+    WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
@@ -176,7 +176,7 @@ TEST(WriteOpTests, TargetMultiAllShards) {
     }());
 
     // Do multi-target write op
-    WriteOp writeOp(BatchItemRef(&request, 0));
+    WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
@@ -243,7 +243,7 @@ TEST_F(WriteOpTransactionTests, TargetMultiDoesNotTargetAllShards) {
     }());
 
     // Target the multi-write.
-    WriteOp writeOp(BatchItemRef(&request, 0));
+    WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
@@ -285,7 +285,7 @@ TEST(WriteOpTests, ErrorSingle) {
 
     // Do single-target write op
 
-    WriteOp writeOp(BatchItemRef(&request, 0));
+    WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
@@ -326,7 +326,7 @@ TEST(WriteOpTests, CancelSingle) {
 
     // Do single-target write op
 
-    WriteOp writeOp(BatchItemRef(&request, 0));
+    WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
@@ -365,7 +365,7 @@ TEST(WriteOpTests, RetrySingleOp) {
 
     // Do single-target write op
 
-    WriteOp writeOp(BatchItemRef(&request, 0));
+    WriteOp writeOp(BatchItemRef(&request, 0), false);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;

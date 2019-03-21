@@ -60,6 +60,7 @@ public:
     static const BSONField<OID> electionId;
     static const BSONField<std::vector<WriteErrorDetail*>> writeErrors;
     static const BSONField<WriteConcernErrorDetail*> writeConcernError;
+    static const BSONField<std::vector<std::string>> errorLabels;
 
     BatchedCommandResponse();
     ~BatchedCommandResponse();
@@ -133,6 +134,9 @@ public:
     bool isWriteConcernErrorSet() const;
     const WriteConcernErrorDetail* getWriteConcernError() const;
 
+    bool isErrorLabelsSet() const;
+    const std::vector<std::string>& getErrorLabels() const;
+
     /**
      * Converts the specified command response into a status, based on all of its contents.
      */
@@ -181,6 +185,9 @@ private:
 
     // (O)  errors that occurred while trying to satisfy the write concern.
     std::unique_ptr<WriteConcernErrorDetail> _wcErrDetails;
+
+    // (O)  array containing the error labels in string format.
+    std::vector<std::string> _errorLabels;
 };
 
 }  // namespace mongo

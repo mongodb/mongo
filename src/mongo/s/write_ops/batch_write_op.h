@@ -234,6 +234,9 @@ private:
     int _numMatched{0};
     int _numModified{0};
     int _numDeleted{0};
+
+    // Set to true if this write is part of a transaction.
+    const bool _inTransaction{false};
 };
 
 /**

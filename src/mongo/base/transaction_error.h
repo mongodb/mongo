@@ -33,6 +33,10 @@
 
 namespace mongo {
 
+namespace txn {
+static constexpr StringData TransientTxnErrorFieldName = "TransientTransactionError"_sd;
+}
+
 /**
  * Whether a write error in a transaction should be labelled with "TransientTransactionError".
  */

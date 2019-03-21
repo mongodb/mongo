@@ -39,8 +39,6 @@ selector:
   # View tests aren't expected to work when collections are implicitly sharded.
   - jstests/core/txns/view_reads_in_transaction.js
 
-  # TODO SERVER-39175: Mongos doesn't correctly report write errors in transactions
-  - jstests/core/txns/multi_statement_transaction_write_error.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # Tests tagged with the following will fail because they assume collections are not sharded.

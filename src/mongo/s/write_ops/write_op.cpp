@@ -173,7 +173,7 @@ void WriteOp::_updateOpState() {
             childErrors.push_back(&childOp);
 
             // Any non-retry error aborts all
-            if (!isRetryErrCode(childOp.error->toStatus().code())) {
+            if (_inTxn || !isRetryErrCode(childOp.error->toStatus().code())) {
                 isRetryError = false;
             }
         }

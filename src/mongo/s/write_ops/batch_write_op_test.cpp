@@ -1594,15 +1594,17 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Delete) {
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
 
-    bool recordTargetErrors = false;
-    ASSERT_THROWS_CODE(batchOp.targetBatch(targeter, recordTargetErrors, &targeted),
-                       AssertionException,
-                       ErrorCodes::UnknownError);
+    auto status = batchOp.targetBatch(targeter, false, &targeted);
+    batchOp.forgetTargetedBatchesOnTransactionAbortingError();
 
-    recordTargetErrors = true;
-    ASSERT_THROWS_CODE(batchOp.targetBatch(targeter, recordTargetErrors, &targeted),
-                       AssertionException,
-                       ErrorCodes::UnknownError);
+    ASSERT_EQ(ErrorCodes::UnknownError, status.code());
+
+    BatchedCommandResponse response;
+    batchOp.buildClientResponse(&response);
+
+    ASSERT(response.isErrDetailsSet());
+    ASSERT_GT(response.sizeErrDetails(), 0u);
+    ASSERT_EQ(ErrorCodes::UnknownError, response.getErrDetailsAt(0)->toStatus().code());
 }
 
 TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
@@ -1622,15 +1624,17 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
     OwnedPointerMap<ShardId, TargetedWriteBatch> targetedOwned;
     std::map<ShardId, TargetedWriteBatch*>& targeted = targetedOwned.mutableMap();
 
-    bool recordTargetErrors = false;
-    ASSERT_THROWS_CODE(batchOp.targetBatch(targeter, recordTargetErrors, &targeted),
-                       AssertionException,
-                       ErrorCodes::UnknownError);
+    auto status = batchOp.targetBatch(targeter, false, &targeted);
+    batchOp.forgetTargetedBatchesOnTransactionAbortingError();
 
-    recordTargetErrors = true;
-    ASSERT_THROWS_CODE(batchOp.targetBatch(targeter, recordTargetErrors, &targeted),
-                       AssertionException,
-                       ErrorCodes::UnknownError);
+    ASSERT_EQ(ErrorCodes::UnknownError, status.code());
+
+    BatchedCommandResponse response;
+    batchOp.buildClientResponse(&response);
+
+    ASSERT(response.isErrDetailsSet());
+    ASSERT_GT(response.sizeErrDetails(), 0u);
+    ASSERT_EQ(ErrorCodes::UnknownError, response.getErrDetailsAt(0)->toStatus().code());
 }
 
 }  // namespace

@@ -1,4 +1,4 @@
-// Verifies targeting errors encountered in a transaction lead to command response errors.
+// Verifies targeting errors encountered in a transaction lead to write errors.
 //
 // @tags: [uses_transactions]
 (function() {
@@ -22,7 +22,7 @@
     let res = sessionDB.runCommand(
         {update: collName, updates: [{q: {skey: {$lte: 5}}, u: {$set: {x: 1}}, multi: false}]});
     assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
-    assert(!res.hasOwnProperty("writeErrors"), "expected no write errors, res: " + tojson(res));
+    assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojson(res));
 
     session.abortTransaction_forTesting();
 
@@ -32,7 +32,7 @@
 
     res = sessionDB.runCommand({delete: collName, deletes: [{q: {skey: {$lte: 5}}, limit: 1}]});
     assert.commandFailedWithCode(res, ErrorCodes.ShardKeyNotFound);
-    assert(!res.hasOwnProperty("writeErrors"), "expected no write errors, res: " + tojson(res));
+    assert(res.hasOwnProperty("writeErrors"), "expected write errors, res: " + tojson(res));
 
     session.abortTransaction_forTesting();
 

@@ -50,7 +50,7 @@ BSONObj getErrorLabels(const OperationSessionInfoFromClient& sessionOptions,
         commandName == "commitTransaction" || commandName == "coordinateCommitTransaction");
 
     if (isTransient) {
-        return BSON("errorLabels" << BSON_ARRAY("TransientTransactionError"));
+        return BSON("errorLabels" << BSON_ARRAY(txn::TransientTxnErrorFieldName));
     }
     return {};
 }
