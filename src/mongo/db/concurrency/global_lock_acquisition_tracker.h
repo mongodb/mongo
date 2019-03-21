@@ -58,6 +58,11 @@ public:
     bool getGlobalSharedLockTaken() const;
 
     /**
+     * Returns whether we have ever taken a global lock in this operation.
+     */
+    bool getGlobalLockTaken() const;
+
+    /**
      * Sets the mode bit in _globalLockMode. Once a mode bit is set, we won't clear it.
      */
     void setGlobalLockModeBit(LockMode mode);

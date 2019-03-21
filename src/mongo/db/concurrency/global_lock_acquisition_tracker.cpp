@@ -44,6 +44,10 @@ bool GlobalLockAcquisitionTracker::getGlobalSharedLockTaken() const {
     return _globalLockMode & (1 << MODE_S);
 }
 
+bool GlobalLockAcquisitionTracker::getGlobalLockTaken() const {
+    return _globalLockMode & ((1 << MODE_IX) | (1 << MODE_X) | (1 << MODE_IS) | (1 << MODE_S));
+}
+
 void GlobalLockAcquisitionTracker::setGlobalLockModeBit(LockMode mode) {
     _globalLockMode |= (1 << mode);
 }

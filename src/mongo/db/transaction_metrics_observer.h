@@ -117,9 +117,9 @@ public:
      * Updates relevant metrics and storage statistics when an operation running on the transaction
      * completes. An operation may be a read/write operation, or an abort/commit command.
      */
-    void onTransactionOperation(Client* client,
+    void onTransactionOperation(OperationContext* opCtx,
                                 OpDebug::AdditiveMetrics additiveMetrics,
-                                std::shared_ptr<StorageStats> storageStats);
+                                bool isPrepared);
 
     /**
      * Returns a read-only reference to the SingleTransactionStats object stored in this

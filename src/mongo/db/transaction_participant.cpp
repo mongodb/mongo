@@ -736,9 +736,7 @@ void TransactionParticipant::Participant::_stashActiveTransaction(OperationConte
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         o(lk).transactionMetricsObserver.onStash(ServerTransactionsMetrics::get(opCtx), tickSource);
         o(lk).transactionMetricsObserver.onTransactionOperation(
-            opCtx->getClient(),
-            CurOp::get(opCtx)->debug().additiveMetrics,
-            CurOp::get(opCtx)->debug().storageStats);
+            opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
     }
 
     invariant(!o().txnResourceStash);
@@ -1256,9 +1254,7 @@ void TransactionParticipant::Participant::_finishCommitTransaction(OperationCont
                                                   &Top::get(getGlobalServiceContext()),
                                                   isCommittingWithPrepare);
         o(lk).transactionMetricsObserver.onTransactionOperation(
-            opCtx->getClient(),
-            CurOp::get(opCtx)->debug().additiveMetrics,
-            CurOp::get(opCtx)->debug().storageStats);
+            opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
     }
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
@@ -1338,9 +1334,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
     if (!o().txnState.isNone()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onTransactionOperation(
-            opCtx->getClient(),
-            CurOp::get(opCtx)->debug().additiveMetrics,
-            CurOp::get(opCtx)->debug().storageStats);
+            opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
     }
 
     // We reserve an oplog slot before aborting the transaction so that no writes that are causally

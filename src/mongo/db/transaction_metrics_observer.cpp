@@ -193,10 +193,9 @@ void TransactionMetricsObserver::onAbortInactive(
     }
 }
 
-void TransactionMetricsObserver::onTransactionOperation(
-    Client* client,
-    OpDebug::AdditiveMetrics additiveMetrics,
-    std::shared_ptr<StorageStats> storageStats) {
+void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
+                                                        OpDebug::AdditiveMetrics additiveMetrics,
+                                                        bool isPrepared) {
     // Add the latest operation stats to the aggregate OpDebug::AdditiveMetrics object stored in the
     // SingleTransactionStats instance on the TransactionMetricsObserver.
     _singleTransactionStats.getOpDebug()->additiveMetrics.add(additiveMetrics);
@@ -204,18 +203,24 @@ void TransactionMetricsObserver::onTransactionOperation(
     // If there are valid storage statistics for this operation, put those in the
     // SingleTransactionStats instance either by creating a new storageStats instance or by adding
     // into an existing storageStats instance stored in SingleTransactionStats.
-    if (storageStats) {
-        if (!_singleTransactionStats.getOpDebug()->storageStats) {
-            _singleTransactionStats.getOpDebug()->storageStats = storageStats->getCopy();
-        } else {
-            *_singleTransactionStats.getOpDebug()->storageStats += *storageStats;
+    // WiredTiger doesn't let storage statistics be collected when transaction is prepared.
+    if (!isPrepared) {
+        std::shared_ptr<StorageStats> storageStats =
+            opCtx->recoveryUnit()->getOperationStatistics();
+        if (storageStats) {
+            CurOp::get(opCtx)->debug().storageStats = storageStats;
+            if (!_singleTransactionStats.getOpDebug()->storageStats) {
+                _singleTransactionStats.getOpDebug()->storageStats = storageStats->getCopy();
+            } else {
+                *_singleTransactionStats.getOpDebug()->storageStats += *storageStats;
+            }
         }
     }
 
     // Update the LastClientInfo object stored in the SingleTransactionStats instance on the
     // TransactionMetricsObserver with this Client's information. This is the last client that ran a
     // transaction operation on the txnParticipant.
-    _singleTransactionStats.updateLastClientInfo(client);
+    _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
 }
 
 void TransactionMetricsObserver::_onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
