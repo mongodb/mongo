@@ -66,9 +66,7 @@ StatusWith<ConstDataRange> BlockCompressor::compress(ConstDataRange source) {
     if (err != Z_STREAM_END) {
         (void)deflateEnd(&stream);
 
-        if (err != Z_OK) {
-            return {ErrorCodes::ZLibError, str::stream() << "deflate failed with " << err};
-        }
+        return {ErrorCodes::ZLibError, str::stream() << "deflate failed with " << err};
     }
 
     err = deflateEnd(&stream);
