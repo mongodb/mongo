@@ -15,6 +15,16 @@
     load("jstests/libs/write_concern_util.js");
     load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
+    // Waits for the given log to appear a number of times in the shell's rawMongoProgramOutput.
+    // Loops because it is not guaranteed the program output will immediately contain all lines
+    // logged at an earlier wall clock time.
+    function waitForLog(logLine, times) {
+        assert.soon(function() {
+            const matches = rawMongoProgramOutput().match(new RegExp(logLine, "g")) || [];
+            return matches.length === times;
+        }, 'Failed to find "' + logLine + '" logged ' + times + ' times');
+    }
+
     const addTxnFields = function(command, lsid, txnNumber) {
         const txnFields = {
             lsid: lsid,
@@ -294,15 +304,11 @@
             failureMode.checkCommitResult(commitRetryRes);
 
             if (type.includes("SingleShard")) {
-                assert.eq(
-                    2,
-                    rawMongoProgramOutput().match(/Committing single-shard transaction/g).length);
+                waitForLog("Committing single-shard transaction", 2);
             } else if (type.includes("readOnly")) {
-                assert.eq(
-                    2, rawMongoProgramOutput().match(/Committing read-only transaction/g).length);
+                waitForLog("Committing read-only transaction", 2);
             } else if (type.includes("MultiShard")) {
-                assert.eq(
-                    2, rawMongoProgramOutput().match(/Committing multi-shard transaction/g).length);
+                waitForLog("Committing multi-shard transaction", 2);
             } else {
                 assert(false, `Unknown transaction type: ${type}`);
             }
