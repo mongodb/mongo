@@ -148,8 +148,10 @@ function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
             secondary,
             {
               startClean: true,
-              setParameter:
-                  {'failpoint.initialSyncFuzzerSynchronizationPoint1': tojson({mode: 'alwaysOn'})}
+              setParameter: {
+                  'failpoint.initialSyncFuzzerSynchronizationPoint1': tojson({mode: 'alwaysOn'}),
+                  'logComponentVerbosity': tojsononeline(TestData.logComponentVerbosity),
+              }
             },
             true);
     }

@@ -4921,6 +4921,19 @@ tasks:
       jepsen_test_name: read-concern-majority
       jepsen_write_concern: --write-concern w1
 
+## initial sync generational fuzzer ##
+- <<: *jstestfuzz_template
+  name: initial_sync_fuzzer_gen
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 10
+      num_tasks: 5
+      npm_command: initsync-fuzzer
+      resmoke_args: --suites=initial_sync_fuzzer
+      name: initial_sync_fuzzer
+
 ## Standalone generational fuzzer for aggregation pipelines ##
 - <<: *jstestfuzz_template
   name: aggregation_multiversion_fuzzer_gen
@@ -9562,6 +9575,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: free_monitoring
+  - name: initial_sync_fuzzer_gen
   - name: integration_tests_standalone
     distros:
     - windows-64-vs2017-compile
@@ -10148,6 +10162,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
+  - name: initial_sync_fuzzer_gen
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_decimal
@@ -10877,6 +10892,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: idl_tests
+  - name: initial_sync_fuzzer_gen
   - name: integration_tests_replset
     distros:
     - rhel62-large
@@ -11106,6 +11122,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
+  - name: initial_sync_fuzzer_gen
   - name: integration_tests_replset
     distros:
     - rhel62-large
@@ -11319,6 +11336,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
+  - name: initial_sync_fuzzer_gen
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
@@ -13888,6 +13906,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
+  - name: initial_sync_fuzzer_gen
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: jsCore
@@ -14096,6 +14115,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
+  - name: initial_sync_fuzzer_gen
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: integration_tests_standalone
