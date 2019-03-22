@@ -530,6 +530,14 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
     });
 }
 
+bool MONGO_API_CALL
+stitch_support_v1_projection_requires_match(stitch_support_v1_projection* const projection) {
+    return [projection]() noexcept {
+        return projection->projectionExec.projectRequiresQueryExpression();
+    }
+    ();
+}
+
 stitch_support_v1_update* MONGO_API_CALL
 stitch_support_v1_update_create(stitch_support_v1_lib* lib,
                                 const uint8_t* updateExprBSON,
@@ -644,6 +652,11 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
         static_cast<void>(std::copy_n(outputObj.objdata(), outputSize, output));
         return mongo::toInterfaceType(output);
     });
+}
+
+bool MONGO_API_CALL
+stitch_support_v1_update_requires_match(stitch_support_v1_update* const update) {
+    return [update]() { return update->updateDriver.needMatchDetails(); }();
 }
 
 stitch_support_v1_update_details* MONGO_API_CALL stitch_support_v1_update_details_create(void) {

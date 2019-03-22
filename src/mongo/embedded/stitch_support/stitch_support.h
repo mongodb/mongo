@@ -398,6 +398,17 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
                                    stitch_support_v1_status* status);
 
 /**
+ * Returns true iff applying this projection requires a matcher that matches the input document,
+ * as is the case when the projection includes the positional ($) operator.
+ *
+ * When this function returns true, it is illegal to call stitch_support_v1_projection_apply()
+ * unless the projection has a matcher (passed in during stitch_support_v1_projection_create) and
+ * the matcher matches the input document.
+ */
+STITCH_SUPPORT_API bool MONGO_API_CALL
+stitch_support_v1_projection_requires_match(stitch_support_v1_projection* const projection);
+
+/**
  * An update details object stores the list of paths modified by a call to
  * stitch_support_v1_update_apply().
  */
@@ -533,6 +544,17 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
  */
 STITCH_SUPPORT_API uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(
     stitch_support_v1_update* const update, stitch_support_v1_status* status);
+
+/**
+ * Returns true iff applying this update requires a matcher that matches the input document, as is
+ * the case when the update includes the positional ($) operator.
+ *
+ * When this function returns true, it is illegal to call stitch_support_v1_update_apply() unless
+ * the update has a matcher (passed in during stitch_support_v1_update_create) and the matcher
+ * matches the input document.
+ */
+STITCH_SUPPORT_API bool MONGO_API_CALL
+stitch_support_v1_update_requires_match(stitch_support_v1_update* const update);
 
 /**
  * Free the memory of a BSON buffer returned by stitch_support_v1_projection_apply() or

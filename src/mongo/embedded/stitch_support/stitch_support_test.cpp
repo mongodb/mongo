@@ -159,7 +159,7 @@ protected:
                            return result;
                        });
 
-        return results;
+        return std::make_pair(results, stitch_support_v1_projection_requires_match(projection));
     }
 
     auto checkProjectionStatus(const char* specJSON,
@@ -221,6 +221,10 @@ protected:
             status);
         ASSERT(update);
         ON_BLOCK_EXIT([update] { stitch_support_v1_update_destroy(update); });
+
+        // We assume that callers of this function will provide a 'match' argument if and only if
+        // the update requires it.
+        ASSERT_EQ(match != nullptr, stitch_support_v1_update_requires_match(update));
 
         auto updateResult = stitch_support_v1_update_apply(
             update, toBSONForAPI(document).first, updateDetails, status);
@@ -397,21 +401,29 @@ TEST_F(StitchSupportTest, CheckMatchWorksWithCollation) {
 }
 
 TEST_F(StitchSupportTest, CheckProjectionWorksWithDefaults) {
-    auto results =
+    auto[results, needsMatch] =
         checkProjection("{a: 1}", {"{_id: 1, a: 100, b: 200}", "{_id: 1, a: 200, b: 300}"});
+    ASSERT_FALSE(needsMatch);
     ASSERT_EQ("{ \"_id\" : 1, \"a\" : 100 }", results[0]);
     ASSERT_EQ("{ \"_id\" : 1, \"a\" : 200 }", results[1]);
-    results = checkProjection("{'a.$.c': 1}",
-                              {"{_id: 1, a: [{b: 2, c: 100}, {b: 1, c: 200}]}",
-                               "{_id: 1, a: [{b: 1, c: 100, d: 45}, {b: 2, c: 200}]}"},
-                              "{'a.b': 1}");
+
+    std::tie(results, needsMatch) =
+        checkProjection("{'a.$.c': 1}",
+                        {"{_id: 1, a: [{b: 2, c: 100}, {b: 1, c: 200}]}",
+                         "{_id: 1, a: [{b: 1, c: 100, d: 45}, {b: 2, c: 200}]}"},
+                        "{'a.b': 1}");
+    ASSERT_TRUE(needsMatch);
     ASSERT_EQ("{ \"_id\" : 1, \"a\" : [ { \"b\" : 1, \"c\" : 200 } ] }", results[0]);
     ASSERT_EQ("{ \"_id\" : 1, \"a\" : [ { \"b\" : 1, \"c\" : 100, \"d\" : 45 } ] }", results[1]);
-    ASSERT_EQ(
-        "{ \"a\" : [ { \"b\" : 2, \"c\" : 2 } ] }",
-        checkProjection("{a: {$elemMatch: {b: 2}}}", {"{a: [{b: 1, c: 1}, {b: 2, c: 2}]}"})[0]);
-    ASSERT_EQ("{ \"a\" : [ 2, 3 ] }",
-              checkProjection("{a: {$slice: [1, 2]}}", {"{a: [1, 2, 3, 4]}"})[0]);
+
+    std::tie(results, needsMatch) =
+        checkProjection("{a: {$elemMatch: {b: 2}}}", {"{a: [{b: 1, c: 1}, {b: 2, c: 2}]}"});
+    ASSERT_FALSE(needsMatch);
+    ASSERT_EQ("{ \"a\" : [ { \"b\" : 2, \"c\" : 2 } ] }", results[0]);
+
+    std::tie(results, needsMatch) = checkProjection("{a: {$slice: [1, 2]}}", {"{a: [1, 2, 3, 4]}"});
+    ASSERT_FALSE(needsMatch);
+    ASSERT_EQ("{ \"a\" : [ 2, 3 ] }", results[0]);
 }
 
 TEST_F(StitchSupportTest, CheckProjectionProducesExpectedStatus) {
@@ -429,18 +441,24 @@ TEST_F(StitchSupportTest, CheckProjectionCollatesRespectfully) {
     auto collator = stitch_support_v1_collator_create(
         lib, toBSONForAPI("{locale: 'en', strength: 2}").first, nullptr);
     ON_BLOCK_EXIT([collator] { stitch_support_v1_collator_destroy(collator); });
-    ASSERT_EQ("{ \"_id\" : 1, \"a\" : [ \"mixEdCaSe\" ] }",
-              checkProjection("{a: {$elemMatch: {$eq: 'MiXedcAse'}}}",
-                              {"{_id: 1, a: ['lowercase', 'mixEdCaSe', 'UPPERCASE']}"},
-                              nullptr,
-                              collator)[0]);
+
+    auto[results, needsMatch] =
+        checkProjection("{a: {$elemMatch: {$eq: 'MiXedcAse'}}}",
+                        {"{_id: 1, a: ['lowercase', 'mixEdCaSe', 'UPPERCASE']}"},
+                        nullptr,
+                        collator);
+    ASSERT_FALSE(needsMatch);
+    ASSERT_EQ("{ \"_id\" : 1, \"a\" : [ \"mixEdCaSe\" ] }", results[0]);
+
     // Ignore a matcher's collator.
-    ASSERT_EQ("{ \"_id\" : 1 }",
-              checkProjection("{a: {$elemMatch: {$eq: 'MiXedcAse'}}}",
-                              {"{_id: 1, a: ['lowercase', 'mixEdCaSe', 'UPPERCASE']}"},
-                              "{_id: 1}",
-                              collator,
-                              true)[0]);
+    std::tie(results, needsMatch) =
+        checkProjection("{a: {$elemMatch: {$eq: 'MiXedcAse'}}}",
+                        {"{_id: 1, a: ['lowercase', 'mixEdCaSe', 'UPPERCASE']}"},
+                        "{_id: 1}",
+                        collator,
+                        true);
+    ASSERT_FALSE(needsMatch);
+    ASSERT_EQ("{ \"_id\" : 1 }", results[0]);
 }
 
 TEST_F(StitchSupportTest, TestUpdateSingleElement) {
