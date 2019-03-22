@@ -1026,6 +1026,9 @@ functions:
             "../../../../../../mongo-tools/$i${exe|}" --version
         done
 
+        mkdir -p ../../../../../../mongo-tools/distsrc
+        cp THIRD-PARTY-NOTICES ../../../../../../mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools
+
   "get modified patch files":
     command: shell.exec
     params:
