@@ -139,7 +139,7 @@ public:
                                               const NamespaceString& fullns,
                                               repl::OpTime dropOpTime = {}) = 0;
 
-    virtual Status dropView(OperationContext* const opCtx, const StringData fullns) = 0;
+    virtual Status dropView(OperationContext* const opCtx, const NamespaceString& viewName) = 0;
 
     virtual Collection* createCollection(OperationContext* const opCtx,
                                          StringData ns,
@@ -148,7 +148,7 @@ public:
                                          const BSONObj& idIndex = BSONObj()) = 0;
 
     virtual Status createView(OperationContext* const opCtx,
-                              const StringData viewName,
+                              const NamespaceString& viewName,
                               const CollectionOptions& options) = 0;
 
     /**

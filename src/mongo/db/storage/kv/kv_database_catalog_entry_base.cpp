@@ -128,7 +128,13 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
                                                     const NamespaceString& nss,
                                                     const CollectionOptions& options,
                                                     bool allocateDefaultSpace) {
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
+    // be no longer a special case.
+    if (nss.coll().startsWith("system.views")) {
+        dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
+    } else {
+        dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    }
 
     invariant(nss.coll().size() > 0);
 

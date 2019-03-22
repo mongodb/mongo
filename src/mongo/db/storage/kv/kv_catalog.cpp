@@ -410,7 +410,13 @@ Status KVCatalog::newCollection(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 const CollectionOptions& options,
                                 KVPrefix prefix) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
+    // be no longer a special case.
+    if (nss.coll().startsWith("system.views")) {
+        invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    } else {
+        invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    }
 
     const string ident = _newUniqueIdent(nss.ns(), "collection");
 

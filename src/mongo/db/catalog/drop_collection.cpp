@@ -51,6 +51,99 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 
+Status _dropView(OperationContext* opCtx,
+                 std::unique_ptr<AutoGetDb>& autoDb,
+                 const NamespaceString& collectionName,
+                 BSONObjBuilder& result) {
+    // TODO(SERVER-39520): No need to relock once createCollection doesn't need X lock.
+    autoDb.reset();
+    autoDb = std::make_unique<AutoGetDb>(opCtx, collectionName.db(), MODE_IX);
+    Database* db = autoDb->getDb();
+    if (!db) {
+        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+    }
+    auto view = ViewCatalog::get(db)->lookup(opCtx, collectionName.ns());
+    if (!view) {
+        return Status(ErrorCodes::NamespaceNotFound, "ns not found");
+    }
+    Lock::CollectionLock systemViewsLock(opCtx->lockState(), db->getSystemViewsName(), MODE_X);
+    Lock::CollectionLock collLock(opCtx->lockState(), collectionName.ns(), MODE_IX);
+
+    if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
+        log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "
+                 "disabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringDropCollection);
+    }
+
+    AutoStatsTracker statsTracker(opCtx,
+                                  collectionName,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                  autoDb->getDb()->getProfilingLevel());
+
+    if (opCtx->writesAreReplicated() &&
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName)) {
+        return Status(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while dropping collection " << collectionName);
+    }
+
+    WriteUnitOfWork wunit(opCtx);
+    Status status = db->dropView(opCtx, collectionName);
+    if (!status.isOK()) {
+        return status;
+    }
+    wunit.commit();
+
+    result.append("ns", collectionName.ns());
+    return Status::OK();
+}
+
+Status _dropCollection(OperationContext* opCtx,
+                       Database* db,
+                       Collection* coll,
+                       const NamespaceString& collectionName,
+                       const repl::OpTime& dropOpTime,
+                       DropCollectionSystemCollectionMode systemCollectionMode,
+                       BSONObjBuilder& result) {
+    if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
+        log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "
+                 "disabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringDropCollection);
+    }
+
+    AutoStatsTracker statsTracker(opCtx,
+                                  collectionName,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                  db->getProfilingLevel());
+
+    if (opCtx->writesAreReplicated() &&
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName)) {
+        return Status(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while dropping collection " << collectionName);
+    }
+
+    WriteUnitOfWork wunit(opCtx);
+
+    int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
+    BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
+    IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid().get());
+    Status status =
+        systemCollectionMode == DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops
+        ? db->dropCollection(opCtx, collectionName.ns(), dropOpTime)
+        : db->dropCollectionEvenIfSystem(opCtx, collectionName, dropOpTime);
+
+    if (!status.isOK()) {
+        return status;
+    }
+    wunit.commit();
+
+    result.append("nIndexesWas", numIndexes);
+    result.append("ns", collectionName.ns());
+
+    return Status::OK();
+}
+
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       BSONObjBuilder& result,
@@ -61,67 +154,21 @@ Status dropCollection(OperationContext* opCtx,
     }
 
     return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
-        AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
-        Database* const db = autoDb.getDb();
-        Collection* coll = db ? db->getCollection(opCtx, collectionName) : nullptr;
-        auto view =
-            db && !coll ? ViewCatalog::get(db)->lookup(opCtx, collectionName.ns()) : nullptr;
+        // TODO(SERVER-39520): Get rid of database MODE_X lock.
+        auto autoDb = std::make_unique<AutoGetDb>(opCtx, collectionName.db(), MODE_X);
 
-        if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
-            log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "
-                     "disabled.";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringDropCollection);
-        }
-
-        if (!db || (!coll && !view)) {
+        Database* db = autoDb->getDb();
+        if (!db) {
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");
         }
 
-        const bool shardVersionCheck = true;
-        OldClientContext context(opCtx, collectionName.ns(), shardVersionCheck);
-
-        bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
-
-        if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while dropping collection "
-                                        << collectionName);
-        }
-
-        WriteUnitOfWork wunit(opCtx);
-        if (!result.hasField("ns")) {
-            result.append("ns", collectionName.ns());
-        }
-
-        if (coll) {
-            invariant(!view);
-            int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
-
-            BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
-            IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-                coll->uuid().get());
-
-            Status s = systemCollectionMode ==
-                    DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops
-                ? db->dropCollection(opCtx, collectionName.ns(), dropOpTime)
-                : db->dropCollectionEvenIfSystem(opCtx, collectionName, dropOpTime);
-
-            if (!s.isOK()) {
-                return s;
-            }
-
-            result.append("nIndexesWas", numIndexes);
+        Collection* coll = db->getCollection(opCtx, collectionName);
+        if (!coll) {
+            return _dropView(opCtx, autoDb, collectionName, result);
         } else {
-            invariant(view);
-            Status status = db->dropView(opCtx, collectionName.ns());
-            if (!status.isOK()) {
-                return status;
-            }
+            return _dropCollection(
+                opCtx, db, coll, collectionName, dropOpTime, systemCollectionMode, result);
         }
-        wunit.commit();
-
-        return Status::OK();
     });
 }
 

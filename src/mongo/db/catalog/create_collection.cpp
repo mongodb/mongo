@@ -51,6 +51,78 @@
 namespace mongo {
 namespace {
 
+Status _createView(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const CollectionOptions& collectionOptions,
+                   const BSONObj& idIndex) {
+    return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
+        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock systemViewsLock(
+            opCtx->lockState(),
+            NamespaceString(nss.db(), NamespaceString::kSystemDotViewsCollectionName).toString(),
+            MODE_X);
+        Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IX);
+
+        Database* db = autoDb.getDb();
+
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::NotLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                      db->getProfilingLevel());
+
+        if (opCtx->writesAreReplicated() &&
+            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while creating collection " << nss);
+        }
+
+        // Create 'system.views' in a separate WUOW if it does not exist.
+        WriteUnitOfWork wuow(opCtx);
+        db->getOrCreateCollection(opCtx, NamespaceString(db->getSystemViewsName()));
+        wuow.commit();
+
+        WriteUnitOfWork wunit(opCtx);
+        Status status = db->userCreateNS(opCtx, nss, collectionOptions, true, idIndex);
+        if (!status.isOK()) {
+            return status;
+        }
+        wunit.commit();
+
+        return Status::OK();
+    });
+}
+
+Status _createCollection(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         const CollectionOptions& collectionOptions,
+                         const BSONObj& idIndex) {
+    return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
+        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
+
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::NotLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurop,
+                                      autoDb.getDb()->getProfilingLevel());
+
+        if (opCtx->writesAreReplicated() &&
+            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while creating collection " << nss);
+        }
+
+        WriteUnitOfWork wunit(opCtx);
+        Status status = autoDb.getDb()->userCreateNS(opCtx, nss, collectionOptions, true, idIndex);
+        if (!status.isOK()) {
+            return status;
+        }
+        wunit.commit();
+
+        return Status::OK();
+    });
+}
+
 /**
  * Shared part of the implementation of the createCollection versions for replicated and regular
  * collection creation.
@@ -97,41 +169,13 @@ Status createCollection(OperationContext* opCtx,
         }
     }
 
-    return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
-        Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
-
-        const bool shardVersionCheck = true;
-        OldClientContext ctx(opCtx, nss.ns(), shardVersionCheck);
-
-        if (opCtx->writesAreReplicated() &&
-            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
-            return Status(ErrorCodes::NotMaster,
-                          str::stream() << "Not primary while creating collection " << nss);
-        }
-
-        if (collectionOptions.isView()) {
-            // If the `system.views` collection does not exist, create it in a separate
-            // WriteUnitOfWork.
-            WriteUnitOfWork wuow(opCtx);
-            ctx.db()->getOrCreateCollection(opCtx, NamespaceString(ctx.db()->getSystemViewsName()));
-            wuow.commit();
-        }
-
-        WriteUnitOfWork wunit(opCtx);
-
-        // Create collection.
-        const bool createDefaultIndexes = true;
-        Status status =
-            ctx.db()->userCreateNS(opCtx, nss, collectionOptions, createDefaultIndexes, idIndex);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        wunit.commit();
-
-        return Status::OK();
-    });
+    if (collectionOptions.isView()) {
+        return _createView(opCtx, nss, collectionOptions, idIndex);
+    } else {
+        return _createCollection(opCtx, nss, collectionOptions, idIndex);
+    }
 }
+
 }  // namespace
 
 Status createCollection(OperationContext* opCtx,

@@ -91,7 +91,7 @@ public:
                                       const NamespaceString& fullns,
                                       repl::OpTime dropOpTime) final;
 
-    Status dropView(OperationContext* opCtx, StringData fullns) final;
+    Status dropView(OperationContext* opCtx, const NamespaceString& viewName) final;
 
     Status userCreateNS(OperationContext* opCtx,
                         const NamespaceString& fullns,
@@ -106,7 +106,7 @@ public:
                                  const BSONObj& idIndex = BSONObj()) final;
 
     Status createView(OperationContext* opCtx,
-                      StringData viewName,
+                      const NamespaceString& viewName,
                       const CollectionOptions& options) final;
 
     /**

@@ -138,7 +138,13 @@ void IndexCatalogImpl::IndexBuildBlock::fail(OperationContext* opCtx,
     fassert(17204, collection->ok());  // defensive
 
     NamespaceString ns(_indexNamespace);
-    invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
+    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
+    // be no longer a special case.
+    if (ns.coll().startsWith(NamespaceString::kSystemDotViewsCollectionName)) {
+        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_IX));
+    } else {
+        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
+    }
 
     if (_entry) {
         invariant(_catalog->_dropIndex(opCtx, _entry).isOK());
@@ -156,7 +162,13 @@ void IndexCatalogImpl::IndexBuildBlock::success(OperationContext* opCtx, Collect
 
     fassert(17207, collection->ok());
     NamespaceString ns(_indexNamespace);
-    invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
+    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
+    // be no longer a special case.
+    if (ns.coll().startsWith(NamespaceString::kSystemDotViewsCollectionName)) {
+        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_IX));
+    } else {
+        invariant(opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
+    }
 
     if (_indexBuildInterceptor) {
         // An index build should never be completed with writes remaining in the interceptor.

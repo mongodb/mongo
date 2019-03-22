@@ -146,6 +146,11 @@ Status ViewCatalog::_createOrUpdateView(WithLock lk,
                                         const NamespaceString& viewOn,
                                         const BSONArray& pipeline,
                                         std::unique_ptr<CollatorInterface> collator) {
+    invariant(opCtx->lockState()->isDbLockedForMode(viewName.db(), MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+
     _requireValidCatalog(lk, opCtx);
 
     // Build the BSON definition for this view to be saved in the durable view catalog. If the
@@ -329,6 +334,12 @@ Status ViewCatalog::createView(OperationContext* opCtx,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline,
                                const BSONObj& collation) {
+
+    invariant(opCtx->lockState()->isDbLockedForMode(viewName.db(), MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (viewName.db() != viewOn.db())
@@ -359,6 +370,8 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline) {
+    invariant(opCtx->lockState()->isDbLockedForMode(viewName.db(), MODE_X));
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (viewName.db() != viewOn.db())
@@ -388,6 +401,11 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
 }
 
 Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) {
+    invariant(opCtx->lockState()->isDbLockedForMode(viewName.db(), MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _requireValidCatalog(lk, opCtx);
 

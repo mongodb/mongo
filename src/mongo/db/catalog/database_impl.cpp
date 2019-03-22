@@ -350,10 +350,14 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     }
 }
 
-Status DatabaseImpl::dropView(OperationContext* opCtx, StringData fullns) {
+Status DatabaseImpl::dropView(OperationContext* opCtx, const NamespaceString& viewName) {
+    dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
+
     auto views = ViewCatalog::get(this);
-    Status status = views->dropView(opCtx, NamespaceString(fullns));
-    Top::get(opCtx->getServiceContext()).collectionDropped(fullns);
+    Status status = views->dropView(opCtx, viewName);
+    Top::get(opCtx->getServiceContext()).collectionDropped(viewName.toString());
     return status;
 }
 
@@ -639,22 +643,24 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
 }
 
 Status DatabaseImpl::createView(OperationContext* opCtx,
-                                StringData ns,
+                                const NamespaceString& viewName,
                                 const CollectionOptions& options) {
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
+
     invariant(options.isView());
 
-    NamespaceString nss(ns);
-    NamespaceString viewOnNss(nss.db(), options.viewOn);
-    _checkCanCreateCollection(opCtx, nss, options);
-    audit::logCreateCollection(&cc(), ns);
+    NamespaceString viewOnNss(viewName.db(), options.viewOn);
+    _checkCanCreateCollection(opCtx, viewName, options);
+    audit::logCreateCollection(&cc(), viewName.toString());
 
-    if (nss.isOplog())
+    if (viewName.isOplog())
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "invalid namespace name for a view: " + nss.toString());
+                      str::stream() << "invalid namespace name for a view: " + viewName.toString());
 
-    auto views = ViewCatalog::get(this);
-    return views->createView(opCtx, nss, viewOnNss, BSONArray(options.pipeline), options.collation);
+    return ViewCatalog::get(this)->createView(
+        opCtx, viewName, viewOnNss, BSONArray(options.pipeline), options.collation);
 }
 
 Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
@@ -662,9 +668,16 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            const CollectionOptions& options,
                                            bool createIdIndex,
                                            const BSONObj& idIndex) {
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
     invariant(!options.isView());
     NamespaceString nss(ns);
+
+    // TODO(SERVER-39520): Once createCollection does not need database IX lock, 'system.views' will
+    // be no longer a special case.
+    if (nss.coll().startsWith("system.views")) {
+        invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
+    } else {
+        invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+    }
 
     uassert(CannotImplicitlyCreateCollectionInfo(nss),
             "request doesn't allow collection to be created implicitly",
@@ -959,7 +972,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     }
 
     if (collectionOptions.isView()) {
-        uassertStatusOK(createView(opCtx, fullns.ns(), collectionOptions));
+        uassertStatusOK(createView(opCtx, fullns, collectionOptions));
     } else {
         invariant(
             createCollection(opCtx, fullns.ns(), collectionOptions, createDefaultIndexes, idIndex),
