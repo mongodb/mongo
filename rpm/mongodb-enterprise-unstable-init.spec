@@ -245,6 +245,7 @@ fi
 %files tools
 %defattr(-,root,root,-)
 #%doc README
+%doc THIRD-PARTY-NOTICES.gotools
 
 %{_bindir}/bsondump
 %{_bindir}/install_compass
