@@ -108,7 +108,7 @@ void persistParticipantListBlocking(OperationContext* opCtx,
                                     const LogicalSessionId& lsid,
                                     TxnNumber txnNumber,
                                     const std::vector<ShardId>& participantList) {
-    LOG(0) << "Going to write participant list for " << lsid.getId() << ':' << txnNumber;
+    LOG(3) << "Going to write participant list for " << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWritingParticipantList)) {
         LOG(0) << "Hit hangBeforeWritingParticipantList failpoint";
@@ -175,7 +175,7 @@ void persistParticipantListBlocking(OperationContext* opCtx,
     // Throw any other error.
     uassertStatusOK(upsertStatus);
 
-    LOG(0) << "Wrote participant list for " << lsid.getId() << ':' << txnNumber;
+    LOG(3) << "Wrote participant list for " << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWaitingForParticipantListWriteConcern)) {
         LOG(0) << "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint";
@@ -282,7 +282,7 @@ void persistDecisionBlocking(OperationContext* opCtx,
                              TxnNumber txnNumber,
                              const std::vector<ShardId>& participantList,
                              const boost::optional<Timestamp>& commitTimestamp) {
-    LOG(0) << "Going to write decision " << (commitTimestamp ? "commit" : "abort") << " for "
+    LOG(3) << "Going to write decision " << (commitTimestamp ? "commit" : "abort") << " for "
            << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWritingDecision)) {
@@ -370,7 +370,7 @@ void persistDecisionBlocking(OperationContext* opCtx,
                                 << doc);
     }
 
-    LOG(0) << "Wrote decision " << (commitTimestamp ? "commit" : "abort") << " for " << lsid.getId()
+    LOG(3) << "Wrote decision " << (commitTimestamp ? "commit" : "abort") << " for " << lsid.getId()
            << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeWaitingForDecisionWriteConcern)) {
@@ -449,7 +449,7 @@ namespace {
 void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                                   const LogicalSessionId& lsid,
                                   TxnNumber txnNumber) {
-    LOG(0) << "Going to delete coordinator doc for " << lsid.getId() << ':' << txnNumber;
+    LOG(3) << "Going to delete coordinator doc for " << lsid.getId() << ':' << txnNumber;
 
     if (MONGO_FAIL_POINT(hangBeforeDeletingCoordinatorDoc)) {
         LOG(0) << "Hit hangBeforeDeletingCoordinatorDoc failpoint";
@@ -504,7 +504,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                                 << doc);
     }
 
-    LOG(0) << "Deleted coordinator doc for " << lsid.getId() << ':' << txnNumber;
+    LOG(3) << "Deleted coordinator doc for " << lsid.getId() << ':' << txnNumber;
 }
 }  // namespace
 
