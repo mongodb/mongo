@@ -181,7 +181,11 @@ cursor = t.find({
 cursor.batchSize(3);
 cursor.maxTimeMS(20 * 1000);
 assert.doesNotThrow(function() {
+    // SERVER-40305: Add some additional logging here in case this fails to help us track down why
+    // it failed.
+    assert.commandWorked(db.adminCommand({setParameter: 1, traceExceptions: 1}));
     cursor.itcount();
+    assert.commandWorked(db.adminCommand({setParameter: 1, traceExceptions: 0}));
 }, [], "expected find() to not hit the time limit");
 
 //
