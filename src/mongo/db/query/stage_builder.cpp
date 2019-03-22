@@ -99,7 +99,12 @@ PlanStage* buildStages(OperationContext* opCtx,
 
             params.descriptor =
                 collection->getIndexCatalog()->findIndexByName(opCtx, ixn->index.name);
-            invariant(params.descriptor);
+            invariant(params.descriptor,
+                      str::stream() << "Namespace: " << collection->ns().toString()
+                                    << ", CanonicalQuery: "
+                                    << cq.toStringShort()
+                                    << ", IndexEntry: "
+                                    << ixn->index.toString());
 
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
