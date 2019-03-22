@@ -51,8 +51,13 @@
 
     // Set up a replica set for use in RollbackTest. We disable majority reads on all nodes so that
     // they will use the "rollbackViaRefetch" algorithm.
-    let replTest = new ReplSetTest(
-        {name, nodes: 3, useBridge: true, nodeOptions: {enableMajorityReadConcern: "false"}});
+    let replTest = new ReplSetTest({
+        name,
+        nodes: 3,
+        useBridge: true,
+        settings: {chainingAllowed: false},
+        nodeOptions: {enableMajorityReadConcern: "false"}
+    });
     replTest.startSet();
     let config = replTest.getReplSetConfig();
     config.members[2].priority = 0;

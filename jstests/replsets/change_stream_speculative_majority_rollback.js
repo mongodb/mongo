@@ -17,8 +17,13 @@
 
     // Set up a replica set for use in RollbackTest. We disable majority reads on all nodes so we
     // will utilize speculative majority reads for change streams.
-    const replTest = new ReplSetTest(
-        {name, nodes: 3, useBridge: true, nodeOptions: {enableMajorityReadConcern: "false"}});
+    const replTest = new ReplSetTest({
+        name,
+        nodes: 3,
+        useBridge: true,
+        settings: {chainingAllowed: false},
+        nodeOptions: {enableMajorityReadConcern: "false"}
+    });
     replTest.startSet();
     let config = replTest.getReplSetConfig();
     config.members[2].priority = 0;

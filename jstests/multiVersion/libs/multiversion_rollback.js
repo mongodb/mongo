@@ -111,7 +111,8 @@ function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
     // second node will be priority: 0 to ensure that it will never become primary. This, in
     // addition to stopping/restarting server replication should make the node exhibit similar
     // behavior to an arbiter.
-    var rst = new ReplSetTest({name: testName, nodes: initialNodes, useBridge: true});
+    var rst = new ReplSetTest(
+        {name: testName, nodes: initialNodes, useBridge: true, settings: {chainingAllowed: false}});
     rst.startSet();
     rst.initiate();
 

@@ -103,6 +103,11 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         let secondaries = replSet.getSecondaries();
         let config = replSet.getReplSetConfigFromNode();
 
+        // Make sure chaining is disabled, so that the tiebreaker cannot be used as a sync source.
+        assert.eq(config.settings.chainingAllowed,
+                  false,
+                  "Must set up ReplSetTest with chaining disabled.");
+
         // Make sure the primary is not a priority: 0 node.
         assert.neq(0, config.members[0].priority);
         assert.eq(config.members[0].host, curPrimary.host);
