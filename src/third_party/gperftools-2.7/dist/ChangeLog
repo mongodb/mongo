@@ -1,7 +1,21 @@
-commit b1478737e978b698a2fa881cb06e2f40215ff782 (HEAD -> 2.7-mongodb,
-tag: 2.7-mongodb-exported, origin/2.7-mongodb)
+commit f402f44778d29ba1b532044278329b94589c2a0c (HEAD -> 2.7-mongodb,
+origin/2.7-mongodb_labs-patches/cherrypick-62c4eca6e7ec9dc78333dc6b499f90eef9849378,
+origin/2.7-mongodb)
+Author: obones <obones@free.fr>
+Date:   Fri Jul 20 11:07:02 2018 +0200
+
+    Under x64, the PE loader looks for callbacks in constant sections
+
+    [alkondratenko@gmail.com: deleted some trailing whitespace]
+
+    (cherry picked from commit 62c4eca6e7ec9dc78333dc6b499f90eef9849378)
+
+M	src/windows/port.cc
+
+commit b1478737e978b698a2fa881cb06e2f40215ff782 (tag:
+2.7-mongodb-exported)
 Author: Billy Donahue <BillyDonahue@users.noreply.github.com>
-Date:   Wed Feb 27 15:49:55 2019 -0500
+Date:	Wed Feb 27 15:49:55 2019 -0500
 
     Add a disable for struct mallinfo detection (#6)
 
