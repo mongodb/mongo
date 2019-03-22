@@ -239,6 +239,7 @@ fi
 %files tools
 %defattr(-,root,root,-)
 #%doc README LICENSE-Community.txt
+%doc THIRD-PARTY-NOTICES.gotools
 
 %{_bindir}/bsondump
 %{_bindir}/install_compass
