@@ -926,7 +926,7 @@ var ReplSetTest = function(opts) {
         const cmdName = Object.keys(cmd)[0];
         const errorMsg = `${cmdName} during initiate failed`;
         assert.retry(() => {
-            assert.commandWorkedOrFailedWithCode(
+            const result = assert.commandWorkedOrFailedWithCode(
                 master.runCommand(cmd),
                 [
                   ErrorCodes.NodeNotFound,
@@ -934,7 +934,7 @@ var ReplSetTest = function(opts) {
                   ErrorCodes.InterruptedDueToStepDown
                 ],
                 errorMsg);
-            return true;
+            return result.ok;
         }, errorMsg, 3, 5 * 1000);
     }
 
