@@ -237,6 +237,7 @@ fi
 %files tools
 %defattr(-,root,root,-)
 #%doc README GNU-AGPL-3.0.txt
+%doc THIRD-PARTY-NOTICES.gotools
 
 %{_bindir}/bsondump
 %{_bindir}/mongodecrypt

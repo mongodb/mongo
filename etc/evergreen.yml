@@ -496,6 +496,9 @@ functions:
             file "../../../../../../mongo-tools/$i${exe|}"
         done
 
+        mkdir -p ../../../../../../mongo-tools/distsrc
+        cp THIRD-PARTY-NOTICES ../../../../../../mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools
+
   "do setup" :
   - *fetch_artifacts
   - *fetch_binaries

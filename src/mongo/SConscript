@@ -500,7 +500,11 @@ def installExternalBinary( e, name_str ):
 # "--use-new-tools" adds dependencies for rewritten (Go) tools
 # It is required for "dist" but optional for "install"
 if has_option("use-new-tools"):
+
+    env.Append(MODULE_BANNERS=[env.File('#/src/mongo-tools/distsrc/THIRD-PARTY-NOTICES.gotools')])
+
     toolsRoot = "src/mongo-tools"
+
     for t in rewrittenTools:
         installExternalBinary(env, "%s/%s" % (toolsRoot, t))
     if has_option("build-mongoreplay") and get_option("build-mongoreplay") == "true":
