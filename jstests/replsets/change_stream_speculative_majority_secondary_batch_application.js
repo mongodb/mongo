@@ -2,6 +2,8 @@
  * Test speculative majority change stream reads against a secondary while it is applying an oplog
  * batch. Speculative majority change stream reads on secondaries should read from the lastApplied
  * timestamp.
+ *
+ *  @tags: [uses_speculative_majority]
  */
 (function() {
     "use strict";
