@@ -85,7 +85,8 @@ extern "C" PERFTOOLS_DLL_DECL void WriteToStderr(const char* buf, int len) {
 
 // Windows doesn't support pthread_key_create's destr_function, and in
 // fact it's a bit tricky to get code to run when a thread exits.  This
-// is cargo-cult magic from http://www.codeproject.com/threads/tls.asp.
+// is cargo-cult magic from https://www.codeproject.com/Articles/8113/Thread-Local-Storage-The-C-Way
+// and http://lallouslab.net/2017/05/30/using-cc-tls-callbacks-in-visual-studio-with-your-32-or-64bits-programs/.
 // This code is for VC++ 7.1 and later; VC++ 6.0 support is possible
 // but more busy-work -- see the webpage for how to do it.  If all
 // this fails, we could use DllMain instead.  The big problem with
@@ -147,8 +148,11 @@ static void NTAPI on_tls_callback(HINSTANCE h, DWORD dwReason, PVOID pv) {
 
 // extern "C" suppresses C++ name mangling so we know the symbol names
 // for the linker /INCLUDE:symbol pragmas above.
+// Note that for some unknown reason, the extern "C" {} construct is ignored
+// by the MSVC VS2017 compiler (at least) when a const modifier is used
+#if defined(_M_IX86)
 extern "C" {
-// This tells the linker to run these functions.
+// In x86, the PE loader looks for callbacks in a data segment
 #pragma data_seg(push, old_seg)
 #pragma data_seg(".CRT$XLB")
 void (NTAPI *p_thread_callback_tcmalloc)(
@@ -157,6 +161,16 @@ void (NTAPI *p_thread_callback_tcmalloc)(
 int (*p_process_term_tcmalloc)(void) = on_process_term;
 #pragma data_seg(pop, old_seg)
 }  // extern "C"
+#elif defined(_M_X64)
+// In x64, the PE loader looks for callbacks in a constant segment
+#pragma const_seg(push, oldseg)
+#pragma const_seg(".CRT$XLB")
+extern "C" void (NTAPI * const p_thread_callback_tcmalloc)(
+	HINSTANCE h, DWORD dwReason, PVOID pv) = on_tls_callback;
+#pragma const_seg(".CRT$XTU")
+extern "C" int (NTAPI * const p_process_term_tcmalloc)(void) = on_process_term;
+#pragma const_seg(pop, oldseg)
+#endif
 
 #else  // #ifdef _MSC_VER  [probably msys/mingw]
 
