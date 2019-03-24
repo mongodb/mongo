@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -146,7 +147,13 @@ public:
             return NamespaceString(request().getDbName(), "");
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
+                                                             ActionType::internal}));
+        }
     };
 
     bool adminOnly() const override {
