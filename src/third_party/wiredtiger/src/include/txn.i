@@ -72,7 +72,7 @@ __wt_txn_op_set_recno(WT_SESSION_IMPL *session, uint64_t recno)
 	 * again. Even though only prepared updates can be evicted, at this
 	 * stage we don't know whether this transaction will be prepared or
 	 * not, hence we are copying the key for all operations, so that we can
-	 * use this key to fetch the update incase this transaction is
+	 * use this key to fetch the update in case this transaction is
 	 * prepared.
 	 */
 	op->u.op_col.recno = recno;
@@ -108,7 +108,7 @@ __wt_txn_op_set_key(WT_SESSION_IMPL *session, const WT_ITEM *key)
 	 * again. Even though only prepared updates can be evicted, at this
 	 * stage we don't know whether this transaction will be prepared or
 	 * not, hence we are copying the key for all operations, so that we can
-	 * use this key to fetch the update incase this transaction is
+	 * use this key to fetch the update in case this transaction is
 	 * prepared.
 	 */
 	return (__wt_buf_set(session, &op->u.op_row.key, key->data, key->size));

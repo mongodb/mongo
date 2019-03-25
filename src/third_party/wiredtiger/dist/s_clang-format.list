@@ -1,0 +1,5 @@
+src/include/bitstring.i
+src/include/queue.h
+src/os_posix/os_getopt.c
+src/support/hash_city.c
+src/support/hash_fnv.c

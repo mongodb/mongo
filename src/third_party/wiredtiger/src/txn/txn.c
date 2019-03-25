@@ -531,6 +531,25 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.val)
 		F_SET(txn, WT_TXN_IGNORE_PREPARE);
 
+	/*
+	 * Check if the prepare timestamp and the commit timestamp of a
+	 * prepared transaction need to be rounded up.
+	 */
+	WT_RET(__wt_config_gets_def(
+	    session, cfg, "roundup_timestamps.prepared", 0, &cval));
+	if (cval.val)
+		F_SET(txn, WT_TXN_TS_ROUND_PREPARED);
+	else
+		F_CLR(txn, WT_TXN_TS_ROUND_PREPARED);
+
+	/* Check if read timestamp needs to be rounded up. */
+	WT_RET(__wt_config_gets_def(
+	    session, cfg, "roundup_timestamps.read", 0, &cval));
+	if (cval.val)
+		F_SET(txn, WT_TXN_TS_ROUND_READ);
+	else
+		F_CLR(txn, WT_TXN_TS_ROUND_READ);
+
 	WT_RET(__wt_txn_parse_read_timestamp(session, cfg));
 
 	return (0);
@@ -791,6 +810,13 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	readonly = txn->mod_count == 0;
 
 	prepare = F_ISSET(txn, WT_TXN_PREPARE);
+	/*
+	 * Clear the prepared round up flag if the transaction is not prepared.
+	 * There is no rounding up to do in that case.
+	 */
+	if (!prepare)
+		F_CLR(txn, WT_TXN_TS_ROUND_PREPARED);
+
 	/* Look for a commit timestamp. */
 	WT_ERR(
 	    __wt_config_gets_def(session, cfg, "commit_timestamp", 0, &cval));
@@ -1047,7 +1073,6 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	WT_UPDATE *upd;
-	wt_timestamp_t ts;
 	u_int i;
 
 	txn = &session->txn;
@@ -1060,8 +1085,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_txn_context_check(session, true));
 
 	/* Parse and validate the prepare timestamp.  */
-	WT_RET(__wt_txn_parse_prepare_timestamp(session, cfg, &ts));
-	txn->prepare_timestamp = ts;
+	WT_RET(__wt_txn_parse_prepare_timestamp(session, cfg));
 
 	/*
 	 * We are about to release the snapshot: copy values into any
@@ -1106,7 +1130,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 			}
 
 			/* Set prepare timestamp. */
-			upd->start_ts = ts;
+			upd->start_ts = txn->prepare_timestamp;
 
 			WT_PUBLISH(upd->prepare_state, WT_PREPARE_INPROGRESS);
 			op->u.op_upd = NULL;

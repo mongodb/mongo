@@ -251,7 +251,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		/*
 		 * In case of append, the recno (key) for the value is assigned
 		 * now. Set the recno in the transaction operation to be used
-		 * incase this transaction is prepared to retrieve the update
+		 * in case this transaction is prepared to retrieve the update
 		 * corresponding to this operation.
 		 */
 		__wt_txn_op_set_recno(session, cbt->recno);

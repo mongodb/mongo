@@ -152,11 +152,13 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_config.py. */
 ''')
 
 # Make a TextWrapper that wraps at commas.
-w = textwrap.TextWrapper(width=64, break_on_hyphens=False)
+w = textwrap.TextWrapper(width=64, break_on_hyphens=False,
+                         break_long_words=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
 
 # TextWrapper that wraps at whitespace.
-ws = textwrap.TextWrapper(width=64, break_on_hyphens=False)
+ws = textwrap.TextWrapper(width=64, break_on_hyphens=False,
+                          break_long_words=False)
 
 def checkstr(c):
     '''Generate the function reference and JSON string used by __wt_config_check

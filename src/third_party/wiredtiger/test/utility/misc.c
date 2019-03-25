@@ -166,8 +166,8 @@ testutil_progress(TEST_OPTS *opts, const char *message)
 	uint64_t now;
 
 	if (opts->progress_fp == NULL)
-		testutil_assert((opts->progress_fp =
-		    fopen(opts->progress_file_name, "w")) != NULL);
+		testutil_checksys((opts->progress_fp =
+		    fopen(opts->progress_file_name, "w")) == NULL);
 
 	fp = opts->progress_fp;
 	__wt_seconds(NULL, &now);

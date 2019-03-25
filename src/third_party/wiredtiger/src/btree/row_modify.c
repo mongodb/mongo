@@ -208,7 +208,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	if (logged && modify_type != WT_UPDATE_RESERVE) {
 		WT_ERR(__wt_txn_log_op(session, cbt));
 		/*
-		 * Set the key in the transaction operation to be used incase
+		 * Set the key in the transaction operation to be used in case
 		 * this transaction is prepared to retrieve the update
 		 * corresponding to this operation.
 		 */

@@ -209,6 +209,58 @@ durable timestamp, instead of commit timestamp for persisting the data updates.
 If the durable timestamp is not specified, then the commit timestamp will be
 considered as the durable timestamp.
 
+There are a number of constraints around assigning timestamps for running
+transactions - the table below summarizes those constraints:
+
+| API     | Prepared | Constraint | Enforced | Description |
+|---------|----------|------------|----------|-------------|
+| Prepare | During | prepare_timestamp >= stable_timestamp | Y | None |
+| Commit  | No | commit_timestamp > stable_timestamp | Y | None |
+| Commit  | Yes | commit_timestamp >= prepare_timestamp | Y | The commit timestamp may be older than the oldest timestamp at the time of commit. |
+| Commit  | Yes | durable_timestamp > stable_timestamp | Y | None |
+| Commit  | Yes | durable_timestamp != 0 \|\| commit_timestamp > stable_timestamp | N | If no durable timestamp is given when committing a prepared transaction, the commit timestamp must be greater than the stable timestamp. |
+
+@subsection timestamp_roundup Automatic rounding of timestamps
+Applications setting timestamps for a transaction have to comply with the
+constraints based on the global timestamp state. In order to be compliant with
+the constraints applications need to query the global timestamp state and
+check their timestamps for compliance and adjust timestamps if required.
+To simplify the burden on applications related to rounding up timestamps
+WiredTiger supports automatic rounding of timestamps in some scenarios.
+
+Applications can configure
+<code>roundup_timestamps=(prepared=true,read=true)</code> with
+WT_SESSION::begin_transaction.
+
+The configuration <code>roundup_timestamps=(prepared=true)</code> will be valid
+only for prepared transactions. It indicates that the prepare timestamp could be
+rounded up to the oldest timestamp, if the prepare timestamp is less than the
+oldest timestamp. This setting also indicates that the commit timestamp of the
+transaction could be rounded up to the prepare timestamp, if the commit
+timestamp is less than the prepare timestamp. Based on the timestamps values
+and constraints, enabling this configuration could result in only one of
+timestamps being rounded up. For example, for the timestamp values
+<code>prepare_timestamp=100, commit_timestamp=300, oldest_timestamp=200</code>
+with configuration <code>roundup_timestamps=(prepared=true)</code> only the
+prepare timestamp will be rounded up to the oldest timestamp and the commit
+timestamp will not be adjusted and the result will be
+<code>prepare_timestamp=200, commit_timestamp=300, oldest_timestamp=200</code>.
+For cases where both the prepare timestamp and the commit timestamp needs to be
+rounded up, first the prepare timestamp will be rounded to the oldest timestamp
+and then the commit timestamp will be rounded up to the new prepare timestamp.
+For example, for the timestamp values <code>prepare_timestamp=100,
+    commit_timestamp=150, oldest_timestamp=200</code> with configuration
+    <code>roundup_timestamps=(prepared=true)</code>, the prepare timestamp is
+    rounded up to the oldest timestamp, as part of the
+    WT_SESSION::prepare_transaction, as <code>prepare_timestamp=200</code> and
+    subsequently as part of WT_SESSION::commit_transaction, the commit
+    timestamp is rounded up to the new prepare timestamp as
+    <code>commit_timestamp=200</code>.
+
+Configuring <code>roundup_timestamps=(read=true)</code> causes the read
+timestamp to be rounded up to the oldest timestamp, if the read timestamp is
+greater than the oldest timestamp no change will be made.
+
 @subsection timestamp_connection Managing global timestamp state
 
 Applications that use timestamps need to manage some global state in order
@@ -233,6 +285,16 @@ to WT_CONNECTION::rollback_to_stable. With the rollback, however, WiredTiger
 does not automatically reset the maximum commit timestamp it is tracking. The
 application should explicitly do so by setting a commit timestamp in
 WT_CONNECTION::set_timestamp.
+
+| Timestamp | Description | Constraint |
+|-----------|-------------|------------|
+| all_committed | The oldest timestamp at which all previous write transactions have committed. | |
+| last_checkpoint | The point at which the last checkpoint ran. If no checkpoint has run it's value will be 0. | last_checkpoint <= stable timestamp |
+| oldest | Point in time readers cannot be created using a timestamp older than the oldest timestamp, as explained above modification history is discarded prior to the oldest timestamp. This timestamp can be set via the API. | 0 <= oldest <= stable |
+| oldest_reader | The timestamp of the oldest currently active read transaction, if there is no current read transaction then querying for the oldest_reader with WT_CONNECTION::query_timestamp will return WT_NOTFOUND. | |
+| pinned | Minimum of the oldest_reader and oldest timestamp. | |
+| recovery | The stable timestamp used, if any, in the most recent checkpoint prior to the last shutdown. | |
+| stable | Any active transaction with a commit timestamp less than or equal to the current stable timestamp will not be able to modify data, except in the instance of prepared transactions. This timestamp can be set via the API. | stable >= oldest |
 
 @subsection timestamp_extensions Timestamp support in the extension API
 

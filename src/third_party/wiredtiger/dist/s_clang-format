@@ -1,0 +1,33 @@
+#! /bin/sh
+
+# Installation of the clang development package isn't standard, list a
+# couple of the places we're using.
+export PATH=$PATH:/usr/local/clang60/bin:/usr/local/llvm-devel/bin
+
+# Find the top-level WiredTiger directory and move to there.
+cd `git rev-parse --show-toplevel` || exit 1
+
+# Ensure that we have the correct version of clang-format.
+clang_format_version="6.0.0"
+clang-format --version | grep "version $clang_format_version" >/dev/null 2>&1
+if test $? -ne 0; then
+	echo "$0: found incorrect version of clang-format ($clang_format_version required)"
+	exit 1
+fi
+
+case $# in
+0)
+	# Get all source files that aren't in s_clang-format.list.
+	search=`find src -name '*.[chi]'`
+	for f in `cat dist/s_clang-format.list`; do
+		search=`echo "$search" | sed "\#$f#d"`
+	done;;
+1)
+	search="$1";;
+*)
+	echo "usage: $0 [file]"
+	exit 1;;
+esac
+
+# Format each file inplace.
+clang-format -i --fallback-style=none $search

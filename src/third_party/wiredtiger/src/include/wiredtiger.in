@@ -1794,6 +1794,23 @@ struct __wt_session {
 	 * @config{round_to_oldest, if read timestamp is earlier than oldest
 	 * timestamp\, read timestamp will be rounded to oldest timestamp., a
 	 * boolean flag; default \c false.}
+	 * @config{roundup_timestamps = (, round up timestamps of the
+	 * transaction.  This setting alters the visibility expected in a
+	 * transaction.  See @ref transaction_timestamps., a set of related
+	 * configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prepared, applicable only for
+	 * prepared transactions.  Indicates if the prepare timestamp and the
+	 * commit timestamp of this transaction can be rounded up.  If the
+	 * prepare timestamp is less than the oldest timestamp\, the prepare
+	 * timestamp will be rounded to the oldest timestamp.  If the commit
+	 * timestamp is less than the prepare timestamp\, the commit timestamp
+	 * will be rounded up to the prepare timestamp., a boolean flag; default
+	 * \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read, if the read
+	 * timestamp is less than the oldest timestamp\, the read timestamp will
+	 * be rounded up to the oldest timestamp., a boolean flag; default \c
+	 * false.}
+	 * @config{ ),,}
 	 * @config{snapshot, use a named\, in-memory snapshot\, see @ref
 	 * transaction_named_snapshots., a string; default empty.}
 	 * @config{sync, whether to sync log records when the transaction

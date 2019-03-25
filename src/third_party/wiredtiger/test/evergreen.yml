@@ -1069,7 +1069,14 @@ buildvariants:
   tasks:
     - name: compile
     - name: compile-windows-alt
-    - name: unit-test
+    - name: unit-test-bucket00
+    - name: unit-test-bucket01
+    - name: unit-test-bucket02
+    - name: unit-test-bucket03
+    - name: unit-test-bucket04
+    - name: unit-test-bucket05
+    - name: unit-test-bucket06
+    - name: unit-test-bucket07
     #- name: format  - Enable when we have a solution for hangs and crashses
     - name: fops
 
