@@ -97,5 +97,16 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
+    // Create a new collection to move the minimum visible snapshot to that operation time. Then
+    // read at a cluster time behind the minimum visible snapshot which should fail.
+    let newCollName = "newColl";
+    assert.commandWorked(db.createCollection(newCollName));
+    let createCollClusterTime = db.getSession().getOperationTime();
+    res = db[newCollName].runCommand("find", {
+        $_internalReadAtClusterTime:
+            Timestamp(createCollClusterTime.getTime() - 1, createCollClusterTime.getInc()),
+    });
+    assert.commandFailedWithCode(res, ErrorCodes.SnapshotUnavailable);
+
     rst.stopSet();
 })();

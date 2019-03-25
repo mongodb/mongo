@@ -110,6 +110,23 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // need to check for pending catalog changes.
     while (auto coll = _autoColl->getCollection()) {
 
+        auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+        auto minSnapshot = coll->getMinimumVisibleSnapshot();
+        auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+
+        // If we are reading at a provided timestamp earlier than the latest catalog changes, then
+        // we must return an error.
+        if (readSource == RecoveryUnit::ReadSource::kProvided && minSnapshot &&
+            (*mySnapshot < *minSnapshot)) {
+            uasserted(ErrorCodes::SnapshotUnavailable,
+                      str::stream()
+                          << "Unable to read from a snapshot due to pending collection catalog "
+                             "changes; please retry the operation. Snapshot timestamp is "
+                          << mySnapshot->toString()
+                          << ". Collection minimum is "
+                          << minSnapshot->toString());
+        }
+
         // During batch application on secondaries, there is a potential to read inconsistent states
         // that would normally be protected by the PBWM lock. In order to serve secondary reads
         // during this period, we default to not acquiring the lock (by setting
@@ -139,12 +156,11 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             ? boost::optional<Timestamp>(replCoord->getMyLastAppliedOpTime().getTimestamp())
             : boost::none;
 
-        auto minSnapshot = coll->getMinimumVisibleSnapshot();
         if (!_conflictingCatalogChanges(opCtx, minSnapshot, lastAppliedTimestamp)) {
             return;
         }
 
-        auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+        readSource = opCtx->recoveryUnit()->getTimestampReadSource();
         invariant(lastAppliedTimestamp ||
                   readSource == RecoveryUnit::ReadSource::kMajorityCommitted);
         invariant(readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
