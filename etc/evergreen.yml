@@ -3538,7 +3538,7 @@ tasks:
         optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/cryptd-archive/mongodb-cryptd.tgz
+        local_file: src/cryptd-archive/mongodb-cryptd.${ext|tgz}
         remote_file: ${mongo_cryptd}
         bucket: mciuploads
         permissions: public-read
