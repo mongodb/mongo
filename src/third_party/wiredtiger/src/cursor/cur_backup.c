@@ -306,16 +306,24 @@ __backup_start(
 	}
 
 err:	/* Close the hot backup file. */
-	WT_TRET(__wt_fclose(session, &cb->bfs));
 	if (srcfs != NULL)
 		WT_TRET(__wt_fclose(session, &srcfs));
+	/*
+	 * Sync and rename the temp file into place.
+	 */
+	if (ret == 0)
+		ret = __wt_sync_and_rename(session,
+		    &cb->bfs, WT_BACKUP_TMP, dest);
 	if (ret == 0) {
-		WT_ASSERT(session, dest != NULL);
-		WT_TRET(__wt_fs_rename(session, WT_BACKUP_TMP, dest, false));
 		__wt_writelock(session, &conn->hot_backup_lock);
 		conn->hot_backup_list = cb->list;
 		__wt_writeunlock(session, &conn->hot_backup_lock);
 	}
+	/*
+	 * If the file hasn't been closed, do it now.
+	 */
+	if (cb->bfs != NULL)
+		WT_TRET(__wt_fclose(session, &cb->bfs));
 
 	return (ret);
 }
