@@ -422,10 +422,10 @@ variables:
   - enterprise-windows-64-2k8-nopush-template
   - enterprise-windows-64-2k8-openssl
   - enterprise-windows-64-2k8-wtdevelop
-  - ubuntu1604-debug-asan
-  - ubuntu1604-debug-ubsan
-  - ubuntu1604-debug-aubsan-lite
-  - ubuntu1604-debug-aubsan-async
+  - ubuntu1804-debug-asan
+  - ubuntu1804-debug-ubsan
+  - ubuntu1804-debug-aubsan-lite
+  - ubuntu1804-debug-aubsan-async
 
 #######################################
 #            Functions                #
@@ -13805,12 +13805,12 @@ buildvariants:
 #     Experimental buildvariants          #
 ###########################################
 
-- name: ubuntu1604-debug-asan
-  display_name: ~ ASAN Enterprise SSL Ubuntu 16.04 DEBUG
+- name: ubuntu1804-debug-asan
+  display_name: ~ ASAN Enterprise SSL Ubuntu 18.04 DEBUG
   modules:
   - enterprise
   run_on:
-  - ubuntu1604-build
+  - ubuntu1804-build
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
@@ -13819,7 +13819,7 @@ buildvariants:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    multiversion_platform: ubuntu1604
+    multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     tooltags: "ssl"
@@ -13970,10 +13970,10 @@ buildvariants:
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough_gen
 
-- name: ubuntu1604-asan
-  display_name: ~ ASAN SSL Ubuntu 16.04
+- name: ubuntu1804-asan
+  display_name: ~ ASAN SSL Ubuntu 18.04
   run_on:
-  - ubuntu1604-build
+  - ubuntu1804-build
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
@@ -14013,12 +14013,12 @@ buildvariants:
   - name: jstestfuzz_sharded_continuous_stepdown_gen
   - name: jstestfuzz_sharded_session_gen
 
-- name: ubuntu1604-debug-ubsan
-  display_name: ~ UBSAN Enterprise Ubuntu 16.04 DEBUG
+- name: ubuntu1804-debug-ubsan
+  display_name: ~ UBSAN Enterprise Ubuntu 18.04 DEBUG
   modules:
   - enterprise
   run_on:
-  - ubuntu1604-build
+  - ubuntu1804-build
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
@@ -14027,7 +14027,7 @@ buildvariants:
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    multiversion_platform: ubuntu1604
+    multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
     tooltags: "ssl sasl"
@@ -14170,12 +14170,12 @@ buildvariants:
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough_gen
 
-- name: ubuntu1604-debug-aubsan-lite
-  display_name: "! {A,UB}SAN Enterprise SSL Ubuntu 16.04 DEBUG"
+- name: ubuntu1804-debug-aubsan-lite
+  display_name: "! {A,UB}SAN Enterprise SSL Ubuntu 18.04 DEBUG"
   modules:
   - enterprise
   run_on:
-  - ubuntu1604-build
+  - ubuntu1804-build
   stepback: true
   expansions:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
@@ -14202,12 +14202,12 @@ buildvariants:
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: watchdog_wiredtiger
 
-- name: ubuntu1604-debug-aubsan-async
-  display_name: "~ {A,UB}SAN Enterprise SSL Ubuntu 16.04 async"
+- name: ubuntu1804-debug-aubsan-async
+  display_name: "~ {A,UB}SAN Enterprise SSL Ubuntu 18.04 async"
   modules:
   - enterprise
   run_on:
-  - ubuntu1604-build
+  - ubuntu1804-build
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
