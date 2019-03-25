@@ -238,7 +238,7 @@ protected:
         const auto opTime =
             logOp(opCtx(), kNss, uuid, session->getSessionId(), txnNum, stmtId, prevOpTime);
         txnParticipant.onWriteOpCompletedOnPrimary(
-            opCtx(), txnNum, {stmtId}, opTime, Date_t::now(), txnState);
+            opCtx(), txnNum, {stmtId}, opTime, Date_t::now(), txnState, boost::none);
         wuow.commit();
 
         return opTime;
@@ -398,7 +398,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionN
     const auto uuid = UUID::gen();
     const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, 0);
     ASSERT_THROWS(txnParticipant.onWriteOpCompletedOnPrimary(
-                      opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none),
+                      opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none, boost::none),
                   AssertionException);
 }
 
@@ -457,7 +457,7 @@ DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, 0);
         txnParticipant.onWriteOpCompletedOnPrimary(
-            opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none);
+            opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none, boost::none);
         wuow.commit();
     }
 
@@ -466,7 +466,7 @@ DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
         WriteUnitOfWork wuow(opCtx());
         const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum - 1, 0);
         txnParticipant.onWriteOpCompletedOnPrimary(
-            opCtx(), txnNum - 1, {0}, opTime, Date_t::now(), boost::none);
+            opCtx(), txnNum - 1, {0}, opTime, Date_t::now(), boost::none, boost::none);
     }
 }
 
@@ -486,7 +486,7 @@ DEATH_TEST_F(TransactionParticipantRetryableWritesTest,
 
     txnParticipant.invalidate(opCtx());
     txnParticipant.onWriteOpCompletedOnPrimary(
-        opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none);
+        opCtx(), txnNum, {0}, opTime, Date_t::now(), boost::none, boost::none);
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTruncation) {
@@ -591,7 +591,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
                                   false /* inTxn */,
                                   OplogSlot());
         txnParticipant.onWriteOpCompletedOnPrimary(
-            opCtx(), txnNum, {1}, opTime, wallClockTime, boost::none);
+            opCtx(), txnNum, {1}, opTime, wallClockTime, boost::none, boost::none);
         wuow.commit();
 
         return opTime;
@@ -621,8 +621,13 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
                                   false /* inTxn */,
                                   OplogSlot());
 
-        txnParticipant.onWriteOpCompletedOnPrimary(
-            opCtx(), txnNum, {kIncompleteHistoryStmtId}, opTime, wallClockTime, boost::none);
+        txnParticipant.onWriteOpCompletedOnPrimary(opCtx(),
+                                                   txnNum,
+                                                   {kIncompleteHistoryStmtId},
+                                                   opTime,
+                                                   wallClockTime,
+                                                   boost::none,
+                                                   boost::none);
         wuow.commit();
     }
 

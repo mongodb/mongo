@@ -1865,7 +1865,8 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
     std::vector<StmtId> stmtIdsWritten,
     const repl::OpTime& lastStmtIdWriteOpTime,
     Date_t lastStmtIdWriteDate,
-    boost::optional<DurableTxnStateEnum> txnState) {
+    boost::optional<DurableTxnStateEnum> txnState,
+    boost::optional<repl::OpTime> startOpTime) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     invariant(txnNumber == o().activeTxnNumber);
 
@@ -1879,7 +1880,7 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
     }
 
     const auto updateRequest =
-        _makeUpdateRequest(lastStmtIdWriteOpTime, lastStmtIdWriteDate, txnState);
+        _makeUpdateRequest(lastStmtIdWriteOpTime, lastStmtIdWriteDate, txnState, startOpTime);
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
@@ -1898,8 +1899,8 @@ void TransactionParticipant::Participant::onMigrateCompletedOnPrimary(
 
     // We do not migrate transaction oplog entries so don't set the txn state
     const auto txnState = boost::none;
-    const auto updateRequest =
-        _makeUpdateRequest(lastStmtIdWriteOpTime, oplogLastStmtIdWriteDate, txnState);
+    const auto updateRequest = _makeUpdateRequest(
+        lastStmtIdWriteOpTime, oplogLastStmtIdWriteDate, txnState, boost::none /* startOpTime */);
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
@@ -2027,7 +2028,8 @@ boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStateme
 UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
     const repl::OpTime& newLastWriteOpTime,
     Date_t newLastWriteDate,
-    boost::optional<DurableTxnStateEnum> newState) const {
+    boost::optional<DurableTxnStateEnum> newState,
+    boost::optional<repl::OpTime> startOpTime) const {
     UpdateRequest updateRequest(NamespaceString::kSessionTransactionsTableNamespace);
 
     const auto updateBSON = [&] {
@@ -2037,10 +2039,15 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
         newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
         newTxnRecord.setLastWriteDate(newLastWriteDate);
         newTxnRecord.setState(newState);
-        if (newState == DurableTxnStateEnum::kPrepared) {
+        if (gUseMultipleOplogEntryFormatForTransactions && startOpTime) {
+            // The startOpTime should only be set when transitioning the txn to in-progress or
+            // prepared.
+            invariant(newState == DurableTxnStateEnum::kInProgress ||
+                      newState == DurableTxnStateEnum::kPrepared);
+            newTxnRecord.setStartOpTime(*startOpTime);
+        } else if (newState == DurableTxnStateEnum::kPrepared) {
             newTxnRecord.setStartOpTime(o().prepareOpTime);
         }
-
         return newTxnRecord.toBSON();
     }();
     updateRequest.setUpdates(updateBSON);

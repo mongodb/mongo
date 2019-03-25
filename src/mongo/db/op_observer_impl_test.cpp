@@ -460,7 +460,7 @@ public:
             WriteUnitOfWork wuow(opCtx);
             auto opTime = repl::OpTime(Timestamp(10, 1), 1);  // Dummy timestamp.
             txnParticipant.onWriteOpCompletedOnPrimary(
-                opCtx, txnNum, {stmtId}, opTime, Date_t::now(), boost::none);
+                opCtx, txnNum, {stmtId}, opTime, Date_t::now(), boost::none, boost::none);
             wuow.commit();
         }
     }
@@ -628,6 +628,26 @@ protected:
                                    {BSON("_id" << session()->getSessionId().toBSON())});
         ASSERT(cursor);
         ASSERT(!cursor->more());
+    }
+
+    void assertTxnRecordStartOpTime(boost::optional<repl::OpTime> startOpTime) {
+        DBDirectClient client(opCtx());
+        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
+                                   {BSON("_id" << session()->getSessionId().toBSON())});
+        ASSERT(cursor);
+        ASSERT(cursor->more());
+
+        auto txnRecordObj = cursor->next();
+        auto txnRecord =
+            SessionTxnRecord::parse(IDLParserErrorContext("SessionEntryWritten"), txnRecordObj);
+        ASSERT(!cursor->more());
+        ASSERT_EQ(session()->getSessionId(), txnRecord.getSessionId());
+        if (!startOpTime) {
+            ASSERT(!txnRecord.getStartOpTime());
+        } else {
+            ASSERT(txnRecord.getStartOpTime());
+            ASSERT_EQ(*startOpTime, *txnRecord.getStartOpTime());
+        }
     }
 
     Session* session() {
@@ -1567,11 +1587,14 @@ TEST_F(OpObserverMultiEntryTransactionTest,
     auto prepareEntryObj = oplogEntryObjs.back();
     const auto prepareOplogEntry = assertGet(OplogEntry::parse(prepareEntryObj));
     checkSessionAndTransactionFields(prepareEntryObj, 0);
+    // The startOpTime should refer to the prepare oplog entry for an empty transaction.
+    const auto startOpTime = prepareOplogEntry.getOpTime();
 
     ASSERT_EQ(prepareOpTime.getTimestamp(), opCtx()->recoveryUnit()->getPrepareTimestamp());
     ASSERT_BSONOBJ_EQ(BSON("prepareTransaction" << 1), prepareOplogEntry.getObject());
     txnParticipant.stashTransactionResources(opCtx());
     assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
+    assertTxnRecordStartOpTime(startOpTime);
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
 
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
@@ -1853,6 +1876,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     const auto insertEntry = assertGet(OplogEntry::parse(oplogEntryObjs[0]));
     ASSERT_TRUE(insertEntry.getOpType() == repl::OpTypeEnum::kInsert);
 
+    const auto startOpTime = insertEntry.getOpTime();
+
     const auto prepareTimestamp = prepareOpTime.getTimestamp();
 
     const auto prepareEntry = assertGet(OplogEntry::parse(oplogEntryObjs[1]));
@@ -1865,6 +1890,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
     txnParticipant.stashTransactionResources(opCtx());
     assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
+    assertTxnRecordStartOpTime(startOpTime);
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
 
     // Mimic committing the transaction.
@@ -1893,6 +1919,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     ASSERT_BSONOBJ_EQ(oExpected, o);
 
     assertTxnRecord(txnNum(), commitSlot.opTime, DurableTxnStateEnum::kCommitted);
+    // startTimestamp should no longer be set once the transaction has been committed.
+    assertTxnRecordStartOpTime(boost::none);
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
@@ -1923,6 +1951,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
 
     const auto insertEntry = assertGet(OplogEntry::parse(oplogEntryObjs[0]));
     ASSERT_TRUE(insertEntry.getOpType() == repl::OpTypeEnum::kInsert);
+    const auto startOpTime = insertEntry.getOpTime();
 
     const auto prepareTimestamp = prepareOpTime.getTimestamp();
 
@@ -1936,6 +1965,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
     ASSERT_EQ(prepareOpTime, txnParticipant.getLastWriteOpTime());
     txnParticipant.stashTransactionResources(opCtx());
     assertTxnRecord(txnNum(), prepareOpTime, DurableTxnStateEnum::kPrepared);
+    assertTxnRecordStartOpTime(startOpTime);
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
 
     // Mimic aborting the transaction by resetting the WUOW.
@@ -1955,6 +1985,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
     ASSERT_BSONOBJ_EQ(oExpected, o);
 
     assertTxnRecord(txnNum(), abortSlot.opTime, DurableTxnStateEnum::kAborted);
+    // startOpTime should no longer be set once a transaction has been aborted.
+    assertTxnRecordStartOpTime(boost::none);
 }
 
 }  // namespace

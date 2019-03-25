@@ -535,7 +535,8 @@ public:
                                          std::vector<StmtId> stmtIdsWritten,
                                          const repl::OpTime& lastStmtIdWriteOpTime,
                                          Date_t lastStmtIdWriteDate,
-                                         boost::optional<DurableTxnStateEnum> txnState);
+                                         boost::optional<DurableTxnStateEnum> txnState,
+                                         boost::optional<repl::OpTime> startOpTime);
 
         /**
          * Called after an entry for the specified session and transaction has been written to the
@@ -655,7 +656,8 @@ public:
 
         UpdateRequest _makeUpdateRequest(const repl::OpTime& newLastWriteOpTime,
                                          Date_t newLastWriteDate,
-                                         boost::optional<DurableTxnStateEnum> newState) const;
+                                         boost::optional<DurableTxnStateEnum> newState,
+                                         boost::optional<repl::OpTime> startOpTime) const;
 
         void _registerUpdateCacheOnCommit(OperationContext* opCtx,
                                           std::vector<StmtId> stmtIdsWritten,

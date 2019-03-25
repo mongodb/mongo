@@ -2914,7 +2914,8 @@ public:
 
             sessionInfo = getSessionTxnInfoAtTimestamp(secondOplogEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "inProgress");
-            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), secondOplogEntryTs);
+            // The transaction table is only updated at the start of the transaction.
+            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), firstOplogEntryTs);
 
             sessionInfo = getSessionTxnInfoAtTimestamp(commitEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "committed");
@@ -3091,7 +3092,8 @@ public:
 
             sessionInfo = getSessionTxnInfoAtTimestamp(secondOplogEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "inProgress");
-            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), secondOplogEntryTs);
+            // The transaction table is only updated at the start of the transaction.
+            ASSERT_EQ(sessionInfo["lastWriteOpTime"]["ts"].timestamp(), firstOplogEntryTs);
 
             sessionInfo = getSessionTxnInfoAtTimestamp(prepareEntryTs, true);
             ASSERT_EQ(sessionInfo["state"].String(), "prepared");
