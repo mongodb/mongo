@@ -43,8 +43,8 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
-#include "mongo/db/pipeline/document_source_out_in_place.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
@@ -192,19 +192,18 @@ void Pipeline::validateTopLevelPipeline() const {
             }
         }
     }
-    // Make sure we aren't reading and writing to the same namespace for an $out. This is
-    // allowed for mode "replaceCollection", but not for the in-place modes.
-    if (auto outStage = dynamic_cast<DocumentSourceOutInPlace*>(_sources.back().get())) {
-        const auto& outNss = outStage->getOutputNs();
+    // Make sure we aren't reading from and writing to the same namespace for a $merge.
+    if (auto mergeStage = dynamic_cast<DocumentSourceMerge*>(_sources.back().get())) {
+        const auto& outNss = mergeStage->getOutputNs();
         stdx::unordered_set<NamespaceString> collectionNames;
-        // In order to gather only the involved namespaces which we are reading to, not the one we
-        // are writing from, skip the final stage as we know it is an $out stage.
+        // In order to gather only the involved namespaces which we are reading from, not the one we
+        // are writing to, skip the final stage as we know it is a $merge stage.
         for (auto it = _sources.begin(); it != std::prev(_sources.end()); it++) {
             (*it)->addInvolvedCollections(&collectionNames);
         }
         uassert(51079,
-                "Cannot use $out to write to the same namespace being read from elsewhere in the "
-                "pipeline unless $out's mode is \"replaceCollection\"",
+                "Cannot use $merge to write to the same namespace being read from elsewhere in the "
+                "pipeline",
                 collectionNames.find(outNss) == collectionNames.end());
     }
 }
@@ -309,7 +308,8 @@ bool Pipeline::aggSupportsWriteConcern(const BSONObj& cmd) {
             return false;
         }
 
-        if (stage.Obj().hasField("$out")) {
+        if (stage.Obj().hasField(DocumentSourceOut::kStageName) ||
+            stage.Obj().hasField(DocumentSourceMerge::kStageName)) {
             return true;
         }
     }

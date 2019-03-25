@@ -66,15 +66,15 @@
         [{$out: {to: target.getName(), mode: "replaceDocuments", uniqueKey: {name: 1, team: 1}}}];
 
     // Missing both "name" and "team".
-    assertErrorCode(source, pipelineNameTeam, 50905);
+    assertErrorCode(source, pipelineNameTeam, 51132);
 
     // Missing "name".
     assert.commandWorked(source.update({_id: 0}, {_id: 0, team: "query"}));
-    assertErrorCode(source, pipelineNameTeam, 50905);
+    assertErrorCode(source, pipelineNameTeam, 51132);
 
     // Missing "team".
     assert.commandWorked(source.update({_id: 0}, {_id: 0, name: "nicholas"}));
-    assertErrorCode(source, pipelineNameTeam, 50905);
+    assertErrorCode(source, pipelineNameTeam, 51132);
 
     // A document with both "name" and "team" will be accepted.
     assert.commandWorked(source.update({_id: 0}, {_id: 0, name: "nicholas", team: "query"}));
@@ -92,19 +92,19 @@
 
     // Explicit null "song" (a prefix of a "uniqueKey" field).
     assert.commandWorked(source.update({_id: 0}, {_id: 0, song: null}));
-    assertErrorCode(source, pipelineSongDotArtist, 50905);
+    assertErrorCode(source, pipelineSongDotArtist, 51132);
 
     // Explicit undefined "song" (a prefix of a "uniqueKey" field).
     assert.commandWorked(source.update({_id: 0}, {_id: 0, song: undefined}));
-    assertErrorCode(source, pipelineSongDotArtist, 50905);
+    assertErrorCode(source, pipelineSongDotArtist, 51132);
 
     // Explicit null "song.artist".
     assert.commandWorked(source.update({_id: 0}, {_id: 0, song: {artist: null}}));
-    assertErrorCode(source, pipelineSongDotArtist, 50905);
+    assertErrorCode(source, pipelineSongDotArtist, 51132);
 
     // Explicit undefined "song.artist".
     assert.commandWorked(source.update({_id: 0}, {_id: 0, song: {artist: undefined}}));
-    assertErrorCode(source, pipelineSongDotArtist, 50905);
+    assertErrorCode(source, pipelineSongDotArtist, 51132);
 
     // A valid "artist" will be accepted.
     assert.commandWorked(source.update({_id: 0}, {_id: 0, song: {artist: "Illenium"}}));
@@ -124,11 +124,11 @@
     // "address.street" is an array.
     assert.commandWorked(
         source.update({_id: 0}, {_id: 0, address: {street: ["West 43rd St", "1633 Broadway"]}}));
-    assertErrorCode(source, pipelineAddressDotStreet, 50943);
+    assertErrorCode(source, pipelineAddressDotStreet, 51185);
 
     // "address" is an array (a prefix of a "uniqueKey" field).
     assert.commandWorked(source.update({_id: 0}, {_id: 0, address: [{street: "1633 Broadway"}]}));
-    assertErrorCode(source, pipelineAddressDotStreet, 50905);
+    assertErrorCode(source, pipelineAddressDotStreet, 51132);
 
     // A scalar "address.street" is accepted.
     assert.commandWorked(source.update({_id: 0}, {_id: 0, address: {street: "1633 Broadway"}}));

@@ -386,7 +386,7 @@
                 shouldForceReadConcern = false;
             }
 
-            if (OverrideHelpers.isAggregationWithOutStage(cmdName, cmdObj)) {
+            if (OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj)) {
                 // The $out stage can only be used with readConcern={level: "local"}.
                 shouldForceReadConcern = false;
             } else {

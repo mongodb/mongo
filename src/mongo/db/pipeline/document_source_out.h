@@ -71,6 +71,8 @@ public:
  */
 class DocumentSourceOut : public DocumentSource {
 public:
+    static constexpr StringData kStageName = "$out"_sd;
+
     /**
      * A "lite parsed" $out stage is similar to other stages involving foreign collections except in
      * some cases the foreign collection is allowed to be sharded.
@@ -236,7 +238,7 @@ public:
     /**
      * Creates a new $out stage from the given arguments.
      */
-    static boost::intrusive_ptr<DocumentSourceOut> create(
+    static boost::intrusive_ptr<DocumentSource> create(
         NamespaceString outputNs,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WriteModeEnum,

@@ -14,9 +14,9 @@
 
     function setAggHang(mode) {
         assert.commandWorked(st.shard0.adminCommand(
-            {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
+            {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
         assert.commandWorked(st.shard1.adminCommand(
-            {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
+            {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
     }
 
     function removeShard(shard) {

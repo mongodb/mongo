@@ -68,7 +68,8 @@
                 shouldForceReadConcern = false;
             }
 
-            if (OverrideHelpers.isAggregationWithOutStage(commandName, commandObjUnwrapped)) {
+            if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName,
+                                                                 commandObjUnwrapped)) {
                 // The $out stage can only be used with readConcern={level: "local"} or
                 // readConcern={level: "majority"}
                 if (TestData.defaultReadConcernLevel === "linearizable") {

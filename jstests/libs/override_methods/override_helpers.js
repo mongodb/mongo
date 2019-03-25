@@ -25,7 +25,7 @@ var OverrideHelpers = (function() {
         };
     }
 
-    function isAggregationWithOutStage(commandName, commandObj) {
+    function isAggregationWithOutOrMergeStage(commandName, commandObj) {
         if (commandName !== "aggregate" || typeof commandObj !== "object" || commandObj === null) {
             return false;
         }
@@ -39,7 +39,8 @@ var OverrideHelpers = (function() {
             return false;
         }
 
-        return Object.keys(lastStage)[0] === "$out";
+        const lastStageName = Object.keys(lastStage)[0];
+        return lastStageName === "$out" || lastStageName === "$merge";
     }
 
     function isMapReduceWithInlineOutput(commandName, commandObj) {
@@ -99,7 +100,7 @@ var OverrideHelpers = (function() {
     return {
         isAggregationWithListLocalSessionsStage:
             makeIsAggregationWithFirstStage("$listLocalSessions"),
-        isAggregationWithOutStage: isAggregationWithOutStage,
+        isAggregationWithOutOrMergeStage: isAggregationWithOutOrMergeStage,
         isMapReduceWithInlineOutput: isMapReduceWithInlineOutput,
         prependOverrideInParallelShell: prependOverrideInParallelShell,
         overrideRunCommand: overrideRunCommand,

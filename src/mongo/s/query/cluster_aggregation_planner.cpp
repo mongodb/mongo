@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
@@ -376,10 +377,7 @@ bool anyStageModifiesShardKeyOrNeedsMerge(std::set<std::string> shardKeyPaths,
 }
 
 boost::optional<ShardedExchangePolicy> walkPipelineBackwardsTrackingShardKey(
-    OperationContext* opCtx,
-    const boost::intrusive_ptr<const DocumentSourceOut>& outStage,
-    const Pipeline* mergePipeline,
-    const ChunkManager& chunkManager) {
+    OperationContext* opCtx, const Pipeline* mergePipeline, const ChunkManager& chunkManager) {
 
     const ShardKeyPattern& shardKey = chunkManager.getShardKeyPattern();
     std::set<std::string> shardKeyPaths;
@@ -562,22 +560,21 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
         return boost::none;
     }
 
-    const auto outStage =
-        dynamic_cast<DocumentSourceOut*>(mergePipeline->getSources().back().get());
-    if (!outStage || outStage->getMode() == WriteModeEnum::kModeReplaceCollection) {
-        // If there's no $out stage we won't try to do an $exchange. If the $out stage is using mode
-        // "replaceCollection", then there's no point doing an $exchange because all the writes will
-        // go to a single node, so we should just perform the merge on that host.
+    auto mergeStage = dynamic_cast<DocumentSourceMerge*>(mergePipeline->getSources().back().get());
+    if (!mergeStage) {
+        // If there's no $merge stage we won't try to do an $exchange. For the $out stage there's no
+        // point doing an $exchange because all the writes will go to a single node, so we should
+        // just perform the merge on that host.
         return boost::none;
     }
 
     const auto routingInfo =
-        uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, outStage->getOutputNs()));
+        uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, mergeStage->getOutputNs()));
     if (!routingInfo.cm()) {
         return boost::none;
     }
 
-    // The collection is sharded and we have an $out stage! Here we assume the $out stage has
+    // The collection is sharded and we have a $merge stage! Here we assume the $merge stage has
     // already verified that the shard key pattern is compatible with the unique key being used.
     // Assuming this, we just have to make sure the shard key is preserved (though possibly renamed)
     // all the way to the front of the merge pipeline. If this is the case then for any document
@@ -585,7 +582,7 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
     // inserted on. With this ability we can insert an exchange on the shards to partition the
     // documents based on which shard will end up owning them. Then each shard can perform a merge
     // of only those documents which belong to it (optimistically, barring chunk migrations).
-    return walkPipelineBackwardsTrackingShardKey(opCtx, outStage, mergePipeline, *routingInfo.cm());
+    return walkPipelineBackwardsTrackingShardKey(opCtx, mergePipeline, *routingInfo.cm());
 }
 
 }  // namespace cluster_aggregation_planner

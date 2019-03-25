@@ -70,6 +70,7 @@ public:
                 bool upsert,
                 bool multi,
                 boost::optional<OID> targetEpoch) override;
+
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx, const NamespaceString& ns) final;
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,

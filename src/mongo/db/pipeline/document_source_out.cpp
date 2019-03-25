@@ -34,9 +34,9 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_out_gen.h"
-#include "mongo/db/pipeline/document_source_out_in_place.h"
 #include "mongo/db/pipeline/document_source_out_replace_coll.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -272,7 +272,7 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
     MONGO_UNREACHABLE;
 }
 
-intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
+intrusive_ptr<DocumentSource> DocumentSourceOut::create(
     NamespaceString outputNs,
     const intrusive_ptr<ExpressionContext>& expCtx,
     WriteModeEnum mode,
@@ -317,11 +317,21 @@ intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
             return new DocumentSourceOutReplaceColl(
                 std::move(outputNs), expCtx, mode, std::move(uniqueKey), targetCollectionVersion);
         case WriteModeEnum::kModeInsertDocuments:
-            return new DocumentSourceOutInPlace(
-                std::move(outputNs), expCtx, mode, std::move(uniqueKey), targetCollectionVersion);
+            return DocumentSourceMerge::create(std::move(outputNs),
+                                               expCtx,
+                                               MergeWhenMatchedModeEnum::kFail,
+                                               MergeWhenNotMatchedModeEnum::kInsert,
+                                               std::move(uniqueKey),
+                                               targetCollectionVersion,
+                                               true /* serialize as $out stage */);
         case WriteModeEnum::kModeReplaceDocuments:
-            return new DocumentSourceOutInPlaceReplace(
-                std::move(outputNs), expCtx, mode, std::move(uniqueKey), targetCollectionVersion);
+            return DocumentSourceMerge::create(std::move(outputNs),
+                                               expCtx,
+                                               MergeWhenMatchedModeEnum::kReplaceWithNew,
+                                               MergeWhenNotMatchedModeEnum::kInsert,
+                                               std::move(uniqueKey),
+                                               targetCollectionVersion,
+                                               true /* serialize as $out stage */);
         default:
             MONGO_UNREACHABLE;
     }

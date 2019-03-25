@@ -97,7 +97,7 @@
     assertErrorCode(
         coll,
         [{$out: {to: outColl.getName(), mode: "replaceDocuments", uniqueKey: {missing: 1}}}],
-        50905  // This attempt should fail because there's no field 'missing' in the document.
+        51132  // This attempt should fail because there's no field 'missing' in the document.
         );
 
     // Test that a replace fails to insert a document if it violates a unique index constraint. In
@@ -123,7 +123,7 @@
           {$addFields: {_id: 0}},
           {$out: {to: outColl.getName(), mode: "replaceDocuments", uniqueKey: {_id: 1, "a.b": 1}}}
         ],
-        50905);
+        51132);
 
     coll.drop();
     assert.commandWorked(coll.insert({_id: 0, a: [{b: 1}]}));
@@ -133,7 +133,7 @@
           {$addFields: {_id: 0}},
           {$out: {to: outColl.getName(), mode: "replaceDocuments", uniqueKey: {_id: 1, "a.b": 1}}}
         ],
-        50905);
+        51132);
 
     // Tests for $out to a database that differs from the aggregation database.
     const foreignDb = db.getSiblingDB("mode_replace_documents_foreign");

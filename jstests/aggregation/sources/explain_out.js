@@ -44,7 +44,7 @@
             explain: {aggregate: sourceColl.getName(), pipeline: [outStage], cursor: {}},
             verbosity: verbosity
         }),
-                                     51029);
+                                     [51029, 51184]);
         assert.eq(targetColl.find().itcount(), 0);
     }
 

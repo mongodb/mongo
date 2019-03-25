@@ -105,7 +105,7 @@ load('jstests/aggregation/extras/utils.js');
                            mode: "replaceDocuments"
                        }
                     }],
-                    50905);
+                    51132);
 
     // Turn off the exchange and rerun the query.
     assert.commandWorked(mongosDB.adminCommand({setParameter: 1, internalQueryDisableExchange: 1}));
@@ -126,7 +126,7 @@ load('jstests/aggregation/extras/utils.js');
                            mode: "replaceDocuments"
                        }
                     }],
-                    50905);
+                    51132);
 
     // SERVER-38349 Make sure mongos rejects specifying exchange directly.
     assert.commandFailedWithCode(mongosDB.runCommand({

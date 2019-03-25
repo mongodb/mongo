@@ -9,16 +9,18 @@
     const sourceColl = mongosDB["source"];
     const targetColl = mongosDB["target"];
 
-    function setAggHang(mode) {
-        assert.commandWorked(st.shard0.adminCommand(
-            {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
-        assert.commandWorked(st.shard1.adminCommand(
-            {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
+    function setAggHang(mode, outMode) {
+        const failPoint = outMode == "replaceCollection"
+            ? "hangWhileBuildingDocumentSourceOutBatch"
+            : "hangWhileBuildingDocumentSourceMergeBatch";
+
+        assert.commandWorked(st.shard0.adminCommand({configureFailPoint: failPoint, mode: mode}));
+        assert.commandWorked(st.shard1.adminCommand({configureFailPoint: failPoint, mode: mode}));
     }
 
     function runOutWithMode(outMode, shardedColl, expectFailCode) {
         // Set the failpoint to hang in the first call to DocumentSourceCursor's getNext().
-        setAggHang("alwaysOn");
+        setAggHang("alwaysOn", outMode);
 
         // Set the primary shard.
         st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
@@ -59,7 +61,7 @@
         st.ensurePrimaryShard(mongosDB.getName(), st.shard1.shardName);
 
         // Unset the failpoint to unblock the $out and join with the parallel shell.
-        setAggHang("off");
+        setAggHang("off", outMode);
         outShell();
 
         // Verify that the $out succeeded.

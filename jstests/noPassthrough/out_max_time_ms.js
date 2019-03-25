@@ -123,7 +123,10 @@
 
         // Force the aggregation to hang while the batch is being built.
         forceAggregationToHangAndCheckMaxTimeMsExpires(
-            mode, conn, "hangWhileBuildingDocumentSourceOutBatch");
+            mode,
+            conn,
+            mode == "replaceCollection" ? "hangWhileBuildingDocumentSourceOutBatch"
+                                        : "hangWhileBuildingDocumentSourceMergeBatch");
     }
 
     // Run on a standalone.

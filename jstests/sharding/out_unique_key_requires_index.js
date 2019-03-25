@@ -183,7 +183,7 @@
                     }
                   }
                 ],
-                50905);
+                mode === "replaceCollection" ? 50905 : 51132);
         });
 
         // Test that a unique index that is multikey can still be used.

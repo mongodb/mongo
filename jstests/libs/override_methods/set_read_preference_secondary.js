@@ -110,7 +110,7 @@
         }
 
         let shouldForceReadPreference = kCommandsSupportingReadPreference.has(commandName);
-        if (OverrideHelpers.isAggregationWithOutStage(commandName, commandObjUnwrapped)) {
+        if (OverrideHelpers.isAggregationWithOutOrMergeStage(commandName, commandObjUnwrapped)) {
             // An aggregation with a $out stage must be sent to the primary.
             shouldForceReadPreference = false;
         } else if ((commandName === "mapReduce" || commandName === "mapreduce") &&

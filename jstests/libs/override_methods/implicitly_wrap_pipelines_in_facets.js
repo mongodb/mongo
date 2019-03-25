@@ -31,14 +31,8 @@
             return originalRunCommand.apply(this, arguments);
         }
 
-        const stagesDisallowedInsideFacet = [
-            '$changeStream',
-            '$collStats',
-            '$facet',
-            '$geoNear',
-            '$indexStats',
-            '$out',
-        ];
+        const stagesDisallowedInsideFacet =
+            ['$changeStream', '$collStats', '$facet', '$geoNear', '$indexStats', '$merge', '$out'];
         for (let stageSpec of originalPipeline) {
             // Skip wrapping the pipeline in a $facet stage if it has an invalid stage
             // specification.

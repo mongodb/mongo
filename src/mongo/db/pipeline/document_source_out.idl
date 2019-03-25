@@ -35,6 +35,7 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/s/chunk_version.idl"
 
 enums:
     WriteMode:
@@ -44,14 +45,6 @@ enums:
             kModeReplaceCollection: "replaceCollection"
             kModeInsertDocuments: "insertDocuments"
             kModeReplaceDocuments: "replaceDocuments"
-
-types:
-    ChunkVersion:
-        bson_serialization_type: object
-        description: An object representing a chunk version for a collection.
-        cpp_type: ChunkVersion
-        serializer: ChunkVersion::toBSON
-        deserializer: ChunkVersion::fromBSONThrowing
 
 structs:
     DocumentSourceOutSpec:
