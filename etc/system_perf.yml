@@ -503,6 +503,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: jasper_smoke
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "jasper_smoke"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: retryable_writes_workloads
   priority: 5
   commands:
@@ -818,6 +828,7 @@ buildvariants:
     - name: snapshot_reads
     - name: linkbench
     - name: tpcc
+    - name: jasper_smoke
     - name: insert_remove
     - name: big_update
 
@@ -840,6 +851,7 @@ buildvariants:
   tasks: &standalonetasks
     - name: industry_benchmarks
     - name: crud_workloads
+    - name: jasper_smoke
     - name: insert_remove
     - name: mixed_workloads
     - name: misc_workloads
@@ -892,6 +904,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks
     - name: crud_workloads
+    - name: jasper_smoke
     - name: insert_remove
     - name: mixed_workloads
     - name: misc_workloads
@@ -958,6 +971,7 @@ buildvariants:
     - name: industry_benchmarks
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
+    - name: jasper_smoke
     - name: insert_remove
     - name: service_architecture_workloads
     - name: mixed_workloads
@@ -978,6 +992,25 @@ buildvariants:
     - name: tpcc
     - name: linkbench
     - name: big_update
+
+- name: linux-3-node-replSet-ssl
+  display_name: Linux 3-Node ReplSet (SSL)
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    setup: replica-ssl
+    cluster: replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-linux-64-amzn
+  tasks: &3nodetasks
+    - name: industry_benchmarks
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
