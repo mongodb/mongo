@@ -14,7 +14,7 @@ pcreSuffix = "-8.42"
 mozjsSuffix = '-60'
 yamlSuffix = '-0.6.2'
 icuSuffix = '-57.1'
-gperftoolsSuffix = '-2.7' if env['MONGO_ALLOCATOR'] == "tcmalloc-experimental" else '-2.5'
+gperftoolsSuffix = '-2.7'
 timelibSuffix = '-2018.01'
 tomcryptSuffix = '-1.18.2'
 benchmarkSuffix = '-1.4.1'
