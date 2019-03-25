@@ -2,3 +2,4 @@
 PyYAML >= 3.0.0
 requests >= 2.0.0
 pymongo >= 3.0, < 3.6.0 # See PYTHON-1434, SERVER-34820
+psutil
