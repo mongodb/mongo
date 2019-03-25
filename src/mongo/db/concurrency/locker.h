@@ -235,6 +235,26 @@ public:
     virtual bool inAWriteUnitOfWork() const = 0;
 
     /**
+     * Returns whether we have ever taken a global lock in X or IX mode in this operation.
+     */
+    virtual bool wasGlobalWriteLockTaken() const = 0;
+
+    /**
+     * Returns whether we have ever taken a global lock in S mode in this operation.
+     */
+    virtual bool wasGlobalSharedLockTaken() const = 0;
+
+    /**
+     * Returns whether we have ever taken a global lock in this operation.
+     */
+    virtual bool wasGlobalLockTaken() const = 0;
+
+    /**
+     * Sets the mode bit in _globalLockMode. Once a mode bit is set, we won't clear it.
+     */
+    virtual void setGlobalLockModeBit(LockMode mode) = 0;
+
+    /**
      * Acquires lock on the specified resource in the specified mode and returns the outcome
      * of the operation. See the details for LockResult for more information on what the
      * different results mean.

@@ -615,6 +615,37 @@ bool LockerImpl::isCollectionLockedForMode(const NamespaceString& nss, LockMode 
     return false;
 }
 
+bool LockerImpl::wasGlobalWriteLockTaken() const {
+    return _globalLockMode.load() & ((1 << MODE_IX) | (1 << MODE_X));
+}
+
+bool LockerImpl::wasGlobalSharedLockTaken() const {
+    return _globalLockMode.load() & (1 << MODE_S);
+}
+
+bool LockerImpl::wasGlobalLockTaken() const {
+    return _globalLockMode.load() &
+        ((1 << MODE_IX) | (1 << MODE_X) | (1 << MODE_IS) | (1 << MODE_S));
+}
+
+void LockerImpl::setGlobalLockModeBit(LockMode mode) {
+    const unsigned char bit = 1 << mode;
+    unsigned char actual = _globalLockMode.load();
+    unsigned char expected;
+
+    // This is monotonic (once "bit" is set it is never unset) so we can optimistically try to set
+    // it, retrying if another thread modifies _globalLockMode between the load and the swap. If
+    // another thread sets "bit" while we are trying to, then we're done.
+    do {
+        if (actual & bit) {
+            return;
+        }
+
+        expected = actual;
+        actual = _globalLockMode.compareAndSwap(expected, actual | bit);
+    } while (actual != expected);
+}
+
 ResourceId LockerImpl::getWaitingResource() const {
     scoped_spinlock scopedLock(_lock);
 

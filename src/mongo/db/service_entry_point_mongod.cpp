@@ -34,7 +34,6 @@
 #include "mongo/db/service_entry_point_mongod.h"
 
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -106,8 +105,7 @@ public:
         auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         // Ensures that if we tried to do a write, we wait for write concern, even if that write was
         // a noop.
-        if ((lastOpAfterRun == lastOpBeforeRun) &&
-            GlobalLockAcquisitionTracker::get(opCtx).getGlobalWriteLocked()) {
+        if ((lastOpAfterRun == lastOpBeforeRun) && opCtx->lockState()->wasGlobalWriteLockTaken()) {
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
             lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         }

@@ -158,6 +158,14 @@ public:
         return _wuowNestingLevel > 0;
     }
 
+    bool wasGlobalWriteLockTaken() const override;
+
+    bool wasGlobalSharedLockTaken() const override;
+
+    bool wasGlobalLockTaken() const override;
+
+    void setGlobalLockModeBit(LockMode mode) override;
+
     /**
      * Requests a lock for resource 'resId' with mode 'mode'. An OperationContext 'opCtx' must be
      * provided to interrupt waiting on the locker condition variable that indicates status of
@@ -347,6 +355,9 @@ private:
     // for example, lock attempts will time out immediately if the lock is not immediately
     // available. Note this will be ineffective if uninterruptible lock guard is set.
     boost::optional<Milliseconds> _maxLockTimeout;
+
+    // Tracks the global lock modes ever acquired in this Locker's life.
+    AtomicWord<unsigned char> _globalLockMode;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //
