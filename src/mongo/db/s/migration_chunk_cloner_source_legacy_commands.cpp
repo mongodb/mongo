@@ -71,18 +71,21 @@ public:
                 str::stream() << "Collection " << nss->ns() << " does not exist",
                 _autoColl->getCollection());
 
-        auto csr = CollectionShardingRuntime::get(opCtx, *nss);
-        _csrLock.emplace(CollectionShardingRuntime::CSRLock::lock(opCtx, csr));
+        {
+            auto csr = CollectionShardingRuntime::get(opCtx, *nss);
+            auto csrLock = CollectionShardingRuntime::CSRLock::lock(opCtx, csr);
 
-        if (auto msm = MigrationSourceManager::get(csr, *_csrLock)) {
-            // It is now safe to access the cloner
-            _chunkCloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(msm->getCloner());
-            invariant(_chunkCloner);
-
-        } else {
-            uasserted(ErrorCodes::IllegalOperation,
-                      str::stream() << "No active migrations were found for collection "
-                                    << nss->ns());
+            if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+                // It is now safe to access the cloner
+                _chunkCloner =
+                    std::dynamic_pointer_cast<MigrationChunkClonerSourceLegacy,
+                                              MigrationChunkClonerSource>(msm->getCloner());
+                invariant(_chunkCloner);
+            } else {
+                uasserted(ErrorCodes::IllegalOperation,
+                          str::stream() << "No active migrations were found for collection "
+                                        << nss->ns());
+            }
         }
 
         // Ensure the session ids are correct
@@ -105,19 +108,15 @@ public:
 
     MigrationChunkClonerSourceLegacy* getCloner() const {
         invariant(_chunkCloner);
-        return _chunkCloner;
+        return _chunkCloner.get();
     }
 
 private:
     // Scoped database + collection lock
     boost::optional<AutoGetCollection> _autoColl;
 
-    // The CollectionShardingRuntime::CSRLock corresponding to the collection to which this
-    // migration belongs.
-    boost::optional<CollectionShardingRuntime::CSRLock> _csrLock;
-
     // Contains the active cloner for the namespace
-    MigrationChunkClonerSourceLegacy* _chunkCloner;
+    std::shared_ptr<MigrationChunkClonerSourceLegacy> _chunkCloner;
 };
 
 class InitialCloneCommand : public BasicCommand {

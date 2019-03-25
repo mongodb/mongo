@@ -168,10 +168,10 @@ public:
      * the migration source manager is currently in the clone phase (i.e. the previous call to
      * startClone has succeeded).
      *
-     * Must be called with some form of lock on the collection namespace.
+     * Must be called with a both a collection lock and the CollectionShardingRuntimeLock.
      */
-    MigrationChunkClonerSource* getCloner() const {
-        return _cloneDriver.get();
+    std::shared_ptr<MigrationChunkClonerSource> getCloner() const {
+        return _cloneDriver;
     }
 
     /**
@@ -232,10 +232,10 @@ private:
     boost::optional<UUID> _collectionUuid;
 
     // The chunk cloner source. Only available if there is an active migration going on. To set and
-    // remove it, global S lock needs to be acquired first in order to block all logOp calls and
-    // then the mutex. To access it, only the mutex is necessary. Available after cloning stage has
-    // completed.
-    std::unique_ptr<MigrationChunkClonerSource> _cloneDriver;
+    // remove it, a collection lock and the CollectionShardingRuntimeLock need to be acquired first
+    // in order to block all logOp calls and then the mutex. To access it, only the mutex is
+    // necessary. Available after cloning stage has completed.
+    std::shared_ptr<MigrationChunkClonerSource> _cloneDriver;
 
     // The statistics about a chunk migration to be included in moveChunk.commit
     BSONObj _recipientCloneCounts;
