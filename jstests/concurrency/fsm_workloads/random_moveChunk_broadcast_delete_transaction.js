@@ -32,11 +32,20 @@ var $config = extendWorkload($config, function($config, $super) {
 
     // A moveChunk may fail with a WriteConflict when clearing orphans on the destination shard if
     // any of them are concurrently written to by a broadcast transaction operation. The error
-    // message may be different depending on where the failure occurs.
-    // TODO SERVER-39141: Remove once the range deleter retries on write conflict exceptions.
+    // message and top-level code may be different depending on where the failure occurs.
+    //
+    // TODO SERVER-39141: Don't ignore WriteConflict error message once the range deleter retries on
+    // write conflict exceptions.
+    //
+    // Additionally, because deletes don't have a shard filter stage, a migration may fail if a
+    // broadcast delete is operating on orphans from a previous migration in the range being
+    // migrated back in. The particular error code is replaced with a more generic one, so this is
+    // identified by the failed migration's error message.
     $config.data.isMoveChunkErrorAcceptable = (err) => {
-        return err.message && (err.message.indexOf("WriteConflict") > -1 ||
-                               err.message.indexOf("CommandFailed") > -1);
+        return err.message &&
+            (err.message.indexOf("WriteConflict") > -1 ||
+             err.message.indexOf("CommandFailed") > -1 ||
+             err.message.indexOf("Documents in target range may still be in use") > -1);
     };
 
     /**
