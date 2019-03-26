@@ -10,12 +10,16 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/google/gopacket"
 	"net"
+
+	"github.com/google/gopacket"
 )
 
+// DNSClass defines the class associated with a request/response.  Different DNS
+// classes can be thought of as an array of parallel namespace trees.
 type DNSClass uint16
 
+// DNSClass known values.
 const (
 	DNSClassIN  DNSClass = 1   // Internet
 	DNSClassCS  DNSClass = 2   // the CSNET class (Obsolete)
@@ -24,8 +28,28 @@ const (
 	DNSClassAny DNSClass = 255 // AnyClass
 )
 
+func (dc DNSClass) String() string {
+	switch dc {
+	default:
+		return "Unknown"
+	case DNSClassIN:
+		return "IN"
+	case DNSClassCS:
+		return "CS"
+	case DNSClassCH:
+		return "CH"
+	case DNSClassHS:
+		return "HS"
+	case DNSClassAny:
+		return "Any"
+	}
+}
+
+// DNSType defines the type of data being requested/returned in a
+// question/answer.
 type DNSType uint16
 
+// DNSType known values.
 const (
 	DNSTypeA     DNSType = 1  // a host address
 	DNSTypeNS    DNSType = 2  // an authoritative name server
@@ -47,9 +71,55 @@ const (
 	DNSTypeSRV   DNSType = 33 // server discovery [RFC2782] [RFC6195]
 )
 
+func (dt DNSType) String() string {
+	switch dt {
+	default:
+		return "Unknown"
+	case DNSTypeA:
+		return "A"
+	case DNSTypeNS:
+		return "NS"
+	case DNSTypeMD:
+		return "MD"
+	case DNSTypeMF:
+		return "MF"
+	case DNSTypeCNAME:
+		return "CNAME"
+	case DNSTypeSOA:
+		return "SOA"
+	case DNSTypeMB:
+		return "MB"
+	case DNSTypeMG:
+		return "MG"
+	case DNSTypeMR:
+		return "MR"
+	case DNSTypeNULL:
+		return "NULL"
+	case DNSTypeWKS:
+		return "WKS"
+	case DNSTypePTR:
+		return "PTR"
+	case DNSTypeHINFO:
+		return "HINFO"
+	case DNSTypeMINFO:
+		return "MINFO"
+	case DNSTypeMX:
+		return "MX"
+	case DNSTypeTXT:
+		return "TXT"
+	case DNSTypeAAAA:
+		return "AAAA"
+	case DNSTypeSRV:
+		return "SRV"
+	}
+}
+
+// DNSResponseCode provides response codes for question answers.
 type DNSResponseCode uint8
 
+// DNSResponseCode known values.
 const (
+	DNSResponseCodeNoErr    DNSResponseCode = 0  // No error
 	DNSResponseCodeFormErr  DNSResponseCode = 1  // Format Error                       [RFC1035]
 	DNSResponseCodeServFail DNSResponseCode = 2  // Server Failure                     [RFC1035]
 	DNSResponseCodeNXDomain DNSResponseCode = 3  // Non-Existent Domain                [RFC1035]
@@ -74,6 +144,8 @@ func (drc DNSResponseCode) String() string {
 	switch drc {
 	default:
 		return "Unknown"
+	case DNSResponseCodeNoErr:
+		return "No Error"
 	case DNSResponseCodeFormErr:
 		return "Format Error"
 	case DNSResponseCodeServFail:
@@ -111,8 +183,10 @@ func (drc DNSResponseCode) String() string {
 	}
 }
 
+// DNSOpCode defines a set of different operation types.
 type DNSOpCode uint8
 
+// DNSOpCode known values.
 const (
 	DNSOpCodeQuery  DNSOpCode = 0 // Query                  [RFC1035]
 	DNSOpCodeIQuery DNSOpCode = 1 // Inverse Query Obsolete [RFC3425]
@@ -120,6 +194,23 @@ const (
 	DNSOpCodeNotify DNSOpCode = 4 // Notify                 [RFC1996]
 	DNSOpCodeUpdate DNSOpCode = 5 // Update                 [RFC2136]
 )
+
+func (doc DNSOpCode) String() string {
+	switch doc {
+	default:
+		return "Unknown"
+	case DNSOpCodeQuery:
+		return "Query"
+	case DNSOpCodeIQuery:
+		return "Inverse Query"
+	case DNSOpCodeStatus:
+		return "Status"
+	case DNSOpCodeNotify:
+		return "Notify"
+	case DNSOpCodeUpdate:
+		return "Update"
+	}
+}
 
 // DNS is specified in RFC 1034 / RFC 1035
 // +---------------------+
@@ -163,7 +254,7 @@ type DNS struct {
 	TC bool  // Truncated
 	RD bool  // Recursion desired
 	RA bool  // Recursion available
-	Z  uint8 // Resrved for future use
+	Z  uint8 // Reserved for future use
 
 	ResponseCode DNSResponseCode
 	QDCount      uint16 // Number of questions to expect
@@ -205,7 +296,7 @@ func (d *DNS) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 
 	if len(data) < 12 {
 		df.SetTruncated()
-		return fmt.Errorf("DNS packet too short")
+		return errDNSPacketTooShort
 	}
 
 	// since there are no further layers, the baselayer's content is
@@ -275,36 +366,153 @@ func (d *DNS) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	}
 
 	if uint16(len(d.Questions)) != d.QDCount {
-		return errors.New("Invalid query decoding, not the right number of questions")
+		return errDecodeQueryBadQDCount
 	} else if uint16(len(d.Answers)) != d.ANCount {
-		return errors.New("Invalid query decoding, not the right number of answers")
+		return errDecodeQueryBadANCount
 	} else if uint16(len(d.Authorities)) != d.NSCount {
-		return errors.New("Invalid query decoding, not the right number of authorities")
+		return errDecodeQueryBadNSCount
 	} else if uint16(len(d.Additionals)) != d.ARCount {
-		return errors.New("Invalid query decoding, not the right number of additionals info")
+		return errDecodeQueryBadARCount
 	}
 	return nil
 }
 
+// CanDecode implements gopacket.DecodingLayer.
 func (d *DNS) CanDecode() gopacket.LayerClass {
 	return LayerTypeDNS
 }
 
+// NextLayerType implements gopacket.DecodingLayer.
 func (d *DNS) NextLayerType() gopacket.LayerType {
 	return gopacket.LayerTypePayload
 }
 
+// Payload returns nil.
 func (d *DNS) Payload() []byte {
 	return nil
 }
 
-var maxRecursion = errors.New("max DNS recursion level hit")
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func recSize(rr *DNSResourceRecord) int {
+	switch rr.Type {
+	case DNSTypeA:
+		return 4
+	case DNSTypeAAAA:
+		return 16
+	case DNSTypeNS:
+		return len(rr.NS) + 2
+	case DNSTypeCNAME:
+		return len(rr.CNAME) + 2
+	case DNSTypePTR:
+		return len(rr.PTR) + 2
+	case DNSTypeSOA:
+		return len(rr.SOA.MName) + 2 + len(rr.SOA.RName) + 2 + 20
+	case DNSTypeMX:
+		return 2 + len(rr.MX.Name) + 2
+	case DNSTypeTXT:
+		l := len(rr.TXTs)
+		for _, txt := range rr.TXTs {
+			l += len(txt)
+		}
+		return l
+	case DNSTypeSRV:
+		return 6 + len(rr.SRV.Name) + 2
+	}
+
+	return 0
+}
+
+func computeSize(recs []DNSResourceRecord) int {
+	sz := 0
+	for _, rr := range recs {
+		sz += len(rr.Name) + 12
+		sz += recSize(&rr)
+	}
+	return sz
+}
+
+// SerializeTo writes the serialized form of this layer into the
+// SerializationBuffer, implementing gopacket.SerializableLayer.
+func (d *DNS) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
+	dsz := 0
+	for _, q := range d.Questions {
+		dsz += len(q.Name) + 6
+	}
+	dsz += computeSize(d.Answers)
+	dsz += computeSize(d.Authorities)
+	dsz += computeSize(d.Additionals)
+
+	bytes, err := b.PrependBytes(12 + dsz)
+	if err != nil {
+		return err
+	}
+	binary.BigEndian.PutUint16(bytes, d.ID)
+	bytes[2] = byte((b2i(d.QR) << 7) | (int(d.OpCode) << 3) | (b2i(d.AA) << 2) | (b2i(d.TC) << 1) | b2i(d.RD))
+	bytes[3] = byte((b2i(d.RA) << 7) | (int(d.Z) << 4) | int(d.ResponseCode))
+
+	if opts.FixLengths {
+		d.QDCount = uint16(len(d.Questions))
+		d.ANCount = uint16(len(d.Answers))
+		d.NSCount = uint16(len(d.Authorities))
+		d.ARCount = uint16(len(d.Additionals))
+	}
+	binary.BigEndian.PutUint16(bytes[4:], d.QDCount)
+	binary.BigEndian.PutUint16(bytes[6:], d.ANCount)
+	binary.BigEndian.PutUint16(bytes[8:], d.NSCount)
+	binary.BigEndian.PutUint16(bytes[10:], d.ARCount)
+
+	off := 12
+	for _, qd := range d.Questions {
+		n := qd.encode(bytes, off)
+		off += n
+	}
+
+	for i := range d.Answers {
+		// done this way so we can modify DNSResourceRecord to fix
+		// lengths if requested
+		qa := &d.Answers[i]
+		n, err := qa.encode(bytes, off, opts)
+		if err != nil {
+			return err
+		}
+		off += n
+	}
+
+	for i := range d.Authorities {
+		qa := &d.Authorities[i]
+		n, err := qa.encode(bytes, off, opts)
+		if err != nil {
+			return err
+		}
+		off += n
+	}
+	for i := range d.Additionals {
+		qa := &d.Additionals[i]
+		n, err := qa.encode(bytes, off, opts)
+		if err != nil {
+			return err
+		}
+		off += n
+	}
+
+	return nil
+}
 
 const maxRecursionLevel = 255
 
 func decodeName(data []byte, offset int, buffer *[]byte, level int) ([]byte, int, error) {
 	if level > maxRecursionLevel {
-		return nil, 0, maxRecursion
+		return nil, 0, errMaxRecursion
+	} else if offset >= len(data) {
+		return nil, 0, errDNSNameOffsetTooHigh
+	} else if offset < 0 {
+		return nil, 0, errDNSNameOffsetNegative
 	}
 	start := len(*buffer)
 	index := offset
@@ -325,8 +533,9 @@ loop:
 			*/
 			index2 := index + int(data[index]) + 1
 			if index2-offset > 255 {
-				return nil, 0,
-					fmt.Errorf("dns name is too long")
+				return nil, 0, errDNSNameTooLong
+			} else if index2 < index+1 || index2 > len(data) {
+				return nil, 0, errDNSNameInvalidIndex
 			}
 			*buffer = append(*buffer, '.')
 			*buffer = append(*buffer, data[index+1:index2]...)
@@ -352,8 +561,13 @@ loop:
 			      - a pointer
 			      - a sequence of labels ending with a pointer
 			*/
-
+			if index+2 > len(data) {
+				return nil, 0, errDNSPointerOffsetTooHigh
+			}
 			offsetp := int(binary.BigEndian.Uint16(data[index:index+2]) & 0x3fff)
+			if offsetp > len(data) {
+				return nil, 0, errDNSPointerOffsetTooHigh
+			}
 			// This looks a little tricky, but actually isn't.  Because of how
 			// decodeName is written, calling it appends the decoded name to the
 			// current buffer.  We already have the start of the buffer, then, so
@@ -373,10 +587,17 @@ loop:
 			return nil, 0, fmt.Errorf("qname '0x80' unsupported yet (data=%x index=%d)",
 				data[index], index)
 		}
+		if index >= len(data) {
+			return nil, 0, errDNSIndexOutOfRange
+		}
+	}
+	if len(*buffer) <= start {
+		return nil, 0, errDNSNameHasNoData
 	}
 	return (*buffer)[start+1:], index + 1, nil
 }
 
+// DNSQuestion wraps a single request (question) within a DNS query.
 type DNSQuestion struct {
 	Name  []byte
 	Type  DNSType
@@ -394,6 +615,13 @@ func (q *DNSQuestion) decode(data []byte, offset int, df gopacket.DecodeFeedback
 	q.Class = DNSClass(binary.BigEndian.Uint16(data[endq+2 : endq+4]))
 
 	return endq + 4, nil
+}
+
+func (q *DNSQuestion) encode(data []byte, offset int) int {
+	noff := encodeName(q.Name, data, offset)
+	binary.BigEndian.PutUint16(data[noff:], uint16(q.Type))
+	binary.BigEndian.PutUint16(data[noff+2:], uint16(q.Class))
+	return len(q.Name) + 6
 }
 
 //  DNSResourceRecord
@@ -417,6 +645,8 @@ func (q *DNSQuestion) decode(data []byte, offset int, df gopacket.DecodeFeedback
 //  /                                               /
 //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
+// DNSResourceRecord wraps the data from a single DNS resource within a
+// response.
 type DNSResourceRecord struct {
 	// Header
 	Name  []byte
@@ -452,7 +682,11 @@ func (rr *DNSResourceRecord) decode(data []byte, offset int, df gopacket.DecodeF
 	rr.Class = DNSClass(binary.BigEndian.Uint16(data[endq+2 : endq+4]))
 	rr.TTL = binary.BigEndian.Uint32(data[endq+4 : endq+8])
 	rr.DataLength = binary.BigEndian.Uint16(data[endq+8 : endq+10])
-	rr.Data = data[endq+10 : endq+10+int(rr.DataLength)]
+	end := endq + 10 + int(rr.DataLength)
+	if end > len(data) {
+		return 0, errDecodeRecordLength
+	}
+	rr.Data = data[endq+10 : end]
 
 	if err = rr.decodeRData(data, endq+10, buffer); err != nil {
 		return 0, err
@@ -461,11 +695,99 @@ func (rr *DNSResourceRecord) decode(data []byte, offset int, df gopacket.DecodeF
 	return endq + 10 + int(rr.DataLength), nil
 }
 
-func (rr *DNSResourceRecord) String() string {
-	if (rr.Class == DNSClassIN) && ((rr.Type == DNSTypeA) || (rr.Type == DNSTypeAAAA)) {
-		return net.IP(rr.Data).String()
+func encodeName(name []byte, data []byte, offset int) int {
+	l := 0
+	for i := range name {
+		if name[i] == '.' {
+			data[offset+i-l] = byte(l)
+			l = 0
+		} else {
+			// skip one to write the length
+			data[offset+i+1] = name[i]
+			l++
+		}
 	}
-	return "..."
+	// length for final portion
+	data[offset+len(name)-l] = byte(l)
+	data[offset+len(name)+1] = 0x00 // terminal
+	return offset + len(name) + 2
+}
+
+func (rr *DNSResourceRecord) encode(data []byte, offset int, opts gopacket.SerializeOptions) (int, error) {
+
+	noff := encodeName(rr.Name, data, offset)
+
+	binary.BigEndian.PutUint16(data[noff:], uint16(rr.Type))
+	binary.BigEndian.PutUint16(data[noff+2:], uint16(rr.Class))
+	binary.BigEndian.PutUint32(data[noff+4:], uint32(rr.TTL))
+
+	switch rr.Type {
+	case DNSTypeA:
+		copy(data[noff+10:], rr.IP.To4())
+	case DNSTypeAAAA:
+		copy(data[noff+10:], rr.IP)
+	case DNSTypeNS:
+		encodeName(rr.NS, data, noff+10)
+	case DNSTypeCNAME:
+		encodeName(rr.CNAME, data, noff+10)
+	case DNSTypePTR:
+		encodeName(rr.PTR, data, noff+10)
+	case DNSTypeSOA:
+		noff2 := encodeName(rr.SOA.MName, data, noff+10)
+		noff2 = encodeName(rr.SOA.RName, data, noff2)
+		binary.BigEndian.PutUint32(data[noff2:], rr.SOA.Serial)
+		binary.BigEndian.PutUint32(data[noff2+4:], rr.SOA.Refresh)
+		binary.BigEndian.PutUint32(data[noff2+8:], rr.SOA.Retry)
+		binary.BigEndian.PutUint32(data[noff2+12:], rr.SOA.Expire)
+		binary.BigEndian.PutUint32(data[noff2+16:], rr.SOA.Minimum)
+	case DNSTypeMX:
+		binary.BigEndian.PutUint16(data[noff+10:], rr.MX.Preference)
+		encodeName(rr.MX.Name, data, noff+12)
+	case DNSTypeTXT:
+		noff2 := noff + 10
+		for _, txt := range rr.TXTs {
+			data[noff2] = byte(len(txt))
+			copy(data[noff2+1:], txt)
+			noff2 += 1 + len(txt)
+		}
+	case DNSTypeSRV:
+		binary.BigEndian.PutUint16(data[noff+10:], rr.SRV.Priority)
+		binary.BigEndian.PutUint16(data[noff+12:], rr.SRV.Weight)
+		binary.BigEndian.PutUint16(data[noff+14:], rr.SRV.Port)
+		encodeName(rr.SRV.Name, data, noff+16)
+	default:
+		return 0, fmt.Errorf("serializing resource record of type %v not supported", rr.Type)
+	}
+
+	// DataLength
+	dSz := recSize(rr)
+	binary.BigEndian.PutUint16(data[noff+8:], uint16(dSz))
+
+	if opts.FixLengths {
+		rr.DataLength = uint16(dSz)
+	}
+
+	return len(rr.Name) + 1 + 11 + dSz, nil
+}
+
+func (rr *DNSResourceRecord) String() string {
+
+	if rr.Class == DNSClassIN {
+		switch rr.Type {
+		case DNSTypeA, DNSTypeAAAA:
+			return rr.IP.String()
+		case DNSTypeNS:
+			return "NS " + string(rr.NS)
+		case DNSTypeCNAME:
+			return "CNAME " + string(rr.CNAME)
+		case DNSTypePTR:
+			return "PTR " + string(rr.PTR)
+		case DNSTypeTXT:
+			return "TXT " + string(rr.TXT)
+		}
+	}
+
+	return fmt.Sprintf("<%v, %v>", rr.Class, rr.Type)
 }
 
 func decodeCharacterStrings(data []byte) ([][]byte, error) {
@@ -474,7 +796,7 @@ func decodeCharacterStrings(data []byte) ([][]byte, error) {
 	for index, index2 := 0, 0; index != end; index = index2 {
 		index2 = index + 1 + int(data[index]) // index increases by 1..256 and does not overflow
 		if index2 > end {
-			return nil, errors.New("Insufficient data for a <character-string>")
+			return nil, errCharStringMissData
 		}
 		strings = append(strings, data[index+1:index2])
 	}
@@ -548,17 +870,45 @@ func (rr *DNSResourceRecord) decodeRData(data []byte, offset int, buffer *[]byte
 	return nil
 }
 
+// DNSSOA is a Start of Authority record.  Each domain requires a SOA record at
+// the cutover where a domain is delegated from its parent.
 type DNSSOA struct {
 	MName, RName                            []byte
 	Serial, Refresh, Retry, Expire, Minimum uint32
 }
 
+// DNSSRV is a Service record, defining a location (hostname/port) of a
+// server/service.
 type DNSSRV struct {
 	Priority, Weight, Port uint16
 	Name                   []byte
 }
 
+// DNSMX is a mail exchange record, defining a mail server for a recipient's
+// domain.
 type DNSMX struct {
 	Preference uint16
 	Name       []byte
 }
+
+var (
+	errMaxRecursion = errors.New("max DNS recursion level hit")
+
+	errDNSNameOffsetTooHigh    = errors.New("dns name offset too high")
+	errDNSNameOffsetNegative   = errors.New("dns name offset is negative")
+	errDNSPacketTooShort       = errors.New("DNS packet too short")
+	errDNSNameTooLong          = errors.New("dns name is too long")
+	errDNSNameInvalidIndex     = errors.New("dns name uncomputable: invalid index")
+	errDNSPointerOffsetTooHigh = errors.New("dns offset pointer too high")
+	errDNSIndexOutOfRange      = errors.New("dns index walked out of range")
+	errDNSNameHasNoData        = errors.New("no dns data found for name")
+
+	errCharStringMissData = errors.New("Insufficient data for a <character-string>")
+
+	errDecodeRecordLength = errors.New("resource record length exceeds data")
+
+	errDecodeQueryBadQDCount = errors.New("Invalid query decoding, not the right number of questions")
+	errDecodeQueryBadANCount = errors.New("Invalid query decoding, not the right number of answers")
+	errDecodeQueryBadNSCount = errors.New("Invalid query decoding, not the right number of authorities")
+	errDecodeQueryBadARCount = errors.New("Invalid query decoding, not the right number of additionals info")
+)

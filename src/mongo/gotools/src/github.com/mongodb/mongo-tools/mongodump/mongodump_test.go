@@ -189,7 +189,11 @@ func readBSONIntoDatabase(dir, restoreDBName string) error {
 			continue
 		}
 
-		collectionName := fileName[:strings.LastIndex(fileName, ".bson")]
+		collectionName, err := util.UnescapeCollectionName(fileName[:strings.LastIndex(fileName, ".bson")])
+		if err != nil {
+			return err
+		}
+
 		collection := session.DB(restoreDBName).C(collectionName)
 
 		file, err := os.Open(fmt.Sprintf("%s/%s", dir, fileName))

@@ -12,6 +12,12 @@ This package is meant to be used with its parent,
 http://github.com/google/gopacket, although it can also be used independently
 if you just want to get packet data from the wire.
 
+Depending on libpcap version, os support, or file timestamp resolution,
+nanosecond resolution is used for the internal timestamps. Returned timestamps
+are always scaled to nanosecond resolution due to the usage of time.Time.
+libpcap must be at least version 1.5 to support nanosecond timestamps. OpenLive
+supports only microsecond resolution.
+
 Reading PCAP Files
 
 The following code can be used to read in data from a pcap file.
@@ -28,7 +34,7 @@ The following code can be used to read in data from a pcap file.
 Reading Live Packets
 
 The following code can be used to read in data from a live device, in this case
-"eth0".
+"eth0". Be aware, that OpenLive only supports microsecond resolution.
 
  if handle, err := pcap.OpenLive("eth0", 1600, true, pcap.BlockForever); err != nil {
    panic(err)
@@ -96,5 +102,11 @@ PCAP File Writing
 
 This package does not implement PCAP file writing.  However, gopacket/pcapgo
 does!  Look there if you'd like to write PCAP files.
+
+Note For Windows Users
+
+gopacket can use winpcap or npcap. If both are installed at the same time,
+npcap is preferred. Make sure the right windows service is loaded (npcap for npcap
+and npf for winpcap).
 */
 package pcap

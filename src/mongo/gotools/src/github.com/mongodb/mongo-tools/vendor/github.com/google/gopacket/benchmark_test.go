@@ -129,7 +129,7 @@ func BenchmarkUnbufferedChannel(b *testing.B) {
 	defer close(ca)
 	go func() {
 		defer close(cb)
-		for _ = range ca {
+		for range ca {
 			cb <- true
 		}
 	}()
@@ -144,7 +144,7 @@ func BenchmarkSmallBufferedChannel(b *testing.B) {
 	defer close(ca)
 	go func() {
 		defer close(cb)
-		for _ = range ca {
+		for range ca {
 			cb <- true
 		}
 	}()
@@ -159,7 +159,7 @@ func BenchmarkLargeBufferedChannel(b *testing.B) {
 	defer close(ca)
 	go func() {
 		defer close(cb)
-		for _ = range ca {
+		for range ca {
 			cb <- true
 		}
 	}()

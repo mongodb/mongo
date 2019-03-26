@@ -9,6 +9,7 @@
 package afpacket
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -36,7 +37,7 @@ func (t OptTPacketVersion) String() string {
 	return "InvalidVersion"
 }
 
-// OptSockType is the socket type used to open the TPacket socket.
+// OptSocketType is the socket type used to open the TPacket socket.
 type OptSocketType int
 
 func (t OptSocketType) String() string {
@@ -49,6 +50,7 @@ func (t OptSocketType) String() string {
 	return "UnknownSocketType"
 }
 
+// TPacket version numbers for use with NewHandle.
 const (
 	// TPacketVersionHighestAvailable tells NewHandle to use the highest available version of tpacket the kernel has available.
 	// This is the default, should a version number not be given in NewHandle's options.
@@ -86,11 +88,33 @@ type OptNumBlocks int
 // It can be passed into NewTPacket.
 type OptBlockTimeout time.Duration
 
+// OptPollTimeout is the number of milliseconds that poll() should block waiting  for a file
+// descriptor to become ready. Specifying a negative value in  time‐out means an infinite timeout.
+type OptPollTimeout time.Duration
+
+// OptAddVLANHeader modifies the packet data that comes back from the
+// kernel by adding in the VLAN header that the NIC stripped.  AF_PACKET by
+// default uses VLAN offloading, in which the NIC strips the VLAN header off of
+// the packet before handing it to the kernel.  This means that, even if a
+// packet has an 802.1q header on the wire, it'll show up without one by the
+// time it goes through AF_PACKET.  If this option is true, the VLAN header is
+// added back in before the packet is returned.  Note that this potentially has
+// a large performance hit, especially in otherwise zero-copy operation.
+//
+// Note that if you do not need to have a "real" VLAN layer, it may be
+// preferable to use the VLAN ID provided by the AncillaryVLAN struct
+// in CaptureInfo.AncillaryData, which is populated out-of-band and has
+// negligible performance impact. Such ancillary data will automatically
+// be provided if available.
+type OptAddVLANHeader bool
+
+// Default constants used by options.
 const (
 	DefaultFrameSize    = 4096                   // Default value for OptFrameSize.
 	DefaultBlockSize    = DefaultFrameSize * 128 // Default value for OptBlockSize.
 	DefaultNumBlocks    = 128                    // Default value for OptNumBlocks.
 	DefaultBlockTimeout = 64 * time.Millisecond  // Default value for OptBlockTimeout.
+	DefaultPollTimeout  = -1 * time.Millisecond  // Default value for OptPollTimeout. This blocks forever.
 )
 
 type options struct {
@@ -98,7 +122,9 @@ type options struct {
 	framesPerBlock int
 	blockSize      int
 	numBlocks      int
+	addVLANHeader  bool
 	blockTimeout   time.Duration
+	pollTimeout    time.Duration
 	version        OptTPacketVersion
 	socktype       OptSocketType
 	iface          string
@@ -109,6 +135,7 @@ var defaultOpts = options{
 	blockSize:    DefaultBlockSize,
 	numBlocks:    DefaultNumBlocks,
 	blockTimeout: DefaultBlockTimeout,
+	pollTimeout:  DefaultPollTimeout,
 	version:      TPacketVersionHighestAvailable,
 	socktype:     SocketRaw,
 }
@@ -125,14 +152,18 @@ func parseOptions(opts ...interface{}) (ret options, err error) {
 			ret.numBlocks = int(v)
 		case OptBlockTimeout:
 			ret.blockTimeout = time.Duration(v)
+		case OptPollTimeout:
+			ret.pollTimeout = time.Duration(v)
 		case OptTPacketVersion:
 			ret.version = v
 		case OptInterface:
 			ret.iface = string(v)
 		case OptSocketType:
 			ret.socktype = v
+		case OptAddVLANHeader:
+			ret.addVLANHeader = bool(v)
 		default:
-			err = fmt.Errorf("unknown type in options")
+			err = errors.New("unknown type in options")
 			return
 		}
 	}

@@ -17,7 +17,7 @@ set_goenv() {
         *)
             PREF_GOROOT="/opt/golang/go1.11"
             # XXX might not need mongodbtoolchain anymore
-            PREF_PATH="$PREF_GOROOT/bin:/opt/mongodbtoolchain/v2/bin/:$PATH"
+            PREF_PATH="$PREF_GOROOT/bin:/opt/mongodbtoolchain/v3/bin/:$PATH"
         ;;
     esac
 
@@ -40,13 +40,13 @@ set_goenv() {
         UNAME_M=$(PATH="/usr/bin:/bin" uname -m)
         case $UNAME_M in
             aarch64)
-                export CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc
+                export CC=/opt/mongodbtoolchain/v3/bin/aarch64-mongodb-linux-gcc
             ;;
             ppc64le)
-                export CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc
+                export CC=/opt/mongodbtoolchain/v3/bin/ppc64le-mongodb-linux-gcc
             ;;
             s390x)
-                export CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc
+                export CC=/opt/mongodbtoolchain/v3/bin/s390x-mongodb-linux-gcc
             ;;
             *)
                 # Not needed for other architectures

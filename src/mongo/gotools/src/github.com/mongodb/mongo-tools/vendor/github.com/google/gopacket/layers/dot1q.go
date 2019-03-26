@@ -63,7 +63,7 @@ func (d *Dot1Q) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeO
 	}
 	firstBytes := uint16(d.Priority)<<13 | d.VLANIdentifier
 	if d.DropEligible {
-		firstBytes |= 0x10
+		firstBytes |= 0x1000
 	}
 	binary.BigEndian.PutUint16(bytes, firstBytes)
 	binary.BigEndian.PutUint16(bytes[2:], uint16(d.Type))

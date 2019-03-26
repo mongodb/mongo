@@ -16,6 +16,7 @@ import (
 // EthernetCTP layer.
 type EthernetCTPFunction uint16
 
+// EthernetCTPFunction values.
 const (
 	EthernetCTPFunctionReply       EthernetCTPFunction = 1
 	EthernetCTPFunctionForwardData EthernetCTPFunction = 2

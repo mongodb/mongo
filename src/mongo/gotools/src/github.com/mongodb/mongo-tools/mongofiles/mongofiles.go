@@ -280,6 +280,24 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (err error) {
 		log.Logvf(log.DebugLow, "creating GridFS file '%v' from local file '%v'", mf.FileName, localFileName)
 	}
 
+	var id interface{}
+	if hasID {
+		id, err = mf.parseID()
+		if err != nil {
+			return err
+		}
+
+		query := gfs.Find(bson.M{"_id": id})
+
+		n, err := query.Count()
+		if err != nil {
+			return fmt.Errorf("error while checking if file with _id already exists: %v", err)
+		}
+		if n != 0 {
+			return fmt.Errorf("file with _id %v already exists", id)
+		}
+	}
+
 	gridFile, err := gfs.Create(mf.FileName)
 	if err != nil {
 		return fmt.Errorf("error while creating '%v' in GridFS: %v\n", mf.FileName, err)
@@ -294,11 +312,7 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (err error) {
 		}
 	}()
 
-	if hasID {
-		id, err := mf.parseID()
-		if err != nil {
-			return err
-		}
+	if id != nil {
 		gridFile.SetId(id)
 	}
 

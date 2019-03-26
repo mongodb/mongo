@@ -155,7 +155,11 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// deprecations with --nsInclude --nsExclude
 	if restore.NSOptions.DB != "" || restore.NSOptions.Collection != "" {
 		// these are only okay if restoring from a bson file
-		_, fileType := restore.getInfoFromFilename(restore.TargetDirectory)
+		_, fileType, err := restore.getInfoFromFilename(restore.TargetDirectory)
+		if err != nil {
+			return err
+		}
+
 		if fileType != BSONFileType {
 			log.Logvf(log.Always, "the --db and --collection args should only be used when "+
 				"restoring from a BSON file. Other uses are deprecated and will not exist "+

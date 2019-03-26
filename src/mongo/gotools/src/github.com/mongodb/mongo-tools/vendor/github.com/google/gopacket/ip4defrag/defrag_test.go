@@ -1,11 +1,18 @@
 // Copyright 2013 Google, Inc. All rights reserved.
+//
+// Use of this source code is governed by a BSD-style license
+// that can be found in the LICENSE file in the root of the source
+// tree.
+
 package ip4defrag
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/bytediff"
@@ -28,10 +35,12 @@ func TestNotFrag(t *testing.T) {
 	}
 }
 
-func TestDefragPing1(t *testing.T) {
+func TestDefragPingMultipleFrags(t *testing.T) {
 	defrag := NewIPv4Defragmenter()
 
-	// We inject the 4 fragment and test the DefragIPv4 interface
+	// We inject the 4 fragments and test the DefragIPv4 interface
+	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
+	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
 	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
 	gentestDefrag(t, defrag, testPing1Frag3, false, "Ping1Frag3")
 	gentestDefrag(t, defrag, testPing1Frag2, false, "Ping1Frag2")
@@ -49,6 +58,48 @@ func TestDefragPing1(t *testing.T) {
 		fmt.Println(bytediff.BashOutput.String(
 			bytediff.Diff(validPayload, ip.Payload)))
 		t.Errorf("defrag: payload is not correctly defragmented")
+	}
+
+	discarded := defrag.DiscardOlderThan(time.Now())
+	if 0 != discarded {
+		t.Errorf("defrag: discarded more fragments then expected: %d", discarded)
+	}
+}
+
+func TestDefragPing1(t *testing.T) {
+	defrag := NewIPv4Defragmenter()
+
+	// We inject the 4 fragments and test the DefragIPv4 interface
+	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
+	gentestDefrag(t, defrag, testPing1Frag3, false, "Ping1Frag3")
+	gentestDefrag(t, defrag, testPing1Frag2, false, "Ping1Frag2")
+	ip := gentestDefrag(t, defrag, testPing1Frag4, true, "Ping1Frag4")
+
+	if len(ip.Payload) != 4508 {
+		t.Fatalf("defrag: expecting a packet of 4508 bytes, got %d", len(ip.Payload))
+	}
+
+	validPayload := append(testPing1Frag1[34:], testPing1Frag2[34:]...)
+	validPayload = append(validPayload, testPing1Frag3[34:]...)
+	validPayload = append(validPayload, testPing1Frag4[34:]...)
+
+	if bytes.Compare(validPayload, ip.Payload) != 0 {
+		fmt.Println(bytediff.BashOutput.String(
+			bytediff.Diff(validPayload, ip.Payload)))
+		t.Errorf("defrag: payload is not correctly defragmented")
+	}
+
+	// We redo the same test to handle duplication, and be sure
+	// that the internal list is correctly cleaned up.
+	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
+	gentestDefrag(t, defrag, testPing1Frag3, false, "Ping1Frag3")
+	gentestDefrag(t, defrag, testPing1Frag2, false, "Ping1Frag2")
+	ip2 := gentestDefrag(t, defrag, testPing1Frag4, true, "Ping1Frag4")
+
+	if bytes.Compare(ip2.Payload, ip.Payload) != 0 {
+		fmt.Println(bytediff.BashOutput.String(
+			bytediff.Diff(validPayload, ip.Payload)))
+		t.Errorf("defrag: ip and ip2 payload are different")
 	}
 }
 
@@ -99,27 +150,113 @@ func TestDefragPing1and2(t *testing.T) {
 	debug = false
 }
 
-func TestDefragPingTooMuch(t *testing.T) {
+func TestDefragTooSmall(t *testing.T) {
 	defrag := NewIPv4Defragmenter()
 
-	// We inject the 7 fragments, and expect to hit an error at the
-	// 8th fragment
-	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
-	gentestDefrag(t, defrag, testPing1Frag2, false, "Ping1Frag2")
-	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
-	gentestDefrag(t, defrag, testPing1Frag2, false, "Ping1Frag2")
-	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
-	gentestDefrag(t, defrag, testPing1Frag2, false, "Ping1Frag2")
-	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
-
-	p := gopacket.NewPacket(testPing1Frag1, layers.LinkTypeEthernet,
-		gopacket.Default)
-	ip, _ := p.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
-
-	_, err := defrag.DefragIPv4(ip)
-	if err == nil {
-		t.Fatalf("defrag: Maximum number of fragments are supposed to be 8")
+	ip1 := layers.IPv4{
+		Version:    4,
+		IHL:        5,
+		TTL:        15,
+		SrcIP:      net.IPv4(1, 1, 1, 1),
+		DstIP:      net.IPv4(2, 2, 2, 2),
+		Id:         0xcc,
+		FragOffset: 0,
+		Length:     27, // Minimum fragment size -1 + header (20)
+		Flags:      layers.IPv4MoreFragments,
 	}
+	if _, err := defrag.DefragIPv4(&ip1); err == nil {
+		t.Fatal("defrag: Minimum fragment size is supposed to be 8")
+	}
+
+	ip1.Length++
+	if _, err := defrag.DefragIPv4(&ip1); err != nil {
+		t.Fatalf("defrag: Minimum fragment size is supposed to be 8, %s", err)
+	}
+}
+
+func TestDefragFragmentOffset(t *testing.T) {
+	defrag := NewIPv4Defragmenter()
+
+	ip1 := layers.IPv4{
+		Version:    4,
+		IHL:        5,
+		TTL:        15,
+		SrcIP:      net.IPv4(1, 1, 1, 1),
+		DstIP:      net.IPv4(2, 2, 2, 2),
+		Id:         0xcc,
+		FragOffset: 0,
+		Length:     512,
+		Flags:      layers.IPv4MoreFragments,
+	}
+	if _, err := defrag.DefragIPv4(&ip1); err != nil {
+		t.Fatal(err)
+	}
+
+	ip2 := ip1
+	ip2.FragOffset = 8184
+
+	_, err := defrag.DefragIPv4(&ip2)
+	if err == nil {
+		t.Fatalf("defrag: Maximum fragment offset is supposed to be 8183")
+	}
+}
+
+func TestDefragDiscard(t *testing.T) {
+	defrag := NewIPv4Defragmenter()
+
+	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
+	gentestDefrag(t, defrag, testPing2Frag1, false, "Ping2Frag1")
+
+	discarded := defrag.DiscardOlderThan(time.Now())
+	if 2 != discarded {
+		t.Errorf("defrag: discarded more fragments then expected: %d", discarded)
+	}
+}
+
+func TestDefragMaxSize(t *testing.T) {
+	defrag := NewIPv4Defragmenter()
+
+	ip1 := layers.IPv4{
+		Version:    4,
+		IHL:        5,
+		TTL:        15,
+		SrcIP:      net.IPv4(1, 1, 1, 1),
+		DstIP:      net.IPv4(2, 2, 2, 2),
+		Id:         0xcc,
+		FragOffset: 0,
+		Length:     65535,
+		Flags:      layers.IPv4MoreFragments,
+	}
+	if _, err := defrag.DefragIPv4(&ip1); err != nil {
+		t.Fatal(err)
+	}
+
+	ip2 := ip1
+	ip2.Length = 28
+	ip2.FragOffset = 1
+
+	_, err := defrag.DefragIPv4(&ip2)
+	if err != nil {
+		t.Fatal(err)
+		t.Fatalf("defrag: Maximum length is supposed to be 65535")
+	}
+}
+
+func TestDefragIDField(t *testing.T) {
+	defrag := NewIPv4Defragmenter()
+
+	expectedID := binary.BigEndian.Uint16(testPing1Frag1[18:])
+
+	gentestDefrag(t, defrag, testPing1Frag1, false, "Ping1Frag1")
+	gentestDefrag(t, defrag, testPing1Frag3, false, "Ping1Frag3")
+	gentestDefrag(t, defrag, testPing1Frag2, false, "Ping1Frag2")
+	ipFragmented := gentestDefrag(t, defrag, testPing1Frag4, true, "Ping1Frag4")
+
+	if ipFragmented.Id != expectedID {
+		t.Fatalf("defrag: expecting a fragmented packet with ID %d, got %d",
+			expectedID, ipFragmented.Id)
+	}
+
 }
 
 func gentestDefrag(t *testing.T, defrag *IPv4Defragmenter, buf []byte, expect bool, label string) *layers.IPv4 {

@@ -54,6 +54,7 @@ type LinuxSLL struct {
 	AddrLen      uint16
 	Addr         net.HardwareAddr
 	EthernetType EthernetType
+	AddrType     uint16
 }
 
 // LayerType returns LayerTypeLinuxSLL.
@@ -76,6 +77,7 @@ func (sll *LinuxSLL) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) er
 		return errors.New("Linux SLL packet too small")
 	}
 	sll.PacketType = LinuxSLLPacketType(binary.BigEndian.Uint16(data[0:2]))
+	sll.AddrType = binary.BigEndian.Uint16(data[2:4])
 	sll.AddrLen = binary.BigEndian.Uint16(data[4:6])
 
 	sll.Addr = net.HardwareAddr(data[6 : sll.AddrLen+6])

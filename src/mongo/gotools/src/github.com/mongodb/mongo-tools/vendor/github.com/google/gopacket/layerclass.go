@@ -18,11 +18,12 @@ type LayerClass interface {
 	LayerTypes() []LayerType
 }
 
-// Make LayerType itself be a LayerClass.
+// Contains implements LayerClass.
 func (l LayerType) Contains(a LayerType) bool {
 	return l == a
 }
 
+// LayerTypes implements LayerClass.
 func (l LayerType) LayerTypes() []LayerType {
 	return []LayerType{l}
 }

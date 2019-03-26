@@ -16,6 +16,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -29,6 +30,12 @@ type CaptureInfo struct {
 	// Length is the size of the original packet.  Should always be >=
 	// CaptureLength.
 	Length int
+	// InterfaceIndex
+	InterfaceIndex int
+	// The packet source can place ancillary data of various types here.
+	// For example, the afpacket source can report the VLAN of captured
+	// packets this way.
+	AncillaryData []interface{}
 }
 
 // PacketMetadata contains metadata for a packet.
@@ -108,9 +115,7 @@ type packet struct {
 	// metadata is the PacketMetadata for this packet
 	metadata PacketMetadata
 
-	// recoverPanics is true if we should recover from panics we see while
-	// decoding and set a DecodeFailure layer.
-	recoverPanics bool
+	decodeOptions DecodeOptions
 
 	// Pointers to the various important layers
 	link        LinkLayer
@@ -172,6 +177,10 @@ func (p *packet) Data() []byte {
 	return p.data
 }
 
+func (p *packet) DecodeOptions() *DecodeOptions {
+	return &p.decodeOptions
+}
+
 func (p *packet) addFinalDecodeError(err error, stack []byte) {
 	fail := &DecodeFailure{err: err, stack: stack}
 	if p.last == nil {
@@ -184,7 +193,7 @@ func (p *packet) addFinalDecodeError(err error, stack []byte) {
 }
 
 func (p *packet) recoverDecodeError() {
-	if p.recoverPanics {
+	if !p.decodeOptions.SkipDecodeRecovery {
 		if r := recover(); r != nil {
 			p.addFinalDecodeError(fmt.Errorf("%v", r), debug.Stack())
 		}
@@ -204,7 +213,7 @@ func (p *packet) recoverDecodeError() {
 // Payload layer and it's internal 'data' field, which contains a large byte
 // array that would really mess up formatting.
 func LayerString(l Layer) string {
-	return fmt.Sprintf("%v\t%s", l.LayerType(), layerString(l, false, false))
+	return fmt.Sprintf("%v\t%s", l.LayerType(), layerString(reflect.ValueOf(l), false, false))
 }
 
 // Dumper dumps verbose information on a value.  If a layer type implements
@@ -242,20 +251,21 @@ func LayerDump(l Layer) string {
 //   writeSpace:  if we've already written a value in a struct, and need to
 //     write a space before writing more.  This happens when we write various
 //     anonymous values, and need to keep writing more.
-func layerString(i interface{}, anonymous bool, writeSpace bool) string {
+func layerString(v reflect.Value, anonymous bool, writeSpace bool) string {
 	// Let String() functions take precedence.
-	if s, ok := i.(fmt.Stringer); ok {
-		return s.String()
+	if v.CanInterface() {
+		if s, ok := v.Interface().(fmt.Stringer); ok {
+			return s.String()
+		}
 	}
 	// Reflect, and spit out all the exported fields as key=value.
-	v := reflect.ValueOf(i)
 	switch v.Type().Kind() {
 	case reflect.Interface, reflect.Ptr:
 		if v.IsNil() {
 			return "nil"
 		}
 		r := v.Elem()
-		return layerString(r.Interface(), anonymous, writeSpace)
+		return layerString(r, anonymous, writeSpace)
 	case reflect.Struct:
 		var b bytes.Buffer
 		typ := v.Type()
@@ -267,7 +277,7 @@ func layerString(i interface{}, anonymous bool, writeSpace bool) string {
 			ftype := typ.Field(i)
 			f := v.Field(i)
 			if ftype.Anonymous {
-				anonStr := layerString(f.Interface(), true, writeSpace)
+				anonStr := layerString(f, true, writeSpace)
 				writeSpace = writeSpace || anonStr != ""
 				b.WriteString(anonStr)
 			} else if ftype.PkgPath == "" { // exported
@@ -275,7 +285,7 @@ func layerString(i interface{}, anonymous bool, writeSpace bool) string {
 					b.WriteByte(' ')
 				}
 				writeSpace = true
-				fmt.Fprintf(&b, "%s=%s", typ.Field(i).Name, layerString(f.Interface(), false, writeSpace))
+				fmt.Fprintf(&b, "%s=%s", typ.Field(i).Name, layerString(f, false, writeSpace))
 			}
 		}
 		if !anonymous {
@@ -292,7 +302,7 @@ func layerString(i interface{}, anonymous bool, writeSpace bool) string {
 				if j != 0 {
 					b.WriteString(", ")
 				}
-				b.WriteString(layerString(v.Index(j).Interface(), false, false))
+				b.WriteString(layerString(v.Index(j), false, false))
 			}
 		}
 		b.WriteByte(']')
@@ -356,7 +366,7 @@ func layerGoString(i interface{}, b *bytes.Buffer) {
 		t := v.Type()
 		b.WriteString(t.String())
 		b.WriteByte('{')
-		for i := 0; i < v.NumField(); i += 1 {
+		for i := 0; i < v.NumField(); i++ {
 			if i > 0 {
 				b.WriteString(", ")
 			}
@@ -421,11 +431,11 @@ type eagerPacket struct {
 	packet
 }
 
-var nilDecoderError = errors.New("NextDecoder passed nil decoder, probably an unsupported decode type")
+var errNilDecoder = errors.New("NextDecoder passed nil decoder, probably an unsupported decode type")
 
 func (p *eagerPacket) NextDecoder(next Decoder) error {
 	if next == nil {
-		return nilDecoderError
+		return errNilDecoder
 	}
 	if p.last == nil {
 		return errors.New("NextDecoder called, but no layers added yet")
@@ -492,7 +502,7 @@ type lazyPacket struct {
 
 func (p *lazyPacket) NextDecoder(next Decoder) error {
 	if next == nil {
-		return nilDecoderError
+		return errNilDecoder
 	}
 	p.next = next
 	return nil
@@ -612,6 +622,11 @@ type DecodeOptions struct {
 	// the issue.  If this flag is set, panics are instead allowed to continue up
 	// the stack.
 	SkipDecodeRecovery bool
+	// DecodeStreamsAsDatagrams enables routing of application-level layers in the TCP
+	// decoder. If true, we should try to decode layers after TCP in single packets.
+	// This is disabled by default because the reassembly package drives the decoding
+	// of TCP payload data after reassembly.
+	DecodeStreamsAsDatagrams bool
 }
 
 // Default decoding provides the safest (but slowest) method for decoding
@@ -621,13 +636,16 @@ type DecodeOptions struct {
 // though, so beware.  If you can guarantee that the packet will only be used
 // by one goroutine at a time, set Lazy decoding.  If you can guarantee that
 // the underlying slice won't change, set NoCopy decoding.
-var Default DecodeOptions = DecodeOptions{}
+var Default = DecodeOptions{}
 
 // Lazy is a DecodeOptions with just Lazy set.
-var Lazy DecodeOptions = DecodeOptions{Lazy: true}
+var Lazy = DecodeOptions{Lazy: true}
 
 // NoCopy is a DecodeOptions with just NoCopy set.
-var NoCopy DecodeOptions = DecodeOptions{NoCopy: true}
+var NoCopy = DecodeOptions{NoCopy: true}
+
+// DecodeStreamsAsDatagrams is a DecodeOptions with just DecodeStreamsAsDatagrams set.
+var DecodeStreamsAsDatagrams = DecodeOptions{DecodeStreamsAsDatagrams: true}
 
 // NewPacket creates a new Packet object from a set of bytes.  The
 // firstLayerDecoder tells it how to interpret the first layer from the bytes,
@@ -640,11 +658,10 @@ func NewPacket(data []byte, firstLayerDecoder Decoder, options DecodeOptions) Pa
 	}
 	if options.Lazy {
 		p := &lazyPacket{
-			packet: packet{data: data},
+			packet: packet{data: data, decodeOptions: options},
 			next:   firstLayerDecoder,
 		}
 		p.layers = p.initialLayers[:0]
-		p.recoverPanics = !options.SkipDecodeRecovery
 		// Crazy craziness:
 		// If the following return statemet is REMOVED, and Lazy is FALSE, then
 		// eager packet processing becomes 17% FASTER.  No, there is no logical
@@ -658,10 +675,9 @@ func NewPacket(data []byte, firstLayerDecoder Decoder, options DecodeOptions) Pa
 		return p
 	}
 	p := &eagerPacket{
-		packet: packet{data: data},
+		packet: packet{data: data, decodeOptions: options},
 	}
 	p.layers = p.initialLayers[:0]
-	p.recoverPanics = !options.SkipDecodeRecovery
 	p.initialDecode(firstLayerDecoder)
 	return p
 }
@@ -679,6 +695,31 @@ type PacketDataSource interface {
 	//  err:  An error encountered while reading packet data.  If err != nil,
 	//    then data/ci will be ignored.
 	ReadPacketData() (data []byte, ci CaptureInfo, err error)
+}
+
+// ConcatFinitePacketDataSources returns a PacketDataSource that wraps a set
+// of internal PacketDataSources, each of which will stop with io.EOF after
+// reading a finite number of packets.  The returned PacketDataSource will
+// return all packets from the first finite source, followed by all packets from
+// the second, etc.  Once all finite sources have returned io.EOF, the returned
+// source will as well.
+func ConcatFinitePacketDataSources(pds ...PacketDataSource) PacketDataSource {
+	c := concat(pds)
+	return &c
+}
+
+type concat []PacketDataSource
+
+func (c *concat) ReadPacketData() (data []byte, ci CaptureInfo, err error) {
+	for len(*c) > 0 {
+		data, ci, err = (*c)[0].ReadPacketData()
+		if err == io.EOF {
+			*c = (*c)[1:]
+			continue
+		}
+		return
+	}
+	return nil, CaptureInfo{}, io.EOF
 }
 
 // ZeroCopyPacketDataSource is an interface to pull packet data from sources
@@ -726,7 +767,7 @@ type ZeroCopyPacketDataSource interface {
 // importantly the io.EOF error in cases where packets are being read from
 // a file.
 //  for {
-//    packet, err := packetSource.NextPacket() {
+//    packet, err := packetSource.NextPacket()
 //    if err == io.EOF {
 //      break
 //    } else if err != nil {
@@ -774,7 +815,7 @@ func (p *PacketSource) packetsToChannel() {
 	defer close(p.c)
 	for {
 		packet, err := p.NextPacket()
-		if err == io.EOF {
+		if err == io.EOF || err == syscall.EBADF {
 			return
 		} else if err == nil {
 			p.c <- packet

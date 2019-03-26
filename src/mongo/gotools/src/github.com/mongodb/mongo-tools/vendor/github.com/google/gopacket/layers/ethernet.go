@@ -46,6 +46,7 @@ func (eth *Ethernet) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) er
 	eth.SrcMAC = net.HardwareAddr(data[6:12])
 	eth.EthernetType = EthernetType(binary.BigEndian.Uint16(data[12:14]))
 	eth.BaseLayer = BaseLayer{data[:14], data[14:]}
+	eth.Length = 0
 	if eth.EthernetType < 0x0600 {
 		eth.Length = uint16(eth.EthernetType)
 		eth.EthernetType = EthernetTypeLLC

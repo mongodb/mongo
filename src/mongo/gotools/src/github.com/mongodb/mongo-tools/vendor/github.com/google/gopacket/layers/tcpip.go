@@ -8,7 +8,9 @@
 package layers
 
 import (
+	"errors"
 	"fmt"
+
 	"github.com/google/gopacket"
 )
 
@@ -64,7 +66,7 @@ func tcpipChecksum(data []byte, csum uint32) uint16 {
 	for csum > 0xffff {
 		csum = (csum >> 16) + (csum & 0xffff)
 	}
-	return ^uint16(csum + (csum >> 16))
+	return ^uint16(csum)
 }
 
 // computeChecksum computes a TCP or UDP checksum.  headerAndPayload is the
@@ -72,7 +74,7 @@ func tcpipChecksum(data []byte, csum uint32) uint16 {
 // out. headerProtocol is the IP protocol number of the upper-layer header.
 func (c *tcpipchecksum) computeChecksum(headerAndPayload []byte, headerProtocol IPProtocol) (uint16, error) {
 	if c.pseudoheader == nil {
-		return 0, fmt.Errorf("TCP/IP layer 4 checksum cannot be computed without network layer... call SetNetworkLayerForChecksum to set which layer to use")
+		return 0, errors.New("TCP/IP layer 4 checksum cannot be computed without network layer... call SetNetworkLayerForChecksum to set which layer to use")
 	}
 	length := uint32(len(headerAndPayload))
 	csum, err := c.pseudoheader.pseudoheaderChecksum()

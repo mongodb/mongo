@@ -356,7 +356,7 @@ func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
 			return docsCount, err
 		}
 		docsCount++
-		if docsCount%watchProgressorUpdateFrequency == 0 {
+		if docsCount % watchProgressorUpdateFrequency == 0 {
 			watchProgressor.Set(docsCount)
 		}
 	}

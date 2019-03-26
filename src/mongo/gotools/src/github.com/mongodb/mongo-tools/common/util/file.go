@@ -9,6 +9,7 @@ package util
 import (
 	"bufio"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 )
@@ -38,6 +39,14 @@ func GetFieldsFromFile(path string) ([]string, error) {
 // replaced by multiple separators
 func ToUniversalPath(path string) string {
 	return filepath.FromSlash(path)
+}
+
+func EscapeCollectionName(collName string) string {
+	return url.PathEscape(collName)
+}
+
+func UnescapeCollectionName(escapedCollName string) (string, error) {
+	return url.PathUnescape(escapedCollName)
 }
 
 type WrappedReadCloser struct {

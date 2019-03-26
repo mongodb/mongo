@@ -4,8 +4,6 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-// Package pcapgo provides some native PCAP support, not requiring
-// C libpcap to be installed.
 package pcapgo
 
 import (
@@ -26,6 +24,9 @@ import (
 // timestamp resolution and little-endian encoding.
 type Writer struct {
 	w io.Writer
+
+	// Moving this into the struct seems to save an allocation for each call to writePacketHeader
+	buf [16]byte
 }
 
 const magicMicroseconds = 0xA1B2C3D4
@@ -71,19 +72,17 @@ func (w *Writer) WriteFileHeader(snaplen uint32, linktype layers.LinkType) error
 const nanosPerMicro = 1000
 
 func (w *Writer) writePacketHeader(ci gopacket.CaptureInfo) error {
-	var buf [16]byte
-
 	t := ci.Timestamp
 	if t.IsZero() {
 		t = time.Now()
 	}
 	secs := t.Unix()
 	usecs := t.Nanosecond() / nanosPerMicro
-	binary.LittleEndian.PutUint32(buf[0:4], uint32(secs))
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(usecs))
-	binary.LittleEndian.PutUint32(buf[8:12], uint32(ci.CaptureLength))
-	binary.LittleEndian.PutUint32(buf[12:16], uint32(ci.Length))
-	_, err := w.w.Write(buf[:])
+	binary.LittleEndian.PutUint32(w.buf[0:4], uint32(secs))
+	binary.LittleEndian.PutUint32(w.buf[4:8], uint32(usecs))
+	binary.LittleEndian.PutUint32(w.buf[8:12], uint32(ci.CaptureLength))
+	binary.LittleEndian.PutUint32(w.buf[12:16], uint32(ci.Length))
+	_, err := w.w.Write(w.buf[:])
 	return err
 }
 
