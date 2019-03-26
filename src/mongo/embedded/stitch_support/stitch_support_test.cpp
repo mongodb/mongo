@@ -33,6 +33,7 @@
 
 #include "stitch_support/stitch_support.h"
 
+#include "mongo/base/initializer.h"
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/quick_exit.h"
@@ -589,6 +590,20 @@ TEST_F(StitchSupportTest, TestUpsertProducesProperStatus) {
 // calling runGlobalInitializers(), which is called both from the regular unit test main() and from
 // the Stitch Support Library intializer function that gets tested here.
 int main(const int argc, const char* const* const argv) {
+    // See comment by the same code block in mongo_embedded_test.cpp
+    const char* null_argv[1] = {nullptr};
+    auto ret = mongo::runGlobalInitializers(0, null_argv, nullptr);
+    if (!ret.isOK()) {
+        std::cerr << "Global initilization failed";
+        return EXIT_FAILURE;
+    }
+
+    ret = mongo::runGlobalDeinitializers();
+    if (!ret.isOK()) {
+        std::cerr << "Global deinitilization failed";
+        return EXIT_FAILURE;
+    }
+
     const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
 
     // This is the standard exit path for Mongo processes. See the mongo::quickExit() declaration

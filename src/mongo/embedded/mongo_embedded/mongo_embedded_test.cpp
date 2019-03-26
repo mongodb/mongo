@@ -34,6 +34,7 @@
 #include <set>
 #include <yaml-cpp/yaml.h>
 
+#include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/json.h"
@@ -695,12 +696,29 @@ int main(const int argc, const char* const* const argv) {
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
     ::mongo::serverGlobalParams.noUnixSocket = true;
-    ::mongo::unittest::setupTestLogger();
 
     // Allocate an error descriptor for use in non-configured tests
     const auto status = makeStatusPtr();
 
     mongo::setTestCommandsEnabled(true);
+
+    // Perform one cycle of global initialization/deinitialization before running test. This will
+    // make sure everything that is needed is setup for the unittest infrastructure.
+    // The reason this works is that the unittest system relies on other systems being initialized
+    // through global init and deinitialize just deinitializes systems that explicitly supports
+    // deinit leaving the systems unittest needs initialized.
+    const char* null_argv[1] = {nullptr};
+    ret = mongo::runGlobalInitializers(0, null_argv, nullptr);
+    if (!ret.isOK()) {
+        std::cerr << "Global initilization failed";
+        return EXIT_FAILURE;
+    }
+
+    ret = mongo::runGlobalDeinitializers();
+    if (!ret.isOK()) {
+        std::cerr << "Global deinitilization failed";
+        return EXIT_FAILURE;
+    }
 
     // Check so we can initialize the library without providing init params
     mongo_embedded_v1_lib* lib = mongo_embedded_v1_lib_init(nullptr, status.get());
@@ -742,6 +760,13 @@ int main(const int argc, const char* const* const argv) {
                   << mongo_embedded_v1_status_get_explanation(status.get()) << std::endl;
     }
 
+    // Attempt to create an embedded instance to make sure something gets logged. This will probably
+    // fail but that's fine.
+    mongo_embedded_v1_instance* instance = mongo_embedded_v1_instance_create(lib, nullptr, nullptr);
+    if (instance) {
+        mongo_embedded_v1_instance_destroy(instance, nullptr);
+    }
+
     if (mongo_embedded_v1_lib_fini(lib, nullptr) != MONGO_EMBEDDED_V1_SUCCESS) {
         std::cerr << "mongo_embedded_v1_fini() failed with "
                   << mongo_embedded_v1_status_get_error(status.get()) << ": "
@@ -750,6 +775,7 @@ int main(const int argc, const char* const* const argv) {
 
     if (!receivedCallback) {
         std::cerr << "Did not get a log callback." << std::endl;
+        return EXIT_FAILURE;
     }
 
     const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);

@@ -38,6 +38,7 @@
 #include <mongoc/mongoc.h>
 #include <yaml-cpp/yaml.h>
 
+#include "mongo/base/initializer.h"
 #include "mongo/db/server_options.h"
 #include "mongo/embedded/mongo_embedded/mongo_embedded.h"
 #include "mongo/embedded/mongoc_embedded/mongoc_embedded_test_gen.h"
@@ -282,7 +283,20 @@ int main(int argc, char** argv, char** envp) {
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
     ::mongo::serverGlobalParams.noUnixSocket = true;
-    ::mongo::unittest::setupTestLogger();
+
+    // See comment by the same code block in mongo_embedded_test.cpp
+    const char* null_argv[1] = {nullptr};
+    ret = mongo::runGlobalInitializers(0, null_argv, nullptr);
+    if (!ret.isOK()) {
+        std::cerr << "Global initilization failed";
+        return EXIT_FAILURE;
+    }
+
+    ret = mongo::runGlobalDeinitializers();
+    if (!ret.isOK()) {
+        std::cerr << "Global deinitilization failed";
+        return EXIT_FAILURE;
+    }
 
     StatusPtr status(mongo_embedded_v1_status_create());
     mongoc_init();

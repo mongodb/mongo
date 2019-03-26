@@ -194,9 +194,12 @@ ServiceContext* initialize(const char* yaml_config) {
 
     Status status = mongo::runGlobalInitializers(yaml_config ? 1 : 0, argv, nullptr);
     uassertStatusOKWithContext(status, "Global initilization failed");
+    auto giGuard = makeGuard([] { mongo::runGlobalDeinitializers().ignore(); });
     setGlobalServiceContext(ServiceContext::make());
 
     Client::initThread("initandlisten");
+    // Make sure current thread have no client set in thread_local when we leave this function
+    auto clientGuard = makeGuard([] { Client::releaseCurrent(); });
 
     initWireSpec();
 
@@ -285,10 +288,11 @@ ServiceContext* initialize(const char* yaml_config) {
         quickExit(EXIT_NEED_DOWNGRADE);
     }
 
-    // Assert that the in-memory featureCompatibilityVersion parameter has been explicitly set. If
-    // we are part of a replica set and are started up with no data files, we do not set the
-    // featureCompatibilityVersion until a primary is chosen. For this case, we expect the in-memory
-    // featureCompatibilityVersion parameter to still be uninitialized until after startup.
+    // Assert that the in-memory featureCompatibilityVersion parameter has been explicitly set.
+    // If we are part of a replica set and are started up with no data files, we do not set the
+    // featureCompatibilityVersion until a primary is chosen. For this case, we expect the
+    // in-memory featureCompatibilityVersion parameter to still be uninitialized until after
+    // startup.
     if (canCallFCVSetIfCleanStartup) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
@@ -309,10 +313,10 @@ ServiceContext* initialize(const char* yaml_config) {
     // operation context anymore
     startupOpCtx.reset();
 
-    // Make sure current thread have no client set in thread_local
-    Client::releaseCurrent();
-
     serviceContext->notifyStartupComplete();
+
+    // Init succeeded, no need for global deinit.
+    giGuard.dismiss();
 
     return serviceContext;
 }
