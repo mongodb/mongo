@@ -18,10 +18,6 @@ selector:
   # TODO SERVER-40068: Attempting to kill a session while multiple transactions have been started on
   # the server may lead to deadlock.
   - jstests/core/txns/kill_sessions_kills_transaction.js
-  exclude_with_any_tags:
-  # TODO SERVER-39444: Exclude prepared transactions until they are supported with the new multiple
-  # transactions oplog entry format.
-  - uses_prepare_transaction
 
 executor:
   archive:
