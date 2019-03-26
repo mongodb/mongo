@@ -44,7 +44,7 @@ public:
 
     // This is used by the Mobile SE and allows users to set the value
     // passed to SQLite's PRAGMA synchronous command
-    std::int32_t mobileDurabilityLevel;
+    std::uint32_t mobileDurabilityLevel;
 };
 
 extern MobileGlobalOptions mobileGlobalOptions;

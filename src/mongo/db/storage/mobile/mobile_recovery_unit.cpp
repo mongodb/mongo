@@ -34,8 +34,10 @@
 
 #include <string>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/mobile/mobile_global_options.h"
 #include "mongo/db/storage/mobile/mobile_recovery_unit.h"
 #include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
 #include "mongo/db/storage/mobile/mobile_util.h"
@@ -125,6 +127,41 @@ void MobileRecoveryUnit::abortUnitOfWork() {
 
     _inUnitOfWork = false;
     _abort();
+}
+
+bool MobileRecoveryUnit::waitUntilDurable() {
+    // This is going to be slow as we're taking a global X lock and doing a full checkpoint. This
+    // should not be needed to do on Android or iOS if we are on WAL and synchronous=NORMAL which
+    // are our default settings. The system will make sure any non-flushed writes will not be lost
+    // before going down but our powercycle test bench require it. Therefore make sure embedded does
+    // not call this (by disabling writeConcern j:true) but allow it when this is used inside
+    // mongod.
+    if (mobileGlobalOptions.mobileDurabilityLevel < 2) {
+        OperationContext* opCtx = Client::getCurrent()->getOperationContext();
+        _ensureSession(opCtx);
+        RECOVERY_UNIT_TRACE() << "waitUntilDurable called, attempting to perform a checkpoint";
+        int framesInWAL = 0;
+        int checkpointedFrames = 0;
+        int ret;
+        {
+            Lock::GlobalLock lk(opCtx, MODE_X);
+            // Use FULL mode to guarantee durability
+            ret = sqlite3_wal_checkpoint_v2(_session.get()->getSession(),
+                                            NULL,
+                                            SQLITE_CHECKPOINT_FULL,
+                                            &framesInWAL,
+                                            &checkpointedFrames);
+        }
+        embedded::checkStatus(ret, SQLITE_OK, "sqlite3_wal_checkpoint_v2");
+        fassert(51164,
+                framesInWAL != -1 && checkpointedFrames != -1 && framesInWAL == checkpointedFrames);
+        RECOVERY_UNIT_TRACE() << "Checkpointed " << checkpointedFrames << " of the " << framesInWAL
+                              << " total frames in the WAL";
+    } else {
+        RECOVERY_UNIT_TRACE() << "No checkpoint attempted -- in full synchronous mode";
+    }
+
+    return true;
 }
 
 void MobileRecoveryUnit::abandonSnapshot() {
@@ -223,4 +260,4 @@ void MobileRecoveryUnit::_txnClose(bool commit) {
 void MobileRecoveryUnit::enqueueFailedDrop(std::string& dropQuery) {
     _sessionPool->failedDropsQueue.enqueueOp(dropQuery);
 }
-}
+}  // namespace mongo

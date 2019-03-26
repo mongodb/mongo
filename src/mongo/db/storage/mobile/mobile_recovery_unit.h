@@ -55,10 +55,7 @@ public:
     void beginUnitOfWork(OperationContext* opCtx) override;
     void commitUnitOfWork() override;
     void abortUnitOfWork() override;
-
-    bool waitUntilDurable() override {
-        return true;
-    }
+    bool waitUntilDurable() override;
 
     void abandonSnapshot() override;
 

@@ -1,5 +1,5 @@
 //
-// @tags: [SERVER-32709]
+// @tags: [SERVER-40561]
 //
 
 t = db.geo_polygon4;

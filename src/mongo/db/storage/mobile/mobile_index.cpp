@@ -105,8 +105,8 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
         session = MobileRecoveryUnit::get(opCtx)->getSessionNoTxn(opCtx);
     }
 
-    std::string insertQuery = "INSERT INTO \"" + _ident + "\" (key, value) VALUES (?, ?);";
-    SqliteStatement insertStmt(*session, insertQuery);
+    SqliteStatement insertStmt(
+        *session, "INSERT INTO \"", _ident, "\" (key, value) VALUES (?, ?);");
 
     insertStmt.bindBlob(0, key.getBuffer(), key.getSize());
     insertStmt.bindBlob(1, value.getBuffer(), value.getSize());
@@ -126,7 +126,7 @@ Status MobileIndex::doInsert(OperationContext* opCtx,
             return Status::OK();
         }
     }
-    checkStatus(status, SQLITE_DONE, "sqlite3_step");
+    embedded::checkStatus(status, SQLITE_DONE, "sqlite3_step");
 
     return Status::OK();
 }
@@ -144,13 +144,8 @@ void MobileIndex::unindex(OperationContext* opCtx,
 void MobileIndex::_doDelete(OperationContext* opCtx, const KeyString& key, KeyString* value) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
 
-    str::stream deleteQuery;
-    deleteQuery << "DELETE FROM \"" << _ident << "\" WHERE key = ?";
-    if (value) {
-        deleteQuery << " AND value = ?";
-    }
-    deleteQuery << ";";
-    SqliteStatement deleteStmt(*session, deleteQuery);
+    SqliteStatement deleteStmt(
+        *session, "DELETE FROM \"", _ident, "\" WHERE key = ?", value ? " AND value = ?" : "", ";");
 
     deleteStmt.bindBlob(0, key.getBuffer(), key.getSize());
     if (value) {
@@ -166,7 +161,7 @@ void MobileIndex::fullValidate(OperationContext* opCtx,
                                long long* numKeysOut,
                                ValidateResults* fullResults) const {
     if (fullResults) {
-        doValidate(opCtx, fullResults);
+        embedded::doValidate(opCtx, fullResults);
         if (!fullResults->valid) {
             return;
         }
@@ -188,10 +183,11 @@ long long MobileIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     // Sum the number of bytes in each column.
     // SQLite aggregate functions return null if the column is empty or has only nulls, so return 0
     // bytes if there is no data in the column.
-    str::stream sizeQuery;
-    sizeQuery << "SELECT IFNULL(SUM(LENGTH(key)), 0) + "
-              << "IFNULL(SUM(LENGTH(value)), 0) FROM \"" << _ident + "\";";
-    SqliteStatement sizeStmt(*session, sizeQuery);
+    SqliteStatement sizeStmt(*session,
+                             "SELECT IFNULL(SUM(LENGTH(key)), 0) + ",
+                             "IFNULL(SUM(LENGTH(value)), 0) FROM \"",
+                             _ident,
+                             "\";");
 
     sizeStmt.step(SQLITE_ROW);
 
@@ -201,8 +197,8 @@ long long MobileIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
 
 long long MobileIndex::numEntries(OperationContext* opCtx) const {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string countQuery = "SELECT COUNT(*) FROM \"" + _ident + "\";";
-    SqliteStatement countStmt(*session, countQuery);
+
+    SqliteStatement countStmt(*session, "SELECT COUNT(*) FROM \"", _ident, "\";");
 
     countStmt.step(SQLITE_ROW);
     long long numRecs = countStmt.getColInt(0);
@@ -211,14 +207,14 @@ long long MobileIndex::numEntries(OperationContext* opCtx) const {
 
 bool MobileIndex::isEmpty(OperationContext* opCtx) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string emptyCheckQuery = "SELECT * FROM \"" + _ident + "\" LIMIT 1;";
-    SqliteStatement emptyCheckStmt(*session, emptyCheckQuery);
+
+    SqliteStatement emptyCheckStmt(*session, "SELECT * FROM \"", _ident, "\" LIMIT 1;");
 
     int status = emptyCheckStmt.step();
     if (status == SQLITE_DONE) {
         return true;
     }
-    checkStatus(status, SQLITE_ROW, "sqlite3_step");
+    embedded::checkStatus(status, SQLITE_ROW, "sqlite3_step");
     return false;
 }
 
@@ -229,9 +225,9 @@ Status MobileIndex::initAsEmpty(OperationContext* opCtx) {
 
 Status MobileIndex::create(OperationContext* opCtx, const std::string& ident) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSessionNoTxn(opCtx);
-    std::string createTableQuery =
-        "CREATE TABLE \"" + ident + "\"(key BLOB PRIMARY KEY, value BLOB);";
-    SqliteStatement createTableStmt(*session, createTableQuery.c_str());
+
+    SqliteStatement createTableStmt(
+        *session, "CREATE TABLE \"", ident, "\"(key BLOB PRIMARY KEY, value BLOB);");
 
     createTableStmt.step(SQLITE_DONE);
     return Status::OK();
@@ -250,8 +246,7 @@ Status MobileIndex::dupKeyCheck(OperationContext* opCtx,
 
 bool MobileIndex::_isDup(OperationContext* opCtx, const BSONObj& key, RecordId recId) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string dupCheckQuery = "SELECT value FROM \"" + _ident + "\" WHERE key = ?;";
-    SqliteStatement dupCheckStmt(*session, dupCheckQuery);
+    SqliteStatement dupCheckStmt(*session, "SELECT value FROM \"", _ident, "\" WHERE key = ?;");
 
     KeyString keyStr(_keyStringVersion, key, _ordering);
 
@@ -273,7 +268,7 @@ bool MobileIndex::_isDup(OperationContext* opCtx, const BSONObj& key, RecordId r
             return false;
         }
     }
-    checkStatus(status, SQLITE_DONE, "sqlite3_step");
+    embedded::checkStatus(status, SQLITE_DONE, "sqlite3_step");
 
     return isEntryFound;
 }
@@ -401,11 +396,15 @@ public:
           _savedTypeBits(index.getKeyStringVersion()),
           _startPosition(index.getKeyStringVersion()) {
         MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-        str::stream cursorQuery;
-        cursorQuery << "SELECT key, value FROM \"" << _index.getIdent() << "\" WHERE key ";
-        cursorQuery << (_isForward ? ">=" : "<=") << " ? ORDER BY key ";
-        cursorQuery << (_isForward ? "ASC" : "DESC") << ";";
-        _stmt = stdx::make_unique<SqliteStatement>(*session, cursorQuery);
+
+        _stmt = stdx::make_unique<SqliteStatement>(*session,
+                                                   "SELECT key, value FROM \"",
+                                                   _index.getIdent(),
+                                                   "\" WHERE key ",
+                                                   (_isForward ? ">=" : "<="),
+                                                   " ? ORDER BY key ",
+                                                   (_isForward ? "ASC" : "DESC"),
+                                                   ";");
     }
 
     virtual ~CursorBase() {}
@@ -515,7 +514,7 @@ protected:
             _isEOF = true;
             return;
         }
-        checkStatus(status, SQLITE_ROW, "sqlite3_step");
+        embedded::checkStatus(status, SQLITE_ROW, "sqlite3_step");
 
         _isEOF = false;
 

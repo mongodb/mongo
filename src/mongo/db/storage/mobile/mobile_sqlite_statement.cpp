@@ -43,24 +43,20 @@
 #include "mongo/util/scopeguard.h"
 
 #define SQLITE_STMT_TRACE() LOG(MOBILE_TRACE_LEVEL) << "MobileSE: SQLite Stmt ID:" << _id << " "
+#define SQLITE_STMT_TRACE_ENABLED()                 \
+    (::mongo::logger::globalLogDomain()->shouldLog( \
+        MongoLogDefaultComponent_component,         \
+        ::mongo::LogstreamBuilder::severityCast(MOBILE_TRACE_LEVEL)))
 
 namespace mongo {
 
 AtomicInt64 SqliteStatement::_nextID(0);
 
-SqliteStatement::SqliteStatement(const MobileSession& session, const std::string& sqlQuery) {
-    // Increment the global instance count and assign this instance an id.
-    _id = _nextID.addAndFetch(1);
-    _sqlQuery = sqlQuery;
-
-    prepare(session);
-}
-
 void SqliteStatement::finalize() {
     if (!_stmt) {
         return;
     }
-    SQLITE_STMT_TRACE() << "Finalize: " << _sqlQuery;
+    SQLITE_STMT_TRACE() << "Finalize: " << _sqlQuery.data();
 
     int status = sqlite3_finalize(_stmt);
     fassert(37053, status == _exceptionStatus);
@@ -68,16 +64,16 @@ void SqliteStatement::finalize() {
 }
 
 void SqliteStatement::prepare(const MobileSession& session) {
-    SQLITE_STMT_TRACE() << "Preparing: " << _sqlQuery;
+    SQLITE_STMT_TRACE() << "Preparing: " << _sqlQuery.data();
 
-    int status = sqlite3_prepare_v2(
-        session.getSession(), _sqlQuery.c_str(), _sqlQuery.length() + 1, &_stmt, NULL);
+    int status =
+        sqlite3_prepare_v2(session.getSession(), _sqlQuery.data(), _sqlQuery.size(), &_stmt, NULL);
     if (status == SQLITE_BUSY) {
         SQLITE_STMT_TRACE() << "Throwing writeConflictException, "
-                            << "SQLITE_BUSY while preparing: " << _sqlQuery;
+                            << "SQLITE_BUSY while preparing: " << _sqlQuery.data();
         throw WriteConflictException();
     } else if (status != SQLITE_OK) {
-        SQLITE_STMT_TRACE() << "Error while preparing: " << _sqlQuery;
+        SQLITE_STMT_TRACE() << "Error while preparing: " << _sqlQuery.data();
         std::string errMsg = "sqlite3_prepare_v2 failed: ";
         errMsg += sqlite3_errstr(status);
         uasserted(ErrorCodes::UnknownError, errMsg);
@@ -86,29 +82,35 @@ void SqliteStatement::prepare(const MobileSession& session) {
 
 SqliteStatement::~SqliteStatement() {
     finalize();
+
+    static_assert(
+        sizeof(SqliteStatement) ==
+            sizeof(std::aligned_storage_t<sizeof(SqliteStatement), alignof(SqliteStatement)>),
+        "expected size to be exactly its aligned storage size to not waste memory, "
+        "adjust kMaxFixedSize to make this true");
 }
 
 void SqliteStatement::bindInt(int paramIndex, int64_t intValue) {
     // SQLite bind methods begin paramater indexes at 1 rather than 0.
     int status = sqlite3_bind_int64(_stmt, paramIndex + 1, intValue);
-    checkStatus(status, SQLITE_OK, "sqlite3_bind");
+    embedded::checkStatus(status, SQLITE_OK, "sqlite3_bind");
 }
 
 void SqliteStatement::bindBlob(int paramIndex, const void* data, int len) {
     // SQLite bind methods begin paramater indexes at 1 rather than 0.
     int status = sqlite3_bind_blob(_stmt, paramIndex + 1, data, len, SQLITE_STATIC);
-    checkStatus(status, SQLITE_OK, "sqlite3_bind");
+    embedded::checkStatus(status, SQLITE_OK, "sqlite3_bind");
 }
 
 void SqliteStatement::bindText(int paramIndex, const char* data, int len) {
     // SQLite bind methods begin paramater indexes at 1 rather than 0.
     int status = sqlite3_bind_text(_stmt, paramIndex + 1, data, len, SQLITE_STATIC);
-    checkStatus(status, SQLITE_OK, "sqlite3_bind");
+    embedded::checkStatus(status, SQLITE_OK, "sqlite3_bind");
 }
 
 void SqliteStatement::clearBindings() {
     int status = sqlite3_clear_bindings(_stmt);
-    checkStatus(status, SQLITE_OK, "sqlite3_clear_bindings");
+    embedded::checkStatus(status, SQLITE_OK, "sqlite3_clear_bindings");
 }
 
 int SqliteStatement::step(int desiredStatus) {
@@ -117,12 +119,15 @@ int SqliteStatement::step(int desiredStatus) {
     // A non-negative desiredStatus indicates that checkStatus should assert that the returned
     // status is equivalent to the desired status.
     if (desiredStatus >= 0) {
-        checkStatus(status, desiredStatus, "sqlite3_step");
+        embedded::checkStatus(status, desiredStatus, "sqlite3_step");
     }
 
-    char* full_stmt = sqlite3_expanded_sql(_stmt);
-    SQLITE_STMT_TRACE() << sqliteStatusToStr(status) << " - on stepping: " << full_stmt;
-    sqlite3_free(full_stmt);
+    if (SQLITE_STMT_TRACE_ENABLED()) {
+        char* full_stmt = sqlite3_expanded_sql(_stmt);
+        SQLITE_STMT_TRACE() << embedded::sqliteStatusToStr(status)
+                            << " - on stepping: " << full_stmt;
+        sqlite3_free(full_stmt);
+    }
 
     return status;
 }
@@ -143,11 +148,11 @@ const void* SqliteStatement::getColText(int colIndex) {
     return sqlite3_column_text(_stmt, colIndex);
 }
 
-void SqliteStatement::execQuery(MobileSession* session, const std::string& query) {
+void SqliteStatement::_execQuery(sqlite3* session, const char* query) {
     LOG(MOBILE_TRACE_LEVEL) << "MobileSE: SQLite sqlite3_exec: " << query;
 
     char* errMsg = NULL;
-    int status = sqlite3_exec(session->getSession(), query.c_str(), NULL, NULL, &errMsg);
+    int status = sqlite3_exec(session, query, NULL, NULL, &errMsg);
 
     if (status == SQLITE_BUSY || status == SQLITE_LOCKED) {
         LOG(MOBILE_TRACE_LEVEL) << "MobileSE: " << (status == SQLITE_BUSY ? "Busy" : "Locked")
@@ -156,7 +161,7 @@ void SqliteStatement::execQuery(MobileSession* session, const std::string& query
     }
 
     // The only return value from sqlite3_exec in a success case is SQLITE_OK.
-    checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
+    embedded::checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
 
     // When the error message is not NULL, it is allocated through sqlite3_malloc and must be freed
     // before exiting the method. If the error message is NULL, sqlite3_free is a no-op.
@@ -165,7 +170,7 @@ void SqliteStatement::execQuery(MobileSession* session, const std::string& query
 
 void SqliteStatement::reset() {
     int status = sqlite3_reset(_stmt);
-    checkStatus(status, SQLITE_OK, "sqlite3_reset");
+    embedded::checkStatus(status, SQLITE_OK, "sqlite3_reset");
 }
 
 }  // namespace mongo

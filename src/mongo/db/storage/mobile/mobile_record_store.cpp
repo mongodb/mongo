@@ -63,13 +63,17 @@ public:
            bool forward)
         : _opCtx(opCtx), _forward(forward) {
 
-        str::stream cursorQuery;
-        cursorQuery << "SELECT rec_id, data from \"" << ident << "\" "
-                    << "WHERE rec_id " << (forward ? '>' : '<') << " ? "
-                    << "ORDER BY rec_id " << (forward ? "ASC" : "DESC") << ';';
-
         MobileSession* session = MobileRecoveryUnit::get(_opCtx)->getSession(_opCtx);
-        _stmt = stdx::make_unique<SqliteStatement>(*session, cursorQuery);
+        _stmt = stdx::make_unique<SqliteStatement>(*session,
+                                                   "SELECT rec_id, data from \"",
+                                                   ident,
+                                                   "\" ",
+                                                   "WHERE rec_id ",
+                                                   (forward ? ">" : "<"),
+                                                   " ? ",
+                                                   "ORDER BY rec_id ",
+                                                   (forward ? "ASC" : "DESC"),
+                                                   ";");
 
         _startIdNum = (forward ? RecordId::min().repr() : RecordId::max().repr());
         _savedId = RecordId(_startIdNum);
@@ -91,7 +95,7 @@ public:
         }
 
         // Checks no error was thrown and that step retrieved a row.
-        checkStatus(status, SQLITE_ROW, "_stmt->step() in MobileCursor's next");
+        embedded::checkStatus(status, SQLITE_ROW, "_stmt->step() in MobileCursor's next");
 
         long long recId = _stmt->getColInt(0);
         const void* data = _stmt->getColBlob(1);
@@ -192,8 +196,7 @@ MobileRecordStore::MobileRecordStore(OperationContext* opCtx,
 
     // Determines the nextId to be used for a new record.
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string maxRecIdQuery = "SELECT IFNULL(MAX(rec_id), 0) FROM \"" + _ident + "\";";
-    SqliteStatement maxRecIdStmt(*session, maxRecIdQuery);
+    SqliteStatement maxRecIdStmt(*session, "SELECT IFNULL(MAX(rec_id), 0) FROM \"", _ident, "\";");
 
     maxRecIdStmt.step(SQLITE_ROW);
 
@@ -215,8 +218,8 @@ void MobileRecordStore::_initDataSizeIfNeeded_inlock(OperationContext* opCtx) co
     }
 
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string dataSizeQuery = "SELECT IFNULL(SUM(LENGTH(data)), 0) FROM \"" + _ident + "\";";
-    SqliteStatement dataSizeStmt(*session, dataSizeQuery);
+    SqliteStatement dataSizeStmt(
+        *session, "SELECT IFNULL(SUM(LENGTH(data)), 0) FROM \"", _ident, "\";");
 
     dataSizeStmt.step(SQLITE_ROW);
     int64_t dataSize = dataSizeStmt.getColInt(0);
@@ -237,8 +240,7 @@ void MobileRecordStore::_initNumRecsIfNeeded_inlock(OperationContext* opCtx) con
     }
 
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string numRecordsQuery = "SELECT COUNT(*) FROM \"" + _ident + "\";";
-    SqliteStatement numRecordsStmt(*session, numRecordsQuery);
+    SqliteStatement numRecordsStmt(*session, "SELECT COUNT(*) FROM \"", _ident, "\";");
 
     numRecordsStmt.step(SQLITE_ROW);
 
@@ -265,8 +267,7 @@ bool MobileRecordStore::findRecord(OperationContext* opCtx,
                                    const RecordId& recId,
                                    RecordData* rd) const {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string sqlQuery = "SELECT data FROM \"" + _ident + "\" WHERE rec_id = ?;";
-    SqliteStatement stmt(*session, sqlQuery);
+    SqliteStatement stmt(*session, "SELECT data FROM \"", _ident, "\" WHERE rec_id = ?;");
 
     stmt.bindInt(0, recId.repr());
 
@@ -274,7 +275,7 @@ bool MobileRecordStore::findRecord(OperationContext* opCtx,
     if (status == SQLITE_DONE) {
         return false;
     }
-    checkStatus(status, SQLITE_ROW, "sqlite3_step");
+    embedded::checkStatus(status, SQLITE_ROW, "sqlite3_step");
 
     const void* recData = stmt.getColBlob(0);
     int nBytes = stmt.getColBytes(0);
@@ -284,9 +285,9 @@ bool MobileRecordStore::findRecord(OperationContext* opCtx,
 
 void MobileRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& recId) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
-    std::string dataSizeQuery =
-        "SELECT IFNULL(LENGTH(data), 0) FROM \"" + _ident + "\" WHERE rec_id = ?;";
-    SqliteStatement dataSizeStmt(*session, dataSizeQuery);
+
+    SqliteStatement dataSizeStmt(
+        *session, "SELECT IFNULL(LENGTH(data), 0) FROM \"", _ident, "\" WHERE rec_id = ?;");
     dataSizeStmt.bindInt(0, recId.repr());
     dataSizeStmt.step(SQLITE_ROW);
 
@@ -294,8 +295,7 @@ void MobileRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& re
     _changeNumRecs(opCtx, -1);
     _changeDataSize(opCtx, -dataSizeBefore);
 
-    std::string deleteQuery = "DELETE FROM \"" + _ident + "\" WHERE rec_id = ?;";
-    SqliteStatement deleteStmt(*session, deleteQuery);
+    SqliteStatement deleteStmt(*session, "DELETE FROM \"", _ident, "\" WHERE rec_id = ?;");
     deleteStmt.bindInt(0, recId.repr());
     deleteStmt.step(SQLITE_DONE);
 }
@@ -308,9 +308,8 @@ StatusWith<RecordId> MobileRecordStore::insertRecord(
     _changeNumRecs(opCtx, 1);
     _changeDataSize(opCtx, len);
 
-    std::string insertQuery =
-        "INSERT OR REPLACE INTO \"" + _ident + "\"(rec_id, data) VALUES(?, ?);";
-    SqliteStatement insertStmt(*session, insertQuery);
+    SqliteStatement insertStmt(
+        *session, "INSERT OR REPLACE INTO \"", _ident, "\"(rec_id, data) VALUES(?, ?);");
     RecordId recId = _nextId();
     insertStmt.bindInt(0, recId.repr());
     insertStmt.bindBlob(1, data, len);
@@ -350,9 +349,9 @@ Status MobileRecordStore::updateRecord(OperationContext* opCtx,
                                        bool enforceQuota,
                                        UpdateNotifier* notifier) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx, false);
-    std::string dataSizeQuery =
-        "SELECT IFNULL(LENGTH(data), 0) FROM \"" + _ident + "\" WHERE rec_id = ?;";
-    SqliteStatement dataSizeStmt(*session, dataSizeQuery);
+
+    SqliteStatement dataSizeStmt(
+        *session, "SELECT IFNULL(LENGTH(data), 0) FROM \"", _ident, "\" WHERE rec_id = ?;");
     dataSizeStmt.bindInt(0, recId.repr());
     dataSizeStmt.step(SQLITE_ROW);
 
@@ -363,8 +362,7 @@ Status MobileRecordStore::updateRecord(OperationContext* opCtx,
         fassert(37054, notifier->recordStoreGoingToUpdateInPlace(opCtx, recId));
     }
 
-    std::string updateQuery = "UPDATE \"" + _ident + "\" SET data = ? " + "WHERE rec_id = ?;";
-    SqliteStatement updateStmt(*session, updateQuery);
+    SqliteStatement updateStmt(*session, "UPDATE \"", _ident, "\" SET data = ? WHERE rec_id = ?;");
     updateStmt.bindBlob(0, data, len);
     updateStmt.bindInt(1, recId.repr());
     updateStmt.step(SQLITE_DONE);
@@ -403,8 +401,7 @@ Status MobileRecordStore::truncate(OperationContext* opCtx) {
     int64_t dataSizeBefore = dataSize(opCtx);
     _changeDataSize(opCtx, -dataSizeBefore);
 
-    std::string deleteForTruncateQuery = "DELETE FROM \"" + _ident + "\";";
-    SqliteStatement::execQuery(session, deleteForTruncateQuery);
+    SqliteStatement::execQuery(session, "DELETE FROM \"", _ident, "\";");
 
     return Status::OK();
 }
@@ -419,7 +416,7 @@ Status MobileRecordStore::validate(OperationContext* opCtx,
                                    ValidateResults* results,
                                    BSONObjBuilder* output) {
     if (level == kValidateFull) {
-        doValidate(opCtx, results);
+        embedded::doValidate(opCtx, results);
     }
 
     if (!results->valid) {
@@ -429,8 +426,7 @@ Status MobileRecordStore::validate(OperationContext* opCtx,
 
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
     try {
-        std::string selectQuery = "SELECT rec_id, data FROM \"" + _ident + "\";";
-        SqliteStatement selectStmt(*session, selectQuery);
+        SqliteStatement selectStmt(*session, "SELECT rec_id, data FROM \"", _ident, "\";");
 
         int interruptInterval = 4096;
         long long actualNumRecs = 0;
@@ -459,7 +455,7 @@ Status MobileRecordStore::validate(OperationContext* opCtx,
             if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
                 if (results->valid) {
                     std::string errMsg = "detected one or more invalid documents";
-                    validateLogAndAppendError(results, errMsg);
+                    embedded::validateLogAndAppendError(results, errMsg);
                 }
 
                 ++numInvalidRecs;
@@ -470,7 +466,7 @@ Status MobileRecordStore::validate(OperationContext* opCtx,
         if (status == SQLITE_CORRUPT) {
             uasserted(ErrorCodes::UnknownError, sqlite3_errstr(status));
         }
-        checkStatus(status, SQLITE_DONE, "sqlite3_step");
+        embedded::checkStatus(status, SQLITE_DONE, "sqlite3_step");
 
         // Verify that _numRecs and _dataSize are accurate.
         int64_t cachedNumRecs = numRecords(opCtx);
@@ -479,7 +475,7 @@ Status MobileRecordStore::validate(OperationContext* opCtx,
             errMsg << "cached number of records does not match actual number of records - ";
             errMsg << "cached number of records = " << cachedNumRecs << "; ";
             errMsg << "actual number of records = " << actualNumRecs;
-            validateLogAndAppendError(results, errMsg);
+            embedded::validateLogAndAppendError(results, errMsg);
         }
         int64_t cachedDataSize = dataSize(opCtx);
         if (_resetDataSizeIfNeeded(opCtx, actualDataSize)) {
@@ -487,7 +483,7 @@ Status MobileRecordStore::validate(OperationContext* opCtx,
             errMsg << "cached data size does not match actual data size - ";
             errMsg << "cached data size = " << cachedDataSize << "; ";
             errMsg << "actual data size = " << actualDataSize;
-            validateLogAndAppendError(results, errMsg);
+            embedded::validateLogAndAppendError(results, errMsg);
         }
 
         if (level == kValidateFull) {
@@ -497,7 +493,7 @@ Status MobileRecordStore::validate(OperationContext* opCtx,
 
     } catch (const DBException& e) {
         std::string errMsg = "record store is corrupt, could not read documents - " + e.toString();
-        validateLogAndAppendError(results, errMsg);
+        embedded::validateLogAndAppendError(results, errMsg);
     }
 
     return Status::OK();
@@ -609,9 +605,10 @@ boost::optional<RecordId> MobileRecordStore::oplogStartHack(
  */
 void MobileRecordStore::create(OperationContext* opCtx, const std::string& ident) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSessionNoTxn(opCtx);
-    std::string sqlQuery =
-        "CREATE TABLE IF NOT EXISTS \"" + ident + "\"(rec_id INT, data BLOB, PRIMARY KEY(rec_id));";
-    SqliteStatement::execQuery(session, sqlQuery);
+    SqliteStatement::execQuery(session,
+                               "CREATE TABLE IF NOT EXISTS \"",
+                               ident,
+                               "\"(rec_id INT, data BLOB, PRIMARY KEY(rec_id));");
 }
 
 }  // namespace mongo

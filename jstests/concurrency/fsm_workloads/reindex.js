@@ -6,7 +6,7 @@
  * Bulk inserts 1000 documents and builds indexes. Then alternates between reindexing and querying
  * against the collection. Operates on a separate collection for each thread.
  *
- * @tags: [SERVER-32709]
+ * @tags: [SERVER-40561]
  */
 
 var $config = (function() {

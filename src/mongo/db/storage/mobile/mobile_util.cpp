@@ -35,11 +35,13 @@
 
 #include <sqlite3.h>
 
+#include "mongo/db/storage/mobile/mobile_global_options.h"
 #include "mongo/db/storage/mobile/mobile_recovery_unit.h"
 #include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
 #include "mongo/db/storage/mobile/mobile_util.h"
 
 namespace mongo {
+namespace embedded {
 
 using std::string;
 
@@ -152,9 +154,8 @@ void validateLogAndAppendError(ValidateResults* results, const std::string& errM
 
 void doValidate(OperationContext* opCtx, ValidateResults* results) {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string validateQuery = "PRAGMA integrity_check;";
     try {
-        SqliteStatement validateStmt(*session, validateQuery);
+        SqliteStatement validateStmt(*session, "PRAGMA integrity_check;");
 
         int status;
         // By default, the integrity check returns the first 100 errors found.
@@ -182,4 +183,31 @@ void doValidate(OperationContext* opCtx, ValidateResults* results) {
     }
 }
 
+void configureSession(sqlite3* session) {
+    auto executePragma = [session](auto pragma, auto value) {
+        SqliteStatement::execQuery(session, "PRAGMA ", pragma, " = ", value, ";");
+        LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE session configuration: " << pragma << " = " << value;
+    };
+    // We don't manually use VACUUM so set incremental mode to reclaim space
+    executePragma("auto_vacuum"_sd, "incremental"_sd);
+
+    // Set SQLite in Write-Ahead Logging mode. https://sqlite.org/wal.html
+    executePragma("journal_mode"_sd, "WAL"_sd);
+
+    // synchronous = NORMAL(1) is recommended with WAL, but we allow it to be overriden
+    executePragma("synchronous"_sd, std::to_string(mobileGlobalOptions.mobileDurabilityLevel));
+
+    // Set full fsync on OSX (only supported there) to ensure durability
+    executePragma("fullfsync"_sd, "1"_sd);
+
+    // We just use SQLite as key-value store, so disable foreign keys
+    executePragma("foreign_keys"_sd, "0"_sd);
+
+    // Set some additional internal sizes for this session
+    executePragma("cache_size"_sd, "-10240"_sd);           // 10KB (passed as negative means KB)
+    executePragma("mmap_size"_sd, "52428800"_sd);          // 50MB
+    executePragma("journal_size_limit"_sd, "5242880"_sd);  // 5MB
+}
+
+}  // namespace embedded
 }  // namespace mongo
