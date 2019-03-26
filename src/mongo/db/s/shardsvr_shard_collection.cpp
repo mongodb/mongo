@@ -473,9 +473,14 @@ void shardCollection(OperationContext* opCtx,
     // want to do this for mapReduce.
     if (!fromMapReduce) {
         std::vector<AsyncRequestsSender::Request> requests;
+        std::set<ShardId> initializedShards;
         for (const auto& chunk : initialChunks.chunks) {
-            if (chunk.getShard() == dbPrimaryShardId)
+            const auto& chunkShardId = chunk.getShard();
+            if (chunkShardId == dbPrimaryShardId ||
+                initializedShards.find(chunkShardId) != initializedShards.end()) {
                 continue;
+            }
+
 
             CloneCollectionOptionsFromPrimaryShard cloneCollectionOptionsFromPrimaryShardRequest(
                 nss);
@@ -484,9 +489,11 @@ void shardCollection(OperationContext* opCtx,
             cloneCollectionOptionsFromPrimaryShardRequest.setDbName(nss.db());
 
             requests.emplace_back(
-                chunk.getShard(),
+                chunkShardId,
                 cloneCollectionOptionsFromPrimaryShardRequest.toBSON(
                     BSON("writeConcern" << ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
+
+            initializedShards.emplace(chunkShardId);
         }
 
         if (!requests.empty()) {
@@ -533,15 +540,15 @@ void shardCollection(OperationContext* opCtx,
 
     forceShardFilteringMetadataRefresh(opCtx, nss);
 
-    std::vector<ShardId> shardsRefreshed;
+    std::set<ShardId> shardsRefreshed;
     for (const auto& chunk : initialChunks.chunks) {
-        if ((chunk.getShard() == dbPrimaryShardId) ||
-            std::find(shardsRefreshed.begin(), shardsRefreshed.end(), chunk.getShard()) !=
-                shardsRefreshed.end()) {
+        const auto& chunkShardId = chunk.getShard();
+        if (chunkShardId == dbPrimaryShardId ||
+            shardsRefreshed.find(chunkShardId) != shardsRefreshed.end()) {
             continue;
         }
 
-        auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, chunk.getShard()));
+        auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, chunkShardId));
         auto refreshCmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -551,7 +558,7 @@ void shardCollection(OperationContext* opCtx,
             Shard::RetryPolicy::kIdempotent));
 
         uassertStatusOK(refreshCmdResponse.commandStatus);
-        shardsRefreshed.emplace_back(chunk.getShard());
+        shardsRefreshed.emplace(chunkShardId);
     }
 
     ShardingLogging::get(opCtx)->logChange(
