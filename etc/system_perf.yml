@@ -336,6 +336,18 @@ functions:
         script: |
           ../src/dsi/dsi/run-dsi detect-outliers
     - command: shell.exec
+      type: setup
+      params:
+        working_dir: work
+        script: |
+          set -o verbose
+          filename=rejects.json
+          if [ -s "${filename}" ]; then
+            echo "Rejecting task due to the following outliers:"
+            cat "${filename}"
+            exit 1
+          fi
+    - command: shell.exec
       type: test
       params:
         working_dir: work
