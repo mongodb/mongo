@@ -8,11 +8,11 @@ package layers
 
 import (
 	"bytes"
-	_ "fmt"
-	"github.com/google/gopacket"
 	"net"
 	"reflect"
 	"testing"
+
+	"github.com/google/gopacket"
 )
 
 // Generator: python layers/test_creator.py --layerType=LayerTypeRadioTap --linkType=LinkTypeIEEE80211Radio --name=Dot11%s ~/Downloads/mesh.pcap
@@ -419,7 +419,7 @@ func TestPacketDot11DataIP(t *testing.T) {
 	if p.ErrorLayer() != nil {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
 	}
-	checkLayers(p, []gopacket.LayerType{LayerTypeRadioTap, LayerTypeDot11, LayerTypeDot11Data, LayerTypeLLC, LayerTypeSNAP, LayerTypeIPv4, LayerTypeUDP, gopacket.LayerTypePayload}, t)
+	checkLayers(p, []gopacket.LayerType{LayerTypeRadioTap, LayerTypeDot11, LayerTypeDot11Data, LayerTypeLLC, LayerTypeSNAP, LayerTypeIPv4, LayerTypeUDP, LayerTypeDHCPv4}, t)
 }
 func BenchmarkDecodePacketDot11DataIP(b *testing.B) {
 	for i := 0; i < b.N; i++ {
@@ -464,12 +464,75 @@ func TestPacketP6196(t *testing.T) {
 		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
 	}
 
-	checkLayers(p, []gopacket.LayerType{LayerTypeRadioTap, LayerTypeDot11, LayerTypeDot11WEP}, t)
+	checkLayers(p, []gopacket.LayerType{LayerTypeRadioTap, LayerTypeDot11, LayerTypeDot11DataQOSData, LayerTypeDot11WEP}, t)
 }
 
 func BenchmarkDecodePacketP6196(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		gopacket.NewPacket(testPacketP6196, LinkTypeIEEE80211Radio, gopacket.NoCopy)
+	}
+}
+
+// testPacketDot11HTControl is the packet:
+// 0000   00 00 26 00 2b 48 20 00 bf 70 06 02 00 00 00 00   ..&.+H .¿p......
+// 0010   40 00 78 14 40 01 b8 00 00 00 44 00 00 01 73 00   @.x.@.¸...D...s.
+// 0020   00 00 00 00 00 00 88 c9 30 14 01 02 03 04 05 06   .......É0.ò.Jòs}
+// 0030   11 12 13 14 15 16 21 22 23 24 25 26 c0 bd 00 14   .öP.6:M 2.Á7À½..
+// 0040   0e 28 00 a8 06 01 00 04 e6 73 b3 4a 24 3e 19 ea   .(.¨....æs³J$>.ê
+// 0050   2a b7 1f 3c c7 89 2b 22 e2 2b 28 6c 69 aa 0a ee   *·.<Ç.+"â+(liª.î
+// 0060   1e bc 2d 2a 00 35 68 39 ad 6f 29 52 38 07 ae cf   .¼-*.5h9.o)R8.®Ï
+// 0070   03 e7 0d 53 8b 3c 12 28 52 05 cc 70 be c7 68 5e   .ç.S.<.(R.Ìp¾Çh^
+// 0080   5f b1 06 f4 73 22 63 ef 77 41 7b 86               _±.ôs"cïwA{.
+var testPacketDot11HTControl = []byte{
+	0x00, 0x00, 0x26, 0x00, 0x2b, 0x48, 0x20, 0x00, 0xbf, 0x70, 0x06, 0x02, 0x00, 0x00, 0x00, 0x00,
+	0x40, 0x00, 0x78, 0x14, 0x40, 0x01, 0xb8, 0x00, 0x00, 0x00, 0x44, 0x00, 0x00, 0x01, 0x73, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0xc9, 0x30, 0x14, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+	0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0xc0, 0xbd, 0x00, 0x14,
+	0x0e, 0x28, 0x00, 0xa8, 0x06, 0x01, 0x00, 0x04, 0xe6, 0x73, 0xb3, 0x4a, 0x24, 0x3e, 0x19, 0xea,
+	0x2a, 0xb7, 0x1f, 0x3c, 0xc7, 0x89, 0x2b, 0x22, 0xe2, 0x2b, 0x28, 0x6c, 0x69, 0xaa, 0x0a, 0xee,
+	0x1e, 0xbc, 0x2d, 0x2a, 0x00, 0x35, 0x68, 0x39, 0xad, 0x6f, 0x29, 0x52, 0x38, 0x07, 0xae, 0xcf,
+	0x03, 0xe7, 0x0d, 0x53, 0x8b, 0x3c, 0x12, 0x28, 0x52, 0x05, 0xcc, 0x70, 0xbe, 0xc7, 0x68, 0x5e,
+	0x5f, 0xb1, 0x06, 0xf4, 0x73, 0x22, 0x63, 0xef, 0x77, 0x41, 0x7b, 0x86,
+}
+
+var mfb = uint8(20)
+
+var wantHTControl = Dot11HTControl{
+	ACConstraint: false,
+	RDGMorePPDU:  true,
+	HT: &Dot11HTControlHT{
+		LinkAdapationControl: &Dot11LinkAdapationControl{
+			TRQ:  true,
+			MRQ:  true,
+			MSI:  1,
+			MFSI: 0,
+			ASEL: nil,
+			MFB:  &mfb,
+		},
+		CalibrationPosition: 0,
+		CalibrationSequence: 0,
+		CSISteering:         0,
+		NDPAnnouncement:     false,
+		DEI:                 true,
+	},
+}
+
+func TestPacketDot11HTControl(t *testing.T) {
+	p := gopacket.NewPacket(testPacketDot11HTControl, LinkTypeIEEE80211Radio, gopacket.Default)
+	if p.ErrorLayer() != nil {
+		t.Error("Failed to decode packet:", p.ErrorLayer().Error())
+	}
+
+	checkLayers(p, []gopacket.LayerType{LayerTypeRadioTap, LayerTypeDot11, LayerTypeDot11DataQOSData, LayerTypeDot11WEP}, t)
+
+	ld11 := p.Layer(LayerTypeDot11)
+	if dot11, ok := ld11.(*Dot11); ok {
+		if dot11.HTControl == nil {
+			t.Fatal("Packet didn't contain HTControl")
+		}
+		if !reflect.DeepEqual(*dot11.HTControl, wantHTControl) {
+			t.Errorf("Dot11 packet processing failed:\ngot  :\n%#v\n\nwant :\n%#v\n\n", dot11.HTControl, wantHTControl)
+		}
 	}
 }
 

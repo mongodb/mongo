@@ -13,7 +13,7 @@ github.com/nsf/termbox-go               0723e7c3d0a317dea811f0fbe4d6edd81908c971
 github.com/mattn/go-runewidth           d6bea18f789704b5f83375793155289da36a3c7f
 golang.org/x/crypto                     1f22c0103821b9390939b6776727195525381532    github.com/golang/crypto
 github.com/10gen/llmgo                  f046ecde5b7bcffe73676a98111eab6a77edd803
-github.com/google/gopacket              1b0b78901cdd351ecfc68bf1a2adafcd2ff30220
+github.com/google/gopacket              7edef24d642a09d18efcf1e00a9dc2d4c6342c82
 github.com/patrickmn/go-cache           1881a9bccb818787f68c52bfba648c6cf34c34fa
 github.com/10gen/escaper                17fe61c658dcbdcbf246c783f4f7dc97efde3a8b
 github.com/golang/snappy                d9eb7a3d35ec988b8585d4a0068e462c27d28380

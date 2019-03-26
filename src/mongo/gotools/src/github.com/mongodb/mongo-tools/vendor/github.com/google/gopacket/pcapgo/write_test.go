@@ -8,9 +8,10 @@ package pcapgo
 
 import (
 	"bytes"
-	"github.com/google/gopacket"
 	"testing"
 	"time"
+
+	"github.com/google/gopacket"
 )
 
 func TestWriteHeader(t *testing.T) {
@@ -44,6 +45,23 @@ func TestWritePacket(t *testing.T) {
 	}
 	if got := buf.Bytes(); !bytes.Equal(got, want) {
 		t.Errorf("buf mismatch:\nwant: %+v\ngot:  %+v", want, got)
+	}
+}
+
+func BenchmarkWritePacket(b *testing.B) {
+	b.StopTimer()
+	ci := gopacket.CaptureInfo{
+		Timestamp:     time.Unix(0x01020304, 0xAA*1000),
+		Length:        0xABCD,
+		CaptureLength: 10,
+	}
+	data := []byte{9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
+	var buf bytes.Buffer
+	w := NewWriter(&buf)
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		w.WritePacket(ci, data)
 	}
 }
 

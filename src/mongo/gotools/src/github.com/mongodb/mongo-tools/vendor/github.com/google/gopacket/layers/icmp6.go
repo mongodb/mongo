@@ -9,9 +9,11 @@ package layers
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
-	"github.com/google/gopacket"
 	"reflect"
+
+	"github.com/google/gopacket"
 )
 
 const (
@@ -22,12 +24,41 @@ const (
 	ICMPv6TypeParameterProblem       = 4
 	ICMPv6TypeEchoRequest            = 128
 	ICMPv6TypeEchoReply              = 129
+
 	// The following are from RFC 4861
 	ICMPv6TypeRouterSolicitation    = 133
 	ICMPv6TypeRouterAdvertisement   = 134
 	ICMPv6TypeNeighborSolicitation  = 135
 	ICMPv6TypeNeighborAdvertisement = 136
 	ICMPv6TypeRedirect              = 137
+
+	// The following are from RFC 2710
+	ICMPv6TypeMLDv1MulticastListenerQueryMessage  = 130
+	ICMPv6TypeMLDv1MulticastListenerReportMessage = 131
+	ICMPv6TypeMLDv1MulticastListenerDoneMessage   = 132
+
+	// The following are from RFC 3810
+	ICMPv6TypeMLDv2MulticastListenerReportMessageV2 = 143
+)
+
+const (
+	// DestinationUnreachable
+	ICMPv6CodeNoRouteToDst           = 0
+	ICMPv6CodeAdminProhibited        = 1
+	ICMPv6CodeBeyondScopeOfSrc       = 2
+	ICMPv6CodeAddressUnreachable     = 3
+	ICMPv6CodePortUnreachable        = 4
+	ICMPv6CodeSrcAddressFailedPolicy = 5
+	ICMPv6CodeRejectRouteToDst       = 6
+
+	// TimeExceeded
+	ICMPv6CodeHopLimitExceeded               = 0
+	ICMPv6CodeFragmentReassemblyTimeExceeded = 1
+
+	// ParameterProblem
+	ICMPv6CodeErroneousHeaderField   = 0
+	ICMPv6CodeUnrecognizedNextHeader = 1
+	ICMPv6CodeUnrecognizedIPv6Option = 2
 )
 
 type icmpv6TypeCodeInfoStruct struct {
@@ -37,52 +68,52 @@ type icmpv6TypeCodeInfoStruct struct {
 
 var (
 	icmpv6TypeCodeInfo = map[uint8]icmpv6TypeCodeInfoStruct{
-		1: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeDestinationUnreachable: icmpv6TypeCodeInfoStruct{
 			"DestinationUnreachable", &map[uint8]string{
-				0: "NoRouteToDst",
-				1: "AdminProhibited",
-				2: "BeyondScopeOfSrc",
-				3: "AddressUnreachable",
-				4: "PortUnreachable",
-				5: "SrcAddressFailedPolicy",
-				6: "RejectRouteToDst",
+				ICMPv6CodeNoRouteToDst:           "NoRouteToDst",
+				ICMPv6CodeAdminProhibited:        "AdminProhibited",
+				ICMPv6CodeBeyondScopeOfSrc:       "BeyondScopeOfSrc",
+				ICMPv6CodeAddressUnreachable:     "AddressUnreachable",
+				ICMPv6CodePortUnreachable:        "PortUnreachable",
+				ICMPv6CodeSrcAddressFailedPolicy: "SrcAddressFailedPolicy",
+				ICMPv6CodeRejectRouteToDst:       "RejectRouteToDst",
 			},
 		},
-		2: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypePacketTooBig: icmpv6TypeCodeInfoStruct{
 			"PacketTooBig", nil,
 		},
-		3: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeTimeExceeded: icmpv6TypeCodeInfoStruct{
 			"TimeExceeded", &map[uint8]string{
-				0: "HopLimitExceeded",
-				1: "FragmentReassemblyTimeExceeded",
+				ICMPv6CodeHopLimitExceeded:               "HopLimitExceeded",
+				ICMPv6CodeFragmentReassemblyTimeExceeded: "FragmentReassemblyTimeExceeded",
 			},
 		},
-		4: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeParameterProblem: icmpv6TypeCodeInfoStruct{
 			"ParameterProblem", &map[uint8]string{
-				0: "ErroneousHeaderField",
-				1: "UnrecognizedNextHeader",
-				2: "UnrecognizedNextHeader",
+				ICMPv6CodeErroneousHeaderField:   "ErroneousHeaderField",
+				ICMPv6CodeUnrecognizedNextHeader: "UnrecognizedNextHeader",
+				ICMPv6CodeUnrecognizedIPv6Option: "UnrecognizedIPv6Option",
 			},
 		},
-		128: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeEchoRequest: icmpv6TypeCodeInfoStruct{
 			"EchoRequest", nil,
 		},
-		129: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeEchoReply: icmpv6TypeCodeInfoStruct{
 			"EchoReply", nil,
 		},
-		133: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeRouterSolicitation: icmpv6TypeCodeInfoStruct{
 			"RouterSolicitation", nil,
 		},
-		134: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeRouterAdvertisement: icmpv6TypeCodeInfoStruct{
 			"RouterAdvertisement", nil,
 		},
-		135: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeNeighborSolicitation: icmpv6TypeCodeInfoStruct{
 			"NeighborSolicitation", nil,
 		},
-		136: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeNeighborAdvertisement: icmpv6TypeCodeInfoStruct{
 			"NeighborAdvertisement", nil,
 		},
-		137: icmpv6TypeCodeInfoStruct{
+		ICMPv6TypeRedirect: icmpv6TypeCodeInfoStruct{
 			"Redirect", nil,
 		},
 	}
@@ -143,8 +174,10 @@ func CreateICMPv6TypeCode(typ uint8, code uint8) ICMPv6TypeCode {
 // ICMPv6 is the layer for IPv6 ICMP packet data
 type ICMPv6 struct {
 	BaseLayer
-	TypeCode  ICMPv6TypeCode
-	Checksum  uint16
+	TypeCode ICMPv6TypeCode
+	Checksum uint16
+	// TypeBytes is deprecated and always nil. See the different ICMPv6 message types
+	// instead (e.g. ICMPv6TypeRouterSolicitation).
 	TypeBytes []byte
 	tcpipchecksum
 }
@@ -154,10 +187,13 @@ func (i *ICMPv6) LayerType() gopacket.LayerType { return LayerTypeICMPv6 }
 
 // DecodeFromBytes decodes the given bytes into this layer.
 func (i *ICMPv6) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	if len(data) < 4 {
+		df.SetTruncated()
+		return errors.New("ICMP layer less then 4 bytes for ICMPv6 packet")
+	}
 	i.TypeCode = CreateICMPv6TypeCode(data[0], data[1])
 	i.Checksum = binary.BigEndian.Uint16(data[2:4])
-	i.TypeBytes = data[4:8]
-	i.BaseLayer = BaseLayer{data[:8], data[8:]}
+	i.BaseLayer = BaseLayer{data[:4], data[4:]}
 	return nil
 }
 
@@ -165,17 +201,12 @@ func (i *ICMPv6) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error 
 // SerializationBuffer, implementing gopacket.SerializableLayer.
 // See the docs for gopacket.SerializableLayer for more info.
 func (i *ICMPv6) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
-	if i.TypeBytes == nil {
-		i.TypeBytes = lotsOfZeros[:4]
-	} else if len(i.TypeBytes) != 4 {
-		return fmt.Errorf("invalid type bytes for ICMPv6 packet: %v", i.TypeBytes)
-	}
-	bytes, err := b.PrependBytes(8)
+	bytes, err := b.PrependBytes(4)
 	if err != nil {
 		return err
 	}
 	i.TypeCode.SerializeTo(bytes)
-	copy(bytes[4:8], i.TypeBytes)
+
 	if opts.ComputeChecksums {
 		bytes[2] = 0
 		bytes[3] = 0
@@ -186,6 +217,7 @@ func (i *ICMPv6) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Serialize
 		i.Checksum = csum
 	}
 	binary.BigEndian.PutUint16(bytes[2:], i.Checksum)
+
 	return nil
 }
 
@@ -196,6 +228,35 @@ func (i *ICMPv6) CanDecode() gopacket.LayerClass {
 
 // NextLayerType returns the layer type contained by this DecodingLayer.
 func (i *ICMPv6) NextLayerType() gopacket.LayerType {
+	switch i.TypeCode.Type() {
+	case ICMPv6TypeEchoRequest:
+		return LayerTypeICMPv6Echo
+	case ICMPv6TypeEchoReply:
+		return LayerTypeICMPv6Echo
+	case ICMPv6TypeRouterSolicitation:
+		return LayerTypeICMPv6RouterSolicitation
+	case ICMPv6TypeRouterAdvertisement:
+		return LayerTypeICMPv6RouterAdvertisement
+	case ICMPv6TypeNeighborSolicitation:
+		return LayerTypeICMPv6NeighborSolicitation
+	case ICMPv6TypeNeighborAdvertisement:
+		return LayerTypeICMPv6NeighborAdvertisement
+	case ICMPv6TypeRedirect:
+		return LayerTypeICMPv6Redirect
+	case ICMPv6TypeMLDv1MulticastListenerQueryMessage: // Same Code for MLDv1 Query and MLDv2 Query
+		if len(i.Payload) > 20 { // Only payload size differs
+			return LayerTypeMLDv2MulticastListenerQuery
+		} else {
+			return LayerTypeMLDv1MulticastListenerQuery
+		}
+	case ICMPv6TypeMLDv1MulticastListenerDoneMessage:
+		return LayerTypeMLDv1MulticastListenerDone
+	case ICMPv6TypeMLDv1MulticastListenerReportMessage:
+		return LayerTypeMLDv1MulticastListenerReport
+	case ICMPv6TypeMLDv2MulticastListenerReportMessageV2:
+		return LayerTypeMLDv2MulticastListenerReport
+	}
+
 	return gopacket.LayerTypePayload
 }
 

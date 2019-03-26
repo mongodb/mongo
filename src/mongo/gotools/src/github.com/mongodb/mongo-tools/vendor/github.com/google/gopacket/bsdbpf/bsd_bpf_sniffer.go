@@ -9,13 +9,14 @@
 package bsdbpf
 
 import (
-	"github.com/google/gopacket"
-	"golang.org/x/sys/unix"
-
+	"errors"
 	"fmt"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/google/gopacket"
+	"golang.org/x/sys/unix"
 )
 
 const wordSize = int(unsafe.Sizeof(uintptr(0)))
@@ -164,13 +165,15 @@ func (b *BPFSniffer) Close() error {
 
 func (b *BPFSniffer) pickBpfDevice() {
 	var err error
+	b.options.BPFDeviceName = ""
 	for i := 0; i < 99; i++ {
 		b.options.BPFDeviceName = fmt.Sprintf("/dev/bpf%d", i)
 		b.fd, err = syscall.Open(b.options.BPFDeviceName, syscall.O_RDWR, 0)
 		if err == nil {
-			break
+			return
 		}
 	}
+	panic("failed to acquire a BPF device for read-write access")
 }
 
 func (b *BPFSniffer) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
@@ -187,6 +190,16 @@ func (b *BPFSniffer) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
 	hdr := (*unix.BpfHdr)(unsafe.Pointer(&b.readBuffer[b.readBytesConsumed]))
 	frameStart := b.readBytesConsumed + int(hdr.Hdrlen)
 	b.readBytesConsumed += bpfWordAlign(int(hdr.Hdrlen) + int(hdr.Caplen))
+
+	if frameStart+int(hdr.Caplen) > len(b.readBuffer) {
+		captureInfo := gopacket.CaptureInfo{
+			Timestamp:     time.Unix(int64(hdr.Tstamp.Sec), int64(hdr.Tstamp.Usec)*1000),
+			CaptureLength: 0,
+			Length:        0,
+		}
+		return nil, captureInfo, errors.New("BPF captured frame received with corrupted BpfHdr struct.")
+	}
+
 	rawFrame := b.readBuffer[frameStart : frameStart+int(hdr.Caplen)]
 	captureInfo := gopacket.CaptureInfo{
 		Timestamp:     time.Unix(int64(hdr.Tstamp.Sec), int64(hdr.Tstamp.Usec)*1000),

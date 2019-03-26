@@ -14,13 +14,15 @@ package layers
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/google/gopacket"
 	"net"
+
+	"github.com/google/gopacket"
 )
 
 // CDPTLVType is the type of each TLV value in a CiscoDiscovery packet.
 type CDPTLVType uint16
 
+// CDPTLVType values.
 const (
 	CDPTLVDevID              CDPTLVType = 0x0001
 	CDPTLVAddress            CDPTLVType = 0x0002
@@ -68,8 +70,10 @@ type CiscoDiscovery struct {
 	Values   []CiscoDiscoveryValue
 }
 
+// CDPCapability is the set of capabilities advertised by a CDP device.
 type CDPCapability uint32
 
+// CDPCapability values.
 const (
 	CDPCapMaskRouter     CDPCapability = 0x0001
 	CDPCapMaskTBBridge   CDPCapability = 0x0002
@@ -95,6 +99,7 @@ type CDPCapabilities struct {
 	RemotelyManaged bool
 }
 
+// CDP Power-over-Ethernet values.
 const (
 	CDPPoEFourWire  byte = 0x01
 	CDPPoEPDArch    byte = 0x02
@@ -102,6 +107,7 @@ const (
 	CDPPoEPSE       byte = 0x08
 )
 
+// CDPSparePairPoE provides information on PoE.
 type CDPSparePairPoE struct {
 	PSEFourWire  bool // Supported / Not supported
 	PDArchShared bool // Shared / Independent
@@ -122,6 +128,7 @@ type CDPPowerDialogue struct {
 	Values []uint32
 }
 
+// CDPLocation provides location information for a CDP device.
 type CDPLocation struct {
 	Type     uint8 // Undocumented
 	Location string
@@ -143,8 +150,10 @@ type CDPHello struct {
 	ManagementVLAN   uint16
 }
 
+// CDPEnergyWiseSubtype is used within CDP to define TLV values.
 type CDPEnergyWiseSubtype uint32
 
+// CDPEnergyWiseSubtype values.
 const (
 	CDPEnergyWiseRole    CDPEnergyWiseSubtype = 0x00000007
 	CDPEnergyWiseDomain  CDPEnergyWiseSubtype = 0x00000008
@@ -152,6 +161,7 @@ const (
 	CDPEnergyWiseReplyTo CDPEnergyWiseSubtype = 0x00000017
 )
 
+// CDPEnergyWise is used by CDP to monitor and control power usage.
 type CDPEnergyWise struct {
 	EncryptedData  []byte
 	Unknown1       uint32
@@ -473,6 +483,7 @@ const (
 	CDPProtocolType802_2 byte = 2
 )
 
+// CDPAddressType is used to define TLV values within CDP addresses.
 type CDPAddressType uint64
 
 // CDP Address types.

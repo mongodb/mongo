@@ -9,8 +9,10 @@ package layers
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
+
 	"github.com/google/gopacket"
 )
 
@@ -32,24 +34,95 @@ type TCP struct {
 	tcpipchecksum
 }
 
+// TCPOptionKind represents a TCP option code.
+type TCPOptionKind uint8
+
+const (
+	TCPOptionKindEndList                         = 0
+	TCPOptionKindNop                             = 1
+	TCPOptionKindMSS                             = 2  // len = 4
+	TCPOptionKindWindowScale                     = 3  // len = 3
+	TCPOptionKindSACKPermitted                   = 4  // len = 2
+	TCPOptionKindSACK                            = 5  // len = n
+	TCPOptionKindEcho                            = 6  // len = 6, obsolete
+	TCPOptionKindEchoReply                       = 7  // len = 6, obsolete
+	TCPOptionKindTimestamps                      = 8  // len = 10
+	TCPOptionKindPartialOrderConnectionPermitted = 9  // len = 2, obsolete
+	TCPOptionKindPartialOrderServiceProfile      = 10 // len = 3, obsolete
+	TCPOptionKindCC                              = 11 // obsolete
+	TCPOptionKindCCNew                           = 12 // obsolete
+	TCPOptionKindCCEcho                          = 13 // obsolete
+	TCPOptionKindAltChecksum                     = 14 // len = 3, obsolete
+	TCPOptionKindAltChecksumData                 = 15 // len = n, obsolete
+)
+
+func (k TCPOptionKind) String() string {
+	switch k {
+	case TCPOptionKindEndList:
+		return "EndList"
+	case TCPOptionKindNop:
+		return "NOP"
+	case TCPOptionKindMSS:
+		return "MSS"
+	case TCPOptionKindWindowScale:
+		return "WindowScale"
+	case TCPOptionKindSACKPermitted:
+		return "SACKPermitted"
+	case TCPOptionKindSACK:
+		return "SACK"
+	case TCPOptionKindEcho:
+		return "Echo"
+	case TCPOptionKindEchoReply:
+		return "EchoReply"
+	case TCPOptionKindTimestamps:
+		return "Timestamps"
+	case TCPOptionKindPartialOrderConnectionPermitted:
+		return "PartialOrderConnectionPermitted"
+	case TCPOptionKindPartialOrderServiceProfile:
+		return "PartialOrderServiceProfile"
+	case TCPOptionKindCC:
+		return "CC"
+	case TCPOptionKindCCNew:
+		return "CCNew"
+	case TCPOptionKindCCEcho:
+		return "CCEcho"
+	case TCPOptionKindAltChecksum:
+		return "AltChecksum"
+	case TCPOptionKindAltChecksumData:
+		return "AltChecksumData"
+	default:
+		return fmt.Sprintf("Unknown(%d)", k)
+	}
+}
+
 type TCPOption struct {
-	OptionType   uint8
+	OptionType   TCPOptionKind
 	OptionLength uint8
 	OptionData   []byte
 }
 
 func (t TCPOption) String() string {
+	hd := hex.EncodeToString(t.OptionData)
+	if len(hd) > 0 {
+		hd = " 0x" + hd
+	}
 	switch t.OptionType {
-	case 1:
-		return "NOP"
-	case 8:
+	case TCPOptionKindMSS:
+		return fmt.Sprintf("TCPOption(%s:%v%s)",
+			t.OptionType,
+			binary.BigEndian.Uint16(t.OptionData),
+			hd)
+
+	case TCPOptionKindTimestamps:
 		if len(t.OptionData) == 8 {
-			return fmt.Sprintf("TSOPT:%v/%v",
+			return fmt.Sprintf("TCPOption(%s:%v/%v%s)",
+				t.OptionType,
 				binary.BigEndian.Uint32(t.OptionData[:4]),
-				binary.BigEndian.Uint32(t.OptionData[4:8]))
+				binary.BigEndian.Uint32(t.OptionData[4:8]),
+				hd)
 		}
 	}
-	return fmt.Sprintf("TCPOption(%v:%v)", t.OptionType, t.OptionData)
+	return fmt.Sprintf("TCPOption(%s:%s)", t.OptionType, hd)
 }
 
 // LayerType returns gopacket.LayerTypeTCP
@@ -69,7 +142,9 @@ func (t *TCP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOpt
 		}
 	}
 	if opts.FixLengths {
-		t.Padding = lotsOfZeros[:optionLength%4]
+		if rem := optionLength % 4; rem != 0 {
+			t.Padding = lotsOfZeros[:4-rem]
+		}
 		t.DataOffset = uint8((len(t.Padding) + optionLength + 20) / 4)
 	}
 	bytes, err := b.PrependBytes(20 + optionLength + len(t.Padding))
@@ -85,7 +160,7 @@ func (t *TCP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOpt
 	binary.BigEndian.PutUint16(bytes[18:], t.Urgent)
 	start := 20
 	for _, o := range t.Options {
-		bytes[start] = o.OptionType
+		bytes[start] = byte(o.OptionType)
 		switch o.OptionType {
 		case 0, 1:
 			start++
@@ -95,7 +170,7 @@ func (t *TCP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOpt
 			}
 			bytes[start+1] = o.OptionLength
 			copy(bytes[start+2:start+len(o.OptionData)+2], o.OptionData)
-			start += int(o.OptionLength)
+			start += len(o.OptionData) + 2
 		}
 	}
 	copy(bytes[start:], t.Padding)
@@ -111,6 +186,10 @@ func (t *TCP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOpt
 	}
 	binary.BigEndian.PutUint16(bytes[16:], t.Checksum)
 	return nil
+}
+
+func (t *TCP) ComputeChecksum() (uint16, error) {
+	return t.computeChecksum(append(t.Contents, t.Payload...), IPProtocolTCP)
 }
 
 func (t *TCP) flagsAndOffset() uint16 {
@@ -146,6 +225,10 @@ func (t *TCP) flagsAndOffset() uint16 {
 }
 
 func (tcp *TCP) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	if len(data) < 20 {
+		df.SetTruncated()
+		return fmt.Errorf("Invalid TCP header. Length %d less than 20", len(data))
+	}
 	tcp.SrcPort = TCPPort(binary.BigEndian.Uint16(data[0:2]))
 	tcp.sPort = data[0:2]
 	tcp.DstPort = TCPPort(binary.BigEndian.Uint16(data[2:4]))
@@ -165,7 +248,12 @@ func (tcp *TCP) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	tcp.Window = binary.BigEndian.Uint16(data[14:16])
 	tcp.Checksum = binary.BigEndian.Uint16(data[16:18])
 	tcp.Urgent = binary.BigEndian.Uint16(data[18:20])
-	tcp.Options = tcp.opts[:0]
+	if tcp.Options == nil {
+		// Pre-allocate to avoid allocating a slice.
+		tcp.Options = tcp.opts[:0]
+	} else {
+		tcp.Options = tcp.Options[:0]
+	}
 	if tcp.DataOffset < 5 {
 		return fmt.Errorf("Invalid TCP data offset %d < 5", tcp.DataOffset)
 	}
@@ -181,24 +269,25 @@ func (tcp *TCP) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	// From here on, data points just to the header options.
 	data = data[20:dataStart]
 	for len(data) > 0 {
-		if tcp.Options == nil {
-			// Pre-allocate to avoid allocating a slice.
-			tcp.Options = tcp.opts[:0]
-		}
-		tcp.Options = append(tcp.Options, TCPOption{OptionType: data[0]})
+		tcp.Options = append(tcp.Options, TCPOption{OptionType: TCPOptionKind(data[0])})
 		opt := &tcp.Options[len(tcp.Options)-1]
 		switch opt.OptionType {
-		case 0: // End of options
+		case TCPOptionKindEndList: // End of options
 			opt.OptionLength = 1
 			tcp.Padding = data[1:]
 			break
-		case 1: // 1 byte padding
+		case TCPOptionKindNop: // 1 byte padding
 			opt.OptionLength = 1
 		default:
+			if len(data) < 2 {
+				df.SetTruncated()
+				return fmt.Errorf("Invalid TCP option length. Length %d less than 2", len(data))
+			}
 			opt.OptionLength = data[1]
 			if opt.OptionLength < 2 {
 				return fmt.Errorf("Invalid TCP option length %d < 2", opt.OptionLength)
 			} else if int(opt.OptionLength) > len(data) {
+				df.SetTruncated()
 				return fmt.Errorf("Invalid TCP option length %d exceeds remaining %d bytes", opt.OptionLength, len(data))
 			}
 			opt.OptionData = data[2:opt.OptionLength]
@@ -213,7 +302,11 @@ func (t *TCP) CanDecode() gopacket.LayerClass {
 }
 
 func (t *TCP) NextLayerType() gopacket.LayerType {
-	return gopacket.LayerTypePayload
+	lt := t.DstPort.LayerType()
+	if lt == gopacket.LayerTypePayload {
+		lt = t.SrcPort.LayerType()
+	}
+	return lt
 }
 
 func decodeTCP(data []byte, p gopacket.PacketBuilder) error {
@@ -224,9 +317,21 @@ func decodeTCP(data []byte, p gopacket.PacketBuilder) error {
 	if err != nil {
 		return err
 	}
-	return p.NextDecoder(gopacket.LayerTypePayload)
+	if p.DecodeOptions().DecodeStreamsAsDatagrams {
+		return p.NextDecoder(tcp.NextLayerType())
+	} else {
+		return p.NextDecoder(gopacket.LayerTypePayload)
+	}
 }
 
 func (t *TCP) TransportFlow() gopacket.Flow {
 	return gopacket.NewFlow(EndpointTCPPort, t.sPort, t.dPort)
+}
+
+// For testing only
+func (t *TCP) SetInternalPortsForTesting() {
+	t.sPort = make([]byte, 2)
+	t.dPort = make([]byte, 2)
+	binary.BigEndian.PutUint16(t.sPort, uint16(t.SrcPort))
+	binary.BigEndian.PutUint16(t.dPort, uint16(t.DstPort))
 }

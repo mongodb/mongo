@@ -23,6 +23,12 @@ func init() {
 		layers.NewIPEndpoint(net.IP{5, 6, 7, 8}))
 }
 
+func TestSequenceOverflow(t *testing.T) {
+	if want, got := 20, Sequence((1<<32)-10).Difference(Sequence(10)); want != got {
+		t.Errorf("overflow diff failure: got %d want %d", got, want)
+	}
+}
+
 type testSequence struct {
 	in   layers.TCP
 	want []Reassembly
@@ -554,7 +560,7 @@ func BenchmarkMultiStreamConn(b *testing.B) {
 		if i%65536 == 65535 {
 			if t.SYN {
 				t.SYN = false
-				t.Seq += 1
+				t.Seq++
 			}
 			t.Seq += 10
 		}

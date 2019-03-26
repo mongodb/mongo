@@ -36,11 +36,11 @@ type Endpoint struct {
 }
 
 // EndpointType returns the endpoint type associated with this endpoint.
-func (e Endpoint) EndpointType() EndpointType { return e.typ }
+func (a Endpoint) EndpointType() EndpointType { return a.typ }
 
 // Raw returns the raw bytes of this endpoint.  These aren't human-readable
 // most of the time, but they are faster than calling String.
-func (e Endpoint) Raw() []byte { return e.raw[:e.len] }
+func (a Endpoint) Raw() []byte { return a.raw[:a.len] }
 
 // LessThan provides a stable ordering for all endpoints.  It sorts first based
 // on the EndpointType of an endpoint, then based on the raw bytes of that
@@ -130,11 +130,11 @@ func (e EndpointType) String() string {
 	return strconv.Itoa(int(e))
 }
 
-func (e Endpoint) String() string {
-	if t, ok := endpointTypes[e.typ]; ok && t.Formatter != nil {
-		return t.Formatter(e.raw[:e.len])
+func (a Endpoint) String() string {
+	if t, ok := endpointTypes[a.typ]; ok && t.Formatter != nil {
+		return t.Formatter(a.raw[:a.len])
 	}
-	return fmt.Sprintf("%v:%v", e.typ, e.raw)
+	return fmt.Sprintf("%v:%v", a.typ, a.raw)
 }
 
 // Flow represents the direction of traffic for a packet layer, as a source and destination Endpoint.
@@ -164,11 +164,11 @@ func FlowFromEndpoints(src, dst Endpoint) (_ Flow, err error) {
 //
 // The output of FastHash is not guaranteed to remain the same through future
 // code revisions, so should not be used to key values in persistent storage.
-func (a Flow) FastHash() (h uint64) {
+func (f Flow) FastHash() (h uint64) {
 	// This combination must be commutative.  We don't use ^, since that would
 	// give the same hash for all A->A flows.
-	h = fnvHash(a.src[:a.slen]) + fnvHash(a.dst[:a.dlen])
-	h ^= uint64(a.typ)
+	h = fnvHash(f.src[:f.slen]) + fnvHash(f.dst[:f.dlen])
+	h ^= uint64(f.typ)
 	h *= fnvPrime
 	return
 }
@@ -225,12 +225,12 @@ func NewFlow(t EndpointType, src, dst []byte) (f Flow) {
 
 // EndpointInvalid is an endpoint type used for invalid endpoints, IE endpoints
 // that are specified incorrectly during creation.
-var EndpointInvalid EndpointType = RegisterEndpointType(0, EndpointTypeMetadata{"invalid", func(b []byte) string {
+var EndpointInvalid = RegisterEndpointType(0, EndpointTypeMetadata{Name: "invalid", Formatter: func(b []byte) string {
 	return fmt.Sprintf("%v", b)
 }})
 
 // InvalidEndpoint is a singleton Endpoint of type EndpointInvalid.
-var InvalidEndpoint Endpoint = NewEndpoint(EndpointInvalid, nil)
+var InvalidEndpoint = NewEndpoint(EndpointInvalid, nil)
 
 // InvalidFlow is a singleton Flow of type EndpointInvalid.
-var InvalidFlow Flow = NewFlow(EndpointInvalid, nil, nil)
+var InvalidFlow = NewFlow(EndpointInvalid, nil, nil)

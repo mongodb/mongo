@@ -15,7 +15,8 @@ import (
 // PPP is the layer for PPP encapsulation headers.
 type PPP struct {
 	BaseLayer
-	PPPType PPPType
+	PPPType       PPPType
+	HasPPTPHeader bool
 }
 
 // PPPEndpoint is a singleton endpoint for PPP.  Since there is no actual
@@ -36,17 +37,22 @@ func (p *PPP) LinkFlow() gopacket.Flow { return PPPFlow }
 
 func decodePPP(data []byte, p gopacket.PacketBuilder) error {
 	ppp := &PPP{}
-	if data[0]&0x1 == 0 {
-		if data[1]&0x1 == 0 {
+	offset := 0
+	if data[0] == 0xff && data[1] == 0x03 {
+		offset = 2
+		ppp.HasPPTPHeader = true
+	}
+	if data[offset]&0x1 == 0 {
+		if data[offset+1]&0x1 == 0 {
 			return errors.New("PPP has invalid type")
 		}
-		ppp.PPPType = PPPType(binary.BigEndian.Uint16(data[:2]))
-		ppp.Contents = data[:2]
-		ppp.Payload = data[2:]
+		ppp.PPPType = PPPType(binary.BigEndian.Uint16(data[offset : offset+2]))
+		ppp.Contents = data[offset : offset+2]
+		ppp.Payload = data[offset+2:]
 	} else {
-		ppp.PPPType = PPPType(data[0])
-		ppp.Contents = data[:1]
-		ppp.Payload = data[1:]
+		ppp.PPPType = PPPType(data[offset])
+		ppp.Contents = data[offset : offset+1]
+		ppp.Payload = data[offset+1:]
 	}
 	p.AddLayer(ppp)
 	p.SetLinkLayer(ppp)
@@ -69,6 +75,14 @@ func (p *PPP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOpt
 			return err
 		}
 		bytes[0] = uint8(p.PPPType)
+	}
+	if p.HasPPTPHeader {
+		bytes, err := b.PrependBytes(2)
+		if err != nil {
+			return err
+		}
+		bytes[0] = 0xff
+		bytes[1] = 0x03
 	}
 	return nil
 }
