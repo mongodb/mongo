@@ -27,7 +27,7 @@ function wallTimeCompare(d1, d2) {
     }
 }
 
-function optimesAndWallTimesAreEqual(replTest) {
+function optimesAndWallTimesAreEqual(replTest, isPersistent) {
     let prevReplStatus = replTest.nodes[0].getDB('admin').runCommand({replSetGetStatus: 1});
     let prevOptime = prevReplStatus.optimes.appliedOpTime.ts;
     let prevAppliedWallTime = prevReplStatus.optimes.lastAppliedWallTime;
@@ -39,8 +39,7 @@ function optimesAndWallTimesAreEqual(replTest) {
         let currDurableWallTime = currentReplStatus.optimes.lastDurableWallTime;
         if (timestampCompare(prevOptime, currOptime) != 0 ||
             wallTimeCompare(prevAppliedWallTime, currAppliedWallTime) != 0 ||
-            (jsTest.options().storageEngine !== "inMemory") &&
-                wallTimeCompare(prevDurableWallTime, currDurableWallTime) != 0) {
+            (isPersistent && wallTimeCompare(prevDurableWallTime, currDurableWallTime) != 0)) {
             jsTest.log("optimesAndWallTimesAreEqual returning false match, prevOptime: " +
                        prevOptime + " latestOptime: " + currOptime + " prevAppliedWallTime: " +
                        prevAppliedWallTime + " latestWallTime: " + currAppliedWallTime +
@@ -66,8 +65,10 @@ var master = replTest.getPrimary();
 replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
 
+const isPersistent = master.getDB('admin').serverStatus().storageEngine.persistent;
+
 // Check initial optimes
-assert(optimesAndWallTimesAreEqual(replTest));
+assert(optimesAndWallTimesAreEqual(replTest, isPersistent));
 var initialInfo = master.getDB('admin').serverStatus({oplog: true}).oplog;
 let initialReplStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 1});
 
@@ -75,7 +76,7 @@ let initialReplStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 
 // latestOptime should be updated, but earliestOptime should be unchanged
 var options = {writeConcern: {w: replTest.nodes.length}};
 assert.writeOK(master.getDB('test').foo.insert({a: 1}, options));
-assert(optimesAndWallTimesAreEqual(replTest));
+assert(optimesAndWallTimesAreEqual(replTest, isPersistent));
 
 var info = master.getDB('admin').serverStatus({oplog: true}).oplog;
 let replStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 1});
@@ -83,7 +84,7 @@ assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0);
 assert.gt(wallTimeCompare(replStatusInfo.optimes.lastAppliedWallTime,
                           initialReplStatusInfo.optimes.lastAppliedWallTime),
           0);
-if (jsTest.options().storageEngine !== "inMemory") {
+if (isPersistent) {
     assert.gt(wallTimeCompare(replStatusInfo.optimes.lastDurableWallTime,
                               initialReplStatusInfo.optimes.lastDurableWallTime),
               0);
@@ -96,7 +97,7 @@ for (var i = 0; i < 2000; i++) {
     master.getDB('test').foo.insert({largeString: largeString}, options);
 }
 assert.soon(function() {
-    return optimesAndWallTimesAreEqual(replTest);
+    return optimesAndWallTimesAreEqual(replTest, isPersistent);
 });
 
 // This block requires a fresh stable checkpoint.
@@ -107,7 +108,7 @@ assert.soon(function() {
     return timestampCompare(info.latestOptime, initialInfo.latestOptime) > 0 &&
         wallTimeCompare(replStatusInfo.optimes.lastAppliedWallTime,
                         initialReplStatusInfo.optimes.lastAppliedWallTime) > 0 &&
-        ((jsTest.options().storageEngine == "inMemory") ||
+        (!isPersistent ||
          wallTimeCompare(replStatusInfo.optimes.lastDurableWallTime,
                          initialReplStatusInfo.optimes.lastDurableWallTime) > 0) &&
         timestampCompare(info.earliestOptime, initialInfo.earliestOptime) > 0;
