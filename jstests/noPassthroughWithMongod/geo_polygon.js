@@ -1,7 +1,3 @@
-//
-// @tags: [SERVER-32709]
-//
-
 t = db.geo_polygon4;
 t.drop();
 

@@ -8,7 +8,7 @@
  * that because indexes are initially built in the background, reindexing is also done in the
  * background.
  *
- * @tags: [SERVER-32709, creates_background_indexes]
+ * @tags: [creates_background_indexes]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload

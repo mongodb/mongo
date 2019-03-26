@@ -65,90 +65,68 @@ MobileKVEngine::MobileKVEngine(const std::string& path,
     // Initialize the database to be in WAL mode.
     sqlite3* initSession;
     int status = sqlite3_open(_path.c_str(), &initSession);
-    checkStatus(status, SQLITE_OK, "sqlite3_open");
+    embedded::checkStatus(status, SQLITE_OK, "sqlite3_open");
 
     // Guarantees that sqlite3_close() will be called when the function returns.
     ON_BLOCK_EXIT([&initSession] { sqlite3_close(initSession); });
 
-    // Set all of our SQLite pragmas (https://www.sqlite.org/pragma.html)
-    // These should generally improve behavior, performance, and resource usage
-    {
-        for (auto it :
-             {std::string("journal_mode = WAL"),
-              "synchronous = " + std::to_string(durabilityLevel),
-              std::string("fullfsync = 1"),
-              // Allow for periodic calls to purge deleted records and prune db size on disk
-              // Still requires manual vacuum calls using `PRAGMA incremental_vacuum(N);`
-              std::string("auto_vacuum = incremental"),
-              "cache_size = -" + std::to_string(cacheSizeKB),
-              "mmap_size = " + std::to_string(mmapSizeKB * 1024),
-              "journal_size_limit = " + std::to_string(journalSizeLimitKB * 1024)}) {
-            std::string execPragma = "PRAGMA " + it + ";";
-            char* errMsg = NULL;
-            std::int32_t status =
-                sqlite3_exec(initSession, execPragma.c_str(), NULL, NULL, &errMsg);
-            checkStatus(status, SQLITE_OK, "sqlite3_exec", errMsg);
-            sqlite3_free(errMsg);
-            LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE configuration: " << execPragma;
-        }
+    embedded::configureSession(initSession);
 
-        LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Completed all SQLite database configuration";
-    }
-
-    // Check and enforce WAL mode
+    // Check and ensure that WAL mode is working as expected
     // This is not something that we want to be configurable
     {
         sqlite3_stmt* stmt;
         status = sqlite3_prepare_v2(initSession, "PRAGMA journal_mode;", -1, &stmt, NULL);
-        checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
+        embedded::checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
 
         status = sqlite3_step(stmt);
-        checkStatus(status, SQLITE_ROW, "sqlite3_step");
+        embedded::checkStatus(status, SQLITE_ROW, "sqlite3_step");
 
         // Pragma returns current mode in SQLite, ensure it is "wal" mode.
         const void* colText = sqlite3_column_text(stmt, 0);
         const char* mode = reinterpret_cast<const char*>(colText);
         fassert(37001, !strcmp(mode, "wal"));
         status = sqlite3_finalize(stmt);
-        checkStatus(status, SQLITE_OK, "sqlite3_finalize");
+        embedded::checkStatus(status, SQLITE_OK, "sqlite3_finalize");
 
         LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database opened in WAL mode";
     }
 
-    // Check and enforce the synchronous mode
+    // Check and ensure that synchronous mode is working as expected
     {
         sqlite3_stmt* stmt;
         status = sqlite3_prepare_v2(initSession, "PRAGMA synchronous;", -1, &stmt, NULL);
-        checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
+        embedded::checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
 
         status = sqlite3_step(stmt);
-        checkStatus(status, SQLITE_ROW, "sqlite3_step");
+        embedded::checkStatus(status, SQLITE_ROW, "sqlite3_step");
 
         // Pragma returns current "synchronous" setting
         std::uint32_t sync_val = sqlite3_column_int(stmt, 0);
         fassert(50869, sync_val == durabilityLevel);
         status = sqlite3_finalize(stmt);
-        checkStatus(status, SQLITE_OK, "sqlite3_finalize");
+        embedded::checkStatus(status, SQLITE_OK, "sqlite3_finalize");
 
         LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database has synchronous "
                                   << "set to: " << durabilityLevel;
     }
 
-    // Check and enforce that we are using the F_FULLFSYNC fcntl on darwin kernels
+    // Check and ensure that we were able to set the F_FULLFSYNC fcntl on darwin kernels
     // This prevents data corruption as fsync doesn't work as expected
+    // This is not something that we want to be configurable
     {
         sqlite3_stmt* stmt;
         status = sqlite3_prepare_v2(initSession, "PRAGMA fullfsync;", -1, &stmt, NULL);
-        checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
+        embedded::checkStatus(status, SQLITE_OK, "sqlite3_prepare_v2");
 
         status = sqlite3_step(stmt);
-        checkStatus(status, SQLITE_ROW, "sqlite3_step");
+        embedded::checkStatus(status, SQLITE_ROW, "sqlite3_step");
 
         // Pragma returns current fullsync setting, ensure it is enabled.
         int fullfsync_val = sqlite3_column_int(stmt, 0);
         fassert(50868, fullfsync_val == 1);
         status = sqlite3_finalize(stmt);
-        checkStatus(status, SQLITE_OK, "sqlite3_finalize");
+        embedded::checkStatus(status, SQLITE_OK, "sqlite3_finalize");
 
         LOG(MOBILE_LOG_LEVEL_LOW) << "MobileSE: Confirmed SQLite database is set to fsync "
                                   << "with F_FULLFSYNC if the platform supports it (currently"
@@ -254,7 +232,7 @@ Status MobileKVEngine::dropIdent(OperationContext* opCtx, StringData ident) {
     std::string dropQuery = "DROP TABLE IF EXISTS \"" + ident + "\";";
 
     try {
-        SqliteStatement::execQuery(session, dropQuery.c_str());
+        SqliteStatement::execQuery(session, dropQuery);
     } catch (const WriteConflictException&) {
         // It is possible that this drop fails because of transaction running in parallel.
         // We pretend that it succeeded, queue it for now and keep retrying later.
@@ -274,8 +252,7 @@ int64_t MobileKVEngine::getIdentSize(OperationContext* opCtx, StringData ident) 
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
 
     // Get key-value column names.
-    std::string colNameQuery = "PRAGMA table_info(\"" + ident + "\")";
-    SqliteStatement colNameStmt(*session, colNameQuery);
+    SqliteStatement colNameStmt(*session, "PRAGMA table_info(\"", ident, "\")");
 
     colNameStmt.step(SQLITE_ROW);
     std::string keyColName(static_cast<const char*>(colNameStmt.getColText(1)));
@@ -284,10 +261,15 @@ int64_t MobileKVEngine::getIdentSize(OperationContext* opCtx, StringData ident) 
     colNameStmt.step(SQLITE_DONE);
 
     // Get total data size of key-value columns.
-    str::stream dataSizeQuery;
-    dataSizeQuery << "SELECT IFNULL(SUM(LENGTH(" << keyColName << ")), 0) + "
-                  << "IFNULL(SUM(LENGTH(" << valueColName << ")), 0) FROM \"" << ident + "\";";
-    SqliteStatement dataSizeStmt(*session, dataSizeQuery);
+    SqliteStatement dataSizeStmt(*session,
+                                 "SELECT IFNULL(SUM(LENGTH(",
+                                 keyColName,
+                                 ")), 0) + ",
+                                 "IFNULL(SUM(LENGTH(",
+                                 valueColName,
+                                 ")), 0) FROM \"",
+                                 ident,
+                                 "\";");
 
     dataSizeStmt.step(SQLITE_ROW);
     return dataSizeStmt.getColInt(0);
@@ -296,15 +278,15 @@ int64_t MobileKVEngine::getIdentSize(OperationContext* opCtx, StringData ident) 
 bool MobileKVEngine::hasIdent(OperationContext* opCtx, StringData ident) const {
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
 
-    std::string findTableQuery = "SELECT * FROM sqlite_master WHERE type='table' AND name = ?;";
-    SqliteStatement findTableStmt(*session, findTableQuery);
+    SqliteStatement findTableStmt(*session,
+                                  "SELECT * FROM sqlite_master WHERE type='table' AND name = ?;");
     findTableStmt.bindText(0, ident.rawData(), ident.size());
 
     int status = findTableStmt.step();
     if (status == SQLITE_DONE) {
         return false;
     }
-    checkStatus(status, SQLITE_ROW, "sqlite3_step");
+    embedded::checkStatus(status, SQLITE_ROW, "sqlite3_step");
 
     return true;
 }
@@ -312,15 +294,15 @@ bool MobileKVEngine::hasIdent(OperationContext* opCtx, StringData ident) const {
 std::vector<std::string> MobileKVEngine::getAllIdents(OperationContext* opCtx) const {
     std::vector<std::string> idents;
     MobileSession* session = MobileRecoveryUnit::get(opCtx)->getSession(opCtx);
-    std::string getTablesQuery = "SELECT name FROM sqlite_master WHERE type='table';";
-    SqliteStatement getTablesStmt(*session, getTablesQuery);
+
+    SqliteStatement getTablesStmt(*session, "SELECT name FROM sqlite_master WHERE type='table';");
 
     int status;
     while ((status = getTablesStmt.step()) == SQLITE_ROW) {
         std::string tableName(reinterpret_cast<const char*>(getTablesStmt.getColText(0)));
         idents.push_back(tableName);
     }
-    checkStatus(status, SQLITE_DONE, "sqlite3_step");
+    embedded::checkStatus(status, SQLITE_DONE, "sqlite3_step");
     return idents;
 }
 
