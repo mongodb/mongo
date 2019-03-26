@@ -263,19 +263,31 @@ if wiredtiger:
         wtEnv.CppUnitTest(
             target='storage_wiredtiger_util_test',
             source=['wiredtiger_util_test.cpp',
-                    ],
+            ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/service_context',
                 '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
                 'storage_wiredtiger_mock',
-                ],
-            )
+            ],
+        )
 
         wtEnv.CppUnitTest(
             target='storage_wiredtiger_session_cache_test',
             source=['wiredtiger_session_cache_test.cpp',
-                    ],
+            ],
             LIBDEPS=[
                 'storage_wiredtiger_mock',
-                ],
-            )
+            ],
+        )
+
+        wtEnv.Benchmark(
+            target='storage_wiredtiger_begin_transaction_block_bm',
+            source='wiredtiger_begin_transaction_block_bm.cpp',
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/db/service_context',
+                '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+                '$BUILD_DIR/mongo/unittest/unittest',
+                '$BUILD_DIR/mongo/util/clock_source_mock',
+                'storage_wiredtiger_mock',
+            ],
+       )

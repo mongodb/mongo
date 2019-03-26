@@ -33,6 +33,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 #include "mongo/base/checked_cast.h"
@@ -68,6 +70,7 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
 using std::unique_ptr;
 using std::string;
 
@@ -1807,22 +1810,9 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
             const bool force = true;
             _kvEngine->setOldestTimestamp(truncTs, force);
         } else {
-            char commitTSConfigString["commit_timestamp="_sd.size() +
-                                      (8 * 2) /* 8 hexadecimal characters */ +
-                                      1 /* trailing null */];
-            auto size = std::snprintf(commitTSConfigString,
-                                      sizeof(commitTSConfigString),
-                                      "commit_timestamp=%llx",
-                                      truncTs.asULL());
-            if (size < 0) {
-                int e = errno;
-                error() << "error snprintf " << errnoWithDescription(e);
-                fassertFailedNoTrace(40662);
-            }
-
-            invariant(static_cast<std::size_t>(size) < sizeof(commitTSConfigString));
             auto conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
-            invariantWTOK(conn->set_timestamp(conn, commitTSConfigString));
+            auto commitTSConfigString = "commit_timestamp={:x}"_format(truncTs.asULL());
+            invariantWTOK(conn->set_timestamp(conn, commitTSConfigString.c_str()));
         }
 
         _kvEngine->getOplogManager()->setOplogReadTimestamp(truncTs);

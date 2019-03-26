@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <cstdio>
+#include <fmt/format.h>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -39,6 +40,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+using namespace fmt::literals;
 
 WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     WT_SESSION* session,
@@ -84,21 +86,9 @@ WiredTigerBeginTxnBlock::~WiredTigerBeginTxnBlock() {
 
 Status WiredTigerBeginTxnBlock::setReadSnapshot(Timestamp readTimestamp) {
     invariant(_rollback);
-    char readTSConfigString[15 /* read_timestamp= */ + 16 /* 16 hexadecimal digits */ +
-                            1 /* trailing null */];
-    auto size = std::snprintf(readTSConfigString,
-                              sizeof(readTSConfigString),
-                              "read_timestamp=%llx",
-                              readTimestamp.asULL());
-    if (size < 0) {
-        int e = errno;
-        error() << "error snprintf " << errnoWithDescription(e);
-        fassertFailedNoTrace(40664);
-    }
-    invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
+    std::string readTSConfigString = "read_timestamp={:x}"_format(readTimestamp.asULL());
 
-    auto status = wtRCToStatus(_session->timestamp_transaction(_session, readTSConfigString));
-    return status;
+    return wtRCToStatus(_session->timestamp_transaction(_session, readTSConfigString.c_str()));
 }
 
 void WiredTigerBeginTxnBlock::done() {
