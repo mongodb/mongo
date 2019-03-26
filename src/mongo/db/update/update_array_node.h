@@ -86,7 +86,8 @@ public:
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const final {
         for (const auto & [ pathSuffix, child ] : _children) {
-            FieldRefTempAppend tempAppend(*currentPath, toArrayFilterIdentifier(pathSuffix));
+            FieldRef::FieldRefTempAppend tempAppend(*currentPath,
+                                                    toArrayFilterIdentifier(pathSuffix));
             child->produceSerializationMap(currentPath, operatorOrientedUpdates);
         }
     }

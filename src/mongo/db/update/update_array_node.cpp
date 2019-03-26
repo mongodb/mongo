@@ -116,7 +116,8 @@ UpdateNode::ApplyResult UpdateArrayNode::apply(ApplyParams applyParams) const {
             // Merge all of the updates for this array element.
             invariant(updates->second.size() > 0);
             auto mergedChild = updates->second[0];
-            FieldRefTempAppend tempAppend(*(applyParams.pathTaken), childElement.getFieldName());
+            FieldRef::FieldRefTempAppend tempAppend(*(applyParams.pathTaken),
+                                                    childElement.getFieldName());
             for (size_t j = 1; j < updates->second.size(); ++j) {
 
                 // Use the cached merge result, if it is available.
@@ -172,8 +173,8 @@ UpdateNode::ApplyResult UpdateArrayNode::apply(ApplyParams applyParams) const {
 
             // Log the modified array element.
             invariant(modifiedElement);
-            FieldRefTempAppend tempAppend(*(applyParams.pathTaken),
-                                          modifiedElement->getFieldName());
+            FieldRef::FieldRefTempAppend tempAppend(*(applyParams.pathTaken),
+                                                    modifiedElement->getFieldName());
             auto logElement = applyParams.logBuilder->getDocument().makeElementWithNewFieldName(
                 applyParams.pathTaken->dottedField(), *modifiedElement);
             invariant(logElement.ok());

@@ -44,24 +44,6 @@ namespace mongo {
  */
 class UpdateInternalNode : public UpdateNode {
 public:
-    /**
-     * Helper class for appending to a FieldRef for the duration of the current scope and then
-     * restoring the FieldRef at the end of the scope.
-     */
-    class FieldRefTempAppend {
-    public:
-        FieldRefTempAppend(FieldRef& fieldRef, StringData part) : _fieldRef(fieldRef) {
-            _fieldRef.appendPart(part);
-        }
-
-        ~FieldRefTempAppend() {
-            _fieldRef.removeLastPart();
-        }
-
-    private:
-        FieldRef& _fieldRef;
-    };
-
     UpdateInternalNode(UpdateNode::Type type) : UpdateNode(type) {}
 
     /**

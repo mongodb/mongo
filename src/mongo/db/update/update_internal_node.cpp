@@ -85,7 +85,7 @@ std::unique_ptr<UpdateNode> UpdateInternalNode::copyOrMergeAsNecessary(
     } else if (!rightNode) {
         return leftNode->clone();
     } else {
-        FieldRefTempAppend tempAppend(
+        FieldRef::FieldRefTempAppend tempAppend(
             *pathTaken,
             wrapFieldNameAsArrayFilterIdentifier ? toArrayFilterIdentifier(nextField) : nextField);
         return UpdateNode::createUpdateNodeByMerging(*leftNode, *rightNode, pathTaken);

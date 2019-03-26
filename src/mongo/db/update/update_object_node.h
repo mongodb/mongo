@@ -111,12 +111,12 @@ public:
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const final {
         for (const auto & [ pathSuffix, child ] : _children) {
-            FieldRefTempAppend tempAppend(*currentPath, pathSuffix);
+            FieldRef::FieldRefTempAppend tempAppend(*currentPath, pathSuffix);
             child->produceSerializationMap(currentPath, operatorOrientedUpdates);
         }
         // Object nodes have a positional child that must be accounted for.
         if (_positionalChild) {
-            FieldRefTempAppend tempAppend(*currentPath, "$");
+            FieldRef::FieldRefTempAppend tempAppend(*currentPath, "$");
             _positionalChild->produceSerializationMap(currentPath, operatorOrientedUpdates);
         }
     }

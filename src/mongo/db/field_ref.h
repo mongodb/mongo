@@ -52,6 +52,24 @@ namespace mongo {
 class FieldRef {
 public:
     /**
+     * Helper class for appending to a FieldRef for the duration of the current scope and then
+     * restoring the FieldRef at the end of the scope.
+     */
+    class FieldRefTempAppend {
+    public:
+        FieldRefTempAppend(FieldRef& fieldRef, StringData part) : _fieldRef(fieldRef) {
+            _fieldRef.appendPart(part);
+        }
+
+        ~FieldRefTempAppend() {
+            _fieldRef.removeLastPart();
+        }
+
+    private:
+        FieldRef& _fieldRef;
+    };
+
+    /**
      * Returns true if the argument is a numeric string which is eligible to act as the key name for
      * an element in a BSON array; in other words, the string matches the regex ^(0|[1-9]+[0-9]*)$.
      */
