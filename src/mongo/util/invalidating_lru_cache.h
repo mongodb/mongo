@@ -160,6 +160,7 @@ public:
             // should only be missing a perf optimization rather than causing a correctness
             // problem.
             auto ret = activeIt->second.lock();
+            fassert(51148, !ret || ret->isValid());
             return ret ? boost::optional<std::shared_ptr<Value>>(ret) : boost::none;
         }
 
@@ -174,6 +175,7 @@ public:
         std::tie(std::ignore, inserted) = _active.emplace(key, ret);
 
         fassert(50903, inserted);
+        fassert(51147, ret->isValid());
         return ret;
     }
 

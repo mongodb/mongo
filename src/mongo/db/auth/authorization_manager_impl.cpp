@@ -534,7 +534,6 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
     auto returnUser = [&](boost::optional<UserHandle> cachedUser) {
         auto ret = *cachedUser;
         fassert(16914, ret.get());
-        fassert(17003, ret->isValid());
 
         LOG(1) << "Returning user " << userName << " from cache";
         return ret;
