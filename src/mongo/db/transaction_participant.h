@@ -112,7 +112,8 @@ class TransactionParticipant {
             kCommittingWithPrepare = 1 << 4,
             kCommitted = 1 << 5,
             kAbortedWithoutPrepare = 1 << 6,
-            kAbortedWithPrepare = 1 << 7
+            kAbortedWithPrepare = 1 << 7,
+            kExecutedRetryableWrite = 1 << 8,
         };
 
         using StateSet = int;
@@ -159,6 +160,14 @@ class TransactionParticipant {
 
         bool isAborted() const {
             return _state == kAbortedWithPrepare || _state == kAbortedWithoutPrepare;
+        }
+
+        bool hasExecutedRetryableWrite() const {
+            return _state == kExecutedRetryableWrite;
+        }
+
+        bool isInRetryableWriteMode() const {
+            return _state == kNone || _state == kExecutedRetryableWrite;
         }
 
         std::string toString() const {

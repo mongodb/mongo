@@ -407,7 +407,7 @@ void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(Operati
         // Retrying a retryable write.
         uassert(ErrorCodes::InvalidOptions,
                 "Must specify autocommit=false on all operations of a multi-statement transaction.",
-                o().txnState.isNone());
+                o().txnState.isInRetryableWriteMode());
         invariant(p().autoCommit == boost::none);
     }
 }
@@ -420,7 +420,7 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(Oper
                 << txnNumber
                 << " does not match any in-progress transactions. The active transaction number is "
                 << o().activeTxnNumber,
-            txnNumber == o().activeTxnNumber && !o().txnState.isNone());
+            txnNumber == o().activeTxnNumber && !o().txnState.isInRetryableWriteMode());
 
     if (o().txnState.isInProgress() && !o().txnResourceStash) {
         // This indicates that the first command in the transaction failed but did not implicitly
@@ -529,10 +529,15 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
                 "transaction number",
                 serverGlobalParams.clusterRole != ClusterRole::None);
 
-        // The active transaction number can only be reused if the transaction is aborted and has
-        // not been involved in a two phase commit. Assuming routers target primaries in increasing
-        // order of term and in the absence of byzantine messages, this check should never fail.
-        const auto restartableStates = TransactionState::kAbortedWithoutPrepare;
+        // The active transaction number can only be reused if:
+        // 1. The transaction participant is in retryable write mode and has not yet executed a
+        // retryable write, or
+        // 2. A transaction is aborted and has not been involved in a two phase commit.
+        //
+        // Assuming routers target primaries in increasing order of term and in the absence of
+        // byzantine messages, this check should never fail.
+        const auto restartableStates =
+            TransactionState::kNone | TransactionState::kAbortedWithoutPrepare;
         uassert(50911,
                 str::stream() << "Cannot start a transaction at given transaction number "
                               << txnNumber
@@ -827,7 +832,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     invariant(opCtx->getTxnNumber());
 
     // If this is not a multi-document transaction, there is nothing to unstash.
-    if (o().txnState.isNone()) {
+    if (o().txnState.isInRetryableWriteMode()) {
         invariant(!o().txnResourceStash);
         return;
     }
@@ -1345,7 +1350,8 @@ void TransactionParticipant::Participant::abortActiveTransaction(OperationContex
 
 void TransactionParticipant::Participant::abortActiveUnpreparedOrStashPreparedTransaction(
     OperationContext* opCtx) try {
-    if (o().txnState.isInSet(TransactionState::kNone | TransactionState::kCommitted)) {
+    if (o().txnState.isInSet(TransactionState::kNone | TransactionState::kCommitted |
+                             TransactionState::kExecutedRetryableWrite)) {
         // If there is no active transaction, do nothing.
         return;
     }
@@ -1376,7 +1382,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
     invariant(!o().txnResourceStash);
     invariant(!o().txnState.isCommittingWithPrepare());
 
-    if (!o().txnState.isNone()) {
+    if (!o().txnState.isInRetryableWriteMode()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onTransactionOperation(
             opCtx, CurOp::get(opCtx)->debug().additiveMetrics, o().txnState.isPrepared());
@@ -1416,7 +1422,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         invariant(opCtx->getTxnNumber() == o().activeTxnNumber);
         _abortTransactionOnSession(opCtx);
     } else if (opCtx->getTxnNumber() == o().activeTxnNumber) {
-        if (o().txnState.isNone()) {
+        if (o().txnState.isInRetryableWriteMode()) {
             // The active transaction is not a multi-document transaction.
             invariant(opCtx->getWriteUnitOfWork() == nullptr);
             return;
@@ -1433,7 +1439,8 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         // If _activeTxnNumber is higher than ours, it means the transaction is already aborted.
         invariant(o().txnState.isInSet(TransactionState::kNone |
                                        TransactionState::kAbortedWithoutPrepare |
-                                       TransactionState::kAbortedWithPrepare),
+                                       TransactionState::kAbortedWithPrepare |
+                                       TransactionState::kExecutedRetryableWrite),
                   str::stream() << "actual state: " << o().txnState.toString());
     }
 }
@@ -1590,6 +1597,8 @@ std::string TransactionParticipant::TransactionState::toString(StateFlag state) 
             return "TxnState::AbortedWithoutPrepare";
         case TransactionParticipant::TransactionState::kAbortedWithPrepare:
             return "TxnState::AbortedAfterPrepare";
+        case TransactionParticipant::TransactionState::kExecutedRetryableWrite:
+            return "TxnState::ExecutedRetryableWrite";
     }
     MONGO_UNREACHABLE;
 }
@@ -1601,6 +1610,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
             switch (newState) {
                 case kNone:
                 case kInProgress:
+                case kExecutedRetryableWrite:
                     return true;
                 default:
                     return false;
@@ -1662,6 +1672,14 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
             }
             MONGO_UNREACHABLE;
         case kAbortedWithPrepare:
+            switch (newState) {
+                case kNone:
+                    return true;
+                default:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        case kExecutedRetryableWrite:
             switch (newState) {
                 case kNone:
                     return true;
@@ -1778,7 +1796,7 @@ void TransactionParticipant::Participant::_logSlowTransaction(
     TerminationCause terminationCause,
     repl::ReadConcernArgs readConcernArgs) {
     // Only log multi-document transactions.
-    if (!o().txnState.isNone()) {
+    if (!o().txnState.isInRetryableWriteMode()) {
         const auto tickSource = opCtx->getServiceContext()->getTickSource();
         // Log the transaction if its duration is longer than the slowMS command threshold.
         if (o().transactionMetricsObserver.getSingleTransactionStats().getDuration(
@@ -1848,7 +1866,7 @@ void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationCo
                 break;
             case ActiveTransactionHistory::TxnRecordState::kNone:
                 o(lg).txnState.transitionTo(
-                    TransactionState::kNone,
+                    TransactionState::kExecutedRetryableWrite,
                     TransactionState::TransitionValidation::kRelaxTransitionValidation);
                 break;
             case ActiveTransactionHistory::TxnRecordState::kPrepared:
@@ -2092,6 +2110,12 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
                                                existingOpTime,
                                                lastStmtIdWriteOpTime);
                 }
+            }
+
+            // If this is the first time executing a retryable write, we should indicate that to
+            // the transaction participant.
+            if (participant.o(lg).txnState.isNone()) {
+                participant.o(lg).txnState.transitionTo(TransactionState::kExecutedRetryableWrite);
             }
         });
 

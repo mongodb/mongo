@@ -1187,21 +1187,6 @@ protected:
                            50911);
     }
 
-    void cannotSpecifyStartTransactionOnStartedRetryableWrite() {
-        MongoDOperationContextSession opCtxSession(opCtx());
-
-        auto txnParticipant = TransactionParticipant::get(opCtx());
-        txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), boost::none, boost::none);
-        ASSERT_FALSE(txnParticipant.inMultiDocumentTransaction());
-
-        auto autocommit = false;
-        auto startTransaction = true;
-        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
-                               opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction),
-                           AssertionException,
-                           50911);
-    }
-
     void cannotSpecifyStartTransactionOnAbortedPreparedTransaction() {
         auto autocommit = false;
         auto startTransaction = true;
@@ -1222,6 +1207,22 @@ protected:
                                opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction),
                            AssertionException,
                            50911);
+    }
+
+    void canSpecifyStartTransactionOnRetryableWriteWithNoWritesExecuted() {
+        MongoDOperationContextSession opCtxSession(opCtx());
+
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), boost::none, boost::none);
+        ASSERT_FALSE(txnParticipant.inMultiDocumentTransaction());
+
+        auto autocommit = false;
+        auto startTransaction = true;
+
+        txnParticipant.beginOrContinue(
+            opCtx(), *opCtx()->getTxnNumber(), autocommit, startTransaction);
+
+        ASSERT(txnParticipant.inMultiDocumentTransaction());
     }
 };
 
@@ -1257,8 +1258,8 @@ TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnPreparedTxn) {
     cannotSpecifyStartTransactionOnPreparedTxn();
 }
 
-TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnStartedRetryableWrite) {
-    cannotSpecifyStartTransactionOnStartedRetryableWrite();
+TEST_F(ShardTxnParticipantTest, canSpecifyStartTransactionOnRetryableWriteWithNoWritesExecuted) {
+    canSpecifyStartTransactionOnRetryableWriteWithNoWritesExecuted();
 }
 
 TEST_F(ShardTxnParticipantTest, CannotSpecifyStartTransactionOnAbortedPreparedTransaction) {
@@ -1297,8 +1298,8 @@ TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnPreparedTxn) {
     cannotSpecifyStartTransactionOnPreparedTxn();
 }
 
-TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnStartedRetryableWrite) {
-    cannotSpecifyStartTransactionOnStartedRetryableWrite();
+TEST_F(ConfigTxnParticipantTest, canSpecifyStartTransactionOnRetryableWriteWithNoWritesExecuted) {
+    canSpecifyStartTransactionOnRetryableWriteWithNoWritesExecuted();
 }
 
 TEST_F(ConfigTxnParticipantTest, CannotSpecifyStartTransactionOnAbortedPreparedTransaction) {
