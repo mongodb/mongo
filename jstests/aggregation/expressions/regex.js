@@ -378,10 +378,44 @@
 
     (function testMultipleMatches() {
         coll.drop();
-        assert.commandWorked(coll.insert({a: "string1string2"}));
-        assert.commandWorked(coll.insert({a: "string3 string4"}));
-        // Both match.
+        assert.commandWorked(coll.insert({a: "string1string2", regex: "(string[1-2])"}));
+        assert.commandWorked(coll.insert({a: "string3 string4", regex: "(string[3-4])"}));
+        assert.commandWorked(coll.insert({a: "string5 string6", regex: "(string[3-4])"}));
+        // All documents match.
         testRegexFindAgg({input: "$a", regex: "(str.*?[0-9])"}, [
+            {
+              "matches": [
+                  {"match": "string1", "idx": 0, "captures": ["string1"]},
+                  {"match": "string2", "idx": 7, "captures": ["string2"]}
+              ]
+            },
+            {
+              "matches": [
+                  {"match": "string3", "idx": 0, "captures": ["string3"]},
+                  {"match": "string4", "idx": 8, "captures": ["string4"]}
+              ]
+            },
+            {
+              "matches": [
+                  {"match": "string5", "idx": 0, "captures": ["string5"]},
+                  {"match": "string6", "idx": 8, "captures": ["string6"]}
+              ]
+            }
+        ]);
+        // Only one match.
+        testRegexFindAgg({input: "$a", regex: "(^.*[0-2]$)"}, [
+            {"matches": []},
+            {"matches": []},
+            {"matches": [{"match": "string1string2", "idx": 0, "captures": ["string1string2"]}]}
+
+        ]);
+        // None match.
+        testRegexFindAgg({input: "$a", regex: "(^.*[7-9]$)"},
+                         [{"matches": []}, {"matches": []}, {"matches": []}]);
+
+        // All documents match when using variable regex.
+        testRegexFindAgg({input: "$a", regex: "$regex"}, [
+            {"matches": []},
             {
               "matches": [
                   {"match": "string1", "idx": 0, "captures": ["string1"]},
@@ -395,14 +429,6 @@
               ]
             }
         ]);
-        // Only one match.
-        testRegexFindAgg({input: "$a", regex: "(^.*[0-2]$)"}, [
-            {"matches": []},
-            {"matches": [{"match": "string1string2", "idx": 0, "captures": ["string1string2"]}]}
-
-        ]);
-        // None match.
-        testRegexFindAgg({input: "$a", regex: "(^.*[5-9]$)"}, [{"matches": []}, {"matches": []}]);
     })();
 
     (function testInsideCondOperator() {

@@ -5956,24 +5956,93 @@ TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithDottedInputPath) 
 
 namespace ExpressionRegexTest {
 
-TEST(ExpressionRegexFindTest, BasicTest) {
-    Value input(fromjson("{input: 'asdf', regex: '^as' }"));
-    BSONObj expectedOut(fromjson("{match: 'as', idx:0, captures:[]}"));
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExpressionRegexFind regexF(expCtx);
-    regexF.addOperand(ExpressionConstant::create(expCtx, input));
-    Value output = regexF.evaluate(Document());
-    ASSERT_BSONOBJ_EQ(toBson(output.getDocument()), expectedOut);
+class ExpressionRegexTest {
+public:
+    template <typename SubClass, int N>
+    static intrusive_ptr<Expression> generateOptimizedExpression(const BSONObj& input) {
+        intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expr = intrusive_ptr<ExpressionFixedArity<SubClass, N>>();
+        auto expression = expr->parse(expCtx, input.firstElement(), expCtx->variablesParseState);
+        return expression->optimize();
+    }
+
+    static void testAllExpressions(const BSONObj& input,
+                                   bool optimized,
+                                   const std::vector<Value>& expectedFindAllOutput) {
+        {
+            // For $regexFindAll.
+            auto expression = generateOptimizedExpression<ExpressionRegexFindAll, 1>(input);
+            auto regexFindAllExpr = dynamic_cast<ExpressionRegexFindAll*>(expression.get());
+            ASSERT_EQ(regexFindAllExpr->hasConstantRegex(), optimized);
+            Value output = regexFindAllExpr->evaluate(Document());
+            ASSERT_VALUE_EQ(output, Value(expectedFindAllOutput));
+        }
+
+        {
+            // For $regexFind.
+            auto expression = generateOptimizedExpression<ExpressionRegexFind, 1>(input);
+            auto regexFindExpr = dynamic_cast<ExpressionRegexFind*>(expression.get());
+            ASSERT_EQ(regexFindExpr->hasConstantRegex(), optimized);
+            Value output = regexFindExpr->evaluate(Document());
+            ASSERT_VALUE_EQ(
+                output, expectedFindAllOutput.empty() ? Value(BSONNULL) : expectedFindAllOutput[0]);
+        }
+
+        {
+            // For $regexMatch.
+            auto expression = generateOptimizedExpression<ExpressionRegexMatch, 1>(input);
+            auto regexMatchExpr = dynamic_cast<ExpressionRegexMatch*>(expression.get());
+            ASSERT_EQ(regexMatchExpr->hasConstantRegex(), optimized);
+            Value output = regexMatchExpr->evaluate(Document());
+            ASSERT_VALUE_EQ(output, expectedFindAllOutput.empty() ? Value(false) : Value(true));
+        }
+    }
+};
+
+TEST(ExpressionRegexTest, BasicTest) {
+    ExpressionRegexTest::testAllExpressions(
+        fromjson("{$regexFindAll : {input: 'asdf', regex: '^as' }}"),
+        true,
+        {Value(fromjson("{match: 'as', idx:0, captures:[]}"))});
 }
 
-TEST(ExpressionRegexFindTest, ExtendedRegexOptions) {
-    Value input(fromjson("{input: 'FirstLine\\nSecondLine', regex: '^second' , options: 'mi'}"));
-    BSONObj expectedOut(fromjson("{match: 'Second', idx:10, captures:[]}"));
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExpressionRegexFind regexF(expCtx);
-    regexF.addOperand(ExpressionConstant::create(expCtx, input));
-    Value output = regexF.evaluate(Document());
-    ASSERT_BSONOBJ_EQ(toBson(output.getDocument()), expectedOut);
+TEST(ExpressionRegexTest, ExtendedRegexOptions) {
+    ExpressionRegexTest::testAllExpressions(
+        fromjson("{$regexFindAll : {input: 'FirstLine\\nSecondLine', regex: "
+                 "'^second' , options: 'mi'}}"),
+        true,
+        {Value(fromjson("{match: 'Second', idx:10, captures:[]}"))});
+}
+
+TEST(ExpressionRegexTest, MultipleMatches) {
+    ExpressionRegexTest::testAllExpressions(
+        fromjson("{$regexFindAll : {input: 'a1b2c3', regex: '([a-c][1-3])' }}"),
+        true,
+        {Value(fromjson("{match: 'a1', idx:0, captures:['a1']}")),
+         Value(fromjson("{match: 'b2', idx:2, captures:['b2']}")),
+         Value(fromjson("{match: 'c3', idx:4, captures:['c3']}"))});
+}
+
+TEST(ExpressionRegexTest, OptimizPatternWhenInputIsVariable) {
+    ExpressionRegexTest::testAllExpressions(
+        fromjson("{$regexFindAll : {input: '$input', regex: '([a-c][1-3])' }}"), true, {});
+}
+
+TEST(ExpressionRegexTest, NoOptimizePatternWhenRegexVariable) {
+    ExpressionRegexTest::testAllExpressions(
+        fromjson("{$regexFindAll : {input: 'asdf', regex: '$regex' }}"), false, {});
+}
+
+TEST(ExpressionRegexTest, NoOptimizePatternWhenOptionsVariable) {
+    ExpressionRegexTest::testAllExpressions(
+        fromjson("{$regexFindAll : {input: 'asdf', regex: '(asdf)', options: '$options' }}"),
+        false,
+        {Value(fromjson("{match: 'asdf', idx:0, captures:['asdf']}"))});
+}
+
+TEST(ExpressionRegexTest, NoMatch) {
+    ExpressionRegexTest::testAllExpressions(
+        fromjson("{$regexFindAll : {input: 'a1b2c3', regex: 'ab' }}"), true, {});
 }
 
 TEST(ExpressionRegexFindTest, FailureCase) {
@@ -5985,33 +6054,20 @@ TEST(ExpressionRegexFindTest, FailureCase) {
     ASSERT_THROWS_CODE(regexF.evaluate(Document()), DBException, 51105);
 }
 
-TEST(ExpressionRegexFindAllTest, MultipleMatches) {
-    Value input(fromjson("{input: 'a1b2c3', regex: '([a-c][1-3])' }"));
-    std::vector<Value> expectedOut = {Value(fromjson("{match: 'a1', idx:0, captures:['a1']}")),
-                                      Value(fromjson("{match: 'b2', idx:2, captures:['b2']}")),
-                                      Value(fromjson("{match: 'c3', idx:4, captures:['c3']}"))};
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExpressionRegexFindAll regexF(expCtx);
-    regexF.addOperand(ExpressionConstant::create(expCtx, input));
-    Value output = regexF.evaluate(Document());
-    ASSERT_VALUE_EQ(output, Value(expectedOut));
-}
-
-TEST(ExpressionRegexFindAllTest, NoMatch) {
-    Value input(fromjson("{input: 'a1b2c3', regex: 'ab' }"));
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExpressionRegexFindAll regexF(expCtx);
-    regexF.addOperand(ExpressionConstant::create(expCtx, input));
-    Value output = regexF.evaluate(Document());
-    ASSERT_VALUE_EQ(output, Value(std::vector<Value>()));
-}
-
 TEST(ExpressionRegexFindAllTest, FailureCase) {
     Value input(fromjson("{input: 'FirstLine\\nSecondLine', regex: '[0-9'}"));
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ExpressionRegexFindAll regexF(expCtx);
     regexF.addOperand(ExpressionConstant::create(expCtx, input));
     ASSERT_THROWS_CODE(regexF.evaluate(Document()), DBException, 51111);
+}
+
+TEST(ExpressionRegexMatchTest, FailureCase) {
+    Value input(fromjson("{regex: 'valid', input: {invalid : 'input'} , options: 'mi'}"));
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ExpressionRegexMatch regexMatchExpr(expCtx);
+    regexMatchExpr.addOperand(ExpressionConstant::create(expCtx, input));
+    ASSERT_THROWS_CODE(regexMatchExpr.evaluate(Document()), DBException, 51104);
 }
 
 TEST(ExpressionRegexFindAllTest, InvalidUTF8InInput) {
@@ -6037,32 +6093,6 @@ TEST(ExpressionRegexFindAllTest, InvalidUTF8InRegex) {
     regexF.addOperand(ExpressionConstant::create(expCtx, input));
     // Verify that PCRE will error if REGEX is not a valid UTF-8.
     ASSERT_THROWS_CODE(regexF.evaluate(Document()), DBException, 51111);
-}
-
-TEST(ExpressionRegexMatchTest, NoMatch) {
-    Value input(fromjson("{input: 'asdf', regex: '^sd' }"));
-    Value expectedOut(false);
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExpressionRegexMatch regexMatchExpr(expCtx);
-    regexMatchExpr.addOperand(ExpressionConstant::create(expCtx, input));
-    ASSERT_VALUE_EQ(regexMatchExpr.evaluate(Document()), expectedOut);
-}
-
-TEST(ExpressionRegexMatchTest, ExtendedRegexOptions) {
-    Value input(fromjson("{input: 'FirstLine\\nSecondLine', regex: '^second' , options: 'mi'}"));
-    Value expectedOut(true);
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExpressionRegexMatch regexMatchExpr(expCtx);
-    regexMatchExpr.addOperand(ExpressionConstant::create(expCtx, input));
-    ASSERT_VALUE_EQ(regexMatchExpr.evaluate(Document()), expectedOut);
-}
-
-TEST(ExpressionRegexMatchTest, FailureCase) {
-    Value input(fromjson("{regex: 'valid', input: {invalid : 'input'} , options: 'mi'}"));
-    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ExpressionRegexMatch regexMatchExpr(expCtx);
-    regexMatchExpr.addOperand(ExpressionConstant::create(expCtx, input));
-    ASSERT_THROWS_CODE(regexMatchExpr.evaluate(Document()), DBException, 51104);
 }
 
 }  // namespace ExpressionRegexTest
