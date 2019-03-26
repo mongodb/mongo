@@ -68,7 +68,9 @@ replTest.awaitSecondaryNodes();
 const isPersistent = master.getDB('admin').serverStatus().storageEngine.persistent;
 
 // Check initial optimes
-assert(optimesAndWallTimesAreEqual(replTest, isPersistent));
+assert.soon(function() {
+    return optimesAndWallTimesAreEqual(replTest, isPersistent);
+});
 var initialInfo = master.getDB('admin').serverStatus({oplog: true}).oplog;
 let initialReplStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 1});
 
@@ -76,7 +78,9 @@ let initialReplStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 
 // latestOptime should be updated, but earliestOptime should be unchanged
 var options = {writeConcern: {w: replTest.nodes.length}};
 assert.writeOK(master.getDB('test').foo.insert({a: 1}, options));
-assert(optimesAndWallTimesAreEqual(replTest, isPersistent));
+assert.soon(function() {
+    return optimesAndWallTimesAreEqual(replTest, isPersistent);
+});
 
 var info = master.getDB('admin').serverStatus({oplog: true}).oplog;
 let replStatusInfo = master.getDB('admin').runCommand({replSetGetStatus: 1});
