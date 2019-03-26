@@ -125,6 +125,10 @@ public:
             return true;
         }
 
+        bool canIgnorePrepareConflicts() const override {
+            return true;
+        }
+
         bool allowsSpeculativeMajorityReads() const override {
             // Find queries are only allowed to use speculative behavior if the 'allowsSpeculative'
             // flag is passed. The find command will check for this flag internally and fail if

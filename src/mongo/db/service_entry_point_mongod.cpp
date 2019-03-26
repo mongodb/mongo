@@ -67,10 +67,14 @@ public:
     void waitForReadConcern(OperationContext* opCtx,
                             const CommandInvocation* invocation,
                             const OpMsgRequest& request) const override {
+        const auto prepareConflictBehavior = invocation->canIgnorePrepareConflicts()
+            ? PrepareConflictBehavior::kIgnore
+            : PrepareConflictBehavior::kEnforce;
+
         Status rcStatus = mongo::waitForReadConcern(opCtx,
                                                     repl::ReadConcernArgs::get(opCtx),
                                                     invocation->allowsAfterClusterTime(),
-                                                    request.getCommandName());
+                                                    prepareConflictBehavior);
 
         if (!rcStatus.isOK()) {
             if (ErrorCodes::isExceededTimeLimitError(rcStatus.code())) {

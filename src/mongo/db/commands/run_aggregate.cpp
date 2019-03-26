@@ -383,7 +383,8 @@ void _adjustChangeStreamReadConcern(OperationContext* opCtx) {
     }
 
     // Wait for read concern again since we changed the original read concern.
-    uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, true, "aggregate"));
+    uassertStatusOK(
+        waitForReadConcern(opCtx, readConcernArgs, true, PrepareConflictBehavior::kIgnore));
 }
 
 }  // namespace

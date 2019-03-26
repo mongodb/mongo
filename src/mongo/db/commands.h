@@ -491,6 +491,14 @@ public:
     }
 
     /**
+     * Returns true if a command may be able to safely ignore prepare conflicts. Only commands that
+     * can guarantee they will only perform reads may ignore prepare conflicts.
+     */
+    virtual bool canIgnorePrepareConflicts() const {
+        return false;
+    }
+
+    /**
      * Returns true if this command invocation is allowed to utilize "speculative" majority reads to
      * service 'majority' read concern requests. This allows a query to satisfy a 'majority' read
      * without storage engine support for reading from a historical snapshot.
@@ -622,6 +630,14 @@ public:
 
     virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const {
         return true;
+    }
+
+    /**
+     * Returns true if a command may be able to safely ignore prepare conflicts. Only commands that
+     * can guarantee they will only perform reads may ignore prepare conflicts.
+     */
+    virtual bool canIgnorePrepareConflicts() const {
+        return false;
     }
 
 private:

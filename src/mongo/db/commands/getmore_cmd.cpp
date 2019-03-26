@@ -200,6 +200,10 @@ public:
             return false;
         }
 
+        bool canIgnorePrepareConflicts() const override {
+            return true;
+        }
+
         NamespaceString ns() const override {
             return _request.nss;
         }

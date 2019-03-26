@@ -76,6 +76,12 @@ public:
             return Pipeline::aggSupportsWriteConcern(this->_request.body);
         }
 
+        bool canIgnorePrepareConflicts() const override {
+            // Aggregate is a special case for prepare conflicts. It may do writes to an output
+            // collection, but it enables enforcement of prepare conflicts before doing so.
+            return true;
+        }
+
         bool supportsReadConcern(repl::ReadConcernLevel level) const override {
             // Aggregations that are run directly against a collection allow any read concern.
             // Otherwise, if the aggregate is collectionless then the read concern must be 'local'

@@ -43,6 +43,14 @@ class ReadConcernArgs;
 class SpeculativeMajorityReadInfo;
 }
 
+enum class PrepareConflictBehavior {
+    /* When prepare conflicts are encountered, block until the conflict is resolved. */
+    kEnforce,
+    /* Ignore prepare conflicts when they are encountered. This should only be enabled for
+     * operations than only perform reads. */
+    kIgnore
+};
+
 /**
  * Given the specified read concern arguments, performs checks that the read concern can actually be
  * satisfied given the current state of the server and if so calls into the replication subsystem to
@@ -53,7 +61,7 @@ class SpeculativeMajorityReadInfo;
 extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
                            const repl::ReadConcernArgs& readConcernArgs,
                            bool allowAfterClusterTime,
-                           StringData cmdName)
+                           PrepareConflictBehavior prepareConflictBehavior)
                               ->Status) waitForReadConcern;
 
 /*

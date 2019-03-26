@@ -198,16 +198,10 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
     return Status::OK();
 }
 
-// These commands are known to only perform reads, and therefore may be able to safely ignore
-// prepare conflicts. The exception is aggregate, which may do writes to an output collection, but
-// it enables enforcement of prepare conflicts before performing writes.
-static const stdx::unordered_set<std::string> ignorePrepareCommandWhitelist = {
-    "aggregate", "count", "distinct", "find", "getMore", "group"};
-
 /**
  * Returns whether the command should ignore prepare conflicts or not.
  */
-bool shouldIgnorePrepared(StringData cmdName,
+bool shouldIgnorePrepared(PrepareConflictBehavior prepareConflictBehavior,
                           repl::ReadConcernLevel readConcernLevel,
                           boost::optional<LogicalTime> afterClusterTime,
                           boost::optional<LogicalTime> atClusterTime) {
@@ -223,11 +217,7 @@ bool shouldIgnorePrepared(StringData cmdName,
         return false;
     }
 
-    if (ignorePrepareCommandWhitelist.count(cmdName.toString())) {
-        return true;
-    }
-
-    return false;
+    return prepareConflictBehavior == PrepareConflictBehavior::kIgnore;
 }
 }  // namespace
 
@@ -235,7 +225,7 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
 (OperationContext* opCtx,
  const repl::ReadConcernArgs& readConcernArgs,
  bool allowAfterClusterTime,
- StringData cmdName)
+ PrepareConflictBehavior prepareConflictBehavior)
     ->Status {
     // If we are in a direct client within a transaction, then we may be holding locks, so it is
     // illegal to wait for read concern. This is fine, since the outer operation should have handled
@@ -372,7 +362,7 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
     if (!opCtx->getClient()->isInDirectClient()) {
         // Set whether this command should ignore prepare conflicts or not.
         opCtx->recoveryUnit()->setIgnorePrepared(shouldIgnorePrepared(
-            cmdName, readConcernArgs.getLevel(), afterClusterTime, atClusterTime));
+            prepareConflictBehavior, readConcernArgs.getLevel(), afterClusterTime, atClusterTime));
     }
 
     return Status::OK();
