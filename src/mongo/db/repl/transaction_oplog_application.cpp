@@ -27,31 +27,62 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/transaction_oplog_application.h"
 
+#include "mongo/db/background.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+using repl::OplogEntry;
+namespace {
+// If enabled, causes _applyPrepareTransaction to hang before preparing the transaction participant.
+MONGO_FAIL_POINT_DEFINE(applyPrepareCommandHangBeforePreparingTransaction);
+
+
+// Apply the oplog entries for a prepare or a prepared commit during recovery/initial sync.
+Status _applyOperationsForTransaction(OperationContext* opCtx,
+                                      const repl::MultiApplier::Operations& ops,
+                                      repl::OplogApplication::Mode oplogApplicationMode) {
+    // Apply each the operations via repl::applyOperation.
+    for (const auto& op : ops) {
+        AutoGetCollection coll(opCtx, op.getNss(), MODE_IX);
+        auto status = repl::applyOperation_inlock(
+            opCtx, coll.getDb(), op.toBSON(), false /*alwaysUpsert*/, oplogApplicationMode);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
 
 /**
- * Helper that will find the previous oplog entry for that transaction, transform it to be a normal
- * applyOps command and applies the oplog entry. Currently used for oplog application of a
- * commitTransaction oplog entry during recovery, rollback and initial sync.
+ * Helper that will find the previous oplog entry for that transaction, then for old-style applyOps
+ * entries, will transform it to be a normal applyOps command and applies the oplog entry.
+ *
+ * For new-style transactions, with prepare command entries, will then read the entire set of oplog
+ * entries for the transaction and apply each of them.
+ *
+ * Currently used for oplog application of a commitTransaction oplog entry during recovery, rollback
+ * and initial sync.
  */
 Status _applyTransactionFromOplogChain(OperationContext* opCtx,
-                                       const repl::OplogEntry& entry,
+                                       const OplogEntry& entry,
                                        repl::OplogApplication::Mode mode) {
     invariant(mode == repl::OplogApplication::Mode::kRecovering ||
               mode == repl::OplogApplication::Mode::kInitialSync);
 
     BSONObj prepareCmd;
+    repl::MultiApplier::Operations ops;
     {
         // Traverse the oplog chain with its own snapshot and read timestamp.
         ReadSourceScope readSourceScope(opCtx);
@@ -63,16 +94,28 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         invariant(iter.hasNext());
         const auto prepareOplogEntry = iter.next(opCtx);
 
-        // Transform prepare command into a normal applyOps command.
-        prepareCmd = prepareOplogEntry.getOperationToApply().removeField("prepare");
+        if (prepareOplogEntry.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+            // Transform prepare command into a normal applyOps command.
+            prepareCmd = prepareOplogEntry.getOperationToApply().removeField("prepare");
+        } else {
+            invariant(prepareOplogEntry.getCommandType() ==
+                      OplogEntry::CommandType::kPrepareTransaction);
+            ops = readTransactionOperationsFromOplogChain(opCtx, prepareOplogEntry, {});
+        }
     }
-    BSONObjBuilder resultWeDontCareAbout;
-    return applyOps(
-        opCtx, entry.getNss().db().toString(), prepareCmd, mode, &resultWeDontCareAbout);
+
+    if (!prepareCmd.isEmpty()) {
+        BSONObjBuilder resultWeDontCareAbout;
+        return applyOps(
+            opCtx, entry.getNss().db().toString(), prepareCmd, mode, &resultWeDontCareAbout);
+    } else {
+        return _applyOperationsForTransaction(opCtx, ops, mode);
+    }
 }
+}  // namespace
 
 Status applyCommitTransaction(OperationContext* opCtx,
-                              const repl::OplogEntry& entry,
+                              const OplogEntry& entry,
                               repl::OplogApplication::Mode mode) {
     // Return error if run via applyOps command.
     uassert(50987,
@@ -112,7 +155,7 @@ Status applyCommitTransaction(OperationContext* opCtx,
 }
 
 Status applyAbortTransaction(OperationContext* opCtx,
-                             const repl::OplogEntry& entry,
+                             const OplogEntry& entry,
                              repl::OplogApplication::Mode mode) {
     // Return error if run via applyOps command.
     uassert(50972,
@@ -146,8 +189,8 @@ Status applyAbortTransaction(OperationContext* opCtx,
 
 repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     OperationContext* opCtx,
-    const repl::OplogEntry& commitOrPrepare,
-    const std::vector<repl::OplogEntry*> cachedOps) {
+    const OplogEntry& commitOrPrepare,
+    const std::vector<OplogEntry*> cachedOps) {
     repl::MultiApplier::Operations ops;
 
     // Get the previous oplog entry.
@@ -166,8 +209,7 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
 
     TransactionHistoryIterator iter(lastEntryOpTime.get());
     // Empty commits are not allowed, but empty prepares are.
-    invariant(commitOrPrepare.getCommandType() !=
-                  repl::OplogEntry::CommandType::kCommitTransaction ||
+    invariant(commitOrPrepare.getCommandType() != OplogEntry::CommandType::kCommitTransaction ||
               !cachedOps.empty() || iter.hasNext());
     auto commitOrPrepareObj = commitOrPrepare.toBSON();
 
@@ -194,6 +236,84 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
         ops.emplace_back(builder.obj());
     }
     return ops;
+}
+
+/**
+ * Make sure that if we are in replication recovery or initial sync, we don't apply the prepare
+ * transaction oplog entry until we either see a commit transaction oplog entry or are at the very
+ * end of recovery/initial sync. Otherwise, only apply the prepare transaction oplog entry if we are
+ * a secondary.
+ */
+Status applyPrepareTransaction(OperationContext* opCtx,
+                               const OplogEntry& entry,
+                               repl::OplogApplication::Mode oplogApplicationMode) {
+    // Don't apply the operations from the prepared transaction until either we see a commit
+    // transaction oplog entry during recovery or are at the end of recovery.
+    if (oplogApplicationMode == repl::OplogApplication::Mode::kRecovering) {
+        if (!serverGlobalParams.enableMajorityReadConcern) {
+            error() << "Cannot replay a prepared transaction when 'enableMajorityReadConcern' is "
+                       "set to false. Restart the server with --enableMajorityReadConcern=true "
+                       "to complete recovery.";
+        }
+        fassert(51146, serverGlobalParams.enableMajorityReadConcern);
+        return Status::OK();
+    }
+
+    // Don't apply the operations from the prepared transaction until either we see a commit
+    // transaction oplog entry during the oplog application phase of initial sync or are at the end
+    // of initial sync.
+    if (oplogApplicationMode == repl::OplogApplication::Mode::kInitialSync) {
+        return Status::OK();
+    }
+
+    // Return error if run via applyOps command.
+    uassert(51145,
+            "prepareTransaction oplog entry is only used internally by secondaries.",
+            oplogApplicationMode != repl::OplogApplication::Mode::kApplyOpsCmd);
+
+    invariant(oplogApplicationMode == repl::OplogApplication::Mode::kSecondary);
+
+    auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
+
+    // Block application of prepare oplog entry on secondaries when a concurrent background index
+    // build is running.
+    // This will prevent hybrid index builds from corrupting an index on secondary nodes if a
+    // prepared transaction becomes prepared during a build but commits after the index build
+    // commits.
+    for (const auto& op : ops) {
+        auto ns = op.getNss();
+        if (BackgroundOperation::inProgForNs(ns)) {
+            BackgroundOperation::awaitNoBgOpInProgForNs(ns);
+        }
+    }
+
+    // Transaction operations are in their own batch, so we can modify their opCtx.
+    invariant(entry.getSessionId());
+    invariant(entry.getTxnNumber());
+    opCtx->setLogicalSessionId(*entry.getSessionId());
+    opCtx->setTxnNumber(*entry.getTxnNumber());
+    // The write on transaction table may be applied concurrently, so refreshing state
+    // from disk may read that write, causing starting a new transaction on an existing
+    // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+
+    auto transaction = TransactionParticipant::get(opCtx);
+    transaction.unstashTransactionResources(opCtx, "prepareTransaction");
+
+    auto status = _applyOperationsForTransaction(opCtx, ops, oplogApplicationMode);
+    if (!status.isOK())
+        return status;
+
+    if (MONGO_FAIL_POINT(applyPrepareCommandHangBeforePreparingTransaction)) {
+        LOG(0) << "Hit applyPrepareCommandHangBeforePreparingTransaction failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+            opCtx, applyPrepareCommandHangBeforePreparingTransaction);
+    }
+
+    transaction.prepareTransaction(opCtx, entry.getOpTime());
+    transaction.stashTransactionResources(opCtx);
+
+    return Status::OK();
 }
 
 }  // namespace mongo

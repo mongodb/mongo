@@ -1338,6 +1338,17 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
          return applyCommitTransaction(opCtx, entry, mode);
      }}},
+    {"prepareTransaction",
+     {[](OperationContext* opCtx,
+         const char* ns,
+         const BSONElement& ui,
+         BSONObj& cmd,
+         const OpTime& opTime,
+         const OplogEntry& entry,
+         OplogApplication::Mode mode,
+         boost::optional<Timestamp> stableTimestampForRecovery) -> Status {
+         return applyPrepareTransaction(opCtx, entry, mode);
+     }}},
     {"abortTransaction",
      {[](OperationContext* opCtx,
          const char* ns,
@@ -1918,8 +1929,12 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
     // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
     // won't ever change the server configuration collection.
-    auto whitelistedOps = std::vector<std::string>{
-        "dropDatabase", "applyOps", "dbCheck", "commitTransaction", "abortTransaction"};
+    std::vector<std::string> whitelistedOps{"dropDatabase",
+                                            "applyOps",
+                                            "dbCheck",
+                                            "commitTransaction",
+                                            "abortTransaction",
+                                            "prepareTransaction"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
          whitelistedOps.end()) &&
@@ -1951,7 +1966,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         // Don't assign commit timestamp for transaction commands.
         const StringData commandName(o.firstElementFieldName());
         if (op.getBoolField("prepare") || commandName == "abortTransaction" ||
-            commandName == "commitTransaction")
+            commandName == "commitTransaction" || commandName == "prepareTransaction")
             return false;
 
         switch (replMode) {

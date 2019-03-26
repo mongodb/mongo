@@ -95,6 +95,13 @@ OplogApplier::Options SyncTailTest::makeInitialSyncOptions() {
     return options;
 }
 
+OplogApplier::Options SyncTailTest::makeRecoveryOptions() {
+    OplogApplier::Options options;
+    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
+    options.skipWritesToOplog = true;
+    return options;
+}
+
 void SyncTailTest::setUp() {
     ServiceContextMongoDTest::setUp();
 

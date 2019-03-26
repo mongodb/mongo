@@ -59,4 +59,11 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
     const repl::OplogEntry& entry,
     const std::vector<repl::OplogEntry*> cachedOps);
 
+/**
+ * Apply `prepareTransaction` oplog entry.
+ */
+Status applyPrepareTransaction(OperationContext* opCtx,
+                               const repl::OplogEntry& entry,
+                               repl::OplogApplication::Mode mode);
+
 }  // namespace mongo
