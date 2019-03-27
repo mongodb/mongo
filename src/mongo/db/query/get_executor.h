@@ -150,12 +150,12 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * or an aggregation pipeline that uses a $group stage with distinct-like semantics.
  *
  * Distinct is unique in that it doesn't care about getting all the results; it just wants all
- * possible values of a certain field.  As such, we can skip lots of data in certain cases (see
- * body of method for detail).
+ * possible values of a certain field.  As such, we can skip lots of data in certain cases (see body
+ * of method for detail).
  *
  * A $group stage on a single field behaves similarly to a distinct command. If it has no
- * accumulators or only $first accumulators, the $group command only needs to visit one document
- * for each distinct value of the grouped-by (_id) field to compute its result. When there is a sort
+ * accumulators or only $first accumulators, the $group command only needs to visit one document for
+ * each distinct value of the grouped-by (_id) field to compute its result. When there is a sort
  * order specified in parsedDistinct->getQuery()->getQueryRequest.getSort(), the DISTINCT_SCAN will
  * follow that sort order, ensuring that it chooses the correct document from each group to compute
  * any $first accumulators.
@@ -165,6 +165,10 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * field. Without this flag, getExecutorDistinct() may use a plan that takes advantage of
  * DISTINCT_SCAN to filter some but not all duplicates (so that de-duplication is still necessary
  * after query execution), or it may fall back to a regular IXSCAN.
+ *
+ * Note that this function uses the projection in 'parsedDistinct' to produce a covered query when
+ * possible, but when a covered query is not possible, the resulting plan may elide the projection
+ * stage (instead returning entire fetched documents).
  *
  * For example, a distinct query on field 'b' could use a DISTINCT_SCAN over index {a: 1, b: 1}.
  * This plan will reduce the output set by filtering out documents that are equal on both the 'a'

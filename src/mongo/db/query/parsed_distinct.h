@@ -84,7 +84,8 @@ public:
                                             const NamespaceString& nss,
                                             const BSONObj& cmdObj,
                                             const ExtensionsCallback& extensionsCallback,
-                                            bool isExplain);
+                                            bool isExplain,
+                                            const CollatorInterface* defaultCollator = nullptr);
 
 private:
     std::unique_ptr<CanonicalQuery> _query;

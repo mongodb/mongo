@@ -48,6 +48,74 @@ const char ParsedDistinct::kQueryField[] = "query";
 const char ParsedDistinct::kCollationField[] = "collation";
 const char ParsedDistinct::kCommentField[] = "comment";
 
+namespace {
+/**
+ * Checks dotted field for a projection and truncates the field name if we could be projecting on an
+ * array element. Sets 'isIDOut' to true if the projection is on a sub document of _id. For example,
+ * _id.a.2, _id.b.c.
+ */
+std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
+    // Check if field contains an array index.
+    std::vector<std::string> res;
+    mongo::splitStringDelim(field, &res, '.');
+
+    // Since we could exit early from the loop,
+    // we should check _id here and set '*isIDOut' accordingly.
+    *isIDOut = ("_id" == res[0]);
+
+    // Skip the first dotted component. If the field starts
+    // with a number, the number cannot be an array index.
+    int arrayIndex = 0;
+    for (size_t i = 1; i < res.size(); ++i) {
+        if (mongo::parseNumberFromStringWithBase(res[i], 10, &arrayIndex).isOK()) {
+            // Array indices cannot be negative numbers (this is not $slice).
+            // Negative numbers are allowed as field names.
+            if (arrayIndex >= 0) {
+                // Generate prefix of field up to (but not including) array index.
+                std::vector<std::string> prefixStrings(res);
+                prefixStrings.resize(i);
+                // Reset projectedField. Instead of overwriting, joinStringDelim() appends joined
+                // string
+                // to the end of projectedField.
+                std::string projectedField;
+                mongo::joinStringDelim(prefixStrings, &projectedField, '.');
+                return projectedField;
+            }
+        }
+    }
+
+    return field;
+}
+
+/**
+ * Creates a projection spec for a distinct command from the requested field. In most cases, the
+ * projection spec will be {_id: 0, key: 1}.
+ * The exceptions are:
+ * 1) When the requested field is '_id', the projection spec will {_id: 1}.
+ * 2) When the requested field could be an array element (eg. a.0), the projected field will be the
+ *    prefix of the field up to the array element. For example, a.b.2 => {_id: 0, 'a.b': 1} Note
+ *    that we can't use a $slice projection because the distinct command filters the results from
+ *    the executor using the dotted field name. Using $slice will re-order the documents in the
+ *    array in the results.
+ */
+BSONObj getDistinctProjection(const std::string& field) {
+    std::string projectedField(field);
+
+    bool isID = false;
+    if ("_id" == field) {
+        isID = true;
+    } else if (str::contains(field, '.')) {
+        projectedField = getProjectedDottedField(field, &isID);
+    }
+    BSONObjBuilder bob;
+    if (!isID) {
+        bob.append("_id", 0);
+    }
+    bob.append(projectedField, 1);
+    return bob.obj();
+}
+}  // namespace
+
 StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     BSONObjBuilder aggregationBuilder;
 
@@ -120,7 +188,8 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                                                  const NamespaceString& nss,
                                                  const BSONObj& cmdObj,
                                                  const ExtensionsCallback& extensionsCallback,
-                                                 bool isExplain) {
+                                                 bool isExplain,
+                                                 const CollatorInterface* defaultCollator) {
     IDLParserErrorContext ctx("distinct");
 
     DistinctCommand parsedDistinct(nss);
@@ -131,6 +200,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     }
 
     auto qr = stdx::make_unique<QueryRequest>(nss);
+
+    // Create a projection on the fields needed by the distinct command, so that the query planner
+    // will produce a covered plan if possible.
+    qr->setProj(getDistinctProjection(std::string(parsedDistinct.getKey())));
 
     if (auto query = parsedDistinct.getQuery()) {
         qr->setFilter(query.get());
@@ -188,6 +261,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                                            MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!cq.isOK()) {
         return cq.getStatus();
+    }
+
+    if (cq.getValue()->getQueryRequest().getCollation().isEmpty() && defaultCollator) {
+        cq.getValue()->setCollator(defaultCollator->clone());
     }
 
     return ParsedDistinct(std::move(cq.getValue()), parsedDistinct.getKey().toString());

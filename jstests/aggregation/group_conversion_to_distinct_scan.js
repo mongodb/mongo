@@ -28,34 +28,34 @@
     assert.commandWorked(coll.createIndex({"mkFoo.a": 1, "mkFoo.b": 1}));
     assert.commandWorked(coll.createIndex({"foo.a": 1, "mkFoo.b": 1}));
     assert.commandWorked(coll.insert([
-        {a: 1, b: 1, c: 1},
-        {a: 1, b: 2, c: 2},
-        {a: 1, b: 2, c: 3},
-        {a: 1, b: 3, c: 2},
-        {a: 2, b: 2, c: 2},
-        {b: 1, c: 1},
-        {a: null, b: 1, c: 1},
+        {_id: 0, a: 1, b: 1, c: 1},
+        {_id: 1, a: 1, b: 2, c: 2},
+        {_id: 2, a: 1, b: 2, c: 3},
+        {_id: 3, a: 1, b: 3, c: 2},
+        {_id: 4, a: 2, b: 2, c: 2},
+        {_id: 5, b: 1, c: 1},
+        {_id: 6, a: null, b: 1, c: 1},
 
-        {aa: 1, mkB: 2, bb: 2},
-        {aa: 1, mkB: [1, 3], bb: 1},
-        {aa: 2, mkB: [], bb: 3},
+        {_id: 7, aa: 1, mkB: 2, bb: 2},
+        {_id: 8, aa: 1, mkB: [1, 3], bb: 1},
+        {_id: 9, aa: 2, mkB: [], bb: 3},
 
-        {mkA: 1, c: 3},
-        {mkA: [2, 3, 4], c: 3},
-        {mkA: 2, c: 2},
-        {mkA: 3, c: 4},
+        {_id: 10, mkA: 1, c: 3},
+        {_id: 11, mkA: [2, 3, 4], c: 3},
+        {_id: 12, mkA: 2, c: 2},
+        {_id: 13, mkA: 3, c: 4},
 
-        {foo: {a: 1, b: 1}, mkFoo: {a: 1, b: 1}},
-        {foo: {a: 1, b: 2}, mkFoo: {a: 1, b: 2}},
-        {foo: {a: 2, b: 2}, mkFoo: {a: 2, b: 2}},
-        {foo: {b: 1}, mkFoo: {b: 1}},
-        {foo: {a: null, b: 1}, mkFoo: {a: null, b: 1}},
-        {foo: {a: 3}, mkFoo: [{a: 3, b: 4}, {a: 4, b: 3}]},
+        {_id: 14, foo: {a: 1, b: 1}, mkFoo: {a: 1, b: 1}},
+        {_id: 15, foo: {a: 1, b: 2}, mkFoo: {a: 1, b: 2}},
+        {_id: 16, foo: {a: 2, b: 2}, mkFoo: {a: 2, b: 2}},
+        {_id: 17, foo: {b: 1}, mkFoo: {b: 1}},
+        {_id: 18, foo: {a: null, b: 1}, mkFoo: {a: null, b: 1}},
+        {_id: 19, foo: {a: 3}, mkFoo: [{a: 3, b: 4}, {a: 4, b: 3}]},
 
-        {str: "foo", d: 1},
-        {str: "FoO", d: 2},
-        {str: "bar", d: 4},
-        {str: "bAr", d: 3}
+        {_id: 20, str: "foo", d: 1},
+        {_id: 21, str: "FoO", d: 2},
+        {_id: 22, str: "bar", d: 4},
+        {_id: 23, str: "bAr", d: 3}
     ]));
 
     //
@@ -103,6 +103,21 @@
     explain = coll.explain().aggregate(pipeline);
     assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
     assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern);
+    assert.eq(null, getAggPlanStage(explain, "SORT"), explain);
+
+    //
+    // Verify that a $sort-$group pipeline can use DISTINCT_SCAN when a $first accumulator needs the
+    // entire document.
+    //
+    pipeline = [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$$ROOT"}}}];
+    result = coll.aggregate(pipeline).toArray().sort(bsonWoCompare);
+    assert.eq(result, [
+        {_id: null, accum: {_id: 6, a: null, b: 1, c: 1}},
+        {_id: 1, accum: {_id: 3, a: 1, b: 3, c: 2}},
+        {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}}
+    ]);
+    explain = coll.explain().aggregate(pipeline);
+    assert.eq({a: 1, b: 1, c: 1}, getAggPlanStage(explain, "DISTINCT_SCAN").keyPattern, explain);
     assert.eq(null, getAggPlanStage(explain, "SORT"), explain);
 
     //
