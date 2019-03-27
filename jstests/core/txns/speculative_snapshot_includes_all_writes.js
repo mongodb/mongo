@@ -22,15 +22,21 @@
     assert.commandWorked(testDB.createCollection(collName2, {writeConcern: {w: "majority"}}));
 
     const sessionOptions = {causalConsistency: false};
-    const session = db.getMongo().startSession(sessionOptions);
-    const sessionDb = session.getDatabase(dbName);
-    const sessionColl = sessionDb.getCollection(collName);
-    const sessionColl2 = sessionDb.getCollection(collName2);
 
-    const session2 = db.getMongo().startSession(sessionOptions);
-    const session2Db = session2.getDatabase(dbName);
-    const session2Coll = session2Db.getCollection(collName);
-    const session2Coll2 = session2Db.getCollection(collName2);
+    function startSessionAndTransaction(readConcernLevel) {
+        let session = db.getMongo().startSession(sessionOptions);
+        jsTestLog("Start a transaction with readConcern " + readConcernLevel.level + ".");
+        session.startTransaction({readConcern: readConcernLevel});
+        return session;
+    }
+
+    let checkReads = (session, collExpected, coll2Expected) => {
+        let sessionDb = session.getDatabase(dbName);
+        let coll = sessionDb.getCollection(collName);
+        let coll2 = sessionDb.getCollection(collName2);
+        assert.docEq(collExpected, coll.find().toArray());
+        assert.docEq(coll2Expected, coll2.find().toArray());
+    };
 
     // Clear ramlog so checkLog can't find log messages from previous times this fail point was
     // enabled.
@@ -63,21 +69,17 @@
     // the prior uncommitted write is committed.
     assert.commandWorked(testColl.insert([{_id: 1}]));
 
-    jsTestLog("Start a snapshot transaction.");
+    const snapshotSession = startSessionAndTransaction({level: "snapshot"});
+    checkReads(snapshotSession, [{_id: 0}], [{_id: "a"}]);
 
-    session.startTransaction({readConcern: {level: "snapshot"}});
+    const majoritySession = startSessionAndTransaction({level: "majority"});
+    checkReads(majoritySession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
 
-    assert.docEq([{_id: 0}], sessionColl.find().toArray());
+    const localSession = startSessionAndTransaction({level: "local"});
+    checkReads(localSession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
 
-    assert.docEq([{_id: "a"}], sessionColl2.find().toArray());
-
-    jsTestLog("Start a majority-read transaction.");
-
-    session2.startTransaction({readConcern: {level: "majority"}});
-
-    assert.docEq([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
-
-    assert.docEq([{_id: "a"}], session2Coll2.find().toArray());
+    const defaultSession = startSessionAndTransaction({});
+    checkReads(defaultSession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
 
     jsTestLog("Allow the uncommitted write to finish.");
     assert.commandWorked(db.adminCommand({
@@ -88,25 +90,25 @@
     joinHungWrite();
 
     jsTestLog("Double-checking that writes not committed at start of snapshot cannot appear.");
-    assert.docEq([{_id: 0}], sessionColl.find().toArray());
+    checkReads(snapshotSession, [{_id: 0}], [{_id: "a"}]);
 
-    assert.docEq([{_id: "a"}], sessionColl2.find().toArray());
-
-    assert.docEq([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
-
-    assert.docEq([{_id: "a"}], session2Coll2.find().toArray());
+    jsTestLog(
+        "Double-checking that writes performed before the start of a transaction of 'majority' or lower must appear.");
+    checkReads(majoritySession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
+    checkReads(localSession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
+    checkReads(defaultSession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
 
     jsTestLog("Committing transactions.");
-    session.commitTransaction();
-    session2.commitTransaction();
+    snapshotSession.commitTransaction();
+    majoritySession.commitTransaction();
+    localSession.commitTransaction();
+    defaultSession.commitTransaction();
 
-    assert.docEq([{_id: 0}, {_id: 1}], sessionColl.find().toArray());
+    jsTestLog("A new local read must see all committed writes.");
+    checkReads(defaultSession, [{_id: 0}, {_id: 1}], [{_id: "a"}, {_id: "b"}]);
 
-    assert.docEq([{_id: "a"}, {_id: "b"}], sessionColl2.find().toArray());
-
-    assert.docEq([{_id: 0}, {_id: 1}], session2Coll.find().toArray());
-
-    assert.docEq([{_id: "a"}, {_id: "b"}], session2Coll2.find().toArray());
-
-    session.endSession();
+    snapshotSession.endSession();
+    majoritySession.endSession();
+    localSession.endSession();
+    defaultSession.endSession();
 }());

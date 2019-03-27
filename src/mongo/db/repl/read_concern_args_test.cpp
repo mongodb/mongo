@@ -511,6 +511,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, EmptyLevel) {
 
     ASSERT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kSnapshotReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kLocalReadConcern == readConcern.getOriginalLevel());
 }
 
 TEST(UpconvertReadConcernLevelToSnapshot, LevelLocal) {
@@ -523,6 +524,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, LevelLocal) {
 
     ASSERT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kSnapshotReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kLocalReadConcern == readConcern.getOriginalLevel());
 }
 
 TEST(UpconvertReadConcernLevelToSnapshot, LevelMajority) {
@@ -536,6 +538,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, LevelMajority) {
 
     ASSERT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kSnapshotReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kMajorityReadConcern == readConcern.getOriginalLevel());
 }
 
 TEST(UpconvertReadConcernLevelToSnapshot, LevelSnapshot) {
@@ -549,6 +552,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, LevelSnapshot) {
 
     ASSERT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kSnapshotReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kSnapshotReadConcern == readConcern.getOriginalLevel());
 }
 
 TEST(UpconvertReadConcernLevelToSnapshot, LevelSnapshotWithAtClusterTime) {
@@ -566,6 +570,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, LevelSnapshotWithAtClusterTime) {
 
     ASSERT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kSnapshotReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kSnapshotReadConcern == readConcern.getOriginalLevel());
     ASSERT_TRUE(readConcern.getArgsAtClusterTime());
 }
 
@@ -582,6 +587,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, AfterClusterTime) {
 
     ASSERT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kSnapshotReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kLocalReadConcern == readConcern.getOriginalLevel());
     ASSERT_TRUE(readConcern.getArgsAfterClusterTime());
 }
 
@@ -596,6 +602,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, LevelAvailable) {
 
     ASSERT_NOT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kAvailableReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kAvailableReadConcern == readConcern.getOriginalLevel());
 }
 
 TEST(UpconvertReadConcernLevelToSnapshot, LevelLinearizable) {
@@ -609,6 +616,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, LevelLinearizable) {
 
     ASSERT_NOT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kLinearizableReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kLinearizableReadConcern == readConcern.getOriginalLevel());
 }
 
 TEST(UpconvertReadConcernLevelToSnapshot, AfterOpTime) {
@@ -625,6 +633,7 @@ TEST(UpconvertReadConcernLevelToSnapshot, AfterOpTime) {
 
     ASSERT_NOT_OK(readConcern.upconvertReadConcernLevelToSnapshot());
     ASSERT(ReadConcernLevel::kLocalReadConcern == readConcern.getLevel());
+    ASSERT(ReadConcernLevel::kLocalReadConcern == readConcern.getOriginalLevel());
     ASSERT_TRUE(readConcern.getArgsOpTime());
 }
 
