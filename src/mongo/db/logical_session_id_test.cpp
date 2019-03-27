@@ -381,7 +381,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_VerifyUIDEvenIfDoNot
     LogicalSessionFromClient lsid;
     lsid.setId(UUID::gen());
 
-    auto invalidDigest = SHA256Block::computeHash({ConstDataRange("hacker", 6)});
+    auto invalidDigest = SHA256Block::computeHash({ConstDataRange("hacker")});
     lsid.setUid(invalidDigest);
 
     ASSERT_THROWS_CODE(initializeOperationSessionInfo(

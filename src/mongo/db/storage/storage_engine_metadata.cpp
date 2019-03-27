@@ -176,7 +176,7 @@ Status StorageEngineMetadata::read() {
     }
 
     ConstDataRange cdr(&buffer[0], buffer.size());
-    auto swObj = cdr.read<Validated<BSONObj>>();
+    auto swObj = cdr.readNoThrow<Validated<BSONObj>>();
     if (!swObj.isOK()) {
         return swObj.getStatus();
     }

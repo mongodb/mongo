@@ -42,19 +42,14 @@
 
 namespace mongo {
 
-StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf) {
+StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf) try {
     ConstDataRangeCursor compressedDataRange(buf);
 
     // Read the length of the uncompressed buffer
-    auto swUncompressedLength = compressedDataRange.readAndAdvance<LittleEndian<std::uint32_t>>();
-    if (!swUncompressedLength.isOK()) {
-        return {swUncompressedLength.getStatus()};
-    }
+    auto uncompressedLength = compressedDataRange.readAndAdvance<LittleEndian<std::uint32_t>>();
 
     // Now uncompress the data
     // Limit size of the buffer we need zlib
-    auto uncompressedLength = swUncompressedLength.getValue();
-
     if (uncompressedLength > 10000000) {
         return Status(ErrorCodes::InvalidLength, "Metrics chunk has exceeded the allowable size.");
     }
@@ -68,28 +63,13 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
     ConstDataRangeCursor cdc = statusUncompress.getValue();
 
     // The document is not part of any checksum so we must validate it is correct
-    auto swRef = cdc.readAndAdvance<Validated<BSONObj>>();
-    if (!swRef.isOK()) {
-        return {swRef.getStatus()};
-    }
-
-    BSONObj ref = swRef.getValue();
+    BSONObj ref = cdc.readAndAdvance<Validated<BSONObj>>();
 
     // Read count of metrics
-    auto swMetricsCount = cdc.readAndAdvance<LittleEndian<std::uint32_t>>();
-    if (!swMetricsCount.isOK()) {
-        return {swMetricsCount.getStatus()};
-    }
-
-    std::uint32_t metricsCount = swMetricsCount.getValue();
+    auto metricsCount = cdc.readAndAdvance<LittleEndian<std::uint32_t>>();
 
     // Read count of samples
-    auto swSampleCount = cdc.readAndAdvance<LittleEndian<std::uint32_t>>();
-    if (!swSampleCount.isOK()) {
-        return {swSampleCount.getStatus()};
-    }
-
-    std::uint32_t sampleCount = swSampleCount.getValue();
+    auto sampleCount = cdc.readAndAdvance<LittleEndian<std::uint32_t>>();
 
     // Limit size of the buffer we need for metrics and samples
     if (metricsCount * sampleCount > 1000000) {
@@ -138,23 +118,13 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
                 continue;
             }
 
-            auto swDelta = cdrc.readAndAdvance<FTDCVarInt>();
-
-            if (!swDelta.isOK()) {
-                return swDelta.getStatus();
+            auto delta = cdrc.readAndAdvance<FTDCVarInt>();
+            if (delta == 0) {
+                auto zero = cdrc.readAndAdvance<FTDCVarInt>();
+                zeroesCount = zero;
             }
 
-            if (swDelta.getValue() == 0) {
-                auto swZero = cdrc.readAndAdvance<FTDCVarInt>();
-
-                if (!swZero.isOK()) {
-                    return swDelta.getStatus();
-                }
-
-                zeroesCount = swZero.getValue();
-            }
-
-            deltas[FTDCCompressor::getArrayOffset(sampleCount, j, i)] = swDelta.getValue();
+            deltas[FTDCCompressor::getArrayOffset(sampleCount, j, i)] = delta;
         }
     }
 
@@ -179,6 +149,8 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
     }
 
     return {docs};
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 }  // namespace mongo

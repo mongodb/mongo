@@ -130,7 +130,7 @@ public:
                         uassertStatusOK(db.writeAndAdvance<LittleEndian<uint64_t>>(packet.order));
 
                         auto size = db.size() + toWrite.size();
-                        uassertStatusOK(db.getCursor().write<LittleEndian<uint32_t>>(size));
+                        db.getCursor().write<LittleEndian<uint32_t>>(size);
 
                         {
                             stdx::lock_guard<stdx::mutex> lk(_mutex);

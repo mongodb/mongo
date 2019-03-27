@@ -62,22 +62,22 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
     {
         Validated<BSONObj> v;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
-        ASSERT_OK(cdrc.readAndAdvance(&v));
+        ASSERT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
 
     {
         // mess up the data
         DataRangeCursor drc(begin(buf), end(buf));
         // skip past size so we don't trip any sanity checks.
-        drc.advance(4).transitional_ignore();  // skip size
-        while (drc.writeAndAdvance(0xFF).isOK())
+        drc.advanceNoThrow(4).transitional_ignore();  // skip size
+        while (drc.writeAndAdvanceNoThrow(0xFF).isOK())
             ;
     }
 
     {
         Validated<BSONObj> v;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
-        ASSERT_NOT_OK(cdrc.readAndAdvance(&v));
+        ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
 
     {
@@ -85,7 +85,7 @@ TEST(DataTypeValidated, BSONValidationEnabled) {
         setValidation(false);
         Validated<BSONObj> v;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
-        ASSERT_OK(cdrc.readAndAdvance(&v));
+        ASSERT_OK(cdrc.readAndAdvanceNoThrow(&v));
     }
 }
 }

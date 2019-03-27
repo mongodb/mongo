@@ -88,7 +88,7 @@ public:
      * Computes a hash of 'input' from one buffer.
      */
     static SHABlock computeHash(const uint8_t* input, size_t inputLen) {
-        return computeHash({ConstDataRange(reinterpret_cast<const char*>(input), inputLen)});
+        return computeHash({ConstDataRange(input, inputLen)});
     }
 
     /**
@@ -99,8 +99,7 @@ public:
                                 const uint8_t* input,
                                 size_t inputLen) {
         SHABlock output;
-        SHABlock::computeHmac(
-            key, keyLen, {ConstDataRange(reinterpret_cast<const char*>(input), inputLen)}, &output);
+        SHABlock::computeHmac(key, keyLen, {ConstDataRange(input, inputLen)}, &output);
         return output;
     }
 
@@ -113,8 +112,7 @@ public:
                             const uint8_t* input,
                             size_t inputLen,
                             SHABlock* const output) {
-        SHABlock::computeHmac(
-            key, keyLen, {ConstDataRange(reinterpret_cast<const char*>(input), inputLen)}, output);
+        SHABlock::computeHmac(key, keyLen, {ConstDataRange(input, inputLen)}, output);
     }
 
     static SHABlock computeHmac(const uint8_t* key,

@@ -114,8 +114,7 @@ TEST(SSLManager, MongoDBRolesParser) {
         unsigned char derData[] = {0x31, 0x1a, 0x30, 0x18, 0x0c, 0x09, 0x72, 0x6f, 0x6c, 0x65,
                                    0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x0c, 0x0b, 0x54, 0x68, 0x69,
                                    0x72, 0x64, 0x20, 0x66, 0x69, 0x65, 0x6c, 0x64};
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_OK(swPeer.getStatus());
         auto item = *(swPeer.getValue().begin());
         ASSERT_EQ(item.getRole(), "role_name");
@@ -148,8 +147,7 @@ TEST(SSLManager, MongoDBRolesParser) {
             0x6d, 0x65, 0x72, 0x6f, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x72, 0x6f, 0x6c,
             0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x72, 0x6f, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d,
             0x65, 0x0c, 0x0b, 0x54, 0x68, 0x69, 0x72, 0x64, 0x20, 0x66, 0x69, 0x65, 0x6c, 0x64};
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_OK(swPeer.getStatus());
 
         auto item = *(swPeer.getValue().begin());
@@ -168,24 +166,21 @@ TEST(SSLManager, MongoDBRolesParser) {
                                    0x6e, 0x61, 0x6d, 0x65, 0x0c, 0x0b, 0x54, 0x68, 0x69, 0x72,
                                    0x64, 0x20, 0x66, 0x69, 0x65, 0x6c, 0x64};
 
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
     }
 
     // Negative: Runt, only a tag
     {
         unsigned char derData[] = {0x31};
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
     }
 
     // Negative: Runt, only a tag and short length
     {
         unsigned char derData[] = {0x31, 0x0b};
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
     }
 
@@ -194,8 +189,7 @@ TEST(SSLManager, MongoDBRolesParser) {
         unsigned char derData[] = {
             0x31, 0x88, 0xff, 0xff,
         };
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
     }
 
@@ -204,8 +198,7 @@ TEST(SSLManager, MongoDBRolesParser) {
         unsigned char derData[] = {
             0x31, 0x82, 0xff, 0xff,
         };
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
     }
 
@@ -213,8 +206,7 @@ TEST(SSLManager, MongoDBRolesParser) {
     {
         unsigned char derData[] = {
             0x0c, 0x0b, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64};
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
     }
 
@@ -222,8 +214,7 @@ TEST(SSLManager, MongoDBRolesParser) {
     {
         unsigned char derData[] = {
             0x16, 0x0b, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64};
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_NOT_OK(swPeer.getStatus());
     }
 
@@ -234,8 +225,7 @@ TEST(SSLManager, MongoDBRolesParser) {
                                    0x6e, 0x30, 0x18, 0x0c, 0x0f, 0x72, 0x65, 0x61, 0x64,
                                    0x41, 0x6e, 0x79, 0x44, 0x61, 0x74, 0x61, 0x62, 0x61,
                                    0x73, 0x65, 0x0c, 0x05, 0x61, 0x64, 0x6d, 0x69, 0x6e};
-        auto swPeer = parsePeerRoles(ConstDataRange(reinterpret_cast<char*>(derData),
-                                                    std::extent<decltype(derData)>::value));
+        auto swPeer = parsePeerRoles(ConstDataRange(derData));
         ASSERT_OK(swPeer.getStatus());
 
         auto roles = getSortedRoles(swPeer.getValue());

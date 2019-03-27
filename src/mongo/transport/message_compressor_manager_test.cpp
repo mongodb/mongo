@@ -334,10 +334,9 @@ TEST(MessageCompressorManager, MessageSizeTooLarge) {
     badMessage.setLen(128);
 
     DataRangeCursor cursor(badMessage.data(), badMessage.data() + badMessage.dataLen());
-    uassertStatusOK(cursor.writeAndAdvance<LittleEndian<int32_t>>(dbQuery));
-    uassertStatusOK(cursor.writeAndAdvance<LittleEndian<int32_t>>(MaxMessageSizeBytes + 1));
-    uassertStatusOK(
-        cursor.writeAndAdvance<LittleEndian<uint8_t>>(registry.getCompressor("noop")->getId()));
+    cursor.writeAndAdvance<LittleEndian<int32_t>>(dbQuery);
+    cursor.writeAndAdvance<LittleEndian<int32_t>>(MaxMessageSizeBytes + 1);
+    cursor.writeAndAdvance<LittleEndian<uint8_t>>(registry.getCompressor("noop")->getId());
 
     auto status = compManager.decompressMessage(Message(badMessageBuffer), nullptr).getStatus();
     ASSERT_NOT_OK(status);
@@ -357,8 +356,8 @@ TEST(MessageCompressorManager, RuntMessage) {
     // This is a totally bogus compression header of just the orginal opcode + 0 byte uncompressed
     // size
     DataRangeCursor cursor(badMessage.data(), badMessage.data() + badMessage.dataLen());
-    uassertStatusOK(cursor.writeAndAdvance<LittleEndian<int32_t>>(dbQuery));
-    uassertStatusOK(cursor.writeAndAdvance<LittleEndian<int32_t>>(0));
+    cursor.writeAndAdvance<LittleEndian<int32_t>>(dbQuery);
+    cursor.writeAndAdvance<LittleEndian<int32_t>>(0);
 
     auto status = compManager.decompressMessage(Message(badMessageBuffer), nullptr).getStatus();
     ASSERT_NOT_OK(status);

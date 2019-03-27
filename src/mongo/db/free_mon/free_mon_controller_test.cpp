@@ -141,7 +141,7 @@ BSONArray decompressMetrics(ConstDataRange cdr) {
     snappy::Uncompress(cdr.data(), cdr.length(), &outBuffer);
 
     ConstDataRange raw(outBuffer.data(), outBuffer.data() + outBuffer.size());
-    auto swObj = raw.read<Validated<BSONObj>>();
+    auto swObj = raw.readNoThrow<Validated<BSONObj>>();
     ASSERT_OK(swObj.getStatus());
 
     return BSONArray(swObj.getValue().val["data"].Obj().getOwned());

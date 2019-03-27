@@ -236,32 +236,33 @@ boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const Buffer& buffe
 
     // Parse the record header.
     // Extract the ContentType from the header, and ensure it is a handshake.
-    StatusWith<std::uint8_t> record_ContentType = cdr.readAndAdvance<std::uint8_t>();
+    StatusWith<std::uint8_t> record_ContentType = cdr.readAndAdvanceNoThrow<std::uint8_t>();
     if (!record_ContentType.isOK() || record_ContentType.getValue() != ContentType_handshake) {
         return boost::none;
     }
     // Skip the record's ProtocolVersion. Clients tend to send TLS 1.0 in
     // the record, but then their real protocol version in the enclosed ClientHello.
-    StatusWith<ProtocolVersion> record_protocol_version = cdr.readAndAdvance<ProtocolVersion>();
+    StatusWith<ProtocolVersion> record_protocol_version =
+        cdr.readAndAdvanceNoThrow<ProtocolVersion>();
     if (!record_protocol_version.isOK()) {
         return boost::none;
     }
     // Parse the record length. It should be be larger than the remaining expected payload.
-    auto record_length = cdr.readAndAdvance<BigEndian<std::uint16_t>>();
+    auto record_length = cdr.readAndAdvanceNoThrow<BigEndian<std::uint16_t>>();
     if (!record_length.isOK() || record_length.getValue() < cdr.length()) {
         return boost::none;
     }
 
     // Parse the handshake header.
     // Extract the HandshakeType, and ensure it is a ClientHello.
-    StatusWith<std::uint8_t> handshake_type = cdr.readAndAdvance<std::uint8_t>();
+    StatusWith<std::uint8_t> handshake_type = cdr.readAndAdvanceNoThrow<std::uint8_t>();
     if (!handshake_type.isOK() || handshake_type.getValue() != HandshakeType_client_hello) {
         return boost::none;
     }
     // Extract the handshake length, and ensure it is larger than the remaining expected
     // payload. This requires a little work because the packet represents it with a uint24_t.
     StatusWith<std::array<std::uint8_t, 3>> handshake_length_bytes =
-        cdr.readAndAdvance<std::array<std::uint8_t, 3>>();
+        cdr.readAndAdvanceNoThrow<std::array<std::uint8_t, 3>>();
     if (!handshake_length_bytes.isOK()) {
         return boost::none;
     }
@@ -273,7 +274,7 @@ boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(const Buffer& buffe
     if (handshake_length < cdr.length()) {
         return boost::none;
     }
-    StatusWith<ProtocolVersion> client_version = cdr.readAndAdvance<ProtocolVersion>();
+    StatusWith<ProtocolVersion> client_version = cdr.readAndAdvanceNoThrow<ProtocolVersion>();
     if (!client_version.isOK()) {
         return boost::none;
     }

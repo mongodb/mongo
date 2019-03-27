@@ -45,26 +45,26 @@ TEST(BSONObjDataType, ConstDataTypeRangeBSON) {
         BSONObjBuilder b;
         b.append("a", 1);
 
-        ASSERT_OK(drc.writeAndAdvance(b.obj()));
+        ASSERT_OK(drc.writeAndAdvanceNoThrow(b.obj()));
     }
     {
         BSONObjBuilder b;
         b.append("b", "fooo");
 
-        ASSERT_OK(drc.writeAndAdvance(b.obj()));
+        ASSERT_OK(drc.writeAndAdvanceNoThrow(b.obj()));
     }
     {
         BSONObjBuilder b;
         b.append("c", 3);
 
-        ASSERT_OK(drc.writeAndAdvance(b.obj()));
+        ASSERT_OK(drc.writeAndAdvanceNoThrow(b.obj()));
     }
 
     ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
 
-    ASSERT_EQUALS(1, cdrc.readAndAdvance<BSONObj>().getValue().getField("a").numberInt());
-    ASSERT_EQUALS("fooo", cdrc.readAndAdvance<BSONObj>().getValue().getField("b").str());
-    ASSERT_EQUALS(3, cdrc.readAndAdvance<BSONObj>().getValue().getField("c").numberInt());
+    ASSERT_EQUALS(1, cdrc.readAndAdvance<BSONObj>().getField("a").numberInt());
+    ASSERT_EQUALS("fooo", cdrc.readAndAdvance<BSONObj>().getField("b").str());
+    ASSERT_EQUALS(3, cdrc.readAndAdvance<BSONObj>().getField("c").numberInt());
 }
 
 }  // namespace mongo

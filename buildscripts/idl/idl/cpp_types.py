@@ -338,9 +338,8 @@ class _CppTypeVector(CppTypeBase):
 
     def get_getter_body(self, member_name):
         # type: (unicode) -> unicode
-        return common.template_args(
-            'return ConstDataRange(reinterpret_cast<const char*>(${member_name}.data()), ${member_name}.size());',
-            member_name=member_name)
+        return common.template_args('return ConstDataRange(${member_name});',
+                                    member_name=member_name)
 
     def get_setter_body(self, member_name, validator_method_name):
         # type: (unicode, unicode) -> unicode
@@ -352,7 +351,7 @@ class _CppTypeVector(CppTypeBase):
 
     def get_transform_to_getter_type(self, expression):
         # type: (unicode) -> Optional[unicode]
-        return common.template_args('makeCDR(${expression});', expression=expression)
+        return common.template_args('ConstDataRange(${expression});', expression=expression)
 
     def get_transform_to_storage_type(self, expression):
         # type: (unicode) -> Optional[unicode]
@@ -681,7 +680,7 @@ class _BinDataBsonCppTypeBase(BsonCppTypeBase):
                                      expression=expression, method_name=method_name))
         else:
             indented_writer.write_line(
-                common.template_args('ConstDataRange tempCDR = makeCDR(${expression});',
+                common.template_args('ConstDataRange tempCDR(${expression});',
                                      expression=expression))
 
         return common.template_args(

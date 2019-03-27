@@ -95,11 +95,11 @@ public:
     Status write(const T& value, std::size_t offset = 0) {
         _ensureStorage();
 
-        auto status = _unwrittenSpaceCursor.write(value, offset);
+        auto status = _unwrittenSpaceCursor.writeNoThrow(value, offset);
 
         if (!status.isOK()) {
             reserve(_getSerializedSize(value));
-            status = _unwrittenSpaceCursor.write(value, offset);
+            status = _unwrittenSpaceCursor.writeNoThrow(value, offset);
         }
 
         return status;
@@ -117,11 +117,11 @@ public:
         // 1. A way to check if the type has a constant size
         // 2. A way to perform a runtime write which can fail with "too little
         //    size" without status generation
-        auto status = _unwrittenSpaceCursor.writeAndAdvance(value);
+        auto status = _unwrittenSpaceCursor.writeAndAdvanceNoThrow(value);
 
         if (!status.isOK()) {
             reserve(_getSerializedSize(value));
-            status = _unwrittenSpaceCursor.writeAndAdvance(value);
+            status = _unwrittenSpaceCursor.writeAndAdvanceNoThrow(value);
         }
 
         return status;

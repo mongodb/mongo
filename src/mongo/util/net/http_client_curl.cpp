@@ -174,7 +174,7 @@ size_t ReadMemoryCallback(char* buffer, size_t size, size_t nitems, void* instre
     if (cdrc->length() > 0) {
         size_t readSize = std::min(size * nitems, cdrc->length());
         memcpy(buffer, cdrc->data(), readSize);
-        invariant(cdrc->advance(readSize).isOK());
+        invariant(cdrc->advanceNoThrow(readSize).isOK());
         ret = readSize;
     }
 

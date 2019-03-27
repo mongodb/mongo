@@ -103,7 +103,7 @@ public:
     }
 
     ConstDataRange serializeToBSON() const {
-        return makeCDR(_vec);
+        return ConstDataRange(_vec);
     }
 
     const std::vector<std::uint8_t>& getVector() const {

@@ -69,13 +69,13 @@ TEST(DataTypeValidated, SuccessfulValidation) {
 
     {
         DataRangeCursor drc(begin(buf), end(buf));
-        ASSERT_OK(drc.writeAndAdvance(Validated<char>(0xFU)));
+        ASSERT_OK(drc.writeAndAdvanceNoThrow(Validated<char>(0xFU)));
     }
 
     {
         Validated<char> valid;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
-        ASSERT_OK(cdrc.readAndAdvance(&valid));
+        ASSERT_OK(cdrc.readAndAdvanceNoThrow(&valid));
         ASSERT_EQUALS(valid.val, char{0xFU});
     }
 }
@@ -85,7 +85,7 @@ TEST(DataTypeValidated, FailedValidation) {
 
     {
         DataRangeCursor drc(begin(buf), end(buf));
-        ASSERT_NOT_OK(drc.writeAndAdvance(Validated<char>(0x01)));
+        ASSERT_NOT_OK(drc.writeAndAdvanceNoThrow(Validated<char>(0x01)));
     }
 
     buf[0] = char{0x01};
@@ -93,7 +93,7 @@ TEST(DataTypeValidated, FailedValidation) {
     {
         Validated<char> valid;
         ConstDataRangeCursor cdrc(begin(buf), end(buf));
-        ASSERT_NOT_OK(cdrc.readAndAdvance(&valid));
+        ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow(&valid));
     }
 }
 

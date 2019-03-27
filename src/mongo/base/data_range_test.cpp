@@ -38,7 +38,7 @@
 namespace mongo {
 
 TEST(DataRange, ConstDataRange) {
-    char buf[sizeof(uint32_t) * 3];
+    unsigned char buf[sizeof(uint32_t) * 3];
     uint32_t native = 1234;
     uint32_t le = endian::nativeToLittle(native);
     uint32_t be = endian::nativeToBig(native);
@@ -49,11 +49,11 @@ TEST(DataRange, ConstDataRange) {
 
     ConstDataRange cdv(buf, buf + sizeof(buf));
 
-    ASSERT_EQUALS(native, cdv.read<uint32_t>().getValue());
-    ASSERT_EQUALS(native, cdv.read<LittleEndian<uint32_t>>(sizeof(uint32_t)).getValue());
-    ASSERT_EQUALS(native, cdv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2).getValue());
+    ASSERT_EQUALS(native, cdv.read<uint32_t>());
+    ASSERT_EQUALS(native, cdv.read<LittleEndian<uint32_t>>(sizeof(uint32_t)));
+    ASSERT_EQUALS(native, cdv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2));
 
-    auto result = cdv.read<uint32_t>(sizeof(uint32_t) * 3);
+    auto result = cdv.readNoThrow<uint32_t>(sizeof(uint32_t) * 3);
     ASSERT_EQUALS(false, result.isOK());
     ASSERT_EQUALS(ErrorCodes::Overflow, result.getStatus().code());
 }
@@ -65,31 +65,31 @@ TEST(DataRange, ConstDataRangeType) {
 
     ConstDataRange out(nullptr, nullptr);
 
-    auto inner = cdr.readInto(&out);
+    auto inner = cdr.readIntoNoThrow(&out);
 
     ASSERT_OK(inner);
     ASSERT_EQUALS(buf, out.data());
 }
 
 TEST(DataRange, DataRange) {
-    char buf[sizeof(uint32_t) * 3];
+    uint8_t buf[sizeof(uint32_t) * 3];
     uint32_t native = 1234;
 
     DataRange dv(buf, buf + sizeof(buf));
 
-    ASSERT_EQUALS(true, dv.write(native).isOK());
-    ASSERT_EQUALS(true, dv.write(LittleEndian<uint32_t>(native), sizeof(uint32_t)).isOK());
-    ASSERT_EQUALS(true, dv.write(BigEndian<uint32_t>(native), sizeof(uint32_t) * 2).isOK());
+    ASSERT_OK(dv.writeNoThrow(native));
+    ASSERT_OK(dv.writeNoThrow(LittleEndian<uint32_t>(native), sizeof(uint32_t)));
+    ASSERT_OK(dv.writeNoThrow(BigEndian<uint32_t>(native), sizeof(uint32_t) * 2));
 
-    auto result = dv.write(native, sizeof(uint32_t) * 3);
-    ASSERT_EQUALS(false, result.isOK());
+    auto result = dv.writeNoThrow(native, sizeof(uint32_t) * 3);
+    ASSERT_NOT_OK(result);
     ASSERT_EQUALS(ErrorCodes::Overflow, result.code());
 
-    ASSERT_EQUALS(native, dv.read<uint32_t>().getValue());
-    ASSERT_EQUALS(native, dv.read<LittleEndian<uint32_t>>(sizeof(uint32_t)).getValue());
-    ASSERT_EQUALS(native, dv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2).getValue());
+    ASSERT_EQUALS(native, dv.read<uint32_t>());
+    ASSERT_EQUALS(native, dv.read<LittleEndian<uint32_t>>(sizeof(uint32_t)));
+    ASSERT_EQUALS(native, dv.read<BigEndian<uint32_t>>(sizeof(uint32_t) * 2));
 
-    ASSERT_EQUALS(false, dv.read<uint32_t>(sizeof(uint32_t) * 3).isOK());
+    ASSERT_NOT_OK(dv.readNoThrow<uint32_t>(sizeof(uint32_t) * 3));
 }
 
 TEST(DataRange, DataRangeType) {
@@ -100,16 +100,32 @@ TEST(DataRange, DataRangeType) {
 
     DataRange out(nullptr, nullptr);
 
-    Status status = dr.readInto(&out);
+    Status status = dr.readIntoNoThrow(&out);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(buf, out.data());
 
     dr = DataRange(buf2, buf2 + sizeof(buf2) + -1);
-    status = dr.write(out);
+    status = dr.writeNoThrow(out);
 
     ASSERT_OK(status);
     ASSERT_EQUALS(std::string("fooZ"), buf2);
+}
+
+TEST(DataRange, InitFromContainer) {
+    std::vector<uint8_t> vec(20);
+    ConstDataRange dr(vec);
+    DataRange out(nullptr, nullptr);
+
+    ASSERT_OK(dr.readIntoNoThrow(&out));
+
+    DataRange mutableDr(vec);
+    ASSERT_OK(mutableDr.writeNoThrow<int>(6));
+
+    std::array<char, 5> array;
+    DataRange arrDR(array);
+    auto status = arrDR.writeNoThrow<uint64_t>(std::numeric_limits<uint64_t>::max());
+    ASSERT_EQUALS(status, ErrorCodes::Overflow);
 }
 
 }  // namespace mongo

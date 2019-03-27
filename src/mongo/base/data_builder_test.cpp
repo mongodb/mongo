@@ -67,11 +67,10 @@ TEST(DataBuilder, Basic) {
 
     ConstDataRangeCursor cdrc = db.getCursor();
 
-    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>().getValue());
-    ASSERT_EQUALS(static_cast<uint32_t>(2),
-                  cdrc.readAndAdvance<LittleEndian<uint32_t>>().getValue());
-    ASSERT_EQUALS(static_cast<uint64_t>(3), cdrc.readAndAdvance<BigEndian<uint64_t>>().getValue());
-    ASSERT_EQUALS(false, cdrc.readAndAdvance<char>().isOK());
+    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>());
+    ASSERT_EQUALS(static_cast<uint32_t>(2), cdrc.readAndAdvance<LittleEndian<uint32_t>>());
+    ASSERT_EQUALS(static_cast<uint64_t>(3), cdrc.readAndAdvance<BigEndian<uint64_t>>());
+    ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow<char>());
 }
 
 TEST(DataBuilder, ResizeDown) {
@@ -86,8 +85,8 @@ TEST(DataBuilder, ResizeDown) {
 
     ConstDataRangeCursor cdrc = db.getCursor();
 
-    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>().getValue());
-    ASSERT_EQUALS(false, cdrc.readAndAdvance<char>().isOK());
+    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>());
+    ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow<char>());
 }
 
 TEST(DataBuilder, ResizeUp) {
@@ -102,9 +101,9 @@ TEST(DataBuilder, ResizeUp) {
 
     ConstDataRangeCursor cdrc = db.getCursor();
 
-    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>().getValue());
-    ASSERT_EQUALS(static_cast<uint64_t>(2), cdrc.readAndAdvance<uint64_t>().getValue());
-    ASSERT_EQUALS(false, cdrc.readAndAdvance<char>().isOK());
+    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>());
+    ASSERT_EQUALS(static_cast<uint64_t>(2), cdrc.readAndAdvance<uint64_t>());
+    ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow<char>());
 }
 
 TEST(DataBuilder, Reserve) {
@@ -148,7 +147,7 @@ TEST(DataBuilder, Clear) {
     ASSERT_EQUALS(0u, db.size());
 
     ConstDataRangeCursor cdrc = db.getCursor();
-    ASSERT_EQUALS(false, cdrc.readAndAdvance<char>().isOK());
+    ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow<char>());
 }
 
 TEST(DataBuilder, Move) {
@@ -160,7 +159,7 @@ TEST(DataBuilder, Move) {
 
     ConstDataRangeCursor cdrc = db2.getCursor();
 
-    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>().getValue());
+    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>());
     ASSERT_EQUALS(2u, db2.capacity());
     ASSERT_EQUALS(2u, db2.size());
 

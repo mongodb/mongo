@@ -39,16 +39,20 @@ public:
         return inputSize;
     }
 
-    StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override {
-        output.write(input).transitional_ignore();
+    StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override try {
+        output.write(input);
         counterHitCompress(input.length(), input.length());
         return {input.length()};
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
 
-    StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) override {
-        output.write(input).transitional_ignore();
+    StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) override try {
+        output.write(input);
         counterHitDecompress(input.length(), input.length());
         return {input.length()};
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
 };
 }  // namespace mongo

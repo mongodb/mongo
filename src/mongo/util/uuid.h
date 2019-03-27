@@ -125,7 +125,7 @@ public:
      * Returns a ConstDataRange view of the UUID.
      */
     ConstDataRange toCDR() const {
-        return ConstDataRange(reinterpret_cast<const char*>(_uuid.data()), _uuid.size());
+        return ConstDataRange(_uuid);
     }
 
     /**

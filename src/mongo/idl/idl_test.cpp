@@ -45,7 +45,7 @@ namespace mongo {
 namespace {
 
 bool isEquals(ConstDataRange left, const std::vector<uint8_t>& right) {
-    auto rightCDR = makeCDR(right);
+    ConstDataRange rightCDR(right);
     return std::equal(left.data(),
                       left.data() + left.length(),
                       rightCDR.data(),
@@ -1157,7 +1157,7 @@ void TestBinDataVector() {
     {
         BSONObjBuilder builder;
         ParserT one_new;
-        one_new.setValue(makeCDR(expected));
+        one_new.setValue(expected);
         testStruct.serialize(&builder);
 
         auto serializedDoc = builder.obj();

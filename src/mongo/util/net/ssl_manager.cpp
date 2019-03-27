@@ -825,7 +825,7 @@ struct DataType::Handler<DERToken> {
 namespace {
 
 StatusWith<std::string> readDERString(ConstDataRangeCursor& cdc) {
-    auto swString = cdc.readAndAdvance<DERToken>();
+    auto swString = cdc.readAndAdvanceNoThrow<DERToken>();
     if (!swString.isOK()) {
         return swString.getStatus();
     }
@@ -849,7 +849,7 @@ StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
 
     ConstDataRangeCursor cdrc(cdr);
 
-    auto swTagByte = cdrc.readAndAdvance<char>();
+    auto swTagByte = cdrc.readAndAdvanceNoThrow<char>();
     if (!swTagByte.getStatus().isOK()) {
         return swTagByte.getStatus();
     }
@@ -893,7 +893,7 @@ StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
 
     // Read length
     // Depending on the high bit, either read 1 byte or N bytes
-    auto swInitialLengthByte = cdrc.readAndAdvance<char>();
+    auto swInitialLengthByte = cdrc.readAndAdvanceNoThrow<char>();
     if (!swInitialLengthByte.getStatus().isOK()) {
         return swInitialLengthByte.getStatus();
     }
@@ -918,7 +918,7 @@ StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
         // Ensure we have enough data for the length bytes
         const char* lengthLongFormPtr = cdrc.data();
 
-        Status statusLength = cdrc.advance(lengthBytesCount);
+        Status statusLength = cdrc.advanceNoThrow(lengthBytesCount);
         if (!statusLength.isOK()) {
             return statusLength;
         }
@@ -965,7 +965,7 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
      *  ...!UTF8String:"Unrecognized entity in MongoDBAuthorizationGrant"
      * }
      */
-    auto swSet = cdcExtension.readAndAdvance<DERToken>();
+    auto swSet = cdcExtension.readAndAdvanceNoThrow<DERToken>();
     if (!swSet.isOK()) {
         return swSet.getStatus();
     }
@@ -986,7 +986,7 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
          *  database UTF8String
          * }
          */
-        auto swSequence = cdcSet.readAndAdvance<DERToken>();
+        auto swSequence = cdcSet.readAndAdvanceNoThrow<DERToken>();
         if (!swSequence.isOK()) {
             return swSequence.getStatus();
         }

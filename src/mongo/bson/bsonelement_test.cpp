@@ -113,7 +113,7 @@ TEST(BSONElement, ExtractLargeSubObject) {
     std::int32_t size = 17 * 1024 * 1024;
     std::vector<char> buffer(size);
     DataRange bufferRange(&buffer.front(), &buffer.back());
-    ASSERT_OK(bufferRange.write(LittleEndian<int32_t>(size)));
+    ASSERT_OK(bufferRange.writeNoThrow(LittleEndian<int32_t>(size)));
 
     BSONObj obj(buffer.data(), BSONObj::LargeSizeTrait{});
 

@@ -45,18 +45,16 @@ TEST(DataRangeCursor, ConstDataRangeCursor) {
     ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
     ConstDataRangeCursor backup(cdrc);
 
-    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>().getValue());
-    ASSERT_EQUALS(static_cast<uint32_t>(2),
-                  cdrc.readAndAdvance<LittleEndian<uint32_t>>().getValue());
-    ASSERT_EQUALS(static_cast<uint64_t>(3), cdrc.readAndAdvance<BigEndian<uint64_t>>().getValue());
-    ASSERT_EQUALS(false, cdrc.readAndAdvance<char>().isOK());
+    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>());
+    ASSERT_EQUALS(static_cast<uint32_t>(2), cdrc.readAndAdvance<LittleEndian<uint32_t>>());
+    ASSERT_EQUALS(static_cast<uint64_t>(3), cdrc.readAndAdvance<BigEndian<uint64_t>>());
+    ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow<char>());
 
     // test skip()
     cdrc = backup;
-    ASSERT_EQUALS(true, cdrc.skip<uint32_t>().isOK());
-    ;
-    ASSERT_EQUALS(true, cdrc.advance(10).isOK());
-    ASSERT_EQUALS(false, cdrc.readAndAdvance<char>().isOK());
+    ASSERT_OK(cdrc.skipNoThrow<uint32_t>());
+    ASSERT_OK(cdrc.advanceNoThrow(10));
+    ASSERT_NOT_OK(cdrc.readAndAdvanceNoThrow<char>());
 }
 
 TEST(DataRangeCursor, ConstDataRangeCursorType) {
@@ -66,9 +64,7 @@ TEST(DataRangeCursor, ConstDataRangeCursorType) {
 
     ConstDataRangeCursor out(nullptr, nullptr);
 
-    auto inner = cdrc.readInto(&out);
-
-    ASSERT_OK(inner);
+    ASSERT_OK(cdrc.readIntoNoThrow(&out));
     ASSERT_EQUALS(buf, out.data());
 }
 
@@ -77,18 +73,17 @@ TEST(DataRangeCursor, DataRangeCursor) {
 
     DataRangeCursor dc(buf, buf + 14);
 
-    ASSERT_EQUALS(true, dc.writeAndAdvance<uint16_t>(1).isOK());
-    ASSERT_EQUALS(true, dc.writeAndAdvance<LittleEndian<uint32_t>>(2).isOK());
-    ASSERT_EQUALS(true, dc.writeAndAdvance<BigEndian<uint64_t>>(3).isOK());
-    ASSERT_EQUALS(false, dc.writeAndAdvance<char>(1).isOK());
+    ASSERT_OK(dc.writeAndAdvanceNoThrow<uint16_t>(1));
+    ASSERT_OK(dc.writeAndAdvanceNoThrow<LittleEndian<uint32_t>>(2));
+    ASSERT_OK(dc.writeAndAdvanceNoThrow<BigEndian<uint64_t>>(3));
+    ASSERT_NOT_OK(dc.writeAndAdvanceNoThrow<char>(1));
 
     ConstDataRangeCursor cdrc(buf, buf + sizeof(buf));
 
-    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>().getValue());
-    ASSERT_EQUALS(static_cast<uint32_t>(2),
-                  cdrc.readAndAdvance<LittleEndian<uint32_t>>().getValue());
-    ASSERT_EQUALS(static_cast<uint64_t>(3), cdrc.readAndAdvance<BigEndian<uint64_t>>().getValue());
-    ASSERT_EQUALS(static_cast<char>(0), cdrc.readAndAdvance<char>().getValue());
+    ASSERT_EQUALS(static_cast<uint16_t>(1), cdrc.readAndAdvance<uint16_t>());
+    ASSERT_EQUALS(static_cast<uint32_t>(2), cdrc.readAndAdvance<LittleEndian<uint32_t>>());
+    ASSERT_EQUALS(static_cast<uint64_t>(3), cdrc.readAndAdvance<BigEndian<uint64_t>>());
+    ASSERT_EQUALS(static_cast<char>(0), cdrc.readAndAdvance<char>());
 }
 
 TEST(DataRangeCursor, DataRangeCursorType) {
@@ -99,15 +94,12 @@ TEST(DataRangeCursor, DataRangeCursorType) {
 
     DataRangeCursor out(nullptr, nullptr);
 
-    Status status = drc.readInto(&out);
-
-    ASSERT_OK(status);
+    ASSERT_OK(drc.readIntoNoThrow(&out));
     ASSERT_EQUALS(buf, out.data());
 
     drc = DataRangeCursor(buf2, buf2 + sizeof(buf2) + -1);
-    status = drc.write(out);
+    ASSERT_OK(drc.writeNoThrow(out));
 
-    ASSERT_OK(status);
     ASSERT_EQUALS(std::string("fooZ"), buf2);
 }
 }  // namespace mongo
