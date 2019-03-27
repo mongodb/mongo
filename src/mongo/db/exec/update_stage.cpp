@@ -60,6 +60,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpsertPerformsInsert);
+MONGO_FAIL_POINT_DEFINE(hangBeforeThrowWouldChangeOwningShard);
 
 using std::string;
 using std::unique_ptr;
@@ -336,11 +337,11 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                                   << BSONObjMaxUserSize,
                     newObj.objsize() <= BSONObjMaxUserSize);
 
-            if (isFCV42 && metadata->isSharded()) {
-                assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(metadata, oldObj);
-            }
-
             if (!request->isExplain()) {
+                if (isFCV42 && metadata->isSharded()) {
+                    assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(metadata, oldObj);
+                }
+
                 WriteUnitOfWork wunit(getOpCtx());
                 newRecordId = collection()->updateDocument(getOpCtx(),
                                                            recordId,
@@ -919,9 +920,16 @@ void UpdateStage::assertUpdateToShardKeyFieldsIsValidAndDocStillBelongsToNode(
                              " with retryWrites: true.",
             getOpCtx()->getTxnNumber());
 
-    uassert(WouldChangeOwningShardInfo(oldObj.value(), newObj),
-            str::stream() << "This update would cause the doc to change owning shards",
-            metadata->keyBelongsToMe(newShardKey));
+    if (!metadata->keyBelongsToMe(newShardKey)) {
+        if (MONGO_FAIL_POINT(hangBeforeThrowWouldChangeOwningShard)) {
+            log() << "Hit hangBeforeThrowWouldChangeOwningShard failpoint";
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(getOpCtx(),
+                                                            hangBeforeThrowWouldChangeOwningShard);
+        }
+
+        uasserted(WouldChangeOwningShardInfo(oldObj.value(), newObj),
+                  str::stream() << "This update would cause the doc to change owning shards");
+    }
 }
 
 }  // namespace mongo

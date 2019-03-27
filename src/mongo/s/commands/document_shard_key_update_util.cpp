@@ -37,11 +37,14 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/cluster_write.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeInsertOnUpdateShardKey);
 
 /**
  * Calls into the command execution stack to run the given command. Will blindly uassert on any
@@ -56,11 +59,17 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     BatchedCommandResponse deleteResponse;
     BatchWriteExecStats deleteStats;
+
     ClusterWriter::write(opCtx, deleteRequest, &deleteStats, &deleteResponse);
     uassertStatusOK(deleteResponse.toStatus());
     // If we do not delete any document, this is essentially equivalent to not matching a doc.
     if (deleteResponse.getN() != 1)
         return false;
+
+    if (MONGO_FAIL_POINT(hangBeforeInsertOnUpdateShardKey)) {
+        log() << "Hit hangBeforeInsertOnUpdateShardKey failpoint";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeInsertOnUpdateShardKey);
+    }
 
     auto insertOpMsg = OpMsgRequest::fromDBAndBody(db, insertCmdObj);
     auto insertRequest = BatchedCommandRequest::parseInsert(insertOpMsg);
