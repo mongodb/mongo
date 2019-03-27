@@ -113,6 +113,18 @@ void ServerTransactionsMetrics::incrementTotalCommitted() {
     _totalCommitted.fetchAndAdd(1);
 }
 
+void ServerTransactionsMetrics::updateLastTransaction(size_t operationCount,
+                                                      size_t oplogOperationBytes,
+                                                      BSONObj writeConcern) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    if (!_lastCommittedTransaction) {
+        _lastCommittedTransaction = LastCommittedTransaction();
+    }
+    _lastCommittedTransaction->setOperationCount(operationCount);
+    _lastCommittedTransaction->setOplogOperationBytes(oplogOperationBytes);
+    _lastCommittedTransaction->setWriteConcern(std::move(writeConcern));
+}
+
 void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setCurrentActive(_currentActive.load());
     stats->setCurrentInactive(_currentInactive.load());
@@ -120,6 +132,11 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
     stats->setTotalAborted(_totalAborted.load());
     stats->setTotalCommitted(_totalCommitted.load());
     stats->setTotalStarted(_totalStarted.load());
+
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    if (_lastCommittedTransaction) {
+        stats->setLastCommittedTransaction(*_lastCommittedTransaction);
+    }
 }
 
 class TransactionsSSS : public ServerStatusSection {

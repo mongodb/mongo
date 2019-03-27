@@ -69,6 +69,10 @@ public:
     unsigned long long getTotalCommitted() const;
     void incrementTotalCommitted();
 
+    void updateLastTransaction(size_t operationCount,
+                               size_t oplogOperationBytes,
+                               BSONObj writeConcern);
+
     /**
      * Appends the accumulated stats to a transactions stats object.
      */
@@ -92,6 +96,11 @@ private:
 
     // The total number of multi-document transaction commits.
     AtomicUInt64 _totalCommitted{0};
+
+    // Protects member variables below.
+    mutable stdx::mutex _mutex;
+
+    boost::optional<LastCommittedTransaction> _lastCommittedTransaction;
 };
 
 }  // namespace mongo
