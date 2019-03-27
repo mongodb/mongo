@@ -34,7 +34,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/future.h"

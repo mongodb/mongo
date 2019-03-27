@@ -33,10 +33,10 @@
 
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 
-#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/s/grid.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"

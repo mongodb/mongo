@@ -159,8 +159,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                                             WriteConcernOptions::kNoTimeout},
                         &unusedWCResult));
 
-                    auto coordinatorDocs =
-                        TransactionCoordinatorDriver::readAllCoordinatorDocs(opCtx);
+                    auto coordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
 
                     LOG(0) << "Need to resume coordinating commit for " << coordinatorDocs.size()
                            << " transactions";

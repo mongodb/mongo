@@ -41,7 +41,7 @@
 namespace mongo {
 namespace {
 
-using PrepareResponse = TransactionCoordinatorDriver::PrepareResponse;
+using PrepareResponse = txn::PrepareResponse;
 using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
 
 const StatusWith<BSONObj> kNoSuchTransaction =
@@ -109,21 +109,18 @@ protected:
     void setUp() override {
         TransactionCoordinatorTestBase::setUp();
         _aws.emplace(getServiceContext());
-        _driver.emplace(getServiceContext(), *_aws);
     }
 
     void tearDown() override {
-        _driver.reset();
         TransactionCoordinatorTestBase::tearDown();
     }
 
     boost::optional<txn::AsyncWorkScheduler> _aws;
-    boost::optional<TransactionCoordinatorDriver> _driver;
 };
 
 auto makeDummyPrepareCommand(const LogicalSessionId& lsid, const TxnNumber& txnNumber) {
     PrepareTransaction prepareCmd;
-    prepareCmd.setDbName("admin");
+    prepareCmd.setDbName(NamespaceString::kAdminDb);
     auto prepareObj = prepareCmd.toBSON(
         BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
                     << WriteConcernOptions::kWriteConcernField
@@ -135,8 +132,8 @@ auto makeDummyPrepareCommand(const LogicalSessionId& lsid, const TxnNumber& txnN
 
 TEST_F(TransactionCoordinatorDriverTest, SendDecisionToParticipantShardReturnsOnImmediateSuccess) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<void> future = _driver->sendDecisionToParticipantShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<void> future = txn::sendDecisionToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
     ASSERT(!future.isReady());
 
     assertPrepareSentAndRespondWithSuccess();
@@ -147,8 +144,8 @@ TEST_F(TransactionCoordinatorDriverTest, SendDecisionToParticipantShardReturnsOn
 TEST_F(TransactionCoordinatorDriverTest,
        SendDecisionToParticipantShardReturnsSuccessAfterOneFailureAndThenSuccess) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<void> future = _driver->sendDecisionToParticipantShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<void> future = txn::sendDecisionToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
     ASSERT(!future.isReady());
 
     assertPrepareSentAndRespondWithRetryableError();
@@ -162,8 +159,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendDecisionToParticipantShardReturnsSuccessAfterSeveralFailuresAndThenSuccess) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<void> future = _driver->sendDecisionToParticipantShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<void> future = txn::sendDecisionToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
     assertPrepareSentAndRespondWithRetryableError();
     assertPrepareSentAndRespondWithRetryableError();
@@ -176,8 +173,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendDecisionToParticipantShardInterpretsVoteToAbortAsSuccess) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<void> future = _driver->sendDecisionToParticipantShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<void> future = txn::sendDecisionToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
 
@@ -187,8 +184,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendDecisionToParticipantShardCanBeInterruptedAndReturnsError) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<void> future = _driver->sendDecisionToParticipantShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<void> future = txn::sendDecisionToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
     assertPrepareSentAndRespondWithRetryableError();
     aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Shutdown for test"});
@@ -200,8 +197,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 
 TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardReturnsCommitDecisionOnOkResponse) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<PrepareResponse> future = _driver->sendPrepareToShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<PrepareResponse> future = txn::sendPrepareToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
     ASSERT(!future.isReady());
 
     assertPrepareSentAndRespondWithSuccess();
@@ -214,8 +211,8 @@ TEST_F(TransactionCoordinatorDriverTest, SendPrepareToShardReturnsCommitDecision
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareToShardReturnsCommitDecisionOnRetryableErrorThenOkResponse) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<PrepareResponse> future = _driver->sendPrepareToShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<PrepareResponse> future = txn::sendPrepareToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
     ASSERT(!future.isReady());
 
     assertPrepareSentAndRespondWithRetryableError();
@@ -231,8 +228,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareToShardCanBeInterruptedAndReturnsNoDecisionIfNotServiceShutdown) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<PrepareResponse> future = _driver->sendPrepareToShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<PrepareResponse> future = txn::sendPrepareToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
     assertPrepareSentAndRespondWithRetryableError();
     aws.shutdown({ErrorCodes::TransactionCoordinatorReachedAbortDecision, "Retry interrupted"});
@@ -246,8 +243,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareToShardCanBeInterruptedAndThrowsExceptionIfServiceShutdown) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    Future<PrepareResponse> future = _driver->sendPrepareToShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    Future<PrepareResponse> future = txn::sendPrepareToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
     assertPrepareSentAndRespondWithRetryableError();
     aws.shutdown({ErrorCodes::TransactionCoordinatorSteppingDown, "Service shutting down"});
@@ -260,8 +257,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareToShardReturnsAbortDecisionOnVoteAbortResponse) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = _driver->sendPrepareToShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    auto future = txn::sendPrepareToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
     assertPrepareSentAndRespondWithNoSuchTransaction();
 
@@ -273,8 +270,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareToShardReturnsAbortDecisionOnRetryableErrorThenVoteAbortResponse) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = _driver->sendPrepareToShard(
-        aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
+    auto future = txn::sendPrepareToShard(
+        getServiceContext(), aws, kTwoShardIdList[0], makeDummyPrepareCommand(_lsid, _txnNumber));
 
     assertPrepareSentAndRespondWithRetryableError();
     assertPrepareSentAndRespondWithNoSuchTransaction();
@@ -286,38 +283,38 @@ TEST_F(TransactionCoordinatorDriverTest,
 
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareReturnsAbortDecisionWhenFirstParticipantVotesAbortAndSecondVotesCommit) {
-    auto future = _driver->sendPrepare(kTwoShardIdList, _lsid, _txnNumber);
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
                 [&](const executor::RemoteCommandRequest& request) { return kPrepareOk; }});
 
-    auto response = future.get();
-    ASSERT(response.decision == txn::CommitDecision::kAbort);
-    ASSERT(response.maxPrepareTimestamp == boost::none);
+    auto decision = future.get().decision();
+    ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareReturnsAbortDecisionWhenFirstParticipantVotesCommitAndSecondVotesAbort) {
-    auto future = _driver->sendPrepare(kTwoShardIdList, _lsid, _txnNumber);
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess();
     assertPrepareSentAndRespondWithNoSuchTransaction();
 
-    auto response = future.get();
-    ASSERT(response.decision == txn::CommitDecision::kAbort);
-    ASSERT(response.maxPrepareTimestamp == boost::none);
+    auto decision = future.get().decision();
+    ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareReturnsAbortDecisionWhenBothParticipantsVoteAbort) {
-    auto future = _driver->sendPrepare(kTwoShardIdList, _lsid, _txnNumber);
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
                 [&](const executor::RemoteCommandRequest& request) { return kPrepareOk; }});
 
-    auto response = future.get();
-    ASSERT(response.decision == txn::CommitDecision::kAbort);
-    ASSERT(response.maxPrepareTimestamp == boost::none);
+    auto decision = future.get().decision();
+    ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -325,14 +322,15 @@ TEST_F(TransactionCoordinatorDriverTest,
     const auto firstPrepareTimestamp = Timestamp(1, 1);
     const auto maxPrepareTimestamp = Timestamp(2, 1);
 
-    auto future = _driver->sendPrepare(kTwoShardIdList, _lsid, _txnNumber);
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
 
-    auto response = future.get();
-    ASSERT(response.decision == txn::CommitDecision::kCommit);
-    ASSERT(response.maxPrepareTimestamp == maxPrepareTimestamp);
+    auto decision = future.get().decision();
+    ASSERT(decision.getDecision() == txn::CommitDecision::kCommit);
+    ASSERT_EQ(maxPrepareTimestamp, *decision.getCommitTimestamp());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -340,14 +338,15 @@ TEST_F(TransactionCoordinatorDriverTest,
     const auto firstPrepareTimestamp = Timestamp(1, 1);
     const auto maxPrepareTimestamp = Timestamp(2, 1);
 
-    auto future = _driver->sendPrepare(kTwoShardIdList, _lsid, _txnNumber);
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
 
-    auto response = future.get();
-    ASSERT(response.decision == txn::CommitDecision::kCommit);
-    ASSERT(response.maxPrepareTimestamp == maxPrepareTimestamp);
+    auto decision = future.get().decision();
+    ASSERT(decision.getDecision() == txn::CommitDecision::kCommit);
+    ASSERT_EQ(maxPrepareTimestamp, *decision.getCommitTimestamp());
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
@@ -355,19 +354,30 @@ TEST_F(TransactionCoordinatorDriverTest,
     const auto firstPrepareTimestamp = Timestamp(1, 1);
     const auto maxPrepareTimestamp = Timestamp(2, 1);
 
-    auto future = _driver->sendPrepare(kTwoShardIdList, _lsid, _txnNumber);
+    txn::AsyncWorkScheduler aws(getServiceContext());
+    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
 
-    auto response = future.get();
-    ASSERT(response.decision == txn::CommitDecision::kCommit);
-    ASSERT(response.maxPrepareTimestamp == maxPrepareTimestamp);
+    auto decision = future.get().decision();
+    ASSERT(decision.getDecision() == txn::CommitDecision::kCommit);
+    ASSERT_EQ(maxPrepareTimestamp, *decision.getCommitTimestamp());
 }
 
 
 class TransactionCoordinatorDriverPersistenceTest : public TransactionCoordinatorDriverTest {
 protected:
+    void setUp() override {
+        TransactionCoordinatorDriverTest::setUp();
+        _aws.emplace(getServiceContext());
+    }
+
+    void tearDown() override {
+        _aws.reset();
+        TransactionCoordinatorDriverTest::tearDown();
+    }
+
     static void assertDocumentMatches(
         TransactionCoordinatorDocument doc,
         LogicalSessionId expectedLsid,
@@ -401,9 +411,9 @@ protected:
                                              LogicalSessionId lsid,
                                              TxnNumber txnNumber,
                                              const std::vector<ShardId>& participants) {
-        _driver->persistParticipantList(lsid, txnNumber, participants).get();
+        txn::persistParticipantsList(*_aws, lsid, txnNumber, participants).get();
 
-        auto allCoordinatorDocs = TransactionCoordinatorDriver::readAllCoordinatorDocs(opCtx);
+        auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
         ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
         assertDocumentMatches(allCoordinatorDocs[0], lsid, txnNumber, participants);
     }
@@ -413,9 +423,9 @@ protected:
                                       TxnNumber txnNumber,
                                       const std::vector<ShardId>& participants,
                                       const boost::optional<Timestamp>& commitTimestamp) {
-        _driver->persistDecision(lsid, txnNumber, participants, commitTimestamp).get();
+        txn::persistDecision(*_aws, lsid, txnNumber, participants, commitTimestamp).get();
 
-        auto allCoordinatorDocs = TransactionCoordinatorDriver::readAllCoordinatorDocs(opCtx);
+        auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
         ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
         if (commitTimestamp) {
             assertDocumentMatches(allCoordinatorDocs[0],
@@ -433,9 +443,9 @@ protected:
     void deleteCoordinatorDocExpectSuccess(OperationContext* opCtx,
                                            LogicalSessionId lsid,
                                            TxnNumber txnNumber) {
-        _driver->deleteCoordinatorDoc(lsid, txnNumber).get();
+        txn::deleteCoordinatorDoc(*_aws, lsid, txnNumber).get();
 
-        auto allCoordinatorDocs = TransactionCoordinatorDriver::readAllCoordinatorDocs(opCtx);
+        auto allCoordinatorDocs = txn::readAllCoordinatorDocs(opCtx);
         ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(0));
     }
 
@@ -443,6 +453,8 @@ protected:
         ShardId("shard0001"), ShardId("shard0002"), ShardId("shard0003")};
 
     const Timestamp _commitTimestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
+
+    boost::optional<txn::AsyncWorkScheduler> _aws;
 };
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
@@ -464,21 +476,22 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
     std::vector<ShardId> smallerParticipantList{ShardId("shard0001"), ShardId("shard0002")};
     ASSERT_THROWS_CODE(
-        _driver->persistParticipantList(_lsid, _txnNumber, smallerParticipantList).get(),
+        txn::persistParticipantsList(*_aws, _lsid, _txnNumber, smallerParticipantList).get(),
         AssertionException,
         51025);
 
     std::vector<ShardId> largerParticipantList{
         ShardId("shard0001"), ShardId("shard0002"), ShardId("shard0003"), ShardId("shard0004")};
     ASSERT_THROWS_CODE(
-        _driver->persistParticipantList(_lsid, _txnNumber, largerParticipantList).get(),
+        txn::persistParticipantsList(*_aws, _lsid, _txnNumber, largerParticipantList).get(),
         AssertionException,
         51025);
 
     std::vector<ShardId> differentSameSizeParticipantList{
         ShardId("shard0001"), ShardId("shard0002"), ShardId("shard0004")};
     ASSERT_THROWS_CODE(
-        _driver->persistParticipantList(_lsid, _txnNumber, differentSameSizeParticipantList).get(),
+        txn::persistParticipantsList(*_aws, _lsid, _txnNumber, differentSameSizeParticipantList)
+            .get(),
         AssertionException,
         51025);
 }
@@ -487,10 +500,9 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistParticipantListForMultipleTransactionsOnSameSession) {
     for (int i = 1; i <= 3; i++) {
         auto txnNumber = TxnNumber{i};
-        _driver->persistParticipantList(_lsid, txnNumber, _participants).get();
+        txn::persistParticipantsList(*_aws, _lsid, txnNumber, _participants).get();
 
-        auto allCoordinatorDocs =
-            TransactionCoordinatorDriver::readAllCoordinatorDocs(operationContext());
+        auto allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
         ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(i));
     }
 }
@@ -498,10 +510,9 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 TEST_F(TransactionCoordinatorDriverPersistenceTest, PersistParticipantListForMultipleSessions) {
     for (int i = 1; i <= 3; i++) {
         auto lsid = makeLogicalSessionIdForTest();
-        _driver->persistParticipantList(lsid, _txnNumber, _participants).get();
+        txn::persistParticipantsList(*_aws, lsid, _txnNumber, _participants).get();
 
-        auto allCoordinatorDocs =
-            TransactionCoordinatorDriver::readAllCoordinatorDocs(operationContext());
+        auto allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
         ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(i));
     }
 }
@@ -509,7 +520,8 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest, PersistParticipantListForMul
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistAbortDecisionWhenNoDocumentForTransactionExistsFails) {
     ASSERT_THROWS_CODE(
-        _driver->persistDecision(_lsid, _txnNumber, _participants, boost::none /* abort */).get(),
+        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, boost::none /* abort */)
+            .get(),
         AssertionException,
         51026);
 }
@@ -534,7 +546,7 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
        PersistCommitDecisionWhenNoDocumentForTransactionExistsFails) {
     ASSERT_THROWS_CODE(
-        _driver->persistDecision(_lsid, _txnNumber, _participants, _commitTimestamp /* commit */)
+        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, _commitTimestamp /* commit */)
             .get(),
         AssertionException,
         51026);
@@ -564,9 +576,8 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
     const Timestamp differentCommitTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 1);
     ASSERT_THROWS_CODE(
-        _driver
-            ->persistDecision(
-                _lsid, _txnNumber, _participants, differentCommitTimestamp /* commit */)
+        txn::persistDecision(
+            *_aws, _lsid, _txnNumber, _participants, differentCommitTimestamp /* commit */)
             .get(),
         AssertionException,
         51026);
@@ -579,7 +590,8 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
         operationContext(), _lsid, _txnNumber, _participants, _commitTimestamp /* commit */);
 
     ASSERT_THROWS_CODE(
-        _driver->persistDecision(_lsid, _txnNumber, _participants, boost::none /* abort */).get(),
+        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, boost::none /* abort */)
+            .get(),
         AssertionException,
         51026);
 }
@@ -591,7 +603,7 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
         operationContext(), _lsid, _txnNumber, _participants, boost::none /* abort */);
 
     ASSERT_THROWS_CODE(
-        _driver->persistDecision(_lsid, _txnNumber, _participants, _commitTimestamp /* abort */)
+        txn::persistDecision(*_aws, _lsid, _txnNumber, _participants, _commitTimestamp /* abort */)
             .get(),
         AssertionException,
         51026);
@@ -599,14 +611,14 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest, DeleteCoordinatorDocWhenNoDocumentExistsFails) {
     ASSERT_THROWS_CODE(
-        _driver->deleteCoordinatorDoc(_lsid, _txnNumber).get(), AssertionException, 51027);
+        txn::deleteCoordinatorDoc(*_aws, _lsid, _txnNumber).get(), AssertionException, 51027);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
        DeleteCoordinatorDocWhenDocumentExistsWithoutDecisionFails) {
     persistParticipantListExpectSuccess(operationContext(), _lsid, _txnNumber, _participants);
     ASSERT_THROWS_CODE(
-        _driver->deleteCoordinatorDoc(_lsid, _txnNumber).get(), AssertionException, 51027);
+        txn::deleteCoordinatorDoc(*_aws, _lsid, _txnNumber).get(), AssertionException, 51027);
 }
 
 TEST_F(TransactionCoordinatorDriverPersistenceTest,
@@ -631,19 +643,18 @@ TEST_F(TransactionCoordinatorDriverPersistenceTest,
     const auto txnNumber2 = TxnNumber{5};
 
     // Insert coordinator documents for two transactions.
-    _driver->persistParticipantList(_lsid, txnNumber1, _participants).get();
-    _driver->persistParticipantList(_lsid, txnNumber2, _participants).get();
+    txn::persistParticipantsList(*_aws, _lsid, txnNumber1, _participants).get();
+    txn::persistParticipantsList(*_aws, _lsid, txnNumber2, _participants).get();
 
-    auto allCoordinatorDocs =
-        TransactionCoordinatorDriver::readAllCoordinatorDocs(operationContext());
+    auto allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
     ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(2));
 
     // Delete the document for the first transaction and check that only the second transaction's
     // document still exists.
-    _driver->persistDecision(_lsid, txnNumber1, _participants, boost::none /* abort */).get();
-    _driver->deleteCoordinatorDoc(_lsid, txnNumber1).get();
+    txn::persistDecision(*_aws, _lsid, txnNumber1, _participants, boost::none /* abort */).get();
+    txn::deleteCoordinatorDoc(*_aws, _lsid, txnNumber1).get();
 
-    allCoordinatorDocs = TransactionCoordinatorDriver::readAllCoordinatorDocs(operationContext());
+    allCoordinatorDocs = txn::readAllCoordinatorDocs(operationContext());
     ASSERT_EQUALS(allCoordinatorDocs.size(), size_t(1));
     assertDocumentMatches(allCoordinatorDocs[0], _lsid, txnNumber2, _participants);
 }

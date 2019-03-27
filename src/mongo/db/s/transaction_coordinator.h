@@ -31,7 +31,7 @@
 
 #include <vector>
 
-#include "mongo/db/s/transaction_coordinator_driver.h"
+#include "mongo/db/s/transaction_coordinator_util.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/util/fail_point_service.h"
 
@@ -186,10 +186,6 @@ private:
     // 'cancelIfCommitNotYetStarted' if runCommit has not been invoked. If nullptr, then this
     // coordinator was not created with an expiration task.
     std::unique_ptr<txn::AsyncWorkScheduler> _deadlineScheduler;
-
-    // Context object used to perform and track the state of asynchronous operations on behalf of
-    // this coordinator.
-    TransactionCoordinatorDriver _driver;
 
     // Protects the state below
     mutable stdx::mutex _mutex;

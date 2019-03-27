@@ -28,7 +28,6 @@
 global:
     cpp_namespace: "mongo"
 
-
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/s/sharding_types.idl"
@@ -100,3 +99,7 @@ commands:
                               progress on commit by processing using the info in the recoveryToken."
                 optional: true
                 type: TxnRecoveryToken
+
+    abortTransaction:
+        description: "abortTransaction Command"
+        namespace: ignored

@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/transaction_coordinator_driver.h"
+#include "mongo/db/s/transaction_coordinator_util.h"
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -39,14 +39,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/transaction_coordinator_document_gen.h"
-#include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace txn {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
@@ -56,15 +55,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeWritingParticipantList);
 MONGO_FAIL_POINT_DEFINE(hangBeforeWritingDecision);
 MONGO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
 
-using CommitDecision = txn::CommitDecision;
-using PrepareVote = txn::PrepareVote;
-using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
-
-using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
-
-using PrepareResponse = TransactionCoordinatorDriver::PrepareResponse;
-using PrepareVoteConsensus = TransactionCoordinatorDriver::PrepareVoteConsensus;
 
 const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
     WriteConcernOptions::kInternalMajorityNoSnapshot,
@@ -74,14 +65,6 @@ const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 const ReadPreferenceSetting kPrimaryReadPreference{ReadPreference::PrimaryOnly};
-
-bool isRetryableError(ErrorCodes::Error code) {
-    // TODO (SERVER-37880): Consider using RemoteCommandRetryScheduler.
-    return std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
-                     RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
-                     code) != RemoteCommandRetryScheduler::kAllRetriableErrors.end() ||
-        code == ErrorCodes::NetworkInterfaceExceededTimeLimit;
-}
 
 BSONArray buildParticipantListMatchesConditions(const std::vector<ShardId>& participantList) {
     BSONArrayBuilder barr;
@@ -119,10 +102,6 @@ bool shouldRetryPersistingCoordinatorState(const Status& responseStatus) {
 }
 
 }  // namespace
-
-TransactionCoordinatorDriver::TransactionCoordinatorDriver(ServiceContext* serviceContext,
-                                                           txn::AsyncWorkScheduler& scheduler)
-    : _serviceContext(serviceContext), _scheduler(scheduler) {}
 
 namespace {
 void persistParticipantListBlocking(OperationContext* opCtx,
@@ -213,27 +192,53 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 }
 }  // namespace
 
-Future<void> TransactionCoordinatorDriver::persistParticipantList(
-    const LogicalSessionId& lsid, TxnNumber txnNumber, std::vector<ShardId> participantList) {
-    return txn::doWhile(_scheduler,
-                        boost::none /* no need for a backoff */,
-                        [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
-                        [this, lsid, txnNumber, participantList] {
-                            return _scheduler.scheduleWork(
-                                [lsid, txnNumber, participantList](OperationContext* opCtx) {
-                                    persistParticipantListBlocking(
-                                        opCtx, lsid, txnNumber, participantList);
-                                });
-                        });
+Future<void> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
+                                     const LogicalSessionId& lsid,
+                                     TxnNumber txnNumber,
+                                     const txn::ParticipantsList& participants) {
+    return txn::doWhile(
+        scheduler,
+        boost::none /* no need for a backoff */,
+        [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
+        [&scheduler, lsid, txnNumber, participants] {
+            return scheduler.scheduleWork([lsid, txnNumber, participants](OperationContext* opCtx) {
+                persistParticipantListBlocking(opCtx, lsid, txnNumber, participants);
+            });
+        });
 }
 
-Future<PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
-    const std::vector<ShardId>& participantShards,
-    const LogicalSessionId& lsid,
-    TxnNumber txnNumber) {
-    PrepareTransaction prepareCmd;
-    prepareCmd.setDbName("admin");
-    auto prepareObj = prepareCmd.toBSON(
+void PrepareVoteConsensus::registerVote(const PrepareResponse& vote) {
+    if (vote.vote == PrepareVote::kCommit) {
+        ++_numCommitVotes;
+        _maxPrepareTimestamp = std::max(_maxPrepareTimestamp, *vote.prepareTimestamp);
+    } else if (vote.vote == PrepareVote::kAbort) {
+        ++_numAbortVotes;
+    } else {
+        ++_numNoVotes;
+    }
+}
+
+CoordinatorCommitDecision PrepareVoteConsensus::decision() const {
+    invariant(_numShards == _numCommitVotes + _numAbortVotes + _numNoVotes);
+
+    CoordinatorCommitDecision decision;
+    if (_numCommitVotes == _numShards) {
+        decision.setDecision(CommitDecision::kCommit);
+        decision.setCommitTimestamp(_maxPrepareTimestamp);
+    } else {
+        decision.setDecision(CommitDecision::kAbort);
+    }
+    return decision;
+}
+
+Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
+                                         txn::AsyncWorkScheduler& scheduler,
+                                         const LogicalSessionId& lsid,
+                                         TxnNumber txnNumber,
+                                         const txn::ParticipantsList& participants) {
+    PrepareTransaction prepareTransaction;
+    prepareTransaction.setDbName(NamespaceString::kAdminDb);
+    auto prepareObj = prepareTransaction.toBSON(
         BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
                     << WriteConcernOptions::kWriteConcernField
                     << WriteConcernOptions::InternalMajorityNoSnapshot));
@@ -242,10 +247,11 @@ Future<PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
 
     // Send prepare to all participants asynchronously and collect their future responses in a
     // vector of responses.
-    auto prepareScheduler = _scheduler.makeChildScheduler();
+    auto prepareScheduler = scheduler.makeChildScheduler();
 
-    for (const auto& participant : participantShards) {
-        responses.push_back(sendPrepareToShard(*prepareScheduler, participant, prepareObj));
+    for (const auto& participant : participants) {
+        responses.emplace_back(
+            sendPrepareToShard(service, *prepareScheduler, participant, prepareObj));
     }
 
     // Asynchronously aggregate all prepare responses to find the decision and max prepare timestamp
@@ -254,37 +260,19 @@ Future<PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
     return txn::collect(
         std::move(responses),
         // Initial value
-        PrepareVoteConsensus{boost::none, boost::none},
+        PrepareVoteConsensus{int(participants.size())},
         // Aggregates an incoming response (next) with the existing aggregate value (result)
         [prepareScheduler = std::move(prepareScheduler)](PrepareVoteConsensus & result,
                                                          const PrepareResponse& next) {
-            if (!next.vote) {
-                LOG(3) << "Transaction coordinator did not receive a response from shard "
-                       << next.shardId;
-                return txn::ShouldStopIteration::kNo;
+            result.registerVote(next);
+
+            if (next.vote == PrepareVote::kAbort) {
+                prepareScheduler->shutdown(
+                    {ErrorCodes::TransactionCoordinatorReachedAbortDecision,
+                     str::stream() << "Received abort vote from " << next.shardId});
             }
 
-            switch (*next.vote) {
-                case PrepareVote::kAbort:
-                    result.decision = CommitDecision::kAbort;
-                    result.maxPrepareTimestamp = boost::none;
-                    prepareScheduler->shutdown(
-                        {ErrorCodes::TransactionCoordinatorReachedAbortDecision,
-                         "Received at least one vote abort"});
-                    return txn::ShouldStopIteration::kYes;
-                case PrepareVote::kCommit:
-                    result.decision = CommitDecision::kCommit;
-                    result.maxPrepareTimestamp = (result.maxPrepareTimestamp)
-                        ? std::max(result.maxPrepareTimestamp, next.prepareTimestamp)
-                        : next.prepareTimestamp;
-                    return txn::ShouldStopIteration::kNo;
-                case PrepareVote::kCanceled:
-                    // PrepareVote is just an alias for CommitDecision, so we need to include this
-                    // branch as part of the switch statement, but CommitDecision::kCanceled will
-                    // never be a valid response to prepare so this path is unreachable.
-                    MONGO_UNREACHABLE;
-            }
-            MONGO_UNREACHABLE;
+            return txn::ShouldStopIteration::kNo;
         });
 }
 
@@ -400,55 +388,59 @@ void persistDecisionBlocking(OperationContext* opCtx,
 }
 }  // namespace
 
-Future<void> TransactionCoordinatorDriver::persistDecision(
-    const LogicalSessionId& lsid,
-    TxnNumber txnNumber,
-    std::vector<ShardId> participantList,
-    const boost::optional<Timestamp>& commitTimestamp) {
+Future<void> persistDecision(txn::AsyncWorkScheduler& scheduler,
+                             const LogicalSessionId& lsid,
+                             TxnNumber txnNumber,
+                             const txn::ParticipantsList& participants,
+                             const boost::optional<Timestamp>& commitTimestamp) {
     return txn::doWhile(
-        _scheduler,
+        scheduler,
         boost::none /* no need for a backoff */,
         [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
-        [this, lsid, txnNumber, participantList, commitTimestamp] {
-            return _scheduler.scheduleWork([lsid, txnNumber, participantList, commitTimestamp](
-                OperationContext* opCtx) {
-                persistDecisionBlocking(opCtx, lsid, txnNumber, participantList, commitTimestamp);
-            });
+        [&scheduler, lsid, txnNumber, participants, commitTimestamp] {
+            return scheduler.scheduleWork(
+                [lsid, txnNumber, participants, commitTimestamp](OperationContext* opCtx) {
+                    persistDecisionBlocking(opCtx, lsid, txnNumber, participants, commitTimestamp);
+                });
         });
 }
 
-Future<void> TransactionCoordinatorDriver::sendCommit(const std::vector<ShardId>& participantShards,
-                                                      const LogicalSessionId& lsid,
-                                                      TxnNumber txnNumber,
-                                                      Timestamp commitTimestamp) {
+Future<void> sendCommit(ServiceContext* service,
+                        txn::AsyncWorkScheduler& scheduler,
+                        const LogicalSessionId& lsid,
+                        TxnNumber txnNumber,
+                        const txn::ParticipantsList& participants,
+                        Timestamp commitTimestamp) {
     CommitTransaction commitTransaction;
+    commitTransaction.setDbName(NamespaceString::kAdminDb);
     commitTransaction.setCommitTimestamp(commitTimestamp);
-    commitTransaction.setDbName("admin");
-    BSONObj commitObj = commitTransaction.toBSON(
+    auto commitObj = commitTransaction.toBSON(
         BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
                     << WriteConcernOptions::kWriteConcernField
                     << WriteConcernOptions::Majority));
 
     std::vector<Future<void>> responses;
-    for (const auto& participant : participantShards) {
-        responses.push_back(sendDecisionToParticipantShard(_scheduler, participant, commitObj));
+    for (const auto& participant : participants) {
+        responses.push_back(sendDecisionToShard(service, scheduler, participant, commitObj));
     }
     return txn::whenAll(responses);
 }
 
-Future<void> TransactionCoordinatorDriver::sendAbort(const std::vector<ShardId>& participantShards,
-                                                     const LogicalSessionId& lsid,
-                                                     TxnNumber txnNumber) {
-    BSONObj abortObj =
-        BSON("abortTransaction" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << txnNumber
-                                << "autocommit"
-                                << false
-                                << WriteConcernOptions::kWriteConcernField
-                                << WriteConcernOptions::Majority);
+Future<void> sendAbort(ServiceContext* service,
+                       txn::AsyncWorkScheduler& scheduler,
+                       const LogicalSessionId& lsid,
+                       TxnNumber txnNumber,
+                       const txn::ParticipantsList& participants) {
+    AbortTransaction abortTransaction;
+    abortTransaction.setDbName(NamespaceString::kAdminDb);
+    auto abortObj = abortTransaction.toBSON(
+        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
+                    << WriteConcernOptions::kWriteConcernField
+                    << WriteConcernOptions::Majority));
 
     std::vector<Future<void>> responses;
-    for (const auto& participant : participantShards) {
-        responses.push_back(sendDecisionToParticipantShard(_scheduler, participant, abortObj));
+    for (const auto& participant : participants) {
+        responses.push_back(sendDecisionToShard(service, scheduler, participant, abortObj));
     }
     return txn::whenAll(responses);
 }
@@ -516,21 +508,21 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 }
 }  // namespace
 
-Future<void> TransactionCoordinatorDriver::deleteCoordinatorDoc(const LogicalSessionId& lsid,
-                                                                TxnNumber txnNumber) {
-    return txn::doWhile(_scheduler,
+Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
+                                  const LogicalSessionId& lsid,
+                                  TxnNumber txnNumber) {
+    return txn::doWhile(scheduler,
                         boost::none /* no need for a backoff */,
                         [](const Status& s) { return shouldRetryPersistingCoordinatorState(s); },
-                        [this, lsid, txnNumber] {
-                            return _scheduler.scheduleWork(
+                        [&scheduler, lsid, txnNumber] {
+                            return scheduler.scheduleWork(
                                 [lsid, txnNumber](OperationContext* opCtx) {
                                     deleteCoordinatorDocBlocking(opCtx, lsid, txnNumber);
                                 });
                         });
 }
 
-std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAllCoordinatorDocs(
-    OperationContext* opCtx) {
+std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationContext* opCtx) {
     std::vector<TransactionCoordinatorDocument> allCoordinatorDocs;
 
     DBDirectClient client(opCtx);
@@ -548,15 +540,16 @@ std::vector<TransactionCoordinatorDocument> TransactionCoordinatorDriver::readAl
     return allCoordinatorDocs;
 }
 
-Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
-    txn::AsyncWorkScheduler& scheduler, const ShardId& shardId, const BSONObj& commandObj) {
-    const bool isLocalShard = (shardId == txn::getLocalShardId(_serviceContext));
+Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
+                                           txn::AsyncWorkScheduler& scheduler,
+                                           const ShardId& shardId,
+                                           const BSONObj& commandObj) {
+    const bool isLocalShard = (shardId == txn::getLocalShardId(service));
 
     auto f = txn::doWhile(
         scheduler,
         kExponentialBackoff,
-        [ shardId, isLocalShard, commandObj = commandObj.getOwned() ](
-            StatusWith<PrepareResponse> swPrepareResponse) {
+        [](const StatusWith<PrepareResponse>& swPrepareResponse) {
             // *Always* retry until hearing a conclusive response or being told to stop via a
             // coordinator-specific code.
             return !swPrepareResponse.isOK() &&
@@ -629,21 +622,23 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
         });
 }
 
-Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
-    txn::AsyncWorkScheduler& scheduler, const ShardId& shardId, const BSONObj& commandObj) {
-    const bool isLocalShard = (shardId == txn::getLocalShardId(_serviceContext));
+Future<void> sendDecisionToShard(ServiceContext* service,
+                                 txn::AsyncWorkScheduler& scheduler,
+                                 const ShardId& shardId,
+                                 const BSONObj& commandObj) {
+    const bool isLocalShard = (shardId == txn::getLocalShardId(service));
 
     return txn::doWhile(
         scheduler,
         kExponentialBackoff,
-        [ shardId, isLocalShard, commandObj = commandObj.getOwned() ](const Status& s) {
+        [](const Status& s) {
             // *Always* retry until hearing a conclusive response or being told to stop via a
             // coordinator-specific code.
             return !s.isOK() && s != ErrorCodes::TransactionCoordinatorSteppingDown;
         },
         [&scheduler, shardId, isLocalShard, commandObj = commandObj.getOwned() ] {
             LOG(3) << "Coordinator going to send command " << commandObj << " to "
-                   << (isLocalShard ? " local " : "") << " shard " << shardId;
+                   << (isLocalShard ? "local" : "") << " shard " << shardId;
 
             return scheduler.scheduleRemoteCommand(shardId, kPrimaryReadPreference, commandObj)
                 .then([ shardId, commandObj = commandObj.getOwned() ](ResponseStatus response) {
@@ -676,4 +671,5 @@ Future<void> TransactionCoordinatorDriver::sendDecisionToParticipantShard(
         });
 }
 
+}  // namespace txn
 }  // namespace mongo
