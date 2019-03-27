@@ -51,7 +51,8 @@ namespace mongo {
  * the database reference returned by this class should not be retained.
  */
 class AutoGetDb {
-    MONGO_DISALLOW_COPYING(AutoGetDb);
+    AutoGetDb(const AutoGetDb&) = delete;
+    AutoGetDb& operator=(const AutoGetDb&) = delete;
 
 public:
     AutoGetDb(OperationContext* opCtx,
@@ -81,7 +82,8 @@ private:
  * and the collection references returned by this class should not be retained.
  */
 class AutoGetCollection {
-    MONGO_DISALLOW_COPYING(AutoGetCollection);
+    AutoGetCollection(const AutoGetCollection&) = delete;
+    AutoGetCollection& operator=(const AutoGetCollection&) = delete;
 
 public:
     enum ViewMode { kViewsPermitted, kViewsForbidden };
@@ -165,7 +167,8 @@ private:
  * the database reference returned by this class should not be retained.
  */
 class AutoGetOrCreateDb {
-    MONGO_DISALLOW_COPYING(AutoGetOrCreateDb);
+    AutoGetOrCreateDb(const AutoGetOrCreateDb&) = delete;
+    AutoGetOrCreateDb& operator=(const AutoGetOrCreateDb&) = delete;
 
 public:
     AutoGetOrCreateDb(OperationContext* opCtx,
@@ -195,7 +198,8 @@ private:
  * The caller must hold the global exclusive lock for the life of the instance.
  */
 class ConcealUUIDCatalogChangesBlock {
-    MONGO_DISALLOW_COPYING(ConcealUUIDCatalogChangesBlock);
+    ConcealUUIDCatalogChangesBlock(const ConcealUUIDCatalogChangesBlock&) = delete;
+    ConcealUUIDCatalogChangesBlock& operator=(const ConcealUUIDCatalogChangesBlock&) = delete;
 
 public:
     /**

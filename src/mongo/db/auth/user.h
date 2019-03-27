@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/privilege.h"
@@ -61,7 +60,8 @@ namespace mongo {
  * user from the AuthorizationManager.
  */
 class User {
-    MONGO_DISALLOW_COPYING(User);
+    User(const User&) = delete;
+    User& operator=(const User&) = delete;
 
 public:
     template <typename HashBlock>

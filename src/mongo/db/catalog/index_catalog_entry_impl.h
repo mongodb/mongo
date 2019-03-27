@@ -55,7 +55,8 @@ class MatchExpression;
 class OperationContext;
 
 class IndexCatalogEntryImpl : public IndexCatalogEntry {
-    MONGO_DISALLOW_COPYING(IndexCatalogEntryImpl);
+    IndexCatalogEntryImpl(const IndexCatalogEntryImpl&) = delete;
+    IndexCatalogEntryImpl& operator=(const IndexCatalogEntryImpl&) = delete;
 
 public:
     explicit IndexCatalogEntryImpl(

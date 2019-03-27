@@ -33,7 +33,6 @@
 
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"

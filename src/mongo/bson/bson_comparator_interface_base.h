@@ -35,7 +35,6 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -51,7 +50,8 @@ class BSONObj;
  */
 template <typename T>
 class BSONComparatorInterfaceBase {
-    MONGO_DISALLOW_COPYING(BSONComparatorInterfaceBase);
+    BSONComparatorInterfaceBase(const BSONComparatorInterfaceBase&) = delete;
+    BSONComparatorInterfaceBase& operator=(const BSONComparatorInterfaceBase&) = delete;
 
 public:
     BSONComparatorInterfaceBase(BSONComparatorInterfaceBase&& other) = default;

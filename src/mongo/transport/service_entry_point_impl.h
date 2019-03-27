@@ -30,7 +30,6 @@
 #pragma once
 
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
@@ -56,7 +55,8 @@ class Session;
  * (transport::Session).
  */
 class ServiceEntryPointImpl : public ServiceEntryPoint {
-    MONGO_DISALLOW_COPYING(ServiceEntryPointImpl);
+    ServiceEntryPointImpl(const ServiceEntryPointImpl&) = delete;
+    ServiceEntryPointImpl& operator=(const ServiceEntryPointImpl&) = delete;
 
 public:
     explicit ServiceEntryPointImpl(ServiceContext* svcCtx);

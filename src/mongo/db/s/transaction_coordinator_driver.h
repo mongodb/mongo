@@ -88,7 +88,8 @@ struct PrepareVoteConsensus {
  * no other operations are allowed until any returned futures are signalled.
  */
 class TransactionCoordinatorDriver {
-    MONGO_DISALLOW_COPYING(TransactionCoordinatorDriver);
+    TransactionCoordinatorDriver(const TransactionCoordinatorDriver&) = delete;
+    TransactionCoordinatorDriver& operator=(const TransactionCoordinatorDriver&) = delete;
 
 public:
     TransactionCoordinatorDriver(ServiceContext* serviceContext,

@@ -32,7 +32,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
@@ -47,7 +46,8 @@ class IndexCatalogEntry;
  * by a temporary table that is created and destroyed by this tracker.
  */
 class DuplicateKeyTracker {
-    MONGO_DISALLOW_COPYING(DuplicateKeyTracker);
+    DuplicateKeyTracker(const DuplicateKeyTracker&) = delete;
+    DuplicateKeyTracker& operator=(const DuplicateKeyTracker&) = delete;
 
 public:
     /**

@@ -43,7 +43,8 @@ namespace {
  * than forwarding the commands to all shards and combining the results.
  */
 class ClusterIndexFilterCmd : public BasicCommand {
-    MONGO_DISALLOW_COPYING(ClusterIndexFilterCmd);
+    ClusterIndexFilterCmd(const ClusterIndexFilterCmd&) = delete;
+    ClusterIndexFilterCmd& operator=(const ClusterIndexFilterCmd&) = delete;
 
 public:
     /**

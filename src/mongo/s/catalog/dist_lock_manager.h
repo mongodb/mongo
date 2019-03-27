@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/stdx/chrono.h"
@@ -74,7 +73,8 @@ public:
      * RAII type for distributed lock. Not meant to be shared across multiple threads.
      */
     class ScopedDistLock {
-        MONGO_DISALLOW_COPYING(ScopedDistLock);
+        ScopedDistLock(const ScopedDistLock&) = delete;
+        ScopedDistLock& operator=(const ScopedDistLock&) = delete;
 
     public:
         ScopedDistLock(OperationContext* opCtx,

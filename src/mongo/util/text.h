@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 
@@ -93,7 +92,8 @@ inline std::wstring toNativeString(const char* s) {
 #endif
 
 class WindowsCommandLine {
-    MONGO_DISALLOW_COPYING(WindowsCommandLine);
+    WindowsCommandLine(const WindowsCommandLine&) = delete;
+    WindowsCommandLine& operator=(const WindowsCommandLine&) = delete;
     char** _argv;
     char** _envp;
 

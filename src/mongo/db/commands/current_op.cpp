@@ -42,7 +42,8 @@
 namespace mongo {
 
 class CurrentOpCommand final : public CurrentOpCommandBase {
-    MONGO_DISALLOW_COPYING(CurrentOpCommand);
+    CurrentOpCommand(const CurrentOpCommand&) = delete;
+    CurrentOpCommand& operator=(const CurrentOpCommand&) = delete;
 
 public:
     CurrentOpCommand() = default;

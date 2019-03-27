@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -52,7 +51,8 @@ MONGO_FAIL_POINT_DECLARE(rollbackHangBeforeFinish);
 MONGO_FAIL_POINT_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
 class RollBackLocalOperations {
-    MONGO_DISALLOW_COPYING(RollBackLocalOperations);
+    RollBackLocalOperations(const RollBackLocalOperations&) = delete;
+    RollBackLocalOperations& operator=(const RollBackLocalOperations&) = delete;
 
 public:
     class RollbackCommonPoint {

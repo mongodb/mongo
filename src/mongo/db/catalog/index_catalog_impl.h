@@ -251,7 +251,8 @@ public:
     // --- these probably become private?
 
     class IndexBuildBlock : public IndexCatalog::IndexBuildBlockInterface {
-        MONGO_DISALLOW_COPYING(IndexBuildBlock);
+        IndexBuildBlock(const IndexBuildBlock&) = delete;
+        IndexBuildBlock& operator=(const IndexBuildBlock&) = delete;
 
     public:
         IndexBuildBlock(IndexCatalogImpl* catalog,

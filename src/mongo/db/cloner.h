@@ -36,7 +36,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/catalog/collection_options.h"
 
@@ -49,7 +48,8 @@ class OperationContext;
 
 
 class Cloner {
-    MONGO_DISALLOW_COPYING(Cloner);
+    Cloner(const Cloner&) = delete;
+    Cloner& operator=(const Cloner&) = delete;
 
 public:
     Cloner();

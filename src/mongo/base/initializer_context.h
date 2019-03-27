@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/service_context_fwd.h"
 
 #include <map>
@@ -43,7 +42,8 @@ namespace mongo {
  * See mongo/base/initializer.h and mongo/base/initializer_dependency_graph.h for more details.
  */
 class InitializerContext {
-    MONGO_DISALLOW_COPYING(InitializerContext);
+    InitializerContext(const InitializerContext&) = delete;
+    InitializerContext& operator=(const InitializerContext&) = delete;
 
 public:
     typedef std::vector<std::string> ArgumentVector;

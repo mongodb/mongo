@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/util/functional.h"
 
 namespace mongo {
@@ -40,7 +39,8 @@ class Status;
  * Interface for a thread pool.
  */
 class ThreadPoolInterface {
-    MONGO_DISALLOW_COPYING(ThreadPoolInterface);
+    ThreadPoolInterface(const ThreadPoolInterface&) = delete;
+    ThreadPoolInterface& operator=(const ThreadPoolInterface&) = delete;
 
 public:
     using Task = unique_function<void()>;

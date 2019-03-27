@@ -36,7 +36,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -53,7 +52,8 @@ class BSONObjBuilder;
  * instance name.
  */
 class PerfCounterCollection {
-    MONGO_DISALLOW_COPYING(PerfCounterCollection);
+    PerfCounterCollection(const PerfCounterCollection&) = delete;
+    PerfCounterCollection& operator=(const PerfCounterCollection&) = delete;
 
     friend class PerfCounterCollector;
 
@@ -136,7 +136,8 @@ private:
  * output the raw counter values to BSONObjBuilder.
  */
 class PerfCounterCollector {
-    MONGO_DISALLOW_COPYING(PerfCounterCollector);
+    PerfCounterCollector(const PerfCounterCollector&) = delete;
+    PerfCounterCollector& operator=(const PerfCounterCollector&) = delete;
 
 public:
     ~PerfCounterCollector();

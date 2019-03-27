@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -49,7 +48,8 @@ class StatusWith;
  * one instance of this object per shard.
  */
 class ActiveShardCollectionRegistry {
-    MONGO_DISALLOW_COPYING(ActiveShardCollectionRegistry);
+    ActiveShardCollectionRegistry(const ActiveShardCollectionRegistry&) = delete;
+    ActiveShardCollectionRegistry& operator=(const ActiveShardCollectionRegistry&) = delete;
 
 public:
     ActiveShardCollectionRegistry();
@@ -119,7 +119,8 @@ private:
  * registerShardCollection method for more details.
  */
 class ScopedShardCollection {
-    MONGO_DISALLOW_COPYING(ScopedShardCollection);
+    ScopedShardCollection(const ScopedShardCollection&) = delete;
+    ScopedShardCollection& operator=(const ScopedShardCollection&) = delete;
 
 public:
     ScopedShardCollection(std::string nss,

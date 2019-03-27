@@ -129,7 +129,8 @@ const OperationContext::Decoration<bool> alwaysAllowNonLocalWrites =
  * Resets to original value when leaving scope so it is safe to nest.
  */
 class AllowNonLocalWritesBlock {
-    MONGO_DISALLOW_COPYING(AllowNonLocalWritesBlock);
+    AllowNonLocalWritesBlock(const AllowNonLocalWritesBlock&) = delete;
+    AllowNonLocalWritesBlock& operator=(const AllowNonLocalWritesBlock&) = delete;
 
 public:
     AllowNonLocalWritesBlock(OperationContext* opCtx)

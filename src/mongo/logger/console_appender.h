@@ -30,7 +30,6 @@
 #pragma once
 
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/logger/appender.h"
 #include "mongo/logger/console.h"
@@ -44,7 +43,8 @@ namespace logger {
  */
 template <typename Event, typename ConsoleType = Console>
 class ConsoleAppender : public Appender<Event> {
-    MONGO_DISALLOW_COPYING(ConsoleAppender);
+    ConsoleAppender(const ConsoleAppender&) = delete;
+    ConsoleAppender& operator=(const ConsoleAppender&) = delete;
 
 public:
     typedef Encoder<Event> EventEncoder;

@@ -35,7 +35,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -70,7 +69,8 @@ class OperationContext;
  * (as it is itself essentially a form of rollback, you don't want to "rollback the rollback").
  */
 class MultiIndexBlock {
-    MONGO_DISALLOW_COPYING(MultiIndexBlock);
+    MultiIndexBlock(const MultiIndexBlock&) = delete;
+    MultiIndexBlock& operator=(const MultiIndexBlock&) = delete;
 
 public:
     MultiIndexBlock() = default;

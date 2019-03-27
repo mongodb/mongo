@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
@@ -62,7 +61,8 @@ class ReplicationProcess;
 class StorageInterface;
 
 class BackgroundSync {
-    MONGO_DISALLOW_COPYING(BackgroundSync);
+    BackgroundSync(const BackgroundSync&) = delete;
+    BackgroundSync& operator=(const BackgroundSync&) = delete;
 
 public:
     /**

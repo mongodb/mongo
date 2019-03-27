@@ -137,7 +137,8 @@ struct ClientCursorParams {
  * of inactivity.
  */
 class ClientCursor {
-    MONGO_DISALLOW_COPYING(ClientCursor);
+    ClientCursor(const ClientCursor&) = delete;
+    ClientCursor& operator=(const ClientCursor&) = delete;
 
 public:
     CursorId cursorid() const {
@@ -456,7 +457,8 @@ private:
  * policy.
  */
 class ClientCursorPin {
-    MONGO_DISALLOW_COPYING(ClientCursorPin);
+    ClientCursorPin(const ClientCursorPin&) = delete;
+    ClientCursorPin& operator=(const ClientCursorPin&) = delete;
 
 public:
     /**

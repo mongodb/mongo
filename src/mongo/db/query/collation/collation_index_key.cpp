@@ -33,7 +33,6 @@
 
 #include <stack>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -49,7 +48,8 @@ namespace {
 // holds necessary information for in-progress translations.  TranslateContexts are held by a
 // TranslateStack, which acts like a heap-allocated call stack.
 class TranslateContext {
-    MONGO_DISALLOW_COPYING(TranslateContext);
+    TranslateContext(const TranslateContext&) = delete;
+    TranslateContext& operator=(const TranslateContext&) = delete;
 
 public:
     TranslateContext(BSONObjIterator&& iter, BufBuilder* buf)

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 
@@ -41,7 +40,8 @@ namespace mongo {
  * TimestampBlock is in scope.
  */
 class TimestampBlock {
-    MONGO_DISALLOW_COPYING(TimestampBlock);
+    TimestampBlock(const TimestampBlock&) = delete;
+    TimestampBlock& operator=(const TimestampBlock&) = delete;
 
 public:
     TimestampBlock(OperationContext* opCtx, Timestamp ts);

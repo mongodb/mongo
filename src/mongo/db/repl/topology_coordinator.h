@@ -32,7 +32,6 @@
 #include <iosfwd>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -65,7 +64,8 @@ const int kMaxHeartbeatRetries = 2;
  * Methods of this class should be non-blocking.
  */
 class TopologyCoordinator {
-    MONGO_DISALLOW_COPYING(TopologyCoordinator);
+    TopologyCoordinator(const TopologyCoordinator&) = delete;
+    TopologyCoordinator& operator=(const TopologyCoordinator&) = delete;
 
 public:
     /**

@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/logger/appender.h"
@@ -57,7 +56,8 @@ namespace mongo {
  * To read a RamLog, instantiate a RamLog::LineIterator, documented below.
  */
 class RamLog : public logger::Tee {
-    MONGO_DISALLOW_COPYING(RamLog);
+    RamLog(const RamLog&) = delete;
+    RamLog& operator=(const RamLog&) = delete;
 
 public:
     class LineIterator;
@@ -134,7 +134,8 @@ private:
  * and so should not be kept around.
  */
 class RamLog::LineIterator {
-    MONGO_DISALLOW_COPYING(LineIterator);
+    LineIterator(const LineIterator&) = delete;
+    LineIterator& operator=(const LineIterator&) = delete;
 
 public:
     explicit LineIterator(RamLog* ramlog);

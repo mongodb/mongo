@@ -33,7 +33,6 @@
 #include <map>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
@@ -64,7 +63,8 @@ typedef std::map<MigrationIdentifier, Status> MigrationStatuses;
  * Manages and executes parallel migrations for the balancer.
  */
 class MigrationManager {
-    MONGO_DISALLOW_COPYING(MigrationManager);
+    MigrationManager(const MigrationManager&) = delete;
+    MigrationManager& operator=(const MigrationManager&) = delete;
 
 public:
     MigrationManager(ServiceContext* serviceContext);

@@ -63,7 +63,8 @@ class MozJSImplScope;
  *
  */
 class MozJSProxyScope final : public Scope {
-    MONGO_DISALLOW_COPYING(MozJSProxyScope);
+    MozJSProxyScope(const MozJSProxyScope&) = delete;
+    MozJSProxyScope& operator=(const MozJSProxyScope&) = delete;
 
     /**
      * The FSM is fairly tight:

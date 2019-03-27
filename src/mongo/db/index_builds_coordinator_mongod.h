@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -48,7 +47,8 @@ class ServiceContext;
  * accessible via the ServiceContext.
  */
 class IndexBuildsCoordinatorMongod : public IndexBuildsCoordinator {
-    MONGO_DISALLOW_COPYING(IndexBuildsCoordinatorMongod);
+    IndexBuildsCoordinatorMongod(const IndexBuildsCoordinatorMongod&) = delete;
+    IndexBuildsCoordinatorMongod& operator=(const IndexBuildsCoordinatorMongod&) = delete;
 
 public:
     /**

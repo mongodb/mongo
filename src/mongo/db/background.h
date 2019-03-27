@@ -39,7 +39,6 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 
@@ -55,7 +54,8 @@ namespace mongo {
    anything special in the implementation here to be fast.
 */
 class BackgroundOperation {
-    MONGO_DISALLOW_COPYING(BackgroundOperation);
+    BackgroundOperation(const BackgroundOperation&) = delete;
+    BackgroundOperation& operator=(const BackgroundOperation&) = delete;
 
 public:
     static bool inProgForDb(StringData db);

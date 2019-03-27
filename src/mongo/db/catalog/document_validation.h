@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 
@@ -54,7 +53,8 @@ inline bool shouldBypassDocumentValidationForCommand(const BSONObj& cmdObj) {
  * Resets to original value when leaving scope so they are safe to nest.
  */
 class DisableDocumentValidation {
-    MONGO_DISALLOW_COPYING(DisableDocumentValidation);
+    DisableDocumentValidation(const DisableDocumentValidation&) = delete;
+    DisableDocumentValidation& operator=(const DisableDocumentValidation&) = delete;
 
 public:
     DisableDocumentValidation(OperationContext* opCtx)

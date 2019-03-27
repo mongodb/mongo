@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <cstddef>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
@@ -65,7 +64,9 @@ class ReplicationCoordinator;
  * ReplicationCoordinatorImpl should be moved here.
  */
 class ReplicationCoordinatorExternalState {
-    MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalState);
+    ReplicationCoordinatorExternalState(const ReplicationCoordinatorExternalState&) = delete;
+    ReplicationCoordinatorExternalState& operator=(const ReplicationCoordinatorExternalState&) =
+        delete;
 
 public:
     ReplicationCoordinatorExternalState() {}

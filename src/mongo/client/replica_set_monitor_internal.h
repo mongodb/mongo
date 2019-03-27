@@ -41,7 +41,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
@@ -86,7 +85,8 @@ struct ReplicaSetMonitor::IsMasterReply {
 };
 
 struct ReplicaSetMonitor::SetState {
-    MONGO_DISALLOW_COPYING(SetState);
+    SetState(const SetState&) = delete;
+    SetState& operator=(const SetState&) = delete;
 
 public:
     /**
@@ -228,7 +228,8 @@ public:
 };
 
 struct ReplicaSetMonitor::ScanState {
-    MONGO_DISALLOW_COPYING(ScanState);
+    ScanState(const ScanState&) = delete;
+    ScanState& operator=(const ScanState&) = delete;
 
 public:
     ScanState() = default;

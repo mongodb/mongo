@@ -32,7 +32,6 @@
 #include <memory>
 #include <utility>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/reply_interface.h"
 
@@ -44,7 +43,8 @@ namespace rpc {
  */
 template <typename MessageViewType>
 class UniqueMessage {
-    MONGO_DISALLOW_COPYING(UniqueMessage);
+    UniqueMessage(const UniqueMessage&) = delete;
+    UniqueMessage& operator=(const UniqueMessage&) = delete;
 
 public:
     UniqueMessage(Message message, std::unique_ptr<MessageViewType> view)

@@ -32,13 +32,13 @@
 #include <boost/optional.hpp>
 #include <queue>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
 
 class PlanExecutorImpl : public PlanExecutor {
-    MONGO_DISALLOW_COPYING(PlanExecutorImpl);
+    PlanExecutorImpl(const PlanExecutorImpl&) = delete;
+    PlanExecutorImpl& operator=(const PlanExecutorImpl&) = delete;
 
 public:
     /**

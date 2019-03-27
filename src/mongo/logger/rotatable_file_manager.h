@@ -33,7 +33,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/logger/rotatable_file_writer.h"
@@ -50,7 +49,8 @@ typedef StatusWith<RotatableFileWriter*> StatusWithRotatableFileWriter;
  * Unlike RotatableFileWriter, this type leaves synchronization to its consumers.
  */
 class RotatableFileManager {
-    MONGO_DISALLOW_COPYING(RotatableFileManager);
+    RotatableFileManager(const RotatableFileManager&) = delete;
+    RotatableFileManager& operator=(const RotatableFileManager&) = delete;
 
 public:
     typedef std::pair<std::string, Status> FileNameStatusPair;

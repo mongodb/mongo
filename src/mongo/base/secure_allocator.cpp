@@ -43,7 +43,6 @@
 #include <sys/types.h>
 #endif
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -290,7 +289,8 @@ void systemDeallocate(void* ptr, std::size_t bytes) {
  * page size and allocate returns aligned pointers.
  */
 class Allocation {
-    MONGO_DISALLOW_COPYING(Allocation);
+    Allocation(const Allocation&) = delete;
+    Allocation& operator=(const Allocation&) = delete;
 
 public:
     explicit Allocation(std::size_t initialAllocation) {

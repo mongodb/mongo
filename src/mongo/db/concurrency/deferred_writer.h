@@ -57,7 +57,8 @@ class ThreadPool;
  * improper use of the ctor, `flush` and `shutdown` methods below.
  */
 class DeferredWriter {
-    MONGO_DISALLOW_COPYING(DeferredWriter);
+    DeferredWriter(const DeferredWriter&) = delete;
+    DeferredWriter& operator=(const DeferredWriter&) = delete;
 
 public:
     /**

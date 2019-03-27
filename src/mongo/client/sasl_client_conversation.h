@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -45,7 +44,8 @@ class StatusWith;
  * of a SASL mechanism conversation.
  */
 class SaslClientConversation {
-    MONGO_DISALLOW_COPYING(SaslClientConversation);
+    SaslClientConversation(const SaslClientConversation&) = delete;
+    SaslClientConversation& operator=(const SaslClientConversation&) = delete;
 
 public:
     /**

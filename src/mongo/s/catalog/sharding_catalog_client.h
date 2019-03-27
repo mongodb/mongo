@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/write_concern_options.h"
@@ -83,7 +82,8 @@ struct ConnectionPoolStats;
  * move to be run on the config server primary.
  */
 class ShardingCatalogClient {
-    MONGO_DISALLOW_COPYING(ShardingCatalogClient);
+    ShardingCatalogClient(const ShardingCatalogClient&) = delete;
+    ShardingCatalogClient& operator=(const ShardingCatalogClient&) = delete;
 
     // Allows ShardingCatalogManager to access _exhaustiveFindOnConfig
     friend class ShardingCatalogManager;

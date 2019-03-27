@@ -37,7 +37,6 @@
 
 #include <iomanip>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
@@ -147,7 +146,8 @@ BSONObj upconvertGetMoreEntry(const NamespaceString& nss, CursorId cursorId, int
  * The stack itself is represented in the _parent pointers of the CurOp class.
  */
 class CurOp::CurOpStack {
-    MONGO_DISALLOW_COPYING(CurOpStack);
+    CurOpStack(const CurOpStack&) = delete;
+    CurOpStack& operator=(const CurOpStack&) = delete;
 
 public:
     CurOpStack() : _base(nullptr, this) {}

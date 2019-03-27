@@ -34,7 +34,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 
@@ -47,7 +46,8 @@ namespace mongo {
  * Fields other than 'storage.engine' are ignored.
  */
 class StorageEngineMetadata {
-    MONGO_DISALLOW_COPYING(StorageEngineMetadata);
+    StorageEngineMetadata(const StorageEngineMetadata&) = delete;
+    StorageEngineMetadata& operator=(const StorageEngineMetadata&) = delete;
 
 public:
     /**

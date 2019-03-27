@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/rpc/protocol.h"
 
 namespace mongo {
@@ -42,7 +41,8 @@ namespace rpc {
  * An immutable view of an RPC Reply.
  */
 class ReplyInterface {
-    MONGO_DISALLOW_COPYING(ReplyInterface);
+    ReplyInterface(const ReplyInterface&) = delete;
+    ReplyInterface& operator=(const ReplyInterface&) = delete;
 
 public:
     virtual ~ReplyInterface() = default;

@@ -32,7 +32,6 @@
 #include <list>
 #include <map>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
@@ -45,7 +44,9 @@ class OperationContext;
  * Map of one-snot notifications for changes to a particular namespace.
  */
 class NamespaceMetadataChangeNotifications {
-    MONGO_DISALLOW_COPYING(NamespaceMetadataChangeNotifications);
+    NamespaceMetadataChangeNotifications(const NamespaceMetadataChangeNotifications&) = delete;
+    NamespaceMetadataChangeNotifications& operator=(const NamespaceMetadataChangeNotifications&) =
+        delete;
 
     struct NotificationToken;
 
@@ -60,7 +61,8 @@ public:
      * out of scope, if it has not been signalled yet.
      */
     class ScopedNotification {
-        MONGO_DISALLOW_COPYING(ScopedNotification);
+        ScopedNotification(const ScopedNotification&) = delete;
+        ScopedNotification& operator=(const ScopedNotification&) = delete;
 
     public:
         ScopedNotification(NamespaceMetadataChangeNotifications* notifications,

@@ -30,7 +30,6 @@
 #pragma once
 
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -47,7 +46,8 @@ class CollatorInterface;
  * Matcher is a simple wrapper around a BSONObj and the MatchExpression created from it.
  */
 class Matcher {
-    MONGO_DISALLOW_COPYING(Matcher);
+    Matcher(const Matcher&) = delete;
+    Matcher& operator=(const Matcher&) = delete;
 
 public:
     /**

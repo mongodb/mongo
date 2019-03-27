@@ -33,7 +33,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/initializer_function.h"
 #include "mongo/base/status.h"
 #include "mongo/stdx/unordered_map.h"
@@ -84,7 +83,8 @@ private:
  * thread is executing those functions or addInitializer on the same instance.
  */
 class InitializerDependencyGraph {
-    MONGO_DISALLOW_COPYING(InitializerDependencyGraph);
+    InitializerDependencyGraph(const InitializerDependencyGraph&) = delete;
+    InitializerDependencyGraph& operator=(const InitializerDependencyGraph&) = delete;
 
 public:
     InitializerDependencyGraph();

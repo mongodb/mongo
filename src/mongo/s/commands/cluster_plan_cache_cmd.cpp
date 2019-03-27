@@ -50,7 +50,8 @@ using std::vector;
  * forwarding the commands to all shards and combining the results.
  */
 class ClusterPlanCacheCmd : public BasicCommand {
-    MONGO_DISALLOW_COPYING(ClusterPlanCacheCmd);
+    ClusterPlanCacheCmd(const ClusterPlanCacheCmd&) = delete;
+    ClusterPlanCacheCmd& operator=(const ClusterPlanCacheCmd&) = delete;
 
 public:
     virtual ~ClusterPlanCacheCmd() {}

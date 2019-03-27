@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/s/chunk.h"
@@ -61,7 +60,8 @@ using ShardVersionMap = std::map<ShardId, ChunkVersion>;
  * in time.
  */
 class RoutingTableHistory : public std::enable_shared_from_this<RoutingTableHistory> {
-    MONGO_DISALLOW_COPYING(RoutingTableHistory);
+    RoutingTableHistory(const RoutingTableHistory&) = delete;
+    RoutingTableHistory& operator=(const RoutingTableHistory&) = delete;
 
 public:
     /**
@@ -204,7 +204,8 @@ private:
 // This will be renamed to RoutingTableHistory and the original RoutingTableHistory will be
 // ChunkHistoryMap
 class ChunkManager : public std::enable_shared_from_this<ChunkManager> {
-    MONGO_DISALLOW_COPYING(ChunkManager);
+    ChunkManager(const ChunkManager&) = delete;
+    ChunkManager& operator=(const ChunkManager&) = delete;
 
 public:
     class ConstChunkIterator {

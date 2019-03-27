@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/transport/service_entry_point_impl.h"
 
 namespace mongo {
@@ -38,7 +37,8 @@ namespace mongo {
  * The entry point into mongod. Just a wrapper around assembleResponse.
  */
 class ServiceEntryPointMongod final : public ServiceEntryPointImpl {
-    MONGO_DISALLOW_COPYING(ServiceEntryPointMongod);
+    ServiceEntryPointMongod(const ServiceEntryPointMongod&) = delete;
+    ServiceEntryPointMongod& operator=(const ServiceEntryPointMongod&) = delete;
 
 public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;

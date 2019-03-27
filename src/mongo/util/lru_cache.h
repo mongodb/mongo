@@ -35,7 +35,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -57,7 +56,8 @@ template <typename K,
           typename Hash = typename stdx::unordered_map<K, V>::hasher,
           typename KeyEqual = typename stdx::unordered_map<K, V, Hash>::key_equal>
 class LRUCache {
-    MONGO_DISALLOW_COPYING(LRUCache);
+    LRUCache(const LRUCache&) = delete;
+    LRUCache& operator=(const LRUCache&) = delete;
 
 public:
     explicit LRUCache(std::size_t maxSize) : _maxSize(maxSize) {}

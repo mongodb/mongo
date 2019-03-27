@@ -46,7 +46,8 @@ public:
      * NOTE: DO NOT add any new usages of TempRelease. It is being deprecated/removed.
      */
     class TempRelease {
-        MONGO_DISALLOW_COPYING(TempRelease);
+        TempRelease(const TempRelease&) = delete;
+        TempRelease& operator=(const TempRelease&) = delete;
 
     public:
         explicit TempRelease(Locker* lockState);
@@ -72,7 +73,8 @@ public:
      * resources other than RESOURCE_GLOBAL, RESOURCE_DATABASE and RESOURCE_COLLECTION.
      */
     class ResourceLock {
-        MONGO_DISALLOW_COPYING(ResourceLock);
+        ResourceLock(const ResourceLock&) = delete;
+        ResourceLock& operator=(const ResourceLock&) = delete;
 
     public:
         ResourceLock(Locker* locker, ResourceId rid)
@@ -352,7 +354,8 @@ public:
      * will be upgraded to MODE_S and MODE_IX will be upgraded to MODE_X.
      */
     class CollectionLock {
-        MONGO_DISALLOW_COPYING(CollectionLock);
+        CollectionLock(const CollectionLock&) = delete;
+        CollectionLock& operator=(const CollectionLock&) = delete;
 
     public:
         CollectionLock(Locker* lockState,
@@ -379,7 +382,8 @@ public:
      * dassert(), to not have a suitable database lock when taking this lock.
      */
     class OplogIntentWriteLock {
-        MONGO_DISALLOW_COPYING(OplogIntentWriteLock);
+        OplogIntentWriteLock(const OplogIntentWriteLock&) = delete;
+        OplogIntentWriteLock& operator=(const OplogIntentWriteLock&) = delete;
 
     public:
         explicit OplogIntentWriteLock(Locker* lockState);
@@ -398,7 +402,8 @@ public:
      * writers just call setShouldConflictWithSecondaryBatchApplication(false).
      */
     class ParallelBatchWriterMode {
-        MONGO_DISALLOW_COPYING(ParallelBatchWriterMode);
+        ParallelBatchWriterMode(const ParallelBatchWriterMode&) = delete;
+        ParallelBatchWriterMode& operator=(const ParallelBatchWriterMode&) = delete;
 
     public:
         explicit ParallelBatchWriterMode(Locker* lockState);

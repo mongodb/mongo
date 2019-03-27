@@ -34,7 +34,6 @@
 #include <tuple>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/ftdc/collector.h"
@@ -53,7 +52,8 @@ class Client;
  * Manages file rotation, and directory size management.
  */
 class FTDCFileManager {
-    MONGO_DISALLOW_COPYING(FTDCFileManager);
+    FTDCFileManager(const FTDCFileManager&) = delete;
+    FTDCFileManager& operator=(const FTDCFileManager&) = delete;
 
 public:
     ~FTDCFileManager();

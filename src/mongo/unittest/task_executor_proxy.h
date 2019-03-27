@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/task_executor.h"
 
 namespace mongo {
@@ -39,7 +38,8 @@ namespace unittest {
  * Proxy for the executor::TaskExecutor interface used for testing.
  */
 class TaskExecutorProxy : public executor::TaskExecutor {
-    MONGO_DISALLOW_COPYING(TaskExecutorProxy);
+    TaskExecutorProxy(const TaskExecutorProxy&) = delete;
+    TaskExecutorProxy& operator=(const TaskExecutorProxy&) = delete;
 
 public:
     /**

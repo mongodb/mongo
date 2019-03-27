@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/baton.h"
@@ -50,7 +49,8 @@ MONGO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsAfterAcquireConn);
  * Interface to networking for use by TaskExecutor implementations.
  */
 class NetworkInterface {
-    MONGO_DISALLOW_COPYING(NetworkInterface);
+    NetworkInterface(const NetworkInterface&) = delete;
+    NetworkInterface& operator=(const NetworkInterface&) = delete;
 
 public:
     using Response = RemoteCommandResponse;

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/string_map.h"
@@ -47,7 +46,8 @@ using CollectionUUID = UUID;
 class Database;
 
 class NamespaceUUIDCache {
-    MONGO_DISALLOW_COPYING(NamespaceUUIDCache);
+    NamespaceUUIDCache(const NamespaceUUIDCache&) = delete;
+    NamespaceUUIDCache& operator=(const NamespaceUUIDCache&) = delete;
 
 public:
     static const OperationContext::Decoration<NamespaceUUIDCache> get;

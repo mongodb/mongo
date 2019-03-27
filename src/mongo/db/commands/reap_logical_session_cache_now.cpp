@@ -41,7 +41,8 @@ namespace mongo {
 namespace {
 
 class ReapLogicalSessionCacheNowCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(ReapLogicalSessionCacheNowCommand);
+    ReapLogicalSessionCacheNowCommand(const ReapLogicalSessionCacheNowCommand&) = delete;
+    ReapLogicalSessionCacheNowCommand& operator=(const ReapLogicalSessionCacheNowCommand&) = delete;
 
 public:
     ReapLogicalSessionCacheNowCommand() : BasicCommand("reapLogicalSessionCacheNow") {}

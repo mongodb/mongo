@@ -139,7 +139,8 @@ struct InitialSyncerOptions {
  *      -- startup: Start initial sync.
  */
 class InitialSyncer {
-    MONGO_DISALLOW_COPYING(InitialSyncer);
+    InitialSyncer(const InitialSyncer&) = delete;
+    InitialSyncer& operator=(const InitialSyncer&) = delete;
 
 public:
     /**

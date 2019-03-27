@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -54,7 +53,9 @@ class OperationContext;
  * the source migration shard.
  */
 class SessionCatalogMigrationDestination {
-    MONGO_DISALLOW_COPYING(SessionCatalogMigrationDestination);
+    SessionCatalogMigrationDestination(const SessionCatalogMigrationDestination&) = delete;
+    SessionCatalogMigrationDestination& operator=(const SessionCatalogMigrationDestination&) =
+        delete;
 
 public:
     enum class State {

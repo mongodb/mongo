@@ -35,7 +35,6 @@
 #include <tuple>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/ftdc/block_compressor.h"
@@ -61,7 +60,8 @@ namespace mongo {
  * across all documents in the series of documents.
  */
 class FTDCCompressor {
-    MONGO_DISALLOW_COPYING(FTDCCompressor);
+    FTDCCompressor(const FTDCCompressor&) = delete;
+    FTDCCompressor& operator=(const FTDCCompressor&) = delete;
 
 public:
     /**

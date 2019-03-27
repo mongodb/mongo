@@ -33,7 +33,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 
 namespace mongo {
@@ -45,7 +44,8 @@ class Client;
  * been received by the specified Client object.
  */
 class ClientMetadataIsMasterState {
-    MONGO_DISALLOW_COPYING(ClientMetadataIsMasterState);
+    ClientMetadataIsMasterState(const ClientMetadataIsMasterState&) = delete;
+    ClientMetadataIsMasterState& operator=(const ClientMetadataIsMasterState&) = delete;
 
 public:
     ClientMetadataIsMasterState() = default;

@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/killcursors_common.h"
@@ -43,7 +42,8 @@
 namespace mongo {
 
 class KillCursorsCmd final : public KillCursorsCmdBase {
-    MONGO_DISALLOW_COPYING(KillCursorsCmd);
+    KillCursorsCmd(const KillCursorsCmd&) = delete;
+    KillCursorsCmd& operator=(const KillCursorsCmd&) = delete;
 
 public:
     KillCursorsCmd() = default;

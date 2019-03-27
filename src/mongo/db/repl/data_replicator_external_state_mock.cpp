@@ -40,7 +40,8 @@ namespace repl {
 namespace {
 
 class OplogApplierMock : public OplogApplier {
-    MONGO_DISALLOW_COPYING(OplogApplierMock);
+    OplogApplierMock(const OplogApplierMock&) = delete;
+    OplogApplierMock& operator=(const OplogApplierMock&) = delete;
 
 public:
     OplogApplierMock(executor::TaskExecutor* executor,

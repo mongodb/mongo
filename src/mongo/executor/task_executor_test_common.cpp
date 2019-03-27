@@ -35,7 +35,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -80,7 +79,8 @@ static ExecutorTestCaseMap& executorTestCaseRegistry() {
 }
 
 class CetRegistrationAgent {
-    MONGO_DISALLOW_COPYING(CetRegistrationAgent);
+    CetRegistrationAgent(const CetRegistrationAgent&) = delete;
+    CetRegistrationAgent& operator=(const CetRegistrationAgent&) = delete;
 
 public:
     CetRegistrationAgent(const std::string& name, ExecutorTestCaseFactory makeTest) {
@@ -207,7 +207,8 @@ COMMON_EXECUTOR_TEST(OneSchedulesAnother) {
 }
 
 class EventChainAndWaitingTest {
-    MONGO_DISALLOW_COPYING(EventChainAndWaitingTest);
+    EventChainAndWaitingTest(const EventChainAndWaitingTest&) = delete;
+    EventChainAndWaitingTest& operator=(const EventChainAndWaitingTest&) = delete;
 
 public:
     EventChainAndWaitingTest(TaskExecutor* exec, NetworkInterfaceMock* network);

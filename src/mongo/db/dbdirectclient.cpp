@@ -54,7 +54,8 @@ using std::string;
 namespace {
 
 class DirectClientScope {
-    MONGO_DISALLOW_COPYING(DirectClientScope);
+    DirectClientScope(const DirectClientScope&) = delete;
+    DirectClientScope& operator=(const DirectClientScope&) = delete;
 
 public:
     explicit DirectClientScope(OperationContext* opCtx)

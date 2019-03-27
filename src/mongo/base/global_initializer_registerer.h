@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/initializer_function.h"
 #include "mongo/base/status.h"
 
@@ -53,7 +52,8 @@ namespace mongo {
  * mongo/base/init.h and mongo/base/initializer_dependency_graph.h for details.
  */
 class GlobalInitializerRegisterer {
-    MONGO_DISALLOW_COPYING(GlobalInitializerRegisterer);
+    GlobalInitializerRegisterer(const GlobalInitializerRegisterer&) = delete;
+    GlobalInitializerRegisterer& operator=(const GlobalInitializerRegisterer&) = delete;
 
 public:
     /**

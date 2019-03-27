@@ -40,7 +40,8 @@ namespace mongo {
  * of a write command's response (see batched_command_response.h)
  */
 class BatchedUpsertDetail {
-    MONGO_DISALLOW_COPYING(BatchedUpsertDetail);
+    BatchedUpsertDetail(const BatchedUpsertDetail&) = delete;
+    BatchedUpsertDetail& operator=(const BatchedUpsertDetail&) = delete;
 
 public:
     //

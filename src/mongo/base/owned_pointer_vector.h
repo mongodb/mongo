@@ -32,7 +32,6 @@
 #include <cstring>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -43,7 +42,8 @@ namespace mongo {
  */
 template <class T>
 class OwnedPointerVector {
-    MONGO_DISALLOW_COPYING(OwnedPointerVector);
+    OwnedPointerVector(const OwnedPointerVector&) = delete;
+    OwnedPointerVector& operator=(const OwnedPointerVector&) = delete;
 
 public:
     OwnedPointerVector() {}

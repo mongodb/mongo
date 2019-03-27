@@ -132,7 +132,8 @@ private:
      * a particular $or branch.
      */
     struct BranchPlanningResult {
-        MONGO_DISALLOW_COPYING(BranchPlanningResult);
+        BranchPlanningResult(const BranchPlanningResult&) = delete;
+        BranchPlanningResult& operator=(const BranchPlanningResult&) = delete;
 
     public:
         BranchPlanningResult() {}

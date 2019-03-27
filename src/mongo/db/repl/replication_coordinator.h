@@ -31,7 +31,6 @@
 
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
@@ -85,7 +84,8 @@ class UpdatePositionArgs;
  * API that the replication subsystem presents to the rest of the codebase.
  */
 class ReplicationCoordinator : public SyncSourceSelector {
-    MONGO_DISALLOW_COPYING(ReplicationCoordinator);
+    ReplicationCoordinator(const ReplicationCoordinator&) = delete;
+    ReplicationCoordinator& operator=(const ReplicationCoordinator&) = delete;
 
 public:
     static ReplicationCoordinator* get(ServiceContext* service);

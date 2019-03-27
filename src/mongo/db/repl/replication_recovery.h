@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/optime.h"
 
@@ -59,7 +58,8 @@ public:
 };
 
 class ReplicationRecoveryImpl : public ReplicationRecovery {
-    MONGO_DISALLOW_COPYING(ReplicationRecoveryImpl);
+    ReplicationRecoveryImpl(const ReplicationRecoveryImpl&) = delete;
+    ReplicationRecoveryImpl& operator=(const ReplicationRecoveryImpl&) = delete;
 
 public:
     ReplicationRecoveryImpl(StorageInterface* storageInterface,

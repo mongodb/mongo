@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/op_observer.h"
 
 namespace mongo {
@@ -39,7 +38,8 @@ namespace mongo {
  * server (--configsvr).
  */
 class ConfigServerOpObserver final : public OpObserver {
-    MONGO_DISALLOW_COPYING(ConfigServerOpObserver);
+    ConfigServerOpObserver(const ConfigServerOpObserver&) = delete;
+    ConfigServerOpObserver& operator=(const ConfigServerOpObserver&) = delete;
 
 public:
     ConfigServerOpObserver();

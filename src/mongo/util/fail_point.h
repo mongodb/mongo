@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
@@ -69,7 +68,8 @@ namespace mongo {
  * 2. Client visible fail point states are read-only when active.
  */
 class FailPoint {
-    MONGO_DISALLOW_COPYING(FailPoint);
+    FailPoint(const FailPoint&) = delete;
+    FailPoint& operator=(const FailPoint&) = delete;
 
 public:
     typedef unsigned ValType;
@@ -213,7 +213,8 @@ private:
  * MONGO_FAIL_POINT_BLOCK macro.
  */
 class ScopedFailPoint {
-    MONGO_DISALLOW_COPYING(ScopedFailPoint);
+    ScopedFailPoint(const ScopedFailPoint&) = delete;
+    ScopedFailPoint& operator=(const ScopedFailPoint&) = delete;
 
 public:
     template <typename Callable = std::nullptr_t>

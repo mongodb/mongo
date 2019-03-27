@@ -43,7 +43,8 @@ namespace mongo {
  * Container for server-wide multi-document transaction statistics.
  */
 class ServerTransactionsMetrics {
-    MONGO_DISALLOW_COPYING(ServerTransactionsMetrics);
+    ServerTransactionsMetrics(const ServerTransactionsMetrics&) = delete;
+    ServerTransactionsMetrics& operator=(const ServerTransactionsMetrics&) = delete;
 
 public:
     ServerTransactionsMetrics() = default;

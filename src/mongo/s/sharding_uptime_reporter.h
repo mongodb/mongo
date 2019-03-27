@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/timer.h"
 
@@ -46,7 +45,8 @@ class OperationContext;
  * NOTE: Not thread-safe, so it should not be used from more than one thread at a time.
  */
 class ShardingUptimeReporter {
-    MONGO_DISALLOW_COPYING(ShardingUptimeReporter);
+    ShardingUptimeReporter(const ShardingUptimeReporter&) = delete;
+    ShardingUptimeReporter& operator=(const ShardingUptimeReporter&) = delete;
 
 public:
     ShardingUptimeReporter();

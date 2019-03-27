@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
@@ -70,7 +69,8 @@ class ServiceContext;
  * it would be wrong to wait for the highest opTime in this case.
  */
 class SessionCatalogMigrationSource {
-    MONGO_DISALLOW_COPYING(SessionCatalogMigrationSource);
+    SessionCatalogMigrationSource(const SessionCatalogMigrationSource&) = delete;
+    SessionCatalogMigrationSource& operator=(const SessionCatalogMigrationSource&) = delete;
 
 public:
     struct OplogResult {

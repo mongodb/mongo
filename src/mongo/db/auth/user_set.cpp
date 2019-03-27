@@ -41,7 +41,8 @@ namespace mongo {
 
 namespace {
 class UserSetNameIteratorImpl : public UserNameIterator::Impl {
-    MONGO_DISALLOW_COPYING(UserSetNameIteratorImpl);
+    UserSetNameIteratorImpl(const UserSetNameIteratorImpl&) = delete;
+    UserSetNameIteratorImpl& operator=(const UserSetNameIteratorImpl&) = delete;
 
 public:
     UserSetNameIteratorImpl(const UserSet::const_iterator& begin,

@@ -33,7 +33,6 @@
 #include <map>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
@@ -45,7 +44,8 @@ class Client;
  * namespace.
  */
 class ShardedConnectionInfo {
-    MONGO_DISALLOW_COPYING(ShardedConnectionInfo);
+    ShardedConnectionInfo(const ShardedConnectionInfo&) = delete;
+    ShardedConnectionInfo& operator=(const ShardedConnectionInfo&) = delete;
 
 public:
     ShardedConnectionInfo();

@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
@@ -47,7 +46,8 @@ namespace mongo {
  * the response side.
  */
 class BatchedCommandResponse {
-    MONGO_DISALLOW_COPYING(BatchedCommandResponse);
+    BatchedCommandResponse(const BatchedCommandResponse&) = delete;
+    BatchedCommandResponse& operator=(const BatchedCommandResponse&) = delete;
 
 public:
     //

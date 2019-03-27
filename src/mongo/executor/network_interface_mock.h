@@ -34,7 +34,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
@@ -521,7 +520,8 @@ private:
  * Not thread-safe.
  */
 class NetworkInterfaceMock::InNetworkGuard {
-    MONGO_DISALLOW_COPYING(InNetworkGuard);
+    InNetworkGuard(const InNetworkGuard&) = delete;
+    InNetworkGuard& operator=(const InNetworkGuard&) = delete;
 
 public:
     /**

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_state_lock.h"
@@ -44,7 +43,8 @@ class OperationContext;
  * Synchronizes access to this shard server's cached database version for Database.
  */
 class DatabaseShardingState {
-    MONGO_DISALLOW_COPYING(DatabaseShardingState);
+    DatabaseShardingState(const DatabaseShardingState&) = delete;
+    DatabaseShardingState& operator=(const DatabaseShardingState&) = delete;
 
 public:
     /**

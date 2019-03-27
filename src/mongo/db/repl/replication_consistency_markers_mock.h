@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/stdx/mutex.h"
@@ -46,7 +45,8 @@ namespace repl {
  * A mock ReplicationConsistencyMarkers implementation that stores everything in memory.
  */
 class ReplicationConsistencyMarkersMock : public ReplicationConsistencyMarkers {
-    MONGO_DISALLOW_COPYING(ReplicationConsistencyMarkersMock);
+    ReplicationConsistencyMarkersMock(const ReplicationConsistencyMarkersMock&) = delete;
+    ReplicationConsistencyMarkersMock& operator=(const ReplicationConsistencyMarkersMock&) = delete;
 
 public:
     ReplicationConsistencyMarkersMock() = default;

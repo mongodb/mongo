@@ -33,7 +33,6 @@
 #include <queue>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
@@ -73,7 +72,8 @@ class CursorResponse;
  * Does not throw exceptions.
  */
 class AsyncResultsMerger {
-    MONGO_DISALLOW_COPYING(AsyncResultsMerger);
+    AsyncResultsMerger(const AsyncResultsMerger&) = delete;
+    AsyncResultsMerger& operator=(const AsyncResultsMerger&) = delete;
 
 public:
     // When mongos has to do a merge in order to return results to the client in the correct sort

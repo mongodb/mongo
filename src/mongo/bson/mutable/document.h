@@ -31,7 +31,6 @@
 
 #include <cstdint>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/damage_vector.h"
@@ -234,7 +233,8 @@ namespace mutablebson {
 class Document {
     // TODO: In principle there is nothing that prevents implementing a deep copy for
     // Document, but for now it is not permitted.
-    MONGO_DISALLOW_COPYING(Document);
+    Document(const Document&) = delete;
+    Document& operator=(const Document&) = delete;
 
 public:
     //

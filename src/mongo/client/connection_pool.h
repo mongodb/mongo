@@ -31,7 +31,6 @@
 
 #include <map>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
@@ -50,7 +49,8 @@ class NetworkConnectionHook;
  * it should only be used from one thread in accordance with the rules of DBClientBase.
  */
 class ConnectionPool {
-    MONGO_DISALLOW_COPYING(ConnectionPool);
+    ConnectionPool(const ConnectionPool&) = delete;
+    ConnectionPool& operator=(const ConnectionPool&) = delete;
 
 public:
     /**
@@ -79,7 +79,8 @@ public:
      * when the holder goes out of scope.
      */
     class ConnectionPtr {
-        MONGO_DISALLOW_COPYING(ConnectionPtr);
+        ConnectionPtr(const ConnectionPtr&) = delete;
+        ConnectionPtr& operator=(const ConnectionPtr&) = delete;
 
     public:
         /**

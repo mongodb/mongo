@@ -31,7 +31,6 @@
 
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/transport/service_entry_point_impl.h"
 
 namespace mongo {
@@ -40,7 +39,8 @@ namespace mongo {
  * The entry point from the TransportLayer into Mongos.
  */
 class ServiceEntryPointMongos final : public ServiceEntryPointImpl {
-    MONGO_DISALLOW_COPYING(ServiceEntryPointMongos);
+    ServiceEntryPointMongos(const ServiceEntryPointMongos&) = delete;
+    ServiceEntryPointMongos& operator=(const ServiceEntryPointMongos&) = delete;
 
 public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;

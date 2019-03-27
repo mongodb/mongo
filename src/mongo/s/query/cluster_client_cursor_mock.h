@@ -40,7 +40,8 @@
 namespace mongo {
 
 class ClusterClientCursorMock final : public ClusterClientCursor {
-    MONGO_DISALLOW_COPYING(ClusterClientCursorMock);
+    ClusterClientCursorMock(const ClusterClientCursorMock&) = delete;
+    ClusterClientCursorMock& operator=(const ClusterClientCursorMock&) = delete;
 
 public:
     ClusterClientCursorMock(boost::optional<LogicalSessionId> lsid,

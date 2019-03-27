@@ -85,7 +85,8 @@ private:
  * to be thread safe.
  */
 class ClientConnections {
-    MONGO_DISALLOW_COPYING(ClientConnections);
+    ClientConnections(const ClientConnections&) = delete;
+    ClientConnections& operator=(const ClientConnections&) = delete;
 
 public:
     struct Status {

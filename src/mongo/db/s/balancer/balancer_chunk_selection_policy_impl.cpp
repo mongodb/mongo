@@ -117,7 +117,8 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
  * splitting a chunk does not yield the same chunk anymore.
  */
 class SplitCandidatesBuffer {
-    MONGO_DISALLOW_COPYING(SplitCandidatesBuffer);
+    SplitCandidatesBuffer(const SplitCandidatesBuffer&) = delete;
+    SplitCandidatesBuffer& operator=(const SplitCandidatesBuffer&) = delete;
 
 public:
     SplitCandidatesBuffer(NamespaceString nss, ChunkVersion collectionVersion)

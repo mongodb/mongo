@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
 namespace mongo {
@@ -38,7 +37,8 @@ class OperationContext;
  * for the duration of the life of this object.
  */
 class ImpersonationSessionGuard {
-    MONGO_DISALLOW_COPYING(ImpersonationSessionGuard);
+    ImpersonationSessionGuard(const ImpersonationSessionGuard&) = delete;
+    ImpersonationSessionGuard& operator=(const ImpersonationSessionGuard&) = delete;
 
 public:
     ImpersonationSessionGuard(OperationContext* opCtx);

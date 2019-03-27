@@ -42,7 +42,8 @@ namespace mongo {
  */
 class OwnedRemoteCursor {
 public:
-    MONGO_DISALLOW_COPYING(OwnedRemoteCursor);
+    OwnedRemoteCursor(const OwnedRemoteCursor&) = delete;
+    OwnedRemoteCursor& operator=(const OwnedRemoteCursor&) = delete;
 
     OwnedRemoteCursor(OperationContext* opCtx, RemoteCursor&& cursor, NamespaceString nss)
         : _opCtx(opCtx), _remoteCursor(std::move(cursor)), _nss(std::move(nss)) {}

@@ -33,7 +33,6 @@
 #include <ostream>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/stdx/mutex.h"
 
@@ -53,14 +52,16 @@ namespace logger {
  * same value for their fileName.
  */
 class RotatableFileWriter {
-    MONGO_DISALLOW_COPYING(RotatableFileWriter);
+    RotatableFileWriter(const RotatableFileWriter&) = delete;
+    RotatableFileWriter& operator=(const RotatableFileWriter&) = delete;
 
 public:
     /**
      * Guard class representing synchronous use of an instance of RotatableFileWriter.
      */
     class Use {
-        MONGO_DISALLOW_COPYING(Use);
+        Use(const Use&) = delete;
+        Use& operator=(const Use&) = delete;
 
     public:
         /**

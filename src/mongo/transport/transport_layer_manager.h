@@ -50,7 +50,8 @@ namespace transport {
  * underneath.
  */
 class TransportLayerManager final : public TransportLayer {
-    MONGO_DISALLOW_COPYING(TransportLayerManager);
+    TransportLayerManager(const TransportLayerManager&) = delete;
+    TransportLayerManager& operator=(const TransportLayerManager&) = delete;
 
 public:
     TransportLayerManager(std::vector<std::unique_ptr<TransportLayer>> tls)

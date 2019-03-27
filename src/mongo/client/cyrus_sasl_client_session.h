@@ -39,7 +39,8 @@ namespace mongo {
  * using the Cyrus SASL library.
  */
 class CyrusSaslClientSession : public SaslClientSession {
-    MONGO_DISALLOW_COPYING(CyrusSaslClientSession);
+    CyrusSaslClientSession(const CyrusSaslClientSession&) = delete;
+    CyrusSaslClientSession& operator=(const CyrusSaslClientSession&) = delete;
 
 public:
     CyrusSaslClientSession();

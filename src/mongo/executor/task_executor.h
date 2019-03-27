@@ -33,7 +33,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -73,7 +72,8 @@ struct ConnectionPoolStats;
  * blocked in waitForEvent() eventually return.
  */
 class TaskExecutor {
-    MONGO_DISALLOW_COPYING(TaskExecutor);
+    TaskExecutor(const TaskExecutor&) = delete;
+    TaskExecutor& operator=(const TaskExecutor&) = delete;
 
 public:
     struct CallbackArgs;
@@ -289,7 +289,8 @@ protected:
  * Class representing a scheduled callback and providing methods for interacting with it.
  */
 class TaskExecutor::CallbackState {
-    MONGO_DISALLOW_COPYING(CallbackState);
+    CallbackState(const CallbackState&) = delete;
+    CallbackState& operator=(const CallbackState&) = delete;
 
 public:
     virtual ~CallbackState();
@@ -358,7 +359,8 @@ private:
  * Class representing a scheduled event and providing methods for interacting with it.
  */
 class TaskExecutor::EventState {
-    MONGO_DISALLOW_COPYING(EventState);
+    EventState(const EventState&) = delete;
+    EventState& operator=(const EventState&) = delete;
 
 public:
     virtual ~EventState();

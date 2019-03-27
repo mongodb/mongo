@@ -53,7 +53,8 @@ class State;
 // ------------  function interfaces -----------
 
 class Mapper {
-    MONGO_DISALLOW_COPYING(Mapper);
+    Mapper(const Mapper&) = delete;
+    Mapper& operator=(const Mapper&) = delete;
 
 public:
     virtual ~Mapper() {}
@@ -66,7 +67,8 @@ protected:
 };
 
 class Finalizer {
-    MONGO_DISALLOW_COPYING(Finalizer);
+    Finalizer(const Finalizer&) = delete;
+    Finalizer& operator=(const Finalizer&) = delete;
 
 public:
     virtual ~Finalizer() {}
@@ -82,7 +84,8 @@ protected:
 };
 
 class Reducer {
-    MONGO_DISALLOW_COPYING(Reducer);
+    Reducer(const Reducer&) = delete;
+    Reducer& operator=(const Reducer&) = delete;
 
 public:
     Reducer() : numReduces(0) {}
@@ -103,7 +106,8 @@ public:
  * visitor like pattern as Scope is gotten from first access
  */
 class JSFunction {
-    MONGO_DISALLOW_COPYING(JSFunction);
+    JSFunction(const JSFunction&) = delete;
+    JSFunction& operator=(const JSFunction&) = delete;
 
 public:
     /**

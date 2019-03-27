@@ -32,7 +32,6 @@
 #include <sqlite3.h>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/mobile/mobile_session_pool.h"
 
 namespace mongo {
@@ -42,7 +41,8 @@ class MobileSessionPool;
  * This class manages a SQLite database connection object.
  */
 class MobileSession final {
-    MONGO_DISALLOW_COPYING(MobileSession);
+    MobileSession(const MobileSession&) = delete;
+    MobileSession& operator=(const MobileSession&) = delete;
 
 public:
     MobileSession(sqlite3* session, MobileSessionPool* sessionPool);

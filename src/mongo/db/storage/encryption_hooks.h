@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 
 namespace boost {

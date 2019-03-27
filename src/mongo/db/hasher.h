@@ -34,7 +34,6 @@
  */
 
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonelement.h"
 
 namespace mongo {
@@ -42,7 +41,8 @@ namespace mongo {
 typedef int HashSeed;
 
 class BSONElementHasher {
-    MONGO_DISALLOW_COPYING(BSONElementHasher);
+    BSONElementHasher(const BSONElementHasher&) = delete;
+    BSONElementHasher& operator=(const BSONElementHasher&) = delete;
 
 public:
     /* The hash function we use can be given a seed, to effectively randomize it

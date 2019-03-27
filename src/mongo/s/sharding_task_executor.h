@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
@@ -49,7 +48,8 @@ class ThreadPoolTaskExecutor;
  * override methods if needed.
  */
 class ShardingTaskExecutor final : public TaskExecutor {
-    MONGO_DISALLOW_COPYING(ShardingTaskExecutor);
+    ShardingTaskExecutor(const ShardingTaskExecutor&) = delete;
+    ShardingTaskExecutor& operator=(const ShardingTaskExecutor&) = delete;
 
 public:
     ShardingTaskExecutor(std::unique_ptr<ThreadPoolTaskExecutor> executor);

@@ -34,7 +34,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"

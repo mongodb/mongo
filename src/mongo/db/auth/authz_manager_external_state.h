@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"

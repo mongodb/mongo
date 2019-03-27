@@ -44,7 +44,8 @@ namespace mongo {
 namespace {
 
 class CollectionShardingStateMap {
-    MONGO_DISALLOW_COPYING(CollectionShardingStateMap);
+    CollectionShardingStateMap(const CollectionShardingStateMap&) = delete;
+    CollectionShardingStateMap& operator=(const CollectionShardingStateMap&) = delete;
 
 public:
     static const ServiceContext::Decoration<boost::optional<CollectionShardingStateMap>> get;

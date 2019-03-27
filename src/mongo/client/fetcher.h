@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,7 +49,8 @@
 namespace mongo {
 
 class Fetcher {
-    MONGO_DISALLOW_COPYING(Fetcher);
+    Fetcher(const Fetcher&) = delete;
+    Fetcher& operator=(const Fetcher&) = delete;
     using RemoteCommandRequest = executor::RemoteCommandRequest;
 
 public:

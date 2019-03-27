@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/stdx/functional.h"
@@ -41,7 +40,8 @@ namespace repl {
  * Mock implementation of SyncSourceSelector interface for testing.
  */
 class SyncSourceSelectorMock : public SyncSourceSelector {
-    MONGO_DISALLOW_COPYING(SyncSourceSelectorMock);
+    SyncSourceSelectorMock(const SyncSourceSelectorMock&) = delete;
+    SyncSourceSelectorMock& operator=(const SyncSourceSelectorMock&) = delete;
 
 public:
     using ChooseNewSyncSourceHook = stdx::function<void()>;

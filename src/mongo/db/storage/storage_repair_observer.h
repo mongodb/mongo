@@ -33,7 +33,6 @@
 
 #include <boost/filesystem.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -45,7 +44,8 @@ namespace mongo {
  * */
 class StorageRepairObserver {
 public:
-    MONGO_DISALLOW_COPYING(StorageRepairObserver);
+    StorageRepairObserver(const StorageRepairObserver&) = delete;
+    StorageRepairObserver& operator=(const StorageRepairObserver&) = delete;
 
     explicit StorageRepairObserver(const std::string& dbpath);
     ~StorageRepairObserver() = default;

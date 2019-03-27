@@ -43,7 +43,8 @@ namespace transport {
  * This TransportLayerMock is a noop TransportLayer implementation.
  */
 class TransportLayerMock : public TransportLayer {
-    MONGO_DISALLOW_COPYING(TransportLayerMock);
+    TransportLayerMock(const TransportLayerMock&) = delete;
+    TransportLayerMock& operator=(const TransportLayerMock&) = delete;
 
 public:
     TransportLayerMock();

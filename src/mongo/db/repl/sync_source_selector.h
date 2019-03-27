@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -53,7 +52,8 @@ struct SyncSourceResolverResponse;
  * Manage list of viable and blocked sync sources that we can replicate from.
  */
 class SyncSourceSelector {
-    MONGO_DISALLOW_COPYING(SyncSourceSelector);
+    SyncSourceSelector(const SyncSourceSelector&) = delete;
+    SyncSourceSelector& operator=(const SyncSourceSelector&) = delete;
 
 public:
     SyncSourceSelector() = default;

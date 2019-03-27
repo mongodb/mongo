@@ -290,7 +290,8 @@ typedef stdx::function<void(void)> TestFunction;
  * contain lists of these.
  */
 class TestHolder {
-    MONGO_DISALLOW_COPYING(TestHolder);
+    TestHolder(const TestHolder&) = delete;
+    TestHolder& operator=(const TestHolder&) = delete;
 
 public:
     TestHolder(const std::string& name, const TestFunction& fn) : _name(name), _fn(fn) {}
@@ -313,7 +314,8 @@ private:
  * by the TEST() macro.
  */
 class Test {
-    MONGO_DISALLOW_COPYING(Test);
+    Test(const Test&) = delete;
+    Test& operator=(const Test&) = delete;
 
 public:
     Test();
@@ -337,7 +339,8 @@ protected:
      */
     template <typename T>
     class RegistrationAgent {
-        MONGO_DISALLOW_COPYING(RegistrationAgent);
+        RegistrationAgent(const RegistrationAgent&) = delete;
+        RegistrationAgent& operator=(const RegistrationAgent&) = delete;
 
     public:
         RegistrationAgent(const std::string& suiteName, const std::string& testName);
@@ -409,7 +412,8 @@ private:
  * approach is deprecated.
  */
 class Suite {
-    MONGO_DISALLOW_COPYING(Suite);
+    Suite(const Suite&) = delete;
+    Suite& operator=(const Suite&) = delete;
 
 public:
     Suite(const std::string& name);

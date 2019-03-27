@@ -263,7 +263,8 @@ MONGO_REGISTER_SHIM(AuthorizationManager::create)()->std::unique_ptr<Authorizati
  * into the cache, because some invalidation event occurred during the fetch phase.
  */
 class AuthorizationManagerImpl::CacheGuard {
-    MONGO_DISALLOW_COPYING(CacheGuard);
+    CacheGuard(const CacheGuard&) = delete;
+    CacheGuard& operator=(const CacheGuard&) = delete;
 
 public:
     /**

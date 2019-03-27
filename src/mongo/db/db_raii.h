@@ -43,7 +43,8 @@ namespace mongo {
  * desired.
  */
 class AutoStatsTracker {
-    MONGO_DISALLOW_COPYING(AutoStatsTracker);
+    AutoStatsTracker(const AutoStatsTracker&) = delete;
+    AutoStatsTracker& operator=(const AutoStatsTracker&) = delete;
 
 public:
     /**
@@ -94,7 +95,8 @@ private:
  * snapshot to become available.
  */
 class AutoGetCollectionForRead {
-    MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
+    AutoGetCollectionForRead(const AutoGetCollectionForRead&) = delete;
+    AutoGetCollectionForRead& operator=(const AutoGetCollectionForRead&) = delete;
 
 public:
     AutoGetCollectionForRead(
@@ -149,7 +151,8 @@ private:
  * ensure the CurrentOp object has the right namespace and has started its timer.
  */
 class AutoGetCollectionForReadCommand {
-    MONGO_DISALLOW_COPYING(AutoGetCollectionForReadCommand);
+    AutoGetCollectionForReadCommand(const AutoGetCollectionForReadCommand&) = delete;
+    AutoGetCollectionForReadCommand& operator=(const AutoGetCollectionForReadCommand&) = delete;
 
 public:
     AutoGetCollectionForReadCommand(
@@ -185,7 +188,8 @@ private:
  * current operation.
  */
 class OldClientContext {
-    MONGO_DISALLOW_COPYING(OldClientContext);
+    OldClientContext(const OldClientContext&) = delete;
+    OldClientContext& operator=(const OldClientContext&) = delete;
 
 public:
     OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion = true);

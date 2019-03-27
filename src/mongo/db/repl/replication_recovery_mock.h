@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/replication_recovery.h"
 
 namespace mongo {
@@ -37,7 +36,8 @@ class OperationContext;
 namespace repl {
 
 class ReplicationRecoveryMock : public ReplicationRecovery {
-    MONGO_DISALLOW_COPYING(ReplicationRecoveryMock);
+    ReplicationRecoveryMock(const ReplicationRecoveryMock&) = delete;
+    ReplicationRecoveryMock& operator=(const ReplicationRecoveryMock&) = delete;
 
 public:
     ReplicationRecoveryMock() = default;

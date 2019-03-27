@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/optime_with.h"
@@ -69,7 +68,8 @@ enum ShardDrainingStatus {
  * moved out of ShardingCatalogClient and into this class.
  */
 class ShardingCatalogManager {
-    MONGO_DISALLOW_COPYING(ShardingCatalogManager);
+    ShardingCatalogManager(const ShardingCatalogManager&) = delete;
+    ShardingCatalogManager& operator=(const ShardingCatalogManager&) = delete;
     friend class ConfigSvrShardCollectionCommand;
 
 public:

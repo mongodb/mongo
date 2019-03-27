@@ -31,7 +31,6 @@
 
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -50,7 +49,10 @@ class ServiceContext;
 namespace repl {
 
 class ReplicationCoordinatorExternalStateMock : public ReplicationCoordinatorExternalState {
-    MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateMock);
+    ReplicationCoordinatorExternalStateMock(const ReplicationCoordinatorExternalStateMock&) =
+        delete;
+    ReplicationCoordinatorExternalStateMock& operator=(
+        const ReplicationCoordinatorExternalStateMock&) = delete;
 
 public:
     class GlobalSharedLockAcquirer;

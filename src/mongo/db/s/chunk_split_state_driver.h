@@ -33,7 +33,6 @@
 #include <boost/optional.hpp>
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/s/chunk_writes_tracker.h"
 
 
@@ -47,7 +46,8 @@ namespace mongo {
  * the ChunkSplitter which will drive these state changes.
  */
 class ChunkSplitStateDriver final {
-    MONGO_DISALLOW_COPYING(ChunkSplitStateDriver);
+    ChunkSplitStateDriver(const ChunkSplitStateDriver&) = delete;
+    ChunkSplitStateDriver& operator=(const ChunkSplitStateDriver&) = delete;
 
 public:
     /**

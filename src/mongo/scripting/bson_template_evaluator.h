@@ -74,7 +74,8 @@ namespace mongo {
  *
  */
 class BsonTemplateEvaluator {
-    MONGO_DISALLOW_COPYING(BsonTemplateEvaluator);
+    BsonTemplateEvaluator(const BsonTemplateEvaluator&) = delete;
+    BsonTemplateEvaluator& operator=(const BsonTemplateEvaluator&) = delete;
 
 public:
     /* Status of template evaluation. Logically the  the status are "success", "bad operator"

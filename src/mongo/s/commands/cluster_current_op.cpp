@@ -44,7 +44,8 @@ namespace mongo {
 namespace {
 
 class ClusterCurrentOpCommand final : public CurrentOpCommandBase {
-    MONGO_DISALLOW_COPYING(ClusterCurrentOpCommand);
+    ClusterCurrentOpCommand(const ClusterCurrentOpCommand&) = delete;
+    ClusterCurrentOpCommand& operator=(const ClusterCurrentOpCommand&) = delete;
 
 public:
     ClusterCurrentOpCommand() = default;

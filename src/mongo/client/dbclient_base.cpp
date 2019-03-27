@@ -412,7 +412,8 @@ string DBClientBase::createPasswordDigest(const string& username, const string& 
 
 namespace {
 class ScopedMetadataWriterRemover {
-    MONGO_DISALLOW_COPYING(ScopedMetadataWriterRemover);
+    ScopedMetadataWriterRemover(const ScopedMetadataWriterRemover&) = delete;
+    ScopedMetadataWriterRemover& operator=(const ScopedMetadataWriterRemover&) = delete;
 
 public:
     ScopedMetadataWriterRemover(DBClientBase* cli)

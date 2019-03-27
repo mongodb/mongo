@@ -32,7 +32,6 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
@@ -76,7 +75,8 @@ typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
  * query utilization statististics and to decide what to balance.
  */
 class DistributionStatus {
-    MONGO_DISALLOW_COPYING(DistributionStatus);
+    DistributionStatus(const DistributionStatus&) = delete;
+    DistributionStatus& operator=(const DistributionStatus&) = delete;
 
 public:
     DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap);

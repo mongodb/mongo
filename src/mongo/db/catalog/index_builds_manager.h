@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/functional.h"
@@ -53,7 +52,8 @@ enum IndexBuildRecoveryState { Building, Verifying, Committing };
  * state is set up and then cleaned up by this class.
  */
 class IndexBuildsManager {
-    MONGO_DISALLOW_COPYING(IndexBuildsManager);
+    IndexBuildsManager(const IndexBuildsManager&) = delete;
+    IndexBuildsManager& operator=(const IndexBuildsManager&) = delete;
 
 public:
     /**

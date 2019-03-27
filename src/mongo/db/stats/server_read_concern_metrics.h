@@ -40,7 +40,8 @@ namespace mongo {
  * Container for server-wide statistics on readConcern levels used by operations.
  */
 class ServerReadConcernMetrics {
-    MONGO_DISALLOW_COPYING(ServerReadConcernMetrics);
+    ServerReadConcernMetrics(const ServerReadConcernMetrics&) = delete;
+    ServerReadConcernMetrics& operator=(const ServerReadConcernMetrics&) = delete;
 
 public:
     ServerReadConcernMetrics() = default;

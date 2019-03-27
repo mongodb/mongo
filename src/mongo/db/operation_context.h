@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
@@ -74,7 +73,8 @@ class UnreplicatedWritesBlock;
  * RecoveryUnit and to allow better invariant checking.
  */
 class OperationContext : public Interruptible, public Decorable<OperationContext> {
-    MONGO_DISALLOW_COPYING(OperationContext);
+    OperationContext(const OperationContext&) = delete;
+    OperationContext& operator=(const OperationContext&) = delete;
 
 public:
     OperationContext(Client* client, unsigned int opId);
@@ -479,7 +479,8 @@ namespace repl {
  * object is in scope.
  */
 class UnreplicatedWritesBlock {
-    MONGO_DISALLOW_COPYING(UnreplicatedWritesBlock);
+    UnreplicatedWritesBlock(const UnreplicatedWritesBlock&) = delete;
+    UnreplicatedWritesBlock& operator=(const UnreplicatedWritesBlock&) = delete;
 
 public:
     UnreplicatedWritesBlock(OperationContext* opCtx)

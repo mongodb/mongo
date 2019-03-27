@@ -33,7 +33,6 @@
 #include <memory>
 #include <set>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -65,7 +64,8 @@ bool failIndexKeyTooLongParam();
  *
  */
 class IndexAccessMethod {
-    MONGO_DISALLOW_COPYING(IndexAccessMethod);
+    IndexAccessMethod(const IndexAccessMethod&) = delete;
+    IndexAccessMethod& operator=(const IndexAccessMethod&) = delete;
 
 public:
     IndexAccessMethod() = default;
@@ -433,7 +433,8 @@ struct InsertDeleteOptions {
  * dependencies, it is important that IndexAccessMethod remain an interface.
  */
 class AbstractIndexAccessMethod : public IndexAccessMethod {
-    MONGO_DISALLOW_COPYING(AbstractIndexAccessMethod);
+    AbstractIndexAccessMethod(const AbstractIndexAccessMethod&) = delete;
+    AbstractIndexAccessMethod& operator=(const AbstractIndexAccessMethod&) = delete;
 
 public:
     /**

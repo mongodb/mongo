@@ -46,7 +46,8 @@ namespace mongo {
  * This class should only be used by the Balancer!
  */
 class ScopedMigrationRequest {
-    MONGO_DISALLOW_COPYING(ScopedMigrationRequest);
+    ScopedMigrationRequest(const ScopedMigrationRequest&) = delete;
+    ScopedMigrationRequest& operator=(const ScopedMigrationRequest&) = delete;
 
 public:
     /**

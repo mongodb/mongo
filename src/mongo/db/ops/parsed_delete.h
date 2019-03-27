@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/query/plan_executor.h"
 
@@ -55,7 +54,8 @@ class OperationContext;
  * No locks need to be held during parsing.
  */
 class ParsedDelete {
-    MONGO_DISALLOW_COPYING(ParsedDelete);
+    ParsedDelete(const ParsedDelete&) = delete;
+    ParsedDelete& operator=(const ParsedDelete&) = delete;
 
 public:
     /**

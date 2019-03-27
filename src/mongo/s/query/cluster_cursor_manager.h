@@ -70,7 +70,8 @@ class StatusWith;
  * No public methods throw exceptions, and all public methods are thread-safe.
  */
 class ClusterCursorManager {
-    MONGO_DISALLOW_COPYING(ClusterCursorManager);
+    ClusterCursorManager(const ClusterCursorManager&) = delete;
+    ClusterCursorManager& operator=(const ClusterCursorManager&) = delete;
 
 public:
     //
@@ -131,7 +132,8 @@ public:
      * current OperationContext, and return the cursor.
      */
     class PinnedCursor {
-        MONGO_DISALLOW_COPYING(PinnedCursor);
+        PinnedCursor(const PinnedCursor&) = delete;
+        PinnedCursor& operator=(const PinnedCursor&) = delete;
 
     public:
         /**
@@ -550,7 +552,8 @@ private:
      * CursorEntry is a moveable, non-copyable container for a single cursor.
      */
     class CursorEntry {
-        MONGO_DISALLOW_COPYING(CursorEntry);
+        CursorEntry(const CursorEntry&) = delete;
+        CursorEntry& operator=(const CursorEntry&) = delete;
 
     public:
         CursorEntry() = default;
@@ -661,7 +664,8 @@ private:
      * contained cursors share the same 32-bit prefix of their cursor id.
      */
     struct CursorEntryContainer {
-        MONGO_DISALLOW_COPYING(CursorEntryContainer);
+        CursorEntryContainer(const CursorEntryContainer&) = delete;
+        CursorEntryContainer& operator=(const CursorEntryContainer&) = delete;
 
         CursorEntryContainer(uint32_t containerPrefix) : containerPrefix(containerPrefix) {}
 

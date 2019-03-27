@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/deferred_writer.h"
 #include "mongo/db/service_context.h"
 
@@ -45,7 +44,8 @@ class HealthLogEntry;
  * up on shutdown.
  */
 class HealthLog {
-    MONGO_DISALLOW_COPYING(HealthLog);
+    HealthLog(const HealthLog&) = delete;
+    HealthLog& operator=(const HealthLog&) = delete;
 
 public:
     /**

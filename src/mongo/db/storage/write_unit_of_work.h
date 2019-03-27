@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -48,7 +47,8 @@ class OperationContext;
  * also abort.
  */
 class WriteUnitOfWork {
-    MONGO_DISALLOW_COPYING(WriteUnitOfWork);
+    WriteUnitOfWork(const WriteUnitOfWork&) = delete;
+    WriteUnitOfWork& operator=(const WriteUnitOfWork&) = delete;
 
 public:
     /**

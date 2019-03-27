@@ -69,7 +69,8 @@ class FTSTokenizer;
  */
 class FTSLanguage {
     // Use make() instead of copying.
-    MONGO_DISALLOW_COPYING(FTSLanguage);
+    FTSLanguage(const FTSLanguage&) = delete;
+    FTSLanguage& operator=(const FTSLanguage&) = delete;
 
 public:
     /** Create an uninitialized language. */

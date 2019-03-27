@@ -34,7 +34,8 @@
 namespace mongo {
 
 class OpObserverImpl : public OpObserver {
-    MONGO_DISALLOW_COPYING(OpObserverImpl);
+    OpObserverImpl(const OpObserverImpl&) = delete;
+    OpObserverImpl& operator=(const OpObserverImpl&) = delete;
 
 public:
     OpObserverImpl() = default;

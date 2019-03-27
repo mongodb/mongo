@@ -570,7 +570,8 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx,
 }  // namespace
 
 class SyncTail::OpQueueBatcher {
-    MONGO_DISALLOW_COPYING(OpQueueBatcher);
+    OpQueueBatcher(const OpQueueBatcher&) = delete;
+    OpQueueBatcher& operator=(const OpQueueBatcher&) = delete;
 
 public:
     OpQueueBatcher(SyncTail* syncTail, StorageInterface* storageInterface, OplogBuffer* oplogBuffer)

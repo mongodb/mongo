@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/rpc/op_msg.h"
@@ -48,7 +47,8 @@ namespace rpc {
  * Constructs an RPC Reply.
  */
 class ReplyBuilderInterface {
-    MONGO_DISALLOW_COPYING(ReplyBuilderInterface);
+    ReplyBuilderInterface(const ReplyBuilderInterface&) = delete;
+    ReplyBuilderInterface& operator=(const ReplyBuilderInterface&) = delete;
 
 public:
     virtual ~ReplyBuilderInterface() = default;

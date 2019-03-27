@@ -44,7 +44,8 @@ namespace mongo {
  * variable, which can be waited on.
  */
 class CondVarLockGrantNotification : public LockGrantNotification {
-    MONGO_DISALLOW_COPYING(CondVarLockGrantNotification);
+    CondVarLockGrantNotification(const CondVarLockGrantNotification&) = delete;
+    CondVarLockGrantNotification& operator=(const CondVarLockGrantNotification&) = delete;
 
 public:
     CondVarLockGrantNotification();

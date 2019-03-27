@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 
@@ -39,7 +38,9 @@ namespace mongo {
  * The implementation of AuthzSessionExternalState functionality common to mongod and mongos.
  */
 class AuthzSessionExternalStateServerCommon : public AuthzSessionExternalState {
-    MONGO_DISALLOW_COPYING(AuthzSessionExternalStateServerCommon);
+    AuthzSessionExternalStateServerCommon(const AuthzSessionExternalStateServerCommon&) = delete;
+    AuthzSessionExternalStateServerCommon& operator=(const AuthzSessionExternalStateServerCommon&) =
+        delete;
 
 public:
     virtual ~AuthzSessionExternalStateServerCommon();

@@ -34,7 +34,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory.h"
@@ -47,7 +46,8 @@ namespace mongo {
  * An object factory for creating Shard instances via calling registered builders.
  */
 class ShardFactory {
-    MONGO_DISALLOW_COPYING(ShardFactory);
+    ShardFactory(const ShardFactory&) = delete;
+    ShardFactory& operator=(const ShardFactory&) = delete;
 
 public:
     using BuilderCallable =

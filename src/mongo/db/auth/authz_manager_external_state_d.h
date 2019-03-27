@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 #include "mongo/db/auth/role_graph.h"
@@ -44,7 +43,8 @@ namespace mongo {
  * The implementation of AuthzManagerExternalState functionality for mongod.
  */
 class AuthzManagerExternalStateMongod : public AuthzManagerExternalStateLocal {
-    MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongod);
+    AuthzManagerExternalStateMongod(const AuthzManagerExternalStateMongod&) = delete;
+    AuthzManagerExternalStateMongod& operator=(const AuthzManagerExternalStateMongod&) = delete;
 
 public:
     AuthzManagerExternalStateMongod();

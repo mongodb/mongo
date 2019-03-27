@@ -188,7 +188,8 @@ extern Labeler::Label BSIZE;
 
 // Utility class to implement BSON( key << val ) as described above.
 class BSONObjBuilderValueStream {
-    MONGO_DISALLOW_COPYING(BSONObjBuilderValueStream);
+    BSONObjBuilderValueStream(const BSONObjBuilderValueStream&) = delete;
+    BSONObjBuilderValueStream& operator=(const BSONObjBuilderValueStream&) = delete;
 
 public:
     friend class Labeler;

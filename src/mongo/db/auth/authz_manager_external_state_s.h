@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege_format.h"
@@ -45,7 +44,8 @@ namespace mongo {
  * The implementation of AuthzManagerExternalState functionality for mongos.
  */
 class AuthzManagerExternalStateMongos : public AuthzManagerExternalState {
-    MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongos);
+    AuthzManagerExternalStateMongos(const AuthzManagerExternalStateMongos&) = delete;
+    AuthzManagerExternalStateMongos& operator=(const AuthzManagerExternalStateMongos&) = delete;
 
 public:
     AuthzManagerExternalStateMongos();

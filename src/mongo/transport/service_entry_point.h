@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/transport/session.h"
@@ -44,7 +43,8 @@ namespace mongo {
  * reply-with-Message loop.  It may not do this on the TransportLayer’s thread.
  */
 class ServiceEntryPoint {
-    MONGO_DISALLOW_COPYING(ServiceEntryPoint);
+    ServiceEntryPoint(const ServiceEntryPoint&) = delete;
+    ServiceEntryPoint& operator=(const ServiceEntryPoint&) = delete;
 
 public:
     virtual ~ServiceEntryPoint() = default;

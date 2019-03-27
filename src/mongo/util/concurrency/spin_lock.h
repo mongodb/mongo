@@ -35,7 +35,6 @@
 #include <atomic>
 #endif
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/config.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/mutex.h"
@@ -44,7 +43,8 @@ namespace mongo {
 
 #if defined(_WIN32)
 class SpinLock {
-    MONGO_DISALLOW_COPYING(SpinLock);
+    SpinLock(const SpinLock&) = delete;
+    SpinLock& operator=(const SpinLock&) = delete;
 
 public:
     SpinLock() {
@@ -71,7 +71,8 @@ private:
 
 #if MONGO_CONFIG_DEBUG_BUILD
 class SpinLock {
-    MONGO_DISALLOW_COPYING(SpinLock);
+    SpinLock(const SpinLock&) = delete;
+    SpinLock& operator=(const SpinLock&) = delete;
 
 public:
     SpinLock() = default;
@@ -91,7 +92,8 @@ private:
 #else
 
 class SpinLock {
-    MONGO_DISALLOW_COPYING(SpinLock);
+    SpinLock(const SpinLock&) = delete;
+    SpinLock& operator=(const SpinLock&) = delete;
 
 public:
     SpinLock() = default;

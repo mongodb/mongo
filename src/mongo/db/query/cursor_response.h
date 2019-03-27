@@ -31,7 +31,6 @@
 
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/clientcursor.h"
@@ -46,7 +45,8 @@ namespace mongo {
  * command in place.
  */
 class CursorResponseBuilder {
-    MONGO_DISALLOW_COPYING(CursorResponseBuilder);
+    CursorResponseBuilder(const CursorResponseBuilder&) = delete;
+    CursorResponseBuilder& operator=(const CursorResponseBuilder&) = delete;
 
 public:
     /**
@@ -162,7 +162,8 @@ class CursorResponse {
 // TODO SERVER-32467 Remove this ifndef once the compiler has been fixed and the workaround has been
 // removed.
 #ifndef __s390x__
-    MONGO_DISALLOW_COPYING(CursorResponse);
+    CursorResponse(const CursorResponse&) = delete;
+    CursorResponse& operator=(const CursorResponse&) = delete;
 #endif
 
 public:

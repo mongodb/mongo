@@ -32,7 +32,6 @@
 #include "boost/optional.hpp"
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
@@ -51,7 +50,8 @@ typedef size_t WorkingSetID;
  * from the working set, or mutate elements in the working set.
  */
 class WorkingSet {
-    MONGO_DISALLOW_COPYING(WorkingSet);
+    WorkingSet(const WorkingSet&) = delete;
+    WorkingSet& operator=(const WorkingSet&) = delete;
 
 public:
     static const WorkingSetID INVALID_ID = WorkingSetID(-1);
@@ -208,7 +208,8 @@ enum WorkingSetComputedDataType {
  * Data that is a computed function of a WSM.
  */
 class WorkingSetComputedData {
-    MONGO_DISALLOW_COPYING(WorkingSetComputedData);
+    WorkingSetComputedData(const WorkingSetComputedData&) = delete;
+    WorkingSetComputedData& operator=(const WorkingSetComputedData&) = delete;
 
 public:
     WorkingSetComputedData(const WorkingSetComputedDataType type) : _type(type) {}
@@ -234,7 +235,8 @@ private:
  * A WorkingSetMember may have any of the data above.
  */
 class WorkingSetMember {
-    MONGO_DISALLOW_COPYING(WorkingSetMember);
+    WorkingSetMember(const WorkingSetMember&) = delete;
+    WorkingSetMember& operator=(const WorkingSetMember&) = delete;
 
 public:
     WorkingSetMember();

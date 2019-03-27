@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/util/string_map.h"
@@ -54,7 +53,8 @@ namespace moe = mongo::optionenvironment;
  * The MessageCompressorRegistry holds the global registrations of compressors for a process.
  */
 class MessageCompressorRegistry {
-    MONGO_DISALLOW_COPYING(MessageCompressorRegistry);
+    MessageCompressorRegistry(const MessageCompressorRegistry&) = delete;
+    MessageCompressorRegistry& operator=(const MessageCompressorRegistry&) = delete;
 
 public:
     MessageCompressorRegistry() = default;

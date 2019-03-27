@@ -591,7 +591,8 @@ const bool paranoid = false;
  *  Document.
  */
 class Document::Impl {
-    MONGO_DISALLOW_COPYING(Impl);
+    Impl(const Impl&) = delete;
+    Impl& operator=(const Impl&) = delete;
 
 public:
     Impl(Document::InPlaceMode inPlaceMode)

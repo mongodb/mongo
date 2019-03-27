@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -50,7 +49,8 @@ class OperationContext;
  * and an operator to add the statistics values.
  */
 class StorageStats {
-    MONGO_DISALLOW_COPYING(StorageStats);
+    StorageStats(const StorageStats&) = delete;
+    StorageStats& operator=(const StorageStats&) = delete;
 
 public:
     StorageStats() = default;
@@ -80,7 +80,8 @@ public:
  * All on-disk information must be mutated through this interface.
  */
 class RecoveryUnit {
-    MONGO_DISALLOW_COPYING(RecoveryUnit);
+    RecoveryUnit(const RecoveryUnit&) = delete;
+    RecoveryUnit& operator=(const RecoveryUnit&) = delete;
 
 public:
     virtual ~RecoveryUnit() {}

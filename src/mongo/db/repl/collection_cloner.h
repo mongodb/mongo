@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -61,7 +60,8 @@ namespace repl {
 class StorageInterface;
 
 class CollectionCloner : public BaseCloner {
-    MONGO_DISALLOW_COPYING(CollectionCloner);
+    CollectionCloner(const CollectionCloner&) = delete;
+    CollectionCloner& operator=(const CollectionCloner&) = delete;
 
 public:
     /**

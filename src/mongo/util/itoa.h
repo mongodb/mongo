@@ -32,7 +32,6 @@
 #include <cstdint>
 #include <limits>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -42,7 +41,8 @@ namespace mongo {
  * and only really should be used in hot code paths.
  */
 class ItoA {
-    MONGO_DISALLOW_COPYING(ItoA);
+    ItoA(const ItoA&) = delete;
+    ItoA& operator=(const ItoA&) = delete;
 
 public:
     static constexpr size_t kBufSize = std::numeric_limits<uint64_t>::digits10  //

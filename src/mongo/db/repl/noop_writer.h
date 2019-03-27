@@ -43,7 +43,8 @@ namespace repl {
  * coordinator's optime has not changed since the last time it did a write.
  */
 class NoopWriter {
-    MONGO_DISALLOW_COPYING(NoopWriter);
+    NoopWriter(const NoopWriter&) = delete;
+    NoopWriter& operator=(const NoopWriter&) = delete;
 
 public:
     NoopWriter(Seconds waitTime);

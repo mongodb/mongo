@@ -57,7 +57,8 @@ namespace {
  * the session ids match.
  */
 class AutoGetActiveCloner {
-    MONGO_DISALLOW_COPYING(AutoGetActiveCloner);
+    AutoGetActiveCloner(const AutoGetActiveCloner&) = delete;
+    AutoGetActiveCloner& operator=(const AutoGetActiveCloner&) = delete;
 
 public:
     AutoGetActiveCloner(OperationContext* opCtx, const MigrationSessionId& migrationSessionId) {

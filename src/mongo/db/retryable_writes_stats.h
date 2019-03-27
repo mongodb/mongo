@@ -40,7 +40,8 @@ namespace mongo {
  * Container for retryable writes statistics.
  */
 class RetryableWritesStats {
-    MONGO_DISALLOW_COPYING(RetryableWritesStats);
+    RetryableWritesStats(const RetryableWritesStats&) = delete;
+    RetryableWritesStats& operator=(const RetryableWritesStats&) = delete;
 
 public:
     RetryableWritesStats() = default;

@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
 

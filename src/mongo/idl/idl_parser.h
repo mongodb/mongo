@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
@@ -51,7 +50,8 @@ namespace mongo {
  * and provide utility methods like checking a BSON type or set of BSON types.
  */
 class IDLParserErrorContext {
-    MONGO_DISALLOW_COPYING(IDLParserErrorContext);
+    IDLParserErrorContext(const IDLParserErrorContext&) = delete;
+    IDLParserErrorContext& operator=(const IDLParserErrorContext&) = delete;
 
     template <typename T>
     friend void throwComparisonError(IDLParserErrorContext& ctxt,

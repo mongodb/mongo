@@ -37,7 +37,6 @@
 
 #ifdef MONGO_CONFIG_SSL
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"

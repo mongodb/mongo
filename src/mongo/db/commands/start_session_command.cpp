@@ -47,7 +47,8 @@
 namespace mongo {
 
 class StartSessionCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(StartSessionCommand);
+    StartSessionCommand(const StartSessionCommand&) = delete;
+    StartSessionCommand& operator=(const StartSessionCommand&) = delete;
 
 public:
     StartSessionCommand() : BasicCommand("startSession") {}

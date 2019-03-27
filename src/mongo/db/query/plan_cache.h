@@ -241,7 +241,8 @@ class PlanCacheEntry;
  */
 class CachedSolution {
 private:
-    MONGO_DISALLOW_COPYING(CachedSolution);
+    CachedSolution(const CachedSolution&) = delete;
+    CachedSolution& operator=(const CachedSolution&) = delete;
 
 public:
     CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& entry);
@@ -275,7 +276,8 @@ public:
  */
 class PlanCacheEntry {
 private:
-    MONGO_DISALLOW_COPYING(PlanCacheEntry);
+    PlanCacheEntry(const PlanCacheEntry&) = delete;
+    PlanCacheEntry& operator=(const PlanCacheEntry&) = delete;
 
 public:
     /**
@@ -354,7 +356,8 @@ public:
  */
 class PlanCache {
 private:
-    MONGO_DISALLOW_COPYING(PlanCache);
+    PlanCache(const PlanCache&) = delete;
+    PlanCache& operator=(const PlanCache&) = delete;
 
 public:
     // We have three states for a cache entry to be in. Rather than just 'present' or 'not

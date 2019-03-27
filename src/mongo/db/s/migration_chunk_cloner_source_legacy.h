@@ -55,7 +55,8 @@ class Database;
 class RecordId;
 
 class MigrationChunkClonerSourceLegacy final : public MigrationChunkClonerSource {
-    MONGO_DISALLOW_COPYING(MigrationChunkClonerSourceLegacy);
+    MigrationChunkClonerSourceLegacy(const MigrationChunkClonerSourceLegacy&) = delete;
+    MigrationChunkClonerSourceLegacy& operator=(const MigrationChunkClonerSourceLegacy&) = delete;
 
 public:
     MigrationChunkClonerSourceLegacy(MoveChunkRequest request,

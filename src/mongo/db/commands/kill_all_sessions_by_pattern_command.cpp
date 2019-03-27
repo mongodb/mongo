@@ -53,7 +53,8 @@
 namespace mongo {
 
 class KillAllSessionsByPatternCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(KillAllSessionsByPatternCommand);
+    KillAllSessionsByPatternCommand(const KillAllSessionsByPatternCommand&) = delete;
+    KillAllSessionsByPatternCommand& operator=(const KillAllSessionsByPatternCommand&) = delete;
 
 public:
     KillAllSessionsByPatternCommand() : BasicCommand("killAllSessionsByPattern") {}

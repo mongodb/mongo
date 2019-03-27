@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -64,7 +63,8 @@ class OpTime;
  * Drives the receiving side of the MongoD migration process. One instance exists per shard.
  */
 class MigrationDestinationManager {
-    MONGO_DISALLOW_COPYING(MigrationDestinationManager);
+    MigrationDestinationManager(const MigrationDestinationManager&) = delete;
+    MigrationDestinationManager& operator=(const MigrationDestinationManager&) = delete;
 
 public:
     enum State { READY, CLONE, CATCHUP, STEADY, COMMIT_START, DONE, FAIL, ABORT };

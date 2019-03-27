@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/util/polymorphic_scoped.h"
 
 namespace mongo {
@@ -42,7 +41,10 @@ namespace mongo {
 class OperationContext;
 
 class ScopedOperationCompletionShardingActions : public PolymorphicScoped {
-    MONGO_DISALLOW_COPYING(ScopedOperationCompletionShardingActions);
+    ScopedOperationCompletionShardingActions(const ScopedOperationCompletionShardingActions&) =
+        delete;
+    ScopedOperationCompletionShardingActions& operator=(
+        const ScopedOperationCompletionShardingActions&) = delete;
 
 public:
     ScopedOperationCompletionShardingActions(OperationContext* opCtx);

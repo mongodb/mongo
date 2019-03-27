@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -90,7 +89,8 @@ namespace mongo {
 namespace unittest {
 
 class DeathTestImpl : public Test {
-    MONGO_DISALLOW_COPYING(DeathTestImpl);
+    DeathTestImpl(const DeathTestImpl&) = delete;
+    DeathTestImpl& operator=(const DeathTestImpl&) = delete;
 
 protected:
     explicit DeathTestImpl(stdx::function<std::unique_ptr<Test>()> makeTest);

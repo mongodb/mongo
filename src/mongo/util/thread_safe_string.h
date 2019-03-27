@@ -33,7 +33,6 @@
 #include <iosfwd>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -43,7 +42,8 @@ namespace mongo {
  * you will never get a bad pointer, though data may be mungedd
  */
 class ThreadSafeString {
-    MONGO_DISALLOW_COPYING(ThreadSafeString);
+    ThreadSafeString(const ThreadSafeString&) = delete;
+    ThreadSafeString& operator=(const ThreadSafeString&) = delete;
 
 public:
     ThreadSafeString(size_t size = 256) : _size(size), _buf(new char[size]) {

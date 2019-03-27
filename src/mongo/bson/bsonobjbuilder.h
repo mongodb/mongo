@@ -62,7 +62,8 @@ namespace mongo {
     See also the BSON() and BSON_ARRAY() macros.
 */
 class BSONObjBuilder {
-    MONGO_DISALLOW_COPYING(BSONObjBuilder);
+    BSONObjBuilder(const BSONObjBuilder&) = delete;
+    BSONObjBuilder& operator=(const BSONObjBuilder&) = delete;
 
 public:
     /** @param initsize this is just a hint as to the final size of the object */

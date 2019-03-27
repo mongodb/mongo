@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/query/canonical_query.h"
@@ -48,7 +47,8 @@ namespace mongo {
  */
 class AllowedIndicesFilter {
 private:
-    MONGO_DISALLOW_COPYING(AllowedIndicesFilter);
+    AllowedIndicesFilter(const AllowedIndicesFilter&) = delete;
+    AllowedIndicesFilter& operator=(const AllowedIndicesFilter&) = delete;
 
 public:
     AllowedIndicesFilter(const BSONObjSet& indexKeyPatterns,
@@ -107,7 +107,8 @@ public:
  */
 class QuerySettings {
 private:
-    MONGO_DISALLOW_COPYING(QuerySettings);
+    QuerySettings(const QuerySettings&) = delete;
+    QuerySettings& operator=(const QuerySettings&) = delete;
 
 public:
     QuerySettings() = default;

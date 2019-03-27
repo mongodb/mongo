@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/s/request_types/move_chunk_request.h"
@@ -68,7 +67,8 @@ struct ShardingStatistics;
  * is the commitDonateChunk and its comments explain the reasoning.
  */
 class MigrationSourceManager {
-    MONGO_DISALLOW_COPYING(MigrationSourceManager);
+    MigrationSourceManager(const MigrationSourceManager&) = delete;
+    MigrationSourceManager& operator=(const MigrationSourceManager&) = delete;
 
 public:
     /**

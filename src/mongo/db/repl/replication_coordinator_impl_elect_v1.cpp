@@ -33,7 +33,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/vote_requester.h"
@@ -45,7 +44,8 @@ namespace mongo {
 namespace repl {
 
 class ReplicationCoordinatorImpl::LoseElectionGuardV1 {
-    MONGO_DISALLOW_COPYING(LoseElectionGuardV1);
+    LoseElectionGuardV1(const LoseElectionGuardV1&) = delete;
+    LoseElectionGuardV1& operator=(const LoseElectionGuardV1&) = delete;
 
 public:
     LoseElectionGuardV1(ReplicationCoordinatorImpl* replCoord) : _replCoord(replCoord) {}
@@ -76,7 +76,8 @@ protected:
 };
 
 class ReplicationCoordinatorImpl::LoseElectionDryRunGuardV1 : public LoseElectionGuardV1 {
-    MONGO_DISALLOW_COPYING(LoseElectionDryRunGuardV1);
+    LoseElectionDryRunGuardV1(const LoseElectionDryRunGuardV1&) = delete;
+    LoseElectionDryRunGuardV1& operator=(const LoseElectionDryRunGuardV1&) = delete;
 
 public:
     LoseElectionDryRunGuardV1(ReplicationCoordinatorImpl* replCoord)

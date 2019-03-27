@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/cursor_id.h"
@@ -221,7 +220,8 @@ public:
  * any synchronization.
  */
 class CurOp {
-    MONGO_DISALLOW_COPYING(CurOp);
+    CurOp(const CurOp&) = delete;
+    CurOp& operator=(const CurOp&) = delete;
 
 public:
     static CurOp* get(const OperationContext* opCtx);

@@ -49,7 +49,8 @@ StringData getMessageCompressorName(MessageCompressor id);
 using MessageCompressorId = std::underlying_type<MessageCompressor>::type;
 
 class MessageCompressorBase {
-    MONGO_DISALLOW_COPYING(MessageCompressorBase);
+    MessageCompressorBase(const MessageCompressorBase&) = delete;
+    MessageCompressorBase& operator=(const MessageCompressorBase&) = delete;
 
 public:
     virtual ~MessageCompressorBase() = default;

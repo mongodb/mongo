@@ -77,7 +77,8 @@ private:
  * Callers of doWork() must be holding a write lock.
  */
 class UpdateStage final : public RequiresMutableCollectionStage {
-    MONGO_DISALLOW_COPYING(UpdateStage);
+    UpdateStage(const UpdateStage&) = delete;
+    UpdateStage& operator=(const UpdateStage&) = delete;
 
 public:
     UpdateStage(OperationContext* opCtx,

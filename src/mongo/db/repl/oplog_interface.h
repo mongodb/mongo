@@ -33,7 +33,6 @@
 #include <string>
 #include <utility>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
@@ -43,7 +42,8 @@ namespace mongo {
 namespace repl {
 
 class OplogInterface {
-    MONGO_DISALLOW_COPYING(OplogInterface);
+    OplogInterface(const OplogInterface&) = delete;
+    OplogInterface& operator=(const OplogInterface&) = delete;
 
 public:
     class Iterator;
@@ -70,7 +70,8 @@ protected:
 };
 
 class OplogInterface::Iterator {
-    MONGO_DISALLOW_COPYING(Iterator);
+    Iterator(const Iterator&) = delete;
+    Iterator& operator=(const Iterator&) = delete;
 
 public:
     using Value = std::pair<BSONObj, RecordId>;

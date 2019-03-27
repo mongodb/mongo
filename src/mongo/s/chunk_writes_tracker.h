@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 

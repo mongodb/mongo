@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {

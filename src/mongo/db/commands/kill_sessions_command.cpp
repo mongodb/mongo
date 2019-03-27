@@ -80,7 +80,8 @@ KillAllSessionsByPatternSet patternsForLoggedInUser(OperationContext* opCtx) {
 }  // namespace
 
 class KillSessionsCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(KillSessionsCommand);
+    KillSessionsCommand(const KillSessionsCommand&) = delete;
+    KillSessionsCommand& operator=(const KillSessionsCommand&) = delete;
 
 public:
     KillSessionsCommand() : BasicCommand("killSessions") {}

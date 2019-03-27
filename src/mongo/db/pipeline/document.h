@@ -412,7 +412,8 @@ private:
  *  Documents.
  */
 class MutableDocument {
-    MONGO_DISALLOW_COPYING(MutableDocument);
+    MutableDocument(const MutableDocument&) = delete;
+    MutableDocument& operator=(const MutableDocument&) = delete;
 
 public:
     /** Create a new empty Document.

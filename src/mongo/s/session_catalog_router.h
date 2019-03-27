@@ -39,7 +39,8 @@ namespace mongo {
  * at destruction. This can only be used for multi-statement transactions.
  */
 class RouterOperationContextSession {
-    MONGO_DISALLOW_COPYING(RouterOperationContextSession);
+    RouterOperationContextSession(const RouterOperationContextSession&) = delete;
+    RouterOperationContextSession& operator=(const RouterOperationContextSession&) = delete;
 
 public:
     RouterOperationContextSession(OperationContext* opCtx);

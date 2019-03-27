@@ -31,7 +31,6 @@
 
 #include <cstddef>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/fetcher.h"
@@ -72,7 +71,8 @@ MONGO_FAIL_POINT_DECLARE(stopReplProducer);
  * `getMore` commands, and handles restarting on errors.
  */
 class OplogFetcher : public AbstractOplogFetcher {
-    MONGO_DISALLOW_COPYING(OplogFetcher);
+    OplogFetcher(const OplogFetcher&) = delete;
+    OplogFetcher& operator=(const OplogFetcher&) = delete;
 
 public:
     static Seconds kDefaultProtocolZeroAwaitDataTimeout;

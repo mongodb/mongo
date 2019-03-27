@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/stage_types.h"
@@ -133,7 +132,8 @@ struct PlanStageStats {
     std::vector<std::unique_ptr<PlanStageStats>> children;
 
 private:
-    MONGO_DISALLOW_COPYING(PlanStageStats);
+    PlanStageStats(const PlanStageStats&) = delete;
+    PlanStageStats& operator=(const PlanStageStats&) = delete;
 };
 
 struct AndHashStats : public SpecificStats {

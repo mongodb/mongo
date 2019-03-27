@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/jsobj.h"
@@ -67,7 +66,8 @@ protected:
 };
 
 class CallbackResponseSaver {
-    MONGO_DISALLOW_COPYING(CallbackResponseSaver);
+    CallbackResponseSaver(const CallbackResponseSaver&) = delete;
+    CallbackResponseSaver& operator=(const CallbackResponseSaver&) = delete;
 
 public:
     CallbackResponseSaver();
@@ -517,7 +517,8 @@ TEST_F(RemoteCommandRetrySchedulerTest,
 
 bool sharedCallbackStateDestroyed = false;
 class SharedCallbackState {
-    MONGO_DISALLOW_COPYING(SharedCallbackState);
+    SharedCallbackState(const SharedCallbackState&) = delete;
+    SharedCallbackState& operator=(const SharedCallbackState&) = delete;
 
 public:
     SharedCallbackState() {}

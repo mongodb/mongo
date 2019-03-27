@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <map>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -44,7 +43,8 @@ namespace mongo {
  * txnNumber. It supports holding several coordinator objects per session.
  */
 class TransactionCoordinatorCatalog {
-    MONGO_DISALLOW_COPYING(TransactionCoordinatorCatalog);
+    TransactionCoordinatorCatalog(const TransactionCoordinatorCatalog&) = delete;
+    TransactionCoordinatorCatalog& operator=(const TransactionCoordinatorCatalog&) = delete;
 
 public:
     TransactionCoordinatorCatalog();

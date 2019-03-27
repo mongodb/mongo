@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -57,7 +56,8 @@ class UpdateRequest;
  * using the UpdateDriver.
  */
 class ParsedUpdate {
-    MONGO_DISALLOW_COPYING(ParsedUpdate);
+    ParsedUpdate(const ParsedUpdate&) = delete;
+    ParsedUpdate& operator=(const ParsedUpdate&) = delete;
 
 public:
     /**

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -69,7 +68,8 @@ struct QueryToken {
  * SPECIAL_CHARS = '-' | ' ' | '"'
  */
 class FTSQueryParser {
-    MONGO_DISALLOW_COPYING(FTSQueryParser);
+    FTSQueryParser(const FTSQueryParser&) = delete;
+    FTSQueryParser& operator=(const FTSQueryParser&) = delete;
 
 public:
     FTSQueryParser(StringData str);

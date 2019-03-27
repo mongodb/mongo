@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/s/shard_id.h"
@@ -62,7 +61,8 @@ class Status;
  * which case the destructor will take care of clean up based on how far we have advanced.
  */
 class MovePrimarySourceManager {
-    MONGO_DISALLOW_COPYING(MovePrimarySourceManager);
+    MovePrimarySourceManager(const MovePrimarySourceManager&) = delete;
+    MovePrimarySourceManager& operator=(const MovePrimarySourceManager&) = delete;
 
 public:
     /**

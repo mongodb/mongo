@@ -151,7 +151,8 @@ using Hash = uint32_t;
 
 template <class Key, class Value>
 class HashTable {
-    MONGO_DISALLOW_COPYING(HashTable);
+    HashTable(const HashTable&) = delete;
+    HashTable& operator=(const HashTable&) = delete;
 
 private:
     struct Entry {

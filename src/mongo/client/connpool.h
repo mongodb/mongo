@@ -69,7 +69,8 @@ struct ConnectionPoolStats;
  * PoolForHost is not thread-safe; thread safety is handled by DBConnectionPool.
  */
 class PoolForHost {
-    MONGO_DISALLOW_COPYING(PoolForHost);
+    PoolForHost(const PoolForHost&) = delete;
+    PoolForHost& operator=(const PoolForHost&) = delete;
 
 public:
     // Sentinel value indicating pool has no cleanup limit
@@ -411,7 +412,8 @@ private:
 };
 
 class AScopedConnection {
-    MONGO_DISALLOW_COPYING(AScopedConnection);
+    AScopedConnection(const AScopedConnection&) = delete;
+    AScopedConnection& operator=(const AScopedConnection&) = delete;
 
 public:
     AScopedConnection() {

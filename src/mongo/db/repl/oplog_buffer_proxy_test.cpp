@@ -32,7 +32,6 @@
 #include <boost/optional/optional_io.hpp>
 #include <deque>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_buffer_proxy.h"
 #include "mongo/stdx/functional.h"
@@ -46,7 +45,8 @@ using namespace mongo;
 using namespace mongo::repl;
 
 class OplogBufferMock : public OplogBuffer {
-    MONGO_DISALLOW_COPYING(OplogBufferMock);
+    OplogBufferMock(const OplogBufferMock&) = delete;
+    OplogBufferMock& operator=(const OplogBufferMock&) = delete;
 
 public:
     OplogBufferMock() = default;

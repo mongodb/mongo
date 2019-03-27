@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/stdx/memory.h"
@@ -51,7 +50,8 @@ class StatusWith;
  * to only one per shard. There is only one instance of this object per shard.
  */
 class ActiveMigrationsRegistry {
-    MONGO_DISALLOW_COPYING(ActiveMigrationsRegistry);
+    ActiveMigrationsRegistry(const ActiveMigrationsRegistry&) = delete;
+    ActiveMigrationsRegistry& operator=(const ActiveMigrationsRegistry&) = delete;
 
 public:
     ActiveMigrationsRegistry();
@@ -167,7 +167,8 @@ private:
  * registerDonateChunk method for more details.
  */
 class ScopedDonateChunk {
-    MONGO_DISALLOW_COPYING(ScopedDonateChunk);
+    ScopedDonateChunk(const ScopedDonateChunk&) = delete;
+    ScopedDonateChunk& operator=(const ScopedDonateChunk&) = delete;
 
 public:
     ScopedDonateChunk(ActiveMigrationsRegistry* registry,
@@ -220,7 +221,8 @@ private:
  * registry.
  */
 class ScopedReceiveChunk {
-    MONGO_DISALLOW_COPYING(ScopedReceiveChunk);
+    ScopedReceiveChunk(const ScopedReceiveChunk&) = delete;
+    ScopedReceiveChunk& operator=(const ScopedReceiveChunk&) = delete;
 
 public:
     ScopedReceiveChunk(ActiveMigrationsRegistry* registry);

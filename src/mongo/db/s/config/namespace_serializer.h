@@ -44,7 +44,8 @@ namespace mongo {
 class OperationContext;
 
 class NamespaceSerializer {
-    MONGO_DISALLOW_COPYING(NamespaceSerializer);
+    NamespaceSerializer(const NamespaceSerializer&) = delete;
+    NamespaceSerializer& operator=(const NamespaceSerializer&) = delete;
 
 public:
     class ScopedLock {

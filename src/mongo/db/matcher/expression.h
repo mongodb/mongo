@@ -30,7 +30,6 @@
 #pragma once
 
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,7 +55,8 @@ class TreeMatchExpression;
 typedef StatusWith<std::unique_ptr<MatchExpression>> StatusWithMatchExpression;
 
 class MatchExpression {
-    MONGO_DISALLOW_COPYING(MatchExpression);
+    MatchExpression(const MatchExpression&) = delete;
+    MatchExpression& operator=(const MatchExpression&) = delete;
 
 public:
     enum MatchType {

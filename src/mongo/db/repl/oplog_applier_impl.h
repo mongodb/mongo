@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -45,7 +44,8 @@ namespace repl {
  * Reads from an OplogBuffer batches of operations that may be applied in parallel.
  */
 class OplogApplierImpl : public OplogApplier {
-    MONGO_DISALLOW_COPYING(OplogApplierImpl);
+    OplogApplierImpl(const OplogApplierImpl&) = delete;
+    OplogApplierImpl& operator=(const OplogApplierImpl&) = delete;
 
 public:
     /**

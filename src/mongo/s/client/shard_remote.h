@@ -33,7 +33,6 @@
 
 #include "mongo/s/client/shard.h"
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
 
@@ -44,7 +43,8 @@ namespace mongo {
  * the shard (if replica set).
  */
 class ShardRemote : public Shard {
-    MONGO_DISALLOW_COPYING(ShardRemote);
+    ShardRemote(const ShardRemote&) = delete;
+    ShardRemote& operator=(const ShardRemote&) = delete;
 
 public:
     /**

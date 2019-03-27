@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -44,7 +43,8 @@ namespace mongo {
  * transferred to the recipient shard. Databases effectively only support the commit phase.
  */
 class ShardingMigrationCriticalSection {
-    MONGO_DISALLOW_COPYING(ShardingMigrationCriticalSection);
+    ShardingMigrationCriticalSection(const ShardingMigrationCriticalSection&) = delete;
+    ShardingMigrationCriticalSection& operator=(const ShardingMigrationCriticalSection&) = delete;
 
 public:
     ShardingMigrationCriticalSection();

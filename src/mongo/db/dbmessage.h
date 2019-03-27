@@ -452,7 +452,8 @@ struct DbResponse {
  * command responses that don't use the new dbMsg protocol.
  */
 class OpQueryReplyBuilder {
-    MONGO_DISALLOW_COPYING(OpQueryReplyBuilder);
+    OpQueryReplyBuilder(const OpQueryReplyBuilder&) = delete;
+    OpQueryReplyBuilder& operator=(const OpQueryReplyBuilder&) = delete;
 
 public:
     OpQueryReplyBuilder();

@@ -38,7 +38,8 @@ namespace mongo {
  * relevant entries for authentication.
  */
 class AuthOpObserver final : public OpObserver {
-    MONGO_DISALLOW_COPYING(AuthOpObserver);
+    AuthOpObserver(const AuthOpObserver&) = delete;
+    AuthOpObserver& operator=(const AuthOpObserver&) = delete;
 
 public:
     AuthOpObserver();

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/condition_variable.h"
@@ -49,7 +48,8 @@ class BackgroundSync;
 class Reporter;
 
 class SyncSourceFeedback {
-    MONGO_DISALLOW_COPYING(SyncSourceFeedback);
+    SyncSourceFeedback(const SyncSourceFeedback&) = delete;
+    SyncSourceFeedback& operator=(const SyncSourceFeedback&) = delete;
 
 public:
     SyncSourceFeedback() = default;

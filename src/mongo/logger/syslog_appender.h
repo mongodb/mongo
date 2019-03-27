@@ -34,7 +34,6 @@
 #include <sstream>
 #include <syslog.h>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/logger/appender.h"
 #include "mongo/logger/encoder.h"
@@ -47,7 +46,8 @@ namespace logger {
  */
 template <typename Event>
 class SyslogAppender : public Appender<Event> {
-    MONGO_DISALLOW_COPYING(SyslogAppender);
+    SyslogAppender(const SyslogAppender&) = delete;
+    SyslogAppender& operator=(const SyslogAppender&) = delete;
 
 public:
     typedef Encoder<Event> EventEncoder;

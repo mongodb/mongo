@@ -31,7 +31,6 @@
 
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
@@ -73,7 +72,8 @@ struct PlanEnumeratorParams {
  * predicate information to make better decisions about what indices are best.
  */
 class PlanEnumerator {
-    MONGO_DISALLOW_COPYING(PlanEnumerator);
+    PlanEnumerator(const PlanEnumerator&) = delete;
+    PlanEnumerator& operator=(const PlanEnumerator&) = delete;
 
 public:
     /**

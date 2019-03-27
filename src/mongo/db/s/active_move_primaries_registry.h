@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/util/concurrency/notification.h"
 
@@ -43,7 +42,8 @@ class ScopedMovePrimary;
  */
 
 class ActiveMovePrimariesRegistry {
-    MONGO_DISALLOW_COPYING(ActiveMovePrimariesRegistry);
+    ActiveMovePrimariesRegistry(const ActiveMovePrimariesRegistry&) = delete;
+    ActiveMovePrimariesRegistry& operator=(const ActiveMovePrimariesRegistry&) = delete;
 
 public:
     ActiveMovePrimariesRegistry();
@@ -112,7 +112,8 @@ private:
  * registerMovePrimary for more details.
  */
 class ScopedMovePrimary {
-    MONGO_DISALLOW_COPYING(ScopedMovePrimary);
+    ScopedMovePrimary(const ScopedMovePrimary&) = delete;
+    ScopedMovePrimary& operator=(const ScopedMovePrimary&) = delete;
 
 public:
     ScopedMovePrimary(ActiveMovePrimariesRegistry* registry,

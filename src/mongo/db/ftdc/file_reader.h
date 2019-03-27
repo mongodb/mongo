@@ -35,7 +35,6 @@
 #include <stddef.h>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/ftdc/decompressor.h"
@@ -50,7 +49,8 @@ namespace mongo {
  * Does not recover interim files into archive files.
  */
 class FTDCFileReader {
-    MONGO_DISALLOW_COPYING(FTDCFileReader);
+    FTDCFileReader(const FTDCFileReader&) = delete;
+    FTDCFileReader& operator=(const FTDCFileReader&) = delete;
 
 public:
     FTDCFileReader() : _state(State::kNeedsDoc) {}

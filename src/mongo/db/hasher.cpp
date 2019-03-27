@@ -47,7 +47,8 @@ namespace {
 typedef unsigned char HashDigest[16];
 
 class Hasher {
-    MONGO_DISALLOW_COPYING(Hasher);
+    Hasher(const Hasher&) = delete;
+    Hasher& operator=(const Hasher&) = delete;
 
 public:
     explicit Hasher(HashSeed seed);

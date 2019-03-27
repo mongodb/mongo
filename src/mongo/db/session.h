@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -42,7 +41,8 @@ namespace mongo {
  * server. Refer to SessionCatalog for more information on the semantics of sessions.
  */
 class Session : public Decorable<Session> {
-    MONGO_DISALLOW_COPYING(Session);
+    Session(const Session&) = delete;
+    Session& operator=(const Session&) = delete;
 
     friend class ObservableSession;
     friend class SessionCatalog;

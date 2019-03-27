@@ -32,7 +32,6 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -49,7 +48,8 @@ class Status;
 namespace repl {
 
 class VoteRequester {
-    MONGO_DISALLOW_COPYING(VoteRequester);
+    VoteRequester(const VoteRequester&) = delete;
+    VoteRequester& operator=(const VoteRequester&) = delete;
 
 public:
     enum class Result { kSuccessfullyElected, kStaleTerm, kInsufficientVotes, kPrimaryRespondedNo };

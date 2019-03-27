@@ -33,7 +33,6 @@
 
 #include "mongo/s/sharding_task_executor.h"
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"

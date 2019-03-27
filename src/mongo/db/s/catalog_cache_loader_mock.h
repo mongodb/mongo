@@ -39,7 +39,8 @@ namespace mongo {
  * facilitate testing of classes that use a CatalogCacheLoader.
  */
 class CatalogCacheLoaderMock final : public CatalogCacheLoader {
-    MONGO_DISALLOW_COPYING(CatalogCacheLoaderMock);
+    CatalogCacheLoaderMock(const CatalogCacheLoaderMock&) = delete;
+    CatalogCacheLoaderMock& operator=(const CatalogCacheLoaderMock&) = delete;
 
 public:
     CatalogCacheLoaderMock();

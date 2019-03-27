@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 namespace unittest {
@@ -40,7 +39,8 @@ namespace unittest {
  * An RAII temporary directory that deletes itself and all contents files on scope exit.
  */
 class TempDir {
-    MONGO_DISALLOW_COPYING(TempDir);
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
 
 public:
     /**

@@ -239,7 +239,8 @@ public:
  * for MMAPv1 is this class not thread-safe.
  */
 class RecordStore {
-    MONGO_DISALLOW_COPYING(RecordStore);
+    RecordStore(const RecordStore&) = delete;
+    RecordStore& operator=(const RecordStore&) = delete;
 
 public:
     RecordStore(StringData ns) : _ns(ns.toString()) {}

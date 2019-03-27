@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/db/s/balancer/migration_manager.h"
@@ -55,7 +54,8 @@ class Status;
  * loaded shards. It would issue a request for a chunk migration per round, if it found so.
  */
 class Balancer {
-    MONGO_DISALLOW_COPYING(Balancer);
+    Balancer(const Balancer&) = delete;
+    Balancer& operator=(const Balancer&) = delete;
 
 public:
     Balancer(ServiceContext* serviceContext);

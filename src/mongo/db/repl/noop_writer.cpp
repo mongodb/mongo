@@ -60,7 +60,8 @@ const auto kMsgObj = BSON("msg"
  *  Runs the noopWrite argument with waitTime period until its destroyed.
  */
 class NoopWriter::PeriodicNoopRunner {
-    MONGO_DISALLOW_COPYING(PeriodicNoopRunner);
+    PeriodicNoopRunner(const PeriodicNoopRunner&) = delete;
+    PeriodicNoopRunner& operator=(const PeriodicNoopRunner&) = delete;
 
     using NoopWriteFn = stdx::function<void(OperationContext*)>;
 

@@ -34,7 +34,6 @@
 #include <string>
 #include <type_traits>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/executor/task_executor.h"
@@ -53,7 +52,8 @@ namespace repl {
  * _getMutex()).
  */
 class AbstractAsyncComponent {
-    MONGO_DISALLOW_COPYING(AbstractAsyncComponent);
+    AbstractAsyncComponent(const AbstractAsyncComponent&) = delete;
+    AbstractAsyncComponent& operator=(const AbstractAsyncComponent&) = delete;
 
 public:
     AbstractAsyncComponent(executor::TaskExecutor* executor, const std::string& componentName);

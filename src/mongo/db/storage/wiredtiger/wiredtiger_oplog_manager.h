@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -45,7 +44,8 @@ class WiredTigerSessionCache;
 // Manages oplog visibility, by periodically querying WiredTiger's all_committed timestamp value and
 // then using that timestamp for all transactions that read the oplog collection.
 class WiredTigerOplogManager {
-    MONGO_DISALLOW_COPYING(WiredTigerOplogManager);
+    WiredTigerOplogManager(const WiredTigerOplogManager&) = delete;
+    WiredTigerOplogManager& operator=(const WiredTigerOplogManager&) = delete;
 
 public:
     WiredTigerOplogManager() {}

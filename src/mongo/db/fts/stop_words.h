@@ -41,7 +41,8 @@ namespace mongo {
 namespace fts {
 
 class StopWords {
-    MONGO_DISALLOW_COPYING(StopWords);
+    StopWords(const StopWords&) = delete;
+    StopWords& operator=(const StopWords&) = delete;
 
 public:
     StopWords();

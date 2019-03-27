@@ -46,7 +46,8 @@ namespace mongo {
  * retrieves chunk metadata from the shard persisted chunk metadata.
  */
 class ShardServerCatalogCacheLoader : public CatalogCacheLoader {
-    MONGO_DISALLOW_COPYING(ShardServerCatalogCacheLoader);
+    ShardServerCatalogCacheLoader(const ShardServerCatalogCacheLoader&) = delete;
+    ShardServerCatalogCacheLoader& operator=(const ShardServerCatalogCacheLoader&) = delete;
 
 public:
     ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configServerLoader);
@@ -98,7 +99,8 @@ private:
      * metadata for a specific collection.
      */
     struct collAndChunkTask {
-        MONGO_DISALLOW_COPYING(collAndChunkTask);
+        collAndChunkTask(const collAndChunkTask&) = delete;
+        collAndChunkTask& operator=(const collAndChunkTask&) = delete;
         collAndChunkTask(collAndChunkTask&&) = default;
 
         /**
@@ -234,7 +236,8 @@ private:
      * metadata for a specific database.
      */
     struct DBTask {
-        MONGO_DISALLOW_COPYING(DBTask);
+        DBTask(const DBTask&) = delete;
+        DBTask& operator=(const DBTask&) = delete;
         DBTask(DBTask&&) = default;
 
         /**

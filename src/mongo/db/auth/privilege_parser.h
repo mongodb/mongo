@@ -44,7 +44,8 @@ class Privilege;
  * of privileges granted to roles in the role management commands.
  */
 class ParsedResource {
-    MONGO_DISALLOW_COPYING(ParsedResource);
+    ParsedResource(const ParsedResource&) = delete;
+    ParsedResource& operator=(const ParsedResource&) = delete;
 
 public:
     //
@@ -124,7 +125,8 @@ private:
  * This class is used to parse documents describing privileges in the role managment commands.
  */
 class ParsedPrivilege {
-    MONGO_DISALLOW_COPYING(ParsedPrivilege);
+    ParsedPrivilege(const ParsedPrivilege&) = delete;
+    ParsedPrivilege& operator=(const ParsedPrivilege&) = delete;
 
 public:
     //

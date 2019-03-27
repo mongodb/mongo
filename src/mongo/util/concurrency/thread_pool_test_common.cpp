@@ -70,7 +70,8 @@ static ThreadPoolTestCaseMap& threadPoolTestCaseRegistry() {
 }
 
 class TptRegistrationAgent {
-    MONGO_DISALLOW_COPYING(TptRegistrationAgent);
+    TptRegistrationAgent(const TptRegistrationAgent&) = delete;
+    TptRegistrationAgent& operator=(const TptRegistrationAgent&) = delete;
 
 public:
     TptRegistrationAgent(const std::string& name, ThreadPoolTestCaseFactory makeTest) {
@@ -85,7 +86,8 @@ public:
 
 template <typename T>
 class TptDeathRegistrationAgent {
-    MONGO_DISALLOW_COPYING(TptDeathRegistrationAgent);
+    TptDeathRegistrationAgent(const TptDeathRegistrationAgent&) = delete;
+    TptDeathRegistrationAgent& operator=(const TptDeathRegistrationAgent&) = delete;
 
 public:
     TptDeathRegistrationAgent(const std::string& name, ThreadPoolTestCaseFactory makeTest) {

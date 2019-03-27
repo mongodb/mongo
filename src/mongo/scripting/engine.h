@@ -47,7 +47,8 @@ struct JSFile {
 };
 
 class Scope {
-    MONGO_DISALLOW_COPYING(Scope);
+    Scope(const Scope&) = delete;
+    Scope& operator=(const Scope&) = delete;
 
 public:
     Scope();
@@ -204,7 +205,8 @@ protected:
 };
 
 class ScriptEngine : public KillOpListenerInterface {
-    MONGO_DISALLOW_COPYING(ScriptEngine);
+    ScriptEngine(const ScriptEngine&) = delete;
+    ScriptEngine& operator=(const ScriptEngine&) = delete;
 
 public:
     ScriptEngine();

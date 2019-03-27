@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/session.h"
@@ -44,7 +43,8 @@ class Message;
 class MessageCompressorRegistry;
 
 class MessageCompressorManager {
-    MONGO_DISALLOW_COPYING(MessageCompressorManager);
+    MessageCompressorManager(const MessageCompressorManager&) = delete;
+    MessageCompressorManager& operator=(const MessageCompressorManager&) = delete;
 
 public:
     /*

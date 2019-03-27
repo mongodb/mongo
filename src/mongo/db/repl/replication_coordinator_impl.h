@@ -82,7 +82,8 @@ class TopologyCoordinator;
 class VoteRequester;
 
 class ReplicationCoordinatorImpl : public ReplicationCoordinator {
-    MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
+    ReplicationCoordinatorImpl(const ReplicationCoordinatorImpl&) = delete;
+    ReplicationCoordinatorImpl& operator=(const ReplicationCoordinatorImpl&) = delete;
 
 public:
     ReplicationCoordinatorImpl(ServiceContext* serviceContext,

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
@@ -48,7 +47,8 @@ class ClockSource;
  * Indexes must be registered and deregistered on creation/destruction.
  */
 class CollectionIndexUsageTracker {
-    MONGO_DISALLOW_COPYING(CollectionIndexUsageTracker);
+    CollectionIndexUsageTracker(const CollectionIndexUsageTracker&) = delete;
+    CollectionIndexUsageTracker& operator=(const CollectionIndexUsageTracker&) = delete;
 
 public:
     struct IndexUsageStats {

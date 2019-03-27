@@ -146,7 +146,8 @@ struct BenchRunOp {
  * Configuration object describing a bench run activity.
  */
 class BenchRunConfig {
-    MONGO_DISALLOW_COPYING(BenchRunConfig);
+    BenchRunConfig(const BenchRunConfig&) = delete;
+    BenchRunConfig& operator=(const BenchRunConfig&) = delete;
 
 public:
     /**
@@ -314,7 +315,8 @@ private:
  * In all cases, the counter objects must outlive the trace object.
  */
 class BenchRunEventTrace {
-    MONGO_DISALLOW_COPYING(BenchRunEventTrace);
+    BenchRunEventTrace(const BenchRunEventTrace&) = delete;
+    BenchRunEventTrace& operator=(const BenchRunEventTrace&) = delete;
 
 public:
     explicit BenchRunEventTrace(BenchRunEventCounter* eventCounter) {
@@ -381,7 +383,8 @@ struct BenchRunStats {
  * Logically, the states are "starting up", "running" and "finished."
  */
 class BenchRunState {
-    MONGO_DISALLOW_COPYING(BenchRunState);
+    BenchRunState(const BenchRunState&) = delete;
+    BenchRunState& operator=(const BenchRunState&) = delete;
 
 public:
     enum State { BRS_STARTING_UP, BRS_RUNNING, BRS_FINISHED };
@@ -462,7 +465,8 @@ private:
  * Represents the behavior of one thread working in a bench run activity.
  */
 class BenchRunWorker {
-    MONGO_DISALLOW_COPYING(BenchRunWorker);
+    BenchRunWorker(const BenchRunWorker&) = delete;
+    BenchRunWorker& operator=(const BenchRunWorker&) = delete;
 
 public:
     /**
@@ -526,7 +530,8 @@ private:
  * Object representing a "bench run" activity.
  */
 class BenchRunner {
-    MONGO_DISALLOW_COPYING(BenchRunner);
+    BenchRunner(const BenchRunner&) = delete;
+    BenchRunner& operator=(const BenchRunner&) = delete;
 
 public:
     /**

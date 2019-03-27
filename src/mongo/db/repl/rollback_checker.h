@@ -60,7 +60,8 @@ class Mutex;
  *
  */
 class RollbackChecker {
-    MONGO_DISALLOW_COPYING(RollbackChecker);
+    RollbackChecker(const RollbackChecker&) = delete;
+    RollbackChecker& operator=(const RollbackChecker&) = delete;
 
 public:
     // Rollback checker result - true if rollback occurred; false if rollback IDs

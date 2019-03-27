@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user.h"
@@ -47,7 +46,8 @@ namespace mongo {
  * synchronizing access.
  */
 class UserSet {
-    MONGO_DISALLOW_COPYING(UserSet);
+    UserSet(const UserSet&) = delete;
+    UserSet& operator=(const UserSet&) = delete;
 
 public:
     using iterator = stdx::list<UserHandle>::iterator;

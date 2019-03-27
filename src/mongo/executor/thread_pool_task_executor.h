@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
@@ -55,7 +54,8 @@ class NetworkInterface;
  * Implementation of a TaskExecutor that uses a pool of threads to execute work items.
  */
 class ThreadPoolTaskExecutor final : public TaskExecutor {
-    MONGO_DISALLOW_COPYING(ThreadPoolTaskExecutor);
+    ThreadPoolTaskExecutor(const ThreadPoolTaskExecutor&) = delete;
+    ThreadPoolTaskExecutor& operator=(const ThreadPoolTaskExecutor&) = delete;
 
 public:
     /**

@@ -84,7 +84,8 @@ std::wstring utf8ToWide(StringData utf8Str) {
  * (2) Opening files with non-ASCII characters in their names.
  */
 class Win32FileStreambuf : public std::streambuf {
-    MONGO_DISALLOW_COPYING(Win32FileStreambuf);
+    Win32FileStreambuf(const Win32FileStreambuf&) = delete;
+    Win32FileStreambuf& operator=(const Win32FileStreambuf&) = delete;
 
 public:
     Win32FileStreambuf();
@@ -106,7 +107,8 @@ private:
  * Minimal implementation of a stream to Win32 files.
  */
 class Win32FileOStream : public std::ostream {
-    MONGO_DISALLOW_COPYING(Win32FileOStream);
+    Win32FileOStream(const Win32FileOStream&) = delete;
+    Win32FileOStream& operator=(const Win32FileOStream&) = delete;
 
 public:
     /**

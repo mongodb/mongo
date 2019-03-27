@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
@@ -75,7 +74,8 @@ class StorageInterface;
  * See below for explanations of each field.
  */
 class ReplicationConsistencyMarkers {
-    MONGO_DISALLOW_COPYING(ReplicationConsistencyMarkers);
+    ReplicationConsistencyMarkers(const ReplicationConsistencyMarkers&) = delete;
+    ReplicationConsistencyMarkers& operator=(const ReplicationConsistencyMarkers&) = delete;
 
 public:
     // Constructor and Destructor.

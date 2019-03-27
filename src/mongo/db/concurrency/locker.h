@@ -46,7 +46,8 @@ namespace mongo {
  * Lock/unlock methods must always be called from a single thread.
  */
 class Locker {
-    MONGO_DISALLOW_COPYING(Locker);
+    Locker(const Locker&) = delete;
+    Locker& operator=(const Locker&) = delete;
 
     friend class UninterruptibleLockGuard;
 
@@ -537,7 +538,10 @@ private:
  * RAII-style class to opt out of replication's use of ParallelBatchWriterMode.
  */
 class ShouldNotConflictWithSecondaryBatchApplicationBlock {
-    MONGO_DISALLOW_COPYING(ShouldNotConflictWithSecondaryBatchApplicationBlock);
+    ShouldNotConflictWithSecondaryBatchApplicationBlock(
+        const ShouldNotConflictWithSecondaryBatchApplicationBlock&) = delete;
+    ShouldNotConflictWithSecondaryBatchApplicationBlock& operator=(
+        const ShouldNotConflictWithSecondaryBatchApplicationBlock&) = delete;
 
 public:
     explicit ShouldNotConflictWithSecondaryBatchApplicationBlock(Locker* lockState)

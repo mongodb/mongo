@@ -39,7 +39,8 @@ class SaslClientConversation;
  * native SASL implementation.
  */
 class NativeSaslClientSession : public SaslClientSession {
-    MONGO_DISALLOW_COPYING(NativeSaslClientSession);
+    NativeSaslClientSession(const NativeSaslClientSession&) = delete;
+    NativeSaslClientSession& operator=(const NativeSaslClientSession&) = delete;
 
 public:
     NativeSaslClientSession();

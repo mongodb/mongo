@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/fetcher.h"
@@ -53,7 +52,8 @@ namespace repl {
 class StorageInterface;
 
 class DatabaseCloner : public BaseCloner {
-    MONGO_DISALLOW_COPYING(DatabaseCloner);
+    DatabaseCloner(const DatabaseCloner&) = delete;
+    DatabaseCloner& operator=(const DatabaseCloner&) = delete;
 
 public:
     struct Stats {

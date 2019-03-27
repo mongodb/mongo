@@ -31,7 +31,6 @@
 
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/record_store.h"
@@ -177,7 +176,8 @@ private:
 };
 
 class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
-    MONGO_DISALLOW_COPYING(DevNullSortedDataBuilderInterface);
+    DevNullSortedDataBuilderInterface(const DevNullSortedDataBuilderInterface&) = delete;
+    DevNullSortedDataBuilderInterface& operator=(const DevNullSortedDataBuilderInterface&) = delete;
 
 public:
     DevNullSortedDataBuilderInterface() {}

@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/initializer_context.h"
 #include "mongo/base/initializer_dependency_graph.h"
 #include "mongo/base/status.h"
@@ -48,7 +47,8 @@ namespace mongo {
  * execute in an order that respects the programmer-established prerequistes.
  */
 class Initializer {
-    MONGO_DISALLOW_COPYING(Initializer);
+    Initializer(const Initializer&) = delete;
+    Initializer& operator=(const Initializer&) = delete;
 
 public:
     Initializer();

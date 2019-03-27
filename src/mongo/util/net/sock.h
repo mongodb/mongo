@@ -50,7 +50,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/config.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/compiler.h"
@@ -83,7 +82,8 @@ typedef int SOCKET;
  * todo: ssl
  */
 class Socket {
-    MONGO_DISALLOW_COPYING(Socket);
+    Socket(const Socket&) = delete;
+    Socket& operator=(const Socket&) = delete;
 
 public:
     static const int errorPollIntervalSecs;

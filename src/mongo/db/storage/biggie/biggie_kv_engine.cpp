@@ -31,7 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"

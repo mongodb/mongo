@@ -31,7 +31,6 @@
 
 #include <boost/preprocessor/stringize.hpp>
 
-#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -44,7 +43,8 @@ namespace mongo {
  * idle.
  */
 class IdleThreadBlock {
-    MONGO_DISALLOW_COPYING(IdleThreadBlock);
+    IdleThreadBlock(const IdleThreadBlock&) = delete;
+    IdleThreadBlock& operator=(const IdleThreadBlock&) = delete;
 
 public:
     IdleThreadBlock(const char* location) {

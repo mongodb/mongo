@@ -34,7 +34,6 @@
 #include <set>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
@@ -58,7 +57,8 @@ namespace mongo {
  * dropldentsOlderThan() is provided for this purpose.
  */
 class KVDropPendingIdentReaper {
-    MONGO_DISALLOW_COPYING(KVDropPendingIdentReaper);
+    KVDropPendingIdentReaper(const KVDropPendingIdentReaper&) = delete;
+    KVDropPendingIdentReaper& operator=(const KVDropPendingIdentReaper&) = delete;
 
 public:
     explicit KVDropPendingIdentReaper(KVEngine* engine);

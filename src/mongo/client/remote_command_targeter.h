@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -47,7 +46,8 @@ class StatusWith;
  * Interface encapsulating the targeting logic for a given replica set or a standalone host.
  */
 class RemoteCommandTargeter {
-    MONGO_DISALLOW_COPYING(RemoteCommandTargeter);
+    RemoteCommandTargeter(const RemoteCommandTargeter&) = delete;
+    RemoteCommandTargeter& operator=(const RemoteCommandTargeter&) = delete;
 
 public:
     virtual ~RemoteCommandTargeter() = default;

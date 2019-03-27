@@ -48,7 +48,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
@@ -65,7 +64,8 @@ const auto kPathBufferSize = 1024;
 // symbol handler. Because access to the symbol handler API is not thread-safe, it also provides
 // a lock/unlock method so the whole symbol handler can be used with a stdx::lock_guard.
 class SymbolHandler {
-    MONGO_DISALLOW_COPYING(SymbolHandler);
+    SymbolHandler(const SymbolHandler&) = delete;
+    SymbolHandler& operator=(const SymbolHandler&) = delete;
 
 public:
     SymbolHandler() {

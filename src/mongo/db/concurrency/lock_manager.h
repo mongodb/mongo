@@ -52,7 +52,8 @@ namespace mongo {
  * instead go through the Locker interface.
  */
 class LockManager {
-    MONGO_DISALLOW_COPYING(LockManager);
+    LockManager(const LockManager&) = delete;
+    LockManager& operator=(const LockManager&) = delete;
 
 public:
     LockManager();

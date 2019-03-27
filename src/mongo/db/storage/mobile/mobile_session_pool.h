@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mobile/mobile_session.h"
 #include "mongo/stdx/mutex.h"
@@ -46,7 +45,8 @@ class MobileSession;
  * This class manages a queue of operations delayed for some reason
  */
 class MobileDelayedOpQueue final {
-    MONGO_DISALLOW_COPYING(MobileDelayedOpQueue);
+    MobileDelayedOpQueue(const MobileDelayedOpQueue&) = delete;
+    MobileDelayedOpQueue& operator=(const MobileDelayedOpQueue&) = delete;
 
 public:
     MobileDelayedOpQueue();
@@ -65,7 +65,8 @@ private:
  * This class manages a pool of open sqlite3* objects.
  */
 class MobileSessionPool final {
-    MONGO_DISALLOW_COPYING(MobileSessionPool);
+    MobileSessionPool(const MobileSessionPool&) = delete;
+    MobileSessionPool& operator=(const MobileSessionPool&) = delete;
 
 public:
     MobileSessionPool(const std::string& path, std::uint64_t maxPoolSize = 80);

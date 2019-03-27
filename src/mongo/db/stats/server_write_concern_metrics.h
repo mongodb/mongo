@@ -39,7 +39,8 @@ namespace mongo {
  * Container for server-wide statistics on writeConcern levels used by operations.
  */
 class ServerWriteConcernMetrics {
-    MONGO_DISALLOW_COPYING(ServerWriteConcernMetrics);
+    ServerWriteConcernMetrics(const ServerWriteConcernMetrics&) = delete;
+    ServerWriteConcernMetrics& operator=(const ServerWriteConcernMetrics&) = delete;
 
 public:
     ServerWriteConcernMetrics() = default;

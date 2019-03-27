@@ -31,7 +31,6 @@
 
 #include <list>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
@@ -47,7 +46,8 @@ class OperationContext;
 namespace repl {
 
 class TaskRunner {
-    MONGO_DISALLOW_COPYING(TaskRunner);
+    TaskRunner(const TaskRunner&) = delete;
+    TaskRunner& operator=(const TaskRunner&) = delete;
 
 public:
     /**

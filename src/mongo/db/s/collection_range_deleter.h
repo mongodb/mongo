@@ -30,7 +30,6 @@
 
 #include <list>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -55,7 +54,8 @@ extern AtomicWord<int> rangeDeleterBatchSize;
 extern AtomicWord<int> rangeDeleterBatchDelayMS;
 
 class CollectionRangeDeleter {
-    MONGO_DISALLOW_COPYING(CollectionRangeDeleter);
+    CollectionRangeDeleter(const CollectionRangeDeleter&) = delete;
+    CollectionRangeDeleter& operator=(const CollectionRangeDeleter&) = delete;
 
 public:
     /**

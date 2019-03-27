@@ -32,7 +32,6 @@
 #include <chrono>
 #include <thread>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/memory.h"
@@ -52,7 +51,8 @@ namespace mongo {
  * sleeps for the background thread.
  */
 class BackgroundThreadClockSource final : public ClockSource {
-    MONGO_DISALLOW_COPYING(BackgroundThreadClockSource);
+    BackgroundThreadClockSource(const BackgroundThreadClockSource&) = delete;
+    BackgroundThreadClockSource& operator=(const BackgroundThreadClockSource&) = delete;
 
 public:
     BackgroundThreadClockSource(std::unique_ptr<ClockSource> clockSource, Milliseconds granularity);

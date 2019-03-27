@@ -42,7 +42,8 @@
 namespace mongo {
 
 class RefreshSessionsCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(RefreshSessionsCommand);
+    RefreshSessionsCommand(const RefreshSessionsCommand&) = delete;
+    RefreshSessionsCommand& operator=(const RefreshSessionsCommand&) = delete;
 
 public:
     RefreshSessionsCommand() : BasicCommand("refreshSessions") {}

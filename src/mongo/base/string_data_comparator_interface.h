@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "string_data.h"
@@ -40,7 +39,8 @@ namespace mongo {
  * A StringData::ComparatorInterface is an abstract class for comparing StringData objects.
  */
 class StringData::ComparatorInterface {
-    MONGO_DISALLOW_COPYING(ComparatorInterface);
+    ComparatorInterface(const ComparatorInterface&) = delete;
+    ComparatorInterface& operator=(const ComparatorInterface&) = delete;
 
 public:
     /**

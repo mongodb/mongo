@@ -34,7 +34,6 @@
 #include <map>
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/mutex.h"
@@ -60,7 +59,8 @@ class StorageInterface;
  * dropCollectionsOlderThan() for this purpose.
  */
 class DropPendingCollectionReaper {
-    MONGO_DISALLOW_COPYING(DropPendingCollectionReaper);
+    DropPendingCollectionReaper(const DropPendingCollectionReaper&) = delete;
+    DropPendingCollectionReaper& operator=(const DropPendingCollectionReaper&) = delete;
 
 public:
     // Operation Context binding.

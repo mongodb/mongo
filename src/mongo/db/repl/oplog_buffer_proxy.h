@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/stdx/mutex.h"
 
@@ -46,7 +45,8 @@ class StorageInterface;
  * oplog buffer.
  */
 class OplogBufferProxy : public OplogBuffer {
-    MONGO_DISALLOW_COPYING(OplogBufferProxy);
+    OplogBufferProxy(const OplogBufferProxy&) = delete;
+    OplogBufferProxy& operator=(const OplogBufferProxy&) = delete;
 
 public:
     explicit OplogBufferProxy(std::unique_ptr<OplogBuffer> target);

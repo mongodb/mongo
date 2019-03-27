@@ -65,7 +65,8 @@ using ReactorHandle = std::shared_ptr<Reactor>;
  * References to the TransportLayer should be stored on service context objects.
  */
 class TransportLayer {
-    MONGO_DISALLOW_COPYING(TransportLayer);
+    TransportLayer(const TransportLayer&) = delete;
+    TransportLayer& operator=(const TransportLayer&) = delete;
 
 public:
     static const Status SessionUnknownStatus;

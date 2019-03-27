@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
@@ -332,7 +331,8 @@ private:
  * accessed via the global service context.
  */
 class TimeZoneDatabase {
-    MONGO_DISALLOW_COPYING(TimeZoneDatabase);
+    TimeZoneDatabase(const TimeZoneDatabase&) = delete;
+    TimeZoneDatabase& operator=(const TimeZoneDatabase&) = delete;
 
 public:
     /**

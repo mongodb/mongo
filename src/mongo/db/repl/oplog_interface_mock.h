@@ -39,7 +39,8 @@ namespace repl {
  * Simulates oplog for testing rollback functionality.
  */
 class OplogInterfaceMock : public OplogInterface {
-    MONGO_DISALLOW_COPYING(OplogInterfaceMock);
+    OplogInterfaceMock(const OplogInterfaceMock&) = delete;
+    OplogInterfaceMock& operator=(const OplogInterfaceMock&) = delete;
 
 public:
     using Operation = std::pair<BSONObj, RecordId>;

@@ -39,7 +39,8 @@ namespace logger {
  * Logging domain for ephemeral messages with minimum severity.
  */
 class ComponentMessageLogDomain : public MessageLogDomain {
-    MONGO_DISALLOW_COPYING(ComponentMessageLogDomain);
+    ComponentMessageLogDomain(const ComponentMessageLogDomain&) = delete;
+    ComponentMessageLogDomain& operator=(const ComponentMessageLogDomain&) = delete;
 
 public:
     ComponentMessageLogDomain();

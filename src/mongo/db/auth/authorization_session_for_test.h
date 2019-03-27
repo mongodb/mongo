@@ -39,7 +39,8 @@
 namespace mongo {
 
 class AuthorizationSessionForTest : public AuthorizationSessionImpl {
-    MONGO_DISALLOW_COPYING(AuthorizationSessionForTest);
+    AuthorizationSessionForTest(const AuthorizationSessionForTest&) = delete;
+    AuthorizationSessionForTest& operator=(const AuthorizationSessionForTest&) = delete;
 
 public:
     using AuthorizationSessionImpl::AuthorizationSessionImpl;

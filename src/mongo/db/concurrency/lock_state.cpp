@@ -59,7 +59,8 @@ namespace {
  * Partitioned global lock statistics, so we don't hit the same bucket.
  */
 class PartitionedInstanceWideLockStats {
-    MONGO_DISALLOW_COPYING(PartitionedInstanceWideLockStats);
+    PartitionedInstanceWideLockStats(const PartitionedInstanceWideLockStats&) = delete;
+    PartitionedInstanceWideLockStats& operator=(const PartitionedInstanceWideLockStats&) = delete;
 
 public:
     PartitionedInstanceWideLockStats() {}

@@ -49,7 +49,8 @@ class ReplSetConfig;
  * result of the quorum check.
  */
 class QuorumChecker : public ScatterGatherAlgorithm {
-    MONGO_DISALLOW_COPYING(QuorumChecker);
+    QuorumChecker(const QuorumChecker&) = delete;
+    QuorumChecker& operator=(const QuorumChecker&) = delete;
 
 public:
     /**

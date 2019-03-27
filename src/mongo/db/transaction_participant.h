@@ -33,7 +33,6 @@
 #include <iostream>
 #include <map>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
@@ -91,7 +90,8 @@ enum class TerminationCause {
  * the comments below for more information.
  */
 class TransactionParticipant {
-    MONGO_DISALLOW_COPYING(TransactionParticipant);
+    TransactionParticipant(const TransactionParticipant&) = delete;
+    TransactionParticipant& operator=(const TransactionParticipant&) = delete;
 
     struct PrivateState;
     struct ObservableState;

@@ -31,7 +31,6 @@
 
 #include <deque>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog_applier.h"
@@ -58,7 +57,10 @@ class NoopWriter;
 
 class ReplicationCoordinatorExternalStateImpl final : public ReplicationCoordinatorExternalState,
                                                       public JournalListener {
-    MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
+    ReplicationCoordinatorExternalStateImpl(const ReplicationCoordinatorExternalStateImpl&) =
+        delete;
+    ReplicationCoordinatorExternalStateImpl& operator=(
+        const ReplicationCoordinatorExternalStateImpl&) = delete;
 
 public:
     ReplicationCoordinatorExternalStateImpl(

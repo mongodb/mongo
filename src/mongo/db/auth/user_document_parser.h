@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/user.h"
@@ -38,7 +37,8 @@
 namespace mongo {
 
 class V2UserDocumentParser {
-    MONGO_DISALLOW_COPYING(V2UserDocumentParser);
+    V2UserDocumentParser(const V2UserDocumentParser&) = delete;
+    V2UserDocumentParser& operator=(const V2UserDocumentParser&) = delete;
 
 public:
     V2UserDocumentParser() {}

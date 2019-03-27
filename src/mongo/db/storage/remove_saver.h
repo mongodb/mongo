@@ -34,7 +34,6 @@
 #include <ostream>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/data_protector.h"
@@ -48,7 +47,8 @@ namespace mongo {
  * deletion, otherwise the document will be lost if the process gets terminated in between.
  */
 class RemoveSaver {
-    MONGO_DISALLOW_COPYING(RemoveSaver);
+    RemoveSaver(const RemoveSaver&) = delete;
+    RemoveSaver& operator=(const RemoveSaver&) = delete;
 
 public:
     RemoveSaver(const std::string& type, const std::string& ns, const std::string& why);

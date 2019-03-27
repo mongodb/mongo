@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 
 #include "mongo/util/time_support.h"
 
@@ -42,7 +41,8 @@ class ClockSource;
  * construction when it goes out of scope.
  */
 class ScopedTimer {
-    MONGO_DISALLOW_COPYING(ScopedTimer);
+    ScopedTimer(const ScopedTimer&) = delete;
+    ScopedTimer& operator=(const ScopedTimer&) = delete;
 
 public:
     ScopedTimer(ClockSource* cs, long long* counter);

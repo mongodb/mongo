@@ -84,7 +84,8 @@ namespace mozjs {
  * For more information about overriden fields, see mongo::Scope
  */
 class MozJSImplScope final : public Scope {
-    MONGO_DISALLOW_COPYING(MozJSImplScope);
+    MozJSImplScope(const MozJSImplScope&) = delete;
+    MozJSImplScope& operator=(const MozJSImplScope&) = delete;
 
 public:
     explicit MozJSImplScope(MozJSScriptEngine* engine);

@@ -32,7 +32,6 @@
 #include <limits>
 #include <wiredtiger.h>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -123,7 +122,8 @@ private:
 };
 
 class WiredTigerUtil {
-    MONGO_DISALLOW_COPYING(WiredTigerUtil);
+    WiredTigerUtil(const WiredTigerUtil&) = delete;
+    WiredTigerUtil& operator=(const WiredTigerUtil&) = delete;
 
 private:
     WiredTigerUtil();
@@ -287,7 +287,8 @@ private:
 };
 
 class WiredTigerConfigParser {
-    MONGO_DISALLOW_COPYING(WiredTigerConfigParser);
+    WiredTigerConfigParser(const WiredTigerConfigParser&) = delete;
+    WiredTigerConfigParser& operator=(const WiredTigerConfigParser&) = delete;
 
 public:
     WiredTigerConfigParser(StringData config) {

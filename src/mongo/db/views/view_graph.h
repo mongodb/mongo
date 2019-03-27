@@ -50,7 +50,8 @@ class ViewDefinition;
  * This is owned and managed by the ViewCatalog.
  */
 class ViewGraph {
-    MONGO_DISALLOW_COPYING(ViewGraph);
+    ViewGraph(const ViewGraph&) = delete;
+    ViewGraph& operator=(const ViewGraph&) = delete;
 
 public:
     static const int kMaxViewDepth;

@@ -50,7 +50,8 @@ namespace repl {
  * into dbtests.
  */
 class ReplicationCoordinatorMock : public ReplicationCoordinator {
-    MONGO_DISALLOW_COPYING(ReplicationCoordinatorMock);
+    ReplicationCoordinatorMock(const ReplicationCoordinatorMock&) = delete;
+    ReplicationCoordinatorMock& operator=(const ReplicationCoordinatorMock&) = delete;
 
 public:
     ReplicationCoordinatorMock(ServiceContext* service, const ReplSettings& settings);

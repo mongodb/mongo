@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -48,7 +47,8 @@ class ServiceContext;
  * ShardingState in the initialized state.
  */
 class ShardingInitializationMongoD {
-    MONGO_DISALLOW_COPYING(ShardingInitializationMongoD);
+    ShardingInitializationMongoD(const ShardingInitializationMongoD&) = delete;
+    ShardingInitializationMongoD& operator=(const ShardingInitializationMongoD&) = delete;
 
 public:
     using ShardingEnvironmentInitFunc = stdx::function<void(

@@ -37,7 +37,6 @@
 #include <gperftools/malloc_extension.h>
 #include <valgrind/valgrind.h>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"

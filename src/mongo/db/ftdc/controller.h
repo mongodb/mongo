@@ -33,7 +33,6 @@
 #include <cstdint>
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
@@ -53,7 +52,8 @@ class ServiceContext;
  * Exposes an methods to response to configuration changes in a thread-safe manner.
  */
 class FTDCController {
-    MONGO_DISALLOW_COPYING(FTDCController);
+    FTDCController(const FTDCController&) = delete;
+    FTDCController& operator=(const FTDCController&) = delete;
 
 public:
     FTDCController(const boost::filesystem::path path, FTDCConfig config)

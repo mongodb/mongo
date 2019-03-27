@@ -76,7 +76,8 @@ private:
  *  Internal class. Consumers shouldn't care about this.
  */
 class ValueElement {
-    MONGO_DISALLOW_COPYING(ValueElement);
+    ValueElement(const ValueElement&) = delete;
+    ValueElement& operator=(const ValueElement&) = delete;
 
 public:
     Value val;

@@ -95,7 +95,8 @@ struct DeleteStageParams {
  * had the replication coordinator approve the write).
  */
 class DeleteStage final : public RequiresMutableCollectionStage {
-    MONGO_DISALLOW_COPYING(DeleteStage);
+    DeleteStage(const DeleteStage&) = delete;
+    DeleteStage& operator=(const DeleteStage&) = delete;
 
 public:
     DeleteStage(OperationContext* opCtx,

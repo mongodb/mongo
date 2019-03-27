@@ -31,7 +31,6 @@
 
 #include <unordered_map>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/service_context.h"
@@ -176,7 +175,8 @@ using CollectionUUID = UUID;
 class Database;
 
 class UUIDCatalog {
-    MONGO_DISALLOW_COPYING(UUIDCatalog);
+    UUIDCatalog(const UUIDCatalog&) = delete;
+    UUIDCatalog& operator=(const UUIDCatalog&) = delete;
 
 public:
     class iterator {

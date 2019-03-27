@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/transaction_coordinator_catalog.h"
 
 namespace mongo {
 
 class TransactionCoordinatorService {
-    MONGO_DISALLOW_COPYING(TransactionCoordinatorService);
+    TransactionCoordinatorService(const TransactionCoordinatorService&) = delete;
+    TransactionCoordinatorService& operator=(const TransactionCoordinatorService&) = delete;
 
 public:
     TransactionCoordinatorService();

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
@@ -91,7 +90,8 @@ struct WireVersionInfo {
 };
 
 struct WireSpec {
-    MONGO_DISALLOW_COPYING(WireSpec);
+    WireSpec(const WireSpec&) = delete;
+    WireSpec& operator=(const WireSpec&) = delete;
 
     static WireSpec& instance();
 

@@ -34,7 +34,6 @@
 #include <vector>
 
 #include "mongo/base/counter.h"
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/time_support.h"
 
@@ -51,7 +50,8 @@ namespace repl {
  * Implementations are only required to support one pusher and one popper.
  */
 class OplogBuffer {
-    MONGO_DISALLOW_COPYING(OplogBuffer);
+    OplogBuffer(const OplogBuffer&) = delete;
+    OplogBuffer& operator=(const OplogBuffer&) = delete;
 
 public:
     /**

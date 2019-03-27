@@ -62,7 +62,8 @@ public:
 
 private:
     class PeriodicJobImpl {
-        MONGO_DISALLOW_COPYING(PeriodicJobImpl);
+        PeriodicJobImpl(const PeriodicJobImpl&) = delete;
+        PeriodicJobImpl& operator=(const PeriodicJobImpl&) = delete;
 
     public:
         friend class PeriodicRunnerEmbedded;

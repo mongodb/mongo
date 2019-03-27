@@ -198,7 +198,8 @@ void generateErrorResponse(OperationContext* opCtx,
  * elsewhere.
  */
 class MaintenanceModeSetter {
-    MONGO_DISALLOW_COPYING(MaintenanceModeSetter);
+    MaintenanceModeSetter(const MaintenanceModeSetter&) = delete;
+    MaintenanceModeSetter& operator=(const MaintenanceModeSetter&) = delete;
 
 public:
     MaintenanceModeSetter(OperationContext* opCtx)

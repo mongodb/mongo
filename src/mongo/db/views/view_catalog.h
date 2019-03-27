@@ -60,7 +60,8 @@ class Database;
  * views catalog collection if necessary, throwing if the refresh fails.
  */
 class ViewCatalog {
-    MONGO_DISALLOW_COPYING(ViewCatalog);
+    ViewCatalog(const ViewCatalog&) = delete;
+    ViewCatalog& operator=(const ViewCatalog&) = delete;
 
 public:
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;

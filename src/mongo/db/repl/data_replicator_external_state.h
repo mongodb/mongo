@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_applier.h"
@@ -66,7 +65,8 @@ using OpTimeWithTerm = OpTimeWith<long long>;
  * InitialSyncer should be moved here.
  */
 class DataReplicatorExternalState {
-    MONGO_DISALLOW_COPYING(DataReplicatorExternalState);
+    DataReplicatorExternalState(const DataReplicatorExternalState&) = delete;
+    DataReplicatorExternalState& operator=(const DataReplicatorExternalState&) = delete;
 
 public:
     DataReplicatorExternalState() = default;

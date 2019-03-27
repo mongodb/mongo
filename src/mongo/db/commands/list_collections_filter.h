@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
 class ListCollectionsFilter {
-    MONGO_DISALLOW_COPYING(ListCollectionsFilter);
+    ListCollectionsFilter(const ListCollectionsFilter&) = delete;
+    ListCollectionsFilter& operator=(const ListCollectionsFilter&) = delete;
 
 public:
     /**

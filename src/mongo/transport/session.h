@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/baton.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
@@ -55,7 +54,8 @@ using ConstSessionHandle = std::shared_ptr<const Session>;
  * (on the transport side) and Messages with Client objects (on the database side).
  */
 class Session : public std::enable_shared_from_this<Session>, public Decorable<Session> {
-    MONGO_DISALLOW_COPYING(Session);
+    Session(const Session&) = delete;
+    Session& operator=(const Session&) = delete;
 
 public:
     /**

@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
@@ -47,7 +46,8 @@ namespace mongo {
  *  Client side authentication session for SASL PLAIN.
  */
 class SaslSCRAMClientConversation : public SaslClientConversation {
-    MONGO_DISALLOW_COPYING(SaslSCRAMClientConversation);
+    SaslSCRAMClientConversation(const SaslSCRAMClientConversation&) = delete;
+    SaslSCRAMClientConversation& operator=(const SaslSCRAMClientConversation&) = delete;
 
 public:
     using SaslClientConversation::SaslClientConversation;

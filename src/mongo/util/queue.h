@@ -33,7 +33,6 @@
 #include <limits>
 #include <queue>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
@@ -51,7 +50,8 @@ namespace mongo {
  */
 template <typename T>
 class BlockingQueue {
-    MONGO_DISALLOW_COPYING(BlockingQueue);
+    BlockingQueue(const BlockingQueue&) = delete;
+    BlockingQueue& operator=(const BlockingQueue&) = delete;
 
 public:
     using GetSizeFn = stdx::function<size_t(const T&)>;

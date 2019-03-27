@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 
 namespace mongo {
@@ -55,7 +54,8 @@ namespace mongo {
  */
 
 class BackgroundJob {
-    MONGO_DISALLOW_COPYING(BackgroundJob);
+    BackgroundJob(const BackgroundJob&) = delete;
+    BackgroundJob& operator=(const BackgroundJob&) = delete;
 
 protected:
     /**

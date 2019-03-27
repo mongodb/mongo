@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_gen.h"
@@ -51,7 +50,8 @@ class OperationContext;
  * Note: This only supports storing the version for a single namespace.
  */
 class OperationShardingState {
-    MONGO_DISALLOW_COPYING(OperationShardingState);
+    OperationShardingState(const OperationShardingState&) = delete;
+    OperationShardingState& operator=(const OperationShardingState&) = delete;
 
 public:
     OperationShardingState();

@@ -34,7 +34,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"

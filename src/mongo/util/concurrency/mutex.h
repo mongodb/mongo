@@ -35,7 +35,6 @@
 #include <pthread.h>
 #endif
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -49,7 +48,8 @@ namespace mongo {
 #if defined(_WIN32)
 
 class SimpleMutex {
-    MONGO_DISALLOW_COPYING(SimpleMutex);
+    SimpleMutex(const SimpleMutex&) = delete;
+    SimpleMutex& operator=(const SimpleMutex&) = delete;
 
 public:
     SimpleMutex() {
@@ -74,7 +74,8 @@ private:
 #else
 
 class SimpleMutex {
-    MONGO_DISALLOW_COPYING(SimpleMutex);
+    SimpleMutex(const SimpleMutex&) = delete;
+    SimpleMutex& operator=(const SimpleMutex&) = delete;
 
 public:
     SimpleMutex() {

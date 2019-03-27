@@ -34,7 +34,6 @@
 #include <tuple>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -47,7 +46,8 @@ class BSONObjBuilder;
  * able to access version information.
  */
 class VersionInfoInterface {
-    MONGO_DISALLOW_COPYING(VersionInfoInterface);
+    VersionInfoInterface(const VersionInfoInterface&) = delete;
+    VersionInfoInterface& operator=(const VersionInfoInterface&) = delete;
 
 public:
     using BuildInfoTuple = std::tuple<StringData, StringData, bool, bool>;

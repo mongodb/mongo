@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor.h"
@@ -39,7 +38,8 @@
 namespace mongo {
 
 class DeleteRequest {
-    MONGO_DISALLOW_COPYING(DeleteRequest);
+    DeleteRequest(const DeleteRequest&) = delete;
+    DeleteRequest& operator=(const DeleteRequest&) = delete;
 
 public:
     explicit DeleteRequest(const NamespaceString& nsString)

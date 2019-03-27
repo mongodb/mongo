@@ -53,7 +53,8 @@ struct Token {
 };
 
 class Tokenizer {
-    MONGO_DISALLOW_COPYING(Tokenizer);
+    Tokenizer(const Tokenizer&) = delete;
+    Tokenizer& operator=(const Tokenizer&) = delete;
 
 public:
     Tokenizer(const FTSLanguage* language, StringData str);

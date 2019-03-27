@@ -31,7 +31,6 @@
 
 #include <list>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -50,7 +49,8 @@ namespace mongo {
 class RangePreserver;
 
 class MetadataManager {
-    MONGO_DISALLOW_COPYING(MetadataManager);
+    MetadataManager(const MetadataManager&) = delete;
+    MetadataManager& operator=(const MetadataManager&) = delete;
 
 public:
     using CleanupNotification = CollectionRangeDeleter::DeleteNotification;
@@ -152,7 +152,8 @@ private:
      * point in time along with a counter of how many queries are still using it.
      */
     struct CollectionMetadataTracker {
-        MONGO_DISALLOW_COPYING(CollectionMetadataTracker);
+        CollectionMetadataTracker(const CollectionMetadataTracker&) = delete;
+        CollectionMetadataTracker& operator=(const CollectionMetadataTracker&) = delete;
 
         CollectionMetadataTracker(CollectionMetadata inMetadata)
             : metadata(std::move(inMetadata)) {}

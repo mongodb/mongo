@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
@@ -42,7 +41,8 @@ namespace repl {
  * interact with the rollback subsystem.
  */
 class Rollback {
-    MONGO_DISALLOW_COPYING(Rollback);
+    Rollback(const Rollback&) = delete;
+    Rollback& operator=(const Rollback&) = delete;
 
 public:
     /**

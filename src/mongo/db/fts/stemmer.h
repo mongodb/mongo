@@ -44,7 +44,8 @@ namespace fts {
  * running/Running -> run/Run
  */
 class Stemmer {
-    MONGO_DISALLOW_COPYING(Stemmer);
+    Stemmer(const Stemmer&) = delete;
+    Stemmer& operator=(const Stemmer&) = delete;
 
 public:
     Stemmer(const FTSLanguage* language);

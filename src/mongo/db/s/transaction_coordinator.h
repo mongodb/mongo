@@ -45,7 +45,8 @@ namespace mongo {
  * `onCompletion()`.
  */
 class TransactionCoordinator {
-    MONGO_DISALLOW_COPYING(TransactionCoordinator);
+    TransactionCoordinator(const TransactionCoordinator&) = delete;
+    TransactionCoordinator& operator=(const TransactionCoordinator&) = delete;
 
 public:
     /**

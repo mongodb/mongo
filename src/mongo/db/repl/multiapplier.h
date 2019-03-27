@@ -35,7 +35,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
@@ -53,7 +52,8 @@ namespace repl {
 class OpTime;
 
 class MultiApplier {
-    MONGO_DISALLOW_COPYING(MultiApplier);
+    MultiApplier(const MultiApplier&) = delete;
+    MultiApplier& operator=(const MultiApplier&) = delete;
 
 public:
     /**

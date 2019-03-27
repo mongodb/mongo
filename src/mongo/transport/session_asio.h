@@ -74,7 +74,8 @@ Future<void> futurize(const std::error_code& ec) {
 using GenericSocket = asio::generic::stream_protocol::socket;
 
 class TransportLayerASIO::ASIOSession final : public Session {
-    MONGO_DISALLOW_COPYING(ASIOSession);
+    ASIOSession(const ASIOSession&) = delete;
+    ASIOSession& operator=(const ASIOSession&) = delete;
 
 public:
     // If the socket is disconnected while any of these options are being set, this constructor

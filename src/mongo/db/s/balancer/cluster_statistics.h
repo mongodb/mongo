@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
@@ -50,7 +49,8 @@ class StatusWith;
  * the statistics collection. There should be one instance of this object per service context.
  */
 class ClusterStatistics {
-    MONGO_DISALLOW_COPYING(ClusterStatistics);
+    ClusterStatistics(const ClusterStatistics&) = delete;
+    ClusterStatistics& operator=(const ClusterStatistics&) = delete;
 
 public:
     /**

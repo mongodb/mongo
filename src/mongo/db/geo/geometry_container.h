@@ -31,14 +31,14 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/geo/shapes.h"
 #include "third_party/s2/s2regionunion.h"
 
 namespace mongo {
 
 class GeometryContainer {
-    MONGO_DISALLOW_COPYING(GeometryContainer);
+    GeometryContainer(const GeometryContainer&) = delete;
+    GeometryContainer& operator=(const GeometryContainer&) = delete;
 
 public:
     /**

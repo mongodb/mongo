@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/s/client/rs_local_client.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
 
 class ShardLocal : public Shard {
-    MONGO_DISALLOW_COPYING(ShardLocal);
+    ShardLocal(const ShardLocal&) = delete;
+    ShardLocal& operator=(const ShardLocal&) = delete;
 
 public:
     explicit ShardLocal(const ShardId& id);

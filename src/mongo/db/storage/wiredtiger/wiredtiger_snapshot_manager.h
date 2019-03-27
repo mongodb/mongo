@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <wiredtiger.h>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
@@ -43,7 +42,8 @@ namespace mongo {
 class WiredTigerOplogManager;
 
 class WiredTigerSnapshotManager final : public SnapshotManager {
-    MONGO_DISALLOW_COPYING(WiredTigerSnapshotManager);
+    WiredTigerSnapshotManager(const WiredTigerSnapshotManager&) = delete;
+    WiredTigerSnapshotManager& operator=(const WiredTigerSnapshotManager&) = delete;
 
 public:
     WiredTigerSnapshotManager() = default;

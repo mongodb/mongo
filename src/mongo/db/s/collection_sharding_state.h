@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
@@ -53,7 +52,8 @@ namespace mongo {
  * lock on the respective collection.
  */
 class CollectionShardingState {
-    MONGO_DISALLOW_COPYING(CollectionShardingState);
+    CollectionShardingState(const CollectionShardingState&) = delete;
+    CollectionShardingState& operator=(const CollectionShardingState&) = delete;
 
 public:
     using CSRLock = ShardingStateLock<CollectionShardingState>;
@@ -172,7 +172,8 @@ private:
  * which is running.
  */
 class CollectionShardingStateFactory {
-    MONGO_DISALLOW_COPYING(CollectionShardingStateFactory);
+    CollectionShardingStateFactory(const CollectionShardingStateFactory&) = delete;
+    CollectionShardingStateFactory& operator=(const CollectionShardingStateFactory&) = delete;
 
 public:
     static void set(ServiceContext* service,

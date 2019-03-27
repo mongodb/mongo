@@ -32,7 +32,6 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/db/field_ref.h"
@@ -50,7 +49,8 @@ namespace mongo {
  * FieldRefSets do not own the FieldRef paths they contain.
  */
 class FieldRefSet {
-    MONGO_DISALLOW_COPYING(FieldRefSet);
+    FieldRefSet(const FieldRefSet&) = delete;
+    FieldRefSet& operator=(const FieldRefSet&) = delete;
 
     struct FieldRefPtrLessThan {
         bool operator()(const FieldRef* lhs, const FieldRef* rhs) const;

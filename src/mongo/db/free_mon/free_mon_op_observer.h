@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/op_observer.h"
 
 namespace mongo {
@@ -39,7 +38,8 @@ namespace mongo {
  * relevant entries for free monitoring.
  */
 class FreeMonOpObserver final : public OpObserver {
-    MONGO_DISALLOW_COPYING(FreeMonOpObserver);
+    FreeMonOpObserver(const FreeMonOpObserver&) = delete;
+    FreeMonOpObserver& operator=(const FreeMonOpObserver&) = delete;
 
 public:
     FreeMonOpObserver();

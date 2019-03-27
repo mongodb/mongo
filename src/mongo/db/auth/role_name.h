@@ -35,7 +35,6 @@
 #include <vector>
 
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -128,7 +127,8 @@ std::ostream& operator<<(std::ostream& os, const RoleName& name);
 class RoleNameIterator {
 public:
     class Impl {
-        MONGO_DISALLOW_COPYING(Impl);
+        Impl(const Impl&) = delete;
+        Impl& operator=(const Impl&) = delete;
 
     public:
         Impl(){};
@@ -182,7 +182,8 @@ namespace mongo {
 
 template <typename ContainerIterator>
 class RoleNameContainerIteratorImpl : public RoleNameIterator::Impl {
-    MONGO_DISALLOW_COPYING(RoleNameContainerIteratorImpl);
+    RoleNameContainerIteratorImpl(const RoleNameContainerIteratorImpl&) = delete;
+    RoleNameContainerIteratorImpl& operator=(const RoleNameContainerIteratorImpl&) = delete;
 
 public:
     RoleNameContainerIteratorImpl(const ContainerIterator& begin, const ContainerIterator& end)

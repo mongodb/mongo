@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/logger/appender.h"
 #include "mongo/logger/log_severity.h"
 
@@ -61,7 +60,8 @@ namespace logger {
  */
 template <typename E>
 class LogDomain {
-    MONGO_DISALLOW_COPYING(LogDomain);
+    LogDomain(const LogDomain&) = delete;
+    LogDomain& operator=(const LogDomain&) = delete;
 
 public:
     typedef E Event;

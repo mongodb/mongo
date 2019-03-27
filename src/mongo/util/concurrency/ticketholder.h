@@ -32,7 +32,6 @@
 #include <semaphore.h>
 #endif
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -42,7 +41,8 @@
 namespace mongo {
 
 class TicketHolder {
-    MONGO_DISALLOW_COPYING(TicketHolder);
+    TicketHolder(const TicketHolder&) = delete;
+    TicketHolder& operator=(const TicketHolder&) = delete;
 
 public:
     explicit TicketHolder(int num);
@@ -113,7 +113,8 @@ private:
 };
 
 class TicketHolderReleaser {
-    MONGO_DISALLOW_COPYING(TicketHolderReleaser);
+    TicketHolderReleaser(const TicketHolderReleaser&) = delete;
+    TicketHolderReleaser& operator=(const TicketHolderReleaser&) = delete;
 
 public:
     TicketHolderReleaser() {

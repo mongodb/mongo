@@ -32,7 +32,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/namespace_string.h"
@@ -60,7 +59,8 @@ class StorageInterface;
  * This class DOES NOT hold any information related to the consensus protocol.
  */
 class ReplicationProcess {
-    MONGO_DISALLOW_COPYING(ReplicationProcess);
+    ReplicationProcess(const ReplicationProcess&) = delete;
+    ReplicationProcess& operator=(const ReplicationProcess&) = delete;
 
 public:
     static const int kUninitializedRollbackId = -1;

@@ -90,7 +90,8 @@ private:
      * which was created as part of a transaction.
      */
     struct TransactionContext {
-        MONGO_DISALLOW_COPYING(TransactionContext);
+        TransactionContext(const TransactionContext&) = delete;
+        TransactionContext& operator=(const TransactionContext&) = delete;
 
         // The array of oplog entries from an 'applyOps' representing the transaction. Only kept
         // around so that the underlying memory of 'arr' isn't freed.

@@ -458,7 +458,8 @@ protected:
  * builds should be scheduled.
  */
 class ScopedStopNewDatabaseIndexBuilds {
-    MONGO_DISALLOW_COPYING(ScopedStopNewDatabaseIndexBuilds);
+    ScopedStopNewDatabaseIndexBuilds(const ScopedStopNewDatabaseIndexBuilds&) = delete;
+    ScopedStopNewDatabaseIndexBuilds& operator=(const ScopedStopNewDatabaseIndexBuilds&) = delete;
 
 public:
     /**
@@ -488,7 +489,9 @@ private:
  * builds should be scheduled.
  */
 class ScopedStopNewCollectionIndexBuilds {
-    MONGO_DISALLOW_COPYING(ScopedStopNewCollectionIndexBuilds);
+    ScopedStopNewCollectionIndexBuilds(const ScopedStopNewCollectionIndexBuilds&) = delete;
+    ScopedStopNewCollectionIndexBuilds& operator=(const ScopedStopNewCollectionIndexBuilds&) =
+        delete;
 
 public:
     /**

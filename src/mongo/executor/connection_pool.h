@@ -32,7 +32,6 @@
 #include <memory>
 #include <queue>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/stdx/chrono.h"
@@ -188,7 +187,8 @@ private:
  * Minimal interface sets a timer with a callback and cancels the timer.
  */
 class ConnectionPool::TimerInterface {
-    MONGO_DISALLOW_COPYING(TimerInterface);
+    TimerInterface(const TimerInterface&) = delete;
+    TimerInterface& operator=(const TimerInterface&) = delete;
 
 public:
     TimerInterface() = default;
@@ -222,7 +222,8 @@ public:
  * refresh them (issue some kind of ping) and manage a timer.
  */
 class ConnectionPool::ConnectionInterface : public TimerInterface {
-    MONGO_DISALLOW_COPYING(ConnectionInterface);
+    ConnectionInterface(const ConnectionInterface&) = delete;
+    ConnectionInterface& operator=(const ConnectionInterface&) = delete;
 
     friend class ConnectionPool;
 
@@ -325,7 +326,8 @@ private:
  * connection pool.
  */
 class ConnectionPool::DependentTypeFactoryInterface {
-    MONGO_DISALLOW_COPYING(DependentTypeFactoryInterface);
+    DependentTypeFactoryInterface(const DependentTypeFactoryInterface&) = delete;
+    DependentTypeFactoryInterface& operator=(const DependentTypeFactoryInterface&) = delete;
 
 public:
     DependentTypeFactoryInterface() = default;

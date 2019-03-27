@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -43,7 +42,8 @@ class RemoteCommandTargeter;
  * replica set, etc).
  */
 class RemoteCommandTargeterFactory {
-    MONGO_DISALLOW_COPYING(RemoteCommandTargeterFactory);
+    RemoteCommandTargeterFactory(const RemoteCommandTargeterFactory&) = delete;
+    RemoteCommandTargeterFactory& operator=(const RemoteCommandTargeterFactory&) = delete;
 
 public:
     virtual ~RemoteCommandTargeterFactory() = default;

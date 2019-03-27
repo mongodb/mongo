@@ -100,7 +100,8 @@ class DBClientQueryInterface {
  abstract class that implements the core db operations
  */
 class DBClientBase : public DBClientQueryInterface {
-    MONGO_DISALLOW_COPYING(DBClientBase);
+    DBClientBase(const DBClientBase&) = delete;
+    DBClientBase& operator=(const DBClientBase&) = delete;
 
 public:
     DBClientBase()

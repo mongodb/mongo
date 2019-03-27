@@ -69,7 +69,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
  * the collection).
  */
 class WriteContextForTests {
-    MONGO_DISALLOW_COPYING(WriteContextForTests);
+    WriteContextForTests(const WriteContextForTests&) = delete;
+    WriteContextForTests& operator=(const WriteContextForTests&) = delete;
 
 public:
     WriteContextForTests(OperationContext* opCtx, StringData ns);

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_database.h"
@@ -118,7 +117,8 @@ private:
  * writes happen through the ShardingCatalogManager and the cache hierarchy needs to be invalidated.
  */
 class CatalogCache {
-    MONGO_DISALLOW_COPYING(CatalogCache);
+    CatalogCache(const CatalogCache&) = delete;
+    CatalogCache& operator=(const CatalogCache&) = delete;
 
 public:
     CatalogCache(CatalogCacheLoader& cacheLoader);

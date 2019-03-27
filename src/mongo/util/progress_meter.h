@@ -36,7 +36,8 @@
 namespace mongo {
 
 class ProgressMeter {
-    MONGO_DISALLOW_COPYING(ProgressMeter);
+    ProgressMeter(const ProgressMeter&) = delete;
+    ProgressMeter& operator=(const ProgressMeter&) = delete;
 
 public:
     ProgressMeter(unsigned long long total,
@@ -130,7 +131,8 @@ private:
  * underlying ProgressMeter, which is owned by CurOp.
  */
 class ProgressMeterHolder {
-    MONGO_DISALLOW_COPYING(ProgressMeterHolder);
+    ProgressMeterHolder(const ProgressMeterHolder&) = delete;
+    ProgressMeterHolder& operator=(const ProgressMeterHolder&) = delete;
 
 public:
     ProgressMeterHolder() : _pm(nullptr) {}

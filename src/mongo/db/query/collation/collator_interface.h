@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
@@ -49,7 +48,8 @@ namespace mongo {
  * Does not throw exceptions.
  */
 class CollatorInterface : public StringData::ComparatorInterface {
-    MONGO_DISALLOW_COPYING(CollatorInterface);
+    CollatorInterface(const CollatorInterface&) = delete;
+    CollatorInterface& operator=(const CollatorInterface&) = delete;
 
 public:
     /**

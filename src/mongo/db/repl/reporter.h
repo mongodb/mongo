@@ -63,7 +63,8 @@ namespace repl {
  * keep alive timeout, resetting the keep alive schedule.
  */
 class Reporter {
-    MONGO_DISALLOW_COPYING(Reporter);
+    Reporter(const Reporter&) = delete;
+    Reporter& operator=(const Reporter&) = delete;
 
 public:
     /**

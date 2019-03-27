@@ -35,7 +35,6 @@
 #include <iosfwd>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
@@ -71,7 +70,8 @@ struct TimestampedBSONObj {
  *      * Insert documents into a collection
  */
 class StorageInterface {
-    MONGO_DISALLOW_COPYING(StorageInterface);
+    StorageInterface(const StorageInterface&) = delete;
+    StorageInterface& operator=(const StorageInterface&) = delete;
 
 public:
     // Operation Context binding.

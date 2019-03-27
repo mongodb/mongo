@@ -38,7 +38,6 @@
 #include <utility>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -61,7 +60,8 @@ MONGO_FAIL_POINT_DEFINE(scheduleIntoPoolSpinsUntilThreadPoolShutsDown);
 }
 
 class ThreadPoolTaskExecutor::CallbackState : public TaskExecutor::CallbackState {
-    MONGO_DISALLOW_COPYING(CallbackState);
+    CallbackState(const CallbackState&) = delete;
+    CallbackState& operator=(const CallbackState&) = delete;
 
 public:
     static std::shared_ptr<CallbackState> make(CallbackFn&& cb,
@@ -106,7 +106,8 @@ public:
 };
 
 class ThreadPoolTaskExecutor::EventState : public TaskExecutor::EventState {
-    MONGO_DISALLOW_COPYING(EventState);
+    EventState(const EventState&) = delete;
+    EventState& operator=(const EventState&) = delete;
 
 public:
     static std::shared_ptr<EventState> make() {

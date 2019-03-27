@@ -75,7 +75,8 @@ const BSONObj readConcernSnapshot = BSON("level"
                                          << "snapshot");
 
 class BenchRunWorkerStateGuard {
-    MONGO_DISALLOW_COPYING(BenchRunWorkerStateGuard);
+    BenchRunWorkerStateGuard(const BenchRunWorkerStateGuard&) = delete;
+    BenchRunWorkerStateGuard& operator=(const BenchRunWorkerStateGuard&) = delete;
 
 public:
     explicit BenchRunWorkerStateGuard(BenchRunState& brState) : _brState(brState) {

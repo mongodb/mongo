@@ -33,7 +33,6 @@
 #include <boost/optional.hpp>
 #include <cstdint>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/stdx/mutex.h"
@@ -196,7 +195,8 @@ private:
  * Contains settings, which control the behaviour of the balancer.
  */
 class BalancerConfiguration {
-    MONGO_DISALLOW_COPYING(BalancerConfiguration);
+    BalancerConfiguration(const BalancerConfiguration&) = delete;
+    BalancerConfiguration& operator=(const BalancerConfiguration&) = delete;
 
 public:
     /**

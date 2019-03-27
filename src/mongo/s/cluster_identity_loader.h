@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/stdx/condition_variable.h"
@@ -48,7 +47,8 @@ class StatusWith;
  * Decoration on ServiceContext used by any process in a sharded cluster to access the cluster ID.
  */
 class ClusterIdentityLoader {
-    MONGO_DISALLOW_COPYING(ClusterIdentityLoader);
+    ClusterIdentityLoader(const ClusterIdentityLoader&) = delete;
+    ClusterIdentityLoader& operator=(const ClusterIdentityLoader&) = delete;
 
 public:
     ClusterIdentityLoader() = default;

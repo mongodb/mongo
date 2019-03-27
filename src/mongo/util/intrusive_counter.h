@@ -32,7 +32,6 @@
 #include <boost/intrusive_ptr.hpp>
 #include <stdlib.h>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/allocator.h"
@@ -41,7 +40,8 @@ namespace mongo {
 
 /// This is an alternative base class to the above ones (will replace them eventually)
 class RefCountable {
-    MONGO_DISALLOW_COPYING(RefCountable);
+    RefCountable(const RefCountable&) = delete;
+    RefCountable& operator=(const RefCountable&) = delete;
 
 public:
     /// If false you have exclusive access to this object. This is useful for implementing COW.

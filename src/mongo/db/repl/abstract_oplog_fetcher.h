@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/namespace_string.h"
@@ -51,7 +50,8 @@ namespace repl {
  * fetcher. Subclasses also provide a callback to run on successful batches.
  */
 class AbstractOplogFetcher : public AbstractAsyncComponent {
-    MONGO_DISALLOW_COPYING(AbstractOplogFetcher);
+    AbstractOplogFetcher(const AbstractOplogFetcher&) = delete;
+    AbstractOplogFetcher& operator=(const AbstractOplogFetcher&) = delete;
 
 public:
     /**

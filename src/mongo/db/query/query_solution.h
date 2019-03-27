@@ -188,7 +188,8 @@ protected:
     void addCommon(mongoutils::str::stream* ss, int indent) const;
 
 private:
-    MONGO_DISALLOW_COPYING(QuerySolutionNode);
+    QuerySolutionNode(const QuerySolutionNode&) = delete;
+    QuerySolutionNode& operator=(const QuerySolutionNode&) = delete;
 };
 
 /**
@@ -238,7 +239,8 @@ struct QuerySolution {
     }
 
 private:
-    MONGO_DISALLOW_COPYING(QuerySolution);
+    QuerySolution(const QuerySolution&) = delete;
+    QuerySolution& operator=(const QuerySolution&) = delete;
 };
 
 struct TextNode : public QuerySolutionNode {

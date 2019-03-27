@@ -30,7 +30,6 @@
 #pragma once
 
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/logger/appender.h"
 #include "mongo/logger/encoder.h"
@@ -44,7 +43,8 @@ namespace logger {
  */
 template <typename Event>
 class RotatableFileAppender : public Appender<Event> {
-    MONGO_DISALLOW_COPYING(RotatableFileAppender);
+    RotatableFileAppender(const RotatableFileAppender&) = delete;
+    RotatableFileAppender& operator=(const RotatableFileAppender&) = delete;
 
 public:
     typedef Encoder<Event> EventEncoder;

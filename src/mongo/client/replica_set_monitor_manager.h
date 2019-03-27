@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
@@ -48,7 +47,8 @@ class MongoURI;
  * Manages the lifetime of a set of replica set monitors.
  */
 class ReplicaSetMonitorManager {
-    MONGO_DISALLOW_COPYING(ReplicaSetMonitorManager);
+    ReplicaSetMonitorManager(const ReplicaSetMonitorManager&) = delete;
+    ReplicaSetMonitorManager& operator=(const ReplicaSetMonitorManager&) = delete;
 
 public:
     ReplicaSetMonitorManager();

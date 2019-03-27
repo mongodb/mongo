@@ -30,7 +30,6 @@
 
 #include <cstdint>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -70,7 +69,8 @@ int getScriptingEngineInterruptInterval();
  */
 template <typename _Task>
 class DeadlineMonitor {
-    MONGO_DISALLOW_COPYING(DeadlineMonitor);
+    DeadlineMonitor(const DeadlineMonitor&) = delete;
+    DeadlineMonitor& operator=(const DeadlineMonitor&) = delete;
 
 public:
     DeadlineMonitor() {

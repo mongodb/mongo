@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
@@ -51,7 +50,8 @@ class ObservableSession;
  * Keeps track of the transaction runtime state for every active session on this instance.
  */
 class SessionCatalog {
-    MONGO_DISALLOW_COPYING(SessionCatalog);
+    SessionCatalog(const SessionCatalog&) = delete;
+    SessionCatalog& operator=(const SessionCatalog&) = delete;
 
     friend class ObservableSession;
     friend class OperationContextSession;
@@ -295,7 +295,8 @@ private:
  * at destruction.
  */
 class OperationContextSession {
-    MONGO_DISALLOW_COPYING(OperationContextSession);
+    OperationContextSession(const OperationContextSession&) = delete;
+    OperationContextSession& operator=(const OperationContextSession&) = delete;
 
 public:
     /**

@@ -42,7 +42,9 @@ namespace mongo {
 namespace {
 
 class RefreshLogicalSessionCacheNowCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(RefreshLogicalSessionCacheNowCommand);
+    RefreshLogicalSessionCacheNowCommand(const RefreshLogicalSessionCacheNowCommand&) = delete;
+    RefreshLogicalSessionCacheNowCommand& operator=(const RefreshLogicalSessionCacheNowCommand&) =
+        delete;
 
 public:
     RefreshLogicalSessionCacheNowCommand() : BasicCommand("refreshLogicalSessionCacheNow") {}

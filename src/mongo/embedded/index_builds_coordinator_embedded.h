@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/index_builds_coordinator.h"
 
 namespace mongo {
@@ -46,7 +45,8 @@ class ServiceContext;
  * accessible via the ServiceContext.
  */
 class IndexBuildsCoordinatorEmbedded : public IndexBuildsCoordinator {
-    MONGO_DISALLOW_COPYING(IndexBuildsCoordinatorEmbedded);
+    IndexBuildsCoordinatorEmbedded(const IndexBuildsCoordinatorEmbedded&) = delete;
+    IndexBuildsCoordinatorEmbedded& operator=(const IndexBuildsCoordinatorEmbedded&) = delete;
 
 public:
     IndexBuildsCoordinatorEmbedded() = default;

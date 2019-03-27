@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 
 namespace mongo {
@@ -42,7 +41,8 @@ class Client;
  * Type representing an ongoing authentication session.
  */
 class AuthenticationSession {
-    MONGO_DISALLOW_COPYING(AuthenticationSession);
+    AuthenticationSession(const AuthenticationSession&) = delete;
+    AuthenticationSession& operator=(const AuthenticationSession&) = delete;
 
 public:
     explicit AuthenticationSession(std::unique_ptr<ServerMechanismBase> mech)

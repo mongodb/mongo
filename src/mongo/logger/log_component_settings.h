@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
@@ -44,7 +43,8 @@ namespace logger {
  * provide log severities for the other components (up to but not including kNumLogComponents).
  */
 class LogComponentSettings {
-    MONGO_DISALLOW_COPYING(LogComponentSettings);
+    LogComponentSettings(const LogComponentSettings&) = delete;
+    LogComponentSettings& operator=(const LogComponentSettings&) = delete;
 
 public:
     LogComponentSettings();

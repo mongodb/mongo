@@ -35,7 +35,6 @@
 #include <set>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/executor/task_executor.h"
@@ -57,7 +56,8 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
  * All methods perform the required synchronization to allow callers from multiple threads.
  */
 class ReplicaSetMonitor : public std::enable_shared_from_this<ReplicaSetMonitor> {
-    MONGO_DISALLOW_COPYING(ReplicaSetMonitor);
+    ReplicaSetMonitor(const ReplicaSetMonitor&) = delete;
+    ReplicaSetMonitor& operator=(const ReplicaSetMonitor&) = delete;
 
 public:
     class Refresher;

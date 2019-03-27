@@ -33,7 +33,6 @@
 #include <memory>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 
@@ -42,7 +41,8 @@ namespace mongo {
 constexpr StringData kLockFileBasename = "mongod.lock"_sd;
 
 class StorageEngineLockFile {
-    MONGO_DISALLOW_COPYING(StorageEngineLockFile);
+    StorageEngineLockFile(const StorageEngineLockFile&) = delete;
+    StorageEngineLockFile& operator=(const StorageEngineLockFile&) = delete;
 
 public:
     static boost::optional<StorageEngineLockFile>& get(ServiceContext* service);

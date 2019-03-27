@@ -31,7 +31,6 @@
 
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -49,7 +48,8 @@ class ScatterGatherAlgorithm;
  * Interface of a scatter-gather behavior.
  */
 class ScatterGatherRunner {
-    MONGO_DISALLOW_COPYING(ScatterGatherRunner);
+    ScatterGatherRunner(const ScatterGatherRunner&) = delete;
+    ScatterGatherRunner& operator=(const ScatterGatherRunner&) = delete;
 
 public:
     /**

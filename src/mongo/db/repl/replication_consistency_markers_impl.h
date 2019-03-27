@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
@@ -47,7 +46,8 @@ class StorageInterface;
 struct TimestampedBSONObj;
 
 class ReplicationConsistencyMarkersImpl : public ReplicationConsistencyMarkers {
-    MONGO_DISALLOW_COPYING(ReplicationConsistencyMarkersImpl);
+    ReplicationConsistencyMarkersImpl(const ReplicationConsistencyMarkersImpl&) = delete;
+    ReplicationConsistencyMarkersImpl& operator=(const ReplicationConsistencyMarkersImpl&) = delete;
 
 public:
     static constexpr StringData kDefaultMinValidNamespace = "local.replset.minvalid"_sd;

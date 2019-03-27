@@ -36,7 +36,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/bson/util/builder.h"
 
 /**
@@ -134,7 +133,8 @@ struct SortOptions {
  */
 template <typename Key, typename Value>
 class SortIteratorInterface {
-    MONGO_DISALLOW_COPYING(SortIteratorInterface);
+    SortIteratorInterface(const SortIteratorInterface&) = delete;
+    SortIteratorInterface& operator=(const SortIteratorInterface&) = delete;
 
 public:
     typedef std::pair<Key, Value> Data;
@@ -179,7 +179,8 @@ protected:
  */
 template <typename Key, typename Value>
 class Sorter {
-    MONGO_DISALLOW_COPYING(Sorter);
+    Sorter(const Sorter&) = delete;
+    Sorter& operator=(const Sorter&) = delete;
 
 public:
     typedef std::pair<Key, Value> Data;
@@ -219,7 +220,8 @@ protected:
  */
 template <typename Key, typename Value>
 class SortedFileWriter {
-    MONGO_DISALLOW_COPYING(SortedFileWriter);
+    SortedFileWriter(const SortedFileWriter&) = delete;
+    SortedFileWriter& operator=(const SortedFileWriter&) = delete;
 
 public:
     typedef SortIteratorInterface<Key, Value> Iterator;

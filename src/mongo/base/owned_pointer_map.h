@@ -31,7 +31,6 @@
 
 #include <map>
 
-#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -42,7 +41,8 @@ namespace mongo {
  */
 template <class K, class T, class Compare = std::less<K>>
 class OwnedPointerMap {
-    MONGO_DISALLOW_COPYING(OwnedPointerMap);
+    OwnedPointerMap(const OwnedPointerMap&) = delete;
+    OwnedPointerMap& operator=(const OwnedPointerMap&) = delete;
 
 public:
     typedef typename std::map<K, T*, Compare> MapType;

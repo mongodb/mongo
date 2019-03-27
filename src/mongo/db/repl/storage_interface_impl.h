@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -43,7 +42,8 @@ namespace mongo {
 namespace repl {
 
 class StorageInterfaceImpl : public StorageInterface {
-    MONGO_DISALLOW_COPYING(StorageInterfaceImpl);
+    StorageInterfaceImpl(const StorageInterfaceImpl&) = delete;
+    StorageInterfaceImpl& operator=(const StorageInterfaceImpl&) = delete;
 
 public:
     static const char kDefaultRollbackIdNamespace[];

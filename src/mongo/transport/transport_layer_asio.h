@@ -79,7 +79,8 @@ MONGO_FAIL_POINT_DECLARE(transportLayerASIOasyncConnectTimesOut);
  * A TransportLayer implementation based on ASIO networking primitives.
  */
 class TransportLayerASIO final : public TransportLayer {
-    MONGO_DISALLOW_COPYING(TransportLayerASIO);
+    TransportLayerASIO(const TransportLayerASIO&) = delete;
+    TransportLayerASIO& operator=(const TransportLayerASIO&) = delete;
 
 public:
     struct Options {

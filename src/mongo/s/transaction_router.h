@@ -32,7 +32,6 @@
 #include <boost/optional.hpp>
 #include <map>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"

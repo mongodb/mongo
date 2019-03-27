@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/client/shard.h"
@@ -138,7 +137,8 @@ private:
  * errors automatically as well.
  */
 class ShardRegistry {
-    MONGO_DISALLOW_COPYING(ShardRegistry);
+    ShardRegistry(const ShardRegistry&) = delete;
+    ShardRegistry& operator=(const ShardRegistry&) = delete;
 
 public:
     /**

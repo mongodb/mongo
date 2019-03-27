@@ -42,7 +42,6 @@
 #include <streambuf>
 #include <typeinfo>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/logger/log_domain.h"
 #include "mongo/logger/logger.h"
@@ -94,7 +93,8 @@ void endProcessWithSignal(int signalNum) {
 
 // This should only be used with MallocFreeOSteam
 class MallocFreeStreambuf : public std::streambuf {
-    MONGO_DISALLOW_COPYING(MallocFreeStreambuf);
+    MallocFreeStreambuf(const MallocFreeStreambuf&) = delete;
+    MallocFreeStreambuf& operator=(const MallocFreeStreambuf&) = delete;
 
 public:
     MallocFreeStreambuf() {
@@ -114,7 +114,8 @@ private:
 };
 
 class MallocFreeOStream : public std::ostream {
-    MONGO_DISALLOW_COPYING(MallocFreeOStream);
+    MallocFreeOStream(const MallocFreeOStream&) = delete;
+    MallocFreeOStream& operator=(const MallocFreeOStream&) = delete;
 
 public:
     MallocFreeOStream() : std::ostream(&_buf) {}

@@ -40,7 +40,8 @@
 namespace mongo {
 
 class EndSessionsCommand final : public BasicCommand {
-    MONGO_DISALLOW_COPYING(EndSessionsCommand);
+    EndSessionsCommand(const EndSessionsCommand&) = delete;
+    EndSessionsCommand& operator=(const EndSessionsCommand&) = delete;
 
 public:
     EndSessionsCommand() : BasicCommand("endSessions") {}

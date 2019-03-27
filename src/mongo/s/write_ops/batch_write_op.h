@@ -33,7 +33,6 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/db/logical_session_id.h"
@@ -116,7 +115,8 @@ using TargetedBatchMap = std::map<const ShardEndpoint*, TargetedWriteBatch*, End
  *
  */
 class BatchWriteOp {
-    MONGO_DISALLOW_COPYING(BatchWriteOp);
+    BatchWriteOp(const BatchWriteOp&) = delete;
+    BatchWriteOp& operator=(const BatchWriteOp&) = delete;
 
 public:
     BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest);
@@ -244,7 +244,8 @@ private:
  * efficiently be registered for reporting.
  */
 class TargetedWriteBatch {
-    MONGO_DISALLOW_COPYING(TargetedWriteBatch);
+    TargetedWriteBatch(const TargetedWriteBatch&) = delete;
+    TargetedWriteBatch& operator=(const TargetedWriteBatch&) = delete;
 
 public:
     TargetedWriteBatch(const ShardEndpoint& endpoint) : _endpoint(endpoint) {}

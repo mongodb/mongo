@@ -28,7 +28,6 @@
  */
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/abstract_oplog_fetcher.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -40,7 +39,8 @@ namespace repl {
  * This class represents the state at shutdown of an abstract oplog fetcher.
  */
 class ShutdownState {
-    MONGO_DISALLOW_COPYING(ShutdownState);
+    ShutdownState(const ShutdownState&) = delete;
+    ShutdownState& operator=(const ShutdownState&) = delete;
 
 public:
     ShutdownState();

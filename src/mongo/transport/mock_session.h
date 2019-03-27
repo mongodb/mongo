@@ -38,7 +38,8 @@ namespace mongo {
 namespace transport {
 
 class MockSession : public Session {
-    MONGO_DISALLOW_COPYING(MockSession);
+    MockSession(const MockSession&) = delete;
+    MockSession& operator=(const MockSession&) = delete;
 
 public:
     static std::shared_ptr<MockSession> create(TransportLayer* tl) {

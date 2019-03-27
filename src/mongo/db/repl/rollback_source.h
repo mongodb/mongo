@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/net/hostandport.h"
@@ -48,7 +47,8 @@ class OplogInterface;
  * Interface for rollback-related operations on the sync source.
  */
 class RollbackSource {
-    MONGO_DISALLOW_COPYING(RollbackSource);
+    RollbackSource(const RollbackSource&) = delete;
+    RollbackSource& operator=(const RollbackSource&) = delete;
 
 public:
     RollbackSource() = default;

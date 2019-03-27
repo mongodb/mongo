@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -84,7 +83,8 @@ constexpr auto kMetadataDocumentName = "client"_sd;
  * See Driver Specification: "MongoDB Handshake" for more information.
  */
 class ClientMetadata {
-    MONGO_DISALLOW_COPYING(ClientMetadata);
+    ClientMetadata(const ClientMetadata&) = delete;
+    ClientMetadata& operator=(const ClientMetadata&) = delete;
 
 public:
     ClientMetadata(ClientMetadata&&) = default;

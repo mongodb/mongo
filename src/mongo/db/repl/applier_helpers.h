@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -61,7 +60,8 @@ public:
  * successfully.
  */
 class ApplierHelpers::InsertGroup {
-    MONGO_DISALLOW_COPYING(InsertGroup);
+    InsertGroup(const InsertGroup&) = delete;
+    InsertGroup& operator=(const InsertGroup&) = delete;
 
 public:
     using ConstIterator = OperationPtrs::const_iterator;

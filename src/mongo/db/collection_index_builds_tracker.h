@@ -32,7 +32,6 @@
 #include <map>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -53,7 +52,8 @@ class IndexBuildsManager;
  * This is intended to only be used by the IndexBuildsCoordinator class.
  */
 class CollectionIndexBuildsTracker {
-    MONGO_DISALLOW_COPYING(CollectionIndexBuildsTracker);
+    CollectionIndexBuildsTracker(const CollectionIndexBuildsTracker&) = delete;
+    CollectionIndexBuildsTracker& operator=(const CollectionIndexBuildsTracker&) = delete;
 
 public:
     CollectionIndexBuildsTracker() = default;

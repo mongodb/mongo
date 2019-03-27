@@ -31,7 +31,6 @@
 
 #include <stack>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -45,7 +44,8 @@ class DBClientBase;
 
 /** Queries return a cursor object */
 class DBClientCursor {
-    MONGO_DISALLOW_COPYING(DBClientCursor);
+    DBClientCursor(const DBClientCursor&) = delete;
+    DBClientCursor& operator=(const DBClientCursor&) = delete;
 
 public:
     /** If true, safe to call next().  Requests more from server if necessary. */

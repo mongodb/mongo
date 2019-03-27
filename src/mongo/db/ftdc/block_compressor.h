@@ -33,7 +33,6 @@
 #include <vector>
 
 #include "mongo/base/data_range.h"
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 
 namespace mongo {
@@ -42,7 +41,8 @@ namespace mongo {
  * Compesses and uncompresses a block of buffer using zlib.
  */
 class BlockCompressor {
-    MONGO_DISALLOW_COPYING(BlockCompressor);
+    BlockCompressor(const BlockCompressor&) = delete;
+    BlockCompressor& operator=(const BlockCompressor&) = delete;
 
 public:
     BlockCompressor() = default;

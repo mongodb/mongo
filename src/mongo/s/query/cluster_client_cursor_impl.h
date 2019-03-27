@@ -48,7 +48,8 @@ class RouterStageMock;
  * released.
  */
 class ClusterClientCursorGuard final {
-    MONGO_DISALLOW_COPYING(ClusterClientCursorGuard);
+    ClusterClientCursorGuard(const ClusterClientCursorGuard&) = delete;
+    ClusterClientCursorGuard& operator=(const ClusterClientCursorGuard&) = delete;
 
 public:
     ClusterClientCursorGuard(OperationContext* opCtx, std::unique_ptr<ClusterClientCursor> ccc);
@@ -80,7 +81,8 @@ private:
 };
 
 class ClusterClientCursorImpl final : public ClusterClientCursor {
-    MONGO_DISALLOW_COPYING(ClusterClientCursorImpl);
+    ClusterClientCursorImpl(const ClusterClientCursorImpl&) = delete;
+    ClusterClientCursorImpl& operator=(const ClusterClientCursorImpl&) = delete;
 
 public:
     /**

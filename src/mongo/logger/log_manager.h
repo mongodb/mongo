@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/logger/component_message_log_domain.h"
 #include "mongo/logger/rotatable_file_writer.h"
 #include "mongo/stdx/unordered_map.h"
@@ -45,7 +44,8 @@ namespace logger {
  * Use this while setting up the logging system, before launching any threads.
  */
 class LogManager {
-    MONGO_DISALLOW_COPYING(LogManager);
+    LogManager(const LogManager&) = delete;
+    LogManager& operator=(const LogManager&) = delete;
 
 public:
     LogManager();

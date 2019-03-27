@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/util/time_support.h"
 
@@ -46,7 +45,9 @@ namespace repl {
  * that need to happen in between enqueuing the RSTL request and waiting for it to be granted.
  */
 class ReplicationStateTransitionLockGuard {
-    MONGO_DISALLOW_COPYING(ReplicationStateTransitionLockGuard);
+    ReplicationStateTransitionLockGuard(const ReplicationStateTransitionLockGuard&) = delete;
+    ReplicationStateTransitionLockGuard& operator=(const ReplicationStateTransitionLockGuard&) =
+        delete;
 
 public:
     class EnqueueOnly {};

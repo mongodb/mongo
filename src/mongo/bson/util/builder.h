@@ -41,7 +41,6 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
@@ -76,7 +75,8 @@ template <typename Allocator>
 class StringBuilderImpl;
 
 class SharedBufferAllocator {
-    MONGO_DISALLOW_COPYING(SharedBufferAllocator);
+    SharedBufferAllocator(const SharedBufferAllocator&) = delete;
+    SharedBufferAllocator& operator=(const SharedBufferAllocator&) = delete;
 
 public:
     SharedBufferAllocator() = default;
@@ -111,7 +111,8 @@ private:
 };
 
 class StackAllocator {
-    MONGO_DISALLOW_COPYING(StackAllocator);
+    StackAllocator(const StackAllocator&) = delete;
+    StackAllocator& operator=(const StackAllocator&) = delete;
 
 public:
     StackAllocator() = default;

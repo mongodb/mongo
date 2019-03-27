@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/write_concern_options.h"
@@ -48,7 +47,8 @@ class StatusWith;
  * Interface for the distributed lock operations.
  */
 class DistLockCatalog {
-    MONGO_DISALLOW_COPYING(DistLockCatalog);
+    DistLockCatalog(const DistLockCatalog&) = delete;
+    DistLockCatalog& operator=(const DistLockCatalog&) = delete;
 
 public:
     static const WriteConcernOptions kLocalWriteConcern;

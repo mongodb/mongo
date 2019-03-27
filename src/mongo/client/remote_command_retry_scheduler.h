@@ -33,7 +33,6 @@
 #include <initializer_list>
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
@@ -58,7 +57,8 @@ namespace mongo {
  *     - list of error codes, if present in the response, should stop the scheduler.
  */
 class RemoteCommandRetryScheduler {
-    MONGO_DISALLOW_COPYING(RemoteCommandRetryScheduler);
+    RemoteCommandRetryScheduler(const RemoteCommandRetryScheduler&) = delete;
+    RemoteCommandRetryScheduler& operator=(const RemoteCommandRetryScheduler&) = delete;
 
 public:
     class RetryPolicy;

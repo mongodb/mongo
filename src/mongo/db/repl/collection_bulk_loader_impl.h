@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,7 +48,8 @@ namespace repl {
  * Note: Call commit when done inserting documents.
  */
 class CollectionBulkLoaderImpl : public CollectionBulkLoader {
-    MONGO_DISALLOW_COPYING(CollectionBulkLoaderImpl);
+    CollectionBulkLoaderImpl(const CollectionBulkLoaderImpl&) = delete;
+    CollectionBulkLoaderImpl& operator=(const CollectionBulkLoaderImpl&) = delete;
 
 public:
     struct Stats {
