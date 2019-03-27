@@ -823,7 +823,7 @@ bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
     }
 
     for (auto&& memberData : _memberData) {
-        const auto isArbiter = _rsConfig.getMemberAt(memberData.getMemberId()).isArbiter();
+        const auto isArbiter = _rsConfig.getMemberAt(memberData.getConfigIndex()).isArbiter();
 
         // We do not count arbiters towards the write concern.
         if (isArbiter) {
