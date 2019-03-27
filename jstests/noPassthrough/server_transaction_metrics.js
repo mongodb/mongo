@@ -71,7 +71,7 @@
     jsTest.log("Start a transaction and then commit it.");
 
     // Compare server status after starting a transaction with the server status before.
-    session.startTransaction();
+    session.startTransaction({readConcern: {level: 'snapshot'}});
     assert.commandWorked(sessionColl.insert({_id: "insert-1"}));
     // Trigger the oldestOpenUnpreparedReadTimestamp to be set.
     assert.eq(sessionColl.find({_id: "insert-1"}).itcount(), 1);
@@ -110,7 +110,7 @@
     jsTest.log("Start a transaction and then abort it.");
 
     // Compare server status after starting a transaction with the server status before.
-    session.startTransaction();
+    session.startTransaction({readConcern: {level: 'snapshot'}});
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
     // Trigger the oldestOpenUnpreparedReadTimestamp to be set.
     assert.eq(sessionColl.find({_id: "insert-2"}).itcount(), 1);
@@ -150,7 +150,7 @@
     jsTest.log("Start a transaction that will abort on a duplicated key error.");
 
     // Compare server status after starting a transaction with the server status before.
-    session.startTransaction();
+    session.startTransaction({readConcern: {level: 'snapshot'}});
     // Inserting a new document will work fine, and the transaction starts.
     assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
     // Trigger the oldestOpenUnpreparedReadTimestamp to be set.

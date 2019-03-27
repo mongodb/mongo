@@ -35,7 +35,7 @@
         jsTestLog(
             `Testing that SnapshotUnavailable during ${op} is labelled TransientTransactionError`);
 
-        session.startTransaction();
+        session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{}]}));
         // Create collection outside transaction, cannot write to it in the transaction
         assert.commandWorked(primaryDB.getSiblingDB(dbNameB).runCommand({create: collNameB}));

@@ -106,7 +106,8 @@ ReadConcernLevel ReadConcernArgs::getLevel() const {
 }
 
 ReadConcernLevel ReadConcernArgs::getOriginalLevel() const {
-    return _originalLevel.value_or(getLevel());
+    // If no read concern specified, default to "local"
+    return _originalLevel.value_or(ReadConcernLevel::kLocalReadConcern);
 }
 
 bool ReadConcernArgs::hasLevel() const {
