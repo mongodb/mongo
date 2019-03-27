@@ -224,12 +224,18 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     # Initialize setParameters for mongod and mongos, to be passed to the shell via TestData. Since
     # they are dictionaries, they will be converted to JavaScript objects when passed to the shell
     # by the _format_shell_vars() function.
-    mongod_set_parameters = {}
+    mongod_set_parameters = test_data.get("setParameters", {}).copy()
+    mongos_set_parameters = test_data.get("setParametersMongos", {}).copy()
+
+    # Propagate additional setParameters to mongod processes spawned by the mongo shell. Command
+    # line options to resmoke.py override the YAML configuration.
     if config.MONGOD_SET_PARAMETERS is not None:
-        if "setParameters" in test_data:
-            raise ValueError("setParameters passed via TestData can only be set from either the"
-                             " command line or the suite YAML, not both")
-        mongod_set_parameters = utils.load_yaml(config.MONGOD_SET_PARAMETERS)
+        mongod_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+
+    # Propagate additional setParameters to mongos processes spawned by the mongo shell. Command
+    # line options to resmoke.py override the YAML configuration.
+    if config.MONGOS_SET_PARAMETERS is not None:
+        mongos_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
 
     # If the 'logComponentVerbosity' setParameter for mongod was not already specified, we set its
     # value to a default.
@@ -237,13 +243,7 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
                                      default_mongod_log_component_verbosity())
 
     test_data["setParameters"] = mongod_set_parameters
-
-    if config.MONGOS_SET_PARAMETERS is not None:
-        if "setParametersMongos" in test_data:
-            raise ValueError("setParametersMongos passed via TestData can only be set from either"
-                             " the command line or the suite YAML, not both")
-        mongos_set_parameters = utils.load_yaml(config.MONGOS_SET_PARAMETERS)
-        test_data["setParametersMongos"] = mongos_set_parameters
+    test_data["setParametersMongos"] = mongos_set_parameters
 
     # There's a periodic background thread that checks for and aborts expired transactions.
     # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
