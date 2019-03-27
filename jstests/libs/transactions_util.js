@@ -83,7 +83,12 @@ var TransactionsUtil = (function() {
         return dst;
     }
 
+    function isTransientTransactionError(res) {
+        return res.hasOwnProperty('errorLabels') &&
+            res.errorLabels.includes('TransientTransactionError');
+    }
+
     return {
-        commandSupportsTxn, commandTypeCanSupportTxn, deepCopyObject,
+        commandSupportsTxn, commandTypeCanSupportTxn, deepCopyObject, isTransientTransactionError,
     };
 })();

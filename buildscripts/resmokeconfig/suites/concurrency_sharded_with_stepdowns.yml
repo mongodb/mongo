@@ -166,8 +166,21 @@ selector:
   # it's due to a race condition in the NetworkInterfaceTL.
   - jstests/concurrency/fsm_workloads/database_versioning.js
 
+  # serverStatus does not include transaction metrics on mongos.
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+
+  # Uses the same transaction id across different routers, which is not allowed because when either
+  # router tries to commit, it may not know the full participant list.
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+
+  # TODO SERVER-40186: This workload incorrectly retries entire transactions on interrupted commits.
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
+
+  # Use non-retryable commands not allowed by the network retry helper.
+  - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
+  - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+
   exclude_with_any_tags:
-  - uses_transactions
   - requires_replication
   - requires_non_retryable_writes
 

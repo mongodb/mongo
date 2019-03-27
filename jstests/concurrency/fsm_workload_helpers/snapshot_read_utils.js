@@ -3,6 +3,8 @@
  * spans a getmore.
  */
 load('jstests/concurrency/fsm_workload_helpers/cleanup_txns.js');
+load('jstests/libs/transactions_util.js');
+
 /**
  * Parses a cursor from cmdResult, if possible.
  */
@@ -41,9 +43,14 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
         autocommit: false
     };
 
-    // Establish a snapshot batchSize:0 cursor.
     let res = data.sessionDb.runCommand(findCmd);
-    assert.commandWorkedOrFailedWithCode(res, findErrorCodes, () => `cmd: ${tojson(findCmd)}`);
+
+    // A transaction request can always fail with a transient transaction error, so only check the
+    // specific error code if it is not labeled as transient.
+    if (!TransactionsUtil.isTransientTransactionError(res)) {
+        assert.commandWorkedOrFailedWithCode(res, findErrorCodes, () => `cmd: ${tojson(findCmd)}`);
+    }
+
     const cursor = parseCursor(res);
 
     if (!cursor) {
@@ -77,8 +84,13 @@ function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionE
         autocommit: false
     };
     let res = data.sessionDb.runCommand(getMoreCmd);
-    assert.commandWorkedOrFailedWithCode(
-        res, getMoreErrorCodes, () => `cmd: ${tojson(getMoreCmd)}`);
+
+    // A transaction request can always fail with a transient transaction error, so only check the
+    // specific error code if it is not labeled as transient.
+    if (!TransactionsUtil.isTransientTransactionError(res)) {
+        assert.commandWorkedOrFailedWithCode(
+            res, getMoreErrorCodes, () => `cmd: ${tojson(getMoreCmd)}`);
+    }
 
     const commitCmd = {
         commitTransaction: 1,

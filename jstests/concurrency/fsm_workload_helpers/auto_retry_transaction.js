@@ -19,6 +19,32 @@ var {withTxnAndAutoRetry} = (function() {
         }
     }
 
+    // Returns true if the transaction can be retried with a higher transaction number after the
+    // given error.
+    function shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession) {
+        if ((e.hasOwnProperty('errorLabels') &&
+             e.errorLabels.includes('TransientTransactionError'))) {
+            return true;
+        }
+
+        if (isNetworkError(e) && !hasCommitTxnError) {
+            // A network error before commit is considered a transient txn error. Network
+            // errors during commit should be handled at the same level as retries of
+            // retryable writes.
+            return true;
+        }
+
+        // TODO SERVER-40186: Only retry the entire transaction on killed session errors from before
+        // commit.
+        if ((retryOnKilledSession &&
+             (e.code === ErrorCodes.Interrupted || e.code === ErrorCodes.CursorKilled ||
+              e.code == ErrorCodes.CursorNotFound))) {
+            return true;
+        }
+
+        return false;
+    }
+
     // Use a "signature" value that won't typically match a value assigned in normal use. This way
     // the wtimeout set by this override is distinguishable in the server logs.
     const kDefaultWtimeout = 5 * 60 * 1000 + 789;
@@ -26,8 +52,9 @@ var {withTxnAndAutoRetry} = (function() {
     /**
      * Runs 'func' inside of a transaction started with 'txnOptions', and automatically retries
      * until it either succeeds or the server returns a non-TransientTransactionError error
-     * response. There is a probability of 'prepareProbability' that the transaction is prepared
-     * before committing.
+     * response. If retryOnKilledSession is true, the transaction will be automatically retried on
+     * error codes that may come from a killed session as well. There is a probability of
+     * 'prepareProbability' that the transaction is prepared before committing.
      *
      * The caller should take care to ensure 'func' doesn't modify any captured variables in a
      * speculative fashion where calling it multiple times would lead to unintended behavior. The
@@ -81,11 +108,7 @@ var {withTxnAndAutoRetry} = (function() {
                     session.abortTransaction();
                 }
 
-                if ((e.hasOwnProperty('errorLabels') &&
-                     e.errorLabels.includes('TransientTransactionError')) ||
-                    (retryOnKilledSession &&
-                     (e.code === ErrorCodes.Interrupted || e.code === ErrorCodes.CursorKilled ||
-                      e.code == ErrorCodes.CursorNotFound))) {
+                if (shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession)) {
                     hasTransientError = true;
                     continue;
                 }

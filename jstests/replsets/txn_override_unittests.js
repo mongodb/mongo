@@ -285,8 +285,10 @@
      * Runs a specific test case, resetting test state before and after.
      */
     function runTest(testSuite, testCase) {
-        coll1.drop();
-        coll2.drop();
+        // Drop with majority write concern to ensure transactions in subsequent test cases can
+        // immediately take locks on either collection.
+        coll1.drop({writeConcern: {w: "majority"}});
+        coll2.drop({writeConcern: {w: "majority"}});
 
         // Ensure all overrides and failpoints have been turned off before running the test.
         clearAllCommandOverrides();
@@ -516,6 +518,217 @@
               assert.eq(coll1.find().itcount(), 1);
           }
         },
+        {
+          name: "transaction commands not retried on retryable code",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              session.startTransaction();
+              assert.commandFailedWithCode(
+                  testDB.runCommand(
+                      {update: collName1, updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}]}),
+                  ErrorCodes.NotMaster);
+              assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                           ErrorCodes.NoSuchTransaction);
+
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+          }
+        },
+        {
+          name: "transaction commands not retried on network error",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"], {closeConnection: true});
+
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              session.startTransaction();
+              const error = assert.throws(() => {
+                  return testDB.runCommand(
+                      {update: collName1, updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}]});
+              });
+              assert(isNetworkError(error), tojson(error));
+              assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                           ErrorCodes.NoSuchTransaction);
+
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+          }
+        },
+        {
+          name: "commitTransaction retried on retryable code",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["commitTransaction"], {errorCode: ErrorCodes.NotMaster});
+
+              session.startTransaction();
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              assert.commandWorked(session.commitTransaction_forTesting());
+
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+          }
+        },
+        {
+          name: "commitTransaction retried on write concern error",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["commitTransaction"], {
+                  writeConcernError:
+                      {code: ErrorCodes.PrimarySteppedDown, codeName: "PrimarySteppedDown"}
+              });
+
+              session.startTransaction();
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              const res = assert.commandWorked(session.commitTransaction_forTesting());
+              assert(!res.hasOwnProperty("writeConcernError"));
+
+              assert.eq(coll1.find().itcount(), 1);
+          }
+        },
+        {
+          name: "commitTransaction not retried on transient transaction error",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+
+              session.startTransaction();
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              // Abort the transaction so the commit receives NoSuchTransaction. Note that the fail
+              // command failpoint isn't used because it returns without implicitly aborting the
+              // transaction.
+              const lsid = session.getSessionId();
+              const txnNumber = NumberLong(session.getTxnNumber_forTesting());
+              assert.commandWorked(testDB.adminCommand(
+                  {abortTransaction: 1, lsid, txnNumber, autocommit: false, stmtId: NumberInt(0)}));
+
+              const res = assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                                       ErrorCodes.NoSuchTransaction);
+              assert.eq(["TransientTransactionError"], res.errorLabels);
+
+              assert.eq(coll1.find().itcount(), 0);
+          }
+        },
+        {
+          name: "commitTransaction retried on network error",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["commitTransaction"], {closeConnection: true});
+
+              session.startTransaction();
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              assert.commandWorked(session.commitTransaction_forTesting());
+
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+          }
+        },
+        {
+          name: "abortTransaction retried on retryable code",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["abortTransaction"], {errorCode: ErrorCodes.NotMaster});
+
+              session.startTransaction();
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              assert.commandWorked(session.abortTransaction_forTesting());
+
+              assert.eq(coll1.find().itcount(), 0);
+          }
+        },
+        {
+          name: "abortTransaction retried on network error",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["abortTransaction"], {closeConnection: true});
+
+              session.startTransaction();
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              assert.commandWorked(session.abortTransaction_forTesting());
+
+              assert.eq(coll1.find().itcount(), 0);
+          }
+        },
+        {
+          name: "abortTransaction retried on write concern error",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["abortTransaction"], {
+                  writeConcernError:
+                      {code: ErrorCodes.PrimarySteppedDown, codeName: "PrimarySteppedDown"}
+              });
+
+              session.startTransaction();
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              // The fail command fail point with a write concern error triggers after the command
+              // is processed, so the retry will find the transaction has already aborted and return
+              // NoSuchTransaction.
+              const res = assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                                       ErrorCodes.NoSuchTransaction);
+              assert(!res.hasOwnProperty("writeConcernError"));
+
+              assert.eq(coll1.find().itcount(), 0);
+          }
+        },
+        {
+          name: "abortTransaction not retried on transient transaction error",
+          test: function() {
+              const session = testDB.getSession();
+
+              assert.commandWorked(testDB.createCollection(collName1));
+
+              session.startTransaction();
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+
+              // Abort the transaction so the commit receives NoSuchTransaction. Note that the fail
+              // command failpoint isn't used because it returns without implicitly aborting the
+              // transaction.
+              const lsid = session.getSessionId();
+              const txnNumber = NumberLong(session.getTxnNumber_forTesting());
+              assert.commandWorked(testDB.adminCommand(
+                  {abortTransaction: 1, lsid, txnNumber, autocommit: false, stmtId: NumberInt(0)}));
+
+              const res = assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                                       ErrorCodes.NoSuchTransaction);
+              assert.eq(["TransientTransactionError"], res.errorLabels);
+
+              assert.eq(coll1.find().itcount(), 0);
+          }
+        }
     ];
 
     // These tests only retry on TransientTransactionErrors. All other errors are expected to cause

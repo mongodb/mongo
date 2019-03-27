@@ -181,16 +181,11 @@
         if (!configuredForNetworkRetry()) {
             return false;
         }
-        if (configuredForTxnOverride()) {
-            if (isCommitOrAbort(cmdName)) {
-                return true;
-            }
 
-            if (isCmdInTransaction(cmdObj)) {
-                // Commands in transactions cannot be retried at the statement level, except for the
-                // commit and abort.
-                return false;
-            }
+        if (isCmdInTransaction(cmdObj)) {
+            // Commands in transactions cannot be retried at the statement level, except for the
+            // commit and abort.
+            return isCommitOrAbort(cmdName);
         }
 
         return true;
@@ -203,11 +198,6 @@
     function isRetryableExecutorCodeAndMessage(code, msg) {
         return code === ErrorCodes.OperationFailed && typeof msg !== "undefined" &&
             msg.indexOf("InterruptedDueToStepDown") >= 0;
-    }
-
-    function isTransientTransactionError(res) {
-        return res.hasOwnProperty('errorLabels') &&
-            res.errorLabels.includes('TransientTransactionError');
     }
 
     function hasError(res) {
@@ -506,7 +496,7 @@
         });
 
         // Transient transaction errors mean the transaction has aborted, so consider it a success.
-        if (isTransientTransactionError(res)) {
+        if (TransactionsUtil.isTransientTransactionError(res)) {
             return;
         }
         // TODO (SERVER-40001) enforce abortTransaction errors.
@@ -706,7 +696,7 @@
 
         // Transient transaction errors should retry the entire transaction. A
         // TransientTransactionError on "abortTransaction" is considered a success.
-        if (isTransientTransactionError(res) && cmdName !== "abortTransaction") {
+        if (TransactionsUtil.isTransientTransactionError(res) && cmdName !== "abortTransaction") {
             logError("Retrying on TransientTransactionError response");
             res = retryEntireTransaction(conn, lsid);
 
@@ -831,7 +821,7 @@
     function retryWithTxnOverrideException(e, conn, cmdName, cmdObj, lsid, logError) {
         assert(configuredForTxnOverride());
 
-        if (isTransientTransactionError(e) && cmdName !== "abortTransaction") {
+        if (TransactionsUtil.isTransientTransactionError(e) && cmdName !== "abortTransaction") {
             logError("Retrying on TransientTransactionError exception for command");
             const res = retryEntireTransaction(conn, lsid);
 
@@ -898,9 +888,12 @@
         conn, dbName, cmdName, cmdObj, lsid, clientFunction, makeFuncArgs) {
         const startTime = Date.now();
 
-        if (configuredForNetworkRetry() && !isNested()) {
+        const isTxnStatement = isCmdInTransaction(cmdObj);
+
+        if (configuredForNetworkRetry() && !isNested() && !isTxnStatement) {
             // If this is a top level command, make sure that the command supports network error
-            // retries.
+            // retries. Don't validate transaction statements because their encompassing transaction
+            // can be retried at a higher level, even if each statement isn't retryable on its own.
             validateCmdNetworkErrorCompatibility(cmdName, cmdObj);
         }
 
@@ -908,7 +901,8 @@
             setupTransactionCommand(conn, dbName, cmdName, cmdObj, lsid);
         }
 
-        let numNetworkErrorRetries = configuredForNetworkRetry() ? kMaxNumRetries : 0;
+        const canRetryNetworkError = canRetryNetworkErrorForCommand(cmdName, cmdObj);
+        let numNetworkErrorRetries = canRetryNetworkError ? kMaxNumRetries : 0;
         do {
             try {
                 // Actually run the provided command.
@@ -924,7 +918,7 @@
                     res = retryWithTxnOverride(res, conn, dbName, cmdName, cmdObj, lsid, logError);
                 }
 
-                if (canRetryNetworkErrorForCommand(cmdName, cmdObj)) {
+                if (canRetryNetworkError) {
                     const networkRetryRes =
                         shouldRetryWithNetworkErrorOverride(res, cmdName, logError);
                     if (networkRetryRes === kContinue) {
@@ -947,7 +941,7 @@
                     }
                 }
 
-                if (canRetryNetworkErrorForCommand(cmdName, cmdObj)) {
+                if (canRetryNetworkError) {
                     const decrementRetryCount = shouldRetryWithNetworkExceptionOverride(
                         e, cmdName, cmdObj, startTime, numNetworkErrorRetries, logError);
                     if (decrementRetryCount) {
