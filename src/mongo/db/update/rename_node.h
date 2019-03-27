@@ -76,6 +76,10 @@ public:
         visitor->visit(this);
     }
 
+    BSONElement getValue() const {
+        return _val;
+    }
+
 private:
     BSONElement _val;
 };
