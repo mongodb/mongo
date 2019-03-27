@@ -27,10 +27,9 @@
 #
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::txn"
     cpp_includes:
-        - "mongo/db/logical_session_id.h"
-        - "mongo/db/s/transaction_coordinator.h"
+        - "mongo/db/s/transaction_coordinator_structures.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -38,14 +37,29 @@ imports:
     - "mongo/s/sharding_types.idl"
 
 types:
-    CoordinatorCommitDecision:
-        bson_serialization_type: object
-        description: "An object representing the coordinator's commit decision."
-        cpp_type: "TransactionCoordinator::CoordinatorCommitDecision"
-        serializer: "TransactionCoordinator::CoordinatorCommitDecision::toBSON"
-        deserializer: "TransactionCoordinator::CoordinatorCommitDecision::fromBSONThrowing"
+    commit_decision_enum:
+        bson_serialization_type: string
+        description: "Ensures that the commit decision serializes/deserializes to a fixed set of
+                      string values"
+        cpp_type: "txn::CommitDecision"
+        serializer: "::mongo::txn::writeCommitDecisionEnumProperty"
+        deserializer: "::mongo::txn::readCommitDecisionEnumProperty"
 
 structs:
+    CoordinatorCommitDecision:
+        description: "An object representing the coordinator's commit decision."
+        strict: true
+        fields:
+            decision:
+                type: commit_decision_enum
+                description: "See the values in txn::CommitDecision for details. Can only be commit
+                              or abort."
+            commitTimestamp:
+                optional: true
+                type: timestamp
+                description: "If the decision is 'commit', contains the chosen commit timestamp,
+                              otherwise it will not be set"
+
     TransactionCoordinatorDocument:
         description: "A document used for majority confirming the coordinator's state changes"
         strict: true

@@ -44,8 +44,6 @@ namespace mongo {
  */
 class TransactionCoordinatorTestFixture : public ShardServerTestFixture {
 protected:
-    using PrepareResponse = txn::PrepareResponse;
-
     void setUp() override;
 
     /**

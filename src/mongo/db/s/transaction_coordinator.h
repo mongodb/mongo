@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/transaction_coordinator_driver.h"
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -66,34 +67,6 @@ public:
     ~TransactionCoordinator();
 
     /**
-     * Represents a decision made by the coordinator, including commit timestamp to be sent with
-     * commitTransaction in the case of a decision to commit.
-     */
-    struct CoordinatorCommitDecision {
-        txn::CommitDecision decision;
-        boost::optional<Timestamp> commitTimestamp;
-
-        /**
-         * Parses a CoordinatorCommitDecision from the object.
-         */
-        static StatusWith<CoordinatorCommitDecision> fromBSON(const BSONObj& obj);
-
-        /**
-         * Returns an instance of CoordinatorCommitDecision from an object.
-         *
-         * Throws if the object cannot be deserialized.
-         */
-        static CoordinatorCommitDecision fromBSONThrowing(const BSONObj& obj) {
-            return uassertStatusOK(fromBSON(obj));
-        };
-
-        /**
-         * Returns the BSON representation of this object.
-         */
-        BSONObj toBSON() const;
-    };
-
-    /**
      * The state of the coordinator.
      */
     enum class CoordinatorState {
@@ -120,7 +93,7 @@ public:
     /**
      * To be used to continue coordinating a transaction on step up.
      */
-    void continueCommit(const TransactionCoordinatorDocument& doc);
+    void continueCommit(const txn::TransactionCoordinatorDocument& doc);
 
     /**
      * Gets a Future that will contain the decision that the coordinator reaches. Note that this
@@ -162,7 +135,8 @@ private:
      * 3. If the decision is to commit, calculates the commit Timestamp.
      * 4. Writes the decision and waits for the decision to become majority-committed.
      */
-    Future<CoordinatorCommitDecision> _runPhaseOne(const std::vector<ShardId>& participantShards);
+    Future<txn::CoordinatorCommitDecision> _runPhaseOne(
+        const std::vector<ShardId>& participantShards);
 
     /**
      * Expects the decision to already be majority-committed.
@@ -173,14 +147,14 @@ private:
      *    majority-committed.
      */
     Future<void> _runPhaseTwo(const std::vector<ShardId>& participantShards,
-                              const CoordinatorCommitDecision& decision);
+                              const txn::CoordinatorCommitDecision& decision);
 
     /**
     * Asynchronously sends the commit decision to all participants (commit or abort), resolving the
     * returned future when all participants have acknowledged the decision.
     */
     Future<void> _sendDecisionToParticipants(const std::vector<ShardId>& participantShards,
-                                             CoordinatorCommitDecision coordinatorDecision);
+                                             txn::CoordinatorCommitDecision coordinatorDecision);
 
     /**
      * Helper for handling errors that occur during either phase of commit coordination.
@@ -236,10 +210,11 @@ private:
     std::vector<Promise<void>> _completionPromises;
 };
 
-logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
-                                     const TransactionCoordinator::CoordinatorState& state);
+// TODO (SERVER-37886): Remove this failpoint once failover can be tested on coordinators that have
+// a local participant
+MONGO_FAIL_POINT_DECLARE(doNotForgetCoordinator);
 
 logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
-                                     const txn::CommitDecision& decision);
+                                     const TransactionCoordinator::CoordinatorState& state);
 
 }  // namespace mongo

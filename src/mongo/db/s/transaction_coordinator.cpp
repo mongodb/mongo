@@ -36,33 +36,35 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-using CoordinatorCommitDecision = TransactionCoordinator::CoordinatorCommitDecision;
+using CommitDecision = txn::CommitDecision;
+using CoordinatorCommitDecision = txn::CoordinatorCommitDecision;
+using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
 
-CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(
-    ServiceContext* service,
-    const txn::PrepareVoteConsensus& result,
-    const LogicalSessionId& lsid,
-    TxnNumber txnNumber) {
+using PrepareVoteConsensus = TransactionCoordinatorDriver::PrepareVoteConsensus;
+
+CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(ServiceContext* service,
+                                                               const PrepareVoteConsensus& result,
+                                                               const LogicalSessionId& lsid,
+                                                               TxnNumber txnNumber) {
     invariant(result.decision);
-    CoordinatorCommitDecision decision{*result.decision, boost::none};
+    CoordinatorCommitDecision decision(*result.decision);
 
-    if (result.decision == txn::CommitDecision::kCommit) {
+    if (result.decision == CommitDecision::kCommit) {
         invariant(result.maxPrepareTimestamp);
 
-        decision.commitTimestamp = Timestamp(result.maxPrepareTimestamp->getSecs(),
-                                             result.maxPrepareTimestamp->getInc() + 1);
+        decision.setCommitTimestamp(Timestamp(result.maxPrepareTimestamp->getSecs(),
+                                              result.maxPrepareTimestamp->getInc() + 1));
 
-        LOG(3) << "Advancing cluster time to commit Timestamp " << decision.commitTimestamp.get()
-               << " of transaction " << txnNumber << " on session " << lsid.getId();
+        LOG(3) << "Advancing cluster time to the commit timestamp "
+               << *decision.getCommitTimestamp() << " for " << lsid.getId() << ':' << txnNumber;
 
         uassertStatusOK(LogicalClock::get(service)->advanceClusterTime(
-            LogicalTime(result.maxPrepareTimestamp.get())));
+            LogicalTime(*result.maxPrepareTimestamp)));
     }
 
     return decision;
@@ -138,13 +140,11 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
     // Helper lambda to get the decision either from the document passed in or from the participants
     // (by performing 'phase one' of two-phase commit).
     auto getDecision = [&]() -> Future<CoordinatorCommitDecision> {
-        auto decision = doc.getDecision();
+        const auto& decision = doc.getDecision();
         if (!decision) {
             return _runPhaseOne(participantShards);
         } else {
-            return (decision->decision == txn::CommitDecision::kCommit)
-                ? CoordinatorCommitDecision{txn::CommitDecision::kCommit, decision->commitTimestamp}
-                : CoordinatorCommitDecision{txn::CommitDecision::kAbort, boost::none};
+            return *decision;
         }
     };
 
@@ -169,7 +169,7 @@ Future<void> TransactionCoordinator::onCompletion() {
             [](const Status& s) { uasserted(ErrorCodes::InterruptedDueToStepDown, s.reason()); });
 }
 
-SharedSemiFuture<txn::CommitDecision> TransactionCoordinator::getDecision() {
+SharedSemiFuture<CommitDecision> TransactionCoordinator::getDecision() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     return _decisionPromise.getFuture();
 }
@@ -180,7 +180,7 @@ void TransactionCoordinator::cancelIfCommitNotYetStarted() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_state == CoordinatorState::kInit) {
         invariant(!_decisionPromise.getFuture().isReady());
-        _decisionPromise.emplaceValue(txn::CommitDecision::kCanceled);
+        _decisionPromise.emplaceValue(CommitDecision::kCanceled);
         _transitionToDone(std::move(lk));
     }
 }
@@ -195,14 +195,15 @@ void TransactionCoordinator::_cancelTimeoutWaitForCommitTask() {
 Future<CoordinatorCommitDecision> TransactionCoordinator::_runPhaseOne(
     const std::vector<ShardId>& participantShards) {
     return _driver.sendPrepare(participantShards, _lsid, _txnNumber)
-        .then([this, participantShards](txn::PrepareVoteConsensus result) {
+        .then([this, participantShards](PrepareVoteConsensus result) {
             invariant(_state == CoordinatorState::kPreparing);
 
             auto decision =
                 makeDecisionFromPrepareVoteConsensus(_serviceContext, result, _lsid, _txnNumber);
 
             return _driver
-                .persistDecision(_lsid, _txnNumber, participantShards, decision.commitTimestamp)
+                .persistDecision(
+                    _lsid, _txnNumber, participantShards, decision.getCommitTimestamp())
                 .then([decision] { return decision; });
         });
 }
@@ -211,11 +212,8 @@ Future<void> TransactionCoordinator::_runPhaseTwo(const std::vector<ShardId>& pa
                                                   const CoordinatorCommitDecision& decision) {
     return _sendDecisionToParticipants(participantShards, decision)
         .then([this] {
-            if (getGlobalFailPointRegistry()
-                    ->getFailPoint("doNotForgetCoordinator")
-                    ->shouldFail()) {
+            if (MONGO_FAIL_POINT(doNotForgetCoordinator))
                 return Future<void>::makeReady();
-            }
 
             return _driver.deleteCoordinatorDoc(_lsid, _txnNumber);
         })
@@ -230,17 +228,17 @@ Future<void> TransactionCoordinator::_runPhaseTwo(const std::vector<ShardId>& pa
 Future<void> TransactionCoordinator::_sendDecisionToParticipants(
     const std::vector<ShardId>& participantShards, CoordinatorCommitDecision decision) {
     invariant(_state == CoordinatorState::kPreparing);
-    _decisionPromise.emplaceValue(decision.decision);
+    _decisionPromise.emplaceValue(decision.getDecision());
 
-    switch (decision.decision) {
-        case txn::CommitDecision::kCommit:
+    switch (decision.getDecision()) {
+        case CommitDecision::kCommit:
             _state = CoordinatorState::kCommitting;
             return _driver.sendCommit(
-                participantShards, _lsid, _txnNumber, *decision.commitTimestamp);
-        case txn::CommitDecision::kAbort:
+                participantShards, _lsid, _txnNumber, *decision.getCommitTimestamp());
+        case CommitDecision::kAbort:
             _state = CoordinatorState::kAborting;
             return _driver.sendAbort(participantShards, _lsid, _txnNumber);
-        case txn::CommitDecision::kCanceled:
+        case CommitDecision::kCanceled:
             MONGO_UNREACHABLE;
     };
     MONGO_UNREACHABLE;
@@ -292,57 +290,6 @@ void TransactionCoordinator::_transitionToDone(stdx::unique_lock<stdx::mutex> lk
     }
 }
 
-StatusWith<CoordinatorCommitDecision> CoordinatorCommitDecision::fromBSON(const BSONObj& doc) {
-    CoordinatorCommitDecision decision;
-
-    for (const auto& e : doc) {
-        const auto fieldName = e.fieldNameStringData();
-
-        if (fieldName == "decision") {
-            if (e.type() != String) {
-                return Status(ErrorCodes::TypeMismatch, "decision must be a string");
-            }
-
-            if (e.str() == "commit") {
-                decision.decision = txn::CommitDecision::kCommit;
-            } else if (e.str() == "abort") {
-                decision.decision = txn::CommitDecision::kAbort;
-            } else {
-                return Status(ErrorCodes::BadValue, "decision must be either 'abort' or 'commit'");
-            }
-        } else if (fieldName == "commitTimestamp") {
-            if (e.type() != bsonTimestamp && e.type() != Date) {
-                return Status(ErrorCodes::TypeMismatch, "commit timestamp must be a timestamp");
-            }
-            decision.commitTimestamp = {e.timestamp()};
-        }
-    }
-
-    if (decision.decision == txn::CommitDecision::kAbort && decision.commitTimestamp) {
-        return Status(ErrorCodes::BadValue, "abort decision cannot have a timestamp");
-    }
-    if (decision.decision == txn::CommitDecision::kCommit && !decision.commitTimestamp) {
-        return Status(ErrorCodes::BadValue, "commit decision must have a timestamp");
-    }
-
-    return decision;
-}
-
-BSONObj CoordinatorCommitDecision::toBSON() const {
-    BSONObjBuilder builder;
-
-    if (decision == txn::CommitDecision::kCommit) {
-        builder.append("decision", "commit");
-    } else {
-        builder.append("decision", "abort");
-    }
-    if (commitTimestamp) {
-        builder.append("commitTimestamp", *commitTimestamp);
-    }
-
-    return builder.obj();
-}
-
 logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
                                      const TransactionCoordinator::CoordinatorState& state) {
     using State = TransactionCoordinator::CoordinatorState;
@@ -353,18 +300,6 @@ logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
         case State::kAborting: stream.stream() << "kAborting"; break;
         case State::kCommitting: stream.stream() << "kCommitting"; break;
         case State::kDone: stream.stream() << "kDone"; break;
-    };
-    // clang-format on
-    return stream;
-}
-
-logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
-                                     const txn::CommitDecision& decision) {
-    // clang-format off
-    switch (decision) {
-        case txn::CommitDecision::kCommit:     stream.stream() << "kCommit"; break;
-        case txn::CommitDecision::kAbort:      stream.stream() << "kAbort"; break;
-        case txn::CommitDecision::kCanceled:   stream.stream() << "kCanceled"; break;
     };
     // clang-format on
     return stream;

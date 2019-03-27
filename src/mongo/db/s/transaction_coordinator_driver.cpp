@@ -39,16 +39,12 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-
-#include "mongo/bson/bsontypes.h"
 
 namespace mongo {
 namespace {
@@ -60,12 +56,15 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeWritingParticipantList);
 MONGO_FAIL_POINT_DEFINE(hangBeforeWritingDecision);
 MONGO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
 
+using CommitDecision = txn::CommitDecision;
+using PrepareVote = txn::PrepareVote;
+using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
+
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 
-using PrepareVote = txn::PrepareVote;
-using PrepareResponse = txn::PrepareResponse;
-using CommitDecision = txn::CommitDecision;
+using PrepareResponse = TransactionCoordinatorDriver::PrepareResponse;
+using PrepareVoteConsensus = TransactionCoordinatorDriver::PrepareVoteConsensus;
 
 const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
     WriteConcernOptions::kInternalMajorityNoSnapshot,
@@ -228,7 +227,7 @@ Future<void> TransactionCoordinatorDriver::persistParticipantList(
                         });
 }
 
-Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
+Future<PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
     const std::vector<ShardId>& participantShards,
     const LogicalSessionId& lsid,
     TxnNumber txnNumber) {
@@ -255,13 +254,13 @@ Future<txn::PrepareVoteConsensus> TransactionCoordinatorDriver::sendPrepare(
     return txn::collect(
         std::move(responses),
         // Initial value
-        txn::PrepareVoteConsensus{boost::none, boost::none},
+        PrepareVoteConsensus{boost::none, boost::none},
         // Aggregates an incoming response (next) with the existing aggregate value (result)
-        [prepareScheduler = std::move(prepareScheduler)](txn::PrepareVoteConsensus & result,
+        [prepareScheduler = std::move(prepareScheduler)](PrepareVoteConsensus & result,
                                                          const PrepareResponse& next) {
             if (!next.vote) {
                 LOG(3) << "Transaction coordinator did not receive a response from shard "
-                       << next.participantShardId;
+                       << next.shardId;
                 return txn::ShouldStopIteration::kNo;
             }
 
@@ -343,12 +342,12 @@ void persistDecisionBlocking(OperationContext* opCtx,
             TransactionCoordinatorDocument doc;
             doc.setId(sessionInfo);
             doc.setParticipants(std::move(participantList));
-            TransactionCoordinator::CoordinatorCommitDecision decision;
+            txn::CoordinatorCommitDecision decision;
             if (commitTimestamp) {
-                decision.decision = txn::CommitDecision::kCommit;
-                decision.commitTimestamp = commitTimestamp;
+                decision.setDecision(CommitDecision::kCommit);
+                decision.setCommitTimestamp(commitTimestamp);
             } else {
-                decision.decision = txn::CommitDecision::kAbort;
+                decision.setDecision(CommitDecision::kAbort);
             }
             doc.setDecision(decision);
             entry.setU(doc.toBSON());
@@ -561,9 +560,8 @@ Future<PrepareResponse> TransactionCoordinatorDriver::sendPrepareToShard(
             // *Always* retry until hearing a conclusive response or being told to stop via a
             // coordinator-specific code.
             return !swPrepareResponse.isOK() &&
-                swPrepareResponse.getStatus() != ErrorCodes::TransactionCoordinatorSteppingDown &&
-                swPrepareResponse.getStatus() !=
-                ErrorCodes::TransactionCoordinatorReachedAbortDecision;
+                swPrepareResponse != ErrorCodes::TransactionCoordinatorSteppingDown &&
+                swPrepareResponse != ErrorCodes::TransactionCoordinatorReachedAbortDecision;
         },
         [&scheduler, shardId, isLocalShard, commandObj = commandObj.getOwned() ] {
             LOG(3) << "Coordinator going to send command " << commandObj << " to "

@@ -32,52 +32,13 @@
 #include <vector>
 
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
-
-class TransactionCoordinatorDocument;
-
-namespace txn {
-
-/**
- * The decision made by the coordinator whether to commit or abort the transaction.
- */
-enum class CommitDecision {
-    kCommit,
-    kAbort,
-    kCanceled,
-};
-
-/**
- * An alias to indicate a vote from a participant. This just makes it clearer what's going on in
- * different stages of the commit process.
- */
-using PrepareVote = CommitDecision;
-
-/**
- * Represents a response to prepareTransaction from a single participant. The timestamp will only be
- * present if the participant votes to commit (indicated by the decision field).
- */
-struct PrepareResponse {
-    ShardId participantShardId;
-    boost::optional<PrepareVote> vote;
-    boost::optional<Timestamp> prepareTimestamp;
-};
-
-/**
- * Represents the aggregate of all prepare responses, including the decision that should be made and
- * the max of all prepare timestamps received in the case of a decision to commit.
- */
-struct PrepareVoteConsensus {
-    boost::optional<CommitDecision> decision;
-    boost::optional<Timestamp> maxPrepareTimestamp;
-};
-
-}  // namespace txn
 
 /**
  * Single instance of this class is owned by each TransactionCoordinator. It abstracts the
@@ -123,9 +84,18 @@ public:
      * prepare timestamps attached to the participants' responses. Otherwise the result will simply
      * contain the decision to abort.
      */
-    Future<txn::PrepareVoteConsensus> sendPrepare(const std::vector<ShardId>& participantShards,
-                                                  const LogicalSessionId& lsid,
-                                                  TxnNumber txnNumber);
+    struct PrepareVoteConsensus {
+        // Optional decision, if any was reached (decision could be empty if no response was
+        // received)
+        boost::optional<txn::CommitDecision> decision;
+
+        // Should only be consulted if the decision is commit and contains the maximum prepare
+        // timestamp across all participants
+        boost::optional<Timestamp> maxPrepareTimestamp;
+    };
+    Future<PrepareVoteConsensus> sendPrepare(const std::vector<ShardId>& participantShards,
+                                             const LogicalSessionId& lsid,
+                                             TxnNumber txnNumber);
 
     /**
      * If 'commitTimestamp' is boost::none, updates the document in config.transaction_coordinators
@@ -194,7 +164,7 @@ public:
     /**
      * Reads and returns all documents in config.transaction_coordinators.
      */
-    static std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(
+    static std::vector<txn::TransactionCoordinatorDocument> readAllCoordinatorDocs(
         OperationContext* opCtx);
 
     //
@@ -210,9 +180,19 @@ public:
      *   - TransactionCoordinatorSteppingDown
      *   - ShardNotFound
      */
-    Future<txn::PrepareResponse> sendPrepareToShard(txn::AsyncWorkScheduler& scheduler,
-                                                    const ShardId& shardId,
-                                                    const BSONObj& prepareCommandObj);
+    struct PrepareResponse {
+        // Shard id from which the response was received
+        ShardId shardId;
+
+        // If set to none, this means the shard did not produce a vote
+        boost::optional<txn::PrepareVote> vote;
+
+        // Will only be set if the vote was kCommit
+        boost::optional<Timestamp> prepareTimestamp;
+    };
+    Future<PrepareResponse> sendPrepareToShard(txn::AsyncWorkScheduler& scheduler,
+                                               const ShardId& shardId,
+                                               const BSONObj& prepareCommandObj);
 
     /**
      * Sends a command corresponding to a commit decision (i.e. commitTransaction or*

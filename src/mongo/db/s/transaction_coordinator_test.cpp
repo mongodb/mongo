@@ -41,6 +41,9 @@
 namespace mongo {
 namespace {
 
+using PrepareResponse = TransactionCoordinatorDriver::PrepareResponse;
+using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
+
 const StatusWith<BSONObj> kNoSuchTransaction =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
 const StatusWith<BSONObj> kOk = BSON("ok" << 1);
@@ -381,16 +384,16 @@ protected:
 
         auto decision = doc.getDecision();
         if (expectedDecision) {
-            ASSERT(*expectedDecision == decision->decision);
+            ASSERT(*expectedDecision == decision->getDecision());
         } else {
             ASSERT(!decision);
         }
 
         if (expectedCommitTimestamp) {
-            ASSERT(decision->commitTimestamp);
-            ASSERT_EQUALS(*expectedCommitTimestamp, *decision->commitTimestamp);
+            ASSERT(decision->getCommitTimestamp());
+            ASSERT_EQUALS(*expectedCommitTimestamp, *decision->getCommitTimestamp());
         } else if (decision) {
-            ASSERT(!decision->commitTimestamp);
+            ASSERT(!decision->getCommitTimestamp());
         }
     }
 

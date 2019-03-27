@@ -33,13 +33,10 @@
 
 #include "mongo/db/s/transaction_coordinator_catalog.h"
 
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-// TODO (SERVER-37886): Remove this failpoint once failover can be tested on coordinators that have
-// a local participant.
 MONGO_FAIL_POINT_DEFINE(doNotForgetCoordinator);
 
 TransactionCoordinatorCatalog::TransactionCoordinatorCatalog() = default;
