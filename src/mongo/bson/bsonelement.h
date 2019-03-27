@@ -893,28 +893,20 @@ inline long long BSONElement::safeNumberLong() const {
  * same behavior.
  *
  * Historically, safeNumberLong() used a check that would consider 2^63 to be safe to cast to
- * int64_t, but that value actually overflows. That overflow is preserved here.
+ * int64_t, but that cast actually overflows. On most platforms, the undefined cast of 2^63 to
+ * int64_t would roll over to -2^63, and that's the behavior we preserve here explicitly.
  *
  * The new safeNumberLong() function uses a tight bound, allowing it to correctly clamp double 2^63
  * to the max 64-bit int (2^63 - 1).
  */
 inline long long BSONElement::safeNumberLongForHash() const {
-    if (NumberDouble == type()) {
-        double d = numberDouble();
-        if (std::isnan(d)) {
-            return 0;
-        }
-        if (d > (double)std::numeric_limits<long long>::max()) {
-            return std::numeric_limits<long long>::max();
-        }
-        if (d < std::numeric_limits<long long>::min()) {
-            return std::numeric_limits<long long>::min();
-        }
-        return (long long)d;
+    // Rather than relying on the undefined overflow conversion, we maintain compatibility by
+    // explicitly checking for a 2^63 double value and returning -2^63.
+    if (NumberDouble == type() && numberDouble() == BSONElement::kLongLongMaxPlusOneAsDouble) {
+        return std::numeric_limits<long long>::lowest();
+    } else {
+        return safeNumberLong();
     }
-
-    // safeNumberLong() and safeNumberLongForHash() have identical behavior for non-long value.
-    return safeNumberLong();
 }
 
 inline BSONElement::BSONElement() {

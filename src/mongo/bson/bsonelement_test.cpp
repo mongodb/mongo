@@ -138,12 +138,19 @@ TEST(BSONElement, SafeNumberLongPositiveBound) {
                        << "positiveInfinity"
                        << std::numeric_limits<double>::infinity());
 
-    // The numberLongForHash() function clamps kLongLongMaxPlusOneAsDouble to the max 64-bit value
+    // kLongLongMaxPlusOneAsDouble is the least double value that will overflow a 64-bit signed
+    // two's-complement integer. Historically, converting this value with safeNumberLong() would
+    // return the result of casting to double with a C-style cast. That operation is undefined
+    // because of the overflow, but on most platforms we support, it returned the min 64-bit value
+    // (-2^63). The safeNumberLongForHash() function should preserve that behavior indefinitely for
+    // compatibility with on-disk data.
+    ASSERT_EQ(obj["kLongLongMaxPlusOneAsDouble"].safeNumberLongForHash(),
+              std::numeric_limits<long long>::lowest());
+
+    // The safeNumberLong() function clamps kLongLongMaxPlusOneAsDouble to the max 64-bit value
     // (2^63 - 1).
     ASSERT_EQ(obj["kLongLongMaxPlusOneAsDouble"].safeNumberLong(),
               std::numeric_limits<long long>::max());
-    // The safeNumberLongForHash() function will return -2^63, but we don't test it here, because
-    // the overflowing cast that it uses can trigger UBSan
 
     // One quantum below kLongLongMaxPlusOneAsDouble is the largest double that safely converts to a
     // 64-bit signed two-s complement integer. Both safeNumberLong() and safeNumberLongForHash()
