@@ -8753,7 +8753,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: ppc64le-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --allocator=system
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
