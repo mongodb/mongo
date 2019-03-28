@@ -28,7 +28,7 @@
         jsTestLog("Start a transaction with readConcern " + readConcernLevel.level + ".");
         session.startTransaction({readConcern: readConcernLevel});
         return session;
-    };
+    }
 
     let checkReads = (session, collExpected, coll2Expected) => {
         let sessionDb = session.getDatabase(dbName);
