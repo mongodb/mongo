@@ -65,6 +65,9 @@
 
 namespace mongo {
 namespace repl {
+
+MONGO_FAIL_POINT_DEFINE(rollbackHangAfterTransitionToRollback);
+
 namespace {
 
 // Used to set RollbackImpl::_newCounts to force a collection scan to fix count.
@@ -171,6 +174,13 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         return status;
     }
     _listener->onTransitionToRollback();
+
+    if (MONGO_FAIL_POINT(rollbackHangAfterTransitionToRollback)) {
+        log() << "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
+                 "point is disabled (rollback_impl).";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                        rollbackHangAfterTransitionToRollback);
+    }
 
     // We clear the SizeRecoveryState before we recover to a stable timestamp. This ensures that we
     // only use size adjustment markings from the storage and replication recovery processes in this

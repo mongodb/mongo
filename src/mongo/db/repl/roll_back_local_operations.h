@@ -50,6 +50,9 @@ namespace repl {
 MONGO_FAIL_POINT_DECLARE(rollbackHangBeforeFinish);
 MONGO_FAIL_POINT_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
+// This is needed by rs_rollback and rollback_impl.
+MONGO_FAIL_POINT_DECLARE(rollbackHangAfterTransitionToRollback);
+
 class RollBackLocalOperations {
     RollBackLocalOperations(const RollBackLocalOperations&) = delete;
     RollBackLocalOperations& operator=(const RollBackLocalOperations&) = delete;

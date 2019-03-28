@@ -1579,6 +1579,13 @@ void rollback(OperationContext* opCtx,
         }
     }
 
+    if (MONGO_FAIL_POINT(rollbackHangAfterTransitionToRollback)) {
+        log() << "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
+                 "point is disabled (rs_rollback).";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                                                        rollbackHangAfterTransitionToRollback);
+    }
+
     try {
         auto status = syncRollback(
             opCtx, localOplog, rollbackSource, requiredRBID, replCoord, replicationProcess);
