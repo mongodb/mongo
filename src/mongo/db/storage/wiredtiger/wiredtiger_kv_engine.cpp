@@ -977,6 +977,9 @@ Status WiredTigerKVEngine::beginBackup(OperationContext* opCtx) {
         return Status::OK();
     }
 
+    // Persist the sizeStorer information to disk before opening the backup cursor.
+    syncSizeInfo(true);
+
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto session = stdx::make_unique<WiredTigerSession>(_conn);
     WT_CURSOR* c = NULL;
@@ -1001,6 +1004,11 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::beginNonBlockingBackup(
     stdx::lock_guard<stdx::mutex> lock(_oplogPinnedByBackupMutex);
     _checkpointThread->assignOplogNeededForCrashRecoveryTo(&_oplogPinnedByBackup);
     auto pinOplogGuard = makeGuard([&] { _oplogPinnedByBackup = boost::none; });
+
+    // Persist the sizeStorer information to disk before opening the backup cursor. We aren't
+    // guaranteed to have the most up-to-date size information after the backup as writes can still
+    // occur during a nonblocking backup.
+    syncSizeInfo(true);
 
     // This cursor will be freed by the backupSession being closed as the session is uncached
     auto sessionRaii = stdx::make_unique<WiredTigerSession>(_conn);
