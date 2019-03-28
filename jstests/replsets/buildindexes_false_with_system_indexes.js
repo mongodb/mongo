@@ -73,6 +73,8 @@
     rst.restart(primary);
     primary = rst.getPrimary();
     rst.awaitReplication();
+    rst.waitForAllIndexBuildsToFinish("admin", "system.users");
+    rst.waitForAllIndexBuildsToFinish("admin", "system.roles");
     adminDb = primary.getDB("admin");
     assert.eq(["_id_", "user_1_db_1"], adminDb.system.users.getIndexes().map(x => x.name).sort());
     assert.eq(["_id_", "role_1_db_1"], adminDb.system.roles.getIndexes().map(x => x.name).sort());
