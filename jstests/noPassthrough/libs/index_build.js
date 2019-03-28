@@ -51,7 +51,7 @@ class IndexBuildTest {
     /**
      * Checks the db.currentOp() output for the index build with opId.
      */
-    static assertIndexBuildCurrentOpContents(database, opId, expectedBuildingPhaseComplete) {
+    static assertIndexBuildCurrentOpContents(database, opId) {
         const inprog = database.currentOp({opid: opId}).inprog;
         assert.eq(1,
                   inprog.length,
@@ -59,20 +59,6 @@ class IndexBuildTest {
                       tojson(database.currentOp()));
         const op = inprog[0];
         assert.eq(opId, op.opid, 'db.currentOp() returned wrong index build info: ' + tojson(op));
-        assert(op.command.hasOwnProperty('buildUUID'),
-               'expected buildUUID field in index build info: ' + tojson(op));
-        assert(op.command.hasOwnProperty('buildingPhaseComplete'),
-               'expected buildingPhaseComplete field in index build info: ' + tojson(op));
-        assert.eq(expectedBuildingPhaseComplete,
-                  op.command.buildingPhaseComplete,
-                  'invalid buildingPhaseComplete value in index build info: ' + tojson(op));
-        assert(op.command.hasOwnProperty('runTwoPhaseIndexBuild'),
-               'expected runTwoPhaseIndexBuild field in index build info: ' + tojson(op));
-        // TODO: update when two phase index builds are enabled.
-        assert(!op.command.runTwoPhaseIndexBuild,
-               'invalid runTwoPhaseIndexBuild value in index build info: ' + tojson(op));
-        assert(op.command.hasOwnProperty('commitReadyMembers'),
-               'expected commitReadyMembers field in index build info: ' + tojson(op));
     }
 
     /**

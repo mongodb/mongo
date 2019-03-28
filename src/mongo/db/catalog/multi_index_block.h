@@ -327,8 +327,7 @@ private:
      */
     void _updateCurOpOpDescription(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   const std::vector<BSONObj>& indexSpecs,
-                                   bool isBuildingPhaseComplete) const;
+                                   const std::vector<BSONObj>& indexSpecs) const;
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;

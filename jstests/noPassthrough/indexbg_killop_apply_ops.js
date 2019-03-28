@@ -54,9 +54,7 @@
     // When the index build starts, find its op id.
     const opId = IndexBuildTest.waitForIndexBuildToStart(testDB);
 
-    // CurOp output should contain the current state of the index builder such as the build UUID
-    // and build phase.
-    IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, false);
+    IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
 
     // Kill the index build. This should have no effect.
     assert.commandWorked(testDB.killOp(opId));
