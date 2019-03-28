@@ -142,16 +142,21 @@ function InitialSyncTest(name = "InitialSyncTest", replSet, timeout) {
         // Skip validation when stopping the node in case there are transactions in prepare.
         replSet.stop(secondary, undefined, {skipValidation: true});
 
+        const nodeOptions = {
+            startClean: true,
+            setParameter: {
+                'failpoint.initialSyncFuzzerSynchronizationPoint1': tojson({mode: 'alwaysOn'}),
+            },
+        };
+
+        if (TestData.logComponentVerbosity) {
+            nodeOptions.setParameter.logComponentVerbosity =
+                tojsononeline(TestData.logComponentVerbosity);
+        }
+
         // Restart the node with the first synchronization failpoint enabled so that initial sync
         // doesn't finish before we can pause it.
-        secondary = replSet.start(
-            secondary,
-            {
-              startClean: true,
-              setParameter:
-                  {'failpoint.initialSyncFuzzerSynchronizationPoint1': tojson({mode: 'alwaysOn'})}
-            },
-            true);
+        secondary = replSet.start(secondary, nodeOptions, true);
     }
 
     /**
