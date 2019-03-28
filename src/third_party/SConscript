@@ -21,6 +21,9 @@ benchmarkSuffix = '-1.4.1'
 sqliteSuffix = '-amalgamation-3260000'
 
 thirdPartyEnvironmentModifications = {
+   'fmt' : {
+        'CPPPATH' : ['#src/third_party/fmt/dist/include'],
+   },
    's2' : {
         'CPPPATH' : ['#src/third_party/s2'],
    },
@@ -168,6 +171,10 @@ s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp'])
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
 
+fmtEnv = env.Clone()
+fmtEnv.InjectThirdParty(libraries=['fmt'])
+fmtEnv.InjectMongoIncludePaths()
+fmtEnv.SConscript('fmt/SConscript', exports={'env' : fmtEnv})
 
 if use_system_version_of_library("pcre"):
     pcreEnv = env.Clone(
