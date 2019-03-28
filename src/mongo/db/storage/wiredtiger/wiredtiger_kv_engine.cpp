@@ -1633,14 +1633,13 @@ void WiredTigerKVEngine::setOldestTimestampFromStable() {
         return;
     }
 
-    const auto oplogReadTimestamp = Timestamp(_oplogManager->getOplogReadTimestamp());
-    if (!oplogReadTimestamp.isNull() && newOldestTimestamp > oplogReadTimestamp) {
-        // Oplog visibility is updated asynchronously from replication updating the commit point.
-        // When force is not set, lag the `oldest_timestamp` to the possibly stale oplog read
-        // timestamp value. This guarantees an oplog reader's `read_timestamp` can always
-        // be serviced. When force is set, we respect the caller's request and do not lag the
-        // oldest timestamp.
-        newOldestTimestamp = oplogReadTimestamp;
+    const Timestamp initDataTs = getInitialDataTimestamp();
+    if (!initDataTs.isNull() && newOldestTimestamp < initDataTs) {
+        // The oldest timestamp is used to tell WT how much history to keep as well as to guard
+        // readers from reading at too early of a timestamp. Readers may not read at a timestamp
+        // prior to the initial data timestamp. Data is not guaranteed to be consistent at that
+        // time.
+        newOldestTimestamp = initDataTs;
     }
 
     setOldestTimestamp(newOldestTimestamp, false);
