@@ -89,12 +89,14 @@
                          "captures": expectedOutputCaptures
                      }]);
 
-        // Weird case, stops matching after certain limit but doesn't error.
-        const bufferNoMatch = 2553;
-        pattern = "(d)".repeat(bufferNoMatch) + pattern;
-        testRegexAgg({input: "$z", regex: pattern}, []);
+        // In this case, during execution, PCRE will hit the PCRE_ERROR_RECURSIONLIMIT because of
+        // high number of captures and return an error.
+        const bufferExecutionFailure = 2553;
+        pattern = "(d)".repeat(bufferExecutionFailure) + pattern;
+        testRegexAggException({input: "$z", regex: pattern}, 51156);
 
-        // Add more data and verify that PCRE throws an error.
+        // Add one more capture group to the pattern so that it tips over the maximum regex length
+        // limit, and verify that PCRE throws an error while attempting to compile.
         pattern = "(d)" + pattern;
         testRegexAggException({input: "$z", regex: pattern}, 51111);
     })();

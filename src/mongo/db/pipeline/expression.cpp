@@ -5681,10 +5681,15 @@ public:
                                    0,  // No need to overwrite the options set during pcre_compile.
                                    &_capturesBuffer.front(),
                                    _capturesBuffer.size());
-        // The 'execResult' will be '(_numCaptures + 1)' if there is a match, negative if there is
-        // no match, and zero if _capturesBuffer's capacity is not sufficient to hold all the
-        // results; the latter scenario should never actually occur.
-        invariant(execResult < 0 || execResult == _numCaptures + 1);
+        // The 'execResult' will be (_numCaptures + 1) if there is a match, -1 if there is no
+        // match, negative if there is an error during execution, and zero if _capturesBuffer's
+        // capacity is not sufficient to hold all the results. The latter scenario should never
+        // occur.
+        uassert(
+            51156,
+            str::stream() << "Error occurred while executing the regular expression. Result code:"
+                          << execResult,
+            execResult == -1 || execResult == (_numCaptures + 1));
         return execResult;
     }
 

@@ -6019,8 +6019,8 @@ TEST(ExpressionRegexFindAllTest, InvalidUTF8InInput) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ExpressionRegexFindAll regexF(expCtx);
     regexF.addOperand(ExpressionConstant::create(expCtx, input));
-    // Verify no match if there is an invalid UTF-8 character in input.
-    ASSERT_VALUE_EQ(regexF.evaluate(Document()), Value(std::vector<Value>()));
+    // Verify that PCRE will error during execution if input is not a valid UTF-8.
+    ASSERT_THROWS_CODE(regexF.evaluate(Document()), DBException, 51156);
 }
 
 TEST(ExpressionRegexFindAllTest, InvalidUTF8InRegex) {

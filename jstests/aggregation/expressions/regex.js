@@ -254,7 +254,7 @@
         assert.commandWorked(coll.insert({_id: 3, text: "ab\ncd"}));
 
         // LIMIT_MATCH option to limit the number of comparisons PCRE does internally.
-        testRegexFindAggForKey(2, {input: "$text", regex: "(*LIMIT_MATCH=1)fé"}, []);
+        testRegexAggException({input: "$text", regex: "(*LIMIT_MATCH=1)fé"}, 51156);
         testRegexFindAggForKey(2,
                                {input: "$text", regex: "(*LIMIT_MATCH=3)(fé)"},
                                [{"match": "fé", "idx": 2, "captures": ["fé"]}]);
@@ -270,8 +270,8 @@
         testRegexFindAggForKey(2,
                                {input: "$text", regex: String.raw `(*LIMIT_MATCH=5)(*UCP)^(\w+)`},
                                [{"match": "cafétéria", "idx": 0, "captures": ["cafétéria"]}]);
-        testRegexFindAggForKey(
-            2, {input: "$text", regex: String.raw `(*LIMIT_MATCH=1)(*UCP)^(\w+)`}, []);
+        testRegexAggException({input: "$text", regex: String.raw `(*LIMIT_MATCH=1)(*UCP)^(\w+)`},
+                              51156);
     })();
 
     (function testWithUnicodeData() {
