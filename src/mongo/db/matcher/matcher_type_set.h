@@ -118,4 +118,39 @@ struct MatcherTypeSet {
     std::set<BSONType> bsonTypes;
 };
 
+/**
+ * An IDL-compatible wrapper class for MatcherTypeSet for BSON type aliases.
+ * It represents a set of types or of type aliases in the match language.
+ */
+class BSONTypeSet {
+public:
+    static BSONTypeSet parseFromBSON(const BSONElement& element);
+
+    BSONTypeSet(MatcherTypeSet typeSet) : _typeSet(std::move(typeSet)) {}
+
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+
+    const MatcherTypeSet& typeSet() const {
+        return _typeSet;
+    }
+
+    bool operator==(const BSONTypeSet& other) const {
+        return _typeSet == other._typeSet;
+    }
+
+    /**
+     * IDL requires overload of all comparison operators, however for this class the only viable
+     * comparison is equality. These should be removed once SERVER-39677 is implemented.
+     */
+    bool operator>(const BSONTypeSet& other) const {
+        MONGO_UNREACHABLE;
+    }
+
+    bool operator<(const BSONTypeSet& other) const {
+        MONGO_UNREACHABLE;
+    }
+
+private:
+    MatcherTypeSet _typeSet;
+};
 }  // namespace mongo

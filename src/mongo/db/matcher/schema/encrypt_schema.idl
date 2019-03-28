@@ -29,6 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
+        - "mongo/db/matcher/matcher_type_set.h"
         - "mongo/db/matcher/schema/encrypt_schema_types.h"
 
 imports:
@@ -48,6 +49,13 @@ types:
         cpp_type: "mongo::EncryptSchemaKeyId"
         serializer: mongo::EncryptSchemaKeyId::serializeToBSON
         deserializer: mongo::EncryptSchemaKeyId::parseFromBSON
+
+    bsonTypeSet:
+        bson_serialization_type: any
+        description: "A string or array of strings representing BSONType names."
+        cpp_type: "mongo::BSONTypeSet"
+        serializer: mongo::BSONTypeSet::serializeToBSON
+        deserializer: mongo::BSONTypeSet::parseFromBSON
 
 enums:
     FleAlgorithm:
@@ -73,7 +81,7 @@ structs:
         fields:
           bsonType:
             description: "Specifies the type of the to-be-encrypted value."
-            type: string
+            type: bsonTypeSet
             optional: true
           algorithm:
             description: "The encryption algorithm to be used."

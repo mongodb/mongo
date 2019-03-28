@@ -292,5 +292,26 @@ TEST(ExpressionBinDataSubTypeTest, Equivalent) {
     ASSERT(!e1.equivalent(&e3));
 }
 
+TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
+    MatcherTypeSet typeSet;
+    typeSet.bsonTypes.insert(BSONType::String);
+    typeSet.bsonTypes.insert(BSONType::Date);
+    InternalSchemaBinDataEncryptedTypeExpression expr("a", std::move(typeSet));
+
+    FleBlobHeader blob;
+    blob.fleBlobSubtype = FleBlobSubtype::Deterministic;
+    memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
+    blob.originalBsonType = BSONType::String;
+    auto binData = BSONBinData(
+        reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
+
+    BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
+                                                  sizeof(FleBlobHeader),
+                                                  BinDataType::Encrypt));
+    ASSERT_TRUE(expr.matchesBSON(BSON("a" << binData)));
+    ASSERT_FALSE(expr.matchesBSON(BSON("a" << BSON_ARRAY(binData))));
+    ASSERT_FALSE(expr.matchesBSON(BSON("a" << BSONArray())));
+}
+
 }  // namespace
 }  // namepace mongo

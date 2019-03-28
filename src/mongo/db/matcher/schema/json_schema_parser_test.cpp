@@ -1911,7 +1911,7 @@ TEST(JSONSchemaParserTest, EncryptTranslatesCorrectly) {
         })"));
 }
 
-TEST(JSONSchemaParserTest, EncryptWithBsonTypeTranslatesCorrectly) {
+TEST(JSONSchemaParserTest, EncryptWithSingleBsonTypeTranslatesCorrectly) {
     BSONObj schema = fromjson("{properties: {foo: {encrypt: {bsonType: \"string\"}}}}");
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_OK(result.getStatus());
@@ -1922,7 +1922,24 @@ TEST(JSONSchemaParserTest, EncryptWithBsonTypeTranslatesCorrectly) {
             [{foo: {$not: {$exists: true}}}, {
                 $and:
                     [ {foo: {$_internalSchemaBinDataSubType: 6}},
-                    {foo: {$_internalSchemaBinDataEncryptedType: 2}},
+                    {foo: {$_internalSchemaBinDataEncryptedType: [2]}},
+                    {foo: {$_internalSchemaType: [5]}}]
+            }]
+        })"));
+}
+
+TEST(JSONSchemaParserTest, EncryptWithArrayOfMultipleTypesTranslatesCorrectly) {
+    BSONObj schema = fromjson("{properties: {foo: {encrypt: {bsonType: [\"string\",\"date\"]}}}}");
+    auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_OK(result.getStatus());
+    auto optimizedResult = MatchExpression::optimize(std::move(result.getValue()));
+    ASSERT_SERIALIZES_TO(optimizedResult, fromjson(R"(
+        {
+        $or:
+            [{foo: {$not: {$exists: true}}}, {
+                $and:
+                    [ {foo: {$_internalSchemaBinDataSubType: 6}},
+                    {foo: {$_internalSchemaBinDataEncryptedType: [2, 9]}},
                     {foo: {$_internalSchemaType: [5]}}]
             }]
         })"));
@@ -2021,6 +2038,29 @@ TEST(JSONSchemaParserTest, ParseSucceedsWithEmptyEncryptObject) {
     ASSERT_OK(result.getStatus());
 }
 
+TEST(JSONSchemaParserTest, ParseSucceedsWithBsonType) {
+    BSONObj schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType"
+                                                                               << "int"))));
+    auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(JSONSchemaParserTest, ParseFailsWithBsonTypeGivenByCode) {
+    BSONObj schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType" << 5))));
+    auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
+}
+
+TEST(JSONSchemaParserTest, ParseSucceedsWithArrayOfBsonTypes) {
+    BSONObj schema =
+        BSON("properties" << BSON(
+                 "foo" << BSON("encrypt" << BSON("bsonType" << BSON_ARRAY("int"
+                                                                          << "date"
+                                                                          << "string")))));
+    auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
+    ASSERT_OK(result.getStatus());
+}
+
 TEST(JSONSchemaParserTest, ParseSucceedsIfEncryptFieldsAreValid) {
     auto schema = BSON(
         "properties" << BSON(
@@ -2063,7 +2103,8 @@ TEST(JSONSchemaParserTest, FailsToParseWithBadBSONType) {
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 
-    schema = BSON("properties" << BSON("foo" << BSON("encrypt" << BSON("bsonType" << 1))));
+    schema = BSON("properties" << BSON(
+                      "foo" << BSON("encrypt" << BSON("bsonType" << (BSONType::JSTypeMax + 1)))));
     result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
 }

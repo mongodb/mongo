@@ -74,8 +74,7 @@ public:
         return std::move(expr);
     }
 
-    bool matchesSingleElement(const BSONElement& elem,
-                              MatchDetails* details = nullptr) const final {
+    bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const {
         return _typeSet.hasType(elem.type());
     }
 
@@ -239,21 +238,25 @@ private:
 /**
  * Implements matching semantics for the JSON Schema keyword encrypt.bsonType. A document
  * matches successfully if a field is encrypted and the encrypted payload indicates the
- * original BSON element matches the specified type.
+ * original BSON element belongs to the specified type set.
  */
-class InternalSchemaBinDataEncryptedTypeExpression final : public LeafMatchExpression {
+class InternalSchemaBinDataEncryptedTypeExpression final
+    : public TypeMatchExpressionBase<InternalSchemaBinDataEncryptedTypeExpression> {
 public:
     static constexpr StringData kName = "$_internalSchemaBinDataEncryptedType"_sd;
 
-    InternalSchemaBinDataEncryptedTypeExpression(StringData path, BSONType encryptedType)
-        : LeafMatchExpression(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE,
-                              path,
-                              ElementPath::LeafArrayBehavior::kNoTraversal,
-                              ElementPath::NonLeafArrayBehavior::kTraverse),
-          _encryptedType(encryptedType) {}
+    InternalSchemaBinDataEncryptedTypeExpression(StringData path, MatcherTypeSet typeSet)
+        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE,
+                                  path,
+                                  ElementPath::LeafArrayBehavior::kNoTraversal,
+                                  typeSet) {}
 
     StringData name() const {
         return kName;
+    }
+
+    MatchCategory getCategory() const final {
+        return MatchCategory::kOther;
     }
 
     bool matchesSingleElement(const BSONElement& elem,
@@ -276,7 +279,7 @@ public:
             case FleBlobSubtype::Random: {
                 // Verify the type of the encrypted data.
                 auto fleBlob = reinterpret_cast<const FleBlobHeader*>(binData);
-                return fleBlob->originalBsonType == _encryptedType;
+                return typeSet().hasType(static_cast<BSONType>(fleBlob->originalBsonType));
             }
             default:
                 uasserted(33118,
@@ -284,51 +287,5 @@ public:
                                         << " of encrypted binary data (0, 1 and 2 are allowed)");
         }
     }
-
-    std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto expr =
-            stdx::make_unique<InternalSchemaBinDataEncryptedTypeExpression>(path(), _encryptedType);
-        if (getTag()) {
-            expr->setTag(getTag()->clone());
-        }
-        return std::move(expr);
-    }
-
-    void debugString(StringBuilder& debug, int indentationLevel) const final {
-        _debugAddSpace(debug, indentationLevel);
-        debug << path() << " " << name() << ": " << typeName(_encryptedType);
-
-        if (auto td = getTag()) {
-            debug << " ";
-            td->debugString(&debug);
-        }
-        debug << "\n";
-    }
-
-    BSONObj getSerializedRightHandSide() const final {
-        BSONObjBuilder bob;
-        bob.append(name(), _encryptedType);
-        return bob.obj();
-    }
-
-    bool equivalent(const MatchExpression* other) const final {
-        if (matchType() != other->matchType())
-            return false;
-
-        auto realOther = static_cast<const InternalSchemaBinDataEncryptedTypeExpression*>(other);
-
-        if (path() != realOther->path()) {
-            return false;
-        }
-
-        return _encryptedType == realOther->_encryptedType;
-    }
-
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
-
-    BSONType _encryptedType;
 };
 }  // namespace mongo

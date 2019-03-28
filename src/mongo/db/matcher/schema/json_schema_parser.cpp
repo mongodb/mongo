@@ -1375,7 +1375,7 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
 
             if (auto typeOptional = encryptInfo.getBsonType())
                 andExpr->add(new InternalSchemaBinDataEncryptedTypeExpression(
-                    path, typeFromName(typeOptional.get())));
+                    path, typeOptional->typeSet()));
         } catch (const AssertionException&) {
             return exceptionToStatus();
         }

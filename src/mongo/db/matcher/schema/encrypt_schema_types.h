@@ -136,5 +136,4 @@ public:
 private:
     BSONElement _element;
 };
-
 }  // namespace mongo
