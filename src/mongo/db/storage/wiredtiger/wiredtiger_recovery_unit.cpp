@@ -428,6 +428,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     _prepareTimestamp = Timestamp();
     _durableTimestamp = Timestamp();
+    _roundUpPreparedTimestamps = RoundUpPreparedTimestamps::kNoRound;
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
@@ -523,7 +524,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             if (_isOplogReader) {
                 _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
             }
-            WiredTigerBeginTxnBlock(session, _ignorePrepared).done();
+            WiredTigerBeginTxnBlock(session, _ignorePrepared, _roundUpPreparedTimestamps).done();
             break;
         }
         case ReadSource::kMajorityCommitted: {
@@ -531,15 +532,16 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             // transaction was started.
             _majorityCommittedSnapshot =
                 _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(
-                    session, _ignorePrepared);
+                    session, _ignorePrepared, _roundUpPreparedTimestamps);
             break;
         }
         case ReadSource::kLastApplied: {
             if (_sessionCache->snapshotManager().getLocalSnapshot()) {
                 _readAtTimestamp = _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(
-                    session, _ignorePrepared);
+                    session, _ignorePrepared, _roundUpPreparedTimestamps);
             } else {
-                WiredTigerBeginTxnBlock(session, _ignorePrepared).done();
+                WiredTigerBeginTxnBlock(session, _ignorePrepared, _roundUpPreparedTimestamps)
+                    .done();
             }
             break;
         }
@@ -555,8 +557,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             // Intentionally continue to the next case to read at the _readAtTimestamp.
         }
         case ReadSource::kProvided: {
-            WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared);
-            auto status = txnOpen.setTimestamp(_readAtTimestamp);
+            WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared, _roundUpPreparedTimestamps);
+            auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
 
             if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
                 uasserted(ErrorCodes::SnapshotTooOld,
@@ -573,14 +575,13 @@ void WiredTigerRecoveryUnit::_txnOpen() {
 }
 
 Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllCommittedTimestamp(WT_SESSION* session) {
-    WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared);
+    WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared, _roundUpPreparedTimestamps);
     Timestamp txnTimestamp = Timestamp(_oplogManager->fetchAllCommittedValue(session->connection));
-    auto status =
-        txnOpen.setTimestamp(txnTimestamp, WiredTigerBeginTxnBlock::RoundToOldest::kRound);
+    auto status = txnOpen.setReadSnapshot(txnTimestamp, RoundReadUpToOldest::kRound);
     fassert(50948, status);
 
     // Since this is not in a critical section, we might have rounded to oldest between
-    // calling getAllCommitted and setTimestamp.  We need to get the actual read timestamp we
+    // calling getAllCommitted and setReadSnapshot.  We need to get the actual read timestamp we
     // used.
     auto readTimestamp = _getTransactionReadTimestamp(session);
     txnOpen.done();
@@ -618,13 +619,12 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
     // should read afterward.
     Timestamp readTimestamp = (lastApplied) ? std::min(*lastApplied, allCommitted) : allCommitted;
 
-    WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared);
-    auto status =
-        txnOpen.setTimestamp(readTimestamp, WiredTigerBeginTxnBlock::RoundToOldest::kRound);
+    WiredTigerBeginTxnBlock txnOpen(session, _ignorePrepared, _roundUpPreparedTimestamps);
+    auto status = txnOpen.setReadSnapshot(readTimestamp, RoundReadUpToOldest::kRound);
     fassert(51066, status);
 
-    // We might have rounded to oldest between calling getAllCommitted and setTimestamp.  We need to
-    // get the actual read timestamp we used.
+    // We might have rounded to oldest between calling getAllCommitted and setReadSnapshot. We need
+    // to get the actual read timestamp we used.
     readTimestamp = _getTransactionReadTimestamp(session);
     txnOpen.done();
     return readTimestamp;
@@ -750,8 +750,7 @@ Timestamp WiredTigerRecoveryUnit::getPrepareTimestamp() const {
 }
 
 void WiredTigerRecoveryUnit::setIgnorePrepared(bool value) {
-    auto newValue = (value) ? WiredTigerBeginTxnBlock::IgnorePrepared::kIgnore
-                            : WiredTigerBeginTxnBlock::IgnorePrepared::kNoIgnore;
+    auto newValue = (value) ? IgnorePrepared::kIgnore : IgnorePrepared::kNoIgnore;
 
     // If there is an open storage transaction, it is not valid to try to change the behavior of
     // ignoring prepare conflicts, since that behavior is applied when the transaction is opened.
@@ -764,7 +763,17 @@ void WiredTigerRecoveryUnit::setIgnorePrepared(bool value) {
 }
 
 bool WiredTigerRecoveryUnit::getIgnorePrepared() const {
-    return _ignorePrepared == WiredTigerBeginTxnBlock::IgnorePrepared::kIgnore;
+    return _ignorePrepared == IgnorePrepared::kIgnore;
+}
+
+void WiredTigerRecoveryUnit::setRoundUpPreparedTimestamps(bool value) {
+    // This cannot be called after WiredTigerRecoveryUnit::_txnOpen.
+    invariant(!_isActive(),
+              str::stream() << "Can't change round up prepared timestamps flag "
+                            << "when current state is "
+                            << toString(_state));
+    _roundUpPreparedTimestamps =
+        (value) ? RoundUpPreparedTimestamps::kRound : RoundUpPreparedTimestamps::kNoRound;
 }
 
 void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,

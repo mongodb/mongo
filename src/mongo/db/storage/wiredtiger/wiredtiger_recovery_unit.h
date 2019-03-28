@@ -48,6 +48,10 @@
 
 namespace mongo {
 
+using IgnorePrepared = WiredTigerBeginTxnBlock::IgnorePrepared;
+using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
+using RoundReadUpToOldest = WiredTigerBeginTxnBlock::RoundReadUpToOldest;
+
 class BSONObjBuilder;
 
 class WiredTigerOperationStats final : public StorageStats {
@@ -138,6 +142,8 @@ public:
     void setIgnorePrepared(bool ignore) override;
 
     bool getIgnorePrepared() const override;
+
+    void setRoundUpPreparedTimestamps(bool value) override;
 
     void setTimestampReadSource(ReadSource source,
                                 boost::optional<Timestamp> provided = boost::none) override;
@@ -306,8 +312,9 @@ private:
 
     // If set to kIgnore, updates from prepared transactions will not return prepare conflicts and
     // will not allow seeing prepared data.
-    WiredTigerBeginTxnBlock::IgnorePrepared _ignorePrepared{
-        WiredTigerBeginTxnBlock::IgnorePrepared::kNoIgnore};
+    IgnorePrepared _ignorePrepared{IgnorePrepared::kNoIgnore};
+    // Dictates whether to round up prepare and commit timestamp of a prepared transaction.
+    RoundUpPreparedTimestamps _roundUpPreparedTimestamps{RoundUpPreparedTimestamps::kNoRound};
     Timestamp _commitTimestamp;
     Timestamp _durableTimestamp;
     Timestamp _prepareTimestamp;

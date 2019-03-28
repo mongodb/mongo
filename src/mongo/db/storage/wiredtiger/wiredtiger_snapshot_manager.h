@@ -39,6 +39,9 @@
 
 namespace mongo {
 
+using IgnorePrepared = WiredTigerBeginTxnBlock::IgnorePrepared;
+using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
+
 class WiredTigerOplogManager;
 
 class WiredTigerSnapshotManager final : public SnapshotManager {
@@ -63,7 +66,9 @@ public:
      * Throws if there is currently no committed snapshot.
      */
     Timestamp beginTransactionOnCommittedSnapshot(
-        WT_SESSION* session, WiredTigerBeginTxnBlock::IgnorePrepared ignorePrepared) const;
+        WT_SESSION* session,
+        IgnorePrepared ignorePrepared,
+        RoundUpPreparedTimestamps roundUpPreparedTimestamps) const;
 
     /**
      * Starts a transaction on the last stable local timestamp, set by setLocalSnapshot.
@@ -71,7 +76,9 @@ public:
      * Throws if no local snapshot has been set.
      */
     Timestamp beginTransactionOnLocalSnapshot(
-        WT_SESSION* session, WiredTigerBeginTxnBlock::IgnorePrepared ignorePrepared) const;
+        WT_SESSION* session,
+        IgnorePrepared ignorePrepared,
+        RoundUpPreparedTimestamps roundUpPreparedTimestamps) const;
 
     /**
      * Returns lowest SnapshotName that could possibly be used by a future call to

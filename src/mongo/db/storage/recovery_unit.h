@@ -141,6 +141,18 @@ public:
     }
 
     /**
+     * Dictates whether to round up prepare and commit timestamp of a prepared transaction. If set
+     * to true, the prepare timestamp will be rounded up to the oldest timestamp if found to be
+     * earlier; and the commit timestamp will be rounded up to the prepare timestamp if found to
+     * be earlier.
+     *
+     * This must be called before a transaction begins, and defaults to false. On transaction close,
+     * we reset the value to its default.
+     *
+     */
+    virtual void setRoundUpPreparedTimestamps(bool value) {}
+
+    /**
      * Waits until all commits that happened before this call are durable in the journal. Returns
      * true, unless the storage engine cannot guarantee durability, which should never happen when
      * isDurable() returned true. This cannot be called from inside a unit of work, and should
