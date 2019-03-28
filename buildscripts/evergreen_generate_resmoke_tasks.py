@@ -287,7 +287,8 @@ class EvergreenConfigGenerator(object):
             task_spec.distro(self.options.large_distro_name)
 
     def _generate_resmoke_args(self, suite_file):
-        resmoke_args = "--suite={0}.yml {1}".format(suite_file, self.options.resmoke_args)
+        resmoke_args = "--suite={0}.yml --originSuite={1} {2}".format(
+            suite_file, self.options.suite, self.options.resmoke_args)
         if self.options.repeat_suites and "repeatSuites" not in resmoke_args:
             resmoke_args += " --repeatSuites={0} ".format(self.options.repeat_suites)
 

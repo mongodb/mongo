@@ -357,6 +357,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         self.assertEqual(len(config["tasks"]), len(suites) + 1)
         command1 = config["tasks"][0]["commands"][2]
         self.assertIn(options.resmoke_args, command1["vars"]["resmoke_args"])
+        self.assertIn(" --originSuite=suite", command1["vars"]["resmoke_args"])
         self.assertIn(options.run_multiple_jobs, command1["vars"]["run_multiple_jobs"])
         self.assertEqual("run generated tests", command1["func"])
 

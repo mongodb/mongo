@@ -144,7 +144,14 @@ class Resmoke(object):  # pylint: disable=too-many-instance-attributes
 
     def run_tests(self):
         """Run the suite and tests specified."""
-        self._resmoke_logger.info("resmoke.py invocation: %s", " ".join(sys.argv))
+        self._resmoke_logger.info("verbatim resmoke.py invocation: %s", " ".join(sys.argv))
+
+        if config.EVERGREEN_TASK_ID:
+            local_args = parser.to_local_args()
+            self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
+                                      os.path.join("buildscripts", "resmoke.py"),
+                                      " ".join(local_args))
+
         suites = None
         try:
             suites = self._get_suites()
