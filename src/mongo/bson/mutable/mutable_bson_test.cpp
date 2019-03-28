@@ -3437,4 +3437,16 @@ TEST(UnorderedEqualityChecker, MissingItemsInArrayAreNotEqual) {
     ASSERT_NOT_EQUALS(mmb::unordered(b1), mmb::unordered(b2));
 }
 
+TEST(SERVER_36024, RegressionCheck) {
+    mongo::BSONObj obj;
+    mmb::Document doc(obj, mmb::Document::kInPlaceDisabled);
+
+    mmb::Element root = doc.root();
+    auto array = doc.makeElementArray("foo");
+    ASSERT_OK(root.pushBack(array));
+
+    mmb::Element field = root.findFirstChildNamed("foo");
+    ASSERT_OK(field.setValueInt(1));
+}
+
 }  // namespace
