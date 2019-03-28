@@ -83,7 +83,5 @@ structs:
       currentPrepared:
         type: long
         default: 0
-      oldestActiveOplogEntryOpTime:
-        type: optime
       oldestOpenUnpreparedReadTimestamp:
         type: timestamp

@@ -205,12 +205,6 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, OperationC
     stats->setCurrentPrepared(_currentPrepared.load());
     stats->setOldestOpenUnpreparedReadTimestamp(
         ServerTransactionsMetrics::_getOldestOpenUnpreparedReadTimestamp(opCtx));
-    // To avoid compression loss, we use the null OpTime if no oldest active transaction
-    // optime is stored.
-    auto oldestActiveOpTime = getOldestActiveOpTime();
-    repl::OpTime oldestActiveOplogEntryOpTime =
-        (oldestActiveOpTime != boost::none) ? oldestActiveOpTime.get() : repl::OpTime();
-    stats->setOldestActiveOplogEntryOpTime(oldestActiveOplogEntryOpTime);
 }
 
 void ServerTransactionsMetrics::clearOpTimes() {

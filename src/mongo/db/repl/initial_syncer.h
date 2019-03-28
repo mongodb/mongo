@@ -416,18 +416,16 @@ private:
         OpTime& beginFetchingOpTime);
 
     /**
-     * Callback that gets the oldestActiveOplogEntryOptime from the transactions field in the
-     * serverStatus response, which refers to the optime of the oldest active transaction with an
-     * oplog entry. It will be used as the beginFetchingTimestamp.
+     * Callback that gets the optime of the oldest active transaction in the sync source's
+     * transaction table. It will be used as the beginFetchingTimestamp.
      */
     void _getBeginFetchingOpTimeCallback(const StatusWith<Fetcher::QueryResponse>& result,
                                          std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
-     * Schedules a remote command to call serverStatus on the sync source. From the response, we
-     * will be able to get the oldestActiveOplogEntryOptime from the transactions field, which
-     * refers to the optime of the oldest active transaction with an oplog entry. It will be used as
-     * the beginFetchingTimestamp.
+     * Schedules a remote command to issue a find command on sync source's transaction table, which
+     * will get us the optime of the oldest active transaction on that node. It will be used as the
+     * beginFetchingTimestamp.
      */
     Status _scheduleGetBeginFetchingOpTime_inlock(
         std::shared_ptr<OnCompletionGuard> onCompletionGuard);

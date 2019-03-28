@@ -6,7 +6,9 @@
     "use strict";
     load("jstests/core/txns/libs/prepare_helpers.js");
 
-    // Verifies that the serverStatus response has the fields that we expect.
+    /**
+     * Verifies that the serverStatus response has the fields that we expect.
+     */
     function verifyServerStatusFields(serverStatusResponse) {
         assert(serverStatusResponse.hasOwnProperty("transactions"),
                "Expected the serverStatus response to have a 'transactions' field: " +
@@ -37,6 +39,28 @@
         assert.eq(initialStats[valueName] + expectedIncrement,
                   newStats[valueName],
                   "expected " + valueName + " to increase by " + expectedIncrement);
+    }
+
+    /**
+     * Verifies that the timestamp of the oldest active transaction in the transactions table
+     * has the value we expect.
+     */
+    function verifyOldestActiveTransactionTimestamp(testDB, expectedTimestamp) {
+        let res = assert.commandWorked(
+            testDB.getSiblingDB("config").getCollection("transactions").runCommand("find", {
+                "filter": {"state": {"$in": ["prepared", "inProgress"]}},
+                "sort": {"startOpTime": 1},
+                "readConcern": {"level": "local"},
+                "limit": 1
+            }));
+
+        let entry = res.cursor.firstBatch[0];
+        assert.neq(undefined, entry);
+
+        assert.eq(entry.startOpTime.ts,
+                  expectedTimestamp,
+                  "expected the timestamp of the oldest active transaction to have a value of " +
+                      expectedTimestamp);
     }
 
     // Set up the replica set.
@@ -88,10 +112,13 @@
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentPrepared", 1);
 
-    assert.eq(newStatus.transactions.oldestActiveOplogEntryOpTime.ts, prepareTimestampForCommit);
     // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
     // has been prepared.
     assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
+
+    // Verify that the prepare entry has the oldest timestamp of any active transaction
+    // in the transactions table.
+    verifyOldestActiveTransactionTimestamp(testDB, prepareTimestampForCommit);
 
     // Verify the total prepared and committed transaction counters are updated after a commit
     // and that the current prepared counter is decremented.
@@ -137,10 +164,13 @@
     verifyServerStatusChange(
         initialStatus.transactions, newStatus.transactions, "currentPrepared", 1);
 
-    assert.eq(newStatus.transactions.oldestActiveOplogEntryOpTime.ts, prepareTimestampForAbort);
     // Verify that the oldestOpenUnpreparedReadTimestamp is a null timestamp since the transaction
     // has been prepared.
     assert.eq(newStatus.transactions.oldestOpenUnpreparedReadTimestamp, Timestamp(0, 0));
+
+    // Verify that the prepare entry has the oldest timestamp of any active transaction
+    // in the transactions table.
+    verifyOldestActiveTransactionTimestamp(testDB, prepareTimestampForAbort);
 
     // Verify the total prepared and aborted transaction counters are updated after an abort and the
     // current prepared counter is decremented.
