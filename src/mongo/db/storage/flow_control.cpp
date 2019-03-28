@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
@@ -121,7 +122,7 @@ BSONObj FlowControl::generateSection(OperationContext* opCtx,
 
 int FlowControl::getNumTickets() {
     const int maxTickets = 1000 * 1000 * 1000;
-    if (!gFlowControlEnabled) {
+    if (serverGlobalParams.enableMajorityReadConcern == false || gFlowControlEnabled == false) {
         return maxTickets;
     }
 
@@ -238,7 +239,7 @@ std::int64_t FlowControl::_approximateOpsBetween(std::uint64_t prevTs, std::uint
 }
 
 void FlowControl::sample(Timestamp timestamp, std::uint64_t opsApplied) {
-    if (!gFlowControlEnabled) {
+    if (serverGlobalParams.enableMajorityReadConcern == false || gFlowControlEnabled == false) {
         // TODO SERVER-39616: Remove this feature flag such that flow control can be turned on/off
         // at runtime.
         return;
