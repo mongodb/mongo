@@ -6358,6 +6358,14 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 7
 
+- name: replica_sets_multi_oplog_txns_gen
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      task: replica_sets_multi_oplog_txns
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 1
+
 - <<: *task_template
   name: sasl
   commands:
@@ -7853,6 +7861,7 @@ buildvariants:
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_jscore_passthrough
+  - name: replica_sets_multi_oplog_txns_gen
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
@@ -8068,6 +8077,7 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
+  - name: replica_sets_multi_oplog_txns_gen
   - name: powercycle
   - name: powercycle_fcv4.0
   - name: powercycle_kill_mongod
@@ -9652,6 +9662,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
     distros:
     - windows-64-vs2017-compile
+  - name: replica_sets_multi_oplog_txns_gen
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
     distros:
     - windows-64-vs2017-compile
@@ -9765,6 +9776,7 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
   - name: replica_sets_jscore_passthrough
+  - name: replica_sets_multi_oplog_txns_gen
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough_gen
@@ -10233,6 +10245,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: replica_sets
+  - name: replica_sets_multi_oplog_txns_gen
   - name: ssl_gen
   - name: sslSpecial_gen
   - name: stitch_support_lib_build_and_test
@@ -10961,6 +10974,7 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
     distros:
     - rhel62-large
+  - name: replica_sets_multi_oplog_txns_gen
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
     distros:
@@ -11355,6 +11369,7 @@ buildvariants:
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
+  - name: replica_sets_multi_oplog_txns_gen
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
   - name: replica_sets_kill_primary_jscore_passthrough
@@ -11449,6 +11464,7 @@ buildvariants:
   - name: external_auth
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
+  - name: replica_sets_multi_oplog_txns_gen
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
@@ -14293,6 +14309,7 @@ buildvariants:
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
+  - name: replica_sets_multi_oplog_txns_gen
   - name: sasl
   - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   - name: sharded_collections_causally_consistent_jscore_txns_passthrough
