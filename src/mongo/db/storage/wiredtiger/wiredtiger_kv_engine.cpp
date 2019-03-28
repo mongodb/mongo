@@ -1552,6 +1552,7 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
+MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 
 }  // namespace
 
@@ -1623,6 +1624,13 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
 
 void WiredTigerKVEngine::setOldestTimestampFromStable() {
     Timestamp stableTimestamp(_stableTimestamp.load());
+
+    // Set the oldest timestamp to the stable timestamp to ensure that there is no lag window
+    // between the two.
+    if (MONGO_FAIL_POINT(WTSetOldestTSToStableTS)) {
+        setOldestTimestamp(stableTimestamp, false);
+        return;
+    }
 
     // Calculate what the oldest_timestamp should be from the stable_timestamp. The oldest
     // timestamp should lag behind stable by 'targetSnapshotHistoryWindowInSeconds' to create a

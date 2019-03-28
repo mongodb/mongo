@@ -69,7 +69,13 @@
     // Note that the 'disableSnapshotting' failpoint will be unset on the node following the
     // restart.
     replTest.stop(primary, undefined, {skipValidation: true});
-    replTest.start(primary, {}, true);
+    // Restart primary with fail point "WTSetOldestTSToStableTS" to prevent lag between stable
+    // timestamp and oldest timestamp during start up recovery period. We avoid lag to test if
+    // we can prepare and commit a transaction older than oldest timestamp.
+    // TODO: fail point "WTSetOldestTSToStableTS" has to be removed once SERVER-39870 is checked in.
+    replTest.start(primary,
+                   {setParameter: {'failpoint.WTSetOldestTSToStableTS': "{'mode': 'alwaysOn'}"}},
+                   true);
 
     jsTestLog("Node was restarted");
 

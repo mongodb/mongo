@@ -36,7 +36,9 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
@@ -77,7 +79,9 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
  */
 Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                                        const OplogEntry& entry,
-                                       repl::OplogApplication::Mode mode) {
+                                       repl::OplogApplication::Mode mode,
+                                       Timestamp commitTimestamp,
+                                       Timestamp durableTimestamp) {
     invariant(mode == repl::OplogApplication::Mode::kRecovering ||
               mode == repl::OplogApplication::Mode::kInitialSync);
 
@@ -104,13 +108,35 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
         }
     }
 
-    if (!prepareCmd.isEmpty()) {
-        BSONObjBuilder resultWeDontCareAbout;
-        return applyOps(
-            opCtx, entry.getNss().db().toString(), prepareCmd, mode, &resultWeDontCareAbout);
-    } else {
+    if (prepareCmd.isEmpty()) {
         return _applyOperationsForTransaction(opCtx, ops, mode);
     }
+
+    const auto dbName = entry.getNss().db().toString();
+    Status status = Status::OK();
+
+    writeConflictRetry(opCtx, "replaying prepared transaction", dbName, [&] {
+        WriteUnitOfWork wunit(opCtx);
+
+        // we might replay a prepared transaction behind oldest timestamp.
+        opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
+
+        BSONObjBuilder resultWeDontCareAbout;
+        status = applyOps(opCtx, dbName, prepareCmd, mode, &resultWeDontCareAbout);
+        if (status.isOK()) {
+            opCtx->recoveryUnit()->setPrepareTimestamp(commitTimestamp);
+            wunit.prepare();
+
+            // Calls setCommitTimestamp() to set commit timestamp of the transaction and
+            // clears the commit timestamp in the recovery unit when tsBlock goes out of the
+            // scope. It is necessary that we clear the commit timestamp because there can be
+            // another transaction in the same recovery unit calling setTimestamp().
+            TimestampBlock tsBlock(opCtx, commitTimestamp);
+            opCtx->recoveryUnit()->setDurableTimestamp(durableTimestamp);
+            wunit.commit();
+        }
+    });
+    return status;
 }
 }  // namespace
 
@@ -123,14 +149,20 @@ Status applyCommitTransaction(OperationContext* opCtx,
             mode != repl::OplogApplication::Mode::kApplyOpsCmd);
 
     IDLParserErrorContext ctx("commitTransaction");
+    auto commitOplogEntryOpTime = entry.getOpTime();
     auto commitCommand = CommitTransactionOplogObject::parse(ctx, entry.getObject());
     const bool prepared = !commitCommand.getPrepared() || *commitCommand.getPrepared();
     if (!prepared)
         return Status::OK();
+    invariant(commitCommand.getCommitTimestamp());
 
     if (mode == repl::OplogApplication::Mode::kRecovering ||
         mode == repl::OplogApplication::Mode::kInitialSync) {
-        return _applyTransactionFromOplogChain(opCtx, entry, mode);
+        return _applyTransactionFromOplogChain(opCtx,
+                                               entry,
+                                               mode,
+                                               *commitCommand.getCommitTimestamp(),
+                                               commitOplogEntryOpTime.getTimestamp());
     }
 
     invariant(mode == repl::OplogApplication::Mode::kSecondary);
@@ -148,9 +180,8 @@ Status applyCommitTransaction(OperationContext* opCtx,
     auto transaction = TransactionParticipant::get(opCtx);
     invariant(transaction);
     transaction.unstashTransactionResources(opCtx, "commitTransaction");
-    invariant(commitCommand.getCommitTimestamp());
     transaction.commitPreparedTransaction(
-        opCtx, *commitCommand.getCommitTimestamp(), entry.getOpTime());
+        opCtx, *commitCommand.getCommitTimestamp(), commitOplogEntryOpTime);
     return Status::OK();
 }
 
