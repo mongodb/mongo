@@ -82,9 +82,14 @@ private:
 };
 
 /**
- * Sends prepare to all participants and returns a future that will be resolved when either:
- *    a) All participants have responded with a vote to commit, or
- *    b) At least one participant votes to abort.
+ * Sends prepare to all participants and keeps retrying the prepare call infinitely until a vote or
+ * one of the errors below is encountered. The future will be resolved as follows:
+ *  a) kCommit if all participants voted commit
+ *  b) kAbort if at least one participant voted abort
+ *  c) kAbort if the scheduler was interrupted with a TransactionCoordinatorReachedAbortDecision
+ *      error code
+ *  d) kAbort if one of the shards received a ShardNotFound error
+ *  e) Exception TransactionCoordinatorSteppingDown if the scheduler is interrupted with that code
  */
 Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                          txn::AsyncWorkScheduler& scheduler,

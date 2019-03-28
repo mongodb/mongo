@@ -121,6 +121,11 @@ private:
     // Scheduler and context wrapping all asynchronous work dispatched by this coordinator
     std::unique_ptr<txn::AsyncWorkScheduler> _scheduler;
 
+    // Scheduler used for the persist participants + prepare part of the 2PC sequence and
+    // interrupted separately from the rest of the chain in order to allow the clean-up tasks
+    // (running on _scheduler to still be able to execute).
+    std::unique_ptr<txn::AsyncWorkScheduler> _sendPrepareScheduler;
+
     // Protects the state below
     mutable stdx::mutex _mutex;
 

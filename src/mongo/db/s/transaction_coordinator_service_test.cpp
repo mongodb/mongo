@@ -609,8 +609,7 @@ TEST_F(TransactionCoordinatorServiceTest,
                operationContext(), _lsid, _txnNumber, kTwoShardIdSet));
 }
 
-TEST_F(TransactionCoordinatorServiceTest,
-       CoordinatorIsNotCanceledIfDeadlinePassesButHasReceivedParticipantList) {
+TEST_F(TransactionCoordinatorServiceTest, CoordinatorAbortsIfDeadlinePassesAndStillPreparing) {
     auto coordinatorService = TransactionCoordinatorService::get(operationContext());
     const auto deadline = executor()->now() + Milliseconds(1000 * 60 * 10 /* 10 hours */);
     coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, deadline);
@@ -626,9 +625,47 @@ TEST_F(TransactionCoordinatorServiceTest,
     network()->exitNetwork();
 
     // The coordinator should still exist.
+    auto commitDecisionFuture =
+        coordinatorService->coordinateCommit(operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
+    ASSERT(boost::none != commitDecisionFuture);
+
+    // ... and should run the abort sequence
+    assertAbortSentAndRespondWithSuccess();
+    assertAbortSentAndRespondWithSuccess();
+
+    ASSERT_EQ(int(txn::CommitDecision::kAbort), int(commitDecisionFuture->get()));
+}
+
+TEST_F(TransactionCoordinatorServiceTest,
+       CoordinatorContinuesCommittingIfDeadlinePassesAndCommitWasDecided) {
+    auto coordinatorService = TransactionCoordinatorService::get(operationContext());
+    const auto deadline = executor()->now() + Milliseconds(1000 * 60 * 10 /* 10 hours */);
+    coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, deadline);
+
+    // Deliver the participant list before the deadline.
     ASSERT(boost::none !=
            coordinatorService->coordinateCommit(
                operationContext(), _lsid, _txnNumber, kTwoShardIdSet));
+
+    // Vote commit before the deadline
+    onCommands({[&](const executor::RemoteCommandRequest&) { return kPrepareOk; },
+                [&](const executor::RemoteCommandRequest&) { return kPrepareOk; }});
+
+    // Reach the deadline.
+    network()->enterNetwork();
+    network()->advanceTime(deadline);
+    network()->exitNetwork();
+
+    // The coordinator should still exist.
+    auto commitDecisionFuture =
+        coordinatorService->coordinateCommit(operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
+    ASSERT(boost::none != commitDecisionFuture);
+
+    // ... and should run the commit sequence
+    assertCommitSentAndRespondWithSuccess();
+    assertCommitSentAndRespondWithSuccess();
+
+    ASSERT_EQ(int(txn::CommitDecision::kCommit), int(commitDecisionFuture->get()));
 }
 
 

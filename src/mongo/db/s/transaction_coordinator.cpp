@@ -54,7 +54,8 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
     : _serviceContext(serviceContext),
       _lsid(lsid),
       _txnNumber(txnNumber),
-      _scheduler(std::move(scheduler)) {
+      _scheduler(std::move(scheduler)),
+      _sendPrepareScheduler(_scheduler->makeChildScheduler()) {
 
     auto kickOffCommitPF = makePromiseFuture<void>();
     _kickOffCommitPromise = std::move(kickOffCommitPF.promise);
@@ -63,7 +64,16 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
     // sequence has not yet started, it will be abandoned altogether.
     auto deadlineFuture =
         _scheduler
-            ->scheduleWorkAt(deadline, [this](OperationContext*) { cancelIfCommitNotYetStarted(); })
+            ->scheduleWorkAt(deadline,
+                             [this](OperationContext*) {
+                                 cancelIfCommitNotYetStarted();
+
+                                 // See the comments for sendPrepare about the purpose of this
+                                 // cancellation code
+                                 _sendPrepareScheduler->shutdown(
+                                     {ErrorCodes::TransactionCoordinatorReachedAbortDecision,
+                                      "Transaction exceeded deadline"});
+                             })
             .tapError([this](Status s) {
                 if (_reserveKickOffCommitPromise()) {
                     _kickOffCommitPromise.setError(std::move(s));
@@ -86,7 +96,8 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     return Future<void>::makeReady();
             }
 
-            return txn::persistParticipantsList(*_scheduler, _lsid, _txnNumber, *_participants)
+            return txn::persistParticipantsList(
+                       *_sendPrepareScheduler, _lsid, _txnNumber, *_participants)
                 .then([this] {
                     stdx::lock_guard<stdx::mutex> lg(_mutex);
                     _participantsDurable = true;
@@ -106,7 +117,8 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     return Future<void>::makeReady();
             }
 
-            return txn::sendPrepare(_serviceContext, *_scheduler, _lsid, _txnNumber, *_participants)
+            return txn::sendPrepare(
+                       _serviceContext, *_sendPrepareScheduler, _lsid, _txnNumber, *_participants)
                 .then([this](PrepareVoteConsensus consensus) mutable {
                     {
                         stdx::lock_guard<stdx::mutex> lg(_mutex);
