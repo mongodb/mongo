@@ -242,6 +242,11 @@ CollectionImpl::~CollectionImpl() {
         }
         LOG(2) << "destructed collection " << ns() << " with UUID " << uuid()->toString();
     }
+
+    if (ns().isOplog()) {
+        repl::clearLocalOplogPtr();
+    }
+
     _magic = 0;
 }
 

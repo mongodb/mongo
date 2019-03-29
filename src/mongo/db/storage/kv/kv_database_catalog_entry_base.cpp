@@ -35,6 +35,7 @@
 
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
@@ -50,19 +51,14 @@ KVDatabaseCatalogEntryBase::KVDatabaseCatalogEntryBase(StringData db,
                                                        KVStorageEngineInterface* engine)
     : DatabaseCatalogEntry(db), _engine(engine) {}
 
-KVDatabaseCatalogEntryBase::~KVDatabaseCatalogEntryBase() {
-    for (CollectionMap::const_iterator it = _collections.begin(); it != _collections.end(); ++it) {
-        delete it->second;
-    }
-    _collections.clear();
-}
+KVDatabaseCatalogEntryBase::~KVDatabaseCatalogEntryBase() {}
 
 bool KVDatabaseCatalogEntryBase::exists() const {
     return !isEmpty();
 }
 
 bool KVDatabaseCatalogEntryBase::isEmpty() const {
-    return _collections.empty();
+    return UUIDCatalog::get(getGlobalServiceContext()).getAllCatalogEntriesFromDb(name()).empty();
 }
 
 bool KVDatabaseCatalogEntryBase::hasUserData() const {
@@ -72,18 +68,18 @@ bool KVDatabaseCatalogEntryBase::hasUserData() const {
 int64_t KVDatabaseCatalogEntryBase::sizeOnDisk(OperationContext* opCtx) const {
     int64_t size = 0;
 
-    for (CollectionMap::const_iterator it = _collections.begin(); it != _collections.end(); ++it) {
-        const KVCollectionCatalogEntry* coll = it->second;
-        if (!coll)
-            continue;
-        size += coll->getRecordStore()->storageSize(opCtx);
+    auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    auto catalogEntries = uuidCatalog.getAllCatalogEntriesFromDb(name());
+
+    for (auto catalogEntry : catalogEntries) {
+        size += catalogEntry->getRecordStore()->storageSize(opCtx);
 
         std::vector<std::string> indexNames;
-        coll->getAllIndexes(opCtx, &indexNames);
+        catalogEntry->getAllIndexes(opCtx, &indexNames);
 
         for (size_t i = 0; i < indexNames.size(); i++) {
             std::string ident =
-                _engine->getCatalog()->getIndexIdent(opCtx, coll->ns().ns(), indexNames[i]);
+                _engine->getCatalog()->getIndexIdent(opCtx, catalogEntry->ns().ns(), indexNames[i]);
             size += _engine->getEngine()->getIdentSize(opCtx, ident);
         }
     }
@@ -101,27 +97,27 @@ Status KVDatabaseCatalogEntryBase::currentFilesCompatible(OperationContext* opCt
 }
 
 void KVDatabaseCatalogEntryBase::getCollectionNamespaces(std::list<std::string>* out) const {
-    for (CollectionMap::const_iterator it = _collections.begin(); it != _collections.end(); ++it) {
-        out->push_back(it->first);
+    auto& uuidCatalog = UUIDCatalog::get(getGlobalServiceContext());
+    auto catalogEntries = uuidCatalog.getAllCatalogEntriesFromDb(name());
+    for (auto catalogEntry : catalogEntries) {
+        out->push_back(catalogEntry->ns().toString());
     }
 }
 
 CollectionCatalogEntry* KVDatabaseCatalogEntryBase::getCollectionCatalogEntry(StringData ns) const {
-    CollectionMap::const_iterator it = _collections.find(ns.toString());
-    if (it == _collections.end()) {
-        return NULL;
-    }
-
-    return it->second;
+    return UUIDCatalog::get(getGlobalServiceContext())
+        .lookupCollectionCatalogEntryByNamespace(NamespaceString(ns));
 }
 
 RecordStore* KVDatabaseCatalogEntryBase::getRecordStore(StringData ns) const {
-    CollectionMap::const_iterator it = _collections.find(ns.toString());
-    if (it == _collections.end()) {
-        return NULL;
+    CollectionCatalogEntry* catalogEntry =
+        UUIDCatalog::get(getGlobalServiceContext())
+            .lookupCollectionCatalogEntryByNamespace(NamespaceString(ns));
+    if (catalogEntry) {
+        return catalogEntry->getRecordStore();
     }
 
-    return it->second->getRecordStore();
+    return NULL;
 }
 
 Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
@@ -138,9 +134,9 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
 
     invariant(nss.coll().size() > 0);
 
-    if (_collections.count(nss.toString())) {
-        invariant(_collections[nss.toString()]);
-        return Status(ErrorCodes::NamespaceExists, "collection already exists");
+    if (UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss)) {
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << "collection already exists " << nss);
     }
 
     KVPrefix prefix = KVPrefix::getNextPrefix(nss);
@@ -167,22 +163,21 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
         }
     }
 
-    opCtx->recoveryUnit()->onRollback([ opCtx, dce = this, nss, ident ]() {
+    CollectionUUID uuid = options.uuid.get();
+    opCtx->recoveryUnit()->onRollback([ opCtx, dce = this, nss, ident, uuid ]() {
         // Intentionally ignoring failure
         dce->_engine->getEngine()->dropIdent(opCtx, ident).ignore();
 
-        const CollectionMap::iterator it = dce->_collections.find(nss.ns());
-        if (it != dce->_collections.end()) {
-            delete it->second;
-            dce->_collections.erase(it);
-        }
+        UUIDCatalog::get(opCtx).deregisterCatalogEntry(uuid);
     });
 
     auto rs = _engine->getEngine()->getGroupedRecordStore(opCtx, nss.ns(), ident, options, prefix);
     invariant(rs);
 
-    _collections[nss.toString()] = new KVCollectionCatalogEntry(
-        _engine, _engine->getCatalog(), nss.ns(), ident, std::move(rs));
+    UUIDCatalog::get(getGlobalServiceContext())
+        .registerCatalogEntry(uuid,
+                              std::make_unique<KVCollectionCatalogEntry>(
+                                  _engine, _engine->getCatalog(), nss.ns(), ident, std::move(rs)));
 
     return Status::OK();
 }
@@ -190,9 +185,13 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
 void KVDatabaseCatalogEntryBase::initCollection(OperationContext* opCtx,
                                                 const std::string& ns,
                                                 bool forRepair) {
-    invariant(!_collections.count(ns));
+    BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, ns);
+    uassert(ErrorCodes::MustDowngrade,
+            str::stream() << "Collection does not have UUID in KVCatalog. Collection: " << ns,
+            md.options.uuid);
 
-    const std::string ident = _engine->getCatalog()->getCollectionIdent(ns);
+    auto uuid = md.options.uuid.get();
+    auto ident = _engine->getCatalog()->getCollectionIdent(ns);
 
     std::unique_ptr<RecordStore> rs;
     if (forRepair) {
@@ -200,25 +199,21 @@ void KVDatabaseCatalogEntryBase::initCollection(OperationContext* opCtx,
         // repaired. This also ensures that if we try to use it, it will blow up.
         rs = nullptr;
     } else {
-        BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, ns);
         rs = _engine->getEngine()->getGroupedRecordStore(opCtx, ns, ident, md.options, md.prefix);
         invariant(rs);
     }
 
-    // No change registration since this is only for committed collections
-    _collections[ns] =
-        new KVCollectionCatalogEntry(_engine, _engine->getCatalog(), ns, ident, std::move(rs));
+    UUIDCatalog::get(getGlobalServiceContext())
+        .registerCatalogEntry(uuid,
+                              std::make_unique<KVCollectionCatalogEntry>(
+                                  _engine, _engine->getCatalog(), ns, ident, std::move(rs)));
 }
 
 void KVDatabaseCatalogEntryBase::reinitCollectionAfterRepair(OperationContext* opCtx,
                                                              const std::string& ns) {
-    // Get rid of the old entry.
-    CollectionMap::iterator it = _collections.find(ns);
-    invariant(it != _collections.end());
-    delete it->second;
-    _collections.erase(it);
-
-    // Now reopen fully initialized.
+    auto& uuidCatalog = UUIDCatalog::get(getGlobalServiceContext());
+    auto nss = NamespaceString(ns);
+    uuidCatalog.deregisterCatalogEntry(uuidCatalog.lookupUUIDByNSS(nss).get());
     initCollection(opCtx, ns, false);
 }
 
@@ -230,21 +225,9 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* opCtx,
     const NamespaceString fromNss(fromNS);
     const NamespaceString toNss(toNS);
 
-    CollectionMap::const_iterator it = _collections.find(fromNS.toString());
-    if (it == _collections.end()) {
-        return Status(ErrorCodes::NamespaceNotFound, "rename cannot find collection");
-    }
-
-    RecordStore* originalRS = it->second->getRecordStore();
-
-    it = _collections.find(toNS.toString());
-    if (it != _collections.end()) {
-        return Status(ErrorCodes::NamespaceExists, "for rename to already exists");
-    }
-
     const std::string identFrom = _engine->getCatalog()->getCollectionIdent(fromNS);
 
-    Status status = _engine->getEngine()->okToRename(opCtx, fromNS, toNS, identFrom, originalRS);
+    Status status = _engine->getEngine()->okToRename(opCtx, fromNS, toNS, identFrom, nullptr);
     if (!status.isOK())
         return status;
 
@@ -255,45 +238,44 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* opCtx,
     const std::string identTo = _engine->getCatalog()->getCollectionIdent(toNS);
     invariant(identFrom == identTo);
 
-    // Add the destination collection to _collections before erasing the source collection. This
-    // is to ensure that _collections doesn't erroneously appear empty during listDatabases if
-    // a database consists of a single collection and that collection gets renamed (see
-    // SERVER-34531). There is no locking to prevent listDatabases from looking into
-    // _collections as a rename is taking place.
-    auto itFrom = _collections.find(fromNS.toString());
-    invariant(itFrom != _collections.end());
-    auto* collectionCatalogEntry = itFrom->second;
-    invariant(collectionCatalogEntry);
-    _collections[toNS.toString()] = collectionCatalogEntry;
-    _collections.erase(itFrom);
-
-    collectionCatalogEntry->setNs(toNss);
-
-    // Register a Change which, on rollback, will reinstall the collection catalog entry in the
-    // collections map so that it is associated with 'fromNS', not 'toNS'.
-    opCtx->recoveryUnit()->onRollback([ dce = this, collectionCatalogEntry, fromNss, toNss ]() {
-        auto it = dce->_collections.find(toNss.ns());
-        invariant(it != dce->_collections.end());
-        invariant(it->second == collectionCatalogEntry);
-        dce->_collections[fromNss.ns()] = collectionCatalogEntry;
-        dce->_collections.erase(toNss.ns());
-        collectionCatalogEntry->setNs(fromNss);
-
-    });
-
     return Status::OK();
 }
+
+class KVDatabaseCatalogEntryBase::FinishDropCatalogEntryChange : public RecoveryUnit::Change {
+public:
+    FinishDropCatalogEntryChange(UUIDCatalog& uuidCatalog,
+                                 std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry,
+                                 CollectionUUID uuid)
+        : _uuidCatalog(uuidCatalog),
+          _collectionCatalogEntry(std::move(collectionCatalogEntry)),
+          _uuid(uuid) {}
+
+    void commit(boost::optional<Timestamp>) override {
+        _collectionCatalogEntry.reset();
+    }
+
+    void rollback() override {
+        _uuidCatalog.registerCatalogEntry(_uuid, std::move(_collectionCatalogEntry));
+    }
+
+private:
+    UUIDCatalog& _uuidCatalog;
+    std::unique_ptr<CollectionCatalogEntry> _collectionCatalogEntry;
+    CollectionUUID _uuid;
+};
 
 Status KVDatabaseCatalogEntryBase::dropCollection(OperationContext* opCtx, StringData ns) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
     NamespaceString nss(ns);
 
-    CollectionMap::const_iterator it = _collections.find(nss.toString());
-    if (it == _collections.end()) {
+    CollectionCatalogEntry* const entry =
+        UUIDCatalog::get(opCtx).lookupCollectionCatalogEntryByNamespace(nss);
+    if (!entry) {
         return Status(ErrorCodes::NamespaceNotFound, "cannnot find collection to drop");
     }
 
-    KVCollectionCatalogEntry* const entry = it->second;
+    auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    auto uuid = uuidCatalog.lookupUUIDByNSS(nss);
 
     invariant(entry->getTotalIndexCount(opCtx) == entry->getCompletedIndexCount(opCtx));
 
@@ -307,38 +289,39 @@ Status KVDatabaseCatalogEntryBase::dropCollection(OperationContext* opCtx, Strin
 
     invariant(entry->getTotalIndexCount(opCtx) == 0);
 
-    BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, ns);
-    OptionalCollectionUUID uuid = md.options.uuid;
     const std::string ident = _engine->getCatalog()->getCollectionIdent(ns);
 
+    // Remove metadata from mdb_catalog
     Status status = _engine->getCatalog()->dropCollection(opCtx, ns);
     if (!status.isOK()) {
         return status;
     }
 
+    // Remove catalog entry
+    std::unique_ptr<CollectionCatalogEntry> removedCatalogEntry =
+        UUIDCatalog::get(opCtx).deregisterCatalogEntry(uuid.get());
+
+    opCtx->recoveryUnit()->registerChange(new FinishDropCatalogEntryChange(
+        UUIDCatalog::get(opCtx), std::move(removedCatalogEntry), uuid.get()));
+
     // This will lazily delete the KVCollectionCatalogEntry and notify the storageEngine to
     // drop the collection only on WUOW::commit().
-    opCtx->recoveryUnit()->onCommit([ opCtx, dce = this, nss, uuid, ident, entry = it->second ](
-        boost::optional<Timestamp> commitTimestamp) {
-        delete entry;
+    opCtx->recoveryUnit()->onCommit(
+        [ opCtx, dce = this, nss, uuid, ident ](boost::optional<Timestamp> commitTimestamp) {
+            auto engine = dce->_engine;
+            auto storageEngine = engine->getStorageEngine();
+            if (storageEngine->supportsPendingDrops() && commitTimestamp) {
+                log() << "Deferring table drop for collection '" << nss << "' (" << uuid << ")"
+                      << ". Ident: " << ident << ", commit timestamp: " << commitTimestamp;
+                engine->addDropPendingIdent(*commitTimestamp, nss, ident);
+            } else {
+                // Intentionally ignoring failure here. Since we've removed the metadata pointing to
+                // the collection, we should never see it again anyway.
+                auto kvEngine = engine->getEngine();
+                kvEngine->dropIdent(opCtx, ident).ignore();
+            }
+        });
 
-        auto engine = dce->_engine;
-        auto storageEngine = engine->getStorageEngine();
-        if (storageEngine->supportsPendingDrops() && commitTimestamp) {
-            log() << "Deferring table drop for collection '" << nss << "' (" << uuid << ")"
-                  << ". Ident: " << ident << ", commit timestamp: " << commitTimestamp;
-            engine->addDropPendingIdent(*commitTimestamp, nss, ident);
-        } else {
-            // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
-            // collection, we should never see it again anyway.
-            auto kvEngine = engine->getEngine();
-            kvEngine->dropIdent(opCtx, ident).ignore();
-        }
-    });
-
-    opCtx->recoveryUnit()->onRollback(
-        [ dce = this, nss, entry = it->second ]() { dce->_collections[nss.toString()] = entry; });
-    _collections.erase(nss.toString());
 
     return Status::OK();
 }

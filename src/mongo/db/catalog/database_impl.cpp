@@ -94,9 +94,7 @@ std::unique_ptr<Collection> _createCollectionInstance(OperationContext* opCtx,
     invariant(rs,
               str::stream() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
                             << uuid);
-    uassert(ErrorCodes::MustDowngrade,
-            str::stream() << "Record store has no UUID for Collection " << nss.ns(),
-            uuid);
+    invariant(uuid);
 
     auto coll = std::make_unique<CollectionImpl>(opCtx, nss.ns(), uuid, cce, rs, dbEntry);
 
@@ -176,17 +174,14 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
     _dbEntry->getCollectionNamespaces(&collections);
 
     auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    invariant(uuidCatalog.begin(name()) == uuidCatalog.end(),
-              str::stream() << "Collections found for "
-                            << _name);  // No collections in this database.
     for (auto ns : collections) {
         NamespaceString nss(ns);
         auto ownedCollection = _createCollectionInstance(opCtx, _dbEntry, nss);
         invariant(ownedCollection);
 
-        // Call registerUUIDCatalogEntry directly because we're not in a WUOW.
+        // Call registerCollectionObject directly because we're not in a WUOW.
         auto uuid = *(ownedCollection->uuid());
-        uuidCatalog.registerUUIDCatalogEntry(uuid, std::move(ownedCollection));
+        uuidCatalog.registerCollectionObject(uuid, std::move(ownedCollection));
     }
 
     // At construction time of the viewCatalog, the UUIDCatalog map wasn't initialized yet, so no
@@ -515,10 +510,7 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
 Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& fullns,
                                            Collection* collection) const {
-    auto uuid = collection->uuid();
-    auto uuidString = uuid ? uuid.get().toString() : "no UUID";
-    log() << "Finishing collection drop for " << fullns << " (" << uuidString << ").";
-
+    log() << "Finishing collection drop for " << fullns << " (" << collection->uuid() << ").";
     return _dbEntry->dropCollection(opCtx, fullns.toString());
 }
 

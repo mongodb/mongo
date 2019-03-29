@@ -36,6 +36,7 @@
 #include <algorithm>
 
 #include "mongo/db/catalog/catalog_control.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_clock.h"
@@ -271,6 +272,7 @@ void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
     }
 
     stdx::lock_guard<stdx::mutex> lock(_dbsLock);
+    UUIDCatalog::get(opCtx).deregisterAllCatalogEntriesAndCollectionObjects();
     for (auto entry : _dbs) {
         delete entry.second;
     }
@@ -519,8 +521,10 @@ void KVStorageEngine::cleanShutdown() {
         _timestampMonitor->removeListener(&_minOfCheckpointAndOldestTimestampListener);
     }
 
-    for (DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it) {
-        delete it->second;
+    UUIDCatalog::get(getGlobalServiceContext()).deregisterAllCatalogEntriesAndCollectionObjects();
+    stdx::lock_guard<stdx::mutex> lk(_dbsLock);
+    for (auto entry : _dbs) {
+        delete entry.second;
     }
     _dbs.clear();
 

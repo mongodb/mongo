@@ -71,7 +71,10 @@ public:
     }
 
     std::unique_ptr<OperationContext> newOperationContext() {
-        return stdx::make_unique<OperationContextNoop>(_storageEngine.newRecoveryUnit());
+        auto opCtx = stdx::make_unique<OperationContextNoop>(&cc(), 0);
+        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_storageEngine.newRecoveryUnit()),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        return opCtx;
     }
 
     void setUp() final {
@@ -82,8 +85,9 @@ public:
         {
             WriteUnitOfWork wuow(opCtx.get());
             const bool allocateDefaultSpace = true;
-            ASSERT_OK(dbEntry->createCollection(
-                opCtx.get(), _nss, CollectionOptions(), allocateDefaultSpace));
+            CollectionOptions options;
+            options.uuid = UUID::gen();
+            ASSERT_OK(dbEntry->createCollection(opCtx.get(), _nss, options, allocateDefaultSpace));
             wuow.commit();
         }
     }

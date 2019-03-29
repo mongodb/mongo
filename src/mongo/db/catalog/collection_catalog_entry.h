@@ -36,6 +36,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
+#include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 
@@ -239,6 +240,9 @@ public:
     // TODO SERVER-36385 Remove this function: we don't set the feature tracker bit in 4.4 because
     // 4.4 can only downgrade to 4.2 which can read long TypeBits.
     virtual void setIndexKeyStringWithLongTypeBitsExistsOnDisk(OperationContext* opCtx) = 0;
+
+    virtual RecordStore* getRecordStore() = 0;
+    virtual const RecordStore* getRecordStore() const = 0;
 
 private:
     NamespaceString _ns;

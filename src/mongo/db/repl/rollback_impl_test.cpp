@@ -172,11 +172,7 @@ protected:
         ASSERT_OK(_storageInterface->createCollection(opCtx, nss, options));
 
         // Initialize a mock collection.
-        auto coll = std::make_unique<CollectionMock>(nss);
-
-        // Register the UUID to that collection in the UUIDCatalog.
-        UUIDCatalog::get(opCtx).registerUUIDCatalogEntry(uuid, std::move(coll));
-        return std::move(coll);
+        return std::make_unique<CollectionMock>(nss);
     }
 
     /**

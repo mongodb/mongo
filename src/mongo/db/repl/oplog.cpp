@@ -2100,6 +2100,10 @@ void oplogCheckCloseDatabase(OperationContext* opCtx, const Database* db) {
     }
 }
 
+void clearLocalOplogPtr() {
+    localOplogInfo(getGlobalServiceContext()).oplog = nullptr;
+}
+
 void acquireOplogCollectionForLogging(OperationContext* opCtx) {
     auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());
     if (!oplogInfo.oplogName.empty()) {

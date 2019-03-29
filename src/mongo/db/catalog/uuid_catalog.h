@@ -32,6 +32,7 @@
 #include <unordered_map>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/functional.h"
@@ -178,6 +179,9 @@ class UUIDCatalog {
     UUIDCatalog(const UUIDCatalog&) = delete;
     UUIDCatalog& operator=(const UUIDCatalog&) = delete;
 
+    friend class iterator;
+    struct CollectionInfo;
+
 public:
     class iterator {
     public:
@@ -186,12 +190,14 @@ public:
         using reference = const value_type&;
 
         iterator(StringData dbName, uint64_t genNum, const UUIDCatalog& uuidCatalog);
-        iterator(
-            std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator mapIter);
+        iterator(std::map<std::pair<std::string, CollectionUUID>,
+                          UUIDCatalog::CollectionInfo*>::const_iterator mapIter);
         pointer operator->();
         reference operator*();
         iterator operator++();
         iterator operator++(int);
+        boost::optional<CollectionCatalogEntry*> catalogEntry();
+        boost::optional<CollectionUUID> uuid();
 
         /*
          * Equality operators == and != do not attempt to reposition the iterators being compared.
@@ -201,13 +207,21 @@ public:
         bool operator!=(const iterator& other);
 
     private:
+        /**
+         * Check if _mapIter has been invalidated due to a change in the _orderedCollections map. If
+         * it has, restart iteration through a call to lower_bound. If the element that the iterator
+         * is currently pointing to has been deleted, the iterator will be repositioned to the
+         * element that follows it.
+         *
+         * Returns true if iterator got repositioned.
+         */
         bool _repositionIfNeeded();
         bool _exhausted();
 
         std::string _dbName;
         boost::optional<CollectionUUID> _uuid;
         uint64_t _genNum;
-        std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator _mapIter;
+        std::map<std::pair<std::string, CollectionUUID>, CollectionInfo*>::const_iterator _mapIter;
         const UUIDCatalog* _uuidCatalog;
         static constexpr Collection* _nullCollection = nullptr;
     };
@@ -247,13 +261,40 @@ public:
      */
     void onCloseDatabase(Database* db);
 
-    Collection* replaceUUIDCatalogEntry(CollectionUUID uuid, std::unique_ptr<Collection> coll);
-    void registerUUIDCatalogEntry(CollectionUUID uuid, std::unique_ptr<Collection> coll);
-    std::unique_ptr<Collection> removeUUIDCatalogEntry(CollectionUUID uuid);
+    /**
+     * Register the collection catalog entry with `uuid`. The collection object with `uuid` must not
+     * exist in the UUIDCatalog yet.
+     */
+    void registerCatalogEntry(CollectionUUID uuid,
+                              std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry);
 
     /**
-     * This function gets the Collection pointer that corresponds to the CollectionUUID. The
-     * required locks should be obtained prior to calling this function, or else the found
+     * Deregister the collection catalog entry. The collection object with `uuid` is already gone,
+     * so this function completely removes any info about uuid.
+     */
+    std::unique_ptr<CollectionCatalogEntry> deregisterCatalogEntry(CollectionUUID uuid);
+
+    /**
+     * Register the collection object with `uuid`. The collection catalog entry with `uuid` already
+     * exists in the UUIDCatalog.
+     */
+    void registerCollectionObject(CollectionUUID uuid, std::unique_ptr<Collection> coll);
+
+    /**
+     * Deregister the collection object. The collection catalog entry still exists and will be
+     * deregistered later.
+     */
+    std::unique_ptr<Collection> deregisterCollectionObject(CollectionUUID uuid);
+
+
+    /**
+     * Deregister all the collection objects and catalog entries.
+     */
+    void deregisterAllCatalogEntriesAndCollectionObjects();
+
+    /**
+     * This function gets the Collection pointer that corresponds to the CollectionUUID.
+     * The required locks must be obtained prior to calling this function, or else the found
      * Collection pointer might no longer be valid when the call returns.
      *
      * Returns nullptr if the 'uuid' is not known.
@@ -261,8 +302,18 @@ public:
     Collection* lookupCollectionByUUID(CollectionUUID uuid) const;
 
     /**
-     * This function gets the Collection pointer that corresponds to the NamespaceString. The
-     * required locks should be obtained prior to calling this function, or else the found
+     * This function gets the CollectionCatalogEntry pointer that corresponds to the
+     * CollectionUUID.
+     * The required locks must be obtained prior to calling this function, or else the found
+     * CollectionCatalogEntry pointer might no longer be valid when the call returns.
+     *
+     * Returns nullptr if the 'uuid' is not known.
+     */
+    CollectionCatalogEntry* lookupCollectionCatalogEntryByUUID(CollectionUUID uuid) const;
+
+    /**
+     * This function gets the Collection pointer that corresponds to the NamespaceString.
+     * The required locks must be obtained prior to calling this function, or else the found
      * Collection pointer may no longer be valid when the call returns.
      *
      * Returns nullptr if the namespace is unknown.
@@ -270,11 +321,42 @@ public:
     Collection* lookupCollectionByNamespace(const NamespaceString& nss) const;
 
     /**
+     * This function gets the CollectionCatalogEntry pointer that corresponds to the
+     * CollectionUUID.
+     * The required locks must be obtained prior to calling this function, or else the found
+     * CollectionCatalogEntry pointer might no longer be valid when the call returns.
+     *
+     * Returns nullptr if the 'uuid' is not known.
+     */
+    CollectionCatalogEntry* lookupCollectionCatalogEntryByNamespace(
+        const NamespaceString& nss) const;
+
+    /**
      * This function gets the NamespaceString from the Collection* pointer that
      * corresponds to CollectionUUID uuid. If there is no such pointer, an empty
      * NamespaceString is returned. See onCloseCatalog/onOpenCatalog for more info.
      */
     NamespaceString lookupNSSByUUID(CollectionUUID uuid) const;
+
+    /**
+     * Returns the UUID if `nss` exists in UUIDCatalog. The time complexity of
+     * this function is linear to the number of collections in `nss.db()`.
+     */
+    boost::optional<CollectionUUID> lookupUUIDByNSS(const NamespaceString& nss) const;
+
+    /**
+     * This function gets the pointers of all the CollectionCatalogEntries from `dbName`.
+     *
+     * Returns empty vector if the 'dbName' is not known.
+     */
+    std::vector<CollectionCatalogEntry*> getAllCatalogEntriesFromDb(StringData dbName) const;
+
+    /**
+     * This function gets the UUIDs of all collections from `dbName`.
+     *
+     * Returns empty vector if the 'dbName' is not known.
+     */
+    std::vector<CollectionUUID> getAllCollectionUUIDsFromDb(StringData dbName) const;
 
     /**
      * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
@@ -312,12 +394,10 @@ public:
 
 private:
     class FinishDropChange;
+    friend class UUIDCatalog::iterator;
 
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
                                                            const stdx::lock_guard<stdx::mutex>&);
-    void _registerUUIDCatalogEntry_inlock(CollectionUUID uuid, std::unique_ptr<Collection> coll);
-    std::unique_ptr<Collection> _removeUUIDCatalogEntry_inlock(CollectionUUID uuid);
-
     mutable mongo::stdx::mutex _catalogLock;
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
@@ -328,17 +408,23 @@ private:
         _shadowCatalog;
 
     /**
-     * Unordered map from Collection UUID to the corresponding Collection object.
+     * Unordered map from Collection UUID to the corresponding Collection object and
+     * CollectionCatalogEntry object.
      */
-    mongo::stdx::unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>
-        _catalog;
+    struct CollectionInfo {
+        std::unique_ptr<Collection> collection;
+        Collection* collectionPtr;  // This store the address to the collection object
+        std::unique_ptr<CollectionCatalogEntry> collectionCatalogEntry;
+    };
+    mongo::stdx::unordered_map<CollectionUUID, CollectionInfo, CollectionUUID::Hash> _catalog;
 
     /**
      * Ordered map from <database name, collection UUID> to a Collection object.
      */
-    std::map<std::pair<std::string, CollectionUUID>, Collection*> _orderedCollections;
+    std::map<std::pair<std::string, CollectionUUID>, CollectionInfo*> _orderedCollections;
 
-    mongo::stdx::unordered_map<NamespaceString, Collection*> _collections;
+    mongo::stdx::unordered_map<NamespaceString, CollectionInfo*> _collections;
+
     /**
      * Generation number to track changes to the catalog that could invalidate iterators.
      */

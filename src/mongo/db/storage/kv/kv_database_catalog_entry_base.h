@@ -88,10 +88,8 @@ public:
     void reinitCollectionAfterRepair(OperationContext* opCtx, const std::string& ns);
 
 protected:
-    typedef std::map<std::string, KVCollectionCatalogEntry*> CollectionMap;
-
-
     KVStorageEngineInterface* const _engine;  // not owned here
-    CollectionMap _collections;
+private:
+    class FinishDropCatalogEntryChange;
 };
 }  // namespace mongo

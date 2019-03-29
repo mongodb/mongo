@@ -33,6 +33,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional_io.hpp>
 
+#include "mongo/db/catalog/collection_catalog_entry_mock.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/dbmessage.h"
@@ -1422,7 +1423,9 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     const CollectionUUID uuid = UUID::gen();
     const NamespaceString nss("test.testns");
     auto coll = std::make_unique<CollectionMock>(nss);
+    auto catalogEntry = std::make_unique<CollectionCatalogEntryMock>(nss.ns());
     UUIDCatalog& catalog = UUIDCatalog::get(opCtx.get());
+    catalog.registerCatalogEntry(uuid, std::move(catalogEntry));
     catalog.onCreateCollection(opCtx.get(), std::move(coll), uuid);
     QueryRequest qr(NamespaceStringOrUUID("test", uuid));
     // Ensure a call to refreshNSS succeeds.

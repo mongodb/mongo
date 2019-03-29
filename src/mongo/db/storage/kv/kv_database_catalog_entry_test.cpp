@@ -50,9 +50,10 @@ TEST_F(ServiceContextTest, CreateCollectionValidNamespace) {
         new DevNullKVEngine(), KVStorageEngineOptions{}, kvDatabaseCatalogEntryMockFactory);
     storageEngine.finishInit();
     KVDatabaseCatalogEntryMock dbEntry("mydb", &storageEngine);
-    OperationContextNoop ctx;
-    ASSERT_OK(
-        dbEntry.createCollection(&ctx, NamespaceString("mydb.mycoll"), CollectionOptions(), true));
+    OperationContextNoop ctx(&cc(), 0);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ASSERT_OK(dbEntry.createCollection(&ctx, NamespaceString("mydb.mycoll"), options, true));
     std::list<std::string> collectionNamespaces;
     dbEntry.getCollectionNamespaces(&collectionNamespaces);
     ASSERT_FALSE(collectionNamespaces.empty());
@@ -82,9 +83,10 @@ TEST_F(ServiceContextTest, CreateCollectionInvalidRecordStore) {
                                   kvDatabaseCatalogEntryMockFactory);
     storageEngine.finishInit();
     KVDatabaseCatalogEntryMock dbEntry("fail", &storageEngine);
-    OperationContextNoop ctx;
-    ASSERT_NOT_OK(
-        dbEntry.createCollection(&ctx, NamespaceString("fail.me"), CollectionOptions(), true));
+    OperationContextNoop ctx(&cc(), 0);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ASSERT_NOT_OK(dbEntry.createCollection(&ctx, NamespaceString("fail.me"), options, true));
     std::list<std::string> collectionNamespaces;
     dbEntry.getCollectionNamespaces(&collectionNamespaces);
     ASSERT_TRUE(collectionNamespaces.empty());
@@ -95,8 +97,10 @@ DEATH_TEST_F(ServiceContextTest, CreateCollectionEmptyNamespace, "Invariant fail
         new DevNullKVEngine(), KVStorageEngineOptions{}, kvDatabaseCatalogEntryMockFactory);
     storageEngine.finishInit();
     KVDatabaseCatalogEntryMock dbEntry("mydb", &storageEngine);
-    OperationContextNoop ctx;
-    Status status = dbEntry.createCollection(&ctx, NamespaceString(""), CollectionOptions(), true);
+    OperationContextNoop ctx(&cc(), 0);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    Status status = dbEntry.createCollection(&ctx, NamespaceString(""), options, true);
 }
 
 
