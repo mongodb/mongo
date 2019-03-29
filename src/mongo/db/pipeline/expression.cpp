@@ -1946,7 +1946,22 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(
         const StringData fieldPath = rawSD.substr(2);  // strip off $$
         const StringData varName = fieldPath.substr(0, fieldPath.find('.'));
         Variables::uassertValidNameForUserRead(varName);
-        return new ExpressionFieldPath(expCtx, fieldPath.toString(), vps.getVariable(varName));
+        auto varId = vps.getVariable(varName);
+        // $$NOW and $$CLUSTER_TIME are available only in 4.2 and up.
+        // The check should be removed when 4.2 becomes the last stable version.
+        if (varId == Variables::kNowId || varId == Variables::kClusterTimeId) {
+            uassert(ErrorCodes::QueryFeatureNotAllowed,
+                    str::stream()
+                        << "'$$"
+                        << varName
+                        << "' is not allowed in the current feature compatibility version. See "
+                        << feature_compatibility_version_documentation::kCompatibilityLink
+                        << " for more information.",
+                    !expCtx->maxFeatureCompatibilityVersion ||
+                        (ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 <=
+                         *expCtx->maxFeatureCompatibilityVersion));
+        }
+        return new ExpressionFieldPath(expCtx, fieldPath.toString(), varId);
     } else {
         return new ExpressionFieldPath(expCtx,
                                        "CURRENT." + raw.substr(1),  // strip the "$" prefix
