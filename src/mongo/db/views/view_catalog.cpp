@@ -73,7 +73,7 @@ StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* o
 }
 }  // namespace
 
-ViewCatalog* ViewCatalog::get(Database* db) {
+ViewCatalog* ViewCatalog::get(const Database* db) {
     return getViewCatalog(db).get();
 }
 

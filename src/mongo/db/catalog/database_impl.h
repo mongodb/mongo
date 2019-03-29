@@ -39,17 +39,17 @@ class DatabaseImpl final : public Database {
 public:
     explicit DatabaseImpl(StringData name, DatabaseCatalogEntry* dbEntry, uint64_t epoch);
 
-    void init(OperationContext*) final;
+    void init(OperationContext*) const final;
 
 
     // closes files and other cleanup see below.
-    void close(OperationContext* opCtx) final;
+    void close(OperationContext* opCtx) const final;
 
     const std::string& name() const final {
         return _name;
     }
 
-    void clearTmpCollections(OperationContext* opCtx) final;
+    void clearTmpCollections(OperationContext* opCtx) const final;
 
     /**
      * Sets a new profiling level for the database and returns the outcome.
@@ -60,7 +60,7 @@ public:
     Status setProfilingLevel(OperationContext* opCtx, int newLevel) final;
 
     int getProfilingLevel() const final {
-        return _profile;
+        return _profile.load();
     }
     const char* getProfilingNS() const final {
         return _profileName.c_str();
@@ -70,7 +70,7 @@ public:
 
     bool isDropPending(OperationContext* opCtx) const final;
 
-    void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale = 1) final;
+    void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale = 1) const final;
 
     const DatabaseCatalogEntry* getDatabaseCatalogEntry() const final;
 
@@ -86,28 +86,28 @@ public:
      */
     Status dropCollection(OperationContext* opCtx,
                           StringData fullns,
-                          repl::OpTime dropOpTime) final;
+                          repl::OpTime dropOpTime) const final;
     Status dropCollectionEvenIfSystem(OperationContext* opCtx,
                                       const NamespaceString& fullns,
-                                      repl::OpTime dropOpTime) final;
+                                      repl::OpTime dropOpTime) const final;
 
-    Status dropView(OperationContext* opCtx, const NamespaceString& viewName) final;
+    Status dropView(OperationContext* opCtx, const NamespaceString& viewName) const final;
 
     Status userCreateNS(OperationContext* opCtx,
                         const NamespaceString& fullns,
                         CollectionOptions collectionOptions,
                         bool createDefaultIndexes,
-                        const BSONObj& idIndex) final;
+                        const BSONObj& idIndex) const final;
 
     Collection* createCollection(OperationContext* opCtx,
                                  StringData ns,
                                  const CollectionOptions& options = CollectionOptions(),
                                  bool createDefaultIndexes = true,
-                                 const BSONObj& idIndex = BSONObj()) final;
+                                 const BSONObj& idIndex = BSONObj()) const final;
 
     Status createView(OperationContext* opCtx,
                       const NamespaceString& viewName,
-                      const CollectionOptions& options) final;
+                      const CollectionOptions& options) const final;
 
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
@@ -116,7 +116,8 @@ public:
 
     Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const;
 
-    Collection* getOrCreateCollection(OperationContext* opCtx, const NamespaceString& nss) final;
+    Collection* getOrCreateCollection(OperationContext* opCtx,
+                                      const NamespaceString& nss) const final;
 
     /**
      * Renames the fully qualified namespace 'fromNS' to the fully qualified namespace 'toNS'.
@@ -129,16 +130,7 @@ public:
     Status renameCollection(OperationContext* opCtx,
                             StringData fromNS,
                             StringData toNS,
-                            bool stayTemp) final;
-
-    /**
-     * Physically drops the specified opened database and removes it from the server's metadata. It
-     * doesn't notify the replication subsystem or do any other consistency checks, so it should
-     * not be used directly from user commands.
-     *
-     * Must be called with the specified database locked in X mode.
-     */
-    static void dropDatabase(OperationContext* opCtx, Database* db);
+                            bool stayTemp) const final;
 
     static Status validateDBName(StringData dbname);
 
@@ -149,7 +141,7 @@ public:
     StatusWith<NamespaceString> makeUniqueCollectionNamespace(OperationContext* opCtx,
                                                               StringData collectionNameModel) final;
 
-    void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) final;
+    void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const final;
 
     UUIDCatalog::iterator begin(OperationContext* opCtx) const final {
         return UUIDCatalog::get(opCtx).begin(_name);
@@ -169,7 +161,7 @@ private:
      */
     void _checkCanCreateCollection(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   const CollectionOptions& options);
+                                   const CollectionOptions& options) const;
 
     /**
      * Completes a collection drop by removing the collection itself from the storage engine.
@@ -179,14 +171,14 @@ private:
      */
     Status _finishDropCollection(OperationContext* opCtx,
                                  const NamespaceString& fullns,
-                                 Collection* collection);
+                                 Collection* collection) const;
 
     /**
      * Removes all indexes for a collection.
      */
     void _dropCollectionIndexes(OperationContext* opCtx,
                                 const NamespaceString& fullns,
-                                Collection* collection);
+                                Collection* collection) const;
 
     const std::string _name;  // "dbname"
 
@@ -197,12 +189,12 @@ private:
     const std::string _profileName;  // "dbname.system.profile"
     const std::string _viewsName;    // "dbname.system.views"
 
-    int _profile;  // 0=off.
+    AtomicWord<int> _profile{0};  // 0=off
 
     // If '_dropPending' is true, this Database is in the midst of a two-phase drop. No new
     // collections may be created in this Database.
     // This variable may only be read/written while the database is locked in MODE_X.
-    bool _dropPending = false;
+    AtomicWord<bool> _dropPending{false};
 
     // Random number generator used to create unique collection namespaces suitable for temporary
     // collections. Lazily created on first call to makeUniqueCollectionNamespace().

@@ -124,7 +124,7 @@ void uassertNamespaceNotIndex(StringData ns, StringData caller) {
             NamespaceString::normal(ns));
 }
 
-void DatabaseImpl::close(OperationContext* opCtx) {
+void DatabaseImpl::close(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isW());
 
     // Clear cache of oplog Collection pointer.
@@ -161,17 +161,16 @@ DatabaseImpl::DatabaseImpl(const StringData name, DatabaseCatalogEntry* dbEntry,
     auto viewCatalog = std::make_unique<ViewCatalog>(std::move(durableViewCatalog));
 
     ViewCatalog::set(this, std::move(viewCatalog));
+    _profile.store(serverGlobalParams.defaultProfile);
 }
 
-void DatabaseImpl::init(OperationContext* const opCtx) {
+void DatabaseImpl::init(OperationContext* const opCtx) const {
     Status status = validateDBName(_name);
 
     if (!status.isOK()) {
         warning() << "tried to open invalid db: " << _name;
         uasserted(10028, status.toString());
     }
-
-    _profile = serverGlobalParams.defaultProfile;
 
     std::list<std::string> collections;
     _dbEntry->getCollectionNamespaces(&collections);
@@ -205,7 +204,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
     }
 }
 
-void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) {
+void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
     std::list<std::string> collections;
@@ -239,12 +238,14 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) {
 }
 
 Status DatabaseImpl::setProfilingLevel(OperationContext* opCtx, int newLevel) {
-    if (_profile == newLevel) {
+    auto currLevel = _profile.load();
+
+    if (currLevel == newLevel) {
         return Status::OK();
     }
 
     if (newLevel == 0) {
-        _profile = 0;
+        _profile.store(0);
         return Status::OK();
     }
 
@@ -264,27 +265,23 @@ Status DatabaseImpl::setProfilingLevel(OperationContext* opCtx, int newLevel) {
         return status;
     }
 
-    _profile = newLevel;
+    _profile.store(newLevel);
 
     return Status::OK();
 }
 
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
-    if (dropPending) {
-        invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
-        _dropPending = true;
-    } else {
-        invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
-        _dropPending = false;
-    }
+    auto mode = dropPending ? MODE_X : MODE_IX;
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), mode));
+    _dropPending.store(dropPending);
 }
 
 bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
-    return _dropPending;
+    return _dropPending.load();
 }
 
-void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) {
+void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) const {
 
     long long nCollections = 0;
     long long nViews = 0;
@@ -350,7 +347,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     }
 }
 
-Status DatabaseImpl::dropView(OperationContext* opCtx, const NamespaceString& viewName) {
+Status DatabaseImpl::dropView(OperationContext* opCtx, const NamespaceString& viewName) const {
     dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
@@ -363,7 +360,7 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, const NamespaceString& vi
 
 Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                                     StringData fullns,
-                                    repl::OpTime dropOpTime) {
+                                    repl::OpTime dropOpTime) const {
     if (!getCollection(opCtx, fullns)) {
         // Collection doesn't exist so don't bother validating if it can be dropped.
         return Status::OK();
@@ -375,7 +372,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
         if (nss.isSystem()) {
             if (nss.isSystemDotProfile()) {
-                if (_profile != 0)
+                if (_profile.load() != 0)
                     return Status(ErrorCodes::IllegalOperation,
                                   "turn off profiling before dropping system.profile collection");
             } else if (!(nss.isSystemDotViews() || nss.isHealthlog() ||
@@ -392,7 +389,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
 Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                                                 const NamespaceString& fullns,
-                                                repl::OpTime dropOpTime) {
+                                                repl::OpTime dropOpTime) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
     LOG(1) << "dropCollection: " << fullns;
@@ -506,7 +503,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
 void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
                                           const NamespaceString& fullns,
-                                          Collection* collection) {
+                                          Collection* collection) const {
     invariant(_name == fullns.db());
     LOG(1) << "dropCollection: " << fullns << " - dropAllIndexes start";
     collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
@@ -517,7 +514,7 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
 
 Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& fullns,
-                                           Collection* collection) {
+                                           Collection* collection) const {
     auto uuid = collection->uuid();
     auto uuidString = uuid ? uuid.get().toString() : "no UUID";
     log() << "Finishing collection drop for " << fullns << " (" << uuidString << ").";
@@ -548,7 +545,7 @@ Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const Namespace
 Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                       StringData fromNS,
                                       StringData toNS,
-                                      bool stayTemp) {
+                                      bool stayTemp) const {
     audit::logRenameCollection(&cc(), fromNS, toNS);
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
@@ -605,7 +602,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 }
 
 Collection* DatabaseImpl::getOrCreateCollection(OperationContext* opCtx,
-                                                const NamespaceString& nss) {
+                                                const NamespaceString& nss) const {
     Collection* c = getCollection(opCtx, nss);
 
     if (!c) {
@@ -616,7 +613,7 @@ Collection* DatabaseImpl::getOrCreateCollection(OperationContext* opCtx,
 
 void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                                              const NamespaceString& nss,
-                                             const CollectionOptions& options) {
+                                             const CollectionOptions& options) const {
     massert(17399,
             str::stream() << "Cannot create collection " << nss << " - collection already exists.",
             getCollection(opCtx, nss) == nullptr);
@@ -639,12 +636,12 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
     uassert(ErrorCodes::DatabaseDropPending,
             str::stream() << "Cannot create collection " << nss
                           << " - database is in the process of being dropped.",
-            !_dropPending);
+            !_dropPending.load());
 }
 
 Status DatabaseImpl::createView(OperationContext* opCtx,
                                 const NamespaceString& viewName,
-                                const CollectionOptions& options) {
+                                const CollectionOptions& options) const {
     dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
@@ -667,7 +664,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                            StringData ns,
                                            const CollectionOptions& options,
                                            bool createIdIndex,
-                                           const BSONObj& idIndex) {
+                                           const BSONObj& idIndex) const {
     invariant(!options.isView());
     NamespaceString nss(ns);
 
@@ -847,7 +844,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                       << " attempts due to namespace conflicts with existing collections.");
 }
 
-void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) {
+void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const {
     if (name() == "local") {
         // Collections in the local database are not replicated, so we do not need an _id index on
         // any collection. For the same reason, it is not possible for the local database to contain
@@ -889,7 +886,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                                   const NamespaceString& fullns,
                                   CollectionOptions collectionOptions,
                                   bool createDefaultIndexes,
-                                  const BSONObj& idIndex) {
+                                  const BSONObj& idIndex) const {
     LOG(1) << "create collection " << fullns << ' ' << collectionOptions.toBSON();
 
     if (!NamespaceString::validCollectionComponent(fullns.ns()))

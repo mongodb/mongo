@@ -65,7 +65,7 @@ public:
                                 const NamespaceString& fullns,
                                 CollectionOptions collectionOptions,
                                 bool createDefaultIndexes = true,
-                                const BSONObj& idIndex = BSONObj()) = 0;
+                                const BSONObj& idIndex = BSONObj()) const = 0;
 
     Database() = default;
 
@@ -81,14 +81,14 @@ public:
     /**
      * Sets up internal memory structures.
      */
-    virtual void init(OperationContext* opCtx) = 0;
+    virtual void init(OperationContext* opCtx) const = 0;
 
     // closes files and other cleanup see below.
-    virtual void close(OperationContext* const opCtx) = 0;
+    virtual void close(OperationContext* const opCtx) const = 0;
 
     virtual const std::string& name() const = 0;
 
-    virtual void clearTmpCollections(OperationContext* const opCtx) = 0;
+    virtual void clearTmpCollections(OperationContext* const opCtx) const = 0;
 
     /**
      * Sets a new profiling level for the database and returns the outcome.
@@ -118,7 +118,7 @@ public:
 
     virtual void getStats(OperationContext* const opCtx,
                           BSONObjBuilder* const output,
-                          const double scale = 1) = 0;
+                          const double scale = 1) const = 0;
 
     virtual const DatabaseCatalogEntry* getDatabaseCatalogEntry() const = 0;
 
@@ -134,22 +134,23 @@ public:
      */
     virtual Status dropCollection(OperationContext* const opCtx,
                                   const StringData fullns,
-                                  repl::OpTime dropOpTime = {}) = 0;
+                                  repl::OpTime dropOpTime = {}) const = 0;
     virtual Status dropCollectionEvenIfSystem(OperationContext* const opCtx,
                                               const NamespaceString& fullns,
-                                              repl::OpTime dropOpTime = {}) = 0;
+                                              repl::OpTime dropOpTime = {}) const = 0;
 
-    virtual Status dropView(OperationContext* const opCtx, const NamespaceString& viewName) = 0;
+    virtual Status dropView(OperationContext* const opCtx,
+                            const NamespaceString& viewName) const = 0;
 
     virtual Collection* createCollection(OperationContext* const opCtx,
                                          StringData ns,
                                          const CollectionOptions& options = CollectionOptions(),
                                          const bool createDefaultIndexes = true,
-                                         const BSONObj& idIndex = BSONObj()) = 0;
+                                         const BSONObj& idIndex = BSONObj()) const = 0;
 
     virtual Status createView(OperationContext* const opCtx,
                               const NamespaceString& viewName,
-                              const CollectionOptions& options) = 0;
+                              const CollectionOptions& options) const = 0;
 
     /**
      * @param ns - this is fully qualified, which is maybe not ideal ???
@@ -159,12 +160,12 @@ public:
     virtual Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const = 0;
 
     virtual Collection* getOrCreateCollection(OperationContext* const opCtx,
-                                              const NamespaceString& nss) = 0;
+                                              const NamespaceString& nss) const = 0;
 
     virtual Status renameCollection(OperationContext* const opCtx,
                                     const StringData fromNS,
                                     const StringData toNS,
-                                    const bool stayTemp) = 0;
+                                    const bool stayTemp) const = 0;
 
     virtual const std::string& getSystemViewsName() const = 0;
 
@@ -186,7 +187,7 @@ public:
      * database, we also gather a list of drop-pending collection namespaces for the
      * DropPendingCollectionReaper to clean up eventually.
      */
-    virtual void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) = 0;
+    virtual void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const = 0;
 
     /**
      * A database is assigned a new epoch whenever it is closed and re-opened. This involves
