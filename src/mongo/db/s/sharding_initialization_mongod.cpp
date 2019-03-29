@@ -165,6 +165,7 @@ void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
 
     grid->getExecutorPool()->shutdownAndJoin();
     grid->catalogClient()->shutDown(opCtx);
+    grid->shardRegistry()->shutdown();
 }
 
 bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(OperationContext* opCtx) {

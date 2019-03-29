@@ -230,6 +230,10 @@ void cleanupTask(ServiceContext* serviceContext) {
             catalog->shutDown(opCtx);
         }
 
+        if (auto shardRegistry = Grid::get(opCtx)->shardRegistry()) {
+            shardRegistry->shutdown();
+        }
+
 #if __has_feature(address_sanitizer)
         // When running under address sanitizer, we get false positive leaks due to disorder around
         // the lifecycle of a connection and request. When we are running under ASAN, we try a lot

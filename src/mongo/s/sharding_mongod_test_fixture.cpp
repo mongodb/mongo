@@ -297,6 +297,10 @@ void ShardingMongodTestFixture::tearDown() {
         Grid::get(operationContext())->catalogClient()->shutDown(operationContext());
     }
 
+    if (Grid::get(operationContext())->shardRegistry()) {
+        Grid::get(operationContext())->shardRegistry()->shutdown();
+    }
+
     Grid::get(operationContext())->clearForUnitTests();
 
     _opCtx.reset();
