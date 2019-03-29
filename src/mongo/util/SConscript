@@ -129,6 +129,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='uuid',
+    source=[
+        'uuid.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest(
     target="md5_test",
     source=[

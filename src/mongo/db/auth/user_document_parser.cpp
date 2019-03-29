@@ -222,10 +222,18 @@ Status _checkV2RolesArray(const BSONElement& rolesElement) {
 }
 
 Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
-    BSONElement userElement = doc[AuthorizationManager::USER_NAME_FIELD_NAME];
-    BSONElement userDBElement = doc[AuthorizationManager::USER_DB_FIELD_NAME];
-    BSONElement credentialsElement = doc[CREDENTIALS_FIELD_NAME];
-    BSONElement rolesElement = doc[ROLES_FIELD_NAME];
+    auto userIdElement = doc[AuthorizationManager::USERID_FIELD_NAME];
+    auto userElement = doc[AuthorizationManager::USER_NAME_FIELD_NAME];
+    auto userDBElement = doc[AuthorizationManager::USER_DB_FIELD_NAME];
+    auto credentialsElement = doc[CREDENTIALS_FIELD_NAME];
+    auto rolesElement = doc[ROLES_FIELD_NAME];
+
+    // Validate the "userId" element.
+    if (!userIdElement.eoo()) {
+        if (!userIdElement.isBinData(BinDataType::newUUID)) {
+            return _badValue("User document needs 'userId' field to be a UUID", 0);
+        }
+    }
 
     // Validate the "user" element.
     if (userElement.type() != String)
@@ -294,6 +302,18 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
         return status;
 
     return Status::OK();
+}
+
+User::UserId V2UserDocumentParser::extractUserIDFromUserDocument(const BSONObj& doc) const {
+    auto userId = doc[AuthorizationManager::USERID_FIELD_NAME];
+    if (userId.isBinData(BinDataType::newUUID)) {
+        auto id = userId.uuid();
+        User::UserId ret;
+        std::copy(id.begin(), id.end(), std::back_inserter(ret));
+        return ret;
+    }
+
+    return User::UserId();
 }
 
 std::string V2UserDocumentParser::extractUserNameFromUserDocument(const BSONObj& doc) const {

@@ -153,6 +153,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/serveronly',
         '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
         '$BUILD_DIR/mongo/s/client/parallel',
+        '$BUILD_DIR/mongo/util/uuid',
         'apply_ops_cmd_common',
         'core',
         'killcursors_common',
