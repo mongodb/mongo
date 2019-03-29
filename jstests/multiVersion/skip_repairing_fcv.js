@@ -1,6 +1,8 @@
 /**
  * Tests that running repair with a 4.0 binary on 3.4 data files avoids crashing mongod if any of
  * the collections do not have UUIDs and that it exits repair cleanly.
+ *
+ * @tags: [requires_persistence, requires_wiredtiger]
  */
 (function() {
     'use strict';
