@@ -1,7 +1,8 @@
 /**
  * When a primary's oplog size exceeds the configured maximum, it must truncate the oplog only up to
  * the oldest active transaction timestamp at the time of the last stable checkpoint. The first
- * oplog entry that belongs to an active transaction is preserved, and all entries after it.
+ * oplog entry that belongs to an active transaction is preserved, and all entries after it. A
+ * secondary with the inMemory storage engine must treat its own oplog the same.
  *
  * This tests the oldestActiveTransactionTimestamp, which is calculated from the "startOpTime"
  * field of documents in the config.transactions collection.
@@ -13,17 +14,31 @@
     "use strict";
     load("jstests/core/txns/libs/prepare_helpers.js");
 
+    // If the test runner passed --storageEngine=inMemory then we know inMemory is compiled into the
+    // server. We'll actually use both inMemory and wiredTiger storage engines.
+    const storageEngine = jsTest.options().storageEngine;
+    if (storageEngine !== 'inMemory') {
+        jsTestLog(`Skip test: storageEngine == "${storageEngine}", not "inMemory"`);
+        return;
+    }
+
     // A new replica set for both the commit and abort tests to ensure the same clean state.
     function doTest(commitOrAbort) {
         const replSet = new ReplSetTest({
             // Oplog can be truncated each "sync" cycle. Increase its frequency to once per second.
             nodeOptions:
                 {syncdelay: 1, setParameter: {logComponentVerbosity: tojson({storage: 1})}},
-            nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
+            nodes: [
+                {storageEngine: "wiredTiger"},
+                // inMemory node must not be a voter, otherwise lastCommitted never advances
+                {storageEngine: "inMemory", rsConfig: {priority: 0, votes: 0}},
+            ],
+            waitForKeys: false
         });
 
         replSet.startSet(PrepareHelpers.replSetStartSetOptions);
-        replSet.initiate();
+        replSet.initiateWithAnyNodeAsPrimary(
+            null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
         const primary = replSet.getPrimary();
         const secondary = replSet.getSecondary();
@@ -33,7 +48,7 @@
         assert.lte(secondaryOplog.dataSize(), PrepareHelpers.oplogSizeBytes);
 
         const coll = primary.getDB("test").test;
-        assert.commandWorked(coll.insert({}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(coll.insert({}));
 
         jsTestLog("Prepare a transaction");
 

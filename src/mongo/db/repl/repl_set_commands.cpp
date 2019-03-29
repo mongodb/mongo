@@ -383,7 +383,7 @@ public:
         status =
             ReplicationCoordinator::get(opCtx)->processReplSetReconfig(opCtx, parsedArgs, &result);
 
-        Lock::GlobalWrite globalWrite(opCtx);
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
         WriteUnitOfWork wuow(opCtx);
         if (status.isOK() && !parsedArgs.force) {
