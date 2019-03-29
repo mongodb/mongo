@@ -102,6 +102,7 @@
 
     jsTest.log("NoSuchTransaction without write concern error is transient");
     restartServerReplication(rst.nodes);
+    rst.awaitReplication();
     res = newPrimarySessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
@@ -112,7 +113,6 @@
     assert(!res.hasOwnProperty("writeConcernError"), res);
     assert.eq(res["errorLabels"], ["TransientTransactionError"], res);
 
-    rst.awaitNodesAgreeOnPrimary();
     session.endSession();
 
     rst.stopSet();
