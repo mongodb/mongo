@@ -7,10 +7,6 @@
 (function() {
     'use strict';
 
-    // FIXME: Make server understand the no-op collMod invoked by this test and
-    // remove this flag in SERVER-40385.
-    TestData.roleGraphInvalidationIsFatal = false;
-
     load("jstests/replsets/rslib.js");
 
     const testName = "buildindexes_false_with_system_indexes";
