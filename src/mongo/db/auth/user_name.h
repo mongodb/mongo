@@ -39,7 +39,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/util/mongoutils/str.h" 
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
