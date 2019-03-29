@@ -35,7 +35,8 @@
     }
 
     replSet.awaitLastOpCommitted();
-    replSet.awaitReplication();
+    // This function includes a call to awaitReplication().
+    replSet.waitForAllIndexBuildsToFinish(primaryDB.getName(), collName);
 
     // Sanity check.
     assert.eq(secondaryDB.getCollection(collName).find({x: 0}).itcount(), 100);
