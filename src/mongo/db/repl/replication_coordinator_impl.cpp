@@ -1659,6 +1659,11 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         return Status::OK();
     }
 
+    auto interruptStatus = opCtx->checkForInterruptNoAssert();
+    if (!interruptStatus.isOK()) {
+        return interruptStatus;
+    }
+
     auto checkForStepDown = [&]() -> Status {
         if (replMode == modeReplSet && !_memberState.primary()) {
             return {ErrorCodes::PrimarySteppedDown,
@@ -1684,11 +1689,6 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     Status stepdownStatus = checkForStepDown();
     if (!stepdownStatus.isOK()) {
         return stepdownStatus;
-    }
-
-    auto interruptStatus = opCtx->checkForInterruptNoAssert();
-    if (!interruptStatus.isOK()) {
-        return interruptStatus;
     }
 
     if (writeConcern.wMode.empty()) {

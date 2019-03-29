@@ -65,7 +65,7 @@
         var res = db.getSiblingDB('wMajorityCheck').stepdownAndBackUp.insert({a: 2}, {
             writeConcern: {w: 'majority'}
         });
-        assert.writeErrorWithCode(res, ErrorCodes.PrimarySteppedDown);
+        assert.writeErrorWithCode(res, ErrorCodes.InterruptedDueToStepDown);
     };
 
     var joinMajorityWriter = startParallelShell(doMajorityWrite, nodes[0].port);
