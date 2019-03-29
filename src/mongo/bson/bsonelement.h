@@ -610,11 +610,16 @@ public:
         return Timestamp();
     }
 
+    bool isBinData(BinDataType bdt) const {
+        return (type() == BinData) && (binDataType() == bdt);
+    }
+
     const std::array<unsigned char, 16> uuid() const {
         int len = 0;
         const char* data = nullptr;
-        if (type() == BinData && binDataType() == BinDataType::newUUID)
+        if (isBinData(BinDataType::newUUID)) {
             data = binData(len);
+        }
         uassert(ErrorCodes::InvalidUUID,
                 "uuid must be a 16-byte binary field with UUID (4) subtype",
                 len == 16);
@@ -626,8 +631,9 @@ public:
     const std::array<unsigned char, 16> md5() const {
         int len = 0;
         const char* data = nullptr;
-        if (type() == BinData && binDataType() == BinDataType::MD5Type)
+        if (isBinData(BinDataType::MD5Type)) {
             data = binData(len);
+        }
         uassert(40437, "md5 must be a 16-byte binary field with MD5 (5) subtype", len == 16);
         std::array<unsigned char, 16> result;
         memcpy(&result, data, len);

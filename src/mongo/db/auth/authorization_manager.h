@@ -96,6 +96,7 @@ public:
 
     static MONGO_DECLARE_SHIM(()->std::unique_ptr<AuthorizationManager>) create;
 
+    static const std::string USERID_FIELD_NAME;
     static const std::string USER_NAME_FIELD_NAME;
     static const std::string USER_DB_FIELD_NAME;
     static const std::string ROLE_NAME_FIELD_NAME;
@@ -265,6 +266,14 @@ public:
     virtual Status acquireUser(OperationContext* opCtx,
                                const UserName& userName,
                                User** acquiredUser) = 0;
+
+    /**
+     * Validate the ID associated with a known user while refreshing session cache.
+     */
+    virtual Status acquireUserForSessionRefresh(OperationContext* opCtx,
+                                                const UserName& userName,
+                                                const User::UserId& uid,
+                                                User** acquiredUser) = 0;
 
     /**
      * Decrements the refcount of the given User object.  If the refcount has gone to zero,

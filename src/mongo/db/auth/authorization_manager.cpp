@@ -70,6 +70,7 @@ mongo::AuthInfo mongo::internalSecurity;
 
 namespace mongo {
 
+const std::string AuthorizationManager::USERID_FIELD_NAME = "userId";
 const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
 const std::string AuthorizationManager::USER_DB_FIELD_NAME = "db";
 const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "role";

@@ -357,6 +357,8 @@ Status AuthorizationManagerImpl::_initializeUserFromPrivilegeDocument(User* user
                                                 << "\"");
     }
 
+    user->setID(parser.extractUserIDFromUserDocument(privDoc));
+
     Status status = parser.initializeUserCredentialsFromUserDocument(user, privDoc);
     if (!status.isOK()) {
         return status;
@@ -502,6 +504,25 @@ Status AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
         user->invalidate();
     }
     *acquiredUser = user.release();
+
+    return Status::OK();
+}
+
+Status AuthorizationManagerImpl::acquireUserForSessionRefresh(OperationContext* opCtx,
+                                                              const UserName& userName,
+                                                              const User::UserId& uid,
+                                                              User** user) {
+    auto status = acquireUser(opCtx, userName, user);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (uid != (*user)->getID()) {
+        *user = nullptr;
+        return {ErrorCodes::UserNotFound,
+                str::stream() << "User id from privilege document '" << userName.toString()
+                              << "' does not match user id in session."};
+    }
 
     return Status::OK();
 }

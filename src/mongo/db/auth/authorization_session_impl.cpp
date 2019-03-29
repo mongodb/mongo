@@ -836,7 +836,8 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
             // we've cached is marked "out-of-date."
             UserName name = user->getName();
             User* updatedUser;
-            Status status = authMan.acquireUser(opCtx, name, &updatedUser);
+            Status status =
+                authMan.acquireUserForSessionRefresh(opCtx, name, user->getID(), &updatedUser);
 
             // Take out a lock on the client here to ensure that no one reads while
             // _authenticatedUsers is being modified.

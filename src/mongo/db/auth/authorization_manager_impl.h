@@ -120,6 +120,10 @@ public:
     Status acquireUser(OperationContext* opCtx,
                        const UserName& userName,
                        User** acquiredUser) override;
+    Status acquireUserForSessionRefresh(OperationContext* opCtx,
+                                        const UserName& userName,
+                                        const User::UserId& userId,
+                                        User** acquiredUser) override;
 
     void releaseUser(User* user) override;
 

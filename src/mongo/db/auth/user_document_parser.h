@@ -55,6 +55,7 @@ public:
     static Status parseRoleVector(const BSONArray& rolesArray, std::vector<RoleName>* result);
 
     std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
+    User::UserId extractUserIDFromUserDocument(const BSONObj& doc) const;
 
     Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
 
