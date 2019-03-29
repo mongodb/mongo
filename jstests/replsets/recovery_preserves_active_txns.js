@@ -1,7 +1,8 @@
 /**
- * When a primary's oplog size exceeds the configured maximum, it must truncate the oplog only up to
- * the oldest active transaction timestamp at the time of the last stable checkpoint. The first
- * oplog entry that belongs to an active transaction is preserved, and all entries after it.
+ * When the oplog size grows during recovery to exceed the configured maximum, the node must
+ * truncate the oplog only up to the oldest active transaction timestamp at the time of the last
+ * stable checkpoint. The first oplog entry that belongs to an active transaction is preserved, and
+ * all entries after it.
  *
  * This tests the oldestActiveTransactionTimestamp, which is calculated from the "startOpTime"
  * field of documents in the config.transactions collection.
@@ -12,6 +13,7 @@
 (function() {
     "use strict";
     load("jstests/core/txns/libs/prepare_helpers.js");
+    load("jstests/libs/check_log.js");
 
     // A new replica set for both the commit and abort tests to ensure the same clean state.
     function doTest(commitOrAbort) {
@@ -24,13 +26,9 @@
 
         replSet.startSet(PrepareHelpers.replSetStartSetOptions);
         replSet.initiate();
-
         const primary = replSet.getPrimary();
-        const secondary = replSet.getSecondary();
         const primaryOplog = primary.getDB("local").oplog.rs;
         assert.lte(primaryOplog.dataSize(), PrepareHelpers.oplogSizeBytes);
-        const secondaryOplog = secondary.getDB("local").oplog.rs;
-        assert.lte(secondaryOplog.dataSize(), PrepareHelpers.oplogSizeBytes);
 
         const coll = primary.getDB("test").test;
         assert.commandWorked(coll.insert({}, {writeConcern: {w: "majority"}}));
@@ -42,42 +40,38 @@
         assert.commandWorked(session.getDatabase("test").test.insert({myTransaction: 1}));
         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-        jsTestLog("Get transaction entry from config.transactions");
-
-        const txnEntry = primary.getDB("config").transactions.findOne();
-        assert.eq(txnEntry.startOpTime.ts, prepareTimestamp, tojson(txnEntry));
-
-        assert.soonNoExcept(() => {
-            const secondaryTxnEntry = secondary.getDB("config").transactions.findOne();
-            assert.eq(secondaryTxnEntry, txnEntry, tojson(secondaryTxnEntry));
-            return true;
-        });
-
-        jsTestLog("Find prepare oplog entry");
-
-        const oplogEntry = primaryOplog.findOne({prepare: true});
-        assert.eq(oplogEntry.ts, prepareTimestamp, tojson(oplogEntry));
-        // Must already be written on secondary, since the config.transactions entry is.
-        const secondaryOplogEntry = secondaryOplog.findOne({prepare: true});
-        assert.eq(secondaryOplogEntry.ts, prepareTimestamp, tojson(secondaryOplogEntry));
-
         jsTestLog("Insert documents until oplog exceeds oplogSize");
 
         // Oplog with prepared txn grows indefinitely - let it reach twice its supposed max size.
         PrepareHelpers.growOplogPastMaxSize(replSet);
 
-        jsTestLog(
-            `Oplog dataSize = ${primaryOplog.dataSize()}, check the prepare entry still exists`);
+        // Oplog grew past maxSize, and it includes the oldest active transaction's entry.
+        var secondary = replSet.getSecondary();
+        function checkSecondaryOplog() {
+            const secondaryOplog = secondary.getDB("local").oplog.rs;
+            assert.soon(() => {
+                return secondaryOplog.dataSize() >= PrepareHelpers.oplogSizeBytes;
+            }, "waiting for secondary oplog to grow", ReplSetTest.kDefaultTimeoutMS);
+            const secondaryOplogEntry = secondaryOplog.findOne({prepare: true});
+            assert.eq(secondaryOplogEntry.ts, prepareTimestamp, tojson(secondaryOplogEntry));
+        }
+        checkSecondaryOplog();
 
-        assert.eq(oplogEntry, primaryOplog.findOne({prepare: true}));
-        assert.soon(() => {
-            return secondaryOplog.dataSize() > PrepareHelpers.oplogSizeBytes;
-        });
-        assert.eq(oplogEntry, secondaryOplog.findOne({prepare: true}));
+        jsTestLog("Restart the secondary");
+
+        const secondaryId = replSet.getSecondary().nodeId;
+        // Validation can't complete while the active transaction holds a lock.
+        replSet.stop(secondaryId, undefined, {skipValidation: true});
+        secondary = replSet.start(secondaryId, {}, true /* restart */);
+
+        jsTestLog("Restarted");
+
+        replSet.waitForState(replSet.getSecondaries(), ReplSetTest.State.SECONDARY);
+        checkSecondaryOplog();
 
         if (commitOrAbort === "commit") {
             jsTestLog("Commit prepared transaction and wait for oplog to shrink to max oplogSize");
-            PrepareHelpers.commitTransaction(session, prepareTimestamp);
+            PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
         } else if (commitOrAbort === "abort") {
             jsTestLog("Abort prepared transaction and wait for oplog to shrink to max oplogSize");
             session.abortTransaction_forTesting();
@@ -87,9 +81,9 @@
 
         PrepareHelpers.awaitOplogTruncation(replSet);
 
-        replSet.stopSet();
+        // ReplSetTest reacts poorly to restarting a node, end it manually.
+        replSet.stopSet(true, false, {});
     }
-
     doTest("commit");
     doTest("abort");
 })();
