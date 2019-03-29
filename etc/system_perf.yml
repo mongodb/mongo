@@ -342,9 +342,9 @@ functions:
         script: |
           set -o verbose
           filename=rejects.json
-          if [ -s "${filename}" ]; then
+          if [ -s "$filename" ]; then
             echo "Rejecting task due to the following outliers:"
-            cat "${filename}"
+            cat "$filename"
             exit 1
           fi
     - command: shell.exec
