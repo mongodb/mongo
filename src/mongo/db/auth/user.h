@@ -95,6 +95,15 @@ public:
     explicit User(const UserName& name);
     ~User();
 
+    using UserId = std::vector<std::uint8_t>;
+    const UserId& getID() const {
+        return _id;
+    }
+
+    void setID(UserId id) {
+        _id = std::move(id);
+    }
+
     /**
      * Returns the user name for this user.
      */
@@ -232,6 +241,10 @@ public:
     void decrementRefCount();
 
 private:
+    // Unique ID (often UUID) for this user.
+    // May be empty for legacy users.
+    UserId _id;
+
     UserName _name;
 
     // Digest of the full username

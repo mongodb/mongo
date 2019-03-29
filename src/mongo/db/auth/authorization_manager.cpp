@@ -109,6 +109,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser, ("EndStartupOpti
     return exceptionToStatus();
 }
 
+const std::string AuthorizationManager::USERID_FIELD_NAME = "userId";
 const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
 const std::string AuthorizationManager::USER_DB_FIELD_NAME = "db";
 const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "role";
@@ -421,6 +422,8 @@ Status AuthorizationManager::_initializeUserFromPrivilegeDocument(User* user,
                                                 << "\"");
     }
 
+    user->setID(parser.extractUserIDFromUserDocument(privDoc));
+
     Status status = parser.initializeUserCredentialsFromUserDocument(user, privDoc);
     if (!status.isOK()) {
         return status;
@@ -565,6 +568,25 @@ Status AuthorizationManager::acquireUser(OperationContext* opCtx,
         user->invalidate();
     }
     *acquiredUser = user.release();
+
+    return Status::OK();
+}
+
+Status AuthorizationManager::acquireUserForSessionRefresh(OperationContext* opCtx,
+                                                          const UserName& userName,
+                                                          const User::UserId& uid,
+                                                          User** user) {
+    auto status = acquireUser(opCtx, userName, user);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (uid != (*user)->getID()) {
+        *user = nullptr;
+        return {ErrorCodes::UserNotFound,
+                str::stream() << "User id from privilege document '" << userName.toString()
+                              << "' does not match user id in session."};
+    }
 
     return Status::OK();
 }

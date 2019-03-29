@@ -93,6 +93,7 @@ public:
 
     ~AuthorizationManager();
 
+    static const std::string USERID_FIELD_NAME;
     static const std::string USER_NAME_FIELD_NAME;
     static const std::string USER_DB_FIELD_NAME;
     static const std::string ROLE_NAME_FIELD_NAME;
@@ -289,6 +290,14 @@ public:
      *  On non-OK Status return values, acquiredUser will not be modified.
      */
     Status acquireUser(OperationContext* opCtx, const UserName& userName, User** acquiredUser);
+
+    /**
+     * Validate the ID associated with a known user while refreshing session cache.
+     */
+    Status acquireUserForSessionRefresh(OperationContext* opCtx,
+                                        const UserName& userName,
+                                        const User::UserId& uid,
+                                        User** acquiredUser);
 
     /**
      * Decrements the refcount of the given User object.  If the refcount has gone to zero,

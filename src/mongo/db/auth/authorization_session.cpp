@@ -848,7 +848,8 @@ void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
             UserName name = user->getName();
             User* updatedUser;
 
-            Status status = authMan.acquireUser(opCtx, name, &updatedUser);
+            Status status =
+                authMan.acquireUserForSessionRefresh(opCtx, name, user->getID(), &updatedUser);
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             switch (status.code()) {
                 case ErrorCodes::OK: {
