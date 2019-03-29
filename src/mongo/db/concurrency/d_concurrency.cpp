@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
@@ -222,7 +223,7 @@ void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {
 
     const ResourceId globalResId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
     auto lockMode = _opCtx->lockState()->getLockMode(globalResId);
-    _opCtx->lockState()->setGlobalLockModeBit(lockMode);
+    GlobalLockAcquisitionTracker::get(_opCtx).setGlobalLockModeBit(lockMode);
 }
 
 void Lock::GlobalLock::_unlock() {

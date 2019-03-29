@@ -211,7 +211,8 @@ public:
          * Enqueues lock but does not block on lock acquisition.
          * Call waitForLockUntil() to complete locking process.
          *
-         * Does not set Locker::wasGlobalWriteLockTaken(). Call waitForLockUntil to do so.
+         * Does not set that the global lock was taken on the GlobalLockAcquisitionTracker. Call
+         * waitForLockUntil to do so.
          */
         GlobalLock(OperationContext* opCtx,
                    LockMode lockMode,
@@ -235,7 +236,8 @@ public:
         }
 
         /**
-         * Waits for lock to be granted. Sets Locker::wasGlobalWriteLockTaken().
+         * Waits for lock to be granted. Sets that the global lock was taken on the
+         * GlobalLockAcquisitionTracker.
          */
         void waitForLockUntil(Date_t deadline);
 

@@ -40,6 +40,7 @@ env.Library(
     target='lock_manager',
     source=[
         'd_concurrency.cpp',
+        'global_lock_acquisition_tracker.cpp',
         'lock_manager.cpp',
         'lock_state.cpp',
         'lock_stats.cpp',

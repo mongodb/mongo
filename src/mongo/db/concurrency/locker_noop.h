@@ -118,20 +118,6 @@ public:
         return false;
     }
 
-    virtual bool wasGlobalWriteLockTaken() const {
-        return false;
-    }
-
-    virtual bool wasGlobalSharedLockTaken() const {
-        return false;
-    }
-
-    virtual bool wasGlobalLockTaken() const {
-        return false;
-    }
-
-    virtual void setGlobalLockModeBit(LockMode mode) {}
-
     virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
         MONGO_UNREACHABLE;
     }

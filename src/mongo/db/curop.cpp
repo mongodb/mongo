@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_request.h"
@@ -405,7 +406,9 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 
     if (shouldLogOp || (shouldSample && _debug.executionTimeMicros > slowMs * 1000LL)) {
         auto lockerInfo = opCtx->lockState()->getLockerInfo(_lockStatsBase);
-        if (_debug.storageStats == nullptr && opCtx->lockState()->wasGlobalLockTaken() &&
+        const GlobalLockAcquisitionTracker& globalLockTracker =
+            GlobalLockAcquisitionTracker::get(opCtx);
+        if (_debug.storageStats == nullptr && globalLockTracker.getGlobalLockTaken() &&
             opCtx->getServiceContext()->getStorageEngine()) {
             // Do not fetch operation statistics again if we have already got them (for instance,
             // as a part of stashing the transaction).

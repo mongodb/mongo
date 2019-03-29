@@ -44,6 +44,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
