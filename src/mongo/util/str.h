@@ -121,47 +121,55 @@ inline bool endsWith(const char* p, const char* suffix) {
     return strcmp(p + a - b, suffix) == 0;
 }
 
-/** find char x, and return rest of std::string thereafter, or "" if not found */
+/** find char x, and return rest of the string thereafter, or an empty string if not found */
 inline const char* after(const char* s, char x) {
     const char* p = strchr(s, x);
     return (p != 0) ? p + 1 : "";
 }
-inline std::string after(const std::string& s, char x) {
-    const char* p = strchr(s.c_str(), x);
-    return (p != 0) ? std::string(p + 1) : "";
+inline mongo::StringData after(mongo::StringData s, char x) {
+    auto pos = s.find(x);
+    return s.substr(pos == std::string::npos ? s.size() : pos + 1);
 }
 
-/** find std::string x, and return rest of std::string thereafter, or "" if not found */
+/** find string x, and return rest of the string thereafter, or an empty string if not found */
 inline const char* after(const char* s, const char* x) {
     const char* p = strstr(s, x);
     return (p != 0) ? p + strlen(x) : "";
 }
-inline std::string after(const std::string& s, const std::string& x) {
-    const char* p = strstr(s.c_str(), x.c_str());
-    return (p != 0) ? std::string(p + x.size()) : "";
+inline mongo::StringData after(mongo::StringData s, mongo::StringData x) {
+    auto pos = s.find(x);
+    return s.substr(pos == std::string::npos ? s.size() : pos + x.size());
 }
 
-/** @return true if s contains x
- *  These should not be used with strings containing NUL bytes
- */
-inline bool contains(const std::string& s, const std::string& x) {
-    return strstr(s.c_str(), x.c_str()) != 0;
-}
-inline bool contains(const std::string& s, char x) {
-    verify(x != '\0');  // this expects c-strings so don't use when looking for NUL bytes
-    return strchr(s.c_str(), x) != 0;
+/** @return true if s contains x */
+inline bool contains(mongo::StringData s, mongo::StringData x) {
+    return s.find(x) != std::string::npos;
 }
 
-/** @return everything before the character x, else entire std::string */
-inline std::string before(const std::string& s, char x) {
-    const char* p = strchr(s.c_str(), x);
-    return (p != 0) ? s.substr(0, p - s.c_str()) : s;
+/** @return true if s contains x */
+inline bool contains(mongo::StringData s, char x) {
+    return s.find(x) != std::string::npos;
 }
 
-/** @return everything before the std::string x, else entire std::string */
-inline std::string before(const std::string& s, const std::string& x) {
-    const char* p = strstr(s.c_str(), x.c_str());
-    return (p != 0) ? s.substr(0, p - s.c_str()) : s;
+/** @return everything before the character x, else entire string */
+inline mongo::StringData before(const char* s, char x) {
+    const char* p = s;
+    // loop instead of strchr, so if we fail to find we don't have to iterate again.
+    for (; *p && *p != x; ++p) {
+    }
+    return mongo::StringData(s, p - s);
+}
+
+/** @return everything before the character x, else entire string */
+inline mongo::StringData before(mongo::StringData s, char x) {
+    auto pos = s.find(x);
+    return pos == std::string::npos ? s : s.substr(0, pos);
+}
+
+/** @return everything before the string x, else entire string */
+inline mongo::StringData before(mongo::StringData s, mongo::StringData x) {
+    auto pos = s.find(x);
+    return pos != std::string::npos ? s.substr(0, pos) : s;
 }
 
 /** check if if strings share a common starting prefix
@@ -196,34 +204,37 @@ inline unsigned toUnsigned(const std::string& a) {
     return x;
 }
 
-/** split a std::string on a specific char.  We don't split N times, just once
-    on the first occurrence.  If char not present entire std::string is in L
-    and R is empty.
-    @return true if char found
+/** split a string on a specific char.  We don't split N times, just once on the first occurrence.
+   If char not present, 'before' contains entire input string and 'after' is empty.
+   @return true if char found
 */
-inline bool splitOn(const std::string& s, char c, std::string& L, std::string& R) {
-    const char* start = s.c_str();
-    const char* p = strchr(start, c);
-    if (p == 0) {
-        L = s;
-        R.clear();
+inline bool splitOn(mongo::StringData s,
+                    char c,
+                    mongo::StringData& before,
+                    mongo::StringData& after) {
+    auto pos = s.find(c);
+    if (pos == std::string::npos) {
+        before = s;
+        after = mongo::StringData();
         return false;
     }
-    L = std::string(start, p - start);
-    R = std::string(p + 1);
+    before = s.substr(0, pos);
+    after = s.substr(pos + 1);
     return true;
 }
 /** split scanning reverse direction. Splits ONCE ONLY. */
-inline bool rSplitOn(const std::string& s, char c, std::string& L, std::string& R) {
-    const char* start = s.c_str();
-    const char* p = strrchr(start, c);
-    if (p == 0) {
-        L = s;
-        R.clear();
+inline bool rSplitOn(mongo::StringData s,
+                     char c,
+                     mongo::StringData& before,
+                     mongo::StringData& after) {
+    auto pos = s.rfind(c);
+    if (pos == std::string::npos) {
+        before = s;
+        after = mongo::StringData();
         return false;
     }
-    L = std::string(start, p - start);
-    R = std::string(p + 1);
+    before = s.substr(0, pos);
+    after = s.substr(pos + 1);
     return true;
 }
 
@@ -237,11 +248,12 @@ inline unsigned count(const std::string& s, char c) {
 }
 
 /** trim leading spaces. spaces only, not tabs etc. */
-inline std::string ltrim(const std::string& s) {
-    const char* p = s.c_str();
-    while (*p == ' ')
-        p++;
-    return p;
+inline mongo::StringData ltrim(mongo::StringData s) {
+    auto i = s.rawData();
+    auto end = s.rawData() + s.size();
+    for (; i != end && *i == ' '; ++i) {
+    }
+    return s.substr(i - s.rawData());
 }
 
 /**

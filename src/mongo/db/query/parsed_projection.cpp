@@ -231,15 +231,15 @@ Status ParsedProjection::make(OperationContext* opCtx,
                               "Cannot specify positional operator and $elemMatch.");
             }
 
-            std::string after = str::after(elem.fieldName(), ".$");
-            if (str::contains(after, ".$")) {
+            StringData after = str::after(elem.fieldNameStringData(), ".$");
+            if (after.find(".$"_sd) != std::string::npos) {
                 str::stream ss;
                 ss << "Positional projection '" << elem.fieldName() << "' contains "
                    << "the positional operator more than once.";
                 return Status(ErrorCodes::BadValue, ss);
             }
 
-            std::string matchfield = str::before(elem.fieldName(), '.');
+            StringData matchfield = str::before(elem.fieldNameStringData(), '.');
             if (query && !_hasPositionalOperatorMatch(query, matchfield)) {
                 str::stream ss;
                 ss << "Positional projection '" << elem.fieldName() << "' does not "
@@ -388,7 +388,7 @@ bool ParsedProjection::_isPositionalOperator(const char* fieldName) {
 
 // static
 bool ParsedProjection::_hasPositionalOperatorMatch(const MatchExpression* const query,
-                                                   const std::string& matchfield) {
+                                                   StringData matchfield) {
     if (query->getCategory() == MatchExpression::MatchCategory::kLogical) {
         for (unsigned int i = 0; i < query->numChildren(); ++i) {
             if (_hasPositionalOperatorMatch(query->getChild(i), matchfield)) {
@@ -397,14 +397,13 @@ bool ParsedProjection::_hasPositionalOperatorMatch(const MatchExpression* const 
         }
     } else {
         StringData queryPath = query->path();
-        const char* pathRawData = queryPath.rawData();
         // We have to make a distinction between match expressions that are
         // initialized with an empty field/path name "" and match expressions
         // for which the path is not meaningful (eg. $where).
-        if (!pathRawData) {
+        if (!queryPath.rawData()) {
             return false;
         }
-        std::string pathPrefix = str::before(pathRawData, '.');
+        StringData pathPrefix = str::before(queryPath, '.');
         return pathPrefix == matchfield;
     }
     return false;

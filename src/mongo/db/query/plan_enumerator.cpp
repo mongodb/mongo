@@ -48,11 +48,9 @@ using std::string;
 using std::vector;
 
 std::string getPathPrefix(std::string path) {
-    if (str::contains(path, '.')) {
-        return str::before(path, '.');
-    } else {
-        return path;
-    }
+    if (auto dot = path.find('.'); dot != path.npos)
+        path.resize(dot);
+    return path;
 }
 
 /**

@@ -722,13 +722,15 @@ Status checkLongName(const po::variables_map& vm,
             for (StringVector_t::iterator keyValueVectorIt = keyValueVector.begin();
                  keyValueVectorIt != keyValueVector.end();
                  ++keyValueVectorIt) {
-                std::string key;
-                std::string value;
-                if (!str::splitOn(*keyValueVectorIt, '=', key, value)) {
+                StringData keySD;
+                StringData valueSD;
+                if (!str::splitOn(*keyValueVectorIt, '=', keySD, valueSD)) {
                     StringBuilder sb;
                     sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
+                std::string key = keySD.toString();
+                std::string value = valueSD.toString();
                 // Make sure we aren't setting an option to two different values
                 if (mapValue.count(key) > 0 && mapValue[key] != value) {
                     StringBuilder sb;

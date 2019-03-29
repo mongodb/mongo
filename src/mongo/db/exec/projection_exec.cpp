@@ -95,7 +95,7 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                     MatchExpressionParser::parse(elemMatchObj, std::move(expCtx));
                 invariant(statusWithMatcher.isOK());
                 // And store it in _matchers.
-                _matchers[str::before(e.fieldName(), '.').c_str()] =
+                _matchers[str::before(e.fieldNameStringData(), '.')] =
                     statusWithMatcher.getValue().release();
 
                 add(e.fieldName(), true);

@@ -144,7 +144,7 @@ private:
      * Does not take ownership of 'query'.
      */
     static bool _hasPositionalOperatorMatch(const MatchExpression* const query,
-                                            const std::string& matchfield);
+                                            StringData matchfield);
 
     // Track fields needed by the projection so that the query planner can perform projection
     // analysis and possibly give us a covered projection.
