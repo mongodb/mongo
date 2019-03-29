@@ -287,11 +287,6 @@ selector:
   # Creates new mongo connection but won't retry connecting.
   - jstests/core/shell_connection_strings.js
 
-  # Explain command runs for 6 seconds in this test, whereas we kill the primary every 15 seconds.
-  # If it takes longer than 9 seconds for the new primary to step up, there isn't enough time for
-  # the explain command to run.
-  - jstests/core/explain2.js
-
   # Starts a parallel shell but won't restart it after shutdown.
   # TODO SERVER-33229: Remove these exclusions
   - jstests/core/compact_keeps_indexes.js
