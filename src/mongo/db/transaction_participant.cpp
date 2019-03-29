@@ -807,6 +807,17 @@ void TransactionParticipant::Participant::stashTransactionResources(OperationCon
     }
 }
 
+void TransactionParticipant::Participant::resetRetryableWriteState(OperationContext* opCtx) {
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+    invariant(opCtx->getTxnNumber());
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    if (o().txnState.isNone() && p().autoCommit == boost::none) {
+        _resetRetryableWriteState();
+    }
+}
+
 void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     OperationContext* opCtx) {
     // Transaction resources already exist for this transaction.  Transfer them from the

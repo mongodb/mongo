@@ -77,24 +77,6 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
     return true;
 }
 
-TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx) {
-    auto txnRouter = TransactionRouter::get(opCtx);
-    invariant(txnRouter);
-
-    auto txnNumber = opCtx->getTxnNumber();
-    invariant(txnNumber);
-
-    txnRouter->beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
-
-    return txnRouter;
-}
-
-void commitShardKeyUpdateTransaction(OperationContext* opCtx,
-                                     TransactionRouter* txnRouter,
-                                     TxnNumber txnNumber) {
-    auto commitResponse = txnRouter->commitTransaction(opCtx, boost::none);
-}
-
 /**
  * Creates the delete op that will be used to delete the pre-image document. Will also attach the
  * original document _id retrieved from 'updatePreImage'.
@@ -135,10 +117,25 @@ bool updateShardKeyForDocument(OperationContext* opCtx,
     auto updatePostImage = documentKeyChangeInfo.getPostImage()->getOwned();
 
     auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage, stmtId);
-
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, stmtId);
 
     return executeOperationsAsPartOfShardKeyUpdate(opCtx, deleteCmdObj, insertCmdObj, nss.db());
+}
+
+TransactionRouter* startTransactionForShardKeyUpdate(OperationContext* opCtx) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    invariant(txnRouter);
+
+    auto txnNumber = opCtx->getTxnNumber();
+    invariant(txnNumber);
+
+    txnRouter->beginOrContinueTxn(opCtx, *txnNumber, TransactionRouter::TransactionActions::kStart);
+
+    return txnRouter;
+}
+
+void commitShardKeyUpdateTransaction(OperationContext* opCtx, TransactionRouter* txnRouter) {
+    auto commitResponse = txnRouter->commitTransaction(opCtx, boost::none);
 }
 
 BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,

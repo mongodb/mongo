@@ -5,6 +5,7 @@
     "use strict";
 
     load("jstests/libs/feature_compatibility_version.js");
+    load("jstests/sharding/libs/update_shard_key_helpers.js");
 
     let st = new ShardingTest({
         shards: [{binVersion: "latest"}, {binVersion: "latest"}],
@@ -42,7 +43,9 @@
         let sessionDB = session.getDatabase(kDbName);
 
         // Updates to full shard key
-        shardCollectionAndMoveChunks([{x: 30}, {x: 50}, {x: 80}], {x: 1}, {x: 50}, {x: 80});
+        shardCollectionMoveChunks(
+            st, kDbName, ns, {x: 1}, [{x: 30}, {x: 50}, {x: 80}], {x: 50}, {x: 80});
+        cleanupOrphanedDocs(st, ns);
 
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates
@@ -60,12 +63,12 @@
 
         // Assert that updating the shard key when the doc would move shards fails for both modify
         // and replacement updates
-        assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 100}}));
+        assert.writeError(sessionDB.foo.update({x: 80}, {$set: {x: 3}}));
         // TODO: SERVER-39158. Currently, this update will not fail but will not update the doc.
         // After SERVER-39158 is finished, this should fail.
-        assert.writeOK(sessionDB.foo.update({x: 30}, {x: 100}));
-        assert.eq(1, mongos.getDB(kDbName).foo.find({x: 30}).toArray().length);
-        assert.eq(0, mongos.getDB(kDbName).foo.find({x: 100}).toArray().length);
+        assert.writeOK(sessionDB.foo.update({x: 80}, {x: 3}));
+        assert.eq(1, mongos.getDB(kDbName).foo.find({x: 80}).toArray().length);
+        assert.eq(0, mongos.getDB(kDbName).foo.find({x: 3}).toArray().length);
 
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: {x: 80}, update: {$set: {x: 3}}});
@@ -77,10 +80,14 @@
         mongos.getDB(kDbName).foo.drop();
 
         // Updates to partial shard key
-        shardCollectionAndMoveChunks([{x: 30, y: 4}, {x: 50, y: 50}, {x: 80, y: 100}],
-                                     {x: 1, y: 1},
-                                     {x: 50, y: 50},
-                                     {x: 80, y: 100});
+        shardCollectionMoveChunks(st,
+                                  kDbName,
+                                  ns,
+                                  {x: 1, y: 1},
+                                  [{x: 30, y: 4}, {x: 50, y: 50}, {x: 80, y: 100}],
+                                  {x: 50, y: 50},
+                                  {x: 80, y: 100});
+        cleanupOrphanedDocs(st, ns);
 
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates
@@ -98,8 +105,8 @@
 
         // Assert that updating the shard key when the doc would move shards fails for both modify
         // and replacement updates
-        assert.writeError(sessionDB.foo.update({x: 30}, {$set: {x: 100}}));
-        assert.writeError(sessionDB.foo.update({x: 30}, {x: 100}));
+        assert.writeError(sessionDB.foo.update({x: 80}, {$set: {x: 3}}));
+        assert.writeError(sessionDB.foo.update({x: 80}, {x: 3}));
         assert.throws(function() {
             sessionDB.foo.findAndModify({query: {x: 80}, update: {$set: {x: 3}}});
         });
@@ -114,7 +121,9 @@
         sessionDB = session.getDatabase(kDbName);
 
         // Updates to full shard key
-        shardCollectionAndMoveChunks([{x: 30}, {x: 50}, {x: 80}], {x: 1}, {x: 50}, {x: 80});
+        shardCollectionMoveChunks(
+            st, kDbName, ns, {x: 1}, [{x: 30}, {x: 50}, {x: 80}], {x: 50}, {x: 80});
+        cleanupOrphanedDocs(st, ns);
 
         // Assert that updating the shard key when the doc would remain on the same shard fails for
         // both modify and replacement updates

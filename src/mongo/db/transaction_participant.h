@@ -421,6 +421,11 @@ public:
         void stashTransactionResources(OperationContext* opCtx);
 
         /**
+         * Resets the retryable writes state.
+         */
+        void resetRetryableWriteState(OperationContext* opCtx);
+
+        /**
          * Transfers management of transaction resources from the Session to the currently
          * checked-out OperationContext.
          */

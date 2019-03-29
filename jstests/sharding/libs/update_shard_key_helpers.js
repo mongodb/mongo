@@ -106,16 +106,23 @@ function runFindAndModifyCmdSuccess(
     }
 }
 
-function runUpdateCmdFail(st, kDbName, session, sessionDB, inTxn, query, update, multiParamSet) {
+function runUpdateCmdFail(
+    st, kDbName, session, sessionDB, inTxn, query, update, multiParamSet, errorCode) {
     let res;
     if (inTxn) {
         session.startTransaction();
         res = sessionDB.foo.update(query, update, {multi: multiParamSet});
         assert.writeError(res);
+        if (errorCode) {
+            assert.commandFailedWithCode(res, errorCode);
+        }
         session.abortTransaction();
     } else {
         res = sessionDB.foo.update(query, update, {multi: multiParamSet});
         assert.writeError(res);
+        if (errorCode) {
+            assert.commandFailedWithCode(res, errorCode);
+        }
     }
 
     let updatedVal = update["$set"] ? update["$set"] : update;
@@ -495,7 +502,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     } else {
         bulkOp = sessionDB.foo.initializeUnorderedBulkOp();
     }
-    bulkOp.find({"x": 300}).updateOne({$set: {"x": 10}});
+    bulkOp.find({"x": 300}).updateOne({"$set": {"x": 10}});
     bulkOp.find({"x": 4}).updateOne({"$inc": {"a": 1}});
     bulkRes = assert.throws(function() {
         bulkOp.execute();
@@ -512,6 +519,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 4, "a": 3}).itcount());
         assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 4, "a": 4}).itcount());
 
+        assert.writeErrorWithCode(bulkRes, ErrorCodes.InvalidOptions);
         assert.eq(0, bulkRes.nUpserted);
         assert.eq(1, bulkRes.nMatched);
         assert.eq(1, bulkRes.nModified);
@@ -547,7 +555,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp = sessionDB.foo.initializeUnorderedBulkOp();
     }
     bulkOp.find({"x": 4}).updateOne({"$inc": {"a": 1}});
-    bulkOp.find({"x": 300}).updateOne({$set: {"x": 10}});
+    bulkOp.find({"x": 300}).updateOne({"$set": {"x": 10}});
     bulkRes = assert.throws(function() {
         bulkOp.execute();
     });
@@ -609,8 +617,8 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
     if (!inTxn) {
         assert.writeErrorWithCode(bulkRes, ErrorCodes.InvalidOptions);
         assert.eq(0, bulkRes.nUpserted);
-        assert.eq(1, bulkRes.nMatched);
-        assert.eq(1, bulkRes.nModified);
+        assert.eq(0, bulkRes.nMatched);
+        assert.eq(0, bulkRes.nModified);
     }
 
     sessionDB.foo.drop();
@@ -629,7 +637,7 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         bulkOp = sessionDB.foo.initializeUnorderedBulkOp();
     }
     bulkOp.find({"x": 500}).updateOne({"$inc": {"a": 1}});
-    bulkOp.find({"x": 300}).updateOne({$set: {"x": 10}});
+    bulkOp.find({"x": 300}).updateOne({"$set": {"x": 10}});
     bulkRes = assert.throws(function() {
         bulkOp.execute();
     });
@@ -637,17 +645,23 @@ function assertCannotUpdateInBulkOpWhenDocsMoveShards(
         session.abortTransaction();
     }
 
-    // Both updates target the same shard, so neither write will be commited when the second errors.
     assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 300}).itcount());
     assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 10}).itcount());
-    assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 500, "a": 6}).itcount());
-    assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 500, "a": 7}).itcount());
 
     if (!inTxn) {
+        // The first write will succeed
+        assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 500, "a": 6}).itcount());
+        assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 500, "a": 7}).itcount());
+
         assert.writeErrorWithCode(bulkRes, ErrorCodes.InvalidOptions);
         assert.eq(0, bulkRes.nUpserted);
         assert.eq(0, bulkRes.nMatched);
         assert.eq(0, bulkRes.nModified);
+    } else {
+        // Both updates target the same shard, so neither write will be commited when the second
+        // errors.
+        assert.eq(1, st.s.getDB(kDbName).foo.find({"x": 500, "a": 6}).itcount());
+        assert.eq(0, st.s.getDB(kDbName).foo.find({"x": 500, "a": 7}).itcount());
     }
 
     sessionDB.foo.drop();

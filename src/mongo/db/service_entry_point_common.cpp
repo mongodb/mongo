@@ -433,6 +433,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
         throw;
     } catch (const ExceptionFor<ErrorCodes::WouldChangeOwningShard>&) {
         txnParticipant.stashTransactionResources(opCtx);
+        txnParticipant.resetRetryableWriteState(opCtx);
         guard.dismiss();
         throw;
     }
