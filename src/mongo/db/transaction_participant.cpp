@@ -1017,7 +1017,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     std::vector<OplogSlot> reservedSlots;
     if (prepareOptime) {
         // On secondary, we just prepare the transaction and discard the buffered ops.
-        prepareOplogSlot = OplogSlot(*prepareOptime, 0);
+        prepareOplogSlot = OplogSlot(*prepareOptime);
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).prepareOpTime = *prepareOptime;
         reservedSlots.push_back(prepareOplogSlot);
@@ -1045,18 +1045,18 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            o(lk).prepareOpTime = prepareOplogSlot.opTime;
+            o(lk).prepareOpTime = prepareOplogSlot;
         }
 
         if (MONGO_FAIL_POINT(hangAfterReservingPrepareTimestamp)) {
             // This log output is used in js tests so please leave it.
             log() << "transaction - hangAfterReservingPrepareTimestamp fail point "
                      "enabled. Blocking until fail point is disabled. Prepare OpTime: "
-                  << prepareOplogSlot.opTime;
+                  << prepareOplogSlot;
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterReservingPrepareTimestamp);
         }
     }
-    opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.opTime.getTimestamp());
+    opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
     opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(
         opCtx, reservedSlots, completedTransactionOperations);
@@ -1068,7 +1068,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
                             << "been set to: "
                             << p().oldestOplogEntryOpTime->toString());
     // Keep track of the OpTime from the first oplog entry written by this transaction.
-    p().oldestOplogEntryOpTime = prepareOplogSlot.opTime;
+    p().oldestOplogEntryOpTime = prepareOplogSlot;
 
     // Maintain the OpTime of the oldest active oplog entry for this transaction. We currently
     // only write an oplog entry for an in progress transaction when it is in the prepare state
@@ -1092,7 +1092,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
     invariant(unlocked);
 
-    return prepareOplogSlot.opTime.getTimestamp();
+    return prepareOplogSlot.getTimestamp();
 }
 
 void TransactionParticipant::Participant::addTransactionOperation(
@@ -1245,12 +1245,12 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
             invariant(!commitOplogEntryOpTime);
             oplogSlotReserver.emplace(opCtx);
             commitOplogSlot = oplogSlotReserver->getLastSlot();
-            invariant(commitOplogSlot.opTime.getTimestamp() >= commitTimestamp,
+            invariant(commitOplogSlot.getTimestamp() >= commitTimestamp,
                       str::stream() << "Commit oplog entry must be greater than or equal to commit "
                                        "timestamp due to causal consistency. commit timestamp: "
                                     << commitTimestamp.toBSON()
                                     << ", commit oplog entry optime: "
-                                    << commitOplogSlot.opTime.toBSON());
+                                    << commitOplogSlot.toBSON());
         } else {
             // We always expect a non-null commitOplogEntryOpTime to be passed in on secondaries
             // in order to set the finishOpTime.
@@ -1260,7 +1260,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // If commitOplogEntryOpTime is a nullopt, then we grab the OpTime from the commitOplogSlot
         // which will only be set if we are primary. Otherwise, the commitOplogEntryOpTime must have
         // been passed in during secondary oplog application.
-        auto commitOplogSlotOpTime = commitOplogEntryOpTime.value_or(commitOplogSlot.opTime);
+        auto commitOplogSlotOpTime = commitOplogEntryOpTime.value_or(commitOplogSlot);
         opCtx->recoveryUnit()->setDurableTimestamp(commitOplogSlotOpTime.getTimestamp());
 
         _commitStorageTransaction(opCtx);

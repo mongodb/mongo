@@ -1034,7 +1034,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
 
     try {
         // We are only given an oplog slot for prepared transactions.
-        auto prepare = !prepareOplogSlot.opTime.isNull();
+        auto prepare = !prepareOplogSlot.isNull();
         if (prepare) {
             // TODO: SERVER-36814 Remove "prepare" field on applyOps.
             applyOpsBuilder.append("prepare", true);
@@ -1129,7 +1129,7 @@ void logOplogEntriesForTransaction(OperationContext* opCtx,
             stmtId = 0;
             const NamespaceString cmdNss{"admin", "$cmd"};
             auto oplogSlot = oplogSlots.begin();
-            const auto startOpTime = oplogSlot->opTime;
+            const auto startOpTime = *oplogSlot;
             for (const auto& stmt : stmts) {
                 bool isStartOfTxn = prevWriteOpTime.writeOpTime.isNull();
                 prevWriteOpTime = logReplOperationForTransaction(
@@ -1200,7 +1200,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
                                                   false /* prepare */,
                                                   false /* inTxn */,
                                                   oplogSlot);
-            invariant(oplogSlot.opTime.isNull() || oplogSlot.opTime == oplogOpTime);
+            invariant(oplogSlot.isNull() || oplogSlot == oplogOpTime);
 
             onWriteOpCompleted(opCtx,
                                cmdNss,
@@ -1248,7 +1248,7 @@ repl::OpTime logCommitForUnpreparedTransaction(OperationContext* opCtx,
                                           oplogSlot);
     // In the present implementation, a reserved oplog slot is always provided.  However that
     // is not enforced at this level.
-    invariant(oplogSlot.opTime.isNull() || oplogSlot.opTime == oplogOpTime);
+    invariant(oplogSlot.isNull() || oplogSlot == oplogOpTime);
 
     onWriteOpCompleted(opCtx,
                        cmdNss,
@@ -1258,7 +1258,7 @@ repl::OpTime logCommitForUnpreparedTransaction(OperationContext* opCtx,
                        DurableTxnStateEnum::kCommitted,
                        boost::none /* startOpTime */);
 
-    return oplogSlot.opTime;
+    return oplogSlot;
 }
 }  //  namespace
 
@@ -1289,7 +1289,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
         commitOpTime = logCommitForUnpreparedTransaction(opCtx,
                                                          statements.size() /* stmtId */,
-                                                         oplogSlots.back().opTime,
+                                                         oplogSlots.back(),
                                                          commitSlot,
                                                          statements.size());
     }
@@ -1349,7 +1349,7 @@ repl::OpTime logPrepareTransaction(OperationContext* opCtx,
                                           false /* prepare */,
                                           false /* inTxn */,
                                           oplogSlot);
-    invariant(oplogSlot.opTime == oplogOpTime);
+    invariant(oplogSlot == oplogOpTime);
 
     onWriteOpCompleted(opCtx,
                        cmdNss,
@@ -1359,7 +1359,7 @@ repl::OpTime logPrepareTransaction(OperationContext* opCtx,
                        DurableTxnStateEnum::kPrepared,
                        startOpTime /* startOpTime */);
 
-    return oplogSlot.opTime;
+    return oplogSlot;
 }
 
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
@@ -1368,7 +1368,7 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
     invariant(!reservedSlots.empty());
     const auto prepareOpTime = reservedSlots.back();
     invariant(opCtx->getTxnNumber());
-    invariant(!prepareOpTime.opTime.isNull());
+    invariant(!prepareOpTime.isNull());
 
     // Don't write oplog entry on secondaries.
     if (!opCtx->writesAreReplicated()) {
@@ -1413,10 +1413,10 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                     logOplogEntriesForTransaction(opCtx, statements, reservedSlots);
 
                     // The prevOpTime is the OpTime of the second last entry in the reserved slots.
-                    prevOpTime = reservedSlots.rbegin()[1].opTime;
+                    prevOpTime = reservedSlots.rbegin()[1];
                 }
                 auto startTxnSlot = reservedSlots.front();
-                const auto startOpTime = startTxnSlot.opTime;
+                const auto startOpTime = startTxnSlot;
                 logPrepareTransaction(
                     opCtx, statements.size() /* stmtId */, prevOpTime, prepareOpTime, startOpTime);
                 wuow.commit();

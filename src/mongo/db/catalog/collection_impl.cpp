@@ -524,7 +524,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
 
     for (auto it = begin; it != end; it++) {
         records.emplace_back(Record{RecordId(), RecordData(it->doc.objdata(), it->doc.objsize())});
-        timestamps.emplace_back(it->oplogSlot.opTime.getTimestamp());
+        timestamps.emplace_back(it->oplogSlot.getTimestamp());
     }
     Status status = _recordStore->insertRecords(opCtx, &records, timestamps);
     if (!status.isOK())
@@ -538,7 +538,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         invariant(RecordId::min() < loc);
         invariant(loc < RecordId::max());
 
-        BsonRecord bsonRecord = {loc, Timestamp(it->oplogSlot.opTime.getTimestamp()), &(it->doc)};
+        BsonRecord bsonRecord = {loc, Timestamp(it->oplogSlot.getTimestamp()), &(it->doc)};
         bsonRecords.push_back(bsonRecord);
     }
 

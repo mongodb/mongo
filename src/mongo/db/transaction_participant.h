@@ -822,13 +822,13 @@ private:
          */
         OplogSlot getLastSlot() {
             invariant(!_oplogSlots.empty());
-            invariant(!_oplogSlots.back().opTime.isNull());
+            invariant(!_oplogSlots.back().isNull());
             return getSlots().back();
         }
 
         std::vector<OplogSlot>& getSlots() {
             invariant(!_oplogSlots.empty());
-            invariant(!_oplogSlots.back().opTime.isNull());
+            invariant(!_oplogSlots.back().isNull());
             return _oplogSlots;
         }
 

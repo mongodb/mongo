@@ -42,7 +42,6 @@ namespace mongo {
 
 struct InsertStatement;
 class OperationContext;
-struct OplogSlot;
 
 namespace repl {
 class OpTime;

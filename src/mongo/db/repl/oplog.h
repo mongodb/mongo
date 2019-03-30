@@ -51,12 +51,7 @@ class OperationContext;
 class OperationSessionInfo;
 class Session;
 
-struct OplogSlot {
-    OplogSlot() {}
-    OplogSlot(repl::OpTime opTime, std::int64_t hash) : opTime(opTime), hash(hash) {}
-    repl::OpTime opTime;
-    std::int64_t hash = 0;
-};
+using OplogSlot = repl::OpTime;
 
 struct InsertStatement {
 public:
@@ -67,7 +62,7 @@ public:
     InsertStatement(StmtId statementId, BSONObj toInsert, OplogSlot os)
         : stmtId(statementId), oplogSlot(os), doc(toInsert) {}
     InsertStatement(BSONObj toInsert, Timestamp ts, long long term)
-        : oplogSlot(repl::OpTime(ts, term), 0), doc(toInsert) {}
+        : oplogSlot(repl::OpTime(ts, term)), doc(toInsert) {}
 
     StmtId stmtId = kUninitializedStmtId;
     OplogSlot oplogSlot;
