@@ -224,6 +224,13 @@ void FindAndModifyRequest::setArrayFilters(const std::vector<BSONObj>& arrayFilt
     }
 }
 
+void FindAndModifyRequest::setQuery(BSONObj query) {
+    _query = query.getOwned();
+}
+void FindAndModifyRequest::setUpdateObj(BSONObj updateObj) {
+    _updateObj = updateObj.getOwned();
+}
+
 void FindAndModifyRequest::setShouldReturnNew(bool shouldReturnNew) {
     dassert(!_isRemove);
     _shouldReturnNew = shouldReturnNew;

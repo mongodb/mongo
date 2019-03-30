@@ -110,12 +110,25 @@ public:
     //
 
     /**
+    * Sets the filter to find a document.
+    */
+    void setQuery(BSONObj query);
+
+    /**
+    * Sets the update object that specifies how a document gets updated.
+    */
+    void setUpdateObj(BSONObj updateObj);
+
+    /**
      * If shouldReturnNew is new, the findAndModify response should return the document
      * after the modification was applied if the query matched a document. Otherwise,
      * it will return the matched document before the modification.
      */
     void setShouldReturnNew(bool shouldReturnNew);
 
+    /**
+    * Sets a flag whether the statement performs an upsert.
+    */
     void setUpsert(bool upsert);
 
     //
@@ -157,10 +170,10 @@ private:
 
     // Required fields
     const NamespaceString _ns;
-    const BSONObj _query;
+    BSONObj _query;
 
     // Required for updates
-    const BSONObj _updateObj;
+    BSONObj _updateObj;
 
     boost::optional<bool> _isUpsert;
     boost::optional<BSONObj> _fieldProjection;
