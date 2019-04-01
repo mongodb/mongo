@@ -28,6 +28,10 @@
         </Component>
       <?endif?>
 
+      <Component Id="c_ThirdpartyGotools" Guid="7A83B4DF-0D78-4594-8912-30310A3BAEEB">
+        <File Id="f_ThirdpartyGotools" Name="THIRD-PARTY-NOTICES.gotools" Source="$(var.ToolBinarySource)\distsrc\THIRD-PARTY-NOTICES.gotools"
+              DiskId ="1" KeyPath="yes" />
+      </Component>
       <Component Id="c_Readme" Guid="12C17EA1-075C-4A1D-9554-F3B5A2A94874">
         <File Id="f_Readme" Name="README" Source="$(var.LicenseSource)\README"
               DiskId ="1" />
@@ -50,6 +54,7 @@
       <?if $(var.Edition) = Enterprise ?>
       <ComponentRef Id="c_ThirdpartyEnterprise"/>
       <?endif?>
+      <ComponentRef Id="c_ThirdpartyGotools"/>
       <ComponentRef Id="c_License"/>
       <ComponentRef Id="c_InstallKey"/>
       <ComponentRef Id="c_MPL2"/>
