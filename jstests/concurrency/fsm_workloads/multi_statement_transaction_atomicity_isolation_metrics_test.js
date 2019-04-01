@@ -147,8 +147,7 @@ var $config = extendWorkload($config, function($config, $super) {
             maxErrPct);
 
         // allCountsNonNegative() is always expected to succeed.
-        // TODO SERVER-38257: Re-enable this check.
-        // checkInvariant(samples, allCountsNonNegative, 0);
+        checkInvariant(samples, allCountsNonNegative, 0);
     }
 
     $config.setup = function(db, collName, cluster) {

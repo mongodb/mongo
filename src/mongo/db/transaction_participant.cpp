@@ -1447,30 +1447,23 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
 
 void TransactionParticipant::Participant::_abortTransactionOnSession(OperationContext* opCtx) {
     const auto tickSource = opCtx->getServiceContext()->getTickSource();
-    // If the transaction is stashed, then we have aborted an inactive transaction.
-    if (o().txnResourceStash) {
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            // The transaction is stashed, so we abort the inactive transaction on session.
-            o(lk).transactionMetricsObserver.onAbortInactive(
-                ServerTransactionsMetrics::get(opCtx->getServiceContext()),
-                tickSource,
-                p().oldestOplogEntryOpTime,
-                &Top::get(opCtx->getServiceContext()));
-        }
-        _logSlowTransaction(opCtx,
-                            &(o().txnResourceStash->locker()->getLockerInfo(boost::none))->stats,
-                            TerminationCause::kAborted,
-                            o().txnResourceStash->getReadConcernArgs());
-    } else {
+
+    {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        o(lk).transactionMetricsObserver.onAbortActive(
+        o(lk).transactionMetricsObserver.onAbort(
             ServerTransactionsMetrics::get(opCtx->getServiceContext()),
             tickSource,
             p().oldestOplogEntryOpTime,
             p().finishOpTime,
             &Top::get(opCtx->getServiceContext()),
             o().txnState.isPrepared());
+    }
+
+    if (o().txnResourceStash) {
+        _logSlowTransaction(opCtx,
+                            &(o().txnResourceStash->locker()->getLockerInfo(boost::none))->stats,
+                            TerminationCause::kAborted,
+                            o().txnResourceStash->getReadConcernArgs());
     }
 
     const auto nextState = o().txnState.isPrepared() ? TransactionState::kAbortedWithPrepare
