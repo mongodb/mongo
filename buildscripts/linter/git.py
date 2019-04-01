@@ -112,7 +112,7 @@ class Repo(_git.Repository):
         diff_files += self.git_diff(["--name-only"])
 
         file_set = {
-            line.rstrip()
+            os.path.normpath(os.path.join(self.directory, line.rstrip()))
             for line in diff_files.splitlines() if filter_function(line.rstrip())
         }
 
