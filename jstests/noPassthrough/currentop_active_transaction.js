@@ -19,7 +19,7 @@
             // Load the prepare helpers to be called in the parallel shell.
             load('jstests/core/txns/libs/prepare_helpers.js');
             const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-            PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
+            PrepareHelpers.commitTransaction(session, prepareTimestamp);
         } else {
             session.commitTransaction();
         }

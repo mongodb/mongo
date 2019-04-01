@@ -48,25 +48,6 @@ const PrepareHelpers = (function() {
     }
 
     /**
-     * Commits the active transaction on the session at a commitTimestamp that is greater than
-     * the transaction's prepareTimestamp.
-     *
-     * This is a temporary function that should be used to commit prepared transactions
-     * until we allow the stable timestamp to move past the oldest active prepare timestamp.
-     *
-     * @return {object} the response to the 'commitTransaction' command.
-     */
-    function commitTransactionAfterPrepareTS(session, prepareTimestamp) {
-        assert(session);
-
-        // Add 1 to the increment so that the commitTimestamp is "after" the prepareTimestamp.
-        const commitTimestamp =
-            Timestamp(prepareTimestamp.getTime(), prepareTimestamp.getInc() + 1);
-
-        return this.commitTransaction(session, commitTimestamp);
-    }
-
-    /**
      * Creates a session object on the given connection with the provided 'lsid'.
      *
      * @return {session} the session created.
@@ -84,7 +65,6 @@ const PrepareHelpers = (function() {
     return {
         prepareTransaction: prepareTransaction,
         commitTransaction: commitTransaction,
-        commitTransactionAfterPrepareTS: commitTransactionAfterPrepareTS,
         createSessionWithGivenId: createSessionWithGivenId,
     };
 })();

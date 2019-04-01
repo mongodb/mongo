@@ -633,10 +633,6 @@ public:
             return p().oldestOplogEntryOpTime;
         }
 
-        boost::optional<repl::OpTime> getFinishOpTimeForTest() const {
-            return p().finishOpTime;
-        }
-
         const Locker* getTxnResourceStashLockerForTest() const {
             invariant(o().txnResourceStash);
             return o().txnResourceStash->locker();
@@ -915,9 +911,6 @@ private:
 
         // Tracks the OpTime of the first oplog entry written by this TransactionParticipant.
         boost::optional<repl::OpTime> oldestOplogEntryOpTime;
-
-        // Tracks the OpTime of the abort/commit oplog entry associated with this transaction.
-        boost::optional<repl::OpTime> finishOpTime;
 
         //
         // Retryable writes state

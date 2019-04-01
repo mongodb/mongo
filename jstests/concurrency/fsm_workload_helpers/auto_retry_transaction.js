@@ -58,7 +58,7 @@ var {withTxnAndAutoRetry} = (function() {
                     const rand = Random.rand();
                     if (rand < prepareProbability) {
                         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-                        PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
+                        PrepareHelpers.commitTransaction(session, prepareTimestamp);
                     } else {
                         // commitTransaction() calls assert.commandWorked(), which may fail with a
                         // WriteConflict error response, which is ignored.

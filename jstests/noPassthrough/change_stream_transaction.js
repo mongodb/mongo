@@ -134,8 +134,7 @@
         //
         // Commit first transaction and confirm expected changes.
         //
-        assert.commandWorked(
-            PrepareHelpers.commitTransactionAfterPrepareTS(session1, prepareTimestampTxn1));
+        assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestampTxn1));
         assertWriteVisibleWithCapture(
             changeStreamCursor, "insert", {_id: "no-txn-doc-3"}, changeList);
         assertWriteVisibleWithCapture(
@@ -192,8 +191,7 @@
         prepareTimestampTxn3 = PrepareHelpers.prepareTransaction(session3);
         assertNoChanges(changeStreamCursor);
 
-        assert.commandWorked(
-            PrepareHelpers.commitTransactionAfterPrepareTS(session3, prepareTimestampTxn3));
+        assert.commandWorked(PrepareHelpers.commitTransaction(session3, prepareTimestampTxn3));
         assertNoChanges(changeStreamCursor);
 
         assert.commandWorked(db.dropDatabase());

@@ -83,7 +83,7 @@
 
         if (commitOrAbort === "commit") {
             jsTestLog("Commit prepared transaction and wait for oplog to shrink to max oplogSize");
-            PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
+            PrepareHelpers.commitTransaction(session, prepareTimestamp);
         } else if (commitOrAbort === "abort") {
             jsTestLog("Abort prepared transaction and wait for oplog to shrink to max oplogSize");
             session.abortTransaction_forTesting();

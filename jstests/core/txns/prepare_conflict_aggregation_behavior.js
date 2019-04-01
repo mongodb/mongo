@@ -61,7 +61,7 @@
     // Make sure that we can't see the update from the aggregation or the prepared transaction.
     assert.eq([{_id: 0}, {_id: 1, b: 1}], outColl.find().toArray());
 
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     // Make sure that the $out pipeline works once the transaction is committed.
     testColl.aggregate(pipeline);

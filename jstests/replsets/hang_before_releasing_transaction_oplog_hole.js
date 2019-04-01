@@ -45,7 +45,7 @@
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: 'hangBeforeReleasingTransactionOplogHole', mode: 'alwaysOn'}));
 
-        PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
+        PrepareHelpers.commitTransaction(session, prepareTimestamp);
     }
     const joinTransaction = startParallelShell(transactionFn, rst.ports[0]);
 

@@ -31,6 +31,7 @@
 
 #include <set>
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
@@ -93,50 +94,20 @@ public:
     boost::optional<repl::OpTime> getOldestActiveOpTime() const;
 
     /**
-     * Add the transaction's oplog entry OpTime to oldestActiveOplogEntryOpTimes, a set of OpTimes.
-     * Also creates a pair with this OpTime and OpTime::max() as the corresponding commit/abort
-     * oplog entry OpTime. Finally, adds this to oldestNonMajorityCommittedOpTimes.
+     * Add the transaction's oplog entry OpTime to a set of OpTimes.
      */
     void addActiveOpTime(repl::OpTime oldestOplogEntryOpTime);
 
     /**
      * Remove the corresponding transaction oplog entry OpTime if the transaction commits or
-     * aborts. Also updates the pair in oldestNonMajorityCommittedOpTimes with the
-     * oldestOplogEntryOpTime to have a valid finishOpTime instead of OpTime::max(). It's stored in
-     * the format: < oldestOplogEntryOpTime, finishOpTime >.
+     * aborts.
      */
-    void removeActiveOpTime(repl::OpTime oldestOplogEntryOpTime,
-                            boost::optional<repl::OpTime> finishOpTime);
+    void removeActiveOpTime(repl::OpTime oldestOplogEntryOpTime);
 
     /**
      * Returns the number of transaction oplog entry OpTimes currently stored.
      */
     unsigned int getTotalActiveOpTimes() const;
-
-    /**
-     * Returns the oldest oplog entry OpTime across transactions whose corresponding commit or
-     * abort oplog entry has not been majority committed.
-     */
-    boost::optional<repl::OpTime> getOldestNonMajorityCommittedOpTime() const;
-
-    /**
-     * Remove the corresponding transaction oplog entry OpTime pair from
-     * oldestNonMajorityCommittedOpTimes if the transaction is majority committed or aborted.
-     * We determine this by checking if there are any pairs in the set whose
-     * 'finishOpTime' <= 'committedOpTime'.
-     */
-    void removeOpTimesLessThanOrEqToCommittedOpTime(repl::OpTime committedOpTime);
-
-    /**
-     * Testing function that adds an OpTime pair to oldestNonMajorityCommittedOpTimes.
-     */
-    void addNonMajCommittedOpTimePair_forTest(std::pair<repl::OpTime, repl::OpTime> OpTimePair);
-
-    /**
-     * Testing function that returns the oldest non-majority committed OpTime pair in the form:
-     * < oldestOplogEntryOpTime, finishOpTime >.
-     */
-    boost::optional<repl::OpTime> getFinishOpTimeOfOldestNonMajCommitted_forTest() const;
 
     /**
      * Appends the accumulated stats to a transactions stats object.
@@ -145,19 +116,12 @@ public:
 
     /**
      * Invalidates the in-memory state of prepared transactions during replication rollback by
-     * clearing oldestActiveOplogEntryOpTime, oldestActiveOplogEntryOpTimes, and
-     * oldestNonMajorityCommittedOpTimes. These variables/data structures should be properly
-     * reconstructed during replication recovery.
+     * clearing _oldestActiveOplogEntryOpTimes. This data structure should be properly reconstructed
+     * during replication recovery.
      */
     void clearOpTimes();
 
 private:
-    /**
-     * Returns the first and oldest optime in the ordered set of active oplog entry optimes.
-     * Returns boost::none if there are no transaction oplog entry optimes stored.
-     */
-    boost::optional<repl::OpTime> _calculateOldestActiveOpTime(WithLock) const;
-
     /**
      * Returns the oldest read timestamp in use by any open unprepared transaction. This will
      * return a null timestamp if there is no oldest open unprepared read timestamp to be
@@ -203,24 +167,10 @@ private:
     // The current number of transactions in the prepared state.
     AtomicWord<unsigned long long> _currentPrepared{0};
 
-    // The optime of the oldest oplog entry for any active transaction.
-    boost::optional<repl::OpTime> _oldestActiveOplogEntryOpTime;  // (M)
-
     // Maintain the oldest oplog entry OpTime across all active transactions. Currently, we only
     // write an oplog entry for an ongoing transaction if it is in the `prepare` state. By
     // maintaining an ordered set of OpTimes, the OpTime at the beginning will be the oldest.
     std::set<repl::OpTime> _oldestActiveOplogEntryOpTimes;  // (M)
-
-    // Maintain the oldest oplog entry OpTime across transactions whose corresponding abort/commit
-    // oplog entries have not been majority committed. Since this is an ordered set, the first
-    // pair's oldestOplogEntryOpTime represents the earliest OpTime that we should pin the stable
-    // timestamp behind.
-    // Each pair is structured as follows: <oldestOplogEntryOpTime, finishOpTime>
-    // 'oldestOplogEntryOpTime': The first oplog entry OpTime written by a transaction.
-    // 'finishOpTime': The commit/abort oplog entry OpTime.
-    // Once the corresponding abort/commit entry has been majority committed, remove the pair from
-    // this set.
-    std::set<std::pair<repl::OpTime, repl::OpTime>> _oldestNonMajorityCommittedOpTimes;  // (M)
 };
 
 }  // namespace mongo

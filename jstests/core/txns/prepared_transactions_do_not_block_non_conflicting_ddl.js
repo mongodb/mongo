@@ -28,8 +28,7 @@
         assert.commandWorked(sessionColl.update({_id: 1}, {$inc: {x: 1}}));
         const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
         assert.commandWorked(testDB.getSiblingDB(cmdDBName).runCommand(ddlCmd));
-        assert.commandWorked(
-            PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+        assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
     }
 
     jsTest.log("Test 'create'.");

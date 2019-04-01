@@ -56,8 +56,7 @@
     const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
 
     // Commit the first transaction.
-    assert.commandWorked(
-        PrepareHelpers.commitTransactionAfterPrepareTS(session1, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp));
 
     // Abort the second transaction.
     session2.abortTransaction_forTesting();
@@ -112,8 +111,7 @@
     assert.commandWorked(sessionColl1.insert({_id: 5}));
     const prepareTimestamp3 = PrepareHelpers.prepareTransaction(session1);
     // Make sure we can successfully retry the commitTransaction command after rollback.
-    assert.commandWorked(
-        PrepareHelpers.commitTransactionAfterPrepareTS(session1, prepareTimestamp3));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp3));
 
     session1.startTransaction();
     assert.commandWorked(sessionColl1.insert({_id: 6}));

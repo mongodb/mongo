@@ -95,11 +95,8 @@ void TransactionMetricsObserver::onUnstash(ServerTransactionsMetrics* serverTran
 void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
                                           TickSource* tickSource,
                                           boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-                                          boost::optional<repl::OpTime> commitOpTime,
                                           Top* top,
                                           bool wasPrepared) {
-    invariant((oldestOplogEntryOpTime != boost::none && commitOpTime != boost::none) ||
-              (oldestOplogEntryOpTime == boost::none && commitOpTime == boost::none));
     //
     // Per transaction metrics.
     //
@@ -129,7 +126,7 @@ void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTrans
 
     // Remove this transaction's oldest oplog entry OpTime if one was written.
     if (oldestOplogEntryOpTime) {
-        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime, commitOpTime);
+        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime);
     }
 }
 
@@ -137,11 +134,8 @@ void TransactionMetricsObserver::_onAbortActive(
     ServerTransactionsMetrics* serverTransactionsMetrics,
     TickSource* tickSource,
     boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-    boost::optional<repl::OpTime> abortOpTime,
     Top* top,
     bool wasPrepared) {
-    invariant((oldestOplogEntryOpTime != boost::none && abortOpTime != boost::none) ||
-              (oldestOplogEntryOpTime == boost::none && abortOpTime == boost::none));
 
     auto curTick = tickSource->getTicks();
     invariant(_singleTransactionStats.isActive());
@@ -163,7 +157,7 @@ void TransactionMetricsObserver::_onAbortActive(
 
     // Remove this transaction's oldest oplog entry OpTime if one was written.
     if (oldestOplogEntryOpTime) {
-        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime, abortOpTime);
+        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime);
     }
 }
 
@@ -183,25 +177,22 @@ void TransactionMetricsObserver::_onAbortInactive(
 
     // Remove this transaction's oldest oplog entry OpTime if one was written.
     if (oldestOplogEntryOpTime) {
-        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime, boost::none);
+        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime);
     }
 }
 
 void TransactionMetricsObserver::onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
                                          TickSource* tickSource,
                                          boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-                                         boost::optional<repl::OpTime> abortOpTime,
                                          Top* top,
                                          bool wasPrepared) {
     if (_singleTransactionStats.isActive()) {
         _onAbortActive(serverTransactionsMetrics,
                        tickSource,
                        oldestOplogEntryOpTime,
-                       abortOpTime,
                        top,
                        wasPrepared);
     } else {
-        invariant(abortOpTime == boost::none);
         invariant(!wasPrepared);
         _onAbortInactive(serverTransactionsMetrics, tickSource, oldestOplogEntryOpTime, top);
     }
@@ -260,14 +251,13 @@ void TransactionMetricsObserver::_onAbort(ServerTransactionsMetrics* serverTrans
 void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,
                                            repl::OpTime prepareOpTime,
                                            TickSource::Tick curTick) {
-
     //
     // Per transaction metrics.
     //
     _singleTransactionStats.setPreparedStartTime(curTick);
 
     // Since we currently only write an oplog entry for an in progress transaction when it is in
-    // the prepare state, the prepareOpTime is currently the oldest OpTime written to the
+    // the prepare state, the prepareOpTime is currently the oldest optime written to the
     // oplog for this transaction.
     serverTransactionsMetrics->addActiveOpTime(prepareOpTime);
     serverTransactionsMetrics->incrementCurrentPrepared();

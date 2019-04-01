@@ -79,7 +79,7 @@
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: 1}));
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
+    PrepareHelpers.commitTransaction(session, prepareTimestamp);
 
     assert.eq(testColl.find().itcount(), 2);
     assert.eq(testColl.count(), 2);

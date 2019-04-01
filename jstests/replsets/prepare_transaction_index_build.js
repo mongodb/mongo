@@ -63,7 +63,7 @@
 
     jsTestLog("Committing txn");
     // Commit the transaction.
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
     replTest.awaitReplication();
 
     jsTestLog("Testing index integrity");

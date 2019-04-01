@@ -50,7 +50,7 @@ TestData.skipCheckDBHashes = true;
         session.getDatabase('admin').adminCommand({prepareTransaction: 1, writeConcern: {w: 1}}));
     assert(result.prepareTimestamp,
            "prepareTransaction did not return a 'prepareTimestamp': " + tojson(result));
-    PrepareHelpers.commitTransactionAfterPrepareTS(session, result.prepareTimestamp);
+    PrepareHelpers.commitTransaction(session, result.prepareTimestamp);
 
     // Step down current primary and elect a node that lacks the commit.
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();

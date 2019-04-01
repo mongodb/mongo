@@ -56,7 +56,7 @@
     assert.commandFailedWithCode(testColl.update({_id: "from transaction"}, {$set: {a: 1}}),
                                  ErrorCodes.WriteConflict);
 
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
     assert.eq(testColl.findOne({a: 1}), {_id: "from prepared transaction", a: 1});
 
     assert.commandWorked(

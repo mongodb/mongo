@@ -52,8 +52,7 @@
 
     jsTestLog("Commiting the second prepared transaction while a node is in the RECOVERING state");
 
-    assert.commandWorked(
-        PrepareHelpers.commitTransactionAfterPrepareTS(session2, prepareTimestamp2));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp2));
     replSet.awaitReplication();
 
     jsTestLog("Taking secondary out of maintenance mode so it will transition back to SECONDARY");
@@ -96,8 +95,7 @@
 
     jsTestLog("Committing transaction");
 
-    assert.commandWorked(
-        PrepareHelpers.commitTransactionAfterPrepareTS(newSession, prepareTimestamp1));
+    assert.commandWorked(PrepareHelpers.commitTransaction(newSession, prepareTimestamp1));
     replSet.awaitReplication();
 
     replSet.stopSet();

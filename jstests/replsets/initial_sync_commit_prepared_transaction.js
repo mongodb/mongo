@@ -77,8 +77,7 @@
 
     // Commit a transaction on the sync source while collection cloning is paused so that we know
     // they must be applied during the oplog application stage of initial sync.
-    assert.commandWorked(
-        PrepareHelpers.commitTransactionAfterPrepareTS(session1, prepareTimestamp1));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp1));
 
     jsTestLog("Resuming initial sync");
 
@@ -106,8 +105,7 @@
     session2.startTransaction();
     assert.commandWorked(sessionColl2.insert({_id: 4}));
     let prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
-    assert.commandWorked(
-        PrepareHelpers.commitTransactionAfterPrepareTS(session2, prepareTimestamp2));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp2));
     res = newPrimary.getDB(dbName).getCollection(collName).findOne({_id: 4});
     assert.docEq(res, {_id: 4}, res);
 

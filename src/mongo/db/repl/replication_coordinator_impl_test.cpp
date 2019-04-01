@@ -58,7 +58,6 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -3864,8 +3863,6 @@ TEST_F(StableOpTimeTest, CalculateStableOpTime) {
 
     initReplSetMode();
     auto repl = getReplCoord();
-    getStorageInterface()->supportsDocLockingBool = true;
-    auto txnMetrics = ServerTransactionsMetrics::get(getGlobalServiceContext());
     OpTime commitPoint;
     boost::optional<OpTime> expectedStableOpTime, stableOpTime;
     std::set<OpTime> stableOpTimeCandidates;
@@ -3936,23 +3933,6 @@ TEST_F(StableOpTimeTest, CalculateStableOpTime) {
     stableOpTime =
         repl->chooseStableOpTimeFromCandidates_forTest(stableOpTimeCandidates, commitPoint);
     ASSERT_EQ(expectedStableOpTime, stableOpTime);
-
-    // Set the oldest oplog entry OpTime for non-majority committed aborts/commits associated
-    // with a multi-document transaction to be before the current commit point. We will then
-    // make expectedStableOpTime the new stable optime because it is the only candidate before
-    // the oldestNonMajCommittedOpTime.
-    commitPoint = OpTime({1, 5}, term);
-    const auto oldestNonMajCommittedOpTime = OpTime({1, 3}, term);
-    const auto finishOpTime = OpTime({1, 3}, term);
-    stableOpTimeCandidates = {oldestNonMajCommittedOpTime, OpTime({1, 4}, term)};
-
-    // Adds the oldestNonMajCommittedOpTime to both sets.
-    txnMetrics->addActiveOpTime(oldestNonMajCommittedOpTime);
-    // Update the finishOpTime.
-    txnMetrics->removeActiveOpTime(oldestNonMajCommittedOpTime, finishOpTime);
-    stableOpTime =
-        repl->chooseStableOpTimeFromCandidates_forTest(stableOpTimeCandidates, commitPoint);
-    ASSERT_EQ(oldestNonMajCommittedOpTime, stableOpTime);
 }
 
 TEST_F(StableOpTimeTest, CleanupStableOpTimeCandidates) {

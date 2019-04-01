@@ -65,7 +65,7 @@
                    prepareTransactionDocument.timeInactiveMicros);
     assert.gte(prepareTransactionDocument.timePreparedMicros, 0);
 
-    PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp);
+    PrepareHelpers.commitTransaction(session, prepareTimestamp);
     session.endSession();
 
     rst.stopSet();

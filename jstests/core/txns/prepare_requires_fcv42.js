@@ -26,8 +26,7 @@
         session.startTransaction();
         assert.commandWorked(sessionDB[collName].insert({_id: "a"}));
         let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-        assert.commandWorked(
-            PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+        assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
         jsTestLog("Downgrade the featureCompatibilityVersion.");
         assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
@@ -51,7 +50,7 @@
     session.startTransaction();
     assert.commandWorked(sessionDB[collName].insert({_id: "c"}));
     let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
     session.endSession();
 }());

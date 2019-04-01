@@ -70,12 +70,10 @@ public:
     /**
      * Updates relevant metrics when a transaction commits. Also removes this transaction's oldest
      * oplog entry OpTime from the oldestActiveOplogEntryOpTimes set if it is not boost::none.
-     * Finally, updates an entry in oldestNonMajorityCommittedOpTimes to include its commit OpTime.
      */
     void onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource* tickSource,
                   boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-                  boost::optional<repl::OpTime> commitOpTime,
                   Top* top,
                   bool wasPrepared);
 
@@ -86,13 +84,12 @@ public:
     void onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
                  TickSource* tickSource,
                  boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-                 boost::optional<repl::OpTime> abortOpTime,
                  Top* top,
                  bool wasPrepared);
 
     /**
-     * Adds the prepareOpTime, which is currently the Timestamp of the first oplog entry written by
-     * an active transaction, to the oldestActiveOplogEntryTS set.
+     * Adds the prepareOpTime, which is currently the OpTime of the first oplog entry written
+     * by an active transaction, to the oldestActiveOplogEntryOpTimes set.
      */
     void onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,
                    repl::OpTime prepareOpTime,
@@ -138,7 +135,6 @@ private:
     void _onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
                         TickSource* tickSource,
                         boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-                        boost::optional<repl::OpTime> abortOpTime,
                         Top* top,
                         bool wasPrepared);
 

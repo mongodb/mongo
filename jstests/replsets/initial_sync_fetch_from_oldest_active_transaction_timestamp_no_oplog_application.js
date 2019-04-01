@@ -68,9 +68,7 @@
     // that since the beginApplyingTimestamp is the timestamp after which operations are applied
     // during initial sync, this commitTransaction will not be applied.
     const beginApplyingTimestamp =
-        assert
-            .commandWorked(
-                PrepareHelpers.commitTransactionAfterPrepareTS(session1, prepareTimestamp1))
+        assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp1))
             .operationTime;
 
     jsTestLog("beginApplyingTimestamp/stopTimestamp: " + beginApplyingTimestamp);

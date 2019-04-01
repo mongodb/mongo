@@ -77,7 +77,7 @@
 
     // The following commit and abort will be rolled back.
     rollbackTest.transitionToRollbackOperations();
-    PrepareHelpers.commitTransactionAfterPrepareTS(session1, prepareTimestamp);
+    PrepareHelpers.commitTransaction(session1, prepareTimestamp);
     session2.abortTransaction_forTesting();
 
     // The fastcount should be accurate because there are no open transactions.

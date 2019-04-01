@@ -58,8 +58,7 @@
         // Create a proxy session to reuse the session state of the old primary.
         const newSession = new _DelegatingDriverSession(newPrimary, session);
 
-        assert.commandWorked(
-            PrepareHelpers.commitTransactionAfterPrepareTS(newSession, prepareTimestamp));
+        assert.commandWorked(PrepareHelpers.commitTransaction(newSession, prepareTimestamp));
         replTest.awaitReplication();
 
         assert.docEq(doc, testDB.getCollection(collName).findOne());

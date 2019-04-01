@@ -41,7 +41,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -632,21 +631,6 @@ TEST_F(TxnParticipantTest,
                        ErrorCodes::InvalidOptions);
 }
 
-TEST_F(TxnParticipantTest,
-       CommitTransactionWithCommitTimestampEqualToPrepareTimestampFailsOnPreparedTransaction) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
-
-    // The transaction machinery cannot store an empty locker.
-    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
-    auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    ASSERT_THROWS_CODE(txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {}),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
-}
-
 // This test makes sure the abort machinery works even when no operations are done on the
 // transaction.
 TEST_F(TxnParticipantTest, EmptyTransactionAbort) {
@@ -745,7 +729,6 @@ TEST_F(TxnParticipantTest, StepDownAfterPrepareDoesNotBlockThenCommit) {
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
 
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     // Test that we can acquire the RSTL in mode X, and then immediately release it so the test can
     // complete successfully.
@@ -755,7 +738,7 @@ TEST_F(TxnParticipantTest, StepDownAfterPrepareDoesNotBlockThenCommit) {
     };
     runFunctionFromDifferentOpCtx(func);
 
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTS, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
     ASSERT(_opObserver->preparedTransactionCommitted);
     ASSERT(txnParticipant.transactionIsCommitted());
 }
@@ -1024,9 +1007,9 @@ DEATH_TEST_F(TxnParticipantTest,
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+
     txnParticipant.addTransactionOperation(opCtx(), operation);
     auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     // Check that the oldest prepareTimestamp is the one we just set.
     auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
@@ -1041,9 +1024,10 @@ DEATH_TEST_F(TxnParticipantTest,
             ASSERT_FALSE(txnParticipant.transactionIsAborted());
         };
 
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTS, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
     // Check that we removed the prepareTimestamp from the set.
-    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
+    auto oldestActiveTS = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_FALSE(oldestActiveTS);
 }
 
 TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
@@ -1462,15 +1446,14 @@ TEST_F(TransactionsMetricsTest, IncrementTotalCommittedOnCommit) {
 TEST_F(TransactionsMetricsTest, IncrementTotalPreparedThenCommitted) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
+
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTimestamp =
-        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     unsigned long long beforePreparedThenCommittedCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted();
 
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
 
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted(),
@@ -1513,14 +1496,13 @@ TEST_F(TransactionsMetricsTest, IncrementCurrentPreparedWithCommit) {
 
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
+
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTimestamp =
-        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(),
               beforeCurrentPrepared + 1U);
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
     ASSERT(txnParticipant.transactionIsCommitted());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(), beforeCurrentPrepared);
 }
@@ -1698,10 +1680,9 @@ TEST_F(TransactionsMetricsTest, TrackCurrentActiveAndInactivePreparedTransaction
 
     // Tests that unstashing a transaction puts it into an active state.
     auto txnParticipant = TransactionParticipant::get(opCtx());
+
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTimestamp =
-        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
               beforeActivePreparedCounter + 1U);
@@ -1724,7 +1705,8 @@ TEST_F(TransactionsMetricsTest, TrackCurrentActiveAndInactivePreparedTransaction
               beforeInactivePreparedCounter);
 
     // Tests that committing decrements the active counter only.
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
+
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(),
               beforeActivePreparedCounter);
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(),
@@ -1841,12 +1823,10 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsPreparedDurationShouldBeSe
 
     // Prepare the transaction and extend the duration in the prepared state.
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTimestamp =
-        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     tickSource->advance(Microseconds(100));
 
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
     ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest().getPreparedDuration(
                   tickSource, tickSource->getTicks()),
               Microseconds(100));
@@ -1931,9 +1911,6 @@ TEST_F(TransactionsMetricsTest,
 
     // Prepare the transaction and extend the duration in the prepared state.
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTimestamp =
-        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
-
     tickSource->advance(Microseconds(100));
 
     // The prepared transaction's duration should have increased.
@@ -1944,7 +1921,7 @@ TEST_F(TransactionsMetricsTest,
     tickSource->advance(Microseconds(100));
 
     // Commit the prepared transaction and check the prepared duration.
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
     ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest().getPreparedDuration(
                   tickSource, tickSource->getTicks()),
               Microseconds(200));
@@ -2457,9 +2434,6 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
 
     // Prepare the transaction and extend the duration in the prepared state.
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTimestamp =
-        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
-
     const long preparedDuration = 10;
     tickSource->advance(Microseconds(preparedDuration));
 
@@ -2516,7 +2490,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     ASSERT(txnParticipant.reportStashedState(opCtx()).isEmpty());
 
     // Commit the transaction. This allows us to release locks.
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
 }
 
 TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
@@ -2851,7 +2825,7 @@ std::string buildTransactionInfoString(
     // timeInactiveMicros:2 numYields:0 locks:{ Global: { acquireCount: { r: 6, w: 4 } }, Database:
     // { acquireCount: { r: 1, w: 1, W: 2 } }, Collection: { acquireCount: { R: 1 } }, oplog: {
     // acquireCount: { W: 1 } } } wasPrepared:1 totalPreparedDurationMicros:10
-    // prepareOpTime:<OpTime> oldestOplogEntryOpTime:<OpTime> finishOpTime:<OpTime> 0ms
+    // prepareOpTime:<OpTime> oldestOplogEntryOpTime:<OpTime> 0ms
     StringBuilder expectedTransactionInfo;
     expectedTransactionInfo << parametersInfo.str() << readTimestampInfo.str()
                             << singleTransactionStatsInfo.str()
@@ -2876,10 +2850,6 @@ std::string buildTransactionInfoString(
     if (oldestOplogEntryOpTime) {
         ASSERT(!txnParticipant.getOldestOplogEntryOpTimeForTest());
         expectedTransactionInfo << " oldestOplogEntryOpTime:" << oldestOplogEntryOpTime->toString();
-    }
-    if (txnParticipant.getFinishOpTimeForTest()) {
-        expectedTransactionInfo << " finishOpTime:"
-                                << txnParticipant.getFinishOpTimeForTest()->toString();
     }
     expectedTransactionInfo << ", "
                             << duration_cast<Milliseconds>(
@@ -2948,12 +2918,10 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterCommit) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTimestamp =
-        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     tickSource->advance(Microseconds(10));
 
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
     ASSERT(lockerInfo);
@@ -3139,11 +3107,9 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowCommit) {
 
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    const auto commitTimestamp =
-        Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
 
     startCapturingLogMessages();
-    txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, {});
+    txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, {});
     stopCapturingLogMessages();
 
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo(boost::none);
@@ -3460,128 +3426,6 @@ TEST_F(TxnParticipantTest, ReturnNullTimestampIfNoOldestActiveTimestamp) {
     ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
 }
 
-TEST_F(TxnParticipantTest, ProperlyMaintainOldestNonMajorityCommittedOpTimeSet) {
-    auto sessionCheckout = checkOutSession();
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-
-    // Check that there are no Timestamps in the set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
-
-    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
-    auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
-    // Check that we added a Timestamp to the set.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 1U);
-
-    // Check that the oldest prepareTimestamp is equal to first prepareTimestamp because there is
-    // only one prepared transaction on this Service.
-    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
-    ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
-
-    // Check that oldestNonMajorityCommittedOpTimes also has this prepareTimestamp and that the
-    // pair's finishOpTime is Timestamp::max() because this transaction has not been
-    // committed/aborted.
-    auto nonMajorityCommittedOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-    ASSERT_EQ(nonMajorityCommittedOpTime->getTimestamp(), prepareTimestamp);
-    auto nonMajorityCommittedOpTimeFinishOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getFinishOpTimeOfOldestNonMajCommitted_forTest();
-    ASSERT_EQ(nonMajorityCommittedOpTimeFinishOpTime->getTimestamp(), Timestamp::max());
-
-    ASSERT_FALSE(txnParticipant.transactionIsAborted());
-    // Since this test uses a mock opObserver, we have to manually set the finishTimestamp on the
-    // txnParticipant.
-    auto finishOpTime = repl::OpTime({10, 10}, 0);
-    repl::ReplClientInfo::forClient(opCtx()->getClient()).setLastOp(finishOpTime);
-
-    txnParticipant.abortActiveTransaction(opCtx());
-    ASSERT(txnParticipant.transactionIsAborted());
-
-    // Make sure that we moved the OpTime from the oldestActiveOplogEntryOpTimes to
-    // oldestNonMajorityCommittedOpTimes along with the abort/commit oplog entry OpTime
-    // associated with the transaction.
-    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
-    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
-
-    nonMajorityCommittedOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-    nonMajorityCommittedOpTimeFinishOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getFinishOpTimeOfOldestNonMajCommitted_forTest();
-    ASSERT_FALSE(nonMajorityCommittedOpTime == boost::none);
-    ASSERT_FALSE(nonMajorityCommittedOpTimeFinishOpTime == boost::none);
-    ASSERT_EQ(nonMajorityCommittedOpTime->getTimestamp(), prepareTimestamp);
-    ASSERT(nonMajorityCommittedOpTimeFinishOpTime);
-    ASSERT_EQ(*nonMajorityCommittedOpTimeFinishOpTime, finishOpTime);
-
-    // If we pass in a mock commit point that is greater than the finish timestamp of the
-    // oldestNonMajorityCommittedOpTime, it should be removed from the set. This would mean that
-    // the abort/commit oplog entry is majority committed.
-    ServerTransactionsMetrics::get(opCtx())->removeOpTimesLessThanOrEqToCommittedOpTime(
-        repl::OpTime::max());
-    nonMajorityCommittedOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-    ASSERT_FALSE(nonMajorityCommittedOpTime);
-}
-
-TEST_F(TxnParticipantTest, GetOldestNonMajorityCommittedOpTimeReturnsOldestEntry) {
-    const auto earlierOpTime = repl::OpTime({1, 1}, 0);
-    const auto earlierFinishOpTime = repl::OpTime({3, 2}, 0);
-
-    const auto middleOpTime = repl::OpTime({1, 2}, 0);
-    const auto middleFinishOpTime = repl::OpTime({3, 3}, 0);
-
-    const auto laterOpTime = repl::OpTime({1, 3}, 0);
-    const auto laterFinishOpTime = repl::OpTime({3, 4}, 0);
-
-    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(earlierOpTime);
-    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(earlierOpTime, earlierFinishOpTime);
-
-    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(middleOpTime);
-    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(middleOpTime, middleFinishOpTime);
-
-    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(laterOpTime);
-    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(laterOpTime, laterFinishOpTime);
-
-    auto nonMajorityCommittedOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-
-    ASSERT_EQ(*nonMajorityCommittedOpTime, repl::OpTime({1, 1}, 0));
-
-    // If we pass in a mock commit point that is greater than the finish timestamp of the
-    // oldestNonMajorityCommittedOpTime, it should be removed from the set. This would mean that
-    // the abort/commit oplog entry is majority committed.
-    ServerTransactionsMetrics::get(opCtx())->removeOpTimesLessThanOrEqToCommittedOpTime(
-        repl::OpTime::max());
-    nonMajorityCommittedOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-    ASSERT_FALSE(nonMajorityCommittedOpTime);
-
-    // Test that we can remove only a part of the set by passing in a commit point that is only
-    // greater than or equal to two of the optimes.
-    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(earlierOpTime);
-    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(earlierOpTime, earlierFinishOpTime);
-
-    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(middleOpTime);
-    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(middleOpTime, middleFinishOpTime);
-
-    ServerTransactionsMetrics::get(opCtx())->addActiveOpTime(laterOpTime);
-    ServerTransactionsMetrics::get(opCtx())->removeActiveOpTime(laterOpTime, laterFinishOpTime);
-
-    nonMajorityCommittedOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-
-    ASSERT_EQ(*nonMajorityCommittedOpTime, earlierOpTime);
-
-    ServerTransactionsMetrics::get(opCtx())->removeOpTimesLessThanOrEqToCommittedOpTime(
-        repl::OpTime({3, 3}, 0));
-    nonMajorityCommittedOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-
-    // earlierOpTime and middleOpTime must have been removed because their finishOpTime are less
-    // than or equal to the mock commit point.
-    ASSERT(nonMajorityCommittedOpTime);
-    ASSERT_EQ(*nonMajorityCommittedOpTime, laterOpTime);
-}
-
 TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
     auto sessionCheckout = checkOutSession();
 
@@ -3598,7 +3442,6 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
     // Check that our metrics are initialized to their default values.
     ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
-    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime());
 
     // Perform an insert as a part of a transaction so that we have a transaction operation.
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
@@ -3612,13 +3455,10 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
     // Check that we added a Timestamp to oldestActiveOplogEntryOpTimes.
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 1U);
 
-    // Check that the oldest active timestamp and the oldest non majority committed timestamp are
-    // equal to the prepareTimestamp because there is only one prepared transaction.
-    auto oldestActiveOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
-    auto oldestNonMajorityCommittedOpTime =
-        ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime();
-    ASSERT_EQ(oldestActiveOpTime->getTimestamp(), prepareTimestamp);
-    ASSERT_EQ(oldestNonMajorityCommittedOpTime->getTimestamp(), prepareTimestamp);
+    // Check that the oldest active timestamp is equal to the prepareTimestamp because there is
+    // only one prepared transaction.
+    auto prepareOpTime = ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime();
+    ASSERT_EQ(prepareOpTime->getTimestamp(), prepareTimestamp);
     ASSERT_FALSE(txnParticipant.transactionIsAborted());
 
     // Make sure the state of txnParticipant is populated correctly after a prepared transaction.
@@ -3639,7 +3479,6 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
 
     // After calling clearOpTimes, we should no longer have an oldestActiveOpTime.
     ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestActiveOpTime());
-    ASSERT_FALSE(ServerTransactionsMetrics::get(opCtx())->getOldestNonMajorityCommittedOpTime());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalActiveOpTimes(), 0U);
 }
 
@@ -3683,7 +3522,6 @@ TEST_F(TxnParticipantTest, CommitPreparedTransactionAsSecondarySetsTheFinishOpTi
         Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
     const auto commitOplogEntryOpTime = repl::OpTime({10, 10}, 0);
     txnParticipant.commitPreparedTransaction(opCtx(), commitTimestamp, commitOplogEntryOpTime);
-    ASSERT_EQ(txnParticipant.getFinishOpTimeForTest().get(), commitOplogEntryOpTime);
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
 }
 

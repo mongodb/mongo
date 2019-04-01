@@ -152,7 +152,7 @@
     session.startTransaction();
     assert.commandWorked(sessionDB[collName].update({_id: 1}, {_id: 1, a: 3}));
     prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-    assert.commandWorked(PrepareHelpers.commitTransactionAfterPrepareTS(session, prepareTimestamp));
+    assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
     assert.eq(testDB[collName].findOne({_id: 1}), {_id: 1, a: 3});
 
     replTest.stopSet();
