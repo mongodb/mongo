@@ -563,6 +563,15 @@ class BuilderBase(object):
 
         tlist, slist = self._create_nodes(env, target, source)
 
+        # If there is more than one target ensure that if we need to reset
+        # the implicit list to new scan of dependency all targets implicit lists
+        # are cleared. (SERVER-33111)
+        if len(tlist) > 1:
+            # print("Builder:_execute():Tlist > 1 -> %s"%[str(t) for t in tlist])
+            for t in tlist:
+                t.target_peers = tlist
+
+
         # Check for errors with the specified target/source lists.
         _node_errors(self, env, tlist, slist)
 

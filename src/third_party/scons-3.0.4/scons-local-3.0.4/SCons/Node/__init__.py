@@ -529,6 +529,7 @@ class Node(object, with_metaclass(NoSlotsPyPy)):
 
     __slots__ = ['sources',
                  'sources_set',
+                 'target_peers', 
                  '_specific_sources',
                  'depends',
                  'depends_set',
@@ -783,6 +784,11 @@ class Node(object, with_metaclass(NoSlotsPyPy)):
         # waiting for this Node to be built.
         for parent in self.waiting_parents:
             parent.implicit = None
+            try:
+                for peer in parent.target_peers:
+                    peer.implicit = None
+            except AttributeError as e:
+                pass
 
         self.clear()
 
