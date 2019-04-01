@@ -319,4 +319,10 @@ TEST(ConstIterator, StdReplaceCopy) {
     }
 }
 
+TEST(StringDataFmt, Fmt) {
+    using namespace fmt::literals;
+    ASSERT_EQUALS(fmt::format("-{}-", "abc"_sd), "-abc-");
+    ASSERT_EQUALS("-{}-"_format("abc"_sd), "-abc-");
+}
+
 }  // namespace mongo

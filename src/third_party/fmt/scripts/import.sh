@@ -1,35 +1,25 @@
 #!/bin/bash
 # This script downloads and imports libfmt.
 
-set -euo pipefail
-IFS=$'\n\t'
+set -vxeuo pipefail
 
-set -vx
+FMT_GIT_URL="https://github.com/mongodb-forks/fmt.git"
+FMT_GIT_REV=018d8b57f6ff76fc5bb5abaa243ff3f805bf297f  # 2019-03-30
+FMT_GIT_DIR=$(mktemp -d /tmp/import-fmt.XXXXXX)
+trap "rm -rf $FMT_GIT_DIR" EXIT
 
-if [[ "$#" -ne 0 ]]; then
-    echo "This script does not take any arguments" >&2
-    exit 1
-fi
+DIST=$(git rev-parse --show-toplevel)/src/third_party/fmt/dist
+git clone "$FMT_GIT_URL" $FMT_GIT_DIR
+git -C $FMT_GIT_DIR checkout $FMT_GIT_REV
 
-NAME=fmt
-REVISION=mongodb
-
-# If WSL, get Windows temp directory
-if $(grep -q Microsoft /proc/version); then
-    TEMP_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
-else
-    TEMP_ROOT="/tmp"
-fi
-GITDIR=$(mktemp -d $TEMP_ROOT/$NAME.XXXXXX)
-trap "rm -rf $GITDIR" EXIT
-
-DIST=$(git rev-parse --show-toplevel)/src/third_party/$NAME/dist
-
-git clone "git@github.com:BillyDonahue/fmt.git" -c core.autocrlf=false $GITDIR
-git -C $GITDIR checkout $REVISION
-
-mkdir -p $DIST
-cp -Trp $GITDIR/src $DIST/src
-
-mkdir -p $DIST/include/fmt
-cp -Trp $GITDIR/include/fmt $DIST/include/fmt
+# Exclude the file 'include/format', which provides experimental
+# 'std::' definitions.
+SUBDIR_WHITELIST=(
+    src
+    include/fmt
+    LICENSE.rst
+)
+for subdir in ${SUBDIR_WHITELIST[@]}; do
+    [[ -d $FMT_GIT_DIR/$subdir ]] && mkdir -p $DIST/$subdir
+    cp -Trp $FMT_GIT_DIR/$subdir $DIST/$subdir
+done

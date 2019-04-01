@@ -313,6 +313,11 @@ add_option('use-system-tcmalloc',
     nargs=0,
 )
 
+add_option('use-system-fmt',
+    help='use system version of fmt library',
+    nargs=0,
+)
+
 add_option('use-system-pcre',
     help='use system version of pcre library',
     nargs=0,
@@ -3217,6 +3222,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("yaml"):
         conf.FindSysLibDep("yaml", ["yaml-cpp"])
+
+    if use_system_version_of_library("fmt"):
+        conf.FindSysLibDep("fmt", ["fmt"])
 
     if use_system_version_of_library("intel_decimal128"):
         conf.FindSysLibDep("intel_decimal128", ["bid"])

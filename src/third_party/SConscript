@@ -163,18 +163,37 @@ env.AddMethod(injectThirdParty, 'InjectThirdParty')
 env = env.Clone()
 
 murmurEnv = env.Clone()
+murmurEnv.InjectThirdParty(libraries=['fmt'])
 murmurEnv.SConscript('murmurhash3/SConscript', exports={ 'env' : murmurEnv })
 
 
 s2Env = env.Clone()
-s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp'])
+s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp', 'fmt'])
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
 
-fmtEnv = env.Clone()
-fmtEnv.InjectThirdParty(libraries=['fmt'])
-fmtEnv.InjectMongoIncludePaths()
-fmtEnv.SConscript('fmt/SConscript', exports={'env' : fmtEnv})
+
+if use_system_version_of_library("fmt"):
+    fmtEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_FMT_SYSLIBDEP'],
+        ])
+else:
+    fmtEnv = env.Clone()
+    fmtEnv.InjectThirdParty(libraries=['fmt'])
+    fmtEnv.InjectMongoIncludePaths()
+    fmtEnv.SConscript('fmt/SConscript', exports={'env' : fmtEnv})
+    fmtEnv = fmtEnv.Clone(
+        LIBDEPS_INTERFACE=[
+            'fmt/fmt',
+        ])
+
+fmtEnv.Library(
+    target="shim_fmt",
+    source=[
+        'shim_fmt.cpp',
+    ])
+
 
 if use_system_version_of_library("pcre"):
     pcreEnv = env.Clone(

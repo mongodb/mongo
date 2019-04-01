@@ -18,6 +18,7 @@ env = env.Clone()
 env.InjectThirdParty(libraries=[
     'abseil-cpp',
     'boost',
+    'fmt',
     'pcre',
 ])
 

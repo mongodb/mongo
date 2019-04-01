@@ -584,14 +584,6 @@ typedef basic_printf_context_t<internal::wbuffer>::type wprintf_context;
 typedef basic_format_args<printf_context> printf_args;
 typedef basic_format_args<wprintf_context> wprintf_args;
 
-template <typename OutputIt, typename Char = typename OutputIt::value_type>
-struct basic_printf_n_context_t {
-  typedef fmt::internal::truncating_iterator<OutputIt> OutputIter;
-  typedef output_range<OutputIter, Char> Range;
-  typedef basic_printf_context<OutputIter, Char, printf_arg_formatter<Range>>
-      type;
-};
-
 /**
   \rst
   Constructs an `~fmt::format_arg_store` object that contains references to
@@ -627,17 +619,6 @@ inline std::basic_string<Char> vsprintf(
   return to_string(buffer);
 }
 
-template <typename OutputIt, typename S, typename Char = FMT_CHAR(S),
-          FMT_ENABLE_IF(internal::is_output_iterator<OutputIt>::value)>
-inline format_to_n_result<OutputIt> vsnprintf(
-    OutputIt out, std::size_t n, const S& format,
-    basic_format_args<typename basic_printf_n_context_t<OutputIt, Char>::type>
-        args) {
-  typedef internal::truncating_iterator<OutputIt> It;
-  auto it = printf(It(out, n), to_string_view(format), args);
-  return {it.base(), it.count()};
-}
-
 /**
   \rst
   Formats arguments and returns the result as a string.
@@ -656,34 +637,6 @@ inline std::basic_string<FMT_CHAR(S)> sprintf(const S& format,
   typedef typename basic_printf_context_t<buffer>::type context;
   format_arg_store<context, Args...> as{args...};
   return vsprintf(to_string_view(format), basic_format_args<context>(as));
-}
-
-/**
-  \rst
-  Formats arguments for up to ``n`` characters stored through output iterator
-  ``out``. The function returns the updated iterator and the untruncated amount
-  of characters.
-
-  **Example**::
-    std::vector<char> out;
-
-    typedef fmt::format_to_n_result<
-      std::back_insert_iterator<std::vector<char>>> res;
-    res Res = fmt::snprintf(std::back_inserter(out), 5, "The answer is %d", 42);
-  \endrst
-*/
-template <typename OutputIt, typename S, typename... Args,
-          FMT_ENABLE_IF(internal::is_string<S>::value&&
-                            internal::is_output_iterator<OutputIt>::value)>
-inline format_to_n_result<OutputIt> snprintf(OutputIt out, std::size_t n,
-                                             const S& format,
-                                             const Args&... args) {
-  internal::check_format_string<Args...>(format);
-  typedef FMT_CHAR(S) Char;
-  typedef typename basic_printf_n_context_t<OutputIt, Char>::type context;
-  format_arg_store<context, Args...> as{args...};
-  return vsnprintf(out, n, to_string_view(format),
-                   basic_format_args<context>(as));
 }
 
 template <typename S, typename Char = FMT_CHAR(S)>

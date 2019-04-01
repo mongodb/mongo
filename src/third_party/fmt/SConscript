@@ -3,8 +3,9 @@ Import("env")
 Import("has_option")
 Import("debugBuild")
 env = env.Clone()
-files = ['format.cc', 'posix.cc']
 env.Library(
     target='fmt',
-    source=['dist/src/' + f for f in files],
-)
+    source=env.File([
+        'format.cc',
+        'posix.cc',
+    ], 'dist/src'))

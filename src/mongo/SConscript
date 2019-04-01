@@ -146,6 +146,7 @@ env.Library(
         '$BUILD_DIR/third_party/shim_abseil',
         '$BUILD_DIR/third_party/shim_allocator',
         '$BUILD_DIR/third_party/shim_boost',
+        '$BUILD_DIR/third_party/shim_fmt',
         '$BUILD_DIR/third_party/shim_intel_decimal128',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         'util/quick_exit',
