@@ -980,7 +980,7 @@ buildvariants:
     - name: smoke_test
     - name: retryable_writes_workloads
     - name: industry_benchmarks_wmajority
-    - name: secondary_performance
+    - name: secondary_performance # Uses a special 2 node mongodb setup
     - name: non_sharded_workloads
     - name: bestbuy_agg
     - name: bestbuy_agg_out
@@ -1009,8 +1009,9 @@ buildvariants:
   depends_on:
       - name: compile
         variant: compile-linux-64-amzn
-  tasks: &3nodetasks
+  tasks:
     - name: industry_benchmarks
+    - name: mixed_workloads
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
