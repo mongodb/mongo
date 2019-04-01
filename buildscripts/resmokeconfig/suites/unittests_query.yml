@@ -3,7 +3,9 @@ test_kind: cpp_unit_test
 selector:
   root: build/unittests.txt
   include_files:
+  - build/**/pipeline/*
   - build/**/query/*
+  - build/**/exec/*
 
 executor:
   config: {}
