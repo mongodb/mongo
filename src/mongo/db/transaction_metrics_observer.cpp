@@ -187,11 +187,8 @@ void TransactionMetricsObserver::onAbort(ServerTransactionsMetrics* serverTransa
                                          Top* top,
                                          bool wasPrepared) {
     if (_singleTransactionStats.isActive()) {
-        _onAbortActive(serverTransactionsMetrics,
-                       tickSource,
-                       oldestOplogEntryOpTime,
-                       top,
-                       wasPrepared);
+        _onAbortActive(
+            serverTransactionsMetrics, tickSource, oldestOplogEntryOpTime, top, wasPrepared);
     } else {
         invariant(!wasPrepared);
         _onAbortInactive(serverTransactionsMetrics, tickSource, oldestOplogEntryOpTime, top);
