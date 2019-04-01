@@ -323,7 +323,13 @@ private:
     void _allowIndexBuildsOnDatabase(StringData dbName);
     void _allowIndexBuildsOnCollection(const UUID& collectionUUID);
 
-private:
+    /**
+     * Updates CurOp's 'opDescription' field with the current state of this index build.
+     */
+    void _updateCurOpOpDescription(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const std::vector<BSONObj>& indexSpecs) const;
+
     /**
      * Registers an index build so that the rest of the system can discover it.
      *

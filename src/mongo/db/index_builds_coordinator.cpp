@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/op_observer.h"
@@ -64,8 +65,10 @@ MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
 
 namespace {
 
-constexpr auto kUniqueFieldName = "unique"_sd;
-constexpr auto kKeyFieldName = "key"_sd;
+constexpr StringData kCreateIndexesFieldName = "createIndexes"_sd;
+constexpr StringData kIndexesFieldName = "indexes"_sd;
+constexpr StringData kKeyFieldName = "key"_sd;
+constexpr StringData kUniqueFieldName = "unique"_sd;
 
 /**
  * Checks if unique index specification is compatible with sharding configuration.
@@ -440,6 +443,36 @@ void IndexBuildsCoordinator::verifyNoIndexBuilds_forTestOnly() {
     invariant(_collectionIndexBuilds.empty());
 }
 
+void IndexBuildsCoordinator::_updateCurOpOpDescription(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& indexSpecs) const {
+    BSONObjBuilder builder;
+
+    // If the collection namespace is provided, add a 'createIndexes' field with the collection name
+    // to allow tests to identify this op as an index build.
+    if (!nss.isEmpty()) {
+        builder.append(kCreateIndexesFieldName, nss.coll());
+    }
+
+    // If index specs are provided, add them under the 'indexes' field.
+    if (!indexSpecs.empty()) {
+        BSONArrayBuilder indexesBuilder;
+        for (const auto& spec : indexSpecs) {
+            indexesBuilder.append(spec);
+        }
+        builder.append(kIndexesFieldName, indexesBuilder.arr());
+    }
+
+    stdx::unique_lock<Client> lk(*opCtx->getClient());
+    auto curOp = CurOp::get(opCtx);
+    builder.appendElementsUnique(curOp->opDescription());
+    auto opDescObj = builder.obj();
+    curOp->setLogicalOp_inlock(LogicalOp::opCommand);
+    curOp->setOpDescription_inlock(opDescObj);
+    curOp->ensureStarted();
+}
+
 Status IndexBuildsCoordinator::_registerIndexBuild(
     WithLock lk, std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
 
@@ -708,6 +741,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
     invariant(!nss.isEmpty(),
               str::stream() << "Collection '" << replState->collectionUUID
                             << "' should exist because an index build is in progress.");
+
+    // Set up the thread's currentOp information to display createIndexes cmd information.
+    _updateCurOpOpDescription(opCtx, nss, replState->indexSpecs);
 
     // Do not use AutoGetOrCreateDb because we may relock the database in mode IX.
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
