@@ -57,11 +57,6 @@ Future<void> persistParticipantsList(txn::AsyncWorkScheduler& scheduler,
                                      TxnNumber txnNumber,
                                      const txn::ParticipantsList& participants);
 
-/**
- * Sends prepare to all participants and returns a future that will be resolved when either:
- *    a) All participants have responded with a vote to commit, or
- *    b) At least one participant votes to abort.
- */
 struct PrepareResponse;
 class PrepareVoteConsensus {
 public:
@@ -85,6 +80,12 @@ private:
 
     Timestamp _maxPrepareTimestamp;
 };
+
+/**
+ * Sends prepare to all participants and returns a future that will be resolved when either:
+ *    a) All participants have responded with a vote to commit, or
+ *    b) At least one participant votes to abort.
+ */
 Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                          txn::AsyncWorkScheduler& scheduler,
                                          const LogicalSessionId& lsid,

@@ -164,6 +164,11 @@ private:
                                          const ReadPreferenceSetting& readPref);
 
     /**
+     * Returns true when all the registered child schedulers, op contexts and handles have joined.
+     */
+    bool _quiesced(WithLock) const;
+
+    /**
      * Invoked every time a registered op context, handle or child scheduler is getting
      * unregistered. Used to notify the 'all lists empty' condition variable when there is no more
      * activity on a scheduler which has been shut down.

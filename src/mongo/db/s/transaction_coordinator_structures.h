@@ -44,7 +44,6 @@ using ParticipantsList = std::vector<ShardId>;
 enum class PrepareVote {
     kCommit,
     kAbort,
-    kCanceled,
 };
 
 using CommitDecision = PrepareVote;

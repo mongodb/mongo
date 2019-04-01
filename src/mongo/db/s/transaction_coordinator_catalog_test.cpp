@@ -61,7 +61,7 @@ protected:
             lsid,
             txnNumber,
             std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-            boost::none);
+            Date_t::max());
 
         _coordinatorCatalog->insert(opCtx, lsid, txnNumber, newCoordinator);
     }
@@ -140,7 +140,7 @@ TEST_F(TransactionCoordinatorCatalogTest, CoordinatorsRemoveThemselvesFromCatalo
     auto coordinator = _coordinatorCatalog->get(operationContext(), lsid, txnNumber);
 
     coordinator->cancelIfCommitNotYetStarted();
-    ASSERT(coordinator->onCompletion().isReady());
+    coordinator->onCompletion().wait();
 
     auto latestTxnNumAndCoordinator =
         _coordinatorCatalog->getLatestOnSession(operationContext(), lsid);

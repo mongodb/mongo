@@ -59,7 +59,6 @@ StringData writeCommitDecisionEnumProperty(CommitDecision decision) {
     switch (decision) {
         case CommitDecision::kCommit:     return kCommitDecision;
         case CommitDecision::kAbort:      return kAbortDecision;
-        case CommitDecision::kCanceled:   break;
     };
     // clang-format on
     MONGO_UNREACHABLE;
@@ -71,7 +70,6 @@ logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
     switch (decision) {
         case txn::CommitDecision::kCommit:     return stream << "kCommit";
         case txn::CommitDecision::kAbort:      return stream << "kAbort";
-        case txn::CommitDecision::kCanceled:   return stream << "kCanceled";
     };
     // clang-format on
     MONGO_UNREACHABLE;

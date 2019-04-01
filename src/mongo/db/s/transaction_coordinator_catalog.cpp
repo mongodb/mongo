@@ -86,7 +86,7 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
     LOG(3) << "Inserting coordinator " << lsid.getId() << ':' << txnNumber
            << " into in-memory catalog";
 
-    auto cleanupCoordinatorsGuard = makeGuard([&] { _cleanupCompletedCoordinators(); });
+    ON_BLOCK_EXIT([&] { _cleanupCompletedCoordinators(); });
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
     if (!forStepUp) {

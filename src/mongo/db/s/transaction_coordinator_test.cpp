@@ -665,7 +665,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesCommitDecisionOnTwoCommitRes
         _lsid,
         _txnNumber,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        boost::none);
+        Date_t::max());
     coordinator.runCommit(kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -687,7 +687,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnAbortAndCommi
         _lsid,
         _txnNumber,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        boost::none);
+        Date_t::max());
     coordinator.runCommit(kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -709,7 +709,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnCommitAndAbor
         _lsid,
         _txnNumber,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        boost::none);
+        Date_t::max());
     coordinator.runCommit(kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -731,7 +731,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnSingleAbortRe
         _lsid,
         _txnNumber,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        boost::none);
+        Date_t::max());
     coordinator.runCommit(kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -754,7 +754,7 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumber,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        boost::none);
+        Date_t::max());
     coordinator.runCommit(kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -782,7 +782,7 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumber,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        boost::none);
+        Date_t::max());
     coordinator.runCommit(kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -807,7 +807,7 @@ TEST_F(TransactionCoordinatorTest,
         _lsid,
         _txnNumber,
         std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        boost::none);
+        Date_t::max());
     coordinator.runCommit(kTwoShardIdList);
     auto commitDecisionFuture = coordinator.getDecision();
 
@@ -830,15 +830,6 @@ TEST_F(TransactionCoordinatorTest,
     ASSERT_EQ(static_cast<int>(commitDecision), static_cast<int>(txn::CommitDecision::kCommit));
 
     coordinator.onCompletion().get();
-}
-
-TEST_F(TransactionCoordinatorTest, AbandonNewlyCreatedCoordinator) {
-    TransactionCoordinator coordinator(
-        getServiceContext(),
-        _lsid,
-        _txnNumber,
-        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
-        network()->now() + Seconds{30});
 }
 
 }  // namespace

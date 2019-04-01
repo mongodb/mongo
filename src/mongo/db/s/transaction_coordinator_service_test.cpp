@@ -471,8 +471,8 @@ TEST_F(TransactionCoordinatorServiceTest,
     coordinatorService->createCoordinator(
         operationContext(), _lsid, _txnNumber + 1, kCommitDeadline);
 
-    ASSERT_EQ(static_cast<int>(commitDecisionFuture.get()),
-              static_cast<int>(txn::CommitDecision::kCanceled));
+    ASSERT_THROWS_CODE(
+        commitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(
@@ -493,7 +493,10 @@ TEST_F(
         coordinatorService->coordinateCommit(operationContext(), _lsid, _txnNumber, kTwoShardIdSet);
 
     // The old transaction should now be committed.
-    ASSERT(oldTxnCommitDecisionFuture == boost::none);
+    if (oldTxnCommitDecisionFuture) {
+        ASSERT_THROWS_CODE(
+            oldTxnCommitDecisionFuture->get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    }
 
     // Make sure the newly created one works fine too.
     commitTransaction(*coordinatorService, _lsid, _txnNumber + 1, kTwoShardIdSet);

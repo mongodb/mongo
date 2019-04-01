@@ -58,7 +58,10 @@ AsyncWorkScheduler::AsyncWorkScheduler(ServiceContext* serviceContext)
       _executor(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor()) {}
 
 AsyncWorkScheduler::~AsyncWorkScheduler() {
-    join();
+    {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        invariant(_quiesced(lg));
+    }
 
     if (!_parent)
         return;
@@ -218,8 +221,12 @@ Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,
     });
 }
 
-void AsyncWorkScheduler::_notifyAllTasksComplete(WithLock) {
-    if (_activeOpContexts.empty() && _activeHandles.empty() && _childSchedulers.empty())
+bool AsyncWorkScheduler::_quiesced(WithLock) const {
+    return _activeOpContexts.empty() && _activeHandles.empty() && _childSchedulers.empty();
+}
+
+void AsyncWorkScheduler::_notifyAllTasksComplete(WithLock wl) {
+    if (_quiesced(wl))
         _allListsEmptyCV.notify_all();
 }
 

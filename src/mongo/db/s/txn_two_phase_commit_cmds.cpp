@@ -171,6 +171,30 @@ public:
 
 } prepareTransactionCmd;
 
+std::set<ShardId> validateParticipants(OperationContext* opCtx,
+                                       const std::vector<mongo::CommitParticipant>& participants) {
+    StringBuilder ss;
+    std::set<ShardId> participantsSet;
+
+    ss << '[';
+    for (const auto& participant : participants) {
+        const auto& shardId = participant.getShardId();
+        const bool inserted = participantsSet.emplace(shardId).second;
+        uassert(51162,
+                str::stream() << "Participant list contains duplicate shard " << shardId,
+                inserted);
+        ss << shardId << ", ";
+    }
+    ss << ']';
+
+    LOG(3) << "Coordinator shard received request to coordinate commit with "
+              "participant list "
+           << ss.str() << " for " << opCtx->getLogicalSessionId()->getId() << ':'
+           << opCtx->getTxnNumber();
+
+    return participantsSet;
+}
+
 class CoordinateCommitTransactionCmd : public TypedCommand<CoordinateCommitTransactionCmd> {
 public:
     using Request = CoordinateCommitTransaction;
@@ -197,31 +221,11 @@ public:
             boost::optional<Future<txn::CommitDecision>> commitDecisionFuture;
 
             if (!cmd.getParticipants().empty()) {
-                // Convert the participant list array into a set, and assert that all participants
-                // in the list are unique.
-                // TODO (PM-564): Propagate the 'readOnly' flag down into the
-                // TransactionCoordinator.
-                std::set<ShardId> participantList;
-                StringBuilder ss;
-                ss << "[";
-                for (const auto& participant : cmd.getParticipants()) {
-                    const auto& shardId = participant.getShardId();
-                    uassert(ErrorCodes::InvalidOptions,
-                            str::stream() << "Participant list contained duplicate shardId "
-                                          << shardId,
-                            std::find(participantList.begin(), participantList.end(), shardId) ==
-                                participantList.end());
-                    participantList.insert(shardId);
-                    ss << shardId << " ";
-                }
-                ss << "]";
-                LOG(3) << "Coordinator shard received request to coordinate commit with "
-                          "participant list "
-                       << ss.str() << " for " << opCtx->getLogicalSessionId()->getId() << ':'
-                       << opCtx->getTxnNumber();
-
-                commitDecisionFuture = tcs->coordinateCommit(
-                    opCtx, *opCtx->getLogicalSessionId(), *opCtx->getTxnNumber(), participantList);
+                commitDecisionFuture =
+                    tcs->coordinateCommit(opCtx,
+                                          *opCtx->getLogicalSessionId(),
+                                          *opCtx->getTxnNumber(),
+                                          validateParticipants(opCtx, cmd.getParticipants()));
             } else {
                 LOG(3) << "Coordinator shard received request to recover commit decision for "
                        << opCtx->getLogicalSessionId()->getId() << ':' << opCtx->getTxnNumber();
@@ -239,16 +243,26 @@ public:
             });
 
             if (commitDecisionFuture) {
-                // The commit coordination is still ongoing. Block waiting for the decision.
-                auto commitDecision = commitDecisionFuture->get(opCtx);
-                switch (commitDecision) {
-                    case txn::CommitDecision::kCanceled:
-                        // Continue on to recover the commit decision from disk.
-                        break;
-                    case txn::CommitDecision::kAbort:
-                        uasserted(ErrorCodes::NoSuchTransaction, "Transaction was aborted");
-                    case txn::CommitDecision::kCommit:
-                        return;
+                auto swCommitDecision = commitDecisionFuture->getNoThrow(opCtx);
+                // The coordinator can only return NoSuchTransaction if cancelIfCommitNotYetStarted
+                // was called, which can happen in one of 3 cases:
+                //  1) The deadline to receive coordinateCommit passed
+                //  2) Transaction with a newer txnNumber started on the session before
+                //     coordinateCommit was received
+                //  3) This is a sharded transaction, which used the optimized commit path and
+                //     didn't require 2PC
+                //
+                // Even though only (3) requires recovering the commit decision from the local
+                // participant, since these cases cannot be differentiated currently, we always
+                // recover from the local participant.
+                if (swCommitDecision != ErrorCodes::NoSuchTransaction) {
+                    auto commitDecision = uassertStatusOK(std::move(swCommitDecision));
+                    switch (commitDecision) {
+                        case txn::CommitDecision::kCommit:
+                            return;
+                        case txn::CommitDecision::kAbort:
+                            uasserted(ErrorCodes::NoSuchTransaction, "Transaction was aborted");
+                    }
                 }
             }
 
@@ -267,22 +281,24 @@ public:
             // NoSuchTransaction and the client sent a non-default writeConcern, the
             // coordinateCommitTransaction command's post-amble will do a no-op write and wait for
             // the client's writeConcern.
-            BSONObj abortRequestObj =
-                BSON("abortTransaction" << 1 << "lsid" << opCtx->getLogicalSessionId()->toBSON()
-                                        << "txnNumber"
-                                        << *opCtx->getTxnNumber()
-                                        << "autocommit"
-                                        << false);
+            AbortTransaction abortTransaction;
+            abortTransaction.setDbName(NamespaceString::kAdminDb);
+            auto abortObj = abortTransaction.toBSON(
+                BSON("lsid" << opCtx->getLogicalSessionId()->toBSON() << "txnNumber"
+                            << *opCtx->getTxnNumber()
+                            << "autocommit"
+                            << false));
 
             const auto abortStatus = [&] {
                 txn::AsyncWorkScheduler aws(opCtx->getServiceContext());
-                auto awsShutdownGuard = makeGuard([&aws] {
-                    aws.shutdown({ErrorCodes::Interrupted, "Request interrupted due to timeout"});
-                });
                 auto future =
                     aws.scheduleRemoteCommand(txn::getLocalShardId(opCtx->getServiceContext()),
                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              abortRequestObj);
+                                              abortObj);
+                ON_BLOCK_EXIT([&] {
+                    aws.shutdown({ErrorCodes::Interrupted, "Request interrupted due to timeout"});
+                    future.wait();
+                });
                 const auto& responseStatus = future.get(opCtx);
                 uassertStatusOK(responseStatus.status);
 
@@ -290,7 +306,7 @@ public:
             }();
 
             LOG(3) << "coordinateCommitTransaction got response " << abortStatus << " for "
-                   << abortRequestObj << " used to recover decision from local participant";
+                   << abortObj << " used to recover decision from local participant";
 
             // If the abortTransaction succeeded, return that the transaction aborted.
             if (abortStatus.isOK())
