@@ -151,6 +151,10 @@ public:
         return _planSummaryStats;
     }
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 protected:
     DocumentSourceCursor(Collection* collection,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,

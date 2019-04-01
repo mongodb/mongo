@@ -125,6 +125,9 @@ public:
      */
     boost::optional<MergingLogic> mergingLogic() final;
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
 
 private:
     explicit DocumentSourceGeoNear(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

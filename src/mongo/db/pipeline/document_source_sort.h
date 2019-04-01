@@ -140,6 +140,10 @@ public:
         return _limitSrc;
     }
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 protected:
     /**
      * Attempts to absorb a subsequent $limit stage so that it an perform a top-k sort.

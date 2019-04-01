@@ -96,6 +96,10 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     // The raw object given to $collStats containing user specified options.
     BSONObj _collStatsSpec;

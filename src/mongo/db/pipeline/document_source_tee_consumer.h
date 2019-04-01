@@ -78,6 +78,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 protected:
     void doDispose() final;
 

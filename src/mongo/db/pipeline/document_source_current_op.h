@@ -133,6 +133,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     DocumentSourceCurrentOp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                             ConnMode includeIdleConnections,

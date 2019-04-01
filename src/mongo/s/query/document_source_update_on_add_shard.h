@@ -78,6 +78,10 @@ public:
 
     GetNextResult getNext() final;
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     DocumentSourceUpdateOnAddShard(const boost::intrusive_ptr<ExpressionContext>&,
                                    executor::TaskExecutor*,

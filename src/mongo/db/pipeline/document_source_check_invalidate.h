@@ -72,6 +72,10 @@ public:
         return new DocumentSourceCheckInvalidate(expCtx, ignoreFirstInvalidate);
     }
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     /**
      * Use the create static method to create a DocumentSourceCheckInvalidate.

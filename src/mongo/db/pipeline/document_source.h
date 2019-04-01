@@ -47,6 +47,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/document_source_visitor.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -467,6 +468,12 @@ public:
         const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
         return false;
     }
+
+    /**
+     * This allows an arbitrary class to implement logic which gets dispatched to at runtime
+     * depending on the type of the DocumentSource.
+     */
+    virtual void acceptVisitor(DocumentSourceVisitor* visitor) = 0;
 
 protected:
     explicit DocumentSource(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

@@ -66,6 +66,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     DocumentSourceRedact(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const boost::intrusive_ptr<Expression>& previsit);

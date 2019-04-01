@@ -193,6 +193,10 @@ public:
         return buildPipeline(inputDoc);
     }
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 protected:
     void doDispose() final;
 

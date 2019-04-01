@@ -145,6 +145,10 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
     bool usedDisk() final;
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 protected:
     void doDispose() final;
 

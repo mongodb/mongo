@@ -74,6 +74,10 @@ public:
 
     GetNextResult getNext() final;
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         HostTypeRequirement mergeType)

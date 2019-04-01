@@ -66,6 +66,10 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 

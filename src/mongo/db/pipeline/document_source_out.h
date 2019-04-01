@@ -249,6 +249,10 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 protected:
     // Stash the writeConcern of the original command as the operation context may change by the
     // time we start to spill $out writes. This is because certain aggregations (e.g. $exchange)

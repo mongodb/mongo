@@ -84,6 +84,10 @@ public:
     static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     /**
      * Use the create static method to create a DocumentSourceShardCheckResumability.
@@ -144,6 +148,10 @@ public:
 
     static boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
+
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
 
 private:
     /**

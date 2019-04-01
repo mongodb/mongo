@@ -108,6 +108,10 @@ public:
         return kStageName.rawData();
     }
 
+    void acceptVisitor(DocumentSourceVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
 private:
     DocumentSourceLookupChangePostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(expCtx) {}
