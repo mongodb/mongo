@@ -32,11 +32,11 @@
  */
 #ifdef __linux__
 SYSTEM("Linux");
-#define OPEN_EXISTING(name, flags)		open(name, flags)
+#define OPEN_EXISTING(name, flags)		OPEN(name, flags)
 #else /* __linux__ */
 SYSTEM("Darwin");
 #define O_NOATIME 0
-#define OPEN_EXISTING(name, flags)		open(name, flags, 0)
+#define OPEN_EXISTING(name, flags)		OPEN(name, flags, 0)
 #endif /* __linux__ */
 
 #ifdef HAVE_FTRUNCATE
@@ -49,14 +49,20 @@ SYSTEM("Darwin");
 #define FTRUNCATE(fd, len)			/* do nothing */
 #endif
 
-TRACE("close,fdatasync,fsync,ftruncate,open,pwrite64,rename");
+#ifdef WT_USE_OPENAT
+#define OPEN(...)				openat(AT_FDCWD, __VA_ARGS__)
+#else
+#define OPEN(...)				open(__VA_ARGS__)
+#endif
+
+TRACE("close,fdatasync,fsync,ftruncate,open,openat,pwrite64,rename");
 RUN("");
 ...
 OUTPUT("--------------wiredtiger_open");
 // lock == 3
-lock = open("./WiredTiger.lock", O_RDWR|O_CREAT|O_CLOEXEC, 0666);
+lock = OPEN("./WiredTiger.lock", O_RDWR|O_CREAT|O_CLOEXEC, 0666);
 pwrite64(lock, "WiredTiger lock file\n", 0x15, 0x0);
-fd = open("./WiredTiger", O_RDWR|O_CREAT|O_CLOEXEC, 0666);
+fd = OPEN("./WiredTiger", O_RDWR|O_CREAT|O_CLOEXEC, 0666);
 pwrite64(fd, "WiredTiger\nWiredTiger"..., ...);
 #ifdef __linux__
 fdatasync(fd);
@@ -65,7 +71,7 @@ close(fd);
 
 ...  // On Linux, there are calls to open and read "/proc/meminfo" here.
 
-fd = open("./WiredTiger.basecfg.set", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
+fd = OPEN("./WiredTiger.basecfg.set", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
 pwrite64(fd, "# Do not modify this file."..., ...);
 #ifdef __linux__
 fdatasync(fd);
@@ -74,15 +80,15 @@ close(fd);
 rename("./WiredTiger.basecfg.set", "./WiredTiger.basecfg");
 
 #ifdef __linux__
-dir = open("./", O_RDONLY); 
+dir = OPEN("./", O_RDONLY|O_CLOEXEC);
 fdatasync(dir);
 close(dir);
 #endif
 
-fd = open("./WiredTiger.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
+fd = OPEN("./WiredTiger.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
 
 #ifdef __linux__
-dir = open("./", O_RDONLY); 
+dir = OPEN("./", O_RDONLY|O_CLOEXEC);
 fdatasync(dir);
 close(dir);
 #endif /* __linux__ */
@@ -96,7 +102,7 @@ close(fd);
 wt = OPEN_EXISTING("./WiredTiger.wt\0", O_RDWR|O_NOATIME|O_CLOEXEC);
 FTRUNCATE(wt, 0x1000);
 
-fd = open("./WiredTiger.turtle.set\0", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
+fd = OPEN("./WiredTiger.turtle.set\0", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
 pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 #ifdef __linux__
 fdatasync(fd);
@@ -106,10 +112,10 @@ rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 
 ...  // There is a second open of turtle here, is it important?
 
-fd = open("./WiredTigerLAS.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
+fd = OPEN("./WiredTigerLAS.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
 
 #ifdef __linux__
-dir = open("./", O_RDONLY); 
+dir = OPEN("./", O_RDONLY|O_CLOEXEC);
 fdatasync(dir);
 close(dir);
 #endif /* __linux__ */
@@ -134,7 +140,7 @@ fdatasync(wt);
 fd = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
 
 close(fd);
-fd = open("./WiredTiger.turtle.set", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
+fd = OPEN("./WiredTiger.turtle.set", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
 pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 #ifdef __linux__
 fdatasync(fd);
@@ -142,7 +148,7 @@ fdatasync(fd);
 close(fd);
 rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 #ifdef __linux__
-dir = open("./", O_RDONLY); 
+dir = OPEN("./", O_RDONLY|O_CLOEXEC);
 fdatasync(dir);
 close(dir);
 fdatasync(wt);
@@ -151,9 +157,9 @@ fdatasync(wt);
 OUTPUT("--------------open_session");
 OUTPUT("--------------create");
 
-hello = open("./hello.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
+hello = OPEN("./hello.wt", O_RDWR|O_CREAT|O_EXCL|O_NOATIME|O_CLOEXEC, 0666);
 #ifdef __linux__
-dir = open("./", O_RDONLY); 
+dir = OPEN("./", O_RDONLY|O_CLOEXEC);
 fdatasync(dir);
 close(dir);
 #endif /* __linux__ */

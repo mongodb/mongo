@@ -279,6 +279,7 @@ __sweep_server(void *arg)
 	uint64_t last, now;
 	uint64_t last_las_sweep_id, min_sleep, oldest_id, sweep_interval;
 	u_int dead_handles;
+	bool cv_signalled;
 
 	session = arg;
 	conn = S2C(session);
@@ -298,12 +299,13 @@ __sweep_server(void *arg)
 		/* Wait until the next event. */
 		if (FLD_ISSET(conn->timing_stress_flags,
 		    WT_TIMING_STRESS_AGGRESSIVE_SWEEP))
-			__wt_cond_wait(session, conn->sweep_cond,
+			__wt_cond_wait_signal(session, conn->sweep_cond,
 			    min_sleep * 100 * WT_THOUSAND,
-			    __sweep_server_run_chk);
+			    __sweep_server_run_chk, &cv_signalled);
 		else
-			__wt_cond_wait(session, conn->sweep_cond,
-			    min_sleep * WT_MILLION, __sweep_server_run_chk);
+			__wt_cond_wait_signal(session,
+			    conn->sweep_cond, min_sleep * WT_MILLION,
+			    __sweep_server_run_chk, &cv_signalled);
 
 		/* Check if we're quitting or being reconfigured. */
 		if (!__sweep_server_run_chk(session))
@@ -339,7 +341,7 @@ __sweep_server(void *arg)
 		 * less frequently than the lookaside table by default and the
 		 * frequency is controlled by a user setting.
 		 */
-		if (now - last < sweep_interval)
+		if (!cv_signalled && (now - last < sweep_interval))
 			continue;
 		WT_STAT_CONN_INCR(session, dh_sweeps);
 		/*

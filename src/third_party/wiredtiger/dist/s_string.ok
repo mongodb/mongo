@@ -156,6 +156,7 @@ Fsync
 Fuerst
 GCC
 GIDs
+GLIBC
 Gcc
 Geoff
 GetEnvironmentVariableA
@@ -1052,6 +1053,7 @@ online
 onpage
 oo
 opcode
+openat
 opendir
 openfile
 oplist
@@ -1214,6 +1216,7 @@ stdin
 stdout
 stepp
 str
+strace
 strcmp
 strdup
 strerror

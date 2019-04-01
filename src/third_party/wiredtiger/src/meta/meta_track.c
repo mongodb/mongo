@@ -249,6 +249,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 	WT_META_TRACK *trk, *trk_orig;
 	WT_SESSION_IMPL *ckpt_session;
 	int saved_ret;
+	bool did_drop;
 
 	saved_ret = 0;
 
@@ -323,14 +324,20 @@ err:	/*
 	 * Undo any tracked operations on failure.
 	 * Apply any tracked operations post-commit.
 	 */
+	did_drop = false;
 	if (unroll || ret != 0) {
 		saved_ret = ret;
 		ret = 0;
-		while (--trk >= trk_orig)
+		while (--trk >= trk_orig) {
+			did_drop = did_drop || trk->op == WT_ST_DROP_COMMIT;
 			WT_TRET(__meta_track_unroll(session, trk));
+		}
 	} else
-		for (; trk_orig < trk; trk_orig++)
+		for (; trk_orig < trk; trk_orig++) {
+			did_drop = did_drop ||
+			    trk_orig->op == WT_ST_DROP_COMMIT;
 			WT_TRET(__meta_track_apply(session, trk_orig));
+		}
 
 	if (F_ISSET(session, WT_SESSION_SCHEMA_TXN)) {
 		F_CLR(session, WT_SESSION_SCHEMA_TXN);
@@ -345,6 +352,13 @@ err:	/*
 		WT_TRET(__wt_txn_rollback(session, NULL));
 #endif
 	}
+
+	/*
+	 * Wake up the sweep thread: particularly for the in-memory
+	 * storage engine, we want to reclaim space immediately.
+	 */
+	if (did_drop && S2C(session)->sweep_cond != NULL)
+		__wt_cond_signal(session, S2C(session)->sweep_cond);
 
 	if (ret != 0)
 		WT_PANIC_RET(session, ret,
