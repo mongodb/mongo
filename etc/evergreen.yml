@@ -852,7 +852,7 @@ functions:
         set -o verbose
         if [ "${setup_android_toolchain|}" = "true" ]; then
             ${activate_virtualenv}
-            PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh ${android_toolchain_target_arch} ${android_toolchain_api_version}
+            PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh $(pwd)/android_sdk
         fi
 
   "build java embedded sdk":
@@ -3625,6 +3625,11 @@ tasks:
           VERSION=${version}
           WORKDIR=${workdir}
 
+          # build in a different directory then we run tests so that we can verify that the linking
+          # of tests are not relying any built in absolute paths
+          FINAL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION
+          BUILD_PREFIX=$FINAL_PREFIX-tmp
+
           rm -rf mongo-c-driver
 
           # NOTE: If you change the C Driver version here, also change the substitution in the CocoaPod podspec below in the apple builder.
@@ -3636,45 +3641,46 @@ tasks:
 
           trap "cat CMakeFiles/CMakeOutput.log" EXIT
           export ${compile_env|}
-          ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=${cdriver_cmake_osx_deployment_target|} ${cdriver_cmake_flags}
+          ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$BUILD_PREFIX -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=${cdriver_cmake_osx_deployment_target|} ${cdriver_cmake_flags}
+          trap - EXIT # cancel the previous trap '...' EXIT
           make install VERBOSE=1
 
           # TODO: Remove this when we upgrade to a version of the C driver that has CDRIVER-2854 fixed.
-          mkdir -p $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/share/doc/mongo-c-driver
-          cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/share/doc/mongo-c-driver
-          cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/share/doc/mongo-c-driver
-          if [ -d $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks ]; then
+          mkdir -p $BUILD_PREFIX/share/doc/mongo-c-driver
+          cp COPYING $BUILD_PREFIX/share/doc/mongo-c-driver
+          cp THIRD_PARTY_NOTICES $BUILD_PREFIX/share/doc/mongo-c-driver
+          if [ -d $BUILD_PREFIX/Frameworks ]; then
 
               # We need to account for the fact that on the Darwin
               # mobile platforms, things shouldn't go to the Resources
               # directory but on macOS they should. If the Resources
               # directory is there (it should be for the plist file),
               # then use it, otherwise just use the framework root.
-              if [ -e $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources ]; then
-                  cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources
-                  cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources
-                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Resources/Info.plist
+              if [ -e $BUILD_PREFIX/Frameworks/mongoc.framework/Resources ]; then
+                  cp COPYING $BUILD_PREFIX/Frameworks/mongoc.framework/Resources
+                  cp THIRD_PARTY_NOTICES $BUILD_PREFIX/Frameworks/mongoc.framework/Resources
+                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $BUILD_PREFIX/Frameworks/mongoc.framework/Resources/Info.plist
               else
-                  cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework
-                  cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework
-                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/mongoc.framework/Info.plist
+                  cp COPYING $BUILD_PREFIX/Frameworks/mongoc.framework
+                  cp THIRD_PARTY_NOTICES $BUILD_PREFIX/Frameworks/mongoc.framework
+                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $BUILD_PREFIX/Frameworks/mongoc.framework/Info.plist
               fi
 
-              if [ -e $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources ]; then
-                  cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources
-                  cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources
-                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Resources/Info.plist
+              if [ -e $BUILD_PREFIX/Frameworks/bson.framework/Resources ]; then
+                  cp COPYING $BUILD_PREFIX/Frameworks/bson.framework/Resources
+                  cp THIRD_PARTY_NOTICES $BUILD_PREFIX/Frameworks/bson.framework/Resources
+                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $BUILD_PREFIX/Frameworks/bson.framework/Resources/Info.plist
               else
-                  cp COPYING $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework
-                  cp THIRD_PARTY_NOTICES $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework
-                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks/bson.framework/Info.plist
+                  cp COPYING $BUILD_PREFIX/Frameworks/bson.framework
+                  cp THIRD_PARTY_NOTICES $BUILD_PREFIX/Frameworks/bson.framework
+                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $BUILD_PREFIX/Frameworks/bson.framework/Info.plist
               fi
 
           fi
 
           # CMake doesn't seem to do the dSYM for us for the framework
-          if [ -e $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks ]; then
-              pushd $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp/Frameworks
+          if [ -e $BUILD_PREFIX/Frameworks ]; then
+              pushd $BUILD_PREFIX/Frameworks
               xcrun dsymutil -o bson.framework.dSYM bson.framework/bson
               xcrun strip -Sx bson.framework/bson
               xcrun dsymutil -o mongoc.framework.dSYM mongoc.framework/mongoc
@@ -3682,7 +3688,7 @@ tasks:
               popd
           fi
 
-          mv $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp $WORKDIR/src/build/mongo-embedded-sdk-$VERSION
+          mv $BUILD_PREFIX $FINAL_PREFIX
 
 - name: embedded_sdk_install_dev
   commands:
@@ -3690,18 +3696,18 @@ tasks:
       vars:
         targets: install-embedded-dev
         task_compile_flags: &embedded_sdk_compile_flags >-
+          --allocator=system
+          --dbg=off
+          --enable-free-mon=off
+          --enable-http-client=off
           --install-mode=hygienic
           --js-engine=none
-          --prefix='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
-          --dbg=off
           --opt=size
-          --enable-free-mon=off
+          --prefix='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
+          --separate-debug
           --ssl=off
-          --enable-http-client=off
           --use-system-mongo-c=on
           --wiredtiger=off
-          --allocator=system
-          --separate-debug
           CPPPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libmongoc-1.0'
         task_compile_flags_extra: >-
           --link-model=dynamic-sdk
@@ -10159,10 +10165,10 @@ buildvariants:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: >-
-      -j$(sysctl -n hw.logicalcpu)
-      --variables-files=etc/scons/xcode_macosx.vars
-      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+      --variables-files=etc/scons/xcode_macosx.vars
+      -j$(sysctl -n hw.logicalcpu)
+      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
     cdriver_cmake_osx_deployment_target: "10.12"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10189,10 +10195,10 @@ buildvariants:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: >-
-      -j$(sysctl -n hw.logicalcpu)
-      --variables-files=etc/scons/xcode_ios.vars
-      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+      --variables-files=etc/scons/xcode_ios.vars
+      -j$(sysctl -n hw.logicalcpu)
+      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
     cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10221,10 +10227,10 @@ buildvariants:
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: >-
-      -j$(sysctl -n hw.logicalcpu)
-      --variables-files=etc/scons/xcode_ios_sim.vars
-      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+      --variables-files=etc/scons/xcode_ios_sim.vars
+      -j$(sysctl -n hw.logicalcpu)
+      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
     cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10256,10 +10262,10 @@ buildvariants:
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: >-
-      -j$(sysctl -n hw.logicalcpu)
-      --variables-files=etc/scons/xcode_tvos.vars
-      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+      --variables-files=etc/scons/xcode_tvos.vars
+      -j$(sysctl -n hw.logicalcpu)
+      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
     cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10288,10 +10294,10 @@ buildvariants:
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: >-
-      -j$(sysctl -n hw.logicalcpu)
-      --variables-files=etc/scons/xcode_tvos_sim.vars
-      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+      --variables-files=etc/scons/xcode_tvos_sim.vars
+      -j$(sysctl -n hw.logicalcpu)
+      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
     cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10323,10 +10329,10 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions,requires_http_client
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: >-
-      -j$(sysctl -n hw.logicalcpu)
-      --variables-files=etc/scons/xcode_watchos.vars
-      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+      --variables-files=etc/scons/xcode_watchos.vars
+      -j$(sysctl -n hw.logicalcpu)
+      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
     cdriver_cmake_osx_deployment_target: "4.2"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10355,10 +10361,10 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions,requires_http_client
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.1.app
     compile_flags: >-
-      -j$(sysctl -n hw.logicalcpu)
-      --variables-files=etc/scons/xcode_watchos_sim.vars
-      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
       --lto
+      --variables-files=etc/scons/xcode_watchos_sim.vars
+      -j$(sysctl -n hw.logicalcpu)
+      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
     cdriver_cmake_osx_deployment_target: "4.2"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10400,10 +10406,10 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
-    # We need --allocator=system here to work around SERVER-XXXXX
+    # We need --allocator=system here to work around SERVER-27675
     compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      -j$(grep -c ^processor /proc/cpuinfo)
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -10426,33 +10432,32 @@ buildvariants:
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --toolchain-root=$(dirname $(pwd))/android_toolchain-arm-21
-      --variables-files=etc/scons/android_toolchain.vars
-      LIBS=clang_rt.builtins-arm-android
-      LIBPATH="$(dirname $($(dirname $(pwd))/android_toolchain-arm-21/bin/clang -print-file-name=libclang_rt.builtins-arm-android.a)) \$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
       --lto
-      AR=$(dirname $(pwd))/android_toolchain-arm-21/bin/llvm-ar
+      --toolchain-root=$(dirname $(pwd))/android_sdk
+      --variables-files=etc/scons/armv7a-linux-androideabi_toolchain.vars
+      -j$(grep -c ^processor /proc/cpuinfo)
+      LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=armeabi-v7a
-        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-arm-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
+        -DANDROID_PLATFORM=android-21
+        -DANDROID_TOOLCHAIN=clang
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        -DCMAKE_C_FLAGS="-flto"
+        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DENABLE_ZLIB=OFF
-        -DENABLE_SRV=OFF
-        -DCMAKE_C_FLAGS="-flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-flto"
+        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/src/build/mongo-embedded-sdk-$VERSION"
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
+        -DCMAKE_SHARED_LINKER_FLAGS="-flto"
+        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
+        -DENABLE_SRV=OFF
+        -DENABLE_ZLIB=OFF
     disable_unit_tests: true
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "armeabi-v7a"
-    android_system_image_version: "21"
+    android_system_image_version: 24
     android_toolchain_target_arch: "arm"
     android_toolchain_api_version: "21"
     dump_scons_config_on_failure: true
@@ -10468,32 +10473,32 @@ buildvariants:
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --toolchain-root=$(dirname $(pwd))/android_toolchain-arm64-21
-      --variables-files=etc/scons/android_toolchain.vars
-      LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
       --lto
-      AR=$(dirname $(pwd))/android_toolchain-arm64-21/bin/llvm-ar
+      --toolchain-root=$(dirname $(pwd))/android_sdk
+      --variables-files=etc/scons/aarch64-linux-android_toolchain.vars
+      -j$(grep -c ^processor /proc/cpuinfo)
+      LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=arm64-v8a
-        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-arm64-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
+        -DANDROID_PLATFORM=android-21
+        -DANDROID_TOOLCHAIN=clang
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        -DCMAKE_C_FLAGS="-flto"
+        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DENABLE_ZLIB=OFF
-        -DENABLE_SRV=OFF
-        -DCMAKE_C_FLAGS="-flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-flto"
+        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/src/build/mongo-embedded-sdk-$VERSION"
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
+        -DCMAKE_SHARED_LINKER_FLAGS="-flto"
+        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
+        -DENABLE_SRV=OFF
+        -DENABLE_ZLIB=OFF
     disable_unit_tests: true
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "arm64-v8a"
-    android_system_image_version: "24"
+    android_system_image_version: 24
     android_toolchain_target_arch: "arm64"
     android_toolchain_api_version: "21"
     dump_scons_config_on_failure: true
@@ -10509,33 +10514,33 @@ buildvariants:
     test_flags: --excludeWithAnyTags=uses_transactions
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --toolchain-root=$(dirname $(pwd))/android_toolchain-x86_64-21
-      --variables-files=etc/scons/android_toolchain.vars
-      LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
       --lto
-      AR=$(dirname $(pwd))/android_toolchain-x86_64-21/bin/llvm-ar
+      --toolchain-root=$(dirname $(pwd))/android_sdk
+      --variables-files=etc/scons/x86_64-linux-android_toolchain.vars
+      -j$(grep -c ^processor /proc/cpuinfo)
+      LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo
-        -DANDROID_NATIVE_API_LEVEL=21
         -DANDROID_ABI=x86_64
-        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/android_toolchain-x86_64-21;$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp"
+        -DANDROID_PLATFORM=android-21
+        -DANDROID_TOOLCHAIN=clang
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        -DCMAKE_C_FLAGS="-flto"
+        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
         -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DENABLE_ZLIB=OFF
-        -DENABLE_SRV=OFF
-        -DCMAKE_C_FLAGS="-flto"
-        -DCMAKE_SHARED_LINKER_FLAGS="-flto"
+        -DCMAKE_FIND_ROOT_PATH="$WORKDIR/src/build/mongo-embedded-sdk-$VERSION"
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
+        -DCMAKE_SHARED_LINKER_FLAGS="-flto"
+        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
+        -DENABLE_SRV=OFF
+        -DENABLE_ZLIB=OFF
     disable_unit_tests: true
     # The Android x86_64 emulator requires KVM.
     enable_embedded_tests: android_emulator
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "x86_64"
-    android_system_image_version: "21"
+    android_system_image_version: 24
     android_toolchain_target_arch: "x86_64"
     android_toolchain_api_version: "21"
     dump_scons_config_on_failure: true
@@ -10551,7 +10556,7 @@ buildvariants:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "x86_64"
-    android_system_image_version: 21
+    android_system_image_version: 24
     android_toolchain_target_arch: "x86_64"
     android_toolchain_api_version: "21"
   tasks:
@@ -10566,7 +10571,7 @@ buildvariants:
     compile_env: JAVA_HOME=/opt/java/jdk8/
     setup_android_toolchain: true
     android_toolchain_system_image_arch: "x86_64"
-    android_system_image_version: 21
+    android_system_image_version: 24
     android_toolchain_target_arch: "x86_64"
     android_toolchain_api_version: "21"
   tasks:
