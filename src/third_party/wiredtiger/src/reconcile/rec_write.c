@@ -664,6 +664,16 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		WT_ASSERT(session,
 		    !F_ISSET(r, WT_REC_EVICT) ||
 		    F_ISSET(r, WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE));
+
+		/*
+		 * We have written the page, but something prevents it from
+		 * being evicted.  If we wrote the newest versions of updates,
+		 * the on-disk page may contain records that are newer than
+		 * what checkpoint would write.  Make sure that checkpoint
+		 * visits the page and (if necessary) fixes things up.
+		 */
+		if (r->las_skew_newest)
+			mod->first_dirty_txn = WT_TXN_FIRST;
 	} else {
 		/*
 		 * Track the page's maximum transaction ID (used to decide if
