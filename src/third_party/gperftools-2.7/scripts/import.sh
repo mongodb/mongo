@@ -44,7 +44,7 @@ fi
 
 TARGET_UNAME=${UNAME}_${UNAME_PROCESSOR}
 
-git clone https://github.com/mongodb-labs/gperftools.git -c core.autocrlf=false $REPO
+git clone https://github.com/mongodb-forks/gperftools.git -c core.autocrlf=false $REPO
 
 pushd $REPO
 git checkout $REVISION
