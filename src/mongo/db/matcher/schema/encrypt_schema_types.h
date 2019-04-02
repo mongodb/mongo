@@ -126,14 +126,18 @@ public:
      * This type is currenty only used for serialization, not parsing.
      */
     static EncryptSchemaAnyType parseFromBSON(const BSONElement& element) {
-        MONGO_UNREACHABLE;
+        return EncryptSchemaAnyType(element);
     }
 
     EncryptSchemaAnyType() = default;
-    EncryptSchemaAnyType(BSONElement element) : _element(element) {}
+    EncryptSchemaAnyType(const BSONElement& element) : _element(element) {}
 
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
         builder->appendAs(_element, fieldName);
+    }
+
+    const BSONElement& getElement() const {
+        return _element;
     }
 
 private:

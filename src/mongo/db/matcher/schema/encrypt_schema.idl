@@ -131,4 +131,4 @@ structs:
           v:
             description: "value to encrypt"
             type: encryptSchemaAnyType
-            cpp_name: encryptSchemaAnyType
+            cpp_name: value
