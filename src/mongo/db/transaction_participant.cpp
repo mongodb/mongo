@@ -972,6 +972,28 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         }
     });
 
+    auto& completedTransactionOperations = retrieveCompletedTransactionOperations(opCtx);
+
+    // Ensure that no transaction operations were done against temporary collections.
+    // Transactions should not operate on temporary collections because they are for internal use
+    // only and are deleted on both repl stepup and server startup.
+
+    // Create a set of collection UUIDs through which to iterate, so that we do not recheck the same
+    // collection multiple times: it is a costly check.
+    stdx::unordered_set<UUID, UUID::Hash> transactionOperationUuids;
+    for (const auto& transactionOp : completedTransactionOperations) {
+        transactionOperationUuids.insert(transactionOp.getUuid().get());
+    }
+    for (const auto& uuid : transactionOperationUuids) {
+        auto collection = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "prepareTransaction failed because one of the transaction "
+                                 "operations was done against a temporary collection '"
+                              << collection->ns()
+                              << "'.",
+                !collection->isTemporary(opCtx));
+    }
+
     boost::optional<OplogSlotReserver> oplogSlotReserver;
     OplogSlot prepareOplogSlot;
     {
@@ -1026,7 +1048,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.opTime.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
     opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(
-        opCtx, reservedSlots, retrieveCompletedTransactionOperations(opCtx));
+        opCtx, reservedSlots, completedTransactionOperations);
 
     abortGuard.dismiss();
 

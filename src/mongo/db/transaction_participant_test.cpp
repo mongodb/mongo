@@ -60,7 +60,6 @@ namespace mongo {
 namespace {
 
 const NamespaceString kNss("TestDB", "TestColl");
-const OptionalCollectionUUID kUUID;
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
@@ -236,6 +235,20 @@ protected:
         _opObserver = mockObserver.get();
         opObserverRegistry->addObserver(std::move(mockObserver));
 
+        {
+            // Set up a collection so that TransactionParticipant::prepareTransaction() can safely
+            // access it.
+            AutoGetOrCreateDb autoDb(opCtx(), kNss.db(), MODE_X);
+            auto db = autoDb.getDb();
+            ASSERT_TRUE(db);
+
+            WriteUnitOfWork wuow(opCtx());
+            CollectionOptions options;
+            options.uuid = _uuid;
+            db->createCollection(opCtx(), kNss.ns(), options);
+            wuow.commit();
+        }
+
         opCtx()->setLogicalSessionId(_sessionId);
         opCtx()->setTxnNumber(_txnNumber);
     }
@@ -272,6 +285,7 @@ protected:
 
     const LogicalSessionId _sessionId{makeLogicalSessionIdForTest()};
     const TxnNumber _txnNumber{20};
+    const OptionalCollectionUUID _uuid = UUID::gen();
 
     OpObserverMock* _opObserver = nullptr;
 };
@@ -430,7 +444,7 @@ TEST_F(TxnParticipantTest, SameTransactionPreservesStoredStatements) {
 
     // We must have stashed transaction resources to re-open the transaction.
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
     txnParticipant.addTransactionOperation(opCtx(), operation);
     ASSERT_BSONOBJ_EQ(operation.toBSON(),
                       txnParticipant.getTransactionOperationsForTest()[0].toBSON());
@@ -452,7 +466,7 @@ TEST_F(TxnParticipantTest, AbortClearsStoredStatements) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
     txnParticipant.addTransactionOperation(opCtx(), operation);
     ASSERT_BSONOBJ_EQ(operation.toBSON(),
                       txnParticipant.getTransactionOperationsForTest()[0].toBSON());
@@ -513,6 +527,39 @@ TEST_F(TxnParticipantTest, PrepareSucceedsWithNestedLocks) {
     txnParticipant.stashTransactionResources(opCtx());
 
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
+}
+
+TEST_F(TxnParticipantTest, PrepareFailsOnTemporaryCollection) {
+    NamespaceString tempCollNss(kNss.db(), "tempCollection");
+    UUID tempCollUUID = UUID::gen();
+
+    // Create a temporary collection so that we can write to it.
+    {
+        AutoGetOrCreateDb autoDb(opCtx(), kNss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+
+        WriteUnitOfWork wuow(opCtx());
+        CollectionOptions options;
+        options.uuid = tempCollUUID;
+        options.temp = true;
+        db->createCollection(opCtx(), tempCollNss.ns(), options);
+        wuow.commit();
+    }
+
+    // Set up a transaction on the temp collection
+    auto outerScopedSession = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    auto operation =
+        repl::OplogEntry::makeInsertOperation(tempCollNss, tempCollUUID, BSON("TestValue" << 0));
+    txnParticipant.addTransactionOperation(opCtx(), operation);
+
+    ASSERT_THROWS_CODE(txnParticipant.prepareTransaction(opCtx(), {}),
+                       AssertionException,
+                       ErrorCodes::OperationNotSupportedInTransaction);
 }
 
 TEST_F(TxnParticipantTest, CommitTransactionSetsCommitTimestampOnPreparedTransaction) {
@@ -969,7 +1016,7 @@ TEST_F(TxnParticipantTest, CannotInsertInPreparedTransaction) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
     txnParticipant.addTransactionOperation(opCtx(), operation);
 
     txnParticipant.prepareTransaction(opCtx(), {});
@@ -987,7 +1034,7 @@ TEST_F(TxnParticipantTest, ImplictAbortDoesNotAbortPreparedTransaction) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
     txnParticipant.addTransactionOperation(opCtx(), operation);
 
     txnParticipant.prepareTransaction(opCtx(), {});
@@ -1006,7 +1053,7 @@ DEATH_TEST_F(TxnParticipantTest,
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
 
     txnParticipant.addTransactionOperation(opCtx(), operation);
     auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx(), {});
@@ -1051,7 +1098,7 @@ TEST_F(TxnParticipantTest, TransactionTooLargeWhileBuilding) {
     std::unique_ptr<uint8_t[]> bigData(new uint8_t[kBigDataSize]());
     auto operation = repl::OplogEntry::makeInsertOperation(
         kNss,
-        kUUID,
+        _uuid,
         BSON("_id" << 0 << "data" << BSONBinData(bigData.get(), kBigDataSize, BinDataGeneral)));
     txnParticipant.addTransactionOperation(opCtx(), operation);
     txnParticipant.addTransactionOperation(opCtx(), operation);
@@ -1161,7 +1208,7 @@ protected:
         ASSERT(txnParticipant.inMultiDocumentTransaction());
 
         txnParticipant.unstashTransactionResources(opCtx(), "insert");
-        auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+        auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
         txnParticipant.addTransactionOperation(opCtx(), operation);
         txnParticipant.prepareTransaction(opCtx(), {});
 
@@ -3104,7 +3151,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowCommit) {
     setupAdditiveMetrics(metricValue, opCtx());
 
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
     txnParticipant.addTransactionOperation(opCtx(), operation);
 
     serverGlobalParams.slowMS = 10;
@@ -3484,7 +3531,7 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
 
     // Perform an insert as a part of a transaction so that we have a transaction operation.
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
     txnParticipant.addTransactionOperation(opCtx(), operation);
     ASSERT_BSONOBJ_EQ(operation.toBSON(),
                       txnParticipant.getTransactionOperationsForTest()[0].toBSON());
@@ -3678,7 +3725,7 @@ TEST_F(TxnParticipantTest,
     ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
 
     // Simulate an insert.
-    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, _uuid, BSON("TestValue" << 0));
     txnParticipant.addTransactionOperation(opCtx(), operation);
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 }

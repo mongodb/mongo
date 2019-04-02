@@ -731,6 +731,10 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     return newRecStatus;
 }
 
+bool CollectionImpl::isTemporary(OperationContext* opCtx) const {
+    return _details->getCollectionOptions(opCtx).temp;
+}
+
 bool CollectionImpl::isCapped() const {
     return _cappedNotifier.get();
 }

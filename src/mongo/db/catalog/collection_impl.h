@@ -295,7 +295,7 @@ public:
                            StringData newLevel,
                            StringData newAction) final;
 
-    // -----------
+    bool isTemporary(OperationContext* opCtx) const final;
 
     //
     // Stats

@@ -222,6 +222,10 @@ public:
         std::abort();
     }
 
+    bool isTemporary(OperationContext* opCtx) const {
+        std::abort();
+    }
+
     bool isCapped() const {
         std::abort();
     }

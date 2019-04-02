@@ -387,7 +387,13 @@ public:
                                    StringData newLevel,
                                    StringData newAction) = 0;
 
-    // -----------
+    /**
+     * Returns true if this is a temporary collection.
+     *
+     * Calling this function is somewhat costly because it requires accessing the storage engine's
+     * cache of collection information.
+     */
+    virtual bool isTemporary(OperationContext* opCtx) const = 0;
 
     //
     // Stats
