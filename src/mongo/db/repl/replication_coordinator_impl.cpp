@@ -1561,24 +1561,9 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
             opTime, writeConcern.wNumNodes, useDurableOpTime);
     }
 
-    const bool modeIsMajorityNoSnapshot =
-        writeConcern.wMode == WriteConcernOptions::kInternalMajorityNoSnapshot;
-
     StringData patternName;
-    if (writeConcern.wMode == WriteConcernOptions::kMajority || modeIsMajorityNoSnapshot) {
-        if (modeIsMajorityNoSnapshot) {
-            // The internal majority no snapshot write concern waits for an opTime to be majority
-            // committed, but not necessarily in the committed snapshot.
-            const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
-            if (lastCommittedOpTime < opTime) {
-                LOG(1) << "Required optime: " << opTime
-                       << " is not yet majority committed, last committed optime: "
-                       << lastCommittedOpTime;
-                return false;
-            }
-
-            // Fall through to wait for "majority" write concern.
-        } else if (_externalState->snapshotsEnabled() && !gTestingSnapshotBehaviorInIsolation) {
+    if (writeConcern.wMode == WriteConcernOptions::kMajority) {
+        if (_externalState->snapshotsEnabled() && !gTestingSnapshotBehaviorInIsolation) {
             // Make sure we have a valid "committed" snapshot up to the needed optime.
             if (!_currentCommittedSnapshot) {
                 return false;
