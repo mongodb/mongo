@@ -205,7 +205,7 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
 }
 
 void IndexDescriptor::setNs(NamespaceString ns) {
-    _parentNS = ns.toString();
+    _parentNS = ns;
     _indexNamespace = ns.makeIndexNamespace(_indexName).ns();
 
     // Construct a new infoObj with the namespace field replaced.

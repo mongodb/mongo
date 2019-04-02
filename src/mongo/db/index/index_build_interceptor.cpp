@@ -205,28 +205,31 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         // If we are here, either we have reached the end of the table or the batch is full, so
         // insert everything in one WriteUnitOfWork, and delete each inserted document from the side
         // writes table.
-        auto status = writeConflictRetry(opCtx, "index build drain", _indexCatalogEntry->ns(), [&] {
-            WriteUnitOfWork wuow(opCtx);
-            for (auto& operation : batch) {
-                auto status =
-                    _applyWrite(opCtx, operation.second, options, &totalInserted, &totalDeleted);
-                if (!status.isOK()) {
-                    return status;
+        auto status =
+            writeConflictRetry(opCtx, "index build drain", _indexCatalogEntry->ns().ns(), [&] {
+                WriteUnitOfWork wuow(opCtx);
+                for (auto& operation : batch) {
+                    auto status = _applyWrite(
+                        opCtx, operation.second, options, &totalInserted, &totalDeleted);
+                    if (!status.isOK()) {
+                        return status;
+                    }
+
+                    // Delete the document from the table as soon as it has been inserted into the
+                    // index. This ensures that no key is ever inserted twice and no keys are
+                    // skipped.
+                    _sideWritesTable->rs()->deleteRecord(opCtx, operation.first);
                 }
 
-                // Delete the document from the table as soon as it has been inserted into the
-                // index. This ensures that no key is ever inserted twice and no keys are skipped.
-                _sideWritesTable->rs()->deleteRecord(opCtx, operation.first);
-            }
+                // For rollback to work correctly, these writes need to be timestamped. The actual
+                // time is not important, as long as it not older than the most recent visible side
+                // write.
+                IndexTimestampHelper::setGhostCommitTimestampForWrite(opCtx,
+                                                                      _indexCatalogEntry->ns());
 
-            // For rollback to work correctly, these writes need to be timestamped. The actual time
-            // is not important, as long as it not older than the most recent visible side write.
-            IndexTimestampHelper::setGhostCommitTimestampForWrite(
-                opCtx, NamespaceString(_indexCatalogEntry->ns()));
-
-            wuow.commit();
-            return Status::OK();
-        });
+                wuow.commit();
+                return Status::OK();
+            });
         if (!status.isOK()) {
             return status;
         }
@@ -336,7 +339,7 @@ void IndexBuildInterceptor::_tryYield(OperationContext* opCtx) {
 
     MONGO_FAIL_POINT_BLOCK(hangDuringIndexBuildDrainYield, config) {
         StringData ns{config.getData().getStringField("namespace")};
-        if (ns == _indexCatalogEntry->ns()) {
+        if (ns == _indexCatalogEntry->ns().ns()) {
             log() << "Hanging index build during drain yield";
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringIndexBuildDrainYield);
         }

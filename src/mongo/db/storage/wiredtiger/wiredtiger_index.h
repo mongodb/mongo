@@ -138,7 +138,7 @@ public:
         return _keyStringVersion;
     }
 
-    std::string collectionNamespace() const {
+    const NamespaceString& collectionNamespace() const {
         return _collectionNamespace;
     }
 
@@ -184,7 +184,7 @@ protected:
     int _dataFormatVersion;
     std::string _uri;
     uint64_t _tableId;
-    const std::string _collectionNamespace;
+    const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
     KVPrefix _prefix;

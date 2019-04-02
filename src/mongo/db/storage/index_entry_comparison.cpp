@@ -33,6 +33,7 @@
 #include <ostream>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 
 namespace mongo {
@@ -168,7 +169,7 @@ BSONObj IndexEntryComparison::makeQueryObject(const BSONObj& keyPrefix,
 }
 
 Status buildDupKeyErrorStatus(const BSONObj& key,
-                              const std::string& collectionNamespace,
+                              const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern) {
     StringBuilder sb;

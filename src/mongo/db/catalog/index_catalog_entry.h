@@ -62,7 +62,7 @@ public:
     inline IndexCatalogEntry(IndexCatalogEntry&&) = delete;
     inline IndexCatalogEntry& operator=(IndexCatalogEntry&&) = delete;
 
-    virtual const std::string& ns() const = 0;
+    virtual const NamespaceString& ns() const = 0;
 
     virtual void init(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
 

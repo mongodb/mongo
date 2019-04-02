@@ -265,7 +265,7 @@ public:
     BulkBuilderBase(MobileIndex* index,
                     OperationContext* opCtx,
                     bool dupsAllowed,
-                    const std::string& collectionNamespace,
+                    const NamespaceString& collectionNamespace,
                     const std::string& indexName,
                     const BSONObj& keyPattern)
         : _index(index),
@@ -317,7 +317,7 @@ protected:
     OperationContext* const _opCtx;
     BSONObj _lastKey;
     const bool _dupsAllowed;
-    const std::string _collectionNamespace;
+    const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
 };
@@ -330,7 +330,7 @@ public:
     BulkBuilderStandard(MobileIndex* index,
                         OperationContext* opCtx,
                         bool dupsAllowed,
-                        const std::string& collectionNamespace,
+                        const NamespaceString& collectionNamespace,
                         const std::string& indexName,
                         const BSONObj& keyPattern)
         : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName, keyPattern) {}
@@ -351,7 +351,7 @@ public:
     BulkBuilderUnique(MobileIndex* index,
                       OperationContext* opCtx,
                       bool dupsAllowed,
-                      const std::string& collectionNamespace,
+                      const NamespaceString& collectionNamespace,
                       const std::string& indexName,
                       const BSONObj& keyPattern)
         : BulkBuilderBase(index, opCtx, dupsAllowed, collectionNamespace, indexName, keyPattern) {

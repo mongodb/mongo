@@ -35,6 +35,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -209,7 +210,7 @@ private:
  * Returns the formatted error status about the duplicate key.
  */
 Status buildDupKeyErrorStatus(const BSONObj& key,
-                              const std::string& collectionNamespace,
+                              const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern);
 

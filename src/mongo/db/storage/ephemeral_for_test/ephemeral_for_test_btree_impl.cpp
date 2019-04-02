@@ -91,7 +91,7 @@ public:
     EphemeralForTestBtreeBuilderImpl(IndexSet* data,
                                      long long* currentKeySize,
                                      bool dupsAllowed,
-                                     const std::string& collectionNamespace,
+                                     const NamespaceString& collectionNamespace,
                                      const std::string& indexName,
                                      const BSONObj& keyPattern)
         : _data(data),
@@ -136,7 +136,7 @@ private:
     IndexEntryComparison _comparator;  // used by the bulk builder to detect duplicate keys
     IndexSet::const_iterator _last;    // or (key, RecordId) ordering violations
 
-    const std::string _collectionNamespace;
+    const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
 };
@@ -145,7 +145,7 @@ class EphemeralForTestBtreeImpl : public SortedDataInterface {
 public:
     EphemeralForTestBtreeImpl(IndexSet* data,
                               bool isUnique,
-                              const std::string& collectionNamespace,
+                              const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern)
         : _data(data),
@@ -513,7 +513,7 @@ private:
     long long _currentKeySize;
     const bool _isUnique;
 
-    const std::string _collectionNamespace;
+    const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
 };
@@ -523,7 +523,7 @@ private:
 // factories. We don't actually modify it.
 SortedDataInterface* getEphemeralForTestBtreeImpl(const Ordering& ordering,
                                                   bool isUnique,
-                                                  const std::string& collectionNamespace,
+                                                  const NamespaceString& collectionNamespace,
                                                   const std::string& indexName,
                                                   const BSONObj& keyPattern,
                                                   std::shared_ptr<void>* dataInOut) {

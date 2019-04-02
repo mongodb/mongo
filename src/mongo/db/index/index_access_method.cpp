@@ -145,9 +145,9 @@ bool AbstractIndexAccessMethod::ignoreKeyTooLong() {
 bool AbstractIndexAccessMethod::shouldCheckIndexKeySize(OperationContext* opCtx) {
     // Don't check index key size if we cannot write to the collection. That indicates we are a
     // secondary node and we should accept any index key.
-    const NamespaceString collName(_btreeState->ns());
     const auto shouldRelaxConstraints =
-        repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, collName);
+        repl::ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx,
+                                                                              _btreeState->ns());
 
     // Don't check index key size if FCV hasn't been initialized.
     return !shouldRelaxConstraints &&

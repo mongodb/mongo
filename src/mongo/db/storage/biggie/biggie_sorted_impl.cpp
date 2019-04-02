@@ -164,7 +164,7 @@ SortedDataBuilderInterface::SortedDataBuilderInterface(OperationContext* opCtx,
                                                        Ordering order,
                                                        const std::string& prefix,
                                                        const std::string& identEnd,
-                                                       const std::string& collectionNamespace,
+                                                       const NamespaceString& collectionNamespace,
                                                        const std::string& indexName,
                                                        const BSONObj& keyPattern)
     : _opCtx(opCtx),

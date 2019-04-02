@@ -138,7 +138,7 @@ protected:
     const Ordering _ordering;
     const KeyString::Version _keyStringVersion = KeyString::kLatestVersion;
     const std::string _ident;
-    const std::string _collectionNamespace;
+    const NamespaceString _collectionNamespace;
     const std::string _indexName;
     const BSONObj _keyPattern;
 };

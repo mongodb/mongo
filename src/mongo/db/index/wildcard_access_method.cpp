@@ -87,7 +87,7 @@ std::set<FieldRef> WildcardAccessMethod::_getMultikeyPathSet(
     MultikeyMetadataAccessStats* stats) const {
     return writeConflictRetry(opCtx,
                               "wildcard multikey path retrieval",
-                              _descriptor->parentNS(),
+                              _descriptor->parentNS().ns(),
                               [&]() -> std::set<FieldRef> {
                                   stats->numSeeks = 0;
                                   stats->keysExamined = 0;
@@ -207,7 +207,7 @@ std::set<FieldRef> WildcardAccessMethod::getMultikeyPathSet(
 std::set<FieldRef> WildcardAccessMethod::getMultikeyPathSet(
     OperationContext* opCtx, MultikeyMetadataAccessStats* stats) const {
     return writeConflictRetry(
-        opCtx, "wildcard multikey path retrieval", _descriptor->parentNS(), [&]() {
+        opCtx, "wildcard multikey path retrieval", _descriptor->parentNS().ns(), [&]() {
             invariant(stats);
             stats->numSeeks = 0;
             stats->keysExamined = 0;

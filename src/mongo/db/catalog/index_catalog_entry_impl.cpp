@@ -347,7 +347,7 @@ void IndexCatalogEntryImpl::setIndexKeyStringWithLongTypeBitsExistsOnDisk(Operat
 }
 
 void IndexCatalogEntryImpl::setNs(NamespaceString ns) {
-    _ns = ns.toString();
+    _ns = ns;
     _descriptor->setNs(std::move(ns));
 }
 

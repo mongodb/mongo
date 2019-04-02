@@ -68,7 +68,7 @@ public:
 
     ~IndexCatalogEntryImpl() final;
 
-    const std::string& ns() const final {
+    const NamespaceString& ns() const final {
         return _ns;
     }
 
@@ -209,7 +209,7 @@ private:
 
     // -----
 
-    std::string _ns;
+    NamespaceString _ns;
 
     CollectionCatalogEntry* _collection;  // not owned here
 

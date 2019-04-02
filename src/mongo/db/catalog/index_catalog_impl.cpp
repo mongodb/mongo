@@ -1426,7 +1426,7 @@ void IndexCatalogImpl::prepareInsertDeleteOptions(OperationContext* opCtx,
                                                   const IndexDescriptor* desc,
                                                   InsertDeleteOptions* options) const {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->shouldRelaxIndexConstraints(opCtx, NamespaceString(desc->parentNS()))) {
+    if (replCoord->shouldRelaxIndexConstraints(opCtx, desc->parentNS())) {
         options->getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
     } else {
         options->getKeysMode = IndexAccessMethod::GetKeysMode::kEnforceConstraints;
