@@ -156,6 +156,10 @@ TEST(LockerImpl, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediatelyGran
         locker2.lockGlobal(MODE_IS);
         ASSERT_THROWS_CODE(
             locker2.lock(resId, MODE_S, Date_t::max()), DBException, ErrorCodes::LockTimeout);
+
+        // The timed out MODE_S attempt shouldn't be present in the map of lock requests because it
+        // won't ever be granted.
+        ASSERT(locker2.getRequestsForTest().find(resId).finished());
         locker2.unlockGlobal();
 
         // MODE_X attempt.
@@ -163,6 +167,10 @@ TEST(LockerImpl, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediatelyGran
         locker3.lockGlobal(MODE_IX);
         ASSERT_THROWS_CODE(
             locker3.lock(resId, MODE_X, Date_t::max()), DBException, ErrorCodes::LockTimeout);
+
+        // The timed out MODE_X attempt shouldn't be present in the map of lock requests because it
+        // won't ever be granted.
+        ASSERT(locker3.getRequestsForTest().find(resId).finished());
         locker3.unlockGlobal();
     }
 

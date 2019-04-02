@@ -376,23 +376,6 @@ LockResult LockerImpl::_lockGlobalBegin(OperationContext* opCtx, LockMode mode, 
 
     const LockResult result = lockBegin(opCtx, resourceIdGlobal, actualLockMode);
     invariant(result == LOCK_OK || result == LOCK_WAITING);
-
-    // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
-    // Testing-only.
-    if (result == LOCK_WAITING && MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
-        // Clean up the state on any failed lock attempts.
-        auto unlockOnErrorGuard = makeGuard([&] {
-            LockRequestsMap::Iterator it = _requests.find(resourceIdGlobal);
-            _unlockImpl(&it);
-        });
-
-        uassert(ErrorCodes::LockTimeout,
-                "Cannot immediately acquire global lock. Timing out due to failpoint.",
-                (actualLockMode == MODE_IS || actualLockMode == MODE_IX));
-
-        unlockOnErrorGuard.dismiss();
-    }
-
     return result;
 }
 
@@ -495,16 +478,6 @@ void LockerImpl::lock(OperationContext* opCtx, ResourceId resId, LockMode mode, 
         return;
 
     invariant(result == LOCK_WAITING);
-
-    // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
-    // Testing-only.
-    if (MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
-        uassert(ErrorCodes::LockTimeout,
-                str::stream() << "Cannot immediately acquire lock '" << resId.toString()
-                              << "'. Timing out due to failpoint.",
-                (mode == MODE_IS || mode == MODE_IX));
-    }
-
     lockComplete(opCtx, resId, mode, deadline);
 }
 
@@ -847,6 +820,22 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
                               LockMode mode,
                               Date_t deadline) {
 
+    // Clean up the state on any failed lock attempts.
+    auto unlockOnErrorGuard = makeGuard([&] {
+        LockRequestsMap::Iterator it = _requests.find(resId);
+        invariant(it);
+        _unlockImpl(&it);
+    });
+
+    // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
+    // Testing-only.
+    if (MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
+        uassert(ErrorCodes::LockTimeout,
+                str::stream() << "Cannot immediately acquire lock '" << resId.toString()
+                              << "'. Timing out due to failpoint.",
+                (mode == MODE_IS || mode == MODE_IX));
+    }
+
     LockResult result;
     Milliseconds timeout;
     if (deadline == Date_t::max()) {
@@ -865,12 +854,6 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
     Milliseconds waitTime = std::min(timeout, MaxWaitTime);
     const uint64_t startOfTotalWaitTime = curTimeMicros64();
     uint64_t startOfCurrentWaitTime = startOfTotalWaitTime;
-
-    // Clean up the state on any failed lock attempts.
-    auto unlockOnErrorGuard = makeGuard([&] {
-        LockRequestsMap::Iterator it = _requests.find(resId);
-        _unlockImpl(&it);
-    });
 
     while (true) {
         // It is OK if this call wakes up spuriously, because we re-evaluate the remaining
