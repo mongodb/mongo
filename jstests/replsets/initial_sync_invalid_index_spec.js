@@ -40,14 +40,17 @@
     };
     assert.soon(assertFn, "Initial sync should have aborted on invalid index specification");
 
-    assert.soon(function() {
-        try {
-            initSyncNodeAdminDB.runCommand({ping: 1});
-        } catch (e) {
-            return true;
-        }
-        return false;
-    }, "Node did not terminate due to invalid index spec during initial sync", 60 * 1000);
+    assert.soon(
+        function() {
+            try {
+                initSyncNodeAdminDB.runCommand({ping: 1});
+            } catch (e) {
+                return true;
+            }
+            return false;
+        },
+        "Node did not terminate due to invalid index spec during initial sync",
+        ReplSetTest.kDefaultTimeoutMS);
 
     replTest.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
     replTest.stopSet();
