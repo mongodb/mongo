@@ -250,7 +250,7 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
         const auto& operationEntry = iter.next(opCtx);
         invariant(operationEntry.isInPendingTransaction());
         // Now reconstruct the entry "as if" it were at the commit or prepare time.
-        BSONObjBuilder builder(operationEntry.getReplOperation().toBSON());
+        BSONObjBuilder builder(operationEntry.getDurableReplOperation().toBSON());
         builder.appendElementsUnique(commitOrPrepareObj);
         ops.emplace_back(builder.obj());
     }
@@ -262,7 +262,7 @@ repl::MultiApplier::Operations readTransactionOperationsFromOplogChain(
         const auto& operationEntry = *cachedOp;
         invariant(operationEntry.isInPendingTransaction());
         // Now reconstruct the entry "as if" it were at the commit or prepare time.
-        BSONObjBuilder builder(operationEntry.getReplOperation().toBSON());
+        BSONObjBuilder builder(operationEntry.getDurableReplOperation().toBSON());
         builder.appendElementsUnique(commitOrPrepareObj);
         ops.emplace_back(builder.obj());
     }

@@ -39,6 +39,32 @@ namespace mongo {
 namespace repl {
 
 /**
+ * A parsed DurableReplOperation along with information about the operation that should only exist
+ * in-memory.
+ *
+ * ReplOperation should always be used over DurableReplOperation when passing around ReplOperations
+ * in server code.
+ */
+
+class ReplOperation : public DurableReplOperation {
+public:
+    static ReplOperation parse(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject) {
+        ReplOperation o;
+        o.parseProtected(ctxt, bsonObject);
+        return o;
+    }
+    const BSONObj& getPreImageDocumentKey() const {
+        return _preImageDocumentKey;
+    }
+    void setPreImageDocumentKey(BSONObj value) {
+        _preImageDocumentKey = std::move(value);
+    }
+
+private:
+    BSONObj _preImageDocumentKey;
+};
+
+/**
  * A parsed oplog entry that inherits from the OplogEntryBase parsed by the IDL.
  * This class is immutable.
  */
@@ -81,7 +107,7 @@ public:
                                              const BSONObj& docToDelete);
 
     // Get the in-memory size in bytes of a ReplOperation.
-    static size_t getReplOperationSize(const ReplOperation& op);
+    static size_t getDurableReplOperationSize(const DurableReplOperation& op);
 
     static StatusWith<OplogEntry> parse(const BSONObj& object);
 

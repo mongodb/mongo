@@ -1093,7 +1093,7 @@ void TransactionParticipant::Participant::addTransactionOperation(
     invariant(p().autoCommit && !*p().autoCommit && o().activeTxnNumber != kUninitializedTxnNumber);
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     p().transactionOperations.push_back(operation);
-    p().transactionOperationBytes += repl::OplogEntry::getReplOperationSize(operation);
+    p().transactionOperationBytes += repl::OplogEntry::getDurableReplOperationSize(operation);
     // _transactionOperationBytes is based on the in-memory size of the operation.  With overhead,
     // we expect the BSON size of the operation to be larger, so it's possible to make a transaction
     // just a bit too large and have it fail only in the commit.  It's still useful to fail early

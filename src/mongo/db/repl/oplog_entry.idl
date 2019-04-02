@@ -48,8 +48,9 @@ enums:
             kNoop: "n"
 
 structs:
-    ReplOperation:
-        description: A document that represents an operation in transaction.
+    DurableReplOperation:
+        description: "A document that represents an operation in a transaction. Should never be
+                      used directly in server code. Instead, create an instance of ReplOperation."
         fields:
             op:
                 cpp_name: opType
@@ -86,7 +87,7 @@ structs:
         inline_chained_structs: true
         chained_structs:
             OperationSessionInfo : OperationSessionInfo
-            ReplOperation: ReplOperation
+            DurableReplOperation: DurableReplOperation
         fields:
             ts:
                 cpp_name: timestamp
