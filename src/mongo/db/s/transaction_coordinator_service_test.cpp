@@ -67,28 +67,26 @@ const StatusWith<BSONObj> kPrepareOkButWriteConcernError =
 class TransactionCoordinatorServiceTestFixture : public TransactionCoordinatorTestFixture {
 protected:
     void assertPrepareSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
-                                        kPrepareOk,
-                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+        assertCommandSentAndRespondWith(
+            PrepareTransaction::kCommandName, kPrepareOk, WriteConcernOptions::Majority);
     }
 
     void assertPrepareSentAndRespondWithSuccessAndWriteConcernError() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kPrepareOkButWriteConcernError,
-                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+                                        WriteConcernOptions::Majority);
         advanceClockAndExecuteScheduledTasks();
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransaction() {
-        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
-                                        kNoSuchTransaction,
-                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+        assertCommandSentAndRespondWith(
+            PrepareTransaction::kCommandName, kNoSuchTransaction, WriteConcernOptions::Majority);
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransactionAndWriteConcernError() {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         kNoSuchTransactionAndWriteConcernError,
-                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+                                        WriteConcernOptions::Majority);
         advanceClockAndExecuteScheduledTasks();
     }
 

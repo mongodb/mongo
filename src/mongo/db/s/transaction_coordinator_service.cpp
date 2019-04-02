@@ -154,7 +154,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                     uassertStatusOK(waitForWriteConcern(
                         opCtx,
                         lastOpTime,
-                        WriteConcernOptions{WriteConcernOptions::kInternalMajorityNoSnapshot,
+                        WriteConcernOptions{WriteConcernOptions::kMajority,
                                             WriteConcernOptions::SyncMode::UNSET,
                                             WriteConcernOptions::kNoTimeout},
                         &unusedWCResult));

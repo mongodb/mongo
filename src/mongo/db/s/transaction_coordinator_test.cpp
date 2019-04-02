@@ -58,27 +58,24 @@ const StatusWith<BSONObj> kPrepareOk = makePrepareOkResponse(kDummyPrepareTimest
 class TransactionCoordinatorTestBase : public TransactionCoordinatorTestFixture {
 protected:
     void assertPrepareSentAndRespondWithSuccess() {
-        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
-                                        kPrepareOk,
-                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+        assertCommandSentAndRespondWith(
+            PrepareTransaction::kCommandName, kPrepareOk, WriteConcernOptions::Majority);
     }
 
     void assertPrepareSentAndRespondWithSuccess(const Timestamp& timestamp) {
         assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
                                         makePrepareOkResponse(timestamp),
-                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+                                        WriteConcernOptions::Majority);
     }
 
     void assertPrepareSentAndRespondWithNoSuchTransaction() {
-        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
-                                        kNoSuchTransaction,
-                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+        assertCommandSentAndRespondWith(
+            PrepareTransaction::kCommandName, kNoSuchTransaction, WriteConcernOptions::Majority);
     }
 
     void assertPrepareSentAndRespondWithRetryableError() {
-        assertCommandSentAndRespondWith(PrepareTransaction::kCommandName,
-                                        kRetryableError,
-                                        WriteConcernOptions::InternalMajorityNoSnapshot);
+        assertCommandSentAndRespondWith(
+            PrepareTransaction::kCommandName, kRetryableError, WriteConcernOptions::Majority);
         advanceClockAndExecuteScheduledTasks();
     }
 
@@ -124,7 +121,7 @@ auto makeDummyPrepareCommand(const LogicalSessionId& lsid, const TxnNumber& txnN
     auto prepareObj = prepareCmd.toBSON(
         BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
                     << WriteConcernOptions::kWriteConcernField
-                    << WriteConcernOptions::InternalMajorityNoSnapshot));
+                    << WriteConcernOptions::Majority));
 
 
     return prepareObj;

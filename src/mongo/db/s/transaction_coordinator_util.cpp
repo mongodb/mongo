@@ -57,10 +57,9 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
 
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 
-const WriteConcernOptions kInternalMajorityNoSnapshotWriteConcern(
-    WriteConcernOptions::kInternalMajorityNoSnapshot,
-    WriteConcernOptions::SyncMode::UNSET,
-    WriteConcernOptions::kNoTimeout);
+const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kNoTimeout);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
@@ -187,7 +186,7 @@ void persistParticipantListBlocking(OperationContext* opCtx,
     uassertStatusOK(
         waitForWriteConcern(opCtx,
                             repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                            kInternalMajorityNoSnapshotWriteConcern,
+                            kMajorityWriteConcern,
                             &unusedWCResult));
 }
 }  // namespace
@@ -241,7 +240,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
     auto prepareObj = prepareTransaction.toBSON(
         BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
                     << WriteConcernOptions::kWriteConcernField
-                    << WriteConcernOptions::InternalMajorityNoSnapshot));
+                    << WriteConcernOptions::Majority));
 
     std::vector<Future<PrepareResponse>> responses;
 
@@ -383,7 +382,7 @@ void persistDecisionBlocking(OperationContext* opCtx,
     uassertStatusOK(
         waitForWriteConcern(opCtx,
                             repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                            kInternalMajorityNoSnapshotWriteConcern,
+                            kMajorityWriteConcern,
                             &unusedWCResult));
 }
 }  // namespace
