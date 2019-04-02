@@ -89,7 +89,7 @@ public:
                             _activeOpContexts.begin(), tc->makeOperationContext());
                         ul.unlock();
 
-                        auto scopedGuard = makeGuard([&] {
+                        ON_BLOCK_EXIT([&] {
                             ul.lock();
                             _activeOpContexts.erase(uniqueOpCtxIter);
                             // There is no need to call _notifyAllTasksComplete here, because we

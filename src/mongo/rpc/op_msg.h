@@ -123,6 +123,10 @@ struct OpMsgRequest : public OpMsg {
         return OpMsgRequest(OpMsg::parse(message));
     }
 
+    static OpMsgRequest parseOwned(const Message& message) {
+        return OpMsgRequest(OpMsg::parseOwned(message));
+    }
+
     static OpMsgRequest fromDBAndBody(StringData db,
                                       BSONObj body,
                                       const BSONObj& extraFields = {}) {
