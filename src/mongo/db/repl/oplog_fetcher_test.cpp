@@ -543,6 +543,162 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldExcludeFirstDocumentInFirstBatchWhenE
     ASSERT_OK(shutdownState->getStatus());
 }
 
+TEST_F(OplogFetcherTest,
+       OplogFetcherShouldNotDuplicateFirstDocWithEnqueueFirstDocOnErrorAfterFirstDoc) {
+
+    // This function verifies that every oplog entry is only enqueued once.
+    OpTime lastEnqueuedOpTime = OpTime();
+    enqueueDocumentsFn = [&lastEnqueuedOpTime](Fetcher::Documents::const_iterator begin,
+                                               Fetcher::Documents::const_iterator end,
+                                               const OplogFetcher::DocumentsInfo&) -> Status {
+        auto count = 0;
+        auto toEnqueueOpTime = OpTime();
+
+        for (auto i = begin; i != end; ++i) {
+            count++;
+
+            toEnqueueOpTime = OplogEntry(*i).getOpTime();
+            ASSERT_GREATER_THAN(toEnqueueOpTime, lastEnqueuedOpTime);
+            lastEnqueuedOpTime = toEnqueueOpTime;
+        }
+
+        ASSERT_EQ(1, count);
+        return Status::OK();
+    };
+
+    auto shutdownState = stdx::make_unique<ShutdownState>();
+    OplogFetcher oplogFetcher(&getExecutor(),
+                              lastFetched,
+                              source,
+                              nss,
+                              _createConfig(),
+                              1 /* maxFetcherRestarts */,
+                              rbid,
+                              false /* requireFresherSyncSource */,
+                              dataReplicatorExternalState.get(),
+                              enqueueDocumentsFn,
+                              stdx::ref(*shutdownState),
+                              defaultBatchSize,
+                              OplogFetcher::StartingPoint::kEnqueueFirstDoc);
+
+    ASSERT_FALSE(oplogFetcher.isActive());
+    ASSERT_OK(oplogFetcher.startup());
+    ASSERT_TRUE(oplogFetcher.isActive());
+
+    auto firstEntry = makeNoopOplogEntry({{Seconds(123), 0}, lastFetched.getTerm()});
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogQueryMetadataObject(remoteNewerOpTime, rbid, 2, 2);
+
+    // Only send over the first entry. Save the second for the getMore request.
+    processNetworkResponse(
+        {concatenate(makeCursorResponse(22L, {firstEntry}), metadataObj), Milliseconds(0)}, true);
+
+    // Simulate an error right before receiving the second entry.
+    auto request = processNetworkResponse(RemoteCommandResponse(ErrorCodes::QueryPlanKilled,
+                                                                "Simulating failure for test.",
+                                                                Milliseconds(0)),
+                                          true);
+    ASSERT_EQUALS(std::string("getMore"), request.cmdObj.firstElementFieldName());
+
+    // Resend all data for the retry. The enqueueDocumentsFn will check to make sure that
+    // the first entry was not enqueued twice.
+    request = processNetworkResponse(
+        {concatenate(makeCursorResponse(0, {firstEntry, secondEntry}), metadataObj),
+         Milliseconds(0)},
+        false);
+
+    ASSERT_EQUALS(std::string("find"), request.cmdObj.firstElementFieldName());
+    ASSERT_EQUALS("oplog.rs", request.cmdObj["find"].String());
+
+    ASSERT(request.cmdObj["filter"].ok());
+    ASSERT(request.cmdObj["filter"]["ts"].ok());
+    ASSERT(request.cmdObj["filter"]["ts"]["$gte"].ok());
+    ASSERT_EQUALS(firstEntry["ts"].timestamp(), request.cmdObj["filter"]["ts"]["$gte"].timestamp());
+
+    oplogFetcher.join();
+    ASSERT_OK(shutdownState->getStatus());
+}
+
+TEST_F(OplogFetcherTest,
+       OplogFetcherShouldNotDuplicateFirstDocWithEnqueueFirstDocOnErrorAfterSecondDoc) {
+
+    // This function verifies that every oplog entry is only enqueued once.
+    OpTime lastEnqueuedOpTime = OpTime();
+    enqueueDocumentsFn = [&lastEnqueuedOpTime](Fetcher::Documents::const_iterator begin,
+                                               Fetcher::Documents::const_iterator end,
+                                               const OplogFetcher::DocumentsInfo&) -> Status {
+        auto count = 0;
+        auto toEnqueueOpTime = OpTime();
+
+        for (auto i = begin; i != end; ++i) {
+            count++;
+
+            toEnqueueOpTime = OplogEntry(*i).getOpTime();
+            ASSERT_GREATER_THAN(toEnqueueOpTime, lastEnqueuedOpTime);
+            lastEnqueuedOpTime = toEnqueueOpTime;
+        }
+
+        ASSERT_NOT_GREATER_THAN(count, 2);
+        return Status::OK();
+    };
+
+    auto shutdownState = stdx::make_unique<ShutdownState>();
+    OplogFetcher oplogFetcher(&getExecutor(),
+                              lastFetched,
+                              source,
+                              nss,
+                              _createConfig(),
+                              1 /* maxFetcherRestarts */,
+                              rbid,
+                              false /* requireFresherSyncSource */,
+                              dataReplicatorExternalState.get(),
+                              enqueueDocumentsFn,
+                              stdx::ref(*shutdownState),
+                              defaultBatchSize,
+                              OplogFetcher::StartingPoint::kEnqueueFirstDoc);
+
+    ASSERT_FALSE(oplogFetcher.isActive());
+    ASSERT_OK(oplogFetcher.startup());
+    ASSERT_TRUE(oplogFetcher.isActive());
+
+    auto firstEntry = makeNoopOplogEntry({{Seconds(123), 0}, lastFetched.getTerm()});
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.getTerm()});
+    auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogQueryMetadataObject(remoteNewerOpTime, rbid, 2, 2);
+
+    // Only send over the first two entries. Save the third for the getMore request.
+    processNetworkResponse(
+        {concatenate(makeCursorResponse(22L, {firstEntry, secondEntry}), metadataObj),
+         Milliseconds(0)},
+        true);
+
+    // Simulate an error right before receiving the third entry.
+    auto request = processNetworkResponse(RemoteCommandResponse(ErrorCodes::QueryPlanKilled,
+                                                                "Simulating failure for test.",
+                                                                Milliseconds(0)),
+                                          true);
+    ASSERT_EQUALS(std::string("getMore"), request.cmdObj.firstElementFieldName());
+
+    // Resend all data for the retry. The enqueueDocumentsFn will check to make sure that
+    // the first entry was not enqueued twice.
+    request = processNetworkResponse(
+        {concatenate(makeCursorResponse(0, {secondEntry, thirdEntry}), metadataObj),
+         Milliseconds(0)},
+        false);
+
+    ASSERT_EQUALS(std::string("find"), request.cmdObj.firstElementFieldName());
+    ASSERT_EQUALS("oplog.rs", request.cmdObj["find"].String());
+
+    ASSERT(request.cmdObj["filter"].ok());
+    ASSERT(request.cmdObj["filter"]["ts"].ok());
+    ASSERT(request.cmdObj["filter"]["ts"]["$gte"].ok());
+    ASSERT_EQUALS(secondEntry["ts"].timestamp(),
+                  request.cmdObj["filter"]["ts"]["$gte"].timestamp());
+
+    oplogFetcher.join();
+    ASSERT_OK(shutdownState->getStatus());
+}
+
 TEST_F(OplogFetcherTest, OplogFetcherShouldReportErrorsThrownFromCallback) {
     auto metadataObj = makeOplogQueryMetadataObject(remoteNewerOpTime, rbid, 2, 2);
 

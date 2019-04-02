@@ -439,8 +439,16 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
 
         LOG(1) << "oplog fetcher successfully fetched from " << _getSource();
 
-        // If this is the first batch, no rollback is needed and we don't want to enqueue the first
-        // document, skip it.
+        // We do not always enqueue the first document. We elect to skip it for the following
+        // reasons:
+        //    1. This is the first batch and no rollback is needed. Callers specify
+        //       StartingPoint::kSkipFirstDoc when they want this behavior.
+        //    2. We have already enqueued that document in a previous attempt. We can get into
+        //       this situation if we had a batch with StartingPoint::kEnqueueFirstDoc that failed
+        //       right after that first document was enqueued. In such a scenario, we would not
+        //       have advanced the lastFetched opTime, so we skip past that document to avoid
+        //       duplicating it.
+
         if (_startingPoint == StartingPoint::kSkipFirstDoc) {
             firstDocToApply++;
         }
@@ -487,6 +495,10 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
     if (!status.isOK()) {
         return status;
     }
+
+    // Start skipping the first doc after at least one doc has been enqueued in the lifetime
+    // of this fetcher.
+    _startingPoint = StartingPoint::kSkipFirstDoc;
 
     if (_dataReplicatorExternalState->shouldStopFetching(
             _getSource(), replSetMetadata, oqMetadata)) {
