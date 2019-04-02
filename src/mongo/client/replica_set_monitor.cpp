@@ -490,9 +490,10 @@ void Refresher::ensureScanInProgress(const SetStatePtr& set, WithLock lk) {
 }
 
 Refresher::Refresher(const SetStatePtr& setState) : _set(setState), _scan(setState->currentScan) {
-    if (_scan)
+    if (_scan) {
+        _scan->retryAllTriedHosts(_set->rand);
         return;  // participate in in-progress scan
-
+    }
     LOG(2) << "Starting new refresh of replica set " << _set->name;
     _scan = startNewScan(_set.get());
     _set->currentScan = _scan;
@@ -608,7 +609,7 @@ Refresher::NextStep Refresher::getNextStep() {
             for (UnconfirmedReplies::iterator it = _scan->unconfirmedReplies.begin();
                  it != _scan->unconfirmedReplies.end();
                  ++it) {
-                _set->findOrCreateNode(it->host)->update(*it);
+                _set->findOrCreateNode(it->first)->update(it->second);
             }
 
             const string newAddr = _set->getUnconfirmedServerAddress();
@@ -701,8 +702,9 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
         _set->updateNodeIfInNodes(reply);
         _set->notify(/*finishedScan*/ false);
     } else {
+        // Populate possibleNodes.
         receivedIsMasterBeforeFoundMaster(reply);
-        _scan->unconfirmedReplies.push_back(reply);
+        _scan->unconfirmedReplies[from] = reply;
     }
 
     // _set->nodes may still not have any nodes with isUp==true, but we have at least found a
@@ -856,7 +858,7 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
          it != _scan->unconfirmedReplies.end();
          ++it) {
         // this ignores replies from hosts not in _set->nodes (as modified above)
-        _set->updateNodeIfInNodes(*it);
+        _set->updateNodeIfInNodes(it->second);
     }
     _scan->unconfirmedReplies.clear();
 
@@ -1359,5 +1361,17 @@ void ScanState::enqueAllUntriedHosts(const Container& container, PseudoRandom& r
         }
     }
     std::shuffle(hostsToScan.begin(), hostsToScan.end(), rand.urbg());
+}
+
+void ScanState::retryAllTriedHosts(PseudoRandom& rand) {
+    invariant(hostsToScan.empty());  // because we don't try to dedup hosts already in the queue.
+    // Move hosts that are in triedHosts but not in waitingFor from triedHosts to hostsToScan.
+    std::set_difference(triedHosts.begin(),
+                        triedHosts.end(),
+                        waitingFor.begin(),
+                        waitingFor.end(),
+                        std::inserter(hostsToScan, hostsToScan.end()));
+    std::shuffle(hostsToScan.begin(), hostsToScan.end(), rand.urbg());
+    triedHosts = waitingFor;
 }
 }

@@ -102,7 +102,7 @@ TEST_F(ReplicaSetMonitorTest, SeedWithPriOnlySecDown) {
 
     replSet->kill(replSet->getPrimary());
 
-    // Trigger calls to Node::getConnWithRefresh
+    // Trigger connection.
     monitor->runScanForMockReplicaSet();
     monitor.reset();
 }

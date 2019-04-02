@@ -34,6 +34,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/util/invariant.h"
 #include "mongo/util/map_util.h"
 
 #include <sstream>
@@ -45,19 +46,28 @@ namespace mongo {
 using std::string;
 using std::vector;
 
-MockReplicaSet::MockReplicaSet(const string& setName, size_t nodes) : _setName(setName) {
+MockReplicaSet::MockReplicaSet(const string& setName,
+                               size_t nodes,
+                               bool hasPrimary,
+                               bool dollarPrefixHosts)
+    : _setName(setName) {
+    invariant(nodes > 0);
     BSONObjBuilder configBuilder;
     configBuilder.append("_id", setName);
     configBuilder.append("version", 1);
     configBuilder.append("protocolVersion", 1);
 
     BSONArrayBuilder membersBuilder(configBuilder.subarrayStart("members"));
+    // If e.g. setName="rs" and dollarPrefixHosts=true, make hostnames like "$rs0:27017,$rs1:27017".
     for (size_t n = 0; n < nodes; n++) {
         std::stringstream str;
-        str << "$" << setName << n << ":27017";
+        if (dollarPrefixHosts) {
+            str << "$";
+        }
+        str << setName << n << ":27017";
         const string hostName(str.str());
 
-        if (n == 0) {
+        if (n == 0 && hasPrimary) {
             _primaryHost = hostName;
         }
 
@@ -105,6 +115,10 @@ string MockReplicaSet::getConnectionString() const {
     return str.str();
 }
 
+MongoURI MockReplicaSet::getURI() const {
+    return invariant(MongoURI::parse(getConnectionString()));
+}
+
 vector<HostAndPort> MockReplicaSet::getHosts() const {
     vector<HostAndPort> list;
 
@@ -115,15 +129,21 @@ vector<HostAndPort> MockReplicaSet::getHosts() const {
     return list;
 }
 
+bool MockReplicaSet::hasPrimary() const {
+    return !_primaryHost.empty();
+}
+
 string MockReplicaSet::getPrimary() const {
     return _primaryHost;
 }
 
 void MockReplicaSet::setPrimary(const string& hostAndPort) {
-    const MemberConfig* config = _replConfig.findMemberByHostAndPort(HostAndPort(hostAndPort));
-    fassert(16578, config);
+    if (!hostAndPort.empty()) {
+        const MemberConfig* config = _replConfig.findMemberByHostAndPort(HostAndPort(hostAndPort));
+        fassert(16578, config);
 
-    fassert(16579, !config->isHidden() && config->getPriority() > 0 && !config->isArbiter());
+        fassert(16579, !config->isHidden() && config->getPriority() > 0 && !config->isArbiter());
+    }
 
     _primaryHost = hostAndPort;
 
@@ -137,7 +157,7 @@ vector<string> MockReplicaSet::getSecondaries() const {
     for (ReplSetConfig::MemberIterator member = _replConfig.membersBegin();
          member != _replConfig.membersEnd();
          ++member) {
-        if (member->getHostAndPort() != HostAndPort(_primaryHost)) {
+        if (_primaryHost.empty() || member->getHostAndPort() != HostAndPort(_primaryHost)) {
             secondaries.push_back(member->getHostAndPort().toString());
         }
     }
@@ -198,7 +218,9 @@ void MockReplicaSet::mockIsMasterCmd() {
             {
                 // TODO: add passives & arbiters
                 vector<string> hostList;
-                hostList.push_back(getPrimary());
+                if (hasPrimary()) {
+                    hostList.push_back(getPrimary());
+                }
 
                 const vector<string> secondaries = getSecondaries();
                 for (vector<string>::const_iterator secIter = secondaries.begin();
@@ -210,7 +232,9 @@ void MockReplicaSet::mockIsMasterCmd() {
                 builder.append("hosts", hostList);
             }
 
-            builder.append("primary", getPrimary());
+            if (hasPrimary()) {
+                builder.append("primary", getPrimary());
+            }
 
             if (member->isArbiter()) {
                 builder.append("arbiterOnly", true);
@@ -252,7 +276,9 @@ void MockReplicaSet::mockIsMasterCmd() {
         builder.append("me", hostAndPort);
         builder.append("ok", true);
 
+        // DBClientBase::isMaster() sends "ismaster", but ReplicaSetMonitor sends "isMaster".
         nodeIter->second->setCommandReply("ismaster", builder.done());
+        nodeIter->second->setCommandReply("isMaster", builder.done());
     }
 }
 

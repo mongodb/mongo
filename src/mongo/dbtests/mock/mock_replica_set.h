@@ -53,14 +53,20 @@ namespace mongo {
 class MockReplicaSet {
 public:
     /**
-     * Creates a mock replica set and automatically mocks the isMaster
-     * and replSetGetStatus commands based on the default replica set
-     * configuration.
+     * Creates a mock replica set and automatically mocks the isMaster and replSetGetStatus commands
+     * based on the default replica set configuration. Either the first node is primary and the
+     * others are secondaries, or all are secondaries. By default, hostnames begin with "$", which
+     * signals to ReplicaSetMonitor and to ConnectionString::connect that these are mocked hosts.
      *
      * @param setName The name for this replica set
      * @param nodes The initial number of nodes for this replica set
+     * @param hasPrimary Whether the first node is primary or all are secondaries
+     * @param dollarPrefixHosts Whether hostnames should begin with "$"
      */
-    MockReplicaSet(const std::string& setName, size_t nodes);
+    MockReplicaSet(const std::string& setName,
+                   size_t nodes,
+                   bool hasPrimary = true,
+                   bool dollarPrefixHosts = true);
     ~MockReplicaSet();
 
     //
@@ -69,8 +75,10 @@ public:
 
     std::string getSetName() const;
     std::string getConnectionString() const;
+    MongoURI getURI() const;
     std::vector<HostAndPort> getHosts() const;
     repl::ReplSetConfig getReplConfig() const;
+    bool hasPrimary() const;
     std::string getPrimary() const;
     std::vector<std::string> getSecondaries() const;
 
@@ -84,6 +92,9 @@ public:
      */
     void setConfig(const repl::ReplSetConfig& newConfig);
 
+    /**
+     * Mark one of the config members as primary. Pass the empty string if all nodes are secondary.
+     */
     void setPrimary(const std::string& hostAndPort);
 
     /**

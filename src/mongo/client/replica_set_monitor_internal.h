@@ -29,7 +29,7 @@
 
 /**
  * This is an internal header.
- * This should only be included by replica_set_monitor.cpp and replica_set_monitor_test.cpp.
+ * This should only be included by replica_set_monitor.cpp and unittests.
  * This should never be included by any header.
  */
 
@@ -241,7 +241,12 @@ public:
     template <typename Container>
     void enqueAllUntriedHosts(const Container& container, PseudoRandom& rand);
 
-    // This is only for logging and should not effect behavior otherwise.
+    /**
+     * Adds all completed hosts back to hostsToScan and shuffles the queue.
+     */
+    void retryAllTriedHosts(PseudoRandom& rand);
+
+    // This is only for logging and should not affect behavior otherwise.
     Timer timer;
 
     // Access to fields is guarded by associated SetState's mutex.
@@ -253,7 +258,7 @@ public:
     std::set<HostAndPort> triedHosts;     // Hosts that have been returned from getNextStep.
 
     // All responses go here until we find a master.
-    typedef std::vector<IsMasterReply> UnconfirmedReplies;
+    typedef std::map<HostAndPort, IsMasterReply> UnconfirmedReplies;
     UnconfirmedReplies unconfirmedReplies;
 };
 
