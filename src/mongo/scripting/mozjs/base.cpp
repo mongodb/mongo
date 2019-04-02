@@ -75,5 +75,7 @@ void BaseInfo::setProperty(JSContext* cx,
                            JS::HandleValue receiver,
                            JS::ObjectOpResult& result) {}
 
+void BaseInfo::trace(JSTracer* trc, JSObject* obj) {}
+
 }  // namespace mozjs
 }  // namespace mongo

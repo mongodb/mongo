@@ -9,6 +9,11 @@ executor:
     shell_options:
       nodb: ''
       readMode: commands
+      ssl: ''
+      tlsAllowInvalidHostnames: ''
+      tlsAllowInvalidCertificates: ''
+      tlsCAFile: jstests/libs/ca.pem
+      tlsCertificateKeyFile: jstests/libs/client.pem
   hooks:
   - class: CleanEveryN
     n: 20

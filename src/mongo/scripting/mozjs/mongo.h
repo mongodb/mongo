@@ -49,6 +49,7 @@ void setEncryptedDBClientCallback(EncryptedDBClientCallback* callback);
  */
 struct MongoBase : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
+    static void trace(JSTracer* trc, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(auth);
@@ -57,6 +58,10 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(cursorFromId);
         MONGO_DECLARE_JS_FUNCTION(cursorHandleFromId);
         MONGO_DECLARE_JS_FUNCTION(find);
+        MONGO_DECLARE_JS_FUNCTION(generateDataKey);
+        MONGO_DECLARE_JS_FUNCTION(getDataKeyCollection);
+        MONGO_DECLARE_JS_FUNCTION(encrypt);
+        MONGO_DECLARE_JS_FUNCTION(decrypt);
         MONGO_DECLARE_JS_FUNCTION(getClientRPCProtocols);
         MONGO_DECLARE_JS_FUNCTION(getServerRPCProtocols);
         MONGO_DECLARE_JS_FUNCTION(insert);
@@ -75,7 +80,7 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(_startSession);
     };
 
-    static const JSFunctionSpec methods[23];
+    static const JSFunctionSpec methods[27];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
@@ -95,6 +100,17 @@ struct MongoExternalInfo : public MongoBase {
 
     static const JSFunctionSpec freeFunctions[4];
 };
+
+class EncryptionCallbacks {
+public:
+    virtual void generateDataKey(JSContext* cx, JS::CallArgs args) = 0;
+    virtual void getDataKeyCollection(JSContext* cx, JS::CallArgs args) = 0;
+    virtual void encrypt(MozJSImplScope* scope, JSContext* cx, JS::CallArgs args) = 0;
+    virtual void decrypt(MozJSImplScope* scope, JSContext* cx, JS::CallArgs args) = 0;
+    virtual void trace(JSTracer* trc) = 0;
+};
+
+void setEncryptionCallbacks(DBClientBase* conn, EncryptionCallbacks* callbacks);
 
 }  // namespace mozjs
 }  // namespace mongo

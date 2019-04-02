@@ -92,6 +92,7 @@ struct BaseInfo {
                             JS::HandleValue v,
                             JS::HandleValue receiver,
                             JS::ObjectOpResult& result);
+    static void trace(JSTracer* trc, JSObject* obj);
 };
 
 }  // namespace mozjs

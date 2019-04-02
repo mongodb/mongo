@@ -185,7 +185,6 @@ public:
 
     std::string getClassName();
 
-private:
     /**
      * The maximum depth of recursion for writeField
      */
@@ -229,6 +228,7 @@ private:
      */
     using WriteFieldRecursionFrames = LifetimeStack<WriteFieldRecursionFrame, kMaxWriteFieldDepth>;
 
+private:
     /**
      * writes the field "key" into the associated builder
      *

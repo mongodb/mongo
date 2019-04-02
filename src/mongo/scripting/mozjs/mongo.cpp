@@ -67,6 +67,10 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorFromId, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorHandleFromId, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(generateDataKey, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getDataKeyCollection, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(encrypt, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(decrypt, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getClientRPCProtocols, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getServerRPCProtocols, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(insert, MongoExternalInfo),
@@ -201,6 +205,14 @@ void setHiddenMongo(JSContext* cx,
     }
 }
 
+EncryptionCallbacks* getEncryptionCallbacks(DBClientBase* conn) {
+    auto callbackPtr = dynamic_cast<EncryptionCallbacks*>(conn);
+    uassert(31083,
+            "Field Level Encryption must be used in enterprise mode with the correct parameters",
+            callbackPtr != nullptr);
+    return callbackPtr;
+}
+
 }  // namespace
 
 void MongoBase::finalize(js::FreeOp* fop, JSObject* obj) {
@@ -208,6 +220,17 @@ void MongoBase::finalize(js::FreeOp* fop, JSObject* obj) {
 
     if (conn) {
         getScope(fop)->trackedDelete(conn);
+    }
+}
+
+void MongoBase::trace(JSTracer* trc, JSObject* obj) {
+    auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(obj));
+    if (!conn) {
+        return;
+    }
+    auto callbackPtr = dynamic_cast<EncryptionCallbacks*>(conn->get());
+    if (callbackPtr != nullptr) {
+        callbackPtr->trace(trc);
     }
 }
 
@@ -501,6 +524,33 @@ void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
 
     conn->auth(ValueWriter(cx, args.get(0)).toBSON());
     args.rval().setBoolean(true);
+}
+
+void MongoBase::Functions::generateDataKey::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+    auto ptr = getEncryptionCallbacks(conn);
+    ptr->generateDataKey(cx, args);
+}
+
+void MongoBase::Functions::getDataKeyCollection::call(JSContext* cx, JS::CallArgs args) {
+    JS::RootedValue collection(cx);
+    auto conn = getConnection(args);
+    auto ptr = getEncryptionCallbacks(conn);
+    ptr->getDataKeyCollection(cx, args);
+}
+
+void MongoBase::Functions::encrypt::call(JSContext* cx, JS::CallArgs args) {
+    auto scope = getScope(cx);
+    auto conn = getConnection(args);
+    auto ptr = getEncryptionCallbacks(conn);
+    ptr->encrypt(scope, cx, args);
+}
+
+void MongoBase::Functions::decrypt::call(JSContext* cx, JS::CallArgs args) {
+    auto scope = getScope(cx);
+    auto conn = getConnection(args);
+    auto ptr = getEncryptionCallbacks(conn);
+    ptr->decrypt(scope, cx, args);
 }
 
 void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {

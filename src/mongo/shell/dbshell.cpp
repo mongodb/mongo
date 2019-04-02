@@ -233,7 +233,10 @@ void shellHistoryAdd(const char* line) {
     // via runCommand.
     static pcrecpp::RE hiddenCommands(
         "(run|admin)Command\\s*\\(\\s*{\\s*(createUser|updateUser)\\s*:");
-    if (!hiddenHelpers.PartialMatch(line) && !hiddenCommands.PartialMatch(line)) {
+
+    static pcrecpp::RE hiddenFLEConstructor(".*Mongo\\(([\\s\\S]*)secretAccessKey([\\s\\S]*)");
+    if (!hiddenHelpers.PartialMatch(line) && !hiddenCommands.PartialMatch(line) &&
+        !hiddenFLEConstructor.PartialMatch(line)) {
         linenoiseHistoryAdd(line);
     }
 }
