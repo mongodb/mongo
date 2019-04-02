@@ -3473,11 +3473,11 @@ tasks:
           cd cryptd-archive
           ${platform_decompress|tar xzvf} ../mongodb-binaries.tgz
           find . -mindepth 3 ! -name "mongocryptd${exe}" -type f -exec rm {} \; # delete bin/* except bin/mongocryptd
-          if [ $(find . -name mongocryptd | wc -l) -eq 1 ] ; then
+          if [ $(find . -name mongocryptd${exe} | wc -l) -eq 1 ] ; then
             $python ../buildscripts/make_archive.py -o mongodb-cryptd.${ext|tgz} $(find mongodb-* -type f)
 
             # Validate that this build_variant is listed as a known enterprise task for mongocryptd
-            python ../buildscripts/validate_mongocryptd.py --variant "${build_variant}" ../etc/evergreen.yml
+            $python ../buildscripts/validate_mongocryptd.py --variant "${build_variant}" ../etc/evergreen.yml
           fi
           cd ..
 
