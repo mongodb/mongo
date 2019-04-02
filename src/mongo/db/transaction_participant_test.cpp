@@ -1523,6 +1523,45 @@ TEST_F(TransactionsMetricsTest, IncrementCurrentPreparedWithAbort) {
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(), beforeCurrentPrepared);
 }
 
+TEST_F(TransactionsMetricsTest, NoPreparedMetricsChangesAfterExceptionInPrepare) {
+    unsigned long long beforeCurrentPrepared =
+        ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared();
+    unsigned long long beforeTotalPrepared =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPrepared();
+    unsigned long long beforeTotalPreparedThenCommitted =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted();
+    unsigned long long beforeTotalPreparedThenAborted =
+        ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted();
+
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    _opObserver->onTransactionPrepareThrowsException = true;
+
+    ASSERT_THROWS_CODE(txnParticipant.prepareTransaction(opCtx(), {}),
+                       AssertionException,
+                       ErrorCodes::OperationFailed);
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(), beforeCurrentPrepared);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPrepared(), beforeTotalPrepared);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted(),
+              beforeTotalPreparedThenCommitted);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted(),
+              beforeTotalPreparedThenAborted);
+
+    txnParticipant.abortActiveTransaction(opCtx());
+    ASSERT(txnParticipant.transactionIsAborted());
+
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentPrepared(), beforeCurrentPrepared);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPrepared(), beforeTotalPrepared);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenCommitted(),
+              beforeTotalPreparedThenCommitted);
+    ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalPreparedThenAborted(),
+              beforeTotalPreparedThenAborted);
+}
+
 TEST_F(TransactionsMetricsTest, TrackTotalOpenTransactionsWithAbort) {
     unsigned long long beforeTransactionStart =
         ServerTransactionsMetrics::get(opCtx())->getCurrentOpen();

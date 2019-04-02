@@ -74,8 +74,7 @@ public:
     void onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource* tickSource,
                   boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-                  Top* top,
-                  bool wasPrepared);
+                  Top* top);
 
     /**
      * Updates relevant metrics when a transaction aborts.
@@ -84,8 +83,7 @@ public:
     void onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
                  TickSource* tickSource,
                  boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-                 Top* top,
-                 bool wasPrepared);
+                 Top* top);
 
     /**
      * Adds the prepareOpTime, which is currently the OpTime of the first oplog entry written
@@ -135,8 +133,7 @@ private:
     void _onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
                         TickSource* tickSource,
                         boost::optional<repl::OpTime> oldestOplogEntryOpTime,
-                        Top* top,
-                        bool wasPrepared);
+                        Top* top);
 
     /**
      * Updates relevant metrics when an inactive transaction aborts. Also removes this transaction's

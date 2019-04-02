@@ -169,6 +169,13 @@ public:
     }
 
     /**
+     * Returns whether or not the transaction is currently prepared.
+     */
+    bool isPrepared() const {
+        return _preparedStartTime != boost::none;
+    }
+
+    /**
      * Returns the OpDebug object stored in this SingleTransactionStats instance.
      */
     const OpDebug* getOpDebug() const {
