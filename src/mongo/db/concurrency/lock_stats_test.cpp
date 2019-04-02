@@ -31,11 +31,14 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-TEST(LockStats, NoWait) {
+class LockStatsTest : public unittest::Test, public ScopedGlobalServiceContextForTest {};
+
+TEST_F(LockStatsTest, NoWait) {
     const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.NoWait"));
 
     resetGlobalLockStats();
@@ -53,7 +56,7 @@ TEST(LockStats, NoWait) {
     ASSERT_EQUALS(0, stats.get(resId, MODE_X).combinedWaitTimeMicros);
 }
 
-TEST(LockStats, Wait) {
+TEST_F(LockStatsTest, Wait) {
     const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Wait"));
 
     resetGlobalLockStats();
@@ -86,7 +89,7 @@ TEST(LockStats, Wait) {
     ASSERT_GREATER_THAN(stats.get(resId, MODE_S).combinedWaitTimeMicros, 0);
 }
 
-TEST(LockStats, Reporting) {
+TEST_F(LockStatsTest, Reporting) {
     const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Reporting"));
 
     resetGlobalLockStats();
@@ -103,7 +106,7 @@ TEST(LockStats, Reporting) {
     stats.report(&builder);
 }
 
-TEST(LockStats, Subtraction) {
+TEST_F(LockStatsTest, Subtraction) {
     const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Subtraction"));
 
     resetGlobalLockStats();
@@ -173,13 +176,13 @@ void assertAcquisitionStats(ResourceId rid) {
 }
 }  // namespace
 
-TEST(LockStats, GlobalRetrievableSeparately) {
+TEST_F(LockStatsTest, GlobalRetrievableSeparately) {
     assertAcquisitionStats(resourceIdGlobal);
     assertAcquisitionStats(resourceIdParallelBatchWriterMode);
     assertAcquisitionStats(resourceIdReplicationStateTransitionLock);
 }
 
-TEST(LockStats, ServerStatusAggregatesAllGlobal) {
+TEST_F(LockStatsTest, ServerStatusAggregatesAllGlobal) {
     resetGlobalLockStats();
 
     SingleThreadedLockStats stats;

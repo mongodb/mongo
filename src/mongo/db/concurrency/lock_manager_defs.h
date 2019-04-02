@@ -31,8 +31,13 @@
 
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <string>
 
+#include <third_party/murmurhash3/MurmurHash3.h>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
@@ -167,9 +172,21 @@ enum ResourceType {
 };
 
 /**
+ * Maps the resource id to a human-readable string.
+ */
+static const char* ResourceTypeNames[] = {
+    "Invalid", "Global", "Database", "Collection", "Metadata", "Mutex"};
+
+// Ensure we do not add new types without updating the names array.
+MONGO_STATIC_ASSERT((sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) ==
+                    ResourceTypesCount);
+
+/**
  * Returns a human-readable name for the specified resource type.
  */
-const char* resourceTypeName(ResourceType resourceType);
+static const char* resourceTypeName(ResourceType resourceType) {
+    return ResourceTypeNames[resourceType];
+}
 
 /**
  * Uniquely identifies a lockable resource.
@@ -192,9 +209,10 @@ public:
     };
 
     ResourceId() : _fullHash(0) {}
-    ResourceId(ResourceType type, StringData ns);
-    ResourceId(ResourceType type, const std::string& ns);
-    ResourceId(ResourceType type, uint64_t hashId);
+    ResourceId(ResourceType type, StringData ns) : _fullHash(fullHash(type, hashStringData(ns))) {}
+    ResourceId(ResourceType type, const std::string& ns)
+        : _fullHash(fullHash(type, hashStringData(ns))) {}
+    ResourceId(ResourceType type, uint64_t hashId) : _fullHash(fullHash(type, hashId)) {}
 
     bool isValid() const {
         return getType() != RESOURCE_INVALID;
@@ -232,13 +250,16 @@ private:
      */
     uint64_t _fullHash;
 
-    static uint64_t fullHash(ResourceType type, uint64_t hashId);
+    static uint64_t fullHash(ResourceType type, uint64_t hashId) {
+        return (static_cast<uint64_t>(type) << (64 - resourceTypeBits)) +
+            (hashId & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits));
+    }
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
-    // Keep the complete namespace name for debugging purposes (TODO: this will be
-    // removed once we are confident in the robustness of the lock manager).
-    std::string _nsCopy;
-#endif
+    static uint64_t hashStringData(StringData str) {
+        char hash[16];
+        MurmurHash3_x64_128(str.rawData(), str.size(), 0, hash);
+        return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
+    }
 };
 
 #ifndef MONGO_CONFIG_DEBUG_BUILD

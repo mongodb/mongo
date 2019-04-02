@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <set>
 #include <unordered_map>
 
 #include "mongo/db/catalog/collection.h"
@@ -392,6 +393,23 @@ public:
     iterator begin(StringData db) const;
     iterator end() const;
 
+    /**
+     * Lookup the name of a resource by its ResourceId. If there are multiple namespaces mapped to
+     * the same ResourceId entry, we return the boost::none for those namespaces until there is
+     * only one namespace in the set. If the ResourceId is not found, boost::none is returned.
+     */
+    boost::optional<std::string> lookupResourceName(const ResourceId& rid);
+
+    /**
+     * Removes an existing ResourceId 'rid' with namespace 'entry' from the map.
+     */
+    void removeResource(const ResourceId& rid, const std::string& entry);
+
+    /**
+     * Inserts a new ResourceId 'rid' into the map with namespace 'entry'.
+     */
+    void addResource(const ResourceId& rid, const std::string& entry);
+
 private:
     class FinishDropChange;
     friend class UUIDCatalog::iterator;
@@ -429,5 +447,11 @@ private:
      * Generation number to track changes to the catalog that could invalidate iterators.
      */
     uint64_t _generationNumber;
+
+    // Protects _resourceInformation.
+    mutable stdx::mutex _resourceLock;
+
+    // Mapping from ResourceId to a set of strings that contains collection and database namespaces.
+    std::map<ResourceId, std::set<std::string>> _resourceInformation;
 };
 }  // namespace mongo

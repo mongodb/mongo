@@ -34,6 +34,7 @@
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -277,6 +278,12 @@ void UUIDCatalog::setCollectionNamespace(OperationContext* opCtx,
     _collections[toCollection] = _collections[fromCollection];
     _collections.erase(fromCollection);
 
+    ResourceId oldRid = ResourceId(RESOURCE_COLLECTION, fromCollection.ns());
+    ResourceId newRid = ResourceId(RESOURCE_COLLECTION, toCollection.ns());
+
+    removeResource(oldRid, fromCollection.ns());
+    addResource(newRid, toCollection.ns());
+
     opCtx->recoveryUnit()->onRollback([this, coll, fromCollection, toCollection, catalogEntry] {
         stdx::lock_guard<stdx::mutex> lock(_catalogLock);
         coll->setNs(std::move(fromCollection));
@@ -284,6 +291,12 @@ void UUIDCatalog::setCollectionNamespace(OperationContext* opCtx,
 
         _collections[fromCollection] = _collections[toCollection];
         _collections.erase(toCollection);
+
+        ResourceId oldRid = ResourceId(RESOURCE_COLLECTION, fromCollection.ns());
+        ResourceId newRid = ResourceId(RESOURCE_COLLECTION, toCollection.ns());
+
+        removeResource(newRid, toCollection.ns());
+        addResource(oldRid, fromCollection.ns());
     });
 }
 
@@ -296,6 +309,9 @@ void UUIDCatalog::onCloseDatabase(Database* db) {
             deregisterCollectionObject(coll->uuid().get());
         }
     }
+
+    auto rid = ResourceId(RESOURCE_DATABASE, db->name());
+    removeResource(rid, db->name());
 }
 
 void UUIDCatalog::onCloseCatalog(OperationContext* opCtx) {
@@ -492,6 +508,12 @@ void UUIDCatalog::registerCollectionObject(CollectionUUID uuid, std::unique_ptr<
 
     _catalog[uuid].collection = std::move(coll);
     _catalog[uuid].collectionPtr = _catalog[uuid].collection.get();
+
+    auto dbRid = ResourceId(RESOURCE_DATABASE, dbName);
+    addResource(dbRid, dbName);
+
+    auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
+    addResource(collRid, ns.ns());
 }
 
 std::unique_ptr<Collection> UUIDCatalog::deregisterCollectionObject(CollectionUUID uuid) {
@@ -516,6 +538,9 @@ std::unique_ptr<Collection> UUIDCatalog::deregisterCollectionObject(CollectionUU
 
     // Make sure collection catalog entry still exists.
     invariant(_catalog[uuid].collectionCatalogEntry);
+
+    auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
+    removeResource(collRid, ns.ns());
 
     // Removal from an ordered map will invalidate iterators and potentially references to the
     // references to the erased element.
@@ -576,6 +601,9 @@ void UUIDCatalog::deregisterAllCatalogEntriesAndCollectionObjects() {
     _orderedCollections.clear();
     _catalog.clear();
 
+    stdx::lock_guard<stdx::mutex> resourceLock(_resourceLock);
+    _resourceInformation.clear();
+
     _generationNumber++;
 }
 
@@ -585,6 +613,63 @@ UUIDCatalog::iterator UUIDCatalog::begin(StringData db) const {
 
 UUIDCatalog::iterator UUIDCatalog::end() const {
     return iterator(_orderedCollections.end());
+}
+
+boost::optional<std::string> UUIDCatalog::lookupResourceName(const ResourceId& rid) {
+    invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
+    stdx::lock_guard<stdx::mutex> lock(_resourceLock);
+
+    auto search = _resourceInformation.find(rid);
+    if (search == _resourceInformation.end()) {
+        return boost::none;
+    }
+
+    std::set<std::string>& namespaces = search->second;
+
+    // When there are multiple namespaces mapped to the same ResourceId, return boost::none as the
+    // ResourceId does not identify a single namespace.
+    if (namespaces.size() > 1) {
+        return boost::none;
+    }
+
+    return *namespaces.begin();
+}
+
+void UUIDCatalog::removeResource(const ResourceId& rid, const std::string& entry) {
+    invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
+    stdx::lock_guard<stdx::mutex> lock(_resourceLock);
+
+    auto search = _resourceInformation.find(rid);
+    if (search == _resourceInformation.end()) {
+        return;
+    }
+
+    std::set<std::string>& namespaces = search->second;
+    namespaces.erase(entry);
+
+    // Remove the map entry if this is the last namespace in the set for the ResourceId.
+    if (namespaces.size() == 0) {
+        _resourceInformation.erase(search);
+    }
+}
+
+void UUIDCatalog::addResource(const ResourceId& rid, const std::string& entry) {
+    invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
+    stdx::lock_guard<stdx::mutex> lock(_resourceLock);
+
+    auto search = _resourceInformation.find(rid);
+    if (search == _resourceInformation.end()) {
+        std::set<std::string> newSet = {entry};
+        _resourceInformation.insert(std::make_pair(rid, newSet));
+        return;
+    }
+
+    std::set<std::string>& namespaces = search->second;
+    if (namespaces.count(entry) > 0) {
+        return;
+    }
+
+    namespaces.insert(entry);
 }
 
 }  // namespace mongo
