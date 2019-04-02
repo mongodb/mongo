@@ -630,7 +630,7 @@ def decide_platform_tools():
         # we only support MS toolchain on windows
         return ['msvc', 'mslink', 'mslib', 'masm']
     elif mongo_platform.is_running_os('linux', 'solaris'):
-        return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
+        return ['cc', 'c++', 'gnulink', 'ar', 'gas']
     elif mongo_platform.is_running_os('darwin'):
         return ['gcc', 'g++', 'applelink', 'ar', 'libtool', 'as', 'xcode']
     else:
