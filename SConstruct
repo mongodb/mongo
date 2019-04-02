@@ -36,6 +36,9 @@ from buildscripts import moduleconfig
 import libdeps
 import psutil
 
+scons_invocation = '{} {}'.format(sys.executable, ' '.join(sys.argv))
+print('scons: running with args {}'.format(scons_invocation))
+
 atexit.register(mongo.print_build_failures)
 
 def add_option(name, **kwargs):
