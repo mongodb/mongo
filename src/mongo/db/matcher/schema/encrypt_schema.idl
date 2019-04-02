@@ -56,6 +56,13 @@ enums:
         values:
             kDeterministic: "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
             kRandom: "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+    FleAlgorithmInt:
+        description: "The algorithm used to encrypt fields for field level encryption represented
+            as an unsigned integer."
+        type: int
+        values:
+            kDeterministic: 1
+            kRandom: 2
 
 structs:
     # Maps to the encrypt keyword in JSON Schema.
@@ -108,7 +115,7 @@ structs:
         fields:
           a:
             description: "The encryption algorithm to be used."
-            type: FleAlgorithm
+            type: FleAlgorithmInt
             cpp_name: algorithm
           iv:
             description: "Provided to be used for unique encryption for different collections."
