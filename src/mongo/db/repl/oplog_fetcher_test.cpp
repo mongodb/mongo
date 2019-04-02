@@ -38,6 +38,7 @@
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
@@ -278,6 +279,19 @@ TEST_F(OplogFetcherTest, InvalidOplogQueryMetadataInResponseStopsTheOplogFetcher
                             Milliseconds(0)});
 
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, shutdownState->getStatus());
+}
+
+DEATH_TEST_F(OplogFetcherTest,
+             ValidMetadataInResponseWithoutOplogMetadataInvariants,
+             "Invariant failure oqMetadata") {
+    rpc::ReplSetMetadata metadata(1, lastFetched, lastFetched, 1, OID::gen(), 2, 2);
+    BSONObjBuilder bob;
+    ASSERT_OK(metadata.writeToMetadata(&bob));
+    auto metadataObj = bob.obj();
+
+    processSingleBatch(
+        {concatenate(makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}), metadataObj),
+         Milliseconds(0)});
 }
 
 TEST_F(OplogFetcherTest, ValidMetadataWithInResponseShouldBeForwardedToProcessMetadataFn) {
