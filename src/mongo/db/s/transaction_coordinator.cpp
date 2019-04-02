@@ -44,26 +44,6 @@ using CoordinatorCommitDecision = txn::CoordinatorCommitDecision;
 using PrepareVoteConsensus = txn::PrepareVoteConsensus;
 using TransactionCoordinatorDocument = txn::TransactionCoordinatorDocument;
 
-CoordinatorCommitDecision makeDecisionFromPrepareVoteConsensus(ServiceContext* service,
-                                                               const PrepareVoteConsensus& result,
-                                                               const LogicalSessionId& lsid,
-                                                               TxnNumber txnNumber) {
-    auto decision = result.decision();
-
-    if (decision.getDecision() == CommitDecision::kCommit) {
-        LOG(3) << "Advancing cluster time to the commit timestamp "
-               << *decision.getCommitTimestamp() << " for " << lsid.getId() << ':' << txnNumber;
-
-        uassertStatusOK(LogicalClock::get(service)->advanceClusterTime(
-            LogicalTime(*decision.getCommitTimestamp())));
-
-        decision.setCommitTimestamp(Timestamp(decision.getCommitTimestamp()->getSecs(),
-                                              decision.getCommitTimestamp()->getInc() + 1));
-    }
-
-    return decision;
-}
-
 }  // namespace
 
 TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
@@ -191,8 +171,16 @@ Future<CoordinatorCommitDecision> TransactionCoordinator::_runPhaseOne(
         .then([this, participantShards](PrepareVoteConsensus result) {
             invariant(_state == CoordinatorState::kPreparing);
 
-            auto decision =
-                makeDecisionFromPrepareVoteConsensus(_serviceContext, result, _lsid, _txnNumber);
+            auto decision = result.decision();
+            if (decision.getDecision() == CommitDecision::kCommit) {
+                LOG(3) << "Advancing cluster time to the commit timestamp "
+                       << *decision.getCommitTimestamp() << " for " << _lsid.getId() << ':'
+                       << _txnNumber;
+
+                uassertStatusOK(
+                    LogicalClock::get(_serviceContext)
+                        ->advanceClusterTime(LogicalTime(*decision.getCommitTimestamp())));
+            }
 
             return txn::persistDecision(*_scheduler,
                                         _lsid,
