@@ -97,7 +97,17 @@ private:
         Date_t deadline = RemoteCommandRequest::kNoExpirationDate;
         Date_t start;
 
-        ConnectionPool::ConnectionHandle conn;
+        struct Deleter {
+            ConnectionPool::ConnectionHandleDeleter returner;
+            transport::ReactorHandle reactor;
+
+            void operator()(ConnectionPool::ConnectionInterface* ptr) const {
+                reactor->dispatch([ ret = returner, ptr ](auto) { ret(ptr); });
+            }
+        };
+        using ConnHandle = std::unique_ptr<ConnectionPool::ConnectionInterface, Deleter>;
+
+        ConnHandle conn;
         std::unique_ptr<transport::ReactorTimer> timer;
 
         AtomicWord<bool> done;
@@ -128,7 +138,7 @@ private:
     void _eraseInUseConn(const TaskExecutor::CallbackHandle& handle);
     Future<RemoteCommandResponse> _onAcquireConn(std::shared_ptr<CommandState> state,
                                                  Future<RemoteCommandResponse> future,
-                                                 ConnectionPool::ConnectionHandle conn,
+                                                 CommandState::ConnHandle conn,
                                                  const BatonHandle& baton);
 
     std::string _instanceName;

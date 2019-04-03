@@ -213,18 +213,48 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         return Status::OK();
     }
 
-    auto connFuture = _pool->get(request.target, request.sslMode, request.timeout)
-                          .tapError([state](Status error) {
-                              LOG(2) << "Failed to get connection from pool for request "
-                                     << state->request.id << ": " << error;
-                          });
+    // Interacting with the connection pool can involve more work than just getting a connection
+    // out.  In particular, we can end up having to spin up new connections, and fulfilling promises
+    // for other requesters.  Returning connections has the same issue.
+    //
+    // To work around it, we make sure to hop onto the reactor thread before getting a connection,
+    // then making sure to get back to the client thread to do the work (if on a baton).  And we
+    // hook up a connection returning unique_ptr that ensures that however we exit, we always do the
+    // return on the reactor thread.
+    //
+    // TODO: get rid of this cruft once we have a connection pool that's executor aware.
+
+    auto connFuture = [&] {
+        auto conn = _pool->tryGet(request.target, request.sslMode);
+
+        if (conn) {
+            return Future<ConnectionPool::ConnectionHandle>(std::move(*conn));
+        }
+
+        return _reactor
+            ->execute([this, state, request, baton] {
+                return makeReadyFutureWith([this, request] {
+                    return _pool->get(request.target, request.sslMode, request.timeout);
+                });
+            })
+            .tapError([state](Status error) {
+                LOG(2) << "Failed to get connection from pool for request " << state->request.id
+                       << ": " << error;
+            });
+    }().then([this, baton](ConnectionPool::ConnectionHandle conn) {
+        auto deleter = conn.get_deleter();
+
+        // TODO: drop out this shared_ptr once we have a unique_function capable future
+        return std::make_shared<CommandState::ConnHandle>(conn.release(),
+                                                          CommandState::Deleter{deleter, _reactor});
+    });
 
     auto remainingWork =
         [ this, state, future = std::move(pf.future), baton, onFinish = std::move(onFinish) ](
-            StatusWith<ConnectionPool::ConnectionHandle> swConn) mutable {
+            StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
         makeReadyFutureWith([&] {
-            auto conn = uassertStatusOK(std::move(swConn));
-            return _onAcquireConn(state, std::move(future), std::move(conn), baton);
+            auto connHandle = uassertStatusOK(std::move(swConn));
+            return _onAcquireConn(state, std::move(future), std::move(*connHandle), baton);
         })
             .onError([](Status error) -> StatusWith<RemoteCommandResponse> {
                 // The TransportLayer has, for historical reasons returned SocketException for
@@ -253,7 +283,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         // connection
         std::move(connFuture)
             .getAsync([ baton, reactor = _reactor.get(), rw = std::move(remainingWork) ](
-                StatusWith<ConnectionPool::ConnectionHandle> swConn) mutable {
+                StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
                 baton->schedule([ rw = std::move(rw),
                                   swConn = std::move(swConn) ](OperationContext * opCtx) mutable {
                     if (opCtx) {
@@ -268,7 +298,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         // otherwise we're happy to run inline
         std::move(connFuture)
             .getAsync([rw = std::move(remainingWork)](
-                StatusWith<ConnectionPool::ConnectionHandle> swConn) mutable {
+                StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
                 std::move(rw)(std::move(swConn));
             });
     }
@@ -281,7 +311,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
     std::shared_ptr<CommandState> state,
     Future<RemoteCommandResponse> future,
-    ConnectionPool::ConnectionHandle conn,
+    CommandState::ConnHandle conn,
     const BatonHandle& baton) {
     if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsAfterAcquireConn)) {
         conn->indicateSuccess();

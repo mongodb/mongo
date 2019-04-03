@@ -56,9 +56,6 @@ public:
         transport::ConnectSSLMode sslMode,
         size_t generation) override;
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() override;
-    OutOfLineExecutor& getExecutor() override {
-        return *_reactor;
-    }
 
     Date_t now() override;
 
