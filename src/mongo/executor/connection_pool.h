@@ -132,6 +132,11 @@ public:
          * The manager will hold this pool for the lifetime of the pool.
          */
         EgressTagCloserManager* egressTagCloserManager = nullptr;
+
+        /**
+         * Connections created through this connection pool will not attempt to authenticate.
+         */
+        bool skipAuthentication = false;
     };
 
     explicit ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> impl,

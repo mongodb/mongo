@@ -237,6 +237,10 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb) {
             return _client->initWireVersion("NetworkInterfaceTL", isMasterHook.get());
         })
         .then([this, isMasterHook] {
+            if (_skipAuth) {
+                return Future<void>::makeReady();
+            }
+
             boost::optional<std::string> mechanism;
             if (!isMasterHook->saslMechsForInternalAuth().empty())
                 mechanism = isMasterHook->saslMechsForInternalAuth().front();
@@ -331,7 +335,8 @@ std::shared_ptr<ConnectionPool::ConnectionInterface> TLTypeFactory::makeConnecti
                                                hostAndPort,
                                                sslMode,
                                                generation,
-                                               _onConnectHook.get());
+                                               _onConnectHook.get(),
+                                               _connPoolOptions.skipAuthentication);
     fasten(conn.get());
     return conn;
 }

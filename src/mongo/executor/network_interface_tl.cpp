@@ -97,7 +97,7 @@ void NetworkInterfaceTL::startup() {
 
     _reactor = _tl->getReactor(transport::TransportLayer::kNewReactor);
     auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
-        _reactor, _tl, std::move(_onConnectHook));
+        _reactor, _tl, std::move(_onConnectHook), _connPoolOpts);
     _pool = std::make_unique<ConnectionPool>(
         std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
     _ioThread = stdx::thread([this] {
