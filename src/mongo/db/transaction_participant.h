@@ -634,10 +634,6 @@ public:
             return p().speculativeTransactionReadOpTime;
         }
 
-        boost::optional<repl::OpTime> getOldestOplogEntryOpTimeForTest() const {
-            return p().oldestOplogEntryOpTime;
-        }
-
         const Locker* getTxnResourceStashLockerForTest() const {
             invariant(o().txnResourceStash);
             return o().txnResourceStash->locker();
@@ -913,9 +909,6 @@ private:
         // transaction so they can be applied to subsequent opreations before the transaction
         // commits
         std::vector<MultikeyPathInfo> multikeyPathInfo;
-
-        // Tracks the OpTime of the first oplog entry written by this TransactionParticipant.
-        boost::optional<repl::OpTime> oldestOplogEntryOpTime;
 
         //
         // Retryable writes state

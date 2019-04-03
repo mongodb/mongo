@@ -68,12 +68,10 @@ public:
     void onUnstash(ServerTransactionsMetrics* serverTransactionsMetrics, TickSource* tickSource);
 
     /**
-     * Updates relevant metrics when a transaction commits. Also removes this transaction's oldest
-     * oplog entry OpTime from the oldestActiveOplogEntryOpTimes set if it is not boost::none.
+     * Updates relevant metrics when a transaction commits.
      */
     void onCommit(ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource* tickSource,
-                  boost::optional<repl::OpTime> oldestOplogEntryOpTime,
                   Top* top);
 
     /**
@@ -82,16 +80,12 @@ public:
      */
     void onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
                  TickSource* tickSource,
-                 boost::optional<repl::OpTime> oldestOplogEntryOpTime,
                  Top* top);
 
     /**
-     * Adds the prepareOpTime, which is currently the OpTime of the first oplog entry written
-     * by an active transaction, to the oldestActiveOplogEntryOpTimes set.
+     * Updates relevant metrics when a transcation is prepared.
      */
-    void onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,
-                   repl::OpTime prepareOpTime,
-                   TickSource::Tick curTick);
+    void onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics, TickSource::Tick curTick);
 
     /**
      * Updates relevant metrics and storage statistics when an operation running on the transaction
@@ -118,34 +112,26 @@ public:
     }
 
 private:
-    // Updates relevant metrics for any generic transaction abort.
+    /**
+     * Updates relevant metrics for any generic transaction abort.
+     */
     void _onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource::Tick curTick,
                   TickSource* tickSource,
                   Top* top);
 
     /**
-     * Updates relevant metrics when an active transaction aborts. Also removes this transaction's
-     * oldest oplog entry OpTime from the oldestActiveOplogEntryOpTimes set if it is not
-     * boost::none.
-     * Finally, updates an entry in oldestNonMajorityCommittedOpTimes to include its abort OpTime.
+     * Updates relevant metrics when an active transaction aborts.
      */
     void _onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
                         TickSource* tickSource,
-                        boost::optional<repl::OpTime> oldestOplogEntryOpTime,
                         Top* top);
 
     /**
-     * Updates relevant metrics when an inactive transaction aborts. Also removes this transaction's
-     * oldest oplog entry OpTime from the oldestActiveOplogEntryOpTimes set if it is not
-     * boost::none.
-     * Does not accept an optional abortOpTime parameter because we cannot abort an inactive
-     * prepared transaction. Instead, uses boost::none as the abortOpTime, which subsequently will
-     * not modify oldestNonMajorityCommittedOpTimes.
+     * Updates relevant metrics when an inactive transaction aborts.
      */
     void _onAbortInactive(ServerTransactionsMetrics* serverTransactionsMetrics,
                           TickSource* tickSource,
-                          boost::optional<repl::OpTime> oldestOplogEntryOpTime,
                           Top* top);
 
     // Tracks metrics for a single multi-document transaction.

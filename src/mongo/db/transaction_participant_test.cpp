@@ -2839,17 +2839,15 @@ void buildPreparedDurationString(StringBuilder* sb,
 /*
  * Builds the entire expected transaction info string and returns it.
  */
-std::string buildTransactionInfoString(
-    OperationContext* opCtx,
-    TransactionParticipant::Participant txnParticipant,
-    std::string terminationCause,
-    const LogicalSessionId sessionId,
-    const TxnNumber txnNum,
-    const int metricValue,
-    const bool wasPrepared,
-    bool autocommitVal = false,
-    boost::optional<repl::OpTime> prepareOpTime = boost::none,
-    boost::optional<repl::OpTime> oldestOplogEntryOpTime = boost::none) {
+std::string buildTransactionInfoString(OperationContext* opCtx,
+                                       TransactionParticipant::Participant txnParticipant,
+                                       std::string terminationCause,
+                                       const LogicalSessionId sessionId,
+                                       const TxnNumber txnNum,
+                                       const int metricValue,
+                                       const bool wasPrepared,
+                                       bool autocommitVal = false,
+                                       boost::optional<repl::OpTime> prepareOpTime = boost::none) {
     // Calling transactionInfoForLog to get the actual transaction info string.
     const auto lockerInfo =
         opCtx->lockState()->getLockerInfo(CurOp::get(*opCtx)->getLockStatsBase());
@@ -2898,7 +2896,7 @@ std::string buildTransactionInfoString(
     // timeInactiveMicros:2 numYields:0 locks:{ Global: { acquireCount: { r: 6, w: 4 } }, Database:
     // { acquireCount: { r: 1, w: 1, W: 2 } }, Collection: { acquireCount: { R: 1 } }, oplog: {
     // acquireCount: { W: 1 } } } wasPrepared:1 totalPreparedDurationMicros:10
-    // prepareOpTime:<OpTime> oldestOplogEntryOpTime:<OpTime> 0ms
+    // prepareOpTime:<OpTime> 0ms
     StringBuilder expectedTransactionInfo;
     expectedTransactionInfo << parametersInfo.str() << readTimestampInfo.str()
                             << singleTransactionStatsInfo.str()
@@ -2915,15 +2913,7 @@ std::string buildTransactionInfoString(
                                 << (prepareOpTime ? prepareOpTime->toString()
                                                   : txnParticipant.getPrepareOpTime().toString());
     }
-    if (txnParticipant.getOldestOplogEntryOpTimeForTest()) {
-        ASSERT(!oldestOplogEntryOpTime);
-        expectedTransactionInfo << " oldestOplogEntryOpTime:"
-                                << txnParticipant.getOldestOplogEntryOpTimeForTest()->toString();
-    }
-    if (oldestOplogEntryOpTime) {
-        ASSERT(!txnParticipant.getOldestOplogEntryOpTimeForTest());
-        expectedTransactionInfo << " oldestOplogEntryOpTime:" << oldestOplogEntryOpTime->toString();
-    }
+
     expectedTransactionInfo << ", "
                             << duration_cast<Milliseconds>(
                                    txnParticipant.getSingleTransactionStatsForTest().getDuration(
@@ -3278,7 +3268,6 @@ TEST_F(TransactionsMetricsTest, LogPreparedTransactionInfoAfterSlowAbort) {
                                    metricValue,
                                    true,
                                    false,
-                                   prepareOpTime,
                                    prepareOpTime);
 
     ASSERT_EQUALS(1, countLogLinesContaining(expectedTransactionInfo));
