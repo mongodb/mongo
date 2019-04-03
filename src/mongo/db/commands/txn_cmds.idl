@@ -69,6 +69,11 @@ structs:
                 optional: true
                 description: "True if the transaction has been prepared. Set to false for a commit
                               for an unprepared transaction."
+            count:
+                type: long
+                optional: true
+                description: "The number of in-transaction operations applied in a transaction.
+                              This field is required only for unprepared transactions."
 
     AbortTransactionOplogObject:
         description: A document representing the 'o' field of an 'abortTransaction' oplog entry.

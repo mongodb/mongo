@@ -1217,7 +1217,8 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 repl::OpTime logCommitForUnpreparedTransaction(OperationContext* opCtx,
                                                StmtId stmtId,
                                                const repl::OpTime& prevOpTime,
-                                               const OplogSlot oplogSlot) {
+                                               const OplogSlot oplogSlot,
+                                               const unsigned long long numInTxnOps) {
     const NamespaceString cmdNss{"admin", "$cmd"};
 
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
@@ -1229,6 +1230,7 @@ repl::OpTime logCommitForUnpreparedTransaction(OperationContext* opCtx,
     sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
     oplogLink.prevOpTime = prevOpTime;
     cmdObj.setPrepared(false);
+    cmdObj.setCount(numInTxnOps);
 
     const auto oplogOpTime = logOperation(opCtx,
                                           "c",
@@ -1285,8 +1287,11 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         oplogSlots.pop_back();
         invariant(oplogSlots.size() == statements.size());
         logOplogEntriesForTransaction(opCtx, statements, oplogSlots);
-        commitOpTime = logCommitForUnpreparedTransaction(
-            opCtx, statements.size() /* stmtId */, oplogSlots.back().opTime, commitSlot);
+        commitOpTime = logCommitForUnpreparedTransaction(opCtx,
+                                                         statements.size() /* stmtId */,
+                                                         oplogSlots.back().opTime,
+                                                         commitSlot,
+                                                         statements.size());
     }
     invariant(!commitOpTime.isNull());
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements);
