@@ -43,8 +43,7 @@
      */
     function prepareCollection(shouldReverse) {
         coll.drop();
-        assert.commandWorked(
-            db.createCollection("capped6", {capped: true, size: 1000, $nExtents: 11}));
+        assert.commandWorked(db.createCollection("capped6", {capped: true, size: 1000}));
         var valueArray = new Array(maxDocuments);
         var c = "";
         for (i = 0; i < maxDocuments; ++i, c += "-") {

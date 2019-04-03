@@ -1503,8 +1503,8 @@ public:
                                        << "querytests.findingstart"
                                        << "capped"
                                        << true
-                                       << "$nExtents"
-                                       << 5
+                                       << "size"
+                                       << 4096
                                        << "autoIndexId"
                                        << false),
                                   info));
@@ -1570,8 +1570,8 @@ public:
                                        << "querytests.findingstart"
                                        << "capped"
                                        << true
-                                       << "$nExtents"
-                                       << 5
+                                       << "size"
+                                       << 4096
                                        << "autoIndexId"
                                        << false),
                                   info));
@@ -1642,8 +1642,8 @@ public:
                                        << "querytests.findingstart"
                                        << "capped"
                                        << true
-                                       << "$nExtents"
-                                       << 5
+                                       << "size"
+                                       << 4096
                                        << "autoIndexId"
                                        << false),
                                   info));
