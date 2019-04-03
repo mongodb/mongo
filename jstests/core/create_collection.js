@@ -1,6 +1,7 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_capped,
+//         assumes_against_mongod_not_mongos]
 
 // Tests for the "create" command.
 (function() {
@@ -10,8 +11,12 @@
 
     // "create" command rejects invalid options.
     db.create_collection.drop();
-    assert.commandFailedWithCode(db.createCollection("create_collection", {unknown: 1}),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(db.createCollection("create_collection", {unknown: 1}), 40415);
+
+    // Cannot create a collection with null characters.
+    assert.commandFailedWithCode(db.createCollection("\0ab"), ErrorCodes.InvalidNamespace);
+    assert.commandFailedWithCode(db.createCollection("a\0b"), ErrorCodes.InvalidNamespace);
+    assert.commandFailedWithCode(db.createCollection("ab\0"), ErrorCodes.InvalidNamespace);
 
     //
     // Tests for "idIndex" field.
@@ -135,5 +140,28 @@
     assert.neq(indexSpec, null);
     assert.eq(indexSpec.collation.locale, "en_US", tojson(indexSpec));
 
-    assert.commandFailed(db.createCollection('capped_no_size', {capped: true}));
+    //
+    // Tests the combination of the "capped", "size" and "max" fields in createCollection().
+    //
+
+    // When "capped" is true, the "size" field needs to be present.
+    assert.commandFailedWithCode(db.createCollection('capped_no_size_no_max', {capped: true}),
+                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(db.createCollection('capped_no_size', {capped: true, max: 10}),
+                                 ErrorCodes.InvalidOptions);
+    db.no_capped.drop();
+    assert.commandWorked(db.createCollection('no_capped'), {capped: false});
+    db.capped_no_max.drop();
+    assert.commandWorked(db.createCollection('capped_no_max', {capped: true, size: 256}));
+    db.capped_with_max_and_size.drop();
+    assert.commandWorked(
+        db.createCollection('capped_with_max_and_size', {capped: true, max: 10, size: 256}));
+
+    // When the "size" field is present, "capped" needs to be true.
+    assert.commandFailedWithCode(db.createCollection('size_no_capped', {size: 256}),
+                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        db.createCollection('size_capped_false', {capped: false, size: 256}),
+        ErrorCodes.InvalidOptions);
+
 })();
