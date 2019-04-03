@@ -528,7 +528,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
 
     lk.unlock();
     _parent->_factory->getExecutor().schedule(guardCallback([this](auto lk, auto schedStatus) {
-        fassert(51157, schedStatus);
+        fassert(20000, schedStatus);
 
         spawnConnections(lk);
     }));
@@ -616,7 +616,7 @@ void ConnectionPool::SpecificPool::finishRefresh(stdx::unique_lock<stdx::mutex> 
 
     lk.unlock();
     _parent->_factory->getExecutor().schedule(guardCallback([this](auto lk, auto schedStatus) {
-        fassert(51158, schedStatus);
+        fassert(20003, schedStatus);
         fulfillRequests(lk);
     }));
 }
@@ -670,7 +670,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
 
         lk.unlock();
         _parent->_factory->getExecutor().schedule(guardCallback([this](auto lk, auto schedStatus) {
-            fassert(51159, schedStatus);
+            fassert(20004, schedStatus);
             fulfillRequests(lk);
         }));
     }
