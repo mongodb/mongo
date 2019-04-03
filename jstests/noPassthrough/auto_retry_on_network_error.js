@@ -110,5 +110,9 @@
         db.runCommandWithMetadata({getMore: cursorId, collection: collName}, {});
     });
 
+    // Since we expect the mongo shell's connection to get severed as a result of running the
+    // "replSetStepDown" command during validation, we temporarily disable the retry on
+    // network error behavior.
+    TestData.skipRetryOnNetworkError = true;
     rst.stopSet();
 })();

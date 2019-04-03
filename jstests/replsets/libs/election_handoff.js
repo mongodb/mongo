@@ -55,9 +55,9 @@ var ElectionHandoffTest = (function() {
             {"a": 1}, {writeConcern: {w: rst.nodes.length}}));
         rst.awaitNodesAgreeOnAppliedOpTime();
 
-        // Step down the current primary.
+        // Step down the current primary. Skip validation since it prevents election handoff.
         if (options["stepDownBySignal"]) {
-            rst.stop(initialPrimaryId, kSIGTERM, {}, {forRestart: true});
+            rst.stop(initialPrimaryId, kSIGTERM, {skipValidation: true}, {forRestart: true});
             rst.start(initialPrimaryId, {}, true);
         } else {
             assert.adminCommandWorkedAllowingNetworkError(primary, {
