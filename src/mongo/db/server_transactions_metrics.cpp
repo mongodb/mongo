@@ -149,41 +149,6 @@ void ServerTransactionsMetrics::decrementCurrentPrepared() {
     _currentPrepared.fetchAndSubtract(1);
 }
 
-
-boost::optional<repl::OpTime> ServerTransactionsMetrics::getOldestActiveOpTime() const {
-    stdx::lock_guard<stdx::mutex> lm(_mutex);
-    if (_oldestActiveOplogEntryOpTimes.empty()) {
-        return boost::none;
-    }
-    return *(_oldestActiveOplogEntryOpTimes.begin());
-}
-
-void ServerTransactionsMetrics::addActiveOpTime(repl::OpTime oldestOplogEntryOpTime) {
-    stdx::lock_guard<stdx::mutex> lm(_mutex);
-    auto ret = _oldestActiveOplogEntryOpTimes.insert(oldestOplogEntryOpTime);
-    // If ret.second is false, the OpTime we tried to insert already existed.
-    invariant(ret.second,
-              str::stream() << "This oplog entry OpTime already exists."
-                            << "oldestOplogEntryOpTime: "
-                            << oldestOplogEntryOpTime.toString());
-}
-
-void ServerTransactionsMetrics::removeActiveOpTime(repl::OpTime oldestOplogEntryOpTime) {
-    stdx::lock_guard<stdx::mutex> lm(_mutex);
-    auto it = _oldestActiveOplogEntryOpTimes.find(oldestOplogEntryOpTime);
-    invariant(it != _oldestActiveOplogEntryOpTimes.end(),
-              str::stream() << "This oplog entry OpTime does not exist "
-                            << "or has already been removed."
-                            << "oldestOplogEntryOpTime: "
-                            << oldestOplogEntryOpTime.toString());
-    _oldestActiveOplogEntryOpTimes.erase(it);
-}
-
-unsigned int ServerTransactionsMetrics::getTotalActiveOpTimes() const {
-    stdx::lock_guard<stdx::mutex> lm(_mutex);
-    return _oldestActiveOplogEntryOpTimes.size();
-}
-
 Timestamp ServerTransactionsMetrics::_getOldestOpenUnpreparedReadTimestamp(
     OperationContext* opCtx) {
     // The history is not pinned in memory once a transaction has been prepared since reads
@@ -205,11 +170,6 @@ void ServerTransactionsMetrics::updateStats(TransactionsStats* stats, OperationC
     stats->setCurrentPrepared(_currentPrepared.load());
     stats->setOldestOpenUnpreparedReadTimestamp(
         ServerTransactionsMetrics::_getOldestOpenUnpreparedReadTimestamp(opCtx));
-}
-
-void ServerTransactionsMetrics::clearOpTimes() {
-    stdx::lock_guard<stdx::mutex> lm(_mutex);
-    _oldestActiveOplogEntryOpTimes.clear();
 }
 
 namespace {

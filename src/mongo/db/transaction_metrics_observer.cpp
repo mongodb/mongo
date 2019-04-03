@@ -122,11 +122,6 @@ void TransactionMetricsObserver::onCommit(ServerTransactionsMetrics* serverTrans
     auto duration =
         durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));
     top->incrementGlobalTransactionLatencyStats(static_cast<uint64_t>(duration));
-
-    // Remove this transaction's oldest oplog entry OpTime if one was written.
-    if (oldestOplogEntryOpTime) {
-        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime);
-    }
 }
 
 void TransactionMetricsObserver::_onAbortActive(
@@ -152,11 +147,6 @@ void TransactionMetricsObserver::_onAbortActive(
         serverTransactionsMetrics->incrementTotalPreparedThenAborted();
         serverTransactionsMetrics->decrementCurrentPrepared();
     }
-
-    // Remove this transaction's oldest oplog entry OpTime if one was written.
-    if (oldestOplogEntryOpTime) {
-        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime);
-    }
 }
 
 void TransactionMetricsObserver::_onAbortInactive(
@@ -173,11 +163,6 @@ void TransactionMetricsObserver::_onAbortInactive(
     // Server wide transactions metrics.
     //
     serverTransactionsMetrics->decrementCurrentInactive();
-
-    // Remove this transaction's oldest oplog entry OpTime if one was written.
-    if (oldestOplogEntryOpTime) {
-        serverTransactionsMetrics->removeActiveOpTime(*oldestOplogEntryOpTime);
-    }
 }
 
 void TransactionMetricsObserver::onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
@@ -249,10 +234,6 @@ void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTran
     //
     _singleTransactionStats.setPreparedStartTime(curTick);
 
-    // Since we currently only write an oplog entry for an in progress transaction when it is in
-    // the prepare state, the prepareOpTime is currently the oldest optime written to the
-    // oplog for this transaction.
-    serverTransactionsMetrics->addActiveOpTime(prepareOpTime);
     serverTransactionsMetrics->incrementCurrentPrepared();
     serverTransactionsMetrics->incrementTotalPrepared();
 }

@@ -88,38 +88,9 @@ public:
     void decrementCurrentPrepared();
 
     /**
-     * Returns the OpTime of the oldest oplog entry written across all open transactions.
-     * Returns boost::none if there are no transaction oplog entry OpTimes stored.
-     */
-    boost::optional<repl::OpTime> getOldestActiveOpTime() const;
-
-    /**
-     * Add the transaction's oplog entry OpTime to a set of OpTimes.
-     */
-    void addActiveOpTime(repl::OpTime oldestOplogEntryOpTime);
-
-    /**
-     * Remove the corresponding transaction oplog entry OpTime if the transaction commits or
-     * aborts.
-     */
-    void removeActiveOpTime(repl::OpTime oldestOplogEntryOpTime);
-
-    /**
-     * Returns the number of transaction oplog entry OpTimes currently stored.
-     */
-    unsigned int getTotalActiveOpTimes() const;
-
-    /**
      * Appends the accumulated stats to a transactions stats object.
      */
     void updateStats(TransactionsStats* stats, OperationContext* opCtx);
-
-    /**
-     * Invalidates the in-memory state of prepared transactions during replication rollback by
-     * clearing _oldestActiveOplogEntryOpTimes. This data structure should be properly reconstructed
-     * during replication recovery.
-     */
-    void clearOpTimes();
 
 private:
     /**
@@ -128,14 +99,6 @@ private:
      * returned.
      */
     static Timestamp _getOldestOpenUnpreparedReadTimestamp(OperationContext* opCtx);
-
-    //
-    // Member variables, excluding atomic variables, are labeled with the following code to
-    // indicate the synchronization rules for accessing them.
-    //
-    // (M)  Reads and writes guarded by _mutex
-    //
-    mutable stdx::mutex _mutex;
 
     // The number of multi-document transactions currently active.
     AtomicWord<unsigned long long> _currentActive{0};
@@ -166,11 +129,6 @@ private:
 
     // The current number of transactions in the prepared state.
     AtomicWord<unsigned long long> _currentPrepared{0};
-
-    // Maintain the oldest oplog entry OpTime across all active transactions. Currently, we only
-    // write an oplog entry for an ongoing transaction if it is in the `prepare` state. By
-    // maintaining an ordered set of OpTimes, the OpTime at the beginning will be the oldest.
-    std::set<repl::OpTime> _oldestActiveOplogEntryOpTimes;  // (M)
 };
 
 }  // namespace mongo

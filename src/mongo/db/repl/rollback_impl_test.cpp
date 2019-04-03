@@ -44,7 +44,6 @@
 #include "mongo/db/repl/rollback_test_fixture.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/type_shard_identity.h"
-#include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/unittest/death_test.h"
@@ -1367,32 +1366,6 @@ TEST_F(RollbackImplTest, ResetToZeroIfCountGoesNegative) {
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
     ASSERT_EQ(_storageInterface->getFinalCollectionCount(kGenericUUID), 0);
-}
-
-TEST_F(RollbackImplTest, RollbackCallsClearOpTimes) {
-    auto op = makeOpAndRecordId(1);
-    _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
-    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
-
-    auto txnMetrics = ServerTransactionsMetrics::get(getGlobalServiceContext());
-
-    // Insert arbitrary values for _oldestActiveOplogEntryOpTime, _oldestActiveOplogEntryOpTimes,
-    // and _oldestNonMajorityCommittedOpTimes. This simulates two active prepared transactions.
-    txnMetrics->addActiveOpTime(repl::OpTime(Timestamp(1, 2), 0));
-    txnMetrics->addActiveOpTime(repl::OpTime(Timestamp(1, 3), 0));
-
-    // All three variables should be populated at this time.
-    ASSERT(txnMetrics->getOldestActiveOpTime());
-    ASSERT_EQ(*txnMetrics->getOldestActiveOpTime(), repl::OpTime(Timestamp(1, 2), 0));
-    ASSERT_EQ(txnMetrics->getTotalActiveOpTimes(), 2U);
-
-    // Call runRollback to make sure these variables get cleared.
-    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
-
-    ASSERT_FALSE(txnMetrics->getOldestActiveOpTime());
-    ASSERT_EQ(txnMetrics->getTotalActiveOpTimes(), 0U);
 }
 
 /**

@@ -56,7 +56,6 @@
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_recovery.h"
-#include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -250,9 +249,6 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // prepared transaction. This will require us to scan all sessions and call
     // abortPreparedTransactionForRollback() on any txnParticipant with a prepared transaction.
     killSessionsAbortAllPreparedTransactions(opCtx);
-
-    // Clear the in memory state of prepared transactions in ServerTransactionsMetrics.
-    ServerTransactionsMetrics::get(getGlobalServiceContext())->clearOpTimes();
 
     // If there were rolled back operations on any session, invalidate all sessions.
     // We invalidate sessions before we recover so that we avoid invalidating sessions that had
