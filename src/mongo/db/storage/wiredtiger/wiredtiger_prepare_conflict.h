@@ -37,8 +37,11 @@
 
 namespace mongo {
 
-// When set, returns simulates returning WT_PREPARE_CONFLICT on WT cursor read operations.
+// When set, simulates returning WT_PREPARE_CONFLICT on WT cursor read operations.
 MONGO_FAIL_POINT_DECLARE(WTPrepareConflictForReads);
+
+// When set, WT_ROLLBACK is returned in place of retrying on WT_PREPARE_CONFLICT errors.
+MONGO_FAIL_POINT_DECLARE(WTSkipPrepareConflictRetries);
 
 /**
  * Logs a message with the number of prepare conflict retry attempts.
@@ -65,6 +68,15 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         return ret;
     CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
     wiredTigerPrepareConflictLog(attempts);
+
+    if (MONGO_FAIL_POINT(WTSkipPrepareConflictRetries)) {
+        // Callers of wiredTigerPrepareConflictRetry() should eventually call wtRCToStatus() via
+        // invariantWTOK() and have the WT_ROLLBACK error bubble up as a WriteConflictException.
+        // Enabling the "skipWriteConflictRetries" failpoint in conjunction with the
+        // "WTSkipPrepareConflictRetries" failpoint prevents the higher layers from retrying the
+        // entire operation.
+        return WT_ROLLBACK;
+    }
 
     while (true) {
         attempts++;

@@ -41,6 +41,8 @@ namespace mongo {
 // When set, simulates WT_PREPARE_CONFLICT returned from WiredTiger API calls.
 MONGO_FAIL_POINT_DEFINE(WTPrepareConflictForReads);
 
+MONGO_FAIL_POINT_DEFINE(WTSkipPrepareConflictRetries);
+
 void wiredTigerPrepareConflictLog(int attempts) {
     LOG(1) << "Caught WT_PREPARE_CONFLICT, attempt " << attempts
            << ". Waiting for unit of work to commit or abort.";
