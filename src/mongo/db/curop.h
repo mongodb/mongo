@@ -195,6 +195,9 @@ public:
 
     // Stores additive metrics.
     AdditiveMetrics additiveMetrics;
+
+    // Stores storage statistics.
+    std::shared_ptr<StorageStats> storageStats;
 };
 
 /**

@@ -63,6 +63,104 @@ AtomicUInt64 nextSnapshotId{1};
 logger::LogSeverity kSlowTransactionSeverity = logger::LogSeverity::Debug(1);
 }  // namespace
 
+using Section = WiredTigerOperationStats::Section;
+
+std::map<int, std::pair<StringData, Section>> WiredTigerOperationStats::_statNameMap = {
+    {WT_STAT_SESSION_BYTES_READ, std::make_pair("bytesRead"_sd, Section::DATA)},
+    {WT_STAT_SESSION_BYTES_WRITE, std::make_pair("bytesWritten"_sd, Section::DATA)},
+    {WT_STAT_SESSION_LOCK_DHANDLE_WAIT, std::make_pair("handleLock"_sd, Section::WAIT)},
+    {WT_STAT_SESSION_READ_TIME, std::make_pair("timeReadingMicros"_sd, Section::DATA)},
+    {WT_STAT_SESSION_WRITE_TIME, std::make_pair("timeWritingMicros"_sd, Section::DATA)},
+    {WT_STAT_SESSION_LOCK_SCHEMA_WAIT, std::make_pair("schemaLock"_sd, Section::WAIT)},
+    {WT_STAT_SESSION_CACHE_TIME, std::make_pair("cache"_sd, Section::WAIT)}};
+
+std::shared_ptr<StorageStats> WiredTigerOperationStats::getCopy() {
+    std::shared_ptr<WiredTigerOperationStats> copy = std::make_shared<WiredTigerOperationStats>();
+    *copy += *this;
+    return copy;
+}
+
+void WiredTigerOperationStats::fetchStats(WT_SESSION* session,
+                                          const std::string& uri,
+                                          const std::string& config) {
+    invariant(session);
+
+    WT_CURSOR* c = nullptr;
+    const char* cursorConfig = config.empty() ? nullptr : config.c_str();
+    int ret = session->open_cursor(session, uri.c_str(), nullptr, cursorConfig, &c);
+    uassert(ErrorCodes::CursorNotFound, "Unable to open statistics cursor", ret == 0);
+
+    invariant(c);
+    ON_BLOCK_EXIT(c->close, c);
+
+    const char* desc;
+    uint64_t value;
+    uint32_t key;
+    while (c->next(c) == 0 && c->get_key(c, &key) == 0) {
+        fassert(51035, c->get_value(c, &desc, nullptr, &value) == 0);
+        _stats[key] = WiredTigerUtil::castStatisticsValue<long long>(value);
+    }
+
+    // Reset the statistics so that the next fetch gives the recent values.
+    invariantWTOK(c->reset(c));
+}
+
+BSONObj WiredTigerOperationStats::toBSON() {
+    BSONObjBuilder bob;
+    std::unique_ptr<BSONObjBuilder> dataSection;
+    std::unique_ptr<BSONObjBuilder> waitSection;
+
+    for (auto const& stat : _stats) {
+        // Find the user consumable name for this statistic.
+        auto statIt = _statNameMap.find(stat.first);
+        invariant(statIt != _statNameMap.end());
+
+        auto statName = statIt->second.first;
+        Section subs = statIt->second.second;
+        long long val = stat.second;
+        // Add this statistic only if higher than zero.
+        if (val > 0) {
+            // Gather the statistic into its own subsection in the BSONObj.
+            switch (subs) {
+                case Section::DATA:
+                    if (!dataSection)
+                        dataSection = std::make_unique<BSONObjBuilder>();
+
+                    dataSection->append(statName, val);
+                    break;
+                case Section::WAIT:
+                    if (!waitSection)
+                        waitSection = std::make_unique<BSONObjBuilder>();
+
+                    waitSection->append(statName, val);
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
+    }
+
+    if (dataSection)
+        bob.append("data", dataSection->obj());
+    if (waitSection)
+        bob.append("timeWaitingMicros", waitSection->obj());
+
+    return bob.obj();
+}
+
+WiredTigerOperationStats& WiredTigerOperationStats::operator+=(
+    const WiredTigerOperationStats& other) {
+    for (auto const& otherStat : other._stats) {
+        _stats[otherStat.first] += otherStat.second;
+    }
+    return (*this);
+}
+
+StorageStats& WiredTigerOperationStats::operator+=(const StorageStats& other) {
+    *this += checked_cast<const WiredTigerOperationStats&>(other);
+    return (*this);
+}
+
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
     : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}
 
@@ -521,6 +619,21 @@ void WiredTigerRecoveryUnit::beginIdle() {
     if (_session) {
         _session->closeAllCursors("");
     }
+}
+
+std::shared_ptr<StorageStats> WiredTigerRecoveryUnit::getOperationStatistics() const {
+    std::shared_ptr<WiredTigerOperationStats> statsPtr(nullptr);
+
+    if (!_session)
+        return statsPtr;
+
+    WT_SESSION* s = _session->getSession();
+    invariant(s);
+
+    statsPtr = std::make_shared<WiredTigerOperationStats>();
+    statsPtr->fetchStats(s, "statistics:session", "statistics=(fast)");
+
+    return statsPtr;
 }
 
 // ---------------------

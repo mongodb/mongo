@@ -202,6 +202,10 @@ void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {
     if (_opCtx->lockState()->isWriteLocked()) {
         GlobalLockAcquisitionTracker::get(_opCtx).setGlobalExclusiveLockTaken();
     }
+
+    if (_opCtx->lockState()->isLocked()) {
+        GlobalLockAcquisitionTracker::get(_opCtx).setGlobalLockTaken();
+    }
 }
 
 void Lock::GlobalLock::_unlock() {

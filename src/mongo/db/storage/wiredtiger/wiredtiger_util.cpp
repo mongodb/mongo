@@ -644,7 +644,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
             suffix = "num";
         }
 
-        long long v = _castStatisticsValue<long long>(value);
+        long long v = castStatisticsValue<long long>(value);
 
         if (prefix.size() == 0) {
             bob->appendNumber(desc, v);

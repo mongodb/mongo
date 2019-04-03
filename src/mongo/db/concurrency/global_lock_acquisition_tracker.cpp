@@ -44,4 +44,12 @@ bool GlobalLockAcquisitionTracker::getGlobalExclusiveLockTaken() const {
 void GlobalLockAcquisitionTracker::setGlobalExclusiveLockTaken() {
     _globalExclusiveLockTaken = true;
 }
+
+bool GlobalLockAcquisitionTracker::getGlobalLockTaken() const {
+    return _globalLockTaken;
+}
+
+void GlobalLockAcquisitionTracker::setGlobalLockTaken() {
+    _globalLockTaken = true;
+}
 }  // namespace mongo

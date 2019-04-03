@@ -41,6 +41,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_request.h"
@@ -375,6 +377,33 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
 
     if (shouldLogOp || (shouldSample && _debug.executionTimeMicros > slowMs * 1000LL)) {
         auto lockerInfo = opCtx->lockState()->getLockerInfo(_lockStatsBase);
+        const GlobalLockAcquisitionTracker& globalLockTracker =
+            GlobalLockAcquisitionTracker::get(opCtx);
+        if (_debug.storageStats == nullptr && globalLockTracker.getGlobalLockTaken() &&
+            opCtx->getServiceContext()->getStorageEngine()) {
+            // Do not fetch operation statistics again if we have already got them (for instance,
+            // as a part of stashing the transaction).
+            // Take a lock before calling into the storage engine to prevent racing against a
+            // shutdown. Any operation that used a storage engine would have at-least held a
+            // global lock at one point, hence we limit our lock acquisition to such operations.
+            // We can get here and our lock acquisition be timed out or interrupted, log a
+            // message if that happens.
+            try {
+                Lock::GlobalLock lk(opCtx,
+                                    MODE_IS,
+                                    Date_t::now() + Milliseconds(500),
+                                    Lock::InterruptBehavior::kLeaveUnlocked);
+                if (lk.isLocked()) {
+                    _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
+                } else {
+                    log(component) << "Timed out obtaining lock while trying to gather storage "
+                                      "statistics for a slow operation";
+                }
+            } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+                log(component)
+                    << "Interrupted while trying to gather storage statistics for a slow operation";
+            }
+        }
         log(component) << _debug.report(client, *this, (lockerInfo ? &lockerInfo->stats : nullptr));
     }
 
@@ -605,6 +634,10 @@ string OpDebug::report(Client* client,
         s << " locks:" << locks.obj().toString();
     }
 
+    if (storageStats) {
+        s << " storage:" << storageStats->toBSON().toString();
+    }
+
     if (iscommand) {
         s << " protocol:" << getProtoString(networkOp);
     }
@@ -670,6 +703,10 @@ void OpDebug::append(const CurOp& curop,
     {
         BSONObjBuilder locks(b.subobjStart("locks"));
         lockStats.report(&locks);
+    }
+
+    if (storageStats) {
+        b.append("storage", storageStats->toBSON());
     }
 
     if (!errInfo.isOK()) {

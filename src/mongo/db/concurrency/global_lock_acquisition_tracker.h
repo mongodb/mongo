@@ -35,9 +35,10 @@
 namespace mongo {
 
 /**
- * The GlobalLockAcquisitionTracker keeps track of if the global lock has ever been taken in X or
- * IX mode. This class is used to track if we ever did a transaction with the intent to do a
- * write, so that we can enforce write concern on noop writes.
+ * The GlobalLockAcquisitionTracker keeps track of if the global lock has ever been taken in
+ * different modes. This class is also used to track if we ever took a global lock.
+ * This class is used to track if we ever did a transaction with the intent to do a write,
+ * so that we can enforce write concern on noop writes.
  */
 class GlobalLockAcquisitionTracker {
 public:
@@ -56,9 +57,22 @@ public:
      */
     void setGlobalExclusiveLockTaken();
 
+    /**
+     * Returns whether we have ever taken a global lock in this operation.
+     */
+    bool getGlobalLockTaken() const;
+
+    /**
+     * Sets that we have ever taken a global lock in this operation.
+     */
+    void setGlobalLockTaken();
+
 private:
     // Set to true when the global lock is first taken in X or IX mode. Never set back to false.
     bool _globalExclusiveLockTaken = false;
+
+    // Set to true when the global lock is first taken in any mode. Never set back to false.
+    bool _globalLockTaken = false;
 };
 
 }  // namespace mongo

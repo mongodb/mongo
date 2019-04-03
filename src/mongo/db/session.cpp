@@ -754,6 +754,20 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
         _singleTransactionStats.getOpDebug()->additiveMetrics.add(
             CurOp::get(opCtx)->debug().additiveMetrics);
 
+        // If there are valid storage statistics for this operation, put those in the
+        // SingleTransactionStats instance either by creating a new storageStats instance or by
+        // adding into an existing storageStats instance stored in SingleTransactionStats.
+        std::shared_ptr<StorageStats> storageStats =
+            opCtx->recoveryUnit()->getOperationStatistics();
+        if (storageStats) {
+            CurOp::get(opCtx)->debug().storageStats = storageStats;
+            if (!_singleTransactionStats.getOpDebug()->storageStats) {
+                _singleTransactionStats.getOpDebug()->storageStats = storageStats->getCopy();
+            } else {
+                *_singleTransactionStats.getOpDebug()->storageStats += *storageStats;
+            }
+        }
+
         // Update the LastClientInfo object stored in the SingleTransactionStats instance on the
         // Session with this Client's information. This is the last client that ran a transaction
         // operation on the Session.
@@ -942,6 +956,20 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
         _singleTransactionStats.getOpDebug()->additiveMetrics.add(
             CurOp::get(opCtx)->debug().additiveMetrics);
 
+        // If there are valid storage statistics for this operation, put those in the
+        // SingleTransactionStats instance either by creating a new storageStats instance or by
+        // adding into an existing storageStats instance stored in SingleTransactionStats.
+        std::shared_ptr<StorageStats> storageStats =
+            opCtx->recoveryUnit()->getOperationStatistics();
+        if (storageStats) {
+            CurOp::get(opCtx)->debug().storageStats = storageStats;
+            if (!_singleTransactionStats.getOpDebug()->storageStats) {
+                _singleTransactionStats.getOpDebug()->storageStats = storageStats->getCopy();
+            } else {
+                *_singleTransactionStats.getOpDebug()->storageStats += *storageStats;
+            }
+        }
+
         // Update the LastClientInfo object stored in the SingleTransactionStats instance on the
         // Session with this Client's information.
         _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
@@ -1119,6 +1147,23 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                     // SingleTransactionStats instance on the Session.
                     _singleTransactionStats.getOpDebug()->additiveMetrics.add(
                         CurOp::get(opCtx)->debug().additiveMetrics);
+
+                    // If there are valid storage statistics for this operation, put those in the
+                    // SingleTransactionStats instance either by creating a new storageStats
+                    // instance or by adding into an existing storageStats instance stored in
+                    // SingleTransactionStats.
+                    std::shared_ptr<StorageStats> storageStats =
+                        opCtx->recoveryUnit()->getOperationStatistics();
+                    if (storageStats) {
+                        CurOp::get(opCtx)->debug().storageStats = storageStats;
+                        if (!_singleTransactionStats.getOpDebug()->storageStats) {
+                            _singleTransactionStats.getOpDebug()->storageStats =
+                                storageStats->getCopy();
+                        } else {
+                            *_singleTransactionStats.getOpDebug()->storageStats += *storageStats;
+                        }
+                    }
+
                     // Update the LastClientInfo object stored in the SingleTransactionStats
                     // instance on the Session with this Client's information.
                     _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
@@ -1179,6 +1224,21 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         // SingleTransactionStats instance on the Session.
         _singleTransactionStats.getOpDebug()->additiveMetrics.add(
             CurOp::get(opCtx)->debug().additiveMetrics);
+
+        // If there are valid storage statistics for this operation, put those in the
+        // SingleTransactionStats instance either by creating a new storageStats instance or by
+        // adding into an existing storageStats instance stored in SingleTransactionStats.
+        std::shared_ptr<StorageStats> storageStats =
+            opCtx->recoveryUnit()->getOperationStatistics();
+        if (storageStats) {
+            CurOp::get(opCtx)->debug().storageStats = storageStats;
+            if (!_singleTransactionStats.getOpDebug()->storageStats) {
+                _singleTransactionStats.getOpDebug()->storageStats = storageStats->getCopy();
+            } else {
+                *_singleTransactionStats.getOpDebug()->storageStats += *storageStats;
+            }
+        }
+
         // Update the LastClientInfo object stored in the SingleTransactionStats instance on the
         // Session with this Client's information.
         _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
@@ -1288,6 +1348,9 @@ std::string Session::_transactionInfoForLog(const SingleThreadedLockStats* lockS
     BSONObjBuilder locks;
     lockStats->report(&locks);
     s << " locks:" << locks.obj().toString();
+
+    if (_singleTransactionStats.getOpDebug()->storageStats)
+        s << " storage:" << _singleTransactionStats.getOpDebug()->storageStats->toBSON().toString();
 
     // Total duration of the transaction.
     s << " "
