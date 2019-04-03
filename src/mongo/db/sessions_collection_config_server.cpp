@@ -106,13 +106,6 @@ Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext*
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     {
-        // Only try to set up this collection until we have done so successfully once.
-        // Note: if there is a config server election, it's possible that two different
-        // primaries could both run the createIndexes scatter-gather query; this is ok.
-        if (_collectionSetUp) {
-            return Status::OK();
-        }
-
         Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
         // Prevent recreating the collection on downgrade.
         if (serverGlobalParams.featureCompatibility.getVersion() !=
@@ -133,7 +126,6 @@ Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext*
                   << "will try again on the next refresh interval";
         }
 
-        _collectionSetUp = true;
         return res;
     }
 }

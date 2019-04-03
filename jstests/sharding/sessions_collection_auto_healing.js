@@ -3,6 +3,8 @@ load('jstests/libs/sessions_collection.js');
 (function() {
     "use strict";
 
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+
     // This test makes assertions about the number of sessions, which are not compatible with
     // implicit sessions.
     TestData.disableImplicitSessions = true;
@@ -125,18 +127,32 @@ load('jstests/libs/sessions_collection.js');
         assert.eq(shardConfig.system.sessions.count(), 4, "did not flush mongos' sessions");
     }
 
-    // Test that if we drop the index on the sessions collection,
-    // refresh on neither the shard nor the config db heals it.
+    // Test that if we drop the index on the sessions collection, only a refresh on the config
+    // server heals it.
     {
         assert.commandWorked(shardConfig.system.sessions.dropIndex({lastUse: 1}));
 
         validateSessionsCollection(shard, true, false);
 
         assert.commandWorked(configAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
-        validateSessionsCollection(shard, true, false);
+        validateSessionsCollection(shard, true, true);
+
+        assert.commandWorked(shardConfig.system.sessions.dropIndex({lastUse: 1}));
 
         assert.commandWorked(shardAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
         validateSessionsCollection(shard, true, false);
+    }
+
+    // Test that if we drop the collection, it will be recreated only by the config server.
+    {
+        assertDropCollection(mongosConfig, "system.sessions");
+        validateSessionsCollection(shard, false, false);
+
+        assert.commandWorked(shardAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+        validateSessionsCollection(shard, false, false);
+
+        assert.commandWorked(configAdmin.runCommand({refreshLogicalSessionCacheNow: 1}));
+        validateSessionsCollection(shard, true, true);
     }
 
     st.stop();
