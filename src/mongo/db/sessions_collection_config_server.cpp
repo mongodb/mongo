@@ -99,13 +99,6 @@ Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext*
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     {
-        // Only try to set up this collection until we have done so successfully once.
-        // Note: if there is a config server election, it's possible that two different
-        // primaries could both run the createIndexes scatter-gather query; this is ok.
-        if (_collectionSetUp) {
-            return Status::OK();
-        }
-
         auto res = _shardCollectionIfNeeded(opCtx);
         if (!res.isOK()) {
             log() << "Failed to create config.system.sessions: " << res.reason()
@@ -119,7 +112,6 @@ Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext*
                   << "will try again on the next refresh interval";
         }
 
-        _collectionSetUp = true;
         return res;
     }
 }
