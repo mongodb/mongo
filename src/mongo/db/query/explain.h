@@ -202,7 +202,7 @@ private:
      */
     static void generatePlannerInfo(PlanExecutor* exec,
                                     const Collection* collection,
-                                    BSONObjBuilder* out);
+                                    BSONObjBuilder* out, bool backupPlanUsed);
 
     /**
      * Private helper that does the heavy-lifting for the public statsToBSON(...) functions
@@ -228,7 +228,7 @@ private:
                                       ExplainOptions::Verbosity verbosity,
                                       Status executePlanStatus,
                                       PlanStageStats* winningPlanTrialStats,
-                                      BSONObjBuilder* out);
+                                      BSONObjBuilder* out, bool backupPlanUsed);
 
     /**
      * Adds the 'serverInfo' explain section to the BSON object being build

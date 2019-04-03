@@ -263,20 +263,30 @@ void appendMultikeyPaths(const BSONObj& keyPattern,
 /**
  * Gather the PlanStageStats for all of the losing plans. If exec doesn't have a MultiPlanStage
  * (or any losing plans), will return an empty vector.
+ * If a backup plan was used, includes the stats of the new winning plan instaed of the 
  */
-std::vector<std::unique_ptr<PlanStageStats>> getRejectedPlansTrialStats(PlanExecutor* exec) {
+std::vector<std::unique_ptr<PlanStageStats>> getRejectedPlansTrialStats(PlanExecutor* exec, bool backupPlanUsed) {
     // Inspect the tree to see if there is a MultiPlanStage. Plan selection has already happened at
     // this point, since we have a PlanExecutor.
     const auto mps = getMultiPlanStage(exec->getRootStage());
     std::vector<std::unique_ptr<PlanStageStats>> res;
-
+    
     // Get the stats from the trial period for all the plans.
     if (mps) {
         const auto mpsStats = mps->getStats();
-        for (size_t i = 0; i < mpsStats->children.size(); ++i) {
-            if (i != static_cast<size_t>(mps->bestPlanIdx())) {
-                res.emplace_back(std::move(mpsStats->children[i]));
-            }
+
+        if (backupPlanUsed) {
+            for (size_t i = 0; i < mpsStats->children.size(); ++i) {
+                if (i != static_cast<size_t>(mps->originalWinningPlanIdx())) {
+                    res.emplace_back(std::move(mpsStats->children[i]));
+                }
+            }   
+        } else {
+            for (size_t i = 0; i < mpsStats->children.size(); ++i) {
+                if (i != static_cast<size_t>(mps->bestPlanIdx())) {
+                    res.emplace_back(std::move(mpsStats->children[i]));
+                }
+            }   
         }
     }
 
@@ -292,6 +302,17 @@ unique_ptr<PlanStageStats> getWinningPlanStatsTree(const PlanExecutor* exec) {
                : std::move(exec->getRootStage()->getStats());
 }
 
+/**
+ * Returns the root of the orginal winning plan used by 'exec'.
+ * This might be different than the final winning plan in the case that the MultiPlanStage selected a 
+ * blocking plan which failed, and fell back to a non-blocking plan instead.
+ * If there is no MultiPlanStage in the tree, returns the root stage of 'exec'.
+ */
+unique_ptr<PlanStageStats> getOriginalWinningPlanStatsTree(const PlanExecutor* exec) {
+    MultiPlanStage* mps = getMultiPlanStage(exec->getRootStage());
+    return mps ? std::move(mps->getStats()->children[mps->originalWinningPlanIdx()])
+               : std::move(exec->getRootStage()->getStats());
+}
 }  // namespace
 
 namespace mongo {
@@ -637,12 +658,22 @@ void Explain::getWinningPlanStats(const PlanExecutor* exec, BSONObjBuilder* bob)
 // static
 void Explain::generatePlannerInfo(PlanExecutor* exec,
                                   const Collection* collection,
-                                  BSONObjBuilder* out) {
+                                  BSONObjBuilder* out, bool backupPlanUsed) {
     CanonicalQuery* query = exec->getCanonicalQuery();
 
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
 
     plannerBob.append("plannerVersion", QueryPlanner::kPlannerVersion);
+
+    const auto mps = getMultiPlanStage(exec->getRootStage());
+    backupPlanUsed = ((mps->originalWinningPlanIdx()) > -1); 
+
+    if (backupPlanUsed) {
+        plannerBob.append("backupPlanUsed", true);
+    } else {
+        plannerBob.append("backupPlanUsed", false);
+    }
+
     plannerBob.append("namespace", exec->nss().ns());
 
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet'
@@ -693,13 +724,23 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     winningPlanBob.doneFast();
 
     // Genenerate array of rejected plans.
-    const vector<unique_ptr<PlanStageStats>> rejectedStats = getRejectedPlansTrialStats(exec);
+    const vector<unique_ptr<PlanStageStats>> rejectedStats = getRejectedPlansTrialStats(exec, backupPlanUsed);
     BSONArrayBuilder allPlansBob(plannerBob.subarrayStart("rejectedPlans"));
     for (size_t i = 0; i < rejectedStats.size(); i++) {
         BSONObjBuilder childBob(allPlansBob.subobjStart());
         statsToBSON(*rejectedStats[i], &childBob, ExplainOptions::Verbosity::kQueryPlanner);
     }
     allPlansBob.doneFast();
+
+    if (backupPlanUsed) {
+        // Generate array of original winning plan
+        BSONObjBuilder originalWinningPlanBob(plannerBob.subobjStart("originalWinningPlan"));
+        const auto originalWinnerStats = getOriginalWinningPlanStatsTree(exec);
+        statsToBSON(*originalWinnerStats.get(),
+                    &originalWinningPlanBob,
+                    ExplainOptions::Verbosity::kQueryPlanner);
+        originalWinningPlanBob.doneFast();
+    }
 
     plannerBob.doneFast();
 }
@@ -771,13 +812,14 @@ void Explain::generateExecutionInfo(PlanExecutor* exec,
                                     ExplainOptions::Verbosity verbosity,
                                     Status executePlanStatus,
                                     PlanStageStats* winningPlanTrialStats,
-                                    BSONObjBuilder* out) {
+                                    BSONObjBuilder* out, bool backupPlanUsed) {
     invariant(verbosity >= ExplainOptions::Verbosity::kExecStats);
     if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans &&
         findStageOfType(exec->getRootStage(), STAGE_MULTI_PLAN) != nullptr) {
         invariant(winningPlanTrialStats,
                   "winningPlanTrialStats must be non-null when requesting all execution stats");
     }
+    
     BSONObjBuilder execBob(out->subobjStart("executionStats"));
 
     // If there is an execution error while running the query, the error is reported under
@@ -811,7 +853,7 @@ void Explain::generateExecutionInfo(PlanExecutor* exec,
             planBob.doneFast();
         }
 
-        const vector<unique_ptr<PlanStageStats>> rejectedStats = getRejectedPlansTrialStats(exec);
+        const vector<unique_ptr<PlanStageStats>> rejectedStats = getRejectedPlansTrialStats(exec, backupPlanUsed);
         for (size_t i = 0; i < rejectedStats.size(); ++i) {
             BSONObjBuilder planBob(allPlansBob.subobjStart());
             generateSinglePlanExecutionInfo(
@@ -834,13 +876,14 @@ void Explain::explainStages(PlanExecutor* exec,
     //
     // Use the stats trees to produce explain BSON.
     //
+    bool backupPlanUsed = false;
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(exec, collection, out);
+        generatePlannerInfo(exec, collection, out, backupPlanUsed);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        generateExecutionInfo(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
+        generateExecutionInfo(exec, verbosity, executePlanStatus, winningPlanTrialStats, out, backupPlanUsed);
     }
 }
 
@@ -868,8 +911,8 @@ void Explain::explainStages(PlanExecutor* exec,
                             const Collection* collection,
                             ExplainOptions::Verbosity verbosity,
                             BSONObjBuilder* out) {
+    
     auto winningPlanTrialStats = Explain::getWinningPlanTrialStats(exec);
-
     Status executePlanStatus = Status::OK();
 
     // If we need execution stats, then run the plan in order to gather the stats.

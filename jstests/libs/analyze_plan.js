@@ -337,3 +337,7 @@ function assertCoveredQueryAndCount({collection, query, project, count}) {
            "Winning plan for count was not covered: " + tojson(explain.queryPlanner.winningPlan));
     assertExplainCount({explainResults: explain, expectedCount: count});
 }
+
+function backupPlanUsed(root) {
+    return root.queryPlanner.backupPlanUsed;
+}

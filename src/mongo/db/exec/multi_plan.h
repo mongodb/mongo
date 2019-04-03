@@ -128,8 +128,20 @@ public:
     /** Return true if a best plan has been chosen  */
     bool bestPlanChosen() const;
 
-    /** Return the index of the best plan chosen, for testing */
+    /*
+    * Return the index of the best plan chosen
+    */
     int bestPlanIdx() const;
+
+    /**
+     * Return the index of the backup plan chosen 
+     */
+    int backupPlanIdx() const;
+
+    /**
+     * Return the index of the original winning plan chosen
+     */
+    int originalWinningPlanIdx() const;
 
     /**
      * Returns the QuerySolution for the best plan, or NULL if no best plan
@@ -195,13 +207,17 @@ private:
     // one-to-one with _candidates.
     std::vector<CandidatePlan> _candidates;
 
-    // index into _candidates, of the winner of the plan competition
+    // index into '_candidates' of the winner of the plan competition
     // uses -1 / kNoSuchPlan when best plan is not (yet) known
     int _bestPlanIdx;
 
-    // index into _candidates, of the backup plan for sort
-    // uses -1 / kNoSuchPlan when best plan is not (yet) known
+    // The index within '_candidates' of the non-blocking backup plan which can be used if a blocking plan fails. 
+    // This is set to 'kNoSuchPlan' if there is no backup plan, or when it is not yet known.
     int _backupPlanIdx;
+
+    // Index into '_candidates' of the original winner of the plan which can be used if a blocking plan fails.
+    // This is set to 'kNoSuchPlan' if there is no backup plan, or when it is not (yet) known
+    int _originalWinningPlanIdx;
 
     // Set if this MultiPlanStage cannot continue, and the query must fail. This can happen in
     // two ways. The first is that all candidate plans fail. Note that one plan can fail
