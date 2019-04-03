@@ -52,6 +52,33 @@
                               jsTest.authenticate(conn);
                           }
                       })
+                .then(
+                    "best effort to step down node forever",
+                    function(conn) {
+                        if (conn.isReplicaSetMember()) {
+                            // This node should never run for election again. If the node has not
+                            // been initialized yet, then it cannot get elected.
+                            const kFreezeTimeSecs = 24 * 60 * 60;  // 24 hours.
+
+                            assert.commandWorkedOrFailedWithCode(
+                                conn.adminCommand({replSetStepDown: kFreezeTimeSecs, force: true}),
+                                [
+                                  ErrorCodes.NotMaster,
+                                  ErrorCodes.NotYetInitialized,
+                                  ErrorCodes.Unauthorized
+                                ]);
+
+                            assert.commandWorkedOrFailedWithCode(
+                                conn.adminCommand({replSetFreeze: kFreezeTimeSecs}), [
+                                    ErrorCodes.NotYetInitialized,
+                                    ErrorCodes.Unauthorized,
+                                    // We include "NotSecondary" because if replSetStepDown receives
+                                    // "NotYetInitialized", then this command will fail with
+                                    // "NotSecondary". This is why this is a "best-effort".
+                                    ErrorCodes.NotSecondary
+                                ]);
+                        }
+                    })
                 .then("getting the list of databases",
                       function(conn) {
                           const res = conn.adminCommand({listDatabases: 1});
