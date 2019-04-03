@@ -1,0 +1,55 @@
+***********************************************************
+
+ Discontinued.  See git log instead at
+
+   http://www.kernel.org/git/gitweb.cgi?p=libs/libunwind/libunwind.git;a=log
+
+***********************************************************
+
+2002-11-08  David Mosberger-Tang  <David.Mosberger@acm.org>
+
+	* src/ia64/unwind_i.h (ia64_getfp): Change from macro to inline
+	function.  Check "loc" argument for being NULL before dereferencing it.
+	(ia64_putfp): Ditto.
+	(ia64_get): Ditto.
+	(ia64_put): Ditto.
+
+2002-01-18  David Mosberger-Tang  <David.Mosberger@acm.org>
+
+	* src/ia64/parser.c (__ia64_unw_create_state_record): Set
+	IA64_FLAG_HAS_HANDLER if the unwind info descriptors indicate that
+	there a handler.
+
+	* src/ia64/regs.c (__ia64_access_reg): Return zero for UNW_REG_HANDLER
+	in frames that don't have a personality routine.
+
+	* src/ia64/unwind_i.h (IA64_FLAG_HAS_HANDLER): New flag.
+
+	* src/ia64/regs.c (__ia64_access_reg): When reading UNW_REG_HANDLER,
+	account for the fact that the personality address is gp-relative.
+
+	* src/ia64/parser.c (__ia64_unw_create_state_record): Fix
+	initialization of segbase and len.
+
+2002-01-17  David Mosberger-Tang  <David.Mosberger@acm.org>
+
+	* include/unwind-ia64.h: Include via "unwind.h" to ensure
+	the file is picked up from same directory.
+
+2002-01-16  David Mosberger-Tang  <David.Mosberger@acm.org>
+
+	* include/unwind.h: Define UNW_ESTOPUNWIND.  This error code may
+	be returned by acquire_unwind_info() to force termination of
+	unwinding.  An application may want to do this when encountering a
+	call frame for dynamically generated code, for example.
+
+	* unwind.h: Pass opaque argument pointer to acquire_unwind_info()
+	and release_unwind_info() like we do for access_mem() etc.
+
+2002-01-14  David Mosberger-Tang  <David.Mosberger@acm.org>
+
+	* Version 0.0 released.
+
+2002-01-11  David Mosberger-Tang  <David.Mosberger@acm.org>
+
+	* ChangeLog created.

@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 import libdeps
+import json
 
 Import("env use_system_version_of_library usemozjs get_option")
 Import("wiredtiger")
@@ -34,7 +35,9 @@ thirdPartyEnvironmentModifications = {
    },
    'timelib' : {
         'CPPPATH' : ['#/src/third_party/timelib' + timelibSuffix],
-   }
+   },
+   'unwind' : {
+   },
 }
 
 def injectMozJS(thisEnv):
@@ -208,6 +211,38 @@ s2Env = env.Clone()
 s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp', 'fmt', 'safeint'])
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
+
+unwindEnv = None
+if use_system_version_of_library("unwind"):
+    unwindEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_UNWIND_SYSLIBDEP'],
+        ])
+else:
+    unwindEnv = env.Clone()
+    unwindEnv.InjectThirdParty(libraries=['unwind'])
+    unwindEnv.InjectMongoIncludePaths()
+
+    def registerConsumerModifications(env, **kwargs):
+        for k,v in kwargs.items():
+            thirdPartyEnvironmentModifications['unwind'][k] = v
+
+    unwindEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
+    unwindEnv.SConscript('unwind/SConscript', exports={'env' : unwindEnv})
+
+    print("third_party/unwind modifications:",
+          ",".join(thirdPartyEnvironmentModifications['unwind'].keys()))
+
+    unwindEnv = unwindEnv.Clone(
+        LIBDEPS_INTERFACE=[
+            'unwind/unwind',
+        ])
+
+unwindEnv.Library(
+    target="shim_unwind",
+    source=[
+        'shim_unwind.cpp',
+    ])
 
 
 if use_system_version_of_library("fmt"):
@@ -436,14 +471,13 @@ if gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]:
         gperftoolsEnv.InjectThirdParty(libraries=['gperftools'])
         # Allow gperftools to determine its own consumer-side include/ dirs.
         # Needed because those are in a platform-specific subdirectory.
-        mods = {}
+        def registerConsumerModifications(env, **kwargs):
+            for k,v in kwargs.items():
+                thirdPartyEnvironmentModifications['gperftools'][k] = v
+        gperftoolsEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
         gperftoolsEnv.SConscript(
             'gperftools' + gperftoolsSuffix + '/SConscript',
-            exports={'env' : gperftoolsEnv, 'consumerMods' : mods})
-        # Propagate settings that were deposited into 'mods' by gperftools' SConscript.
-        for k,v in mods.items():
-            thirdPartyEnvironmentModifications['gperftools'][k] = v
-
+            exports={'env' : gperftoolsEnv})
         gperftoolsEnv = gperftoolsEnv.Clone(
             LIBDEPS_INTERFACE=[
                 'gperftools' + gperftoolsSuffix + '/tcmalloc_minimal',

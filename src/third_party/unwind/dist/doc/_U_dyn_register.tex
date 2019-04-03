@@ -1,0 +1,47 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{\_U\_dyn\_register}{David Mosberger-Tang}{Programming Library}{\_U\_dyn\_register}\_U\_dyn\_register -- register unwind-info for dynamically generated code
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$libunwind.h$>$}\\
+
+\Type{void} \Func{\_U\_dyn\_register}(\Type{unw\_dyn\_info\_t~*}\Var{di});\\
+
+\section{Description}
+
+The \Func{\_U\_dyn\_register}() routine registers unwind-info for a
+dynamically generated procedure.  The procedure's unwind-info is
+described by a structure of type \Type{unw\_dyn\_info\_t} (see
+\SeeAlso{libunwind-dynamic(3)}).  A pointer to this structure is
+passed in argument \Var{di}.
+
+The \Func{\_U\_dyn\_register}() routine is guaranteed to execute in
+constant time (in the absence of contention from concurrent calls to
+\Func{\_U\_dyn\_register}() or \Func{\_U\_dyn\_cancel}()).
+
+
+\section{Thread and Signal Safety}
+
+\Func{\_U\_dyn\_register}() is thread-safe but \emph{not} safe to use
+from a signal handler.
+
+\section{See Also}
+
+\SeeAlso{libunwind-dynamic(3)}, \SeeAlso{\_U\_dyn\_cancel(3)}
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

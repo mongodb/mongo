@@ -1,0 +1,46 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{\_U\_dyn\_cancel}{David Mosberger-Tang}{Programming Library}{\_U\_dyn\_cancel}\_U\_dyn\_cancel -- cancel unwind-info for dynamically generated code
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$libunwind.h$>$}\\
+
+\Type{void} \Func{\_U\_dyn\_cancel}(\Type{unw\_dyn\_info\_t~*}\Var{di});\\
+
+\section{Description}
+
+The \Func{\_U\_dyn\_cancel}() routine cancels the registration of the
+unwind-info for a dynamically generated procedure.  Argument \Var{di}
+is the pointer to the \Type{unw\_dyn\_info\_t} structure that
+describes the procedure's unwind-info.
+
+The \Func{\_U\_dyn\_cancel}() routine is guaranteed to execute in
+constant time (in the absence of contention from concurrent calls to
+\Func{\_U\_dyn\_register}() or \Func{\_U\_dyn\_cancel}()).
+
+
+\section{Thread and Signal Safety}
+
+\Func{\_U\_dyn\_cancel}() is thread-safe but \emph{not} safe to use
+from a signal handler.
+
+\section{See Also}
+
+\SeeAlso{libunwind-dynamic(3)}, \SeeAlso{\_U\_dyn\_register(3)}
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

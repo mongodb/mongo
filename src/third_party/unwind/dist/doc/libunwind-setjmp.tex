@@ -1,0 +1,87 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{libunwind-setjmp}{David Mosberger-Tang}{Programming Library}{libunwind-based non-local gotos}libunwind-setjmp -- libunwind-based non-local gotos
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$setjmp.h$>$}\\
+
+\noindent
+\Type{int} \Func{setjmp}(\Type{jmp\_buf}~\Var{env});\\
+\Type{void} \Func{longjmp}(\Type{jmp\_buf}~\Var{env}, \Type{int}~\Var{val});\\
+\Type{int} \Func{\_setjmp}(\Type{jmp\_buf}~\Var{env});\\
+\Type{void} \Func{\_longjmp}(\Type{jmp\_buf}~\Var{env}, \Type{int}~\Var{val});\\
+\Type{int} \Func{sigsetjmp}(\Type{sigjmp\_buf}~\Var{env}, \Type{int}~\Var{savemask});\\
+\Type{void} \Func{siglongjmp}(\Type{sigjmp\_buf}~\Var{env}, \Type{int}~\Var{val});\\
+
+\section{Description}
+
+The \Prog{unwind-setjmp} library offers a \Prog{libunwind}-based
+implementation of non-local gotos.  This implementation is intended to
+be a drop-in replacement for the normal, system-provided routines of
+the same name.  The main advantage of using the \Prog{unwind-setjmp}
+library is that setting up a non-local goto via one of the
+\Func{setjmp}() routines is very fast.  Typically, just 2 or 3 words
+need to be saved in the jump-buffer (plus one call to
+\Func{sigprocmask}(2), in the case of \Func{sigsetjmp}).  On the
+other hand, executing a non-local goto by calling one of the
+\Func{longjmp}() routines tends to be much slower than with the
+system-provided routines.  In fact, the time spent on a
+\Func{longjmp}() will be proportional to the number of call frames
+that exist between the points where \Func{setjmp}() and
+\Func{longjmp}() were called.  For this reason, the
+\Prog{unwind-setjmp} library is beneficial primarily in applications
+that frequently call \Func{setjmp}() but only rarely call
+\Func{longjmp}().
+
+\section{Caveats}
+
+\begin{itemize}
+\item The correct operation of this library depends on the presence of
+  correct unwind information.  On newer platforms, this is rarely an
+  issue.  On older platforms, care needs to be taken to
+  ensure that each of the functions whose stack frames may have to be
+  unwound during a \Func{longjmp}() have correct unwind information
+  (on those platforms, there is usually a compiler-switch, such as
+  \Opt{-funwind-tables}, to request the generation of unwind
+  information).
+\item The contents of \Type{jmp\_buf} and \Type{sigjmp\_buf} as setup
+  and used by these routines is completely different from the ones
+  used by the system-provided routines.  Thus, a jump-buffer created
+  by the libunwind-based \Func{setjmp}()/\Func{\_setjmp} may only be
+  used in a call to the libunwind-based
+  \Func{longjmp}()/\Func{\_longjmp}().  The analogous applies for
+  \Type{sigjmp\_buf} with \Func{sigsetjmp}() and \Func{siglongjmp}().
+\end{itemize}
+
+\section{Files}
+
+\begin{Description}
+\item[\Opt{-l}\File{unwind-setjmp}] The library an application should
+  be linked against to ensure it uses the libunwind-based non-local
+  goto routines.
+\end{Description}
+
+
+\section{See Also}
+
+\SeeAlso{libunwind(3)},
+setjmp(3), longjmp(3),
+\_setjmp(3), \_longjmp(3),
+sigsetjmp(3), siglongjmp(3)
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

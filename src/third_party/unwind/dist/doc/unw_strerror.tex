@@ -1,0 +1,42 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{unw\_strerror}{Thomas Hallgren}{Programming Library}{unw\_strerror}unw\_strerror -- get text corresponding to error code
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$libunwind.h$>$}\\
+
+\Type{const char *} \Func{unw\_strerror}(\Type{int} \Var{err\_code});\\
+
+\section{Description}
+
+The \Func{unw\_strerror}() routine maps the (negative) \Var{err\_code}
+to a corresponding text message and returns it.
+
+\section{Return Value}
+
+The message that corresponds to \Var{err\_code} or, if the
+\Var{err\_code} has no corresponding message, the text "invalid error
+code".
+
+\section{Thread and Signal Safety}
+
+\Func{unw\_strerror}() is thread-safe as well as safe to use
+from a signal handler.
+
+\section{Author}
+
+\noindent
+Thomas Hallgren\\
+BEA Systems\\
+Stockholm, Sweden\\
+Email: \Email{thallgre@bea.com}\\
+\LatexManEnd
+
+\end{document}

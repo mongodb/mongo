@@ -1,0 +1,79 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{unw\_init\_remote}{David Mosberger-Tang}{Programming Library}{unw\_init\_remote}unw\_init\_remote -- initialize cursor for remote unwinding
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$libunwind.h$>$}\\
+
+\Type{int} \Func{unw\_init\_remote}(\Type{unw\_cursor\_t~*}\Var{c}, \Type{unw\_addr\_space\_t~}\Var{as}, \Type{void~*}\Var{arg});\\
+
+\section{Description}
+
+The \Func{unw\_init\_remote}() routine initializes the unwind cursor
+pointed to by \Var{c} for unwinding in the address space identified by
+\Var{as}.  The \Var{as} argument can either be set to
+\Var{unw\_local\_addr\_space} (local address space) or to an arbitrary
+address space created with \Func{unw\_create\_addr\_space}().
+
+The \Var{arg} void-pointer tells the address space exactly what entity
+should be unwound.  For example, if \Var{unw\_local\_addr\_space} is
+passed in \Var{as}, then \Var{arg} needs to be a pointer to a context
+structure containing the machine-state of the initial stack frame.
+However, other address-spaces may instead expect a process-id, a
+thread-id, or a pointer to an arbitrary structure which identifies the
+stack-frame chain to be unwound.  In other words, the interpretation
+of \Var{arg} is entirely dependent on the address-space in use;
+\Prog{libunwind} never interprets the argument in any way on its own.
+
+Note that \Func{unw\_init\_remote}() can be used to initiate unwinding
+in \emph{any} process, including the local process in which the
+unwinder itself is running.  However, for local unwinding, it is
+generally preferable to use \Func{unw\_init\_local}() instead, because
+it is easier to use and because it may perform better.
+
+\section{Return Value}
+
+On successful completion, \Func{unw\_init\_remote}() returns 0.
+Otherwise the negative value of one of the error-codes below is
+returned.
+
+\section{Thread and Signal Safety}
+
+\Func{unw\_init\_remote}() is thread-safe.  If the local address-space
+is passed in argument \Var{as}, this routine is also safe to use from
+a signal handler.
+
+\section{Errors}
+
+\begin{Description}
+\item[\Const{UNW\_EINVAL}] \Func{unw\_init\_remote}() was called in a
+  version of \Prog{libunwind} which supports local unwinding only
+  (this normally happens when defining \Const{UNW\_LOCAL\_ONLY} before
+  including \File{$<$libunwind.h$>$} and then calling
+  \Func{unw\_init\_remote}()).
+\item[\Const{UNW\_EUNSPEC}] An unspecified error occurred.
+\item[\Const{UNW\_EBADREG}] A register needed by \Func{unw\_init\_remote}()
+  wasn't accessible.
+\end{Description}
+
+\section{See Also}
+
+\SeeAlso{libunwind(3)}, \SeeAlso{unw\_create\_addr\_space(3)},
+\SeeAlso{unw\_init\_local(3)}
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

@@ -1,0 +1,63 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{unw\_apply\_reg\_state}{David Mosberger-Tang}{Programming Library}{unw\_apply\_reg\_state}unw\_apply\_reg\_state -- apply a register state update to a cursor
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$libunwind.h$>$}\\
+
+\Type{int}
+\Func{unw\_apply\_reg\_state}(\Type{unw\_cursor\_t~*}\Var{cp},
+\Type{void~*}\Var{reg\_states\_data});\\
+
+\section{Description}
+
+The \Func{unw\_apply\_reg\_state}() routine updates the register values
+of a cursor according to the instructions in \Var{reg\_states\_data},
+which have been obtained by calling \Var{unw\_reg\_states\_iterate}.
+
+\section{Return Value}
+
+On successful completion, \Func{unw\_apply\_reg\_state}() returns 0.
+Otherwise the negative value of one of the error-codes below is
+returned.
+
+\section{Thread and Signal Safety}
+
+\Func{unw\_apply\_reg\_state}() is thread-safe.  If cursor \Var{cp} is
+in the local address-space, this routine is also safe to use from a
+signal handler.
+
+\section{Errors}
+
+\begin{Description}
+\item[\Const{UNW\_EUNSPEC}] An unspecified error occurred.
+\item[\Const{UNW\_ENOINFO}] \Prog{Libunwind} was unable to locate
+  unwind-info for the procedure.
+\item[\Const{UNW\_EBADVERSION}] The unwind-info for the procedure has
+  version or format that is not understood by \Prog{libunwind}.
+\end{Description}
+In addition, \Func{unw\_apply\_reg\_state}() may return any error
+returned by the \Func{access\_mem}() call-back (see
+\Func{unw\_create\_addr\_space}(3)).
+
+\section{See Also}
+
+\SeeAlso{libunwind(3)},
+\SeeAlso{unw\_reg\_states\_iterate(3)}
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

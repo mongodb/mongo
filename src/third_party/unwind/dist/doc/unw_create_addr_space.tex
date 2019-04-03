@@ -1,0 +1,265 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{unw\_create\_addr\_space}{David Mosberger-Tang}{Programming Library}{unw\_create\_addr\_space}unw\_create\_addr\_space -- create address space for remote unwinding
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$libunwind.h$>$}\\
+
+\Type{unw\_addr\_space\_t} \Func{unw\_create\_addr\_space}(\Type{unw\_accessors\_t~*}\Var{ap}, \Type{int} \Var{byteorder});\\
+
+\section{Description}
+
+The \Func{unw\_create\_addr\_space}() routine creates a new unwind
+address-space and initializes it based on the call-back routines
+passed via the \Var{ap} pointer and the specified \Var{byteorder}.
+The call-back routines are described in detail below.  The
+\Var{byteorder} can be set to 0 to request the default byte-order of
+the unwind target.  To request a particular byte-order,
+\Var{byteorder} can be set to any constant defined by
+\File{$<$endian.h$>$}.  In particular, \Const{\_\_LITTLE\_ENDIAN} would
+request little-endian byte-order and \Const{\_\_BIG\_ENDIAN} would
+request big-endian byte-order.  Whether or not a particular byte-order
+is supported depends on the target platform.
+
+\section{Call-back Routines}
+
+\Prog{Libunwind} uses a set of call-back routines to access the
+information it needs to unwind a chain of stack-frames.  These
+routines are specified via the \Var{ap} argument, which points to a
+variable of type \Type{unw\_accessors\_t}.  The contents of this
+variable is copied into the newly-created address space, so the
+variable must remain valid only for the duration of the call to
+\Func{unw\_create\_addr\_space}().
+
+The first argument to every call-back routine is an address-space
+identifier (\Var{as}) and the last argument is an arbitrary,
+application-specified void-pointer (\Var{arg}).  When invoking a
+call-back routine, \Prog{libunwind} sets the \Var{as} argument to the
+address-space on whose behalf the invocation is made and the \Var{arg}
+argument to the value that was specified when
+\Func{unw\_init\_remote}(3) was called.
+
+The synopsis and a detailed description of every call-back routine
+follows below.
+
+\subsection{Call-back Routine Synopsis}
+
+\Type{int} \Func{find\_proc\_info}(\Type{unw\_addr\_space\_t} \Var{as},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{unw\_word\_t} \Var{ip}, \Type{unw\_proc\_info\_t~*}\Var{pip},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{int} \Var{need\_unwind\_info}, \Type{void~*}arg);\\
+\Type{void} \Func{put\_unwind\_info}(\Type{unw\_addr\_space\_t} \Var{as},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{unw\_proc\_info\_t~*}pip, \Type{void~*}\Var{arg});\\
+\Type{int} \Func{get\_dyn\_info\_list\_addr}(\Type{unw\_addr\_space\_t} \Var{as},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{unw\_word\_t~*}\Var{dilap}, \Type{void~*}\Var{arg});\\
+\Type{int} \Func{access\_mem}(\Var{unw\_addr\_space\_t} \Var{as},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{unw\_word\_t} \Var{addr}, \Type{unw\_word\_t~*}\Var{valp},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{int} \Var{write}, \Type{void~*}\Var{arg});\\
+\Type{int} \Func{access\_reg}(\Var{unw\_addr\_space\_t} \Var{as},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{unw\_regnum\_t} \Var{regnum}, \Type{unw\_word\_t~*}\Var{valp},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{int} \Var{write}, \Type{void~*}\Var{arg});\\
+\Type{int} \Func{access\_fpreg}(\Var{unw\_addr\_space\_t} \Var{as},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{unw\_regnum\_t} \Var{regnum}, \Type{unw\_fpreg\_t~*}\Var{fpvalp},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{int} \Var{write}, \Type{void~*}\Var{arg});\\
+\Type{int} \Func{resume}(\Var{unw\_addr\_space\_t} \Var{as},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{unw\_cursor\_t~*}\Var{cp}, \Type{void~*}\Var{arg});\\
+\Type{int} \Func{get\_proc\_name}(\Type{unw\_addr\_space\_t} \Var{as},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{unw\_word\_t} \Var{addr}, \Type{char~*}\Var{bufp},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{size\_t} \Var{buf\_len}, \Type{unw\_word\_t~*}\Var{offp},\\
+\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\SP\Type{void~*}\Var{arg});\\
+
+\subsection{find\_proc\_info}
+
+\Prog{Libunwind} invokes the \Func{find\_proc\_info}() call-back to
+locate the information need to unwind a particular procedure.  The
+\Var{ip} argument is an instruction-address inside the procedure whose
+information is needed.  The \Var{pip} argument is a pointer to the
+variable used to return the desired information.  The type of this
+variable is \Type{unw\_proc\_info\_t}.  See
+\Func{unw\_get\_proc\_info(3)} for details.  Argument
+\Var{need\_unwind\_info} is zero if the call-back does not need to
+provide values for the following members in the
+\Type{unw\_proc\_info\_t} structure: \Var{format},
+\Var{unwind\_info\_size}, and \Var{unwind\_info}.  If
+\Var{need\_unwind\_info} is non-zero, valid values need to be returned
+in these members.  Furthermore, the contents of the memory addressed
+by the \Var{unwind\_info} member must remain valid until the info is
+released via the \Func{put\_unwind\_info} call-back (see below).
+
+On successful completion, the \Func{find\_proc\_info}() call-back must
+return zero.  Otherwise, the negative value of one of the
+\Type{unw\_error\_t} error-codes may be returned.  In particular, this
+call-back may return -\Const{UNW\_ESTOPUNWIND} to signal the end of
+the frame-chain.
+
+\subsection{put\_unwind\_info}
+
+\Prog{Libunwind} invokes the \Func{put\_unwind\_info}() call-back to
+release the resources (such as memory) allocated by a previous call to
+\Func{find\_proc\_info}() with the \Var{need\_unwind\_info} argument
+set to a non-zero value.  The \Var{pip} argument has the same value as
+the argument of the same name in the previous matching call to
+\Func{find\_proc\_info}().  Note that \Prog{libunwind} does \emph{not}
+invoke \Func{put\_unwind\_info} for calls to \Func{find\_proc\_info}()
+with a zero \Var{need\_unwind\_info} argument.
+
+
+\subsection{get\_dyn\_info\_list\_addr}
+
+\Prog{Libunwind} invokes the \Func{get\_dyn\_info\_list\_addr}()
+call-back to obtain the address of the head of the dynamic unwind-info
+registration list.  The variable stored at the returned address must
+have a type of \Type{unw\_dyn\_info\_list\_t} (see
+\Func{\_U\_dyn\_register}(3)).  The \Var{dliap} argument is a pointer
+to a variable of type \Type{unw\_word\_t} which is used to return the
+address of the dynamic unwind-info registration list.  If no dynamic
+unwind-info registration list exist, the value pointed to by
+\Var{dliap} must be cleared to zero.  \Prog{Libunwind} will cache the
+value returned by \Func{get\_dyn\_info\_list\_addr}() if caching is
+enabled for the given address-space.  The cache can be cleared with a
+call to \Func{unw\_flush\_cache}().
+
+On successful completion, the \Func{get\_dyn\_info\_list\_addr}()
+call-back must return zero.  Otherwise, the negative value of one of
+the \Type{unw\_error\_t} error-codes may be returned.
+
+\subsection{access\_mem}
+
+\Prog{Libunwind} invokes the \Func{access\_mem}() call-back to read
+from or write to a word of memory in the target address-space.  The
+address of the word to be accessed is passed in argument \Var{addr}.
+To read memory, \Prog{libunwind} sets argument \Var{write} to zero and
+\Var{valp} to point to the word that receives the read value.  To
+write memory, \Prog{libunwind} sets argument \Var{write} to a non-zero
+value and \Var{valp} to point to the word that contains the value to
+be written.  The word that \Var{valp} points to is always in the
+byte-order of the host-platform, regardless of the byte-order of the
+target.  In other words, it is the responsibility of the call-back
+routine to convert between the target's and the host's byte-order, if
+necessary.
+
+On successful completion, the \Func{access\_mem}()
+call-back must return zero.  Otherwise, the negative value of one of
+the \Type{unw\_error\_t} error-codes may be returned.
+
+\subsection{access\_reg}
+
+\Prog{Libunwind} invokes the \Func{access\_reg}() call-back to read
+from or write to a scalar (non-floating-point) CPU register.  The
+index of the register to be accessed is passed in argument
+\Var{regnum}.  To read a register, \Prog{libunwind} sets argument
+\Var{write} to zero and \Var{valp} to point to the word that receives
+the read value.  To write a register, \Prog{libunwind} sets argument
+\Var{write} to a non-zero value and \Var{valp} to point to the word
+that contains the value to be written.  The word that \Var{valp}
+points to is always in the byte-order of the host-platform, regardless
+of the byte-order of the target.  In other words, it is the
+responsibility of the call-back routine to convert between the
+target's and the host's byte-order, if necessary.
+
+On successful completion, the \Func{access\_reg}() call-back must
+return zero.  Otherwise, the negative value of one of the
+\Type{unw\_error\_t} error-codes may be returned.
+
+\subsection{access\_fpreg}
+
+\Prog{Libunwind} invokes the \Func{access\_fpreg}() call-back to read
+from or write to a floating-point CPU register.  The index of the
+register to be accessed is passed in argument \Var{regnum}.  To read a
+register, \Prog{libunwind} sets argument \Var{write} to zero and
+\Var{fpvalp} to point to a variable of type \Type{unw\_fpreg\_t} that
+receives the read value.  To write a register, \Prog{libunwind} sets
+argument \Var{write} to a non-zero value and \Var{fpvalp} to point to
+the variable of type \Type{unw\_fpreg\_t} that contains the value to
+be written.  The word that \Var{fpvalp} points to is always in the
+byte-order of the host-platform, regardless of the byte-order of the
+target.  In other words, it is the responsibility of the call-back
+routine to convert between the target's and the host's byte-order, if
+necessary.
+
+On successful completion, the \Func{access\_fpreg}() call-back must
+return zero.  Otherwise, the negative value of one of the
+\Type{unw\_error\_t} error-codes may be returned.
+
+\subsection{resume}
+
+\Prog{Libunwind} invokes the \Func{resume}() call-back to resume
+execution in the target address space.  Argument \Var{cp} is the
+unwind-cursor that identifies the stack-frame in which execution
+should resume.  By the time \Prog{libunwind} invokes the \Func{resume}
+call-back, it has already established the desired machine- and
+memory-state via calls to the \Func{access\_reg}(),
+\Func{access\_fpreg}, and \Func{access\_mem}() call-backs.  Thus, all
+the call-back needs to do is perform whatever action is needed to
+actually resume execution.
+
+The \Func{resume} call-back is invoked only in response to a call to
+\Func{unw\_resume}(3), so applications which never invoke
+\Func{unw\_resume}(3) need not define the \Func{resume} callback.
+
+On successful completion, the \Func{resume}() call-back must return
+zero.  Otherwise, the negative value of one of the
+\Type{unw\_error\_t} error-codes may be returned.  As a special case,
+when resuming execution in the local address space, the call-back will
+not return on success.
+
+\subsection{get\_proc\_name}
+
+\Prog{Libunwind} invokes the \Func{get\_proc\_name}() call-back to
+obtain the procedure-name of a static (not dynamically generated)
+procedure.  Argument \Var{addr} is an instruction-address within the
+procedure whose name is to be obtained.  The \Var{bufp} argument is a
+pointer to a character-buffer used to return the procedure name.  The
+size of this buffer is specified in argument \Var{buf\_len}.  The
+returned name must be terminated by a NUL character.  If the
+procedure's name is longer than \Var{buf\_len} bytes, it must be
+truncated to \Var{buf\_len}\Prog{-1} bytes, with the last byte in the
+buffer set to the NUL character and -\Const{UNW\_ENOMEM} must be
+returned.  Argument \Var{offp} is a pointer to a word which is used to
+return the byte-offset relative to the start of the procedure whose
+name is being returned.  For example, if procedure \Func{foo}() starts
+at address 0x40003000, then invoking \Func{get\_proc\_name}() with
+\Var{addr} set to 0x40003080 should return a value of 0x80 in the word
+pointed to by \Var{offp} (assuming the procedure is at least 0x80
+bytes long).
+
+On successful completion, the \Func{get\_proc\_name}() call-back must
+return zero.  Otherwise, the negative value of one of the
+\Type{unw\_error\_t} error-codes may be returned.
+
+
+\section{Return Value}
+
+On successful completion, \Func{unw\_create\_addr\_space}() returns a
+non-\Const{NULL} value that represents the newly created
+address-space.  Otherwise, \Const{NULL} is returned.
+
+\section{Thread and Signal Safety}
+
+\Func{unw\_create\_addr\_space}() is thread-safe but \emph{not}
+safe to use from a signal handler.
+
+\section{See Also}
+
+\SeeAlso{\_U\_dyn\_register(3)},
+\SeeAlso{libunwind(3)},
+\SeeAlso{unw\_destroy\_addr\_space(3)},
+\SeeAlso{unw\_get\_proc\_info(3)},
+\SeeAlso{unw\_init\_remote(3)},
+\SeeAlso{unw\_resume(3)}
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

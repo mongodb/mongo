@@ -1,0 +1,134 @@
+\documentclass{article}
+\usepackage[fancyhdr,pdf]{latex2man}
+
+\input{common.tex}
+
+\begin{document}
+
+\begin{Name}{3}{libunwind-ptrace}{David Mosberger-Tang}{Programming Library}{ptrace() support in libunwind}libunwind-ptrace -- ptrace() support in libunwind
+\end{Name}
+
+\section{Synopsis}
+
+\File{\#include $<$libunwind-ptrace.h$>$}\\
+
+\noindent
+\Type{unw\_accessors\_t} \Var{\_UPT\_accessors};\\
+
+\Type{void~*}\Func{\_UPT\_create}(\Type{pid\_t});\\
+\noindent
+\Type{void} \Func{\_UPT\_destroy}(\Type{void~*});\\
+
+\noindent
+\Type{int} \Func{\_UPT\_find\_proc\_info}(\Type{unw\_addr\_space\_t}, \Type{unw\_word\_t}, \Type{unw\_proc\_info\_t~*}, \Type{int}, \Type{void~*});\\
+\noindent
+\Type{void} \Func{\_UPT\_put\_unwind\_info}(\Type{unw\_addr\_space\_t}, \Type{unw\_proc\_info\_t~*}, \Type{void~*});\\
+\noindent
+\Type{int} \Func{\_UPT\_get\_dyn\_info\_list\_addr}(\Type{unw\_addr\_space\_t}, \Type{unw\_word\_t~*}, \Type{void~*});\\
+\noindent
+\Type{int} \Func{\_UPT\_access\_mem}(\Type{unw\_addr\_space\_t}, \Type{unw\_word\_t}, \Type{unw\_word\_t~*}, \Type{int}, \Type{void~*});\\
+\noindent
+\Type{int} \Func{\_UPT\_access\_reg}(\Type{unw\_addr\_space\_t}, \Type{unw\_regnum\_t}, \Type{unw\_word\_t~*}, \Type{int}, \Type{void~*});\\
+\noindent
+\Type{int} \Func{\_UPT\_access\_fpreg}(\Type{unw\_addr\_space\_t}, \Type{unw\_regnum\_t}, \Type{unw\_fpreg\_t~*}, \Type{int}, \Type{void~*});\\
+\noindent
+\Type{int} \Func{\_UPT\_get\_proc\_name}(\Type{unw\_addr\_space\_t}, \Type{unw\_word\_t}, \Type{char~*}, \Type{size\_t}, \Type{unw\_word\_t~*}, \Type{void~*});\\
+\noindent
+\Type{int} \Func{\_UPT\_resume}(\Type{unw\_addr\_space\_t}, \Type{unw\_cursor\_t~*}, \Type{void~*});\\
+
+\section{Description}
+
+The \Func{ptrace}(2) system-call makes it possible for a process to
+gain access to the machine-state and virtual memory of \emph{another}
+process.  With the right set of call-back routines, it is therefore
+possible to hook up \Prog{libunwind} to another process via
+\Func{ptrace}(2).  While it's not very difficult to do so directly,
+\Prog{libunwind} further facilitates this task by providing
+ready-to-use callbacks for this purpose.  The routines and variables
+implementing this facility use a name-prefix of \Func{\_UPT}, which is
+stands for ``unwind-via-ptrace''.
+
+An application that wants to use the \Func{\_UPT}-facility first needs
+to create a new \Prog{libunwind} address-space that represents the
+target process.  This is done by calling
+\Func{unw\_create\_addr\_space}().  In many cases, the application
+will simply want to pass the address of \Var{\_UPT\_accessors} as the
+first argument to this routine.  Doing so will ensure that
+\Prog{libunwind} will be able to properly unwind the target process.
+However, in special circumstances, an application may prefer to use
+only portions of the \Prog{\_UPT}-facility.  For this reason, the
+individual callback routines (\Func{\_UPT\_find\_proc\_info}(),
+\Func{\_UPT\_put\_unwind\_info}(), etc.)  are also available for direct
+use.  Of course, the addresses of these routines could also be picked
+up from \Var{\_UPT\_accessors}, but doing so would prevent static
+initialization.  Also, when using \Var{\_UPT\_accessors}, \emph{all}
+the callback routines will be linked into the application, even if
+they are never actually called.
+
+Next, the application can turn on ptrace-mode on the target process,
+either by forking a new process, invoking \Const{PTRACE\_TRACEME}, and
+then starting the target program (via \Func{execve}(2)), or by
+directly attaching to an already running process (via
+\Const{PTRACE\_ATTACH}).  Either way, once the process-ID (pid) of the
+target process is known, a \Prog{\_UPT}-info-structure can be created
+by calling \Func{\_UPT\_create}(), passing the pid of the target process
+as the only argument.  The returned void-pointer then needs to be
+passed as the ``argument'' pointer (third argument) to
+\Func{unw\_init\_remote}().
+
+The \Func{\_UPT\_resume}() routine can be used to resume execution of
+the target process.  It simply invokes \Func{ptrace}(2) with a command
+value of \Const{PTRACE\_CONT}.
+
+When the application is done using \Prog{libunwind} on the target
+process, \Func{\_UPT\_destroy}() needs to be called, passing it the
+void-pointer that was returned by the corresponding call to
+\Func{\_UPT\_create}().  This ensures that all memory and other
+resources are freed up.
+
+\section{Availability}
+
+Since \Func{ptrace}(2) works within a single machine only, the
+\Prog{\_UPT}-facility by definition is not available in
+\Prog{libunwind}-versions configured for cross-unwinding.
+
+\section{Thread Safety}
+
+The \Prog{\_UPT}-facility assumes that a single \Prog{\_UPT}-info
+structure is never shared between threads.  Because of this, no
+explicit locking is used.  As long as only one thread uses
+a \Prog{\_UPT}-info structure at any given time, this facility
+is thread-safe.
+
+\section{Return Value}
+
+\Func{\_UPT\_create}() may return a \Const{NULL} pointer if it fails
+to create the \Prog{\_UPT}-info-structure for any reason.  For the
+current implementation, the only reason this call may fail is when the
+system is out of memory.
+
+\section{Files}
+
+\begin{Description}
+\item[\File{libunwind-ptrace.h}] Headerfile to include when using the
+  interface defined by this library.
+\item[\Opt{-l}\File{unwind-ptrace} \Opt{-l}\File{unwind-generic}]
+    Linker-switches to add when building a program that uses the
+    functions defined by this library.
+\end{Description}
+
+\section{See Also}
+
+execve(2),
+\SeeAlso{libunwind(3)},
+ptrace(2)
+
+\section{Author}
+
+\noindent
+David Mosberger-Tang\\
+Email: \Email{dmosberger@gmail.com}\\
+WWW: \URL{http://www.nongnu.org/libunwind/}.
+\LatexManEnd
+
+\end{document}

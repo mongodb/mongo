@@ -1,0 +1,34 @@
+$manMacro1a{'Type'}		= $manMacro1a{File};
+	$manMacro1b{'Type'}	= $manMacro1b{File};
+$htmlMacro1a{'Type'}		= $htmlMacro1a{File};
+	$htmlMacro1b{'Type'}	= $htmlMacro1b{File};
+$texiMacro1a{'Type'}		= $texiMacro1a{File};
+	$texiMacro1b{'Type'}	= $texiMacro1b{File};
+$manMacro1a{'Func'}		= $manMacro1a{Prog};
+	$manMacro1b{'Func'}	= $manMacro1b{Prog};
+$htmlMacro1a{'Func'}		= $htmlMacro1a{Arg};
+	$htmlMacro1b{'Func'}	= $htmlMacro1b{Arg};
+$texiMacro1a{'Func'}		= $texiMacro1a{Prog};
+	$texiMacro1b{'Func'}	= $texiMacro1b{Prog};
+$manMacro1a{'Var'}		= $manMacro1a{Prog};
+	$manMacro1b{'Var'}	= $manMacro1b{Prog};
+$htmlMacro1a{'Var'}		= $htmlMacro1a{Prog};
+	$htmlMacro1b{'Var'}	= $htmlMacro1b{Prog};
+$texiMacro1a{'Var'}		= $texiMacro1a{Prog};
+	$texiMacro1b{'Var'}	= $texiMacro1b{Prog};
+$manMacro1a{'Const'}		= $manMacro1a{File};
+	$manMacro1b{'Const'}	= $manMacro1b{File};
+$htmlMacro1a{'Const'}		= $htmlMacro1a{File};
+	$htmlMacro1b{'Const'}	= $htmlMacro1b{File};
+$texiMacro1a{'Const'}		= $texiMacro1a{File};
+	$texiMacro1b{'Const'}	= $texiMacro1b{File};
+
+$manMacro1a{'SeeAlso'}		= $manMacro1a{File};
+	$manMacro1b{'SeeAlso'}	= $manMacro1b{File};
+# special handling of SeeAlso in latex2man, so that argument gets doubled:
+$htmlMacro2a{'SeeAlso'}		= "<a href=\"";
+	$htmlMacro2b{'SeeAlso'}	= ".html\">$htmlMacro1a{File}";
+	$htmlMacro2c{'SeeAlso'}	= "$htmlMacro1b{File}</a>";
+$texiMacro1a{'SeeAlso'}		= $texiMacro1a{File};
+	$texiMacro1b{'SeeAlso'}	= $texiMacro1b{File};
+

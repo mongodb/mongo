@@ -1,0 +1,63 @@
+'\" t
+.\" Manual page created with latex2man on Wed Aug 18 16:51:29 CEST 2004
+.\" NOTE: This file is generated, DO NOT EDIT.
+.de Vb
+.ft CW
+.nf
+..
+.de Ve
+.ft R
+
+.fi
+..
+.TH "UNW\\_STRERROR" "3" "18 August 2004" "Programming Library " "Programming Library "
+.SH NAME
+unw_strerror
+\-\- get text corresponding to error code 
+.PP
+.SH SYNOPSIS
+
+.PP
+#include <libunwind.h>
+.br
+.PP
+const char *
+unw_strerror(int
+err_code);
+.br
+.PP
+.SH DESCRIPTION
+
+.PP
+The unw_strerror()
+routine maps the (negative) err_code
+to a corresponding text message and returns it. 
+.PP
+.SH RETURN VALUE
+
+.PP
+The message that corresponds to err_code
+or, if the 
+err_code
+has no corresponding message, the text "invalid error 
+code". 
+.PP
+.SH THREAD AND SIGNAL SAFETY
+
+.PP
+unw_strerror()
+is thread\-safe as well as safe to use 
+from a signal handler. 
+.PP
+.SH AUTHOR
+
+.PP
+Thomas Hallgren
+.br 
+BEA Systems
+.br 
+Stockholm, Sweden
+.br 
+Email: \fBthallgre@bea.com\fP
+.br
+.\" NOTE: This file is generated, DO NOT EDIT.
