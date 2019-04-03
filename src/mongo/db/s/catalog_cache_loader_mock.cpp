@@ -99,9 +99,7 @@ std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
     const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) {
     auto notify = std::make_shared<Notification<void>>();
 
-    _threadPool.schedule([ this, notify, callbackFn ](auto status) noexcept {
-        invariant(status);
-
+    uassertStatusOK(_threadPool.schedule([ this, notify, callbackFn ]() noexcept {
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         auto swCollAndChunks = [&]() -> StatusWith<CollectionAndChangedChunks> {
@@ -123,7 +121,7 @@ std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
 
         callbackFn(opCtx.get(), std::move(swCollAndChunks));
         notify->set();
-    });
+    }));
 
     return notify;
 }

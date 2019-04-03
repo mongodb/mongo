@@ -343,10 +343,6 @@ error_class("WriteConcernError", ["WriteConcernFailed",
                                   "UnsatisfiableWriteConcern"])
 error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
 
-# isCancelationError() includes all codes that, when passed to a function as its parameter,
-# indicates that it cannot be executed as normal and must abort its intended work.
-error_class("CancelationError", ["ShutdownInProgress", "InterruptedAtShutdown", "CallbackCanceled"])
-
 #TODO SERVER-28679 add checksum failure.
 error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
                                                  "TooManyDocumentSequences"])

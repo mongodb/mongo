@@ -646,9 +646,8 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
                                  // If the host and port were dropped, let this lapse
                                  if (conn->getGeneration() == _generation) {
                                      addToReady(lk, std::move(conn));
-                                     fulfillRequests(lk);
                                  }
-
+                                 spawnConnections(lk);
                                  return;
                              }
 
@@ -672,8 +671,6 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     } else {
         // If it's fine as it is, just put it in the ready queue
         addToReady(lk, std::move(conn));
-        // TODO This should be scheduled on an executor once we have executor-aware pooling
-        fulfillRequests(lk);
     }
 
     updateStateInLock();
@@ -709,6 +706,8 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
 
                             returnConnection(connPtr, std::move(lk));
                         }));
+
+    fulfillRequests(lk);
 }
 
 // Sets state to shutdown and kicks off the failure protocol to tank existing connections
@@ -861,8 +860,8 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
                     // If the host and port was dropped, let the connection lapse
                     if (conn->getGeneration() == _generation) {
                         addToReady(lk, std::move(conn));
-                        fulfillRequests(lk);
                     }
+                    spawnConnections(lk);
                 } else if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
                     // If we've exceeded the time limit, restart the connect, rather than
                     // failing all operations.  We do this because the various callers

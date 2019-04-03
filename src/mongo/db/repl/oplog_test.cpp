@@ -156,8 +156,12 @@ void _checkOplogEntry(const OplogEntry& oplogEntry,
  * the contents of the oplog collection.
  */
 using OpTimeNamespaceStringMap = std::map<OpTime, NamespaceString>;
-template <typename F>
-void _testConcurrentLogOp(const F& makeTaskFunction,
+using MakeTaskFunction =
+    stdx::function<ThreadPoolInterface::Task(const NamespaceString& nss,
+                                             stdx::mutex* mtx,
+                                             OpTimeNamespaceStringMap* opTimeNssMap,
+                                             unittest::Barrier* barrier)>;
+void _testConcurrentLogOp(const MakeTaskFunction& makeTaskFunction,
                           OpTimeNamespaceStringMap* opTimeNssMap,
                           std::vector<OplogEntry>* oplogEntries,
                           std::size_t expectedNumOplogEntries) {
@@ -177,14 +181,10 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     unittest::Barrier barrier(3U);
     const NamespaceString nss1("test1.coll");
     const NamespaceString nss2("test2.coll");
-    pool.schedule([&](auto status) mutable {
-        ASSERT_OK(status) << "Failed to schedule logOp() task for namespace " << nss1;
-        makeTaskFunction(nss1, &mtx, opTimeNssMap, &barrier)();
-    });
-    pool.schedule([&](auto status) mutable {
-        ASSERT_OK(status) << "Failed to schedule logOp() task for namespace " << nss2;
-        makeTaskFunction(nss2, &mtx, opTimeNssMap, &barrier)();
-    });
+    ASSERT_OK(pool.schedule(makeTaskFunction(nss1, &mtx, opTimeNssMap, &barrier)))
+        << "Failed to schedule logOp() task for namespace " << nss1;
+    ASSERT_OK(pool.schedule(makeTaskFunction(nss2, &mtx, opTimeNssMap, &barrier)))
+        << "Failed to schedule logOp() task for namespace " << nss2;
     barrier.countDownAndWait();
 
     // Shut thread pool down.

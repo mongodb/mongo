@@ -176,9 +176,7 @@ std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSin
     const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) {
     auto notify = std::make_shared<Notification<void>>();
 
-    _threadPool.schedule([ nss, version, notify, callbackFn ](auto status) noexcept {
-        invariant(status);
-
+    uassertStatusOK(_threadPool.schedule([ nss, version, notify, callbackFn ]() noexcept {
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         auto swCollAndChunks = [&]() -> StatusWith<CollectionAndChangedChunks> {
@@ -191,7 +189,7 @@ std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSin
 
         callbackFn(opCtx.get(), std::move(swCollAndChunks));
         notify->set();
-    });
+    }));
 
     return notify;
 }
@@ -199,9 +197,7 @@ std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSin
 void ConfigServerCatalogCacheLoader::getDatabase(
     StringData dbName,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    _threadPool.schedule([ name = dbName.toString(), callbackFn ](auto status) noexcept {
-        invariant(status);
-
+    uassertStatusOK(_threadPool.schedule([ name = dbName.toString(), callbackFn ]() noexcept {
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         auto swDbt = [&]() -> StatusWith<DatabaseType> {
@@ -218,7 +214,7 @@ void ConfigServerCatalogCacheLoader::getDatabase(
         }();
 
         callbackFn(opCtx.get(), std::move(swDbt));
-    });
+    }));
 }
 
 }  // namespace mongo

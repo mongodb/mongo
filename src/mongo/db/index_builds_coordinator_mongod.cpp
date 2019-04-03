@@ -154,7 +154,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         opDesc = curOp->opDescription().getOwned();
     }
 
-    _threadPool.schedule([
+    Status status = _threadPool.schedule([
         this,
         buildUUID,
         deadline,
@@ -162,23 +162,8 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         writesAreReplicated,
         shouldNotConflictWithSecondaryBatchApplication,
         logicalOp,
-        opDesc,
-        replState
-    ](auto status) noexcept {
-        // Clean up the index build if we failed to schedule it.
-        if (!status.isOK()) {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-            // Unregister the index build before setting the promises,
-            // so callers do not see the build again.
-            _unregisterIndexBuild(lk, replState);
-
-            // Set the promise in case another thread already joined the index build.
-            replState->sharedPromise.setError(status);
-
-            return;
-        }
-
+        opDesc
+    ]() noexcept {
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         opCtx->setDeadlineByDate(deadline, timeoutError);
@@ -205,6 +190,19 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         _runIndexBuild(opCtx.get(), buildUUID);
     });
 
+    // Clean up the index build if we failed to schedule it.
+    if (!status.isOK()) {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+        // Unregister the index build before setting the promises, so callers do not see the build
+        // again.
+        _unregisterIndexBuild(lk, replState);
+
+        // Set the promise in case another thread already joined the index build.
+        replState->sharedPromise.setError(status);
+
+        return status;
+    }
 
     return replState->sharedPromise.getFuture();
 }

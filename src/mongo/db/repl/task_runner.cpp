@@ -113,10 +113,7 @@ void TaskRunner::schedule(Task task) {
         return;
     }
 
-    _threadPool->schedule([this](auto status) {
-        invariant(status);
-        _runTasks();
-    });
+    invariant(_threadPool->schedule([this] { _runTasks(); }));
 
     _active = true;
     _cancelRequested = false;

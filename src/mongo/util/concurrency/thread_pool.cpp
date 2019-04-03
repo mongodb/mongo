@@ -185,22 +185,15 @@ void ThreadPool::_drainPendingTasks() {
     cleanThread.join();
 }
 
-void ThreadPool::schedule(Task task) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
+Status ThreadPool::schedule(Task task) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     switch (_state) {
         case joinRequired:
         case joining:
-        case shutdownComplete: {
-            auto status = Status(ErrorCodes::ShutdownInProgress,
-                                 str::stream() << "Shutdown of thread pool " << _options.poolName
-                                               << " in progress");
-
-            lk.unlock();
-            task(status);
-            return;
-        } break;
-
+        case shutdownComplete:
+            return Status(ErrorCodes::ShutdownInProgress,
+                          str::stream() << "Shutdown of thread pool " << _options.poolName
+                                        << " in progress");
         case preStart:
         case running:
             break;
@@ -209,7 +202,7 @@ void ThreadPool::schedule(Task task) {
     }
     _pendingTasks.emplace_back(std::move(task));
     if (_state == preStart) {
-        return;
+        return Status::OK();
     }
     if (_numIdleThreads < _pendingTasks.size()) {
         _startWorkerThread_inlock();
@@ -218,6 +211,7 @@ void ThreadPool::schedule(Task task) {
         _lastFullUtilizationDate = Date_t::now();
     }
     _workAvailable.notify_one();
+    return Status::OK();
 }
 
 void ThreadPool::waitForIdle() {
@@ -338,7 +332,7 @@ void ThreadPool::_doOneTask(stdx::unique_lock<stdx::mutex>* lk) noexcept {
     _pendingTasks.pop_front();
     --_numIdleThreads;
     lk->unlock();
-    task(Status::OK());
+    task();
     lk->lock();
     ++_numIdleThreads;
     if (_pendingTasks.empty() && _threads.size() == _numIdleThreads) {

@@ -178,11 +178,7 @@ bool DeferredWriter::insertDocument(BSONObj obj) {
 
     // Add the object to the buffer.
     _numBytes += obj.objsize();
-    _pool->schedule([this, obj](auto status) {
-        fassert(40588, status);
-
-        _worker(InsertStatement(obj.getOwned()));
-    });
+    fassert(40588, _pool->schedule([this, obj] { _worker(InsertStatement(obj.getOwned())); }));
     return true;
 }
 

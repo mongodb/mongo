@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/future.h"
 
@@ -50,7 +49,7 @@ namespace mongo {
  */
 class OutOfLineExecutor {
 public:
-    using Task = unique_function<void(Status)>;
+    using Task = unique_function<void()>;
 
 public:
     /**
@@ -60,32 +59,17 @@ public:
      */
     template <typename Callback>
     Future<FutureContinuationResult<Callback>> execute(Callback&& cb) {
-        auto[promise, future] = makePromiseFuture<FutureContinuationResult<Callback>>();
+        auto pf = makePromiseFuture<FutureContinuationResult<Callback>>();
 
-        schedule([ cb = std::forward<Callback>(cb), p = std::move(promise) ](auto status) mutable {
-            if (!status.isOK()) {
-                p.setError(status);
-                return;
-            }
+        schedule([ cb = std::forward<Callback>(cb), p = std::move(pf.promise) ]() mutable {
             p.setWith(std::move(cb));
         });
 
-        return std::move(future);
+        return std::move(pf.future);
     }
 
     /**
-     * Delegates invocation of the Task to this executor
-     *
-     * Execution of the Task can happen in one of three contexts:
-     * * By default, on an execution context maintained by the OutOfLineExecutor (i.e. a thread).
-     * * During shutdown, on the execution context of shutdown/join/dtor for the OutOfLineExecutor.
-     * * Post-shutdown, on the execution context of the calling code.
-     *
-     * The Task will be passed a Status schedStatus that is either:
-     * * schedStatus.isOK() if the function is run in an out-of-line context
-     * * isCancelationError(schedStatus.code()) if the function is run in an inline context
-     *
-     * All of this is to say: CHECK YOUR STATUS.
+     * Invokes the callback on the executor.  This never happens immediately on the caller's stack.
      */
     virtual void schedule(Task func) = 0;
 

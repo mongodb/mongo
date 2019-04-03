@@ -253,8 +253,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         [ this, state, future = std::move(pf.future), baton, onFinish = std::move(onFinish) ](
             StatusWith<std::shared_ptr<CommandState::ConnHandle>> swConn) mutable {
         makeReadyFutureWith([&] {
-            auto connHandle = uassertStatusOK(std::move(swConn));
-            return _onAcquireConn(state, std::move(future), std::move(*connHandle), baton);
+            return _onAcquireConn(
+                state, std::move(future), std::move(*uassertStatusOK(swConn)), baton);
         })
             .onError([](Status error) -> StatusWith<RemoteCommandResponse> {
                 // The TransportLayer has, for historical reasons returned SocketException for
@@ -456,7 +456,7 @@ Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterface shutdown in progress"};
     }
 
-    _reactor->schedule([action = std::move(action)](auto status) { action(status); });
+    _reactor->schedule([action = std::move(action)]() { action(Status::OK()); });
     return Status::OK();
 }
 
@@ -468,7 +468,7 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
     }
 
     if (when <= now()) {
-        _reactor->schedule([action = std::move(action)](auto status) { action(status); });
+        _reactor->schedule([action = std::move(action)]()->void { action(Status::OK()); });
         return Status::OK();
     }
 
@@ -569,13 +569,7 @@ void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState>
     }
 
     // Fulfill the promise on a reactor thread
-    _reactor->schedule([state](auto status) {
-        if (status.isOK()) {
-            state->promise.emplaceValue();
-        } else {
-            state->promise.setError(status);
-        }
-    });
+    _reactor->schedule([state = std::move(state)]() { state->promise.emplaceValue(); });
 }
 
 bool NetworkInterfaceTL::onNetworkThread() {

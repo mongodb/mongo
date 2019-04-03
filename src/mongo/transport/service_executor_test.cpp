@@ -128,11 +128,11 @@ public:
     }
 
     void schedule(Task task) final {
-        asio::post(_ioContext, [task = std::move(task)] { task(Status::OK()); });
+        asio::post(_ioContext, std::move(task));
     }
 
     void dispatch(Task task) final {
-        asio::dispatch(_ioContext, [task = std::move(task)] { task(Status::OK()); });
+        asio::dispatch(_ioContext, std::move(task));
     }
 
     bool onReactorThread() const final {

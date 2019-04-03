@@ -105,18 +105,17 @@ void NetworkInterfaceThreadPool::join() {
         lk, [&] { return _tasks.empty() && (_consumeState == ConsumeState::kNeutral); });
 }
 
-void NetworkInterfaceThreadPool::schedule(Task task) {
+Status NetworkInterfaceThreadPool::schedule(Task task) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_inShutdown) {
-        lk.unlock();
-        task({ErrorCodes::ShutdownInProgress, "Shutdown in progress"});
-        return;
+        return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
     }
-
     _tasks.emplace_back(std::move(task));
 
     if (_started)
         _consumeTasks(std::move(lk));
+
+    return Status::OK();
 }
 
 /**
@@ -163,7 +162,7 @@ void NetworkInterfaceThreadPool::_consumeTasksInline(stdx::unique_lock<stdx::mut
         const auto lkGuard = makeGuard([&] { lk.lock(); });
 
         for (auto&& task : tasks) {
-            task(Status::OK());
+            task();
         }
 
         tasks.clear();

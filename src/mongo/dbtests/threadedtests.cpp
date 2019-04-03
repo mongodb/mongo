@@ -130,10 +130,7 @@ public:
         tp.startup();
 
         for (unsigned i = 0; i < iterations; i++) {
-            tp.schedule([=](auto status) {
-                ASSERT_OK(status);
-                increment(2);
-            });
+            ASSERT_OK(tp.schedule([=] { increment(2); }));
         }
 
         tp.waitForIdle();

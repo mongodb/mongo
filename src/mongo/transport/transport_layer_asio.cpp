@@ -183,11 +183,11 @@ public:
     }
 
     void schedule(Task task) override {
-        asio::post(_ioContext, [task = std::move(task)] { task(Status::OK()); });
+        asio::post(_ioContext, std::move(task));
     }
 
     void dispatch(Task task) override {
-        asio::dispatch(_ioContext, [task = std::move(task)] { task(Status::OK()); });
+        asio::dispatch(_ioContext, std::move(task));
     }
 
     bool onReactorThread() const override {
