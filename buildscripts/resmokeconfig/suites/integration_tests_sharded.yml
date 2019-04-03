@@ -5,6 +5,7 @@ selector:
   exclude_files:
   - build/integration_tests/network_interface_asio_integration_test*
   - build/integration_tests/dbclient_connection_integration_test* # Needs sleep command
+  - build/integration_tests/task_executor_cursor_integration_test* # Not needed
 
 executor:
   archive:
