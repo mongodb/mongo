@@ -361,7 +361,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
     oilOut->name = elt.fieldName();
 
     bool isHashed = false;
-    if (mongoutils::str::equals("hashed", elt.valuestrsafe())) {
+    if (elt.valueStringDataSafe() == "hashed") {
         isHashed = true;
     }
 
@@ -716,15 +716,14 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             unionize(oilOut);
     } else if (MatchExpression::GEO == expr->matchType()) {
         const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
-
-        if (mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
+        if ("2dsphere" == elt.valueStringDataSafe()) {
             verify(gme->getGeoExpression().getGeometry().hasS2Region());
             const S2Region& region = gme->getGeoExpression().getGeometry().getS2Region();
             S2IndexingParams indexParams;
             ExpressionParams::initialize2dsphereParams(index.infoObj, index.collator, &indexParams);
             ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
-        } else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {
+        } else if ("2d" == elt.valueStringDataSafe()) {
             verify(gme->getGeoExpression().getGeometry().hasR2Region());
             const R2Region& region = gme->getGeoExpression().getGeometry().getR2Region();
 

@@ -250,7 +250,7 @@ TEST_F(DatabaseClonerTest,
        DatabaseClonerReturnsScheduleErrorOnFailingToScheduleListCollectionsCommand) {
     TaskExecutorWithFailureInScheduleRemoteCommand executorProxy(
         &getExecutor(), [](const executor::RemoteCommandRequest& request) {
-            return str::equals("listCollections", request.cmdObj.firstElementFieldName());
+            return request.cmdObj.firstElementFieldNameStringData() == "listCollections";
         });
 
     DatabaseCloner databaseCloner(&executorProxy,

@@ -776,16 +776,16 @@ GeoParser::GeoSpecifier GeoParser::parseGeoSpecifier(const BSONElement& type) {
     if (!type.isABSONObj()) {
         return GeoParser::UNKNOWN;
     }
-    const char* fieldName = type.fieldName();
-    if (mongoutils::str::equals(fieldName, "$box")) {
+    StringData fieldName = type.fieldNameStringData();
+    if (fieldName == "$box") {
         return GeoParser::BOX;
-    } else if (mongoutils::str::equals(fieldName, "$center")) {
+    } else if (fieldName == "$center") {
         return GeoParser::CENTER;
-    } else if (mongoutils::str::equals(fieldName, "$polygon")) {
+    } else if (fieldName == "$polygon") {
         return GeoParser::POLYGON;
-    } else if (mongoutils::str::equals(fieldName, "$centerSphere")) {
+    } else if (fieldName == "$centerSphere") {
         return GeoParser::CENTER_SPHERE;
-    } else if (mongoutils::str::equals(fieldName, "$geometry")) {
+    } else if (fieldName == "$geometry") {
         return GeoParser::GEOMETRY;
     }
     return GeoParser::UNKNOWN;

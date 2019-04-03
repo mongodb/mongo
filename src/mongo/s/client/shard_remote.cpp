@@ -79,7 +79,7 @@ BSONObj appendMaxTimeToCmdObj(Milliseconds maxTimeMSOverride, const BSONObj& cmd
 
     // Remove the user provided maxTimeMS so we can attach the one from the override
     for (const auto& elem : cmdObj) {
-        if (!str::equals(elem.fieldName(), QueryRequest::cmdOptionMaxTimeMS)) {
+        if (elem.fieldNameStringData() != QueryRequest::cmdOptionMaxTimeMS) {
             updatedCmdBuilder.append(elem);
         }
     }

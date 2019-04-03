@@ -707,7 +707,7 @@ bool QueryRequest::isTextScoreMeta(BSONElement elt) {
         return false;
     }
     BSONElement metaElt = metaIt.next();
-    if (!str::equals("$meta", metaElt.fieldName())) {
+    if (metaElt.fieldNameStringData() != "$meta") {
         return false;
     }
     if (mongo::String != metaElt.type()) {
@@ -838,9 +838,9 @@ Status QueryRequest::initFullQuery(const BSONObj& top) {
 
     while (i.more()) {
         BSONElement e = i.next();
-        const char* name = e.fieldName();
+        StringData name = e.fieldNameStringData();
 
-        if (0 == strcmp("$orderby", name) || 0 == strcmp("orderby", name)) {
+        if (name == "$orderby" || name == "orderby") {
             if (Object == e.type()) {
                 _sort = e.embeddedObject().getOwned();
             } else if (Array == e.type()) {
@@ -878,22 +878,22 @@ Status QueryRequest::initFullQuery(const BSONObj& top) {
             } else {
                 return Status(ErrorCodes::BadValue, "sort must be object or array");
             }
-        } else if ('$' == *name) {
-            name++;
-            if (str::equals("explain", name)) {
+        } else if (name.startsWith("$")) {
+            name = name.substr(1);  // chop first char
+            if (name == "explain") {
                 // Won't throw.
                 _explain = e.trueValue();
-            } else if (str::equals("min", name)) {
+            } else if (name == "min") {
                 if (!e.isABSONObj()) {
                     return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
                 }
                 _min = e.embeddedObject().getOwned();
-            } else if (str::equals("max", name)) {
+            } else if (name == "max") {
                 if (!e.isABSONObj()) {
                     return Status(ErrorCodes::BadValue, "$max must be a BSONObj");
                 }
                 _max = e.embeddedObject().getOwned();
-            } else if (str::equals("hint", name)) {
+            } else if (name == "hint") {
                 if (e.isABSONObj()) {
                     _hint = e.embeddedObject().getOwned();
                 } else if (String == e.type()) {
@@ -902,25 +902,25 @@ Status QueryRequest::initFullQuery(const BSONObj& top) {
                     return Status(ErrorCodes::BadValue,
                                   "$hint must be either a string or nested object");
                 }
-            } else if (str::equals("returnKey", name)) {
+            } else if (name == "returnKey") {
                 // Won't throw.
                 if (e.trueValue()) {
                     _returnKey = true;
                     addReturnKeyMetaProj();
                 }
-            } else if (str::equals("showDiskLoc", name)) {
+            } else if (name == "showDiskLoc") {
                 // Won't throw.
                 if (e.trueValue()) {
                     _showRecordId = true;
                     addShowRecordIdMetaProj();
                 }
-            } else if (str::equals("maxTimeMS", name)) {
+            } else if (name == "maxTimeMS") {
                 StatusWith<int> maxTimeMS = parseMaxTimeMS(e);
                 if (!maxTimeMS.isOK()) {
                     return maxTimeMS.getStatus();
                 }
                 _maxTimeMS = maxTimeMS.getValue();
-            } else if (str::equals("comment", name)) {
+            } else if (name == "comment") {
                 // Legacy $comment can be any BSON element. Convert to string if it isn't
                 // already.
                 if (e.type() == BSONType::String) {

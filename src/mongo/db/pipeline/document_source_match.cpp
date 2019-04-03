@@ -298,9 +298,10 @@ Document redactSafePortionDollarOps(BSONObj expr) {
 // the expression can safely be promoted in front of a $redact.
 Document redactSafePortionTopLevel(BSONObj query) {
     MutableDocument output;
-    BSONForEach(field, query) {
-        if (field.fieldName()[0] == '$') {
-            if (str::equals(field.fieldName(), "$or")) {
+    for (BSONElement field : query) {
+        StringData fieldName = field.fieldNameStringData();
+        if (fieldName.startsWith("$")) {
+            if (fieldName == "$or") {
                 // $or must be all-or-nothing (line $in). Can't include subset of elements.
                 vector<Value> okClauses;
                 BSONForEach(elem, field.Obj()) {
@@ -314,7 +315,7 @@ Document redactSafePortionTopLevel(BSONObj query) {
 
                 if (!okClauses.empty())
                     output["$or"] = Value(std::move(okClauses));
-            } else if (str::equals(field.fieldName(), "$and")) {
+            } else if (fieldName == "$and") {
                 // $and can include subset of elements (like $all).
                 vector<Value> okClauses;
                 BSONForEach(elem, field.Obj()) {
@@ -356,7 +357,7 @@ Document redactSafePortionTopLevel(BSONObj query) {
     }
     return output.freeze();
 }
-}
+}  // namespace
 
 BSONObj DocumentSourceMatch::redactSafePortion() const {
     return redactSafePortionTopLevel(getQuery()).toBson();

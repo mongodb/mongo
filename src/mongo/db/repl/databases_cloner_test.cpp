@@ -791,7 +791,7 @@ TEST_F(DBsClonerTest, FailingToScheduleSecondDatabaseClonerShouldCancelTheCloner
 
     TaskExecutorWithFailureInScheduleRemoteCommand _executorProxy(
         &getExecutor(), [](const executor::RemoteCommandRequest& request) {
-            return str::equals("listCollections", request.cmdObj.firstElementFieldName()) &&
+            return request.cmdObj.firstElementFieldNameStringData() == "listCollections" &&
                 request.dbname == "b";
         });
 

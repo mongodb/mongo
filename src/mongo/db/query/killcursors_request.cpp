@@ -37,7 +37,7 @@ namespace mongo {
 
 namespace {
 
-const char kCmdName[] = "killCursors";
+constexpr StringData kCmdName = "killCursors"_sd;
 const char kCursorsField[] = "cursors";
 
 }  // namespace
@@ -48,7 +48,7 @@ KillCursorsRequest::KillCursorsRequest(const NamespaceString& nsString,
 
 StatusWith<KillCursorsRequest> KillCursorsRequest::parseFromBSON(const std::string& dbname,
                                                                  const BSONObj& cmdObj) {
-    if (!str::equals(cmdObj.firstElement().fieldName(), kCmdName)) {
+    if (cmdObj.firstElement().fieldNameStringData() != kCmdName) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "First field name must be '" << kCmdName << "' in: " << cmdObj};
     }

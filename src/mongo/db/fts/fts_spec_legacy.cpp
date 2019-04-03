@@ -206,11 +206,11 @@ StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
         BSONObjIterator i(spec["key"].Obj());
         while (i.more()) {
             BSONElement e = i.next();
-            if (str::equals(e.fieldName(), "_fts") || str::equals(e.fieldName(), "_ftsx")) {
+            if ((e.fieldNameStringData() == "_fts") || (e.fieldNameStringData() == "_ftsx")) {
                 addedFtsStuff = true;
                 b.append(e);
             } else if (e.type() == String &&
-                       (str::equals("fts", e.valuestr()) || str::equals("text", e.valuestr()))) {
+                       (e.valueStringData() == "fts" || e.valueStringData() == "text")) {
                 if (!addedFtsStuff) {
                     _addFTSStuff(&b);
                     addedFtsStuff = true;
@@ -269,20 +269,21 @@ StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
     BSONObjIterator i(spec);
     while (i.more()) {
         BSONElement e = i.next();
-        if (str::equals(e.fieldName(), "key")) {
+        StringData fieldName = e.fieldNameStringData();
+        if (fieldName == "key") {
             b.append("key", keyPattern);
-        } else if (str::equals(e.fieldName(), "weights")) {
+        } else if (fieldName == "weights") {
             b.append("weights", weights);
             weights = BSONObj();
-        } else if (str::equals(e.fieldName(), "default_language")) {
+        } else if (fieldName == "default_language") {
             b.append("default_language", default_language);
             default_language = "";
-        } else if (str::equals(e.fieldName(), "language_override")) {
+        } else if (fieldName == "language_override") {
             b.append("language_override", language_override);
             language_override = "";
-        } else if (str::equals(e.fieldName(), "v")) {
+        } else if (fieldName == "v") {
             version = e.numberInt();
-        } else if (str::equals(e.fieldName(), "textIndexVersion")) {
+        } else if (fieldName == "textIndexVersion") {
             textIndexVersion = e.numberInt();
             if (textIndexVersion != 1) {
                 return {ErrorCodes::CannotCreateIndex,

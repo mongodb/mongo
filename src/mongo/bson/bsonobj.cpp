@@ -217,7 +217,7 @@ bool BSONObj::isFieldNamePrefixOf(const BSONObj& otherObj) const {
     while (a.more() && b.more()) {
         BSONElement x = a.next();
         BSONElement y = b.next();
-        if (!str::equals(x.fieldName(), y.fieldName())) {
+        if (x.fieldNameStringData() != y.fieldNameStringData()) {
             return false;
         }
     }
@@ -382,26 +382,26 @@ Status BSONObj::storageValidEmbedded() const {
     bool first = true;
     while (i.more()) {
         BSONElement e = i.next();
-        const char* name = e.fieldName();
+        StringData name = e.fieldNameStringData();
 
         // Cannot start with "$", unless dbref which must start with ($ref, $id)
-        if (str::startsWith(name, '$')) {
+        if (name.startsWith("$")) {
             if (first &&
                 // $ref is a collection name and must be a String
-                str::equals(name, "$ref") &&
-                e.type() == String && str::equals(i.next().fieldName(), "$id")) {
+                (name == "$ref") &&
+                e.type() == String && (i.next().fieldNameStringData() == "$id")) {
                 first = false;
                 // keep inspecting fields for optional "$db"
                 e = i.next();
-                name = e.fieldName();  // "" if eoo()
+                name = e.fieldNameStringData();  // "" if eoo()
 
                 // optional $db field must be a String
-                if (str::equals(name, "$db") && e.type() == String) {
+                if ((name == "$db") && e.type() == String) {
                     continue;  // this element is fine, so continue on to siblings (if any more)
                 }
 
                 // Can't start with a "$", all other checks are done below (outside if blocks)
-                if (str::startsWith(name, '$')) {
+                if (name.startsWith("$")) {
                     return Status(ErrorCodes::DollarPrefixedFieldName,
                                   str::stream() << name << " is not valid for storage.");
                 }

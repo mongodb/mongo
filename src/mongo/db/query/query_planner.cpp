@@ -79,7 +79,7 @@ static bool is2DIndex(const BSONObj& pattern) {
     BSONObjIterator it(pattern);
     while (it.more()) {
         BSONElement e = it.next();
-        if (String == e.type() && str::equals("2d", e.valuestr())) {
+        if (String == e.type() && (e.valueStringData() == "2d")) {
             return true;
         }
     }
@@ -175,7 +175,7 @@ static bool indexCompatibleMaxMin(const BSONObj& obj,
         // Field names must match and be in the same order.
         BSONElement kpElt = kpIt.next();
         BSONElement objElt = objIt.next();
-        if (!mongoutils::str::equals(kpElt.fieldName(), objElt.fieldName())) {
+        if (kpElt.fieldNameStringData() != objElt.fieldNameStringData()) {
             return false;
         }
 

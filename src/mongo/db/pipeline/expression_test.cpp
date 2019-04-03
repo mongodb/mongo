@@ -113,8 +113,8 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
             // arrays within arrays are treated as constant values by the real
             // parser
             bob << elem.fieldName() << BSONArray(constify(elem.Obj(), true));
-        } else if (str::equals(elem.fieldName(), "$const") ||
-                   (elem.type() == mongo::String && elem.valuestrsafe()[0] == '$')) {
+        } else if (elem.fieldNameStringData() == "$const" ||
+                   (elem.type() == mongo::String && elem.valueStringDataSafe().startsWith("$"))) {
             bob.append(elem);
         } else {
             bob.append(elem.fieldName(), BSON("$const" << elem));

@@ -502,6 +502,10 @@ public:
         return *p == EOO ? "" : p + 1;
     }
 
+    StringData firstElementFieldNameStringData() const {
+        return StringData(firstElementFieldName());
+    }
+
     BSONType firstElementType() const {
         const char* p = objdata() + 4;
         return (BSONType)*p;

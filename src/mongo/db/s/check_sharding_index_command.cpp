@@ -97,7 +97,7 @@ public:
             return false;
         }
 
-        if (keyPattern.nFields() == 1 && str::equals("_id", keyPattern.firstElementFieldName())) {
+        if (keyPattern.nFields() == 1 && keyPattern.firstElementFieldNameStringData() == "_id") {
             result.appendBool("idskip", true);
             return true;
         }

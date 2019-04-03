@@ -525,7 +525,7 @@ TEST_F(CollectionClonerTest,
        CollectionClonerReturnsScheduleErrorOnFailingToScheduleListIndexesCommand) {
     TaskExecutorWithFailureInScheduleRemoteCommand _executorProxy(
         &getExecutor(), [](const executor::RemoteCommandRequest& request) {
-            return str::equals("listIndexes", request.cmdObj.firstElementFieldName());
+            return request.cmdObj.firstElementFieldNameStringData() == "listIndexes";
         });
 
     collectionCloner = stdx::make_unique<CollectionCloner>(&_executorProxy,

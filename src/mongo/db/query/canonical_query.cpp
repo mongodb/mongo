@@ -270,7 +270,7 @@ bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
     BSONObjIterator it(query);
     while (it.more()) {
         BSONElement elt = it.next();
-        if (str::equals("_id", elt.fieldName())) {
+        if (elt.fieldNameStringData() == "_id") {
             // Verify that the query on _id is a simple equality.
             hasID = true;
 

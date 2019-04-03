@@ -116,42 +116,43 @@ public:
             // until we've iterated through all the fields before updating unscaledCollSize
             const auto shardObjCount = static_cast<long long>(res["count"].Number());
 
+            auto fieldIsAnyOf = [](StringData v, std::initializer_list<StringData> il) {
+                auto ei = il.end();
+                return std::find(il.begin(), ei, v) != ei;
+            };
             for (const auto& e : res) {
-                if (str::equals(e.fieldName(), "ns") ||              //
-                    str::equals(e.fieldName(), "ok") ||              //
-                    str::equals(e.fieldName(), "lastExtentSize") ||  //
-                    str::equals(e.fieldName(), "paddingFactor")) {
-                    // Ignored fields
+                StringData fieldName = e.fieldNameStringData();
+                if (fieldIsAnyOf(fieldName, {"ns", "ok", "lastExtentSize", "paddingFactor"})) {
                     continue;
-                } else if (str::equals(e.fieldName(), "userFlags") ||          //
-                           str::equals(e.fieldName(), "capped") ||             //
-                           str::equals(e.fieldName(), "max") ||                //
-                           str::equals(e.fieldName(), "paddingFactorNote") ||  //
-                           str::equals(e.fieldName(), "indexDetails") ||       //
-                           str::equals(e.fieldName(), "wiredTiger")) {
-                    // Fields that are copied from the first shard only, because they need to match
-                    // across shards
+                }
+                if (fieldIsAnyOf(fieldName,
+                                 {"userFlags",
+                                  "capped",
+                                  "max",
+                                  "paddingFactorNote",
+                                  "indexDetails",
+                                  "wiredTiger"})) {
+                    // Fields that are copied from the first shard only, because they need to
+                    // match across shards
                     if (!result.hasField(e.fieldName()))
                         result.append(e);
-                } else if (str::equals(e.fieldName(), "count") ||        //
-                           str::equals(e.fieldName(), "size") ||         //
-                           str::equals(e.fieldName(), "storageSize") ||  //
-                           str::equals(e.fieldName(), "numExtents") ||   //
-                           str::equals(e.fieldName(), "totalIndexSize")) {
+                } else if (fieldIsAnyOf(
+                               fieldName,
+                               {"count", "size", "storageSize", "numExtents", "totalIndexSize"})) {
                     counts[e.fieldName()] += e.numberLong();
-                } else if (str::equals(e.fieldName(), "avgObjSize")) {
+                } else if (fieldName == "avgObjSize") {
                     const auto shardAvgObjSize = e.numberLong();
                     unscaledCollSize += shardAvgObjSize * shardObjCount;
-                } else if (str::equals(e.fieldName(), "maxSize")) {
+                } else if (fieldName == "maxSize") {
                     const auto shardMaxSize = e.numberLong();
                     maxSize = std::max(maxSize, shardMaxSize);
-                } else if (str::equals(e.fieldName(), "indexSizes")) {
+                } else if (fieldName == "indexSizes") {
                     BSONObjIterator k(e.Obj());
                     while (k.more()) {
                         BSONElement temp = k.next();
                         indexSizes[temp.fieldName()] += temp.numberLong();
                     }
-                } else if (str::equals(e.fieldName(), "nindexes")) {
+                } else if (fieldName == "nindexes") {
                     int myIndexes = e.numberInt();
 
                     if (nindexes == 0) {

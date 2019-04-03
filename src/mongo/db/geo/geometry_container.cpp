@@ -36,8 +36,6 @@
 
 namespace mongo {
 
-using mongoutils::str::equals;
-
 bool GeometryContainer::isSimpleContainer() const {
     return NULL != _point || NULL != _line || NULL != _polygon;
 }

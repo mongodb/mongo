@@ -353,7 +353,7 @@ void validateShardKeyAgainstExistingIndexes(OperationContext* opCtx,
         } else {
             bool isExplicitlyUnique = eqQueryResult["unique"].trueValue();
             BSONObj currKey = eqQueryResult["key"].embeddedObject();
-            bool isCurrentID = str::equals(currKey.firstElementFieldName(), "_id");
+            bool isCurrentID = (currKey.firstElementFieldNameStringData() == "_id");
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "can't shard collection " << nss.ns() << ", " << proposedKey
                                   << " index not unique, and unique index explicitly specified",

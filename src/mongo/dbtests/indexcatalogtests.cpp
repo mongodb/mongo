@@ -91,7 +91,7 @@ public:
             BSONObjIterator boit(indexDesc->infoObj());
             while (boit.more() && !foundIndex) {
                 BSONElement e = boit.next();
-                if (str::equals(e.fieldName(), "name") && str::equals(e.valuestrsafe(), "y_1")) {
+                if (e.fieldNameStringData() == "name" && e.valueStringDataSafe() == "y_1") {
                     foundIndex = true;
                     break;
                 }

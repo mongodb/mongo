@@ -384,9 +384,9 @@ public:
         return type() == jstNULL;
     }
 
-    /** Size (length) of a std::string element.
-        You must assure of type std::string first.
-        @return std::string size including terminating null
+    /** Size of a BSON String element.
+        Requires that type() == mongo::String.
+        @return String size including its null-termination.
     */
     int valuestrsize() const {
         return ConstDataView(value()).read<LittleEndian<int>>();
@@ -404,14 +404,17 @@ public:
         return value() + 4;
     }
 
-    /** Get the std::string value of the element.  If not a std::string returns "". */
+    /** Like valuestr, but returns a valid empty string if `type() != mongo::String`. */
     const char* valuestrsafe() const {
         return type() == mongo::String ? valuestr() : "";
     }
-    /** Get the std::string value of the element.  If not a std::string returns "". */
+    /** Like valuestrsafe, but returns StringData. */
+    StringData valueStringDataSafe() const {
+        return type() == mongo::String ? StringData(valuestr(), valuestrsize() - 1) : StringData();
+    }
+    /** Like valuestrsafe, but returns std::string. */
     std::string str() const {
-        return type() == mongo::String ? std::string(valuestr(), valuestrsize() - 1)
-                                       : std::string();
+        return valueStringDataSafe().toString();
     }
 
     /**

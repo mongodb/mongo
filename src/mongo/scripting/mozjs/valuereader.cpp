@@ -208,12 +208,12 @@ void ValueReader::fromBSON(const BSONObj& obj, const BSONObj* parent, bool readO
     JS::RootedObject child(_context);
 
     bool filledDBRef = false;
-    if (obj.firstElementType() == String && str::equals(obj.firstElementFieldName(), "$ref")) {
+    if (obj.firstElementType() == String && (obj.firstElementFieldNameStringData() == "$ref")) {
         BSONObjIterator it(obj);
         it.next();
         const BSONElement id = it.next();
 
-        if (id.ok() && str::equals(id.fieldName(), "$id")) {
+        if (id.ok() && id.fieldNameStringData() == "$id") {
             DBRefInfo::make(_context, &child, obj, parent, readOnly);
             filledDBRef = true;
         }

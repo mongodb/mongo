@@ -396,14 +396,14 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
     VariablesParseState vps = pExpCtx->variablesParseState;
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
-        const char* pFieldName = groupField.fieldName();
+        StringData pFieldName = groupField.fieldNameStringData();
 
-        if (str::equals(pFieldName, "_id")) {
+        if (pFieldName == "_id") {
             uassert(
                 15948, "a group's _id may only be specified once", pGroup->_idExpressions.empty());
             pGroup->setIdExpression(parseIdExpression(pExpCtx, groupField, vps));
             invariant(!pGroup->_idExpressions.empty());
-        } else if (str::equals(pFieldName, "$doingMerge")) {
+        } else if (pFieldName == "$doingMerge") {
             massert(17030, "$doingMerge should be true if present", groupField.Bool());
 
             pGroup->setDoingMerge(true);

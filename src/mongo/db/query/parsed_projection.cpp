@@ -78,7 +78,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
             }
 
             BSONElement e2 = obj.firstElement();
-            if (mongoutils::str::equals(e2.fieldName(), "$slice")) {
+            if (e2.fieldNameStringData() == "$slice") {
                 if (e2.isNumber()) {
                     // This is A-OK.
                 } else if (e2.type() == Array) {
@@ -102,7 +102,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 // Projections with $slice aren't covered.
                 requiresDocument = true;
                 pp->_arrayFields.push_back(elem.fieldNameStringData());
-            } else if (mongoutils::str::equals(e2.fieldName(), "$elemMatch")) {
+            } else if (e2.fieldNameStringData() == "$elemMatch") {
                 // Validate $elemMatch arguments and dependencies.
                 if (Object != e2.type()) {
                     return Status(ErrorCodes::BadValue,
@@ -147,7 +147,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 // Projections with $elemMatch aren't covered.
                 requiresDocument = true;
                 pp->_arrayFields.push_back(elem.fieldNameStringData());
-            } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
+            } else if (e2.fieldNameStringData() == "$meta") {
                 // Field for meta must be top level.  We can relax this at some point.
                 if (mongoutils::str::contains(elem.fieldName(), '.')) {
                     return Status(ErrorCodes::BadValue, "field for $meta cannot be nested");
@@ -190,7 +190,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
                 return Status(ErrorCodes::BadValue,
                               string("Unsupported projection option: ") + elem.toString());
             }
-        } else if (mongoutils::str::equals(elem.fieldName(), "_id") && !elem.trueValue()) {
+        } else if ((elem.fieldNameStringData() == "_id") && !elem.trueValue()) {
             pp->_hasId = false;
         } else {
             pp->_hasDottedFieldPath = pp->_hasDottedFieldPath ||
@@ -291,7 +291,7 @@ Status ParsedProjection::make(OperationContext* opCtx,
         while (srcIt.more()) {
             BSONElement elt = srcIt.next();
             // We've already handled the _id field before entering this loop.
-            if (pp->_hasId && mongoutils::str::equals(elt.fieldName(), "_id")) {
+            if (pp->_hasId && (elt.fieldNameStringData() == "_id")) {
                 continue;
             }
             // $meta sortKey should not be checked as a part of _requiredFields, since it can

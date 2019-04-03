@@ -311,7 +311,7 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalObjId(BsonTemplateEvalu
                                                                const BSONObj& in,
                                                                BSONObjBuilder& out) {
     // in = { #OID: 1 }
-    if (!mongoutils::str::equals(fieldName, "_id"))
+    if (strcmp(fieldName, "_id") != 0)
         // Error: must be generating a value for the _id field.
         return StatusOpEvaluationError;
     out.genOID();

@@ -558,7 +558,7 @@ void State::prepTempCollection() {
                 BSONObjIterator j(currIndex->infoObj());
                 while (j.more()) {
                     BSONElement e = j.next();
-                    if (str::equals(e.fieldName(), "_id") || str::equals(e.fieldName(), "ns"))
+                    if (e.fieldNameStringData() == "_id" || e.fieldNameStringData() == "ns")
                         continue;
                     b.append(e);
                 }

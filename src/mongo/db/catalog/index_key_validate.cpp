@@ -199,11 +199,11 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
         }
 
         // "$**" is acceptable for a text index or wildcard index.
-        if (mongoutils::str::equals(keyElement.fieldName(), "$**") &&
+        if ((keyElement.fieldNameStringData() == "$**") &&
             ((keyElement.isNumber()) || (keyElement.valuestrsafe() == IndexNames::TEXT)))
             continue;
 
-        if (mongoutils::str::equals(keyElement.fieldName(), "_fts") &&
+        if ((keyElement.fieldNameStringData() == "_fts") &&
             keyElement.valuestrsafe() != IndexNames::TEXT) {
             return Status(code, "Index key contains an illegal field name: '_fts'");
         }
