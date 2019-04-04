@@ -44,8 +44,8 @@ namespace merizo {
 class ThreadPoolInterface;
 
 namespace executor {
-MONGO_FAIL_POINT_DECLARE(initialSyncFuzzerSynchronizationPoint1);
-MONGO_FAIL_POINT_DECLARE(initialSyncFuzzerSynchronizationPoint2);
+MERIZO_FAIL_POINT_DECLARE(initialSyncFuzzerSynchronizationPoint1);
+MERIZO_FAIL_POINT_DECLARE(initialSyncFuzzerSynchronizationPoint2);
 
 struct ConnectionPoolStats;
 class NetworkInterface;

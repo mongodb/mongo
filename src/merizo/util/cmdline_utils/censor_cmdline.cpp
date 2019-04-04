@@ -53,7 +53,7 @@ std::set<char> gRedactedCharacterNames;
 bool gGatherOptionsDone = false;
 // Gather list of deprecated names from config options.
 // Must happen after all settings are registered, but before "StartupOptions" asks for censoring.
-MONGO_INITIALIZER_GENERAL(GatherReadctionOptions,
+MERIZO_INITIALIZER_GENERAL(GatherReadctionOptions,
                           ("EndStartupOptionRegistration"),
                           ("BeginStartupOptionSetup"))
 (InitializerContext*) {

@@ -126,8 +126,8 @@ assert.commandFailed(
 assert.commandWorked(
     db.adminCommand({"setParameter": 1, logComponentVerbosity: old.logComponentVerbosity}));
 
-var isMongos = (db.isMaster().msg === 'isdbgrid');
-if (!isMongos) {
+var isMerizos = (db.isMaster().msg === 'isdbgrid');
+if (!isMerizos) {
     //
     // oplogFetcherSteadyStateMaxFetcherRestarts
     //

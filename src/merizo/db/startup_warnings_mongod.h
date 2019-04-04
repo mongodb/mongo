@@ -36,9 +36,9 @@ namespace merizo {
 struct StorageGlobalParams;
 struct ServerGlobalParams;
 
-class StartupWarningsMongod {
+class StartupWarningsMerizod {
 private:
-    StartupWarningsMongod();
+    StartupWarningsMerizod();
 
 public:
     /**
@@ -57,7 +57,7 @@ public:
 
 // Checks various startup conditions and logs any necessary warnings that
 // are specific to the merizod process.
-void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
+void logMerizodStartupWarnings(const StorageGlobalParams& storageParams,
                               const ServerGlobalParams& serverParams,
                               ServiceContext* svcCtx);
 }  // namespace merizo

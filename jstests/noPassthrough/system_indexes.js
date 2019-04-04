@@ -5,7 +5,7 @@
  */
 
 (function() {
-    let conn = MongoRunner.runMongod();
+    let conn = MerizoRunner.runMerizod();
     let config = conn.getDB("config");
     let db = conn.getDB("admin");
 
@@ -22,16 +22,16 @@
 
     // TEST: Destroying admin.system.users index and restarting will recreate it
     assert.commandWorked(db.system.users.dropIndexes());
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({restart: conn, cleanData: false});
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod({restart: conn, cleanData: false});
     db = conn.getDB("admin");
     assert.eq(2, db.system.users.getIndexes().length);
     assert.eq(2, db.system.roles.getIndexes().length);
 
     // TEST: Destroying admin.system.roles index and restarting will recreate it
     assert.commandWorked(db.system.roles.dropIndexes());
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({restart: conn, cleanData: false});
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod({restart: conn, cleanData: false});
     db = conn.getDB("admin");
     assert.eq(2, db.system.users.getIndexes().length);
     assert.eq(2, db.system.roles.getIndexes().length);
@@ -39,8 +39,8 @@
     // TEST: Destroying both authorization indexes and restarting will recreate them
     assert.commandWorked(db.system.users.dropIndexes());
     assert.commandWorked(db.system.roles.dropIndexes());
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({restart: conn, cleanData: false});
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod({restart: conn, cleanData: false});
     db = conn.getDB("admin");
     assert.eq(2, db.system.users.getIndexes().length);
     assert.eq(2, db.system.roles.getIndexes().length);
@@ -57,8 +57,8 @@
     }));
     db.createUser({user: "user", pwd: "pwd", roles: []});
     assert.commandWorked(db.system.users.dropIndexes());
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({restart: conn, cleanData: false});
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod({restart: conn, cleanData: false});
     db = conn.getDB("admin");
     assert.eq(2, db.system.users.getIndexes().length);
 
@@ -74,10 +74,10 @@
     }));
     db.createRole({role: "role", privileges: [], roles: []});
     assert.commandWorked(db.system.roles.dropIndexes());
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({restart: conn, cleanData: false});
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod({restart: conn, cleanData: false});
     db = conn.getDB("admin");
     assert.eq(2, db.system.roles.getIndexes().length);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
 })();

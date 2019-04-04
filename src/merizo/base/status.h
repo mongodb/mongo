@@ -56,7 +56,7 @@ class StringBuilderImpl;
  * determine an error's cause. It further clarifies the error with a textual
  * description, and code-specific extra info (a subclass of ErrorExtraInfo).
  */
-class MONGO_WARN_UNUSED_RESULT_CLASS Status {
+class MERIZO_WARN_UNUSED_RESULT_CLASS Status {
 public:
     /**
      * This is the best way to construct an OK status.
@@ -77,12 +77,12 @@ public:
      * parsing. If the status is round-tripping through non-command BSON, use the constructor that
      * takes a BSONObj so that it can extract the extra info if the code is supposed to have any.
      */
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const std::string& reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, StringData reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
+    MERIZO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const std::string& reason);
+    MERIZO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
+    MERIZO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, StringData reason);
+    MERIZO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
                                         const merizoutils::str::stream& reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
+    MERIZO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
                                         StringData message,
                                         const BSONObj& extraInfoHolder);
 
@@ -90,11 +90,11 @@ public:
      * Constructs a Status with a subclass of ErrorExtraInfo.
      */
     template <typename T, typename = stdx::enable_if_t<std::is_base_of<ErrorExtraInfo, T>::value>>
-    MONGO_COMPILER_COLD_FUNCTION Status(T&& detail, StringData message)
+    MERIZO_COMPILER_COLD_FUNCTION Status(T&& detail, StringData message)
         : Status(T::code,
                  message,
                  std::make_shared<const std::remove_reference_t<T>>(std::forward<T>(detail))) {
-        MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
+        MERIZO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
     }
 
     inline Status(const Status& other);
@@ -180,8 +180,8 @@ public:
      */
     template <typename T>
     const T* extraInfo() const {
-        MONGO_STATIC_ASSERT(std::is_base_of<ErrorExtraInfo, T>());
-        MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
+        MERIZO_STATIC_ASSERT(std::is_base_of<ErrorExtraInfo, T>());
+        MERIZO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
 
         if (isOK())
             return nullptr;
@@ -230,7 +230,7 @@ public:
 
 private:
     // Private since it could result in a type mismatch between code and extraInfo.
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
+    MERIZO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
                                         StringData reason,
                                         std::shared_ptr<const ErrorExtraInfo>);
     inline Status();

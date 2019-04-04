@@ -1858,7 +1858,7 @@ std::unique_ptr<StringMap<
                                              DocumentParseLevel)>>>
     pathlessOperatorMap;
 
-MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
+MERIZO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
     pathlessOperatorMap = stdx::make_unique<StringMap<
         stdx::function<StatusWithMatchExpression(StringData,
                                                  BSONElement,
@@ -1904,7 +1904,7 @@ MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
 // Maps from query operator string name to operator PathAcceptingKeyword.
 std::unique_ptr<StringMap<PathAcceptingKeyword>> queryOperatorMap;
 
-MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
+MERIZO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
     queryOperatorMap =
         stdx::make_unique<StringMap<PathAcceptingKeyword>>(StringMap<PathAcceptingKeyword>{
             // TODO: SERVER-19565 Add $eq after auditing callers.

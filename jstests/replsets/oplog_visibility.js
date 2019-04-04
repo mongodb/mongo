@@ -30,7 +30,7 @@
     for (let idx = 0; idx < 2; ++idx) {
         let coll = "coll_" + idx;
         let writer = new ScopedThread(function(host, coll, stopLatch) {
-            const conn = new Mongo(host);
+            const conn = new Merizo(host);
             let id = 0;
 
             // Cap the amount of data being inserted to avoid rolling over a 10MiB oplog. It takes

@@ -61,7 +61,7 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-MONGO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
+MERIZO_INITIALIZER(DisableReplicaSetMonitorRefreshRetries)(InitializerContext*) {
     ReplicaSetMonitor::disableRefreshRetries_forTest();
     return Status::OK();
 }

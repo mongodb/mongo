@@ -28,7 +28,7 @@
  */
 
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 

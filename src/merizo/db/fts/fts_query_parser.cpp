@@ -55,7 +55,7 @@ QueryToken FTSQueryParser::next() {
 
     // Query Parser should never land on whitespace
     if (type == QueryToken::WHITESPACE) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     if (type == QueryToken::TEXT) {

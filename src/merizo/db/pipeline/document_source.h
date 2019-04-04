@@ -86,7 +86,7 @@ class Document;
  * $sortByCount), you should use the REGISTER_MULTI_STAGE_ALIAS macro instead.
  */
 #define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key, liteParser, fullParser, ...)             \
-    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                  \
+    MERIZO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {                  \
         if (!__VA_ARGS__) {                                                                  \
             return Status::OK();                                                             \
         }                                                                                    \
@@ -121,7 +121,7 @@ class Document;
  *                            DocumentSourceFoo::createFromBson);
  */
 #define REGISTER_MULTI_STAGE_ALIAS(key, liteParser, fullParser)                  \
-    MONGO_INITIALIZER(addAliasToDocSourceParserMap_##key)(InitializerContext*) { \
+    MERIZO_INITIALIZER(addAliasToDocSourceParserMap_##key)(InitializerContext*) { \
         LiteParsedDocumentSource::registerParser("$" #key, (liteParser));        \
         DocumentSource::registerParser("$" #key, (fullParser));                  \
         return Status::OK();                                                     \

@@ -8,7 +8,7 @@
 
     load("jstests/libs/command_sequence_with_retries.js");  // for CommandSequenceWithRetries
 
-    MongoRunner.validateCollectionsCallback = function(port) {
+    MerizoRunner.validateCollectionsCallback = function(port) {
         if (jsTest.options().skipCollectionAndIndexValidation) {
             print("Skipping collection validation during merizod shutdown");
             return;
@@ -16,7 +16,7 @@
 
         let conn;
         try {
-            conn = new Mongo("localhost:" + port);
+            conn = new Merizo("localhost:" + port);
         } catch (e) {
             print(
                 "Skipping collection validation because we couldn't establish a connection to the" +

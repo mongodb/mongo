@@ -27,7 +27,7 @@ var (
 	typeObjectId       = reflect.TypeOf(ObjectId(""))
 	typeDBPointer      = reflect.TypeOf(DBPointer{"", ObjectId("")})
 	typeSymbol         = reflect.TypeOf(Symbol(""))
-	typeMongoTimestamp = reflect.TypeOf(MongoTimestamp(0))
+	typeMerizoTimestamp = reflect.TypeOf(MerizoTimestamp(0))
 	typeOrderKey       = reflect.TypeOf(MinKey)
 	typeDocElem        = reflect.TypeOf(DocElem{})
 	typeRawDocElem     = reflect.TypeOf(RawDocElem{})
@@ -297,7 +297,7 @@ func (e *encoder) addElem(name string, v reflect.Value, minSize bool) {
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		switch v.Type() {
-		case typeMongoTimestamp:
+		case typeMerizoTimestamp:
 			e.addElemName('\x11', name)
 			e.addInt64(v.Int())
 

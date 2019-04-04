@@ -36,7 +36,7 @@
 
 namespace merizo {
 
-MONGO_REGISTER_SHIM(createTransactionCoordinator)
+MERIZO_REGISTER_SHIM(createTransactionCoordinator)
 (OperationContext* opCtx, TxnNumber clientTxnNumber)->void {
     auto clientLsid = opCtx->getLogicalSessionId().get();
     auto clockSource = opCtx->getServiceContext()->getFastClockSource();

@@ -32,11 +32,11 @@ load('jstests/libs/feature_compatibility_version.js');
     {
         // Ensure that merizos can start up when given the CSRS secondary, discover the primary, and
         // perform writes to the config servers.
-        var merizos = MongoRunner.runMongos({configdb: seedList});
+        var merizos = MerizoRunner.runMerizos({configdb: seedList});
         var admin = merizos.getDB('admin');
         assert.writeOK(admin.foo.insert({a: 1}));
         assert.eq(1, admin.foo.findOne().a);
-        MongoRunner.stopMongos(merizos);
+        MerizoRunner.stopMerizos(merizos);
     }
 
     // Wait for replication to all config server replica set members to ensure that merizos
@@ -48,7 +48,7 @@ load('jstests/libs/feature_compatibility_version.js');
     rst.awaitNoPrimary();
 
     // Start a merizos when there is no primary
-    var merizos = MongoRunner.runMongos({configdb: seedList});
+    var merizos = MerizoRunner.runMerizos({configdb: seedList});
     // Take down the one node the merizos knew about to ensure that it autodiscovered the one
     // remaining
     // config server
@@ -57,6 +57,6 @@ load('jstests/libs/feature_compatibility_version.js');
     var admin = merizos.getDB('admin');
     merizos.setSlaveOk(true);
     assert.eq(1, admin.foo.findOne().a);
-    MongoRunner.stopMongos(merizos);
+    MerizoRunner.stopMerizos(merizos);
     rst.stopSet();
 })();

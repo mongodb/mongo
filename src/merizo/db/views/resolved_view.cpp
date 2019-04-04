@@ -38,7 +38,7 @@
 
 namespace merizo {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ResolvedView);
+MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(ResolvedView);
 
 ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
     uassert(40248,

@@ -80,7 +80,7 @@
         // the local database.
         let awaitDrop = startParallelShell(() => assert(db.getSiblingDB("local")["todrop"].drop()),
                                            rst.ports[0]);
-        checkLog.contains(testDB.getMongo(), "hangDuringDropCollection fail point enabled");
+        checkLog.contains(testDB.getMerizo(), "hangDuringDropCollection fail point enabled");
         // The server will attempt to perform a noop write, since the command returns
         // NoSuchTransaction. The noop write will time out acquiring a lock on the local database.
         // This should not be a TransientTransactionError, since the server has not successfully

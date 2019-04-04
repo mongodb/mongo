@@ -135,7 +135,7 @@ TEST(SortKeyGeneratorTest, SortKeyGenerationForArraysRespectsCompoundOrdering) {
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWithStringIsFatal,
            "Invariant failure elt.type() == BSONType::Object") {
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+    MERIZO_COMPILER_VARIABLE_UNUSED auto ignored =
         stdx::make_unique<SortKeyGenerator>(BSON("a"
                                                  << "foo"),
                                             nullptr);
@@ -144,7 +144,7 @@ DEATH_TEST(SortKeyGeneratorTest,
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWhoseObjectHasMultipleKeysIsFatal,
            "Invariant failure elt.embeddedObject().nFields() == 1") {
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+    MERIZO_COMPILER_VARIABLE_UNUSED auto ignored =
         stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$meta"
                                                              << "textScore"
                                                              << "extra"
@@ -155,7 +155,7 @@ DEATH_TEST(SortKeyGeneratorTest,
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWithNonMetaObjectSortIsFatal,
            "Invariant failure metaElem.fieldNameStringData() == \"$meta\"_sd") {
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+    MERIZO_COMPILER_VARIABLE_UNUSED auto ignored =
         stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$unknown"
                                                              << "textScore")),
                                             nullptr);
@@ -164,7 +164,7 @@ DEATH_TEST(SortKeyGeneratorTest,
 DEATH_TEST(SortKeyGeneratorTest,
            SortPatternComponentWithUnknownMetaKeywordIsFatal,
            "Invariant failure metaElem.valueStringData() == \"randVal\"_sd") {
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+    MERIZO_COMPILER_VARIABLE_UNUSED auto ignored =
         stdx::make_unique<SortKeyGenerator>(BSON("a" << BSON("$meta"
                                                              << "unknown")),
                                             nullptr);

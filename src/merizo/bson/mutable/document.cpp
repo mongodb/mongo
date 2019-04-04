@@ -497,12 +497,12 @@ private:
 };
 #pragma pack(pop)
 
-MONGO_STATIC_ASSERT(sizeof(ElementRep) == 32);
+MERIZO_STATIC_ASSERT(sizeof(ElementRep) == 32);
 
 // We want ElementRep to be a POD so Document::Impl can grow the std::vector with
 // memmove.
 //
-MONGO_STATIC_ASSERT(std::is_trivial<ElementRep>::value);
+MERIZO_STATIC_ASSERT(std::is_trivial<ElementRep>::value);
 
 // The ElementRep for the root element is always zero.
 const Element::RepIdx kRootRepIdx = Element::RepIdx(0);
@@ -2270,14 +2270,14 @@ Document::Document(const BSONObj& value, InPlaceMode inPlaceMode)
 
 void Document::reset() {
     _impl->reset(Document::kInPlaceDisabled);
-    MONGO_COMPILER_VARIABLE_UNUSED const Element newRoot = makeRootElement();
+    MERIZO_COMPILER_VARIABLE_UNUSED const Element newRoot = makeRootElement();
     dassert(newRoot._repIdx == _root._repIdx);
     dassert(_root._repIdx == kRootRepIdx);
 }
 
 void Document::reset(const BSONObj& value, InPlaceMode inPlaceMode) {
     _impl->reset(inPlaceMode);
-    MONGO_COMPILER_VARIABLE_UNUSED const Element newRoot = makeRootElement(value);
+    MERIZO_COMPILER_VARIABLE_UNUSED const Element newRoot = makeRootElement(value);
     dassert(newRoot._repIdx == _root._repIdx);
     dassert(_root._repIdx == kRootRepIdx);
 }

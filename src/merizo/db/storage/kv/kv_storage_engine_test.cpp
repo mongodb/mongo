@@ -56,10 +56,10 @@
 namespace merizo {
 namespace {
 
-class KVStorageEngineTest : public ServiceContextMongoDTest {
+class KVStorageEngineTest : public ServiceContextMerizoDTest {
 public:
     KVStorageEngineTest(RepairAction repair)
-        : ServiceContextMongoDTest("ephemeralForTest", repair),
+        : ServiceContextMerizoDTest("ephemeralForTest", repair),
           _storageEngine(checked_cast<KVStorageEngine*>(getServiceContext()->getStorageEngine())) {}
 
     KVStorageEngineTest() : KVStorageEngineTest(RepairAction::kNoRepair) {}
@@ -513,7 +513,7 @@ public:
     mutable std::unique_ptr<Timestamp> stableTimestamp = std::make_unique<Timestamp>();
 };
 
-class TimestampKVEngineTest : public ServiceContextMongoDTest {
+class TimestampKVEngineTest : public ServiceContextMerizoDTest {
 public:
     using TimestampType = KVStorageEngine::TimestampMonitor::TimestampType;
     using TimestampListener = KVStorageEngine::TimestampMonitor::TimestampListener;

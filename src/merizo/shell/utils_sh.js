@@ -2,7 +2,7 @@ sh = function() {
     return "try sh.help();";
 };
 
-sh._checkMongos = function() {
+sh._checkMerizos = function() {
     var x = db.runCommand("ismaster");
     if (x.msg != "isdbgrid")
         throw Error("not connected to a merizos");
@@ -15,12 +15,12 @@ sh._checkFullName = function(fullName) {
 
 sh._adminCommand = function(cmd, skipCheck) {
     if (!skipCheck)
-        sh._checkMongos();
+        sh._checkMerizos();
     return db.getSisterDB("admin").runCommand(cmd);
 };
 
 sh._getConfigDB = function() {
-    sh._checkMongos();
+    sh._checkMerizos();
     return db.getSiblingDB("config");
 };
 
@@ -261,7 +261,7 @@ sh.disableBalancing = function(coll) {
     if (coll instanceof DBCollection) {
         dbase = coll.getDB();
     } else {
-        sh._checkMongos();
+        sh._checkMerizos();
     }
 
     return assert.writeOK(dbase.getSisterDB("config").collections.update(
@@ -278,7 +278,7 @@ sh.enableBalancing = function(coll) {
     if (coll instanceof DBCollection) {
         dbase = coll.getDB();
     } else {
-        sh._checkMongos();
+        sh._checkMerizos();
     }
 
     return assert.writeOK(dbase.getSisterDB("config").collections.update(
@@ -307,14 +307,14 @@ sh._lastMigration = function(ns) {
         config = dbase.getSisterDB("config");
     } else if (ns instanceof ShardingTest) {
         config = ns.s.getDB("config");
-    } else if (ns instanceof Mongo) {
+    } else if (ns instanceof Merizo) {
         config = ns.getDB("config");
     } else {
         // String namespace
         ns = ns + "";
         if (ns.indexOf(".") > 0) {
             config = db.getSisterDB("config");
-            coll = db.getMongo().getCollection(ns);
+            coll = db.getMerizo().getCollection(ns);
         } else {
             config = db.getSisterDB("config");
             dbase = db.getSisterDB(ns);
@@ -561,27 +561,27 @@ function printShardingStatus(configDB, verbose) {
 
     // (most recently) active merizoses
     var merizosActiveThresholdMs = 60000;
-    var mostRecentMongos = configDB.merizos.find().sort({ping: -1}).limit(1);
-    var mostRecentMongosTime = null;
+    var mostRecentMerizos = configDB.merizos.find().sort({ping: -1}).limit(1);
+    var mostRecentMerizosTime = null;
     var merizosAdjective = "most recently active";
-    if (mostRecentMongos.hasNext()) {
-        mostRecentMongosTime = mostRecentMongos.next().ping;
-        // Mongoses older than the threshold are the most recent, but cannot be
+    if (mostRecentMerizos.hasNext()) {
+        mostRecentMerizosTime = mostRecentMerizos.next().ping;
+        // Merizoses older than the threshold are the most recent, but cannot be
         // considered "active" merizoses. (This is more likely to be an old(er)
         // configdb dump, or all the merizoses have been stopped.)
-        if (mostRecentMongosTime.getTime() >= Date.now() - merizosActiveThresholdMs) {
+        if (mostRecentMerizosTime.getTime() >= Date.now() - merizosActiveThresholdMs) {
             merizosAdjective = "active";
         }
     }
 
     output(1, merizosAdjective + " merizoses:");
-    if (mostRecentMongosTime === null) {
+    if (mostRecentMerizosTime === null) {
         output(2, "none");
     } else {
-        var recentMongosQuery = {
+        var recentMerizosQuery = {
             ping: {
                 $gt: (function() {
-                    var d = mostRecentMongosTime;
+                    var d = mostRecentMerizosTime;
                     d.setTime(d.getTime() - merizosActiveThresholdMs);
                     return d;
                 })()
@@ -589,13 +589,13 @@ function printShardingStatus(configDB, verbose) {
         };
 
         if (verbose) {
-            configDB.merizos.find(recentMongosQuery).sort({ping: -1}).forEach(function(z) {
+            configDB.merizos.find(recentMerizosQuery).sort({ping: -1}).forEach(function(z) {
                 output(2, tojsononeline(z));
             });
         } else {
             configDB.merizos
                 .aggregate([
-                    {$match: recentMongosQuery},
+                    {$match: recentMerizosQuery},
                     {$group: {_id: "$merizoVersion", num: {$sum: 1}}},
                     {$sort: {num: -1}}
                 ])

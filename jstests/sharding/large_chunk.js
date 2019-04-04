@@ -50,7 +50,7 @@
         s.adminCommand({
             movechunk: "test.foo",
             find: {_id: 1},
-            to: secondary.getMongo().name,
+            to: secondary.getMerizo().name,
             maxChunkSizeBytes: max
         });
     });
@@ -59,7 +59,7 @@
     print("checkpoint 1b");
     var before = s.config.chunks.find({ns: 'test.foo'}).toArray();
     assert.commandWorked(
-        s.s0.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name}));
+        s.s0.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMerizo().name}));
 
     var after = s.config.chunks.find({ns: 'test.foo'}).toArray();
     assert.neq(before[0].shard, after[0].shard, "move chunk did not work");

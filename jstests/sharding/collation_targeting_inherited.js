@@ -182,7 +182,7 @@
     assert.eq(3, explain.queryPlanner.winningPlan.shards.length);
 
     // Test a find command with a simple collation. This should be single-shard.
-    if (testDB.getMongo().useReadCommands()) {
+    if (testDB.getMerizo().useReadCommands()) {
         assert.eq(1, collCaseInsensitive.find({a: "foo"}).collation({locale: "simple"}).itcount());
         explain = collCaseInsensitive.find({a: "foo"}).collation({locale: "simple"}).explain();
         assert.commandWorked(explain);
@@ -269,7 +269,7 @@
     assert.writeOK(collCaseInsensitive.insert(a_foo));
 
     // Test a remove command on strings with simple collation. This should be single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         writeRes = collCaseInsensitive.remove({a: "foo"}, {collation: {locale: "simple"}});
         assert.writeOK(writeRes);
         assert.eq(1, writeRes.nRemoved);
@@ -299,7 +299,7 @@
 
     // Single remove on string shard key with simple collation should succeed, because it is
     // single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         writeRes =
             collCaseInsensitive.remove({a: "foo"}, {justOne: true, collation: {locale: "simple"}});
         assert.writeOK(writeRes);
@@ -335,7 +335,7 @@
 
     // Single remove on string _id with collection-default collation explicitly given should
     // succeed, because it is an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         assert.writeOK(collCaseInsensitive.insert({_id: "foo", a: "bar"}));
         writeRes =
             collCaseInsensitive.remove({_id: "foo"}, {justOne: true, collation: caseInsensitive});
@@ -363,7 +363,7 @@
     assert.eq(3, explain.queryPlanner.winningPlan.shards.length);
 
     // Test an update command on strings with simple collation. This should be single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         writeRes = collCaseInsensitive.update(
             {a: "foo"}, {$set: {b: 1}}, {multi: true, collation: {locale: "simple"}});
         assert.writeOK(writeRes);
@@ -394,7 +394,7 @@
 
     // Single update on string shard key with simple collation should succeed, because it is
     // single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         writeRes =
             collCaseInsensitive.update({a: "foo"}, {$set: {b: 1}}, {collation: {locale: "simple"}});
         assert.writeOK(writeRes);
@@ -416,7 +416,7 @@
 
     // Single update on string _id with non-collection-default collation should fail, because it is
     // not an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         assert.writeError(collCaseInsensitive.update(
             {_id: "foo"}, {$set: {b: 1}}, {collation: {locale: "simple"}}));
     }
@@ -431,7 +431,7 @@
 
     // Single update on string _id with collection-default collation explicitly given should
     // succeed, because it is an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         assert.writeOK(collCaseInsensitive.insert({_id: "foo", a: "bar"}));
         writeRes =
             collCaseInsensitive.update({_id: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive});
@@ -442,7 +442,7 @@
 
     // Single update on number _id with non-collection-default collation inherited from collection
     // default should succeed, because it is an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         writeRes = collCaseInsensitive.update(
             {_id: a_foo._id}, {$set: {b: 1}}, {collation: {locale: "simple"}});
         assert.writeOK(writeRes);
@@ -457,7 +457,7 @@
         collCaseInsensitive.update({a: "foo"}, {$set: {b: 1}}, {multi: true, upsert: true}));
 
     // Upsert on strings with simple collation should succeed, because it is single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getMerizo().writeMode() === "commands") {
         writeRes = collCaseInsensitive.update(
             {a: "foo"}, {$set: {b: 1}}, {multi: true, upsert: true, collation: {locale: "simple"}});
         assert.writeOK(writeRes);

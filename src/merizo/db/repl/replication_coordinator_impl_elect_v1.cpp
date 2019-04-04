@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationElection
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationElection
 
 #include "merizo/platform/basic.h"
 
@@ -290,7 +290,7 @@ void ReplicationCoordinatorImpl::_startVoteRequester_inlock(long long newTerm) {
         .status_with_transitional_ignore();
 }
 
-MONGO_FAIL_POINT_DEFINE(electionHangsBeforeUpdateMemberState);
+MERIZO_FAIL_POINT_DEFINE(electionHangsBeforeUpdateMemberState);
 
 void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -320,7 +320,7 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm) {
         case VoteRequester::Result::kPrimaryRespondedNo:
             // This is impossible because we would only require the primary's
             // vote during a dry run.
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     // Mark all nodes that responded to our vote request as up to avoid immediately
@@ -331,7 +331,7 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long newTerm) {
     _voteRequester.reset();
     auto electionFinishedEvent = _electionFinishedEvent;
 
-    MONGO_FAIL_POINT_BLOCK(electionHangsBeforeUpdateMemberState, customWait) {
+    MERIZO_FAIL_POINT_BLOCK(electionHangsBeforeUpdateMemberState, customWait) {
         auto waitForMillis = Milliseconds(customWait.getData()["waitForMillis"].numberInt());
         log() << "election succeeded - electionHangsBeforeUpdateMemberState fail point "
                  "enabled, sleeping "

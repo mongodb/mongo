@@ -45,18 +45,18 @@
             var rsName = options.replSet;
             delete options.replSet;
             delete options.shardsvr;
-            var merizodConn = MongoRunner.runMongod(options);
+            var merizodConn = MerizoRunner.runMerizod(options);
             waitForMaster(merizodConn);
 
             var res = merizodConn.getDB('admin').system.version.update({_id: 'shardIdentity'},
                                                                       shardIdentityDoc);
             assert.eq(1, res.nModified);
 
-            MongoRunner.stopMongod(merizodConn);
+            MerizoRunner.stopMerizod(merizodConn);
 
-            newMongodOptions.shardsvr = '';
-            newMongodOptions.replSet = rsName;
-            merizodConn = MongoRunner.runMongod(newMongodOptions);
+            newMerizodOptions.shardsvr = '';
+            newMerizodOptions.replSet = rsName;
+            merizodConn = MerizoRunner.runMerizod(newMerizodOptions);
             waitForMaster(merizodConn);
 
             res = merizodConn.getDB('admin').runCommand({shardingState: 1});
@@ -95,9 +95,9 @@
         // Test normal startup
         //
 
-        var newMongodOptions = Object.extend(merizodConn.savedOptions, {restart: true});
-        MongoRunner.stopMongod(merizodConn);
-        merizodConn = MongoRunner.runMongod(newMongodOptions);
+        var newMerizodOptions = Object.extend(merizodConn.savedOptions, {restart: true});
+        MerizoRunner.stopMerizod(merizodConn);
+        merizodConn = MerizoRunner.runMerizod(newMerizodOptions);
         waitForMaster(merizodConn);
 
         res = merizodConn.getDB('admin').runCommand({shardingState: 1});
@@ -112,45 +112,45 @@
         //
 
         // Note: modification of the shardIdentity is allowed only when not running with --shardsvr
-        MongoRunner.stopMongod(merizodConn);
+        MerizoRunner.stopMerizod(merizodConn);
         // The manipulation of `--replSet` is explained in `restartAndFixShardIdentityDoc`.
-        var rsName = newMongodOptions.replSet;
-        delete newMongodOptions.replSet;
-        delete newMongodOptions.shardsvr;
-        merizodConn = MongoRunner.runMongod(newMongodOptions);
+        var rsName = newMerizodOptions.replSet;
+        delete newMerizodOptions.replSet;
+        delete newMerizodOptions.shardsvr;
+        merizodConn = MerizoRunner.runMerizod(newMerizodOptions);
         waitForMaster(merizodConn);
 
         assert.writeOK(merizodConn.getDB('admin').system.version.update(
             {_id: 'shardIdentity'}, {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
 
-        MongoRunner.stopMongod(merizodConn);
+        MerizoRunner.stopMerizod(merizodConn);
 
-        newMongodOptions.shardsvr = '';
-        newMongodOptions.replSet = rsName;
+        newMerizodOptions.shardsvr = '';
+        newMerizodOptions.replSet = rsName;
         assert.throws(function() {
-            var connToCrashedMongod = MongoRunner.runMongod(newMongodOptions);
-            waitForMaster(connToCrashedMongod);
+            var connToCrashedMerizod = MerizoRunner.runMerizod(newMerizodOptions);
+            waitForMaster(connToCrashedMerizod);
         });
 
-        // We call MongoRunner.stopMongod() using a former connection to the server that is
+        // We call MerizoRunner.stopMerizod() using a former connection to the server that is
         // configured with the same port in order to be able to assert on the server's exit code.
-        MongoRunner.stopMongod(merizodConn, undefined, {allowedExitCode: MongoRunner.EXIT_UNCAUGHT});
+        MerizoRunner.stopMerizod(merizodConn, undefined, {allowedExitCode: MerizoRunner.EXIT_UNCAUGHT});
 
         //
         // Test that it is possible to fix the invalid shardIdentity doc by not passing --shardsvr
         //
-        merizodConn = restartAndFixShardIdentityDoc(newMongodOptions);
+        merizodConn = restartAndFixShardIdentityDoc(newMerizodOptions);
         res = merizodConn.getDB('admin').runCommand({shardingState: 1});
         assert(res.enabled);
     };
 
     var st = new ShardingTest({shards: 1});
 
-    var merizod = MongoRunner.runMongod({shardsvr: ''});
+    var merizod = MerizoRunner.runMerizod({shardsvr: ''});
 
     runTest(merizod, st.configRS.getURL());
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     var replTest = new ReplSetTest({nodes: 1});
     replTest.startSet({shardsvr: ''});

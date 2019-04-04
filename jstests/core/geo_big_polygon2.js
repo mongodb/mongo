@@ -612,7 +612,7 @@ indexes.forEach(function(index) {
         // Update on matching docs
         var result = coll.update(q, {$set: {stored: ObjectId()}}, {multi: true});
         // only check nModified if write commands are enabled
-        if (coll.getMongo().writeMode() == "commands") {
+        if (coll.getMerizo().writeMode() == "commands") {
             assert.eq(p.nI, result.nModified, "update " + p.name);
         }
         // Remove & restore matching docs

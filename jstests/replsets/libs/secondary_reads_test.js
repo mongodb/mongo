@@ -14,7 +14,7 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
     let primaryDB = primary.getDB(dbName);
     let secondary = rst.getSecondary();
     let secondaryDB = secondary.getDB(dbName);
-    secondaryDB.getMongo().setSlaveOk();
+    secondaryDB.getMerizo().setSlaveOk();
 
     let readers = [];
     let signalColl = "signalColl";
@@ -38,7 +38,7 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
     this.startSecondaryReaders = function(nReaders, readFn) {
 
         let read = function() {
-            db.getMongo().setSlaveOk();
+            db.getMerizo().setSlaveOk();
             db = db.getSiblingDB(TestData.dbName);
             while (true) {
                 readFn();
@@ -71,14 +71,14 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
     // but not updated the last applied optime.
     this.pauseSecondaryBatchApplication = function() {
 
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
 
         assert.commandWorked(
             secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
 
         return function() {
             assert.soon(function() {
-                return rawMongoProgramOutput().match(failPoint + " fail point enabled");
+                return rawMerizoProgramOutput().match(failPoint + " fail point enabled");
             });
         };
     };

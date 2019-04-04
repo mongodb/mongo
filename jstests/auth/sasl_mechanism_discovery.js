@@ -51,10 +51,10 @@
     }
 
     // Test standalone.
-    var m = MongoRunner.runMongod(
+    var m = MerizoRunner.runMerizod(
         {setParameter: "authenticationMechanisms=SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"});
     runTest(m);
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 
     // Test merizos.
     var st = new ShardingTest({

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -77,8 +77,8 @@ struct CappedInsertNotifierData {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
-MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
+MERIZO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
+MERIZO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
 
 /**
  * Constructs a PlanYieldPolicy based on 'policy'.
@@ -100,7 +100,7 @@ std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutor* exec,
             return stdx::make_unique<AlwaysPlanKilledYieldPolicy>(exec);
         }
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -471,7 +471,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_waitForInserts(CappedInsertNotifierDa
 
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* objOut,
                                                        RecordId* dlOut) {
-    if (MONGO_FAIL_POINT(planExecutorAlwaysFails)) {
+    if (MERIZO_FAIL_POINT(planExecutorAlwaysFails)) {
         Status status(ErrorCodes::InternalError,
                       str::stream() << "PlanExecutor hit planExecutorAlwaysFails fail point");
         *objOut =
@@ -568,7 +568,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
             // This result didn't have the data the caller wanted, try again.
         } else if (PlanStage::NEED_YIELD == code) {
             invariant(id == WorkingSet::INVALID_ID);
-            if (!_yieldPolicy->canAutoYield() || MONGO_FAIL_POINT(skipWriteConflictRetries)) {
+            if (!_yieldPolicy->canAutoYield() || MERIZO_FAIL_POINT(skipWriteConflictRetries)) {
                 throw WriteConflictException();
             }
 
@@ -584,10 +584,10 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<BSONObj>* obj
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
         } else if (PlanStage::IS_EOF == code) {
-            if (MONGO_FAIL_POINT(planExecutorHangBeforeShouldWaitForInserts)) {
+            if (MERIZO_FAIL_POINT(planExecutorHangBeforeShouldWaitForInserts)) {
                 log() << "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
                          "enabled. Blocking until fail point is disabled.";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET(planExecutorHangBeforeShouldWaitForInserts);
+                MERIZO_FAIL_POINT_PAUSE_WHILE_SET(planExecutorHangBeforeShouldWaitForInserts);
             }
             if (!_shouldWaitForInserts()) {
                 return PlanExecutor::IS_EOF;

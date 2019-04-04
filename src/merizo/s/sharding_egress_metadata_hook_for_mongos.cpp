@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -42,10 +42,10 @@
 namespace merizo {
 namespace rpc {
 
-void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
+void ShardingEgressMetadataHookForMerizos::_saveGLEStats(const BSONObj& metadata,
                                                         StringData hostString) {}
 
-repl::OpTime ShardingEgressMetadataHookForMongos::_getConfigServerOpTime() {
+repl::OpTime ShardingEgressMetadataHookForMerizos::_getConfigServerOpTime() {
     return Grid::get(_serviceContext)->configOpTime();
 }
 

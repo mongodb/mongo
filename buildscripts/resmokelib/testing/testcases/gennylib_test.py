@@ -34,7 +34,7 @@ class GennyLibTestCase(interface.ProcessTestCase):
         """Configure the test case."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
-        env_vars = {"MONGO_CONNECTION_STRING": self.fixture.get_driver_connection_url()}
+        env_vars = {"MERIZO_CONNECTION_STRING": self.fixture.get_driver_connection_url()}
         process_kwargs = {"env_vars": env_vars}
         self.program_options["process_kwargs"] = process_kwargs
 

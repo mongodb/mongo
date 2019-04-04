@@ -73,7 +73,7 @@ public:
      * or ID numbers.
      *
      * This method is not thread-safe and should only be called from a single-threaded context
-     * (a MONGO_INITIALIZER).
+     * (a MERIZO_INITIALIZER).
      */
     void registerImplementation(std::unique_ptr<MessageCompressorBase> impl);
 

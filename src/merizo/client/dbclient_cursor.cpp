@@ -28,10 +28,10 @@
  */
 
 /**
- * Connect to a Mongo database as a database, from C++.
+ * Connect to a Merizo database as a database, from C++.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 

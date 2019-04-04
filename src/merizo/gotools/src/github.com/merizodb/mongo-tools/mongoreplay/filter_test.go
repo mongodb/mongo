@@ -17,7 +17,7 @@ import (
 )
 
 func TestRemoveDriverOpsFromFile(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	cases := []struct {
 		name string
 
@@ -131,7 +131,7 @@ func TestRemoveDriverOpsFromFile(t *testing.T) {
 }
 
 func TestSplitInputFile(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	cases := []struct {
 		name string
 
@@ -219,7 +219,7 @@ func TestSplitInputFile(t *testing.T) {
 }
 
 func TestRemoveOpsBeforeTime(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	// array of times to use for testing
 	timesForTest := make([]time.Time, 16)
 	now := time.Now()
@@ -319,7 +319,7 @@ func TestRemoveOpsBeforeTime(t *testing.T) {
 }
 
 func TestRemoveOpsAfterDuration(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	// array of times to use for testing
 	timesForTest := make([]time.Time, 16)
 	now := time.Now()

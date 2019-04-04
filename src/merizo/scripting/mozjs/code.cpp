@@ -43,7 +43,7 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec CodeInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, CodeInfo), JS_FS_END,
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toString, CodeInfo), JS_FS_END,
 };
 
 const char* const CodeInfo::className = "Code";

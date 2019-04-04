@@ -22,7 +22,7 @@ index 15ed02e538..2183c8a1d2 100644
 -  // ... In favor of these.
 -  virtual void SetUp(State& st) { SetUp(const_cast<const State&>(st)); }
 -  virtual void TearDown(State& st) { TearDown(const_cast<const State&>(st)); }
-+  // MONGODB MODIFICATION: Remove the deprecated version of SetUp() and TearDown() that
++  // MERIZODB MODIFICATION: Remove the deprecated version of SetUp() and TearDown() that
 +  // require `const State&` as an argument.
 +  virtual void SetUp(State&) {}
 +  virtual void TearDown(State&) {}

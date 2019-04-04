@@ -153,7 +153,7 @@ private:
         }
 
         FAIL("Invalid query");
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**

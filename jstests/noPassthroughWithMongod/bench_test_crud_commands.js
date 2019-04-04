@@ -20,7 +20,7 @@
     }
 
     function executeBenchRun(benchOps) {
-        var benchArgs = {ops: benchOps, parallel: 2, seconds: 5, host: db.getMongo().host};
+        var benchArgs = {ops: benchOps, parallel: 2, seconds: 5, host: db.getMerizo().host};
         if (jsTest.options().auth) {
             benchArgs['db'] = 'admin';
             benchArgs['username'] = jsTest.options().authUser;

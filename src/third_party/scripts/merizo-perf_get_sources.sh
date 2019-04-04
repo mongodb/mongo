@@ -54,7 +54,7 @@ find testcases -type f -print0 | xargs -0 -I% -n1 -P$NUM_CPUS          \
                         --threads 1                                    \
                         --excludeFilter capped                         \
                         --excludeFilter where                          \
-                        --generateMongoeBenchConfigFiles merizoebench/  \
+                        --generateMerizoeBenchConfigFiles merizoebench/  \
                         --readCmd false                                \
                         --writeCmd true                                \
                         --excludeFilter aggregation_identityview       \
@@ -65,7 +65,7 @@ find testcases -type f -print0 | xargs -0 -I% -n1 -P$NUM_CPUS          \
                         --threads 1                                    \
                         --excludeFilter capped                         \
                         --excludeFilter where                          \
-                        --generateMongoeBenchConfigFiles merizoebench/  \
+                        --generateMerizoeBenchConfigFiles merizoebench/  \
                         --readCmd true                                 \
                         --writeCmd true                                \
                         --includeFilter aggregation_identityview query_identityview

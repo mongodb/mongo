@@ -67,7 +67,7 @@ enum class FTDCStartMode {
  * Start Full Time Data Capture
  * Starts 1 thread.
  *
- * See MongoD and MongoS specific functions.
+ * See MerizoD and MerizoS specific functions.
  */
 void startFTDC(boost::filesystem::path& path,
                FTDCStartMode startupMode,
@@ -76,7 +76,7 @@ void startFTDC(boost::filesystem::path& path,
 /**
  * Stop Full Time Data Capture
  *
- * See MongoD and MongoS specific functions.
+ * See MerizoD and MerizoS specific functions.
  */
 void stopFTDC();
 

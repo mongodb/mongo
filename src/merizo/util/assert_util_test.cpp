@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/config.h"
 #include "merizo/platform/basic.h"
@@ -67,14 +67,14 @@ namespace {
     }())
 
 // BadValue - no categories
-MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::BadValue>,
+MERIZO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::BadValue>,
                                  error_details::CategoryList<>>());
-MONGO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::BadValue>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+MERIZO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::BadValue>>());
+MERIZO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
                                      ExceptionFor<ErrorCodes::BadValue>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
+MERIZO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
                                      ExceptionFor<ErrorCodes::BadValue>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
+MERIZO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
                                      ExceptionFor<ErrorCodes::BadValue>>());
 
 TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
@@ -88,14 +88,14 @@ TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
 }
 
 // NotMaster - just NotMasterError
-MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::NotMaster>,
+MERIZO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::NotMaster>,
                                  error_details::CategoryList<ErrorCategory::NotMasterError>>());
-MONGO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::NotMaster>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+MERIZO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::NotMaster>>());
+MERIZO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
                                      ExceptionFor<ErrorCodes::NotMaster>>());
-MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
+MERIZO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
                                     ExceptionFor<ErrorCodes::NotMaster>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
+MERIZO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
                                      ExceptionFor<ErrorCodes::NotMaster>>());
 
 TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
@@ -109,17 +109,17 @@ TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
 }
 
 // InterruptedDueToStepDown - NotMasterError and Interruption
-MONGO_STATIC_ASSERT(
+MERIZO_STATIC_ASSERT(
     std::is_same<
         error_details::ErrorCategoriesFor<ErrorCodes::InterruptedDueToStepDown>,
         error_details::CategoryList<ErrorCategory::Interruption, ErrorCategory::NotMasterError>>());
-MONGO_STATIC_ASSERT(
+MERIZO_STATIC_ASSERT(
     std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::InterruptedDueToStepDown>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+MERIZO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
                                      ExceptionFor<ErrorCodes::InterruptedDueToStepDown>>());
-MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
+MERIZO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
                                     ExceptionFor<ErrorCodes::InterruptedDueToStepDown>>());
-MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
+MERIZO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
                                     ExceptionFor<ErrorCodes::InterruptedDueToStepDown>>());
 
 TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
@@ -137,7 +137,7 @@ TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
                    ExceptionForCat<ErrorCategory::Interruption>);
 }
 
-MONGO_STATIC_ASSERT(!error_details::isNamedCode<19999>);
+MERIZO_STATIC_ASSERT(!error_details::isNamedCode<19999>);
 // ExceptionFor<ErrorCodes::Error(19999)> invalidType;  // Must not compile.
 
 TEST(AssertUtils, UassertNumericCode) {
@@ -347,7 +347,7 @@ DEATH_TEST(InvariantTerminationTest,
               msg);
 }
 
-#if defined(MONGO_CONFIG_DEBUG_BUILD)
+#if defined(MERIZO_CONFIG_DEBUG_BUILD)
 // dassert and its friends
 DEATH_TEST(DassertTerminationTest, invariant, "Invariant failure false " __FILE__) {
     dassert(false);
@@ -371,7 +371,7 @@ DEATH_TEST(DassertTerminationTest,
                                           << 12345;
     dassert(false, msg);
 }
-#endif  // defined(MONGO_CONFIG_DEBUG_BUILD)
+#endif  // defined(MERIZO_CONFIG_DEBUG_BUILD)
 
 }  // namespace
 }  // namespace merizo

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #ifdef _WIN32
 #define NVALGRIND
@@ -145,7 +145,7 @@ public:
             appendNumericPropertyIfAvailable(
                 sub, "spinlock_total_delay_ns", "tcmalloc.spinlock_total_delay_ns");
 
-#if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
+#if MERIZO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
             if (verbosity >= 2) {
                 // Size class information
                 BSONArrayBuilder arr;
@@ -171,7 +171,7 @@ private:
             builder.appendNumber(bsonName, value);
     }
 
-#if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
+#if MERIZO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
     static void appendSizeClassInfo(void* bsonarr_builder, const base::MallocSizeClass* stats) {
         BSONArrayBuilder* builder = reinterpret_cast<BSONArrayBuilder*>(bsonarr_builder);
         BSONObjBuilder doc;

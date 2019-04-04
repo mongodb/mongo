@@ -11,7 +11,7 @@
     var startSession = {startSession: 1};
 
     // Run initial tests without auth.
-    conn = MongoRunner.runMongod();
+    conn = MerizoRunner.runMerizod();
     admin = conn.getDB("admin");
 
     result = admin.runCommand(startSession);
@@ -32,8 +32,8 @@
     assert.commandWorked(result, "could not run refreshSessions logged in with --auth off");
 
     // Turn on auth for further testing.
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({auth: "", nojournal: "", setParameter: {maxSessions: 3}});
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod({auth: "", nojournal: "", setParameter: {maxSessions: 3}});
     admin = conn.getDB("admin");
 
     admin.createUser(
@@ -92,5 +92,5 @@
     var config = conn.getDB("config");
     assert.eq(config.system.sessions.count(), 3, "should have refreshed all session records");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

@@ -52,7 +52,7 @@ StringData kReplaceDocumentsMode = WriteMode_serializer(WriteModeEnum::kModeRepl
  * setup. For example, to compute its constraints, the $out stage needs to know if the output
  * collection is sharded.
  */
-class MongoProcessInterfaceForTest : public StubMongoProcessInterface {
+class MerizoProcessInterfaceForTest : public StubMerizoProcessInterface {
 public:
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
         return false;
@@ -77,7 +77,7 @@ public:
 class DocumentSourceOutTest : public AggregationContextFixture {
 public:
     DocumentSourceOutTest() : AggregationContextFixture() {
-        getExpCtx()->merizoProcessInterface = std::make_shared<MongoProcessInterfaceForTest>();
+        getExpCtx()->merizoProcessInterface = std::make_shared<MerizoProcessInterfaceForTest>();
     }
 
     intrusive_ptr<DocumentSourceOut> createOutStage(BSONObj spec) {
@@ -364,7 +364,7 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfUniqueKeyHasDuplicateFields) {
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, ErrorCodes::BadValue);
 }
 
-TEST_F(DocumentSourceOutTest, FailsToParseIfTargetCollectionVersionIsSpecifiedOnMongos) {
+TEST_F(DocumentSourceOutTest, FailsToParseIfTargetCollectionVersionIsSpecifiedOnMerizos) {
     BSONObj spec = BSON("$out" << BSON("to"
                                        << "test"
                                        << "mode"
@@ -373,28 +373,28 @@ TEST_F(DocumentSourceOutTest, FailsToParseIfTargetCollectionVersionIsSpecifiedOn
                                        << BSON("_id" << 1)
                                        << "targetCollectionVersion"
                                        << ChunkVersion(0, 0, OID::gen()).toBSON()));
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 50984);
 
     // Test that 'targetCollectionVersion' is accepted if _from_ merizos.
-    getExpCtx()->inMongos = false;
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->inMerizos = false;
+    getExpCtx()->fromMerizos = true;
     ASSERT(createOutStage(spec) != nullptr);
 
     // Test that 'targetCollectionVersion' is not accepted if on merizod but not from merizos.
-    getExpCtx()->inMongos = false;
-    getExpCtx()->fromMongos = false;
+    getExpCtx()->inMerizos = false;
+    getExpCtx()->fromMerizos = false;
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 51018);
 }
 
-TEST_F(DocumentSourceOutTest, FailsToParseifUniqueKeyIsNotSentFromMongos) {
+TEST_F(DocumentSourceOutTest, FailsToParseifUniqueKeyIsNotSentFromMerizos) {
     BSONObj spec = BSON("$out" << BSON("to"
                                        << "test"
                                        << "mode"
                                        << kDefaultMode
                                        << "targetCollectionVersion"
                                        << ChunkVersion(0, 0, OID::gen()).toBSON()));
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromMerizos = true;
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 51017);
 }
 

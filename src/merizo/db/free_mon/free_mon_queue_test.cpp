@@ -43,7 +43,7 @@
 namespace merizo {
 namespace {
 
-class FreeMonQueueTest : public ServiceContextMongoDTest {
+class FreeMonQueueTest : public ServiceContextMerizoDTest {
 private:
     void setUp() final;
     void tearDown() final;
@@ -57,7 +57,7 @@ protected:
 };
 
 void FreeMonQueueTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     // Set up a NetworkInterfaceMock. Note, unlike NetworkInterfaceASIO, which has its own pool of
     // threads, tasks in the NetworkInterfaceMock must be carried out synchronously by the (single)
@@ -80,7 +80,7 @@ void FreeMonQueueTest::setUp() {
 void FreeMonQueueTest::tearDown() {
     _opCtx = {};
 
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 // Postive: Can we enqueue and dequeue one item

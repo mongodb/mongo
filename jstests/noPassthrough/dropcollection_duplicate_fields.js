@@ -5,7 +5,7 @@
 
 (function() {
     "use strict";
-    var conn = MongoRunner.runMongod();
+    var conn = MerizoRunner.runMerizod();
     var db = conn.getDB('test');
 
     let coll = db.dropcollection_duplicate_fields;
@@ -24,6 +24,6 @@
             db.adminCommand({configureFailPoint: 'WTWriteConflictException', mode: "off"}));
     }
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
 })();

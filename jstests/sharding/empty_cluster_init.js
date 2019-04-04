@@ -18,7 +18,7 @@ jsTest.log("Starting first set of merizoses in parallel...");
 
 var merizoses = [];
 for (var i = 0; i < 3; i++) {
-    var merizos = MongoRunner.runMongos(
+    var merizos = MerizoRunner.runMerizos(
         {binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
     merizoses.push(merizos);
 }
@@ -28,14 +28,14 @@ for (var i = 0; i < 3; i++) {
 var merizosConn = null;
 assert.soon(function() {
     try {
-        merizosConn = new Mongo(merizoses[0].host);
+        merizosConn = new Merizo(merizoses[0].host);
         return true;
     } catch (e) {
         print("Waiting for connect...");
         printjson(e);
         return false;
     }
-}, "Mongos " + merizoses[0].host + " did not start.", 5 * 60 * 1000);
+}, "Merizos " + merizoses[0].host + " did not start.", 5 * 60 * 1000);
 
 var version = merizosConn.getCollection("config.version").findOne();
 
@@ -46,16 +46,16 @@ var version = merizosConn.getCollection("config.version").findOne();
 jsTest.log("Starting second set of merizoses...");
 
 for (var i = 0; i < 3; i++) {
-    var merizos = MongoRunner.runMongos(
+    var merizos = MerizoRunner.runMerizos(
         {binVersion: "latest", configdb: configRS.getURL(), waitForConnect: false});
     merizoses.push(merizos);
 }
 
-var connectToMongos = function(host) {
+var connectToMerizos = function(host) {
     // Eventually connect to a host
     assert.soon(function() {
         try {
-            merizosConn = new Mongo(host);
+            merizosConn = new Merizo(host);
             return true;
         } catch (e) {
             print("Waiting for connect to " + host);
@@ -66,12 +66,12 @@ var connectToMongos = function(host) {
 };
 
 for (var i = 0; i < merizoses.length; i++) {
-    connectToMongos(merizoses[i].host);
+    connectToMerizos(merizoses[i].host);
 }
 
 // Shut down our merizoses now that we've tested them
 for (var i = 0; i < merizoses.length; i++) {
-    MongoRunner.stopMongos(merizoses[i]);
+    MerizoRunner.stopMerizos(merizoses[i]);
 }
 
 //

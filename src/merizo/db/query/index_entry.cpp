@@ -78,7 +78,7 @@ bool IndexEntry::pathHasMultikeyComponent(StringData indexedField) const {
         ++pos;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::ostream& operator<<(std::ostream& stream, const IndexEntry::Identifier& ident) {

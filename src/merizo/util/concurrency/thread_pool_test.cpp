@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -50,7 +50,7 @@
 namespace {
 using namespace merizo;
 
-MONGO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
+MERIZO_INITIALIZER(ThreadPoolCommonTests)(InitializerContext*) {
     addTestsForThreadPool("ThreadPoolCommon",
                           []() { return stdx::make_unique<ThreadPool>(ThreadPool::Options()); });
     return Status::OK();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include <string>
 
@@ -107,7 +107,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(GodInsert);
+MERIZO_REGISTER_TEST_COMMAND(GodInsert);
 
 // Testing only, enabled via command-line.
 class CapTrunc : public BasicCommand {
@@ -180,7 +180,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CapTrunc);
+MERIZO_REGISTER_TEST_COMMAND(CapTrunc);
 
 // Testing-only, enabled via command line.
 class EmptyCapped : public BasicCommand {
@@ -208,5 +208,5 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(EmptyCapped);
+MERIZO_REGISTER_TEST_COMMAND(EmptyCapped);
 }

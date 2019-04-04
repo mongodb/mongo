@@ -9,14 +9,14 @@
     var st = new ShardingTest({shards: 2, merizos: 3, other: {shardOptions: {verbose: 2}}});
 
     var merizos = st.s0;
-    var staleMongosA = st.s1;
-    var staleMongosB = st.s2;
+    var staleMerizosA = st.s1;
+    var staleMerizosB = st.s2;
 
     var admin = merizos.getDB("admin");
     var config = merizos.getDB("config");
     var coll = merizos.getCollection("foo.bar");
-    var staleCollA = staleMongosA.getCollection(coll + "");
-    var staleCollB = staleMongosB.getCollection(coll + "");
+    var staleCollA = staleMerizosA.getCollection(coll + "");
+    var staleCollB = staleMerizosB.getCollection(coll + "");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);

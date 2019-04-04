@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 #define LOG_FOR_ELECTION(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationElection)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationElection)
 
 #include "merizo/platform/basic.h"
 
@@ -94,8 +94,8 @@
 namespace merizo {
 namespace repl {
 
-MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
-MONGO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
+MERIZO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
+MERIZO_FAIL_POINT_DEFINE(holdStableTimestampAtSpecificTimestamp);
 
 // Tracks the number of operations killed on step down.
 Counter64 userOpsKilled;
@@ -1927,11 +1927,11 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         auto action = _updateMemberStateFromTopologyCoordinator(lk, opCtx);
         lk.unlock();
 
-        if (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
+        if (MERIZO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
             log() << "stepping down from primary - "
                      "stepdownHangBeforePerformingPostMemberStateUpdateActions fail point enabled. "
                      "Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
+            while (MERIZO_FAIL_POINT(stepdownHangBeforePerformingPostMemberStateUpdateActions)) {
                 merizo::sleepsecs(1);
                 {
                     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -3352,7 +3352,7 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_chooseStableOpTimeFromCandi
                                           maximumStableOpTime.getTimestamp());
     }
 
-    MONGO_FAIL_POINT_BLOCK(holdStableTimestampAtSpecificTimestamp, data) {
+    MERIZO_FAIL_POINT_BLOCK(holdStableTimestampAtSpecificTimestamp, data) {
         const BSONObj& dataObj = data.getData();
         const auto holdStableTimestamp = dataObj["timestamp"].timestamp();
         maximumStableTimestamp = std::min(maximumStableTimestamp, holdStableTimestamp);
@@ -3437,7 +3437,7 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_recalculateStableOpTime(Wit
     return stableOpTime;
 }
 
-MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
+MERIZO_FAIL_POINT_DEFINE(disableSnapshotting);
 
 void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     // Get the current stable optime.
@@ -3467,7 +3467,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
                 }
                 // Set the stable timestamp regardless of whether the majority commit point moved
                 // forward.
-                if (!MONGO_FAIL_POINT(disableSnapshotting)) {
+                if (!MERIZO_FAIL_POINT(disableSnapshotting)) {
                     _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
                 }
             }
@@ -3737,7 +3737,7 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
         invariant(newCommittedSnapshot.getTimestamp() >= _currentCommittedSnapshot->getTimestamp());
         invariant(newCommittedSnapshot >= _currentCommittedSnapshot);
     }
-    if (MONGO_FAIL_POINT(disableSnapshotting))
+    if (MERIZO_FAIL_POINT(disableSnapshotting))
         return false;
     _currentCommittedSnapshot = newCommittedSnapshot;
     _currentCommittedSnapshotCond.notify_all();

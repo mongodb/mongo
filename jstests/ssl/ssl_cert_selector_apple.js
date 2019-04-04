@@ -37,11 +37,11 @@ requireSSLProvider('apple', function() {
             waitForConnect: false,
             setParameter: {logLevel: '1'},
         };
-        clearRawMongoProgramOutput();
-        const merizod = MongoRunner.runMongod(opts);
+        clearRawMerizoProgramOutput();
+        const merizod = MerizoRunner.runMerizod(opts);
 
         assert.soon(function() {
-            const log = rawMongoProgramOutput();
+            const log = rawMerizoProgramOutput();
             if ((cert.name === null) || (cluster.name === null)) {
                 // Invalid search criteria should fail.
                 return log.search('Certificate selector returned no results') >= 0;
@@ -50,10 +50,10 @@ requireSSLProvider('apple', function() {
             const certOK = log.search('Server Certificate Name: ' + cert.name) >= 0;
             const clusOK = log.search('Client Certificate Name: ' + cluster.name) >= 0;
             return certOK && clusOK;
-        }, "Starting Mongod with " + tojson(opts), 10000);
+        }, "Starting Merizod with " + tojson(opts), 10000);
 
         try {
-            MongoRunner.stopMongod(merizod);
+            MerizoRunner.stopMerizod(merizod);
         } catch (e) {
             // Depending on timing, exitCode might be 0, 1, or -9.
             // All that matters is that it dies, resmoke will tell us if that failed.

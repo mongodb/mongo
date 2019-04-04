@@ -41,7 +41,7 @@ TestData.skipCheckDBHashes = true;
     const rollbackNode = rollbackTest.transitionToRollbackOperations();
 
     // Issue a 'prepareTransaction' command just to the current primary.
-    const session = rollbackNode.getDB(dbName).getMongo().startSession({causalConsistency: false});
+    const session = rollbackNode.getDB(dbName).getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
     session.startTransaction();
@@ -56,7 +56,7 @@ TestData.skipCheckDBHashes = true;
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
     // Verify the old primary crashes trying to roll back.
-    clearRawMongoProgramOutput();
+    clearRawMerizoProgramOutput();
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     jsTestLog("Waiting for crash");
     assert.soon(function() {
@@ -69,11 +69,11 @@ TestData.skipCheckDBHashes = true;
     }, "Node did not fassert", ReplSetTest.kDefaultTimeoutMS);
 
     // Let the ReplSetTest know the old primary is down.
-    rst.stop(rst.getNodeId(rollbackNode), undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    rst.stop(rst.getNodeId(rollbackNode), undefined, {allowedExitCode: MerizoRunner.EXIT_ABRUPT});
 
     const msg = RegExp("Can't roll back this command yet: ");
     assert.soon(function() {
-        return rawMongoProgramOutput().match(msg);
+        return rawMerizoProgramOutput().match(msg);
     }, "Node did not fail to roll back entry.");
 
     rst.stopSet();

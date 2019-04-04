@@ -47,11 +47,11 @@ namespace repl {
 // two separate files, rs_rollback and rs_rollback_no_uuid. However, after
 // MerizoDB 3.8 is released, we no longer need to maintain rs_rollback_no_uuid
 // code and these forward declares can be removed. See SERVER-29766.
-MONGO_FAIL_POINT_DECLARE(rollbackHangBeforeFinish);
-MONGO_FAIL_POINT_DECLARE(rollbackHangThenFailAfterWritingMinValid);
+MERIZO_FAIL_POINT_DECLARE(rollbackHangBeforeFinish);
+MERIZO_FAIL_POINT_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
 // This is needed by rs_rollback and rollback_impl.
-MONGO_FAIL_POINT_DECLARE(rollbackHangAfterTransitionToRollback);
+MERIZO_FAIL_POINT_DECLARE(rollbackHangAfterTransitionToRollback);
 
 class RollBackLocalOperations {
     RollBackLocalOperations(const RollBackLocalOperations&) = delete;

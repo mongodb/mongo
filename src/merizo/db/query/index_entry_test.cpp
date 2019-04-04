@@ -95,7 +95,7 @@ TEST(QueryPlannerIXSelectTest, IndexedFieldHasMultikeyComponents) {
 
 DEATH_TEST(QueryPlannerIXSelectTest,
            IndexedFieldHasMultikeyComponentsPassingInvalidFieldIsFatal,
-           "Invariant failure Hit a MONGO_UNREACHABLE!") {
+           "Invariant failure Hit a MERIZO_UNREACHABLE!") {
     auto indexEntry = makeIndexEntry(BSON("a" << 1), {{}});
     indexEntry.pathHasMultikeyComponent("b"_sd);
 }

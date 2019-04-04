@@ -72,7 +72,7 @@ using stdx::make_unique;
 namespace {
 
 // Failpoint which causes to hang "listCollections" cmd after acquiring the DB lock.
-MONGO_FAIL_POINT_DEFINE(hangBeforeListCollections);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeListCollections);
 
 /**
  * Determines if 'matcher' is an exact match on the "name" field. If so, returns a vector of all the

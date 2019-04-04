@@ -32,7 +32,7 @@
     assert.eq(i, j * 100, "setup");
 
     // Until SERVER-9715 is fixed, the sync command must be run on a diff connection
-    new Mongo(s.s.host).adminCommand("connpoolsync");
+    new Merizo(s.s.host).adminCommand("connpoolsync");
 
     print("done inserting data");
 
@@ -128,7 +128,7 @@
     assert(t.findOne(), "check close 0");
 
     for (i = 0; i < 20; i++) {
-        var conn = new Mongo(db.getMongo().host);
+        var conn = new Merizo(db.getMerizo().host);
         var temp2 = conn.getDB("test2").foobar;
         assert.eq(conn._fullNameSpace, t._fullNameSpace, "check close 1");
         assert(temp2.findOne(), "check close 2");

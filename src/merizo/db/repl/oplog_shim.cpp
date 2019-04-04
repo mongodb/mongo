@@ -31,6 +31,6 @@
 
 namespace merizo {
 namespace repl {
-MONGO_DEFINE_SHIM(GetNextOpTimeClass::getNextOpTimes);
+MERIZO_DEFINE_SHIM(GetNextOpTimeClass::getNextOpTimes);
 }  // namespace repl
 }  // namespace merizo

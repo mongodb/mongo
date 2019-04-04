@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kGeo
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kGeo
 
 #include <chrono>
 #include <memory>
@@ -49,7 +49,7 @@ using merizo::Polygon;  // "windows.h" has another Polygon for Windows GDI.
 
 std::default_random_engine generator;
 
-MONGO_INITIALIZER(R2CellUnion_Test)(InitializerContext* context) {
+MERIZO_INITIALIZER(R2CellUnion_Test)(InitializerContext* context) {
     unsigned seed = stdx::chrono::system_clock::now().time_since_epoch().count();
     for (size_t i = 2; i < context->args().size(); ++i) {
         if (context->args()[i - 1] == "--seed") {

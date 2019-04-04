@@ -103,14 +103,14 @@ Status JSErrorReportToStatus(JSContext* cx,
 
 void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {
     uassertStatusOK(currentJSExceptionToStatus(cx, altCode, altReason));
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 /**
  * Turns a status into a js exception
  */
 void statusToJSException(JSContext* cx, Status status, JS::MutableHandleValue out) {
-    MongoStatusInfo::fromStatus(cx, std::move(status), out);
+    MerizoStatusInfo::fromStatus(cx, std::move(status), out);
 }
 
 /**
@@ -126,8 +126,8 @@ Status jsExceptionToStatus(JSContext* cx,
         return Status(altCode, ValueWriter(cx, excn).toString());
     }
 
-    if (scope->getProto<MongoStatusInfo>().instanceOf(excn)) {
-        return MongoStatusInfo::toStatus(cx, excn);
+    if (scope->getProto<MerizoStatusInfo>().instanceOf(excn)) {
+        return MerizoStatusInfo::toStatus(cx, excn);
     }
 
     JS::RootedObject obj(cx, excn.toObjectOrNull());

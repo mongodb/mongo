@@ -1,4 +1,4 @@
-"""The unittest.TestCase for MQL MongoD Model tests."""
+"""The unittest.TestCase for MQL MerizoD Model tests."""
 
 from __future__ import absolute_import
 
@@ -11,16 +11,16 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 
-class MqlModelMongodTestCase(jsrunnerfile.JSRunnerFileTestCase):
-    """A MQL MongoD Model test to execute."""
+class MqlModelMerizodTestCase(jsrunnerfile.JSRunnerFileTestCase):
+    """A MQL MerizoD Model test to execute."""
 
     REGISTERED_NAME = "mql_model_merizod_test"
 
     def __init__(self, logger, json_filename, shell_executable=None, shell_options=None):
-        """Initialize the MqlModelMongodTestCase with the JSON test file."""
+        """Initialize the MqlModelMerizodTestCase with the JSON test file."""
 
         jsrunnerfile.JSRunnerFileTestCase.__init__(
-            self, logger, "MQL MongoD Model test", json_filename,
+            self, logger, "MQL MerizoD Model test", json_filename,
             test_runner_file="jstests/libs/mql_model_merizod_test_runner.js",
             shell_executable=shell_executable, shell_options=shell_options)
 

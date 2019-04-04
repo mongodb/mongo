@@ -90,7 +90,7 @@ function authDBUsers(conn) {
 // routing table into memory.
 // TODO SERVER-30148: replace this with calls to awaitReplication() on each shard owning data for
 // the sharded collection once secondaries refresh proactively.
-var merizosSetupConn = new Mongo(merizos.host);
+var merizosSetupConn = new Merizo(merizos.host);
 authDBUsers(merizosSetupConn);
 merizosSetupConn.setReadPref("secondary");
 assert(!merizosSetupConn.getCollection(collSharded.toString()).find({}).hasNext());
@@ -103,7 +103,7 @@ gc();  // Clean up connections
 
 jsTest.log("Inserting initial data...");
 
-var merizosConnActive = authDBUsers(new Mongo(merizos.host));
+var merizosConnActive = authDBUsers(new Merizo(merizos.host));
 authDBUsers(merizosConnActive);
 var merizosConnIdle = null;
 var merizosConnNew = null;
@@ -116,7 +116,7 @@ assert.writeOK(merizosConnActive.getCollection(collUnsharded.toString()).insert(
 
 jsTest.log("Stopping primary of third shard...");
 
-merizosConnIdle = authDBUsers(new Mongo(merizos.host));
+merizosConnIdle = authDBUsers(new Merizo(merizos.host));
 
 st.rs2.stop(st.rs2.getPrimary());
 
@@ -142,18 +142,18 @@ assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne
 
 jsTest.log("Testing new connections with third primary down...");
 
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -4}, wc));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 4}, wc));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeOK(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 4}, wc));
 
 gc();  // Clean up new connections
@@ -161,7 +161,7 @@ gc();  // Clean up new connections
 jsTest.log("Stopping primary of second shard...");
 
 merizosConnActive.setSlaveOk();
-merizosConnIdle = authDBUsers(new Mongo(merizos.host));
+merizosConnIdle = authDBUsers(new Merizo(merizos.host));
 merizosConnIdle.setSlaveOk();
 
 // Need to save this node for later
@@ -191,21 +191,21 @@ assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne
 
 jsTest.log("Testing new connections with second primary down...");
 
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 merizosConnNew.setSlaveOk();
 assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 merizosConnNew.setSlaveOk();
 assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 merizosConnNew.setSlaveOk();
 assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -7}, wc));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 7}, wc));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeOK(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}, wc));
 
 gc();  // Clean up new connections
@@ -213,7 +213,7 @@ gc();  // Clean up new connections
 jsTest.log("Stopping primary of first shard...");
 
 merizosConnActive.setSlaveOk();
-merizosConnIdle = authDBUsers(new Mongo(merizos.host));
+merizosConnIdle = authDBUsers(new Merizo(merizos.host));
 merizosConnIdle.setSlaveOk();
 
 st.rs0.stop(st.rs0.getPrimary());
@@ -240,21 +240,21 @@ assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne
 
 jsTest.log("Testing new connections with first primary down...");
 
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 merizosConnNew.setSlaveOk();
 assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 merizosConnNew.setSlaveOk();
 assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 merizosConnNew.setSlaveOk();
 assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -10}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 10}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeError(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 10}));
 
 gc();  // Clean up new connections
@@ -262,7 +262,7 @@ gc();  // Clean up new connections
 jsTest.log("Stopping second shard...");
 
 merizosConnActive.setSlaveOk();
-merizosConnIdle = authDBUsers(new Mongo(merizos.host));
+merizosConnIdle = authDBUsers(new Merizo(merizos.host));
 merizosConnIdle.setSlaveOk();
 
 st.rs1.stop(rs1Secondary);
@@ -287,18 +287,18 @@ assert.neq(null, merizosConnIdle.getCollection(collUnsharded.toString()).findOne
 
 jsTest.log("Testing new connections with second shard down...");
 
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 merizosConnNew.setSlaveOk();
 assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 merizosConnNew.setSlaveOk();
 assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -13}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 13}));
-merizosConnNew = authDBUsers(new Mongo(merizos.host));
+merizosConnNew = authDBUsers(new Merizo(merizos.host));
 assert.writeError(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 13}));
 
 gc();  // Clean up new connections

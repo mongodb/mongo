@@ -201,16 +201,16 @@ tasks:
           set -o verbose
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe)
+          MERIZO_VERSION=$(git describe)
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+            MERIZO_VERSION="$MERIZO_VERSION-patch-${version_id}"
           fi
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/merizodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          MERIZO_VERSION=$MERIZO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/merizodbtoolchain/v3/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -221,7 +221,7 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          ${python|/opt/merizodbtoolchain/v3/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} merizo${extension} merizod${extension} merizos${extension} MONGO_VERSION=${version}
+          ${python|/opt/merizodbtoolchain/v3/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} merizo${extension} merizod${extension} merizos${extension} MERIZO_VERSION=${version}
           mkdir -p merizodb/bin
           mv merizo${extension|} merizodb/bin
           mv merizod${extension|} merizodb/bin

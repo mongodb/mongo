@@ -9,13 +9,13 @@
 
     // The following test verifies that writeConcern: {j: true} ensures that the view catalog is
     // durable.
-    let dbpath = MongoRunner.dataPath + '_durable_view_catalog';
+    let dbpath = MerizoRunner.dataPath + '_durable_view_catalog';
     resetDbpath(dbpath);
 
     let merizodArgs = {dbpath: dbpath, noCleanData: true, journal: ''};
 
     // Start a merizod.
-    let conn = MongoRunner.runMongod(merizodArgs);
+    let conn = MerizoRunner.runMerizod(merizodArgs);
     assert.neq(null, conn, 'merizod was unable to start up');
 
     // Now connect to the merizod, create, remove and modify views and then abruptly stop the server.
@@ -32,10 +32,10 @@
     assert.commandWorked(viewsDB.runCommand({drop: "view1", writeConcern: {j: 1}}));
 
     // Hard kill the merizod to ensure the data was indeed synced to durable storage.
-    MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+    MerizoRunner.stopMerizod(conn, 9, {allowedExitCode: MerizoRunner.EXIT_SIGKILL});
 
     // Restart the merizod.
-    conn = MongoRunner.runMongod(merizodArgs);
+    conn = MerizoRunner.runMerizod(merizodArgs);
     assert.neq(null, conn, 'merizod was unable to restart after receiving a SIGKILL');
 
     // Check that our journaled write still is present.
@@ -60,12 +60,12 @@
     // Insert an invalid view definition directly into system.views to bypass normal validation.
     assert.writeOK(viewsDB.system.views.insert({_id: "badView", pipeline: "badType"}));
 
-    // Skip collection validation during stopMongod if invalid views exists.
+    // Skip collection validation during stopMerizod if invalid views exists.
     TestData.skipValidationOnInvalidViewDefinitions = true;
 
     // Restarting the merizod should succeed despite the presence of invalid view definitions.
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod(merizodArgs);
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod(merizodArgs);
     assert.neq(
         null,
         conn,
@@ -93,5 +93,5 @@
     assert.commandWorked(viewsDB.runCommand({collMod: "view2", viewOn: "view4"}));
     assert.commandWorked(viewsDB.runCommand({drop: "view4"}));
     assert.commandWorked(viewsDB.runCommand({listCollections: 1}));
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

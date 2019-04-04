@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -79,12 +79,12 @@ StatusWith<std::string> extractDBField(const BSONObj& params) {
 }
 
 //
-// MONGODB-CR
+// MERIZODB-CR
 //
 
-Future<void> authMongoCRImpl(RunCommandHook cmd, const BSONObj& params) {
+Future<void> authMerizoCRImpl(RunCommandHook cmd, const BSONObj& params) {
     return Status(ErrorCodes::AuthenticationFailed,
-                  "MONGODB-CR support was removed in MerizoDB 4.0");
+                  "MERIZODB-CR support was removed in MerizoDB 4.0");
 }
 
 //
@@ -94,7 +94,7 @@ Future<void> authMongoCRImpl(RunCommandHook cmd, const BSONObj& params) {
 StatusWith<OpMsgRequest> createX509AuthCmd(const BSONObj& params, StringData clientName) {
     if (clientName.empty()) {
         return {ErrorCodes::AuthenticationFailed,
-                "Please enable SSL on the client-side to use the MONGODB-X509 authentication "
+                "Please enable SSL on the client-side to use the MERIZODB-X509 authentication "
                 "mechanism."};
     }
     auto db = extractDBField(params);
@@ -118,12 +118,12 @@ StatusWith<OpMsgRequest> createX509AuthCmd(const BSONObj& params, StringData cli
 
     return OpMsgRequest::fromDBAndBody(db.getValue(),
                                        BSON("authenticate" << 1 << "mechanism"
-                                                           << "MONGODB-X509"
+                                                           << "MERIZODB-X509"
                                                            << "user"
                                                            << username));
 }
 
-// Use the MONGODB-X509 protocol to authenticate as "username." The certificate details
+// Use the MERIZODB-X509 protocol to authenticate as "username." The certificate details
 // have already been communicated automatically as part of the connect call.
 Future<void> authX509(RunCommandHook runCommand, const BSONObj& params, StringData clientName) {
     invariant(runCommand);
@@ -170,11 +170,11 @@ Future<void> authenticateClient(const BSONObj& params,
                       "You cannot specify both 'db' and 'userSource'. Please use only 'db'.");
     }
 
-    if (mechanism == kMechanismMongoCR)
-        return authMongoCR(runCommand, params).onError(errorHandler);
+    if (mechanism == kMechanismMerizoCR)
+        return authMerizoCR(runCommand, params).onError(errorHandler);
 
-#ifdef MONGO_CONFIG_SSL
-    else if (mechanism == kMechanismMongoX509)
+#ifdef MERIZO_CONFIG_SSL
+    else if (mechanism == kMechanismMerizoX509)
         return authX509(runCommand, params, clientName).onError(errorHandler);
 #endif
 
@@ -185,7 +185,7 @@ Future<void> authenticateClient(const BSONObj& params,
                   mechanism + " mechanism support not compiled into client library.");
 };
 
-AuthMongoCRHandler authMongoCR = authMongoCRImpl;
+AuthMerizoCRHandler authMerizoCR = authMerizoCRImpl;
 
 static stdx::mutex internalAuthKeysMutex;
 static bool internalAuthSet = false;

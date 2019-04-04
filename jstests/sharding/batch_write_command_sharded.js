@@ -27,7 +27,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     //
     //
-    // Mongos _id autogeneration tests for sharded collections
+    // Merizos _id autogeneration tests for sharded collections
 
     var coll = merizos.getCollection("foo.bar");
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));
@@ -67,7 +67,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     for (var i = 0; i < 1000; i++)
         documents.push({a: i, data: data});
 
-    assert.commandWorked(coll.getMongo().getDB("admin").runCommand({setParameter: 1, logLevel: 4}));
+    assert.commandWorked(coll.getMerizo().getDB("admin").runCommand({setParameter: 1, logLevel: 4}));
     coll.remove({});
     request = {insert: coll.getName(), documents: documents};
     printjson(result = coll.runCommand(request));
@@ -118,8 +118,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     // Start a new merizos and bring it up-to-date with the chunks so far
 
-    var staleMongos = MongoRunner.runMongos({configdb: configConnStr});
-    brokenColl = staleMongos.getCollection(brokenColl.toString());
+    var staleMerizos = MerizoRunner.runMerizos({configdb: configConnStr});
+    brokenColl = staleMerizos.getCollection(brokenColl.toString());
     assert.writeOK(brokenColl.insert({hello: "world"}));
 
     // Modify the chunks to make shards at a higher version
@@ -206,8 +206,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq(0, st.config1.getCollection(configColl + "").count());
     assert.eq(0, st.config2.getCollection(configColl + "").count());
 
-    MongoRunner.stopMongod(st.config1);
-    MongoRunner.stopMongod(st.config2);
+    MerizoRunner.stopMerizod(st.config1);
+    MerizoRunner.stopMerizod(st.config2);
     st.configRS.awaitNoPrimary();
 
     // Config server insert with no config PRIMARY
@@ -235,7 +235,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     jsTest.log("DONE!");
 
-    MongoRunner.stopMongos(staleMongos);
+    MerizoRunner.stopMerizos(staleMerizos);
     st.stop();
 
 }());

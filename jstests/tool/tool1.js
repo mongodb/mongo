@@ -1,8 +1,8 @@
 // merizo tool tests, very basic to start with
 
 baseName = "jstests_tool_tool1";
-dbPath = MongoRunner.dataPath + baseName + "/";
-externalPath = MongoRunner.dataPath + baseName + "_external/";
+dbPath = MerizoRunner.dataPath + baseName + "/";
+externalPath = MerizoRunner.dataPath + baseName + "_external/";
 externalBaseName = "export.json";
 externalFile = externalPath + externalBaseName;
 
@@ -17,12 +17,12 @@ function fileSize() {
 
 resetDbpath(externalPath);
 
-var m = MongoRunner.runMongod({dbpath: dbPath, bind_ip: "127.0.0.1"});
+var m = MerizoRunner.runMerizod({dbpath: dbPath, bind_ip: "127.0.0.1"});
 c = m.getDB(baseName).getCollection(baseName);
 c.save({a: 1});
 assert(c.findOne());
 
-var exitCode = MongoRunner.runMongoTool("merizodump", {
+var exitCode = MerizoRunner.runMerizoTool("merizodump", {
     host: "127.0.0.1:" + m.port,
     out: externalPath,
 });
@@ -30,7 +30,7 @@ assert.eq(0, exitCode, "merizodump failed to dump data from merizod");
 
 c.drop();
 
-exitCode = MongoRunner.runMongoTool("merizorestore", {
+exitCode = MerizoRunner.runMerizoTool("merizorestore", {
     host: "127.0.0.1:" + m.port,
     dir: externalPath,
 });
@@ -44,7 +44,7 @@ resetDbpath(externalPath);
 
 assert.eq(-1, fileSize(), "merizoexport prep invalid");
 
-exitCode = MongoRunner.runMongoTool("merizoexport", {
+exitCode = MerizoRunner.runMerizoTool("merizoexport", {
     host: "127.0.0.1:" + m.port,
     db: baseName,
     collection: baseName,
@@ -57,7 +57,7 @@ assert.lt(10, fileSize(), "file size changed");
 
 c.drop();
 
-exitCode = MongoRunner.runMongoTool("merizoimport", {
+exitCode = MerizoRunner.runMerizoTool("merizoimport", {
     host: "127.0.0.1:" + m.port,
     db: baseName,
     collection: baseName,
@@ -68,4 +68,4 @@ assert.eq(
 
 assert.soon("c.findOne()", "merizo import json A");
 assert(c.findOne() && 1 == c.findOne().a, "merizo import json B");
-MongoRunner.stopMongod(m);
+MerizoRunner.stopMerizod(m);

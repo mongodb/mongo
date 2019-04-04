@@ -2,7 +2,7 @@
   "tests": [
     {
       "description": "Option names are normalized to lowercase",
-      "uri": "merizodb://alice:secret@example.com/admin?AUTHMechanism=MONGODB-CR",
+      "uri": "merizodb://alice:secret@example.com/admin?AUTHMechanism=MERIZODB-CR",
       "valid": true,
       "warning": false,
       "hosts": [
@@ -18,7 +18,7 @@
         "db": "admin"
       },
       "options": {
-        "authmechanism": "MONGODB-CR"
+        "authmechanism": "MERIZODB-CR"
       }
     }
   ]

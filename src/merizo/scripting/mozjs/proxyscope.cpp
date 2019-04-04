@@ -370,7 +370,7 @@ void MozJSProxyScope::implThread(void* arg) {
     while (true) {
         stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);
         {
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             proxy->_implCondvar.wait(lk, [proxy] {
                 return proxy->_state == State::ProxyRequest || proxy->_state == State::Shutdown;
             });

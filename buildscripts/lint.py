@@ -30,9 +30,9 @@ class CheckForConfigH(object):
         cur_line = clean_lines.elided[line_num]
         self.found_configh = cur_line.startswith('#include "merizo/config.h"')
 
-        if not self.found_configh and "MONGO_CONFIG_" in cur_line:
+        if not self.found_configh and "MERIZO_CONFIG_" in cur_line:
             error(filename, line_num, 'build/config_h_include', 5,
-                  'MONGO_CONFIG define used without prior inclusion of config.h.')
+                  'MERIZO_CONFIG define used without prior inclusion of config.h.')
 
 
 def run_lint(paths, nudge_on=False):

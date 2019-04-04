@@ -323,7 +323,7 @@ public:
      */
     DBClientBase* get(const std::string& host, double socketTimeout = 0);
     DBClientBase* get(const ConnectionString& host, double socketTimeout = 0);
-    DBClientBase* get(const MongoURI& uri, double socketTimeout = 0);
+    DBClientBase* get(const MerizoURI& uri, double socketTimeout = 0);
 
     /**
      * Gets the number of connections available in the pool.
@@ -454,7 +454,7 @@ public:
         */
     explicit ScopedDbConnection(const std::string& host, double socketTimeout = 0);
     explicit ScopedDbConnection(const ConnectionString& host, double socketTimeout = 0);
-    explicit ScopedDbConnection(const MongoURI& host, double socketTimeout = 0);
+    explicit ScopedDbConnection(const MerizoURI& host, double socketTimeout = 0);
 
     ScopedDbConnection() : _host(""), _conn(0), _socketTimeoutSecs(0) {}
 

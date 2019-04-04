@@ -270,7 +270,7 @@ struct GetNextOpTimeClass {
      * Allocates optimes for new entries in the oplog.  Returns a vector of OplogSlots, which
      * contain the new optimes along with their terms and newly calculated hash fields.
      */
-    static MONGO_DECLARE_SHIM((OperationContext * opCtx, std::size_t count)->std::vector<OplogSlot>)
+    static MERIZO_DECLARE_SHIM((OperationContext * opCtx, std::size_t count)->std::vector<OplogSlot>)
         getNextOpTimes;
 };
 

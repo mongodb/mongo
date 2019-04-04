@@ -39,8 +39,8 @@
 
 namespace merizo {
 
-MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) {
-    if (!handlePreValidationMongoBridgeOptions(moe::startupOptionsParsed)) {
+MERIZO_STARTUP_OPTIONS_VALIDATE(MerizoBridgeOptions)(InitializerContext* context) {
+    if (!handlePreValidationMerizoBridgeOptions(moe::startupOptionsParsed)) {
         quickExit(EXIT_SUCCESS);
     }
     Status ret = moe::startupOptionsParsed.validate();
@@ -50,8 +50,8 @@ MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) 
     return Status::OK();
 }
 
-MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
-    Status ret = storeMongoBridgeOptions(moe::startupOptionsParsed, context->args());
+MERIZO_STARTUP_OPTIONS_STORE(MerizoBridgeOptions)(InitializerContext* context) {
+    Status ret = storeMerizoBridgeOptions(moe::startupOptionsParsed, context->args());
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;

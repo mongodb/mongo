@@ -48,12 +48,12 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec GlobalInfo::freeFunctions[7] = {
-    MONGO_ATTACH_JS_FUNCTION(sleep),
-    MONGO_ATTACH_JS_FUNCTION(gc),
-    MONGO_ATTACH_JS_FUNCTION(print),
-    MONGO_ATTACH_JS_FUNCTION(version),
-    MONGO_ATTACH_JS_FUNCTION(buildInfo),
-    MONGO_ATTACH_JS_FUNCTION(getJSHeapLimitMB),
+    MERIZO_ATTACH_JS_FUNCTION(sleep),
+    MERIZO_ATTACH_JS_FUNCTION(gc),
+    MERIZO_ATTACH_JS_FUNCTION(print),
+    MERIZO_ATTACH_JS_FUNCTION(version),
+    MERIZO_ATTACH_JS_FUNCTION(buildInfo),
+    MERIZO_ATTACH_JS_FUNCTION(getJSHeapLimitMB),
     JS_FS_END,
 };
 
@@ -125,7 +125,7 @@ void GlobalInfo::Functions::sleep::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-MONGO_INITIALIZER(JavascriptPrintDomain)(InitializerContext*) {
+MERIZO_INITIALIZER(JavascriptPrintDomain)(InitializerContext*) {
     jsPrintLogDomain = logger::globalLogManager()->getNamedDomain("javascriptOutput");
     return Status::OK();
 }

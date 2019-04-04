@@ -2,7 +2,7 @@
     'use strict';
     const configuredMaxConns = 5;
     const configuredReadyAdminThreads = 3;
-    let conn = MongoRunner.runMongod({
+    let conn = MerizoRunner.runMerizod({
         config: "jstests/noPassthrough/libs/max_conns_override_config.yaml",
         // We check a specific field in this executor's serverStatus section
         serviceExecutor: "synchronous",
@@ -11,7 +11,7 @@
     // Use up all the maxConns with junk connections, all of these should succeed
     let maxConns = [];
     for (let i = 0; i < 5; i++) {
-        maxConns.push(new Mongo(`127.0.0.1:${conn.port}`));
+        maxConns.push(new Merizo(`127.0.0.1:${conn.port}`));
         let tmpDb = maxConns[maxConns.length - 1].getDB("admin");
         assert.commandWorked(tmpDb.runCommand({isMaster: 1}));
     }
@@ -41,5 +41,5 @@
     // The normal serviceExecutor should only be running maxConns number of threads
     assert.eq(normalExecutorStatus["threadsRunning"], configuredMaxConns);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

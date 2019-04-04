@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -115,7 +115,7 @@ public:
                                                            Shard::RetryPolicy::kIdempotent,
                                                            targetingQuery,
                                                            targetingCollation);
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>& ex) {
             auto parsedDistinct = ParsedDistinct::parse(
                 opCtx, ex->getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);
             if (!parsedDistinct.isOK()) {
@@ -189,7 +189,7 @@ public:
                 Shard::RetryPolicy::kIdempotent,
                 query,
                 collation);
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>& ex) {
             auto parsedDistinct = ParsedDistinct::parse(
                 opCtx, ex->getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);
             uassertStatusOK(parsedDistinct.getStatus());

@@ -41,24 +41,24 @@
 
 namespace merizo {
 
-AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(AuthorizationManager* authzManager)
+AuthzSessionExternalStateMerizod::AuthzSessionExternalStateMerizod(AuthorizationManager* authzManager)
     : AuthzSessionExternalStateServerCommon(authzManager) {}
-AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
+AuthzSessionExternalStateMerizod::~AuthzSessionExternalStateMerizod() {}
 
-void AuthzSessionExternalStateMongod::startRequest(OperationContext* opCtx) {
+void AuthzSessionExternalStateMerizod::startRequest(OperationContext* opCtx) {
     // No locks should be held as this happens before any database accesses occur
     dassert(!opCtx->lockState()->isLocked());
 
     _checkShouldAllowLocalhost(opCtx);
 }
 
-bool AuthzSessionExternalStateMongod::shouldIgnoreAuthChecks() const {
+bool AuthzSessionExternalStateMerizod::shouldIgnoreAuthChecks() const {
     // TODO(spencer): get "isInDirectClient" from OperationContext
     return cc().isInDirectClient() ||
         AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
 }
 
-bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
+bool AuthzSessionExternalStateMerizod::serverIsArbiter() const {
     // Arbiters have access to extra privileges under localhost. See SERVER-5479.
     return (
         repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() ==
@@ -66,9 +66,9 @@ bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
         repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState().arbiter());
 }
 
-MONGO_REGISTER_SHIM(AuthzSessionExternalState::create)
+MERIZO_REGISTER_SHIM(AuthzSessionExternalState::create)
 (AuthorizationManager* const authzManager)->std::unique_ptr<AuthzSessionExternalState> {
-    return std::make_unique<AuthzSessionExternalStateMongod>(authzManager);
+    return std::make_unique<AuthzSessionExternalStateMerizod>(authzManager);
 }
 
 }  // namespace merizo

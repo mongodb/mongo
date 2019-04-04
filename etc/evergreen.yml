@@ -288,7 +288,7 @@ variables:
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MERIZO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -1506,7 +1506,7 @@ functions:
         ${compile_env|} $python ./buildscripts/scons.py                                     \
             ${compile_flags|} ${task_compile_flags|} ${task_compile_flags_extra|}           \
             ${scons_cache_args|} $extra_args                                                \
-            ${targets} ${additional_targets|} MONGO_VERSION=${version} || exit_status=$?
+            ${targets} ${additional_targets|} MERIZO_VERSION=${version} || exit_status=$?
         # If compile fails we do not run any tests
         if [[ $exit_status -ne 0 ]]; then
           if [[ "${dump_scons_config_on_failure}" == true ]]; then
@@ -1526,11 +1526,11 @@ functions:
         set -o verbose
 
         # We get the raw version string (r1.2.3-45-gabcdef) from git
-        MONGO_VERSION=$(git describe)
+        MERIZO_VERSION=$(git describe)
         # If this is a patch build, we add the patch version id to the version string so we know
         # this build was a patch, and which evergreen task it came from
         if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "false" ]; then
-          MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          MERIZO_VERSION="$MERIZO_VERSION-patch-${version_id}"
         fi
 
         ${activate_virtualenv}
@@ -1565,7 +1565,7 @@ functions:
           fi
 
           echo "Shared Cache with setting: ${scons_cache_scope}"
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+          MERIZO_VERSION=$MERIZO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
 
         # Legacy Expansion generation
         else
@@ -1573,7 +1573,7 @@ functions:
           # Proceed with regular expansions generated
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          MERIZO_VERSION=$MERIZO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
         fi
 
   "apply compile expansions":
@@ -3751,7 +3751,7 @@ tasks:
         task_compile_flags: &embedded_sdk_compile_flags >-
           --install-mode=hygienic
           --js-engine=none
-          --prefix='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION'
+          --prefix='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION'
           --dbg=off
           --opt=size
           --enable-free-mon=off
@@ -3761,7 +3761,7 @@ tasks:
           --wiredtiger=off
           --allocator=system
           --separate-debug
-          CPPPATH='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/include/libmerizoc-1.0'
+          CPPPATH='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/include/libbson-1.0 $BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/include/libmerizoc-1.0'
         task_compile_flags_extra: >-
           --link-model=dynamic-sdk
 
@@ -4476,15 +4476,15 @@ tasks:
           sed s/@VERSION@/1.13.0/g src/src/merizo/embedded/merizoc_embedded/merizo-embedded-c-driver.podspec.in | tee merizo-embedded-c-driver.podspec
           DRIVER_SHA=`shasum -a 256 merizo-embedded-sdk-${version}-merizo-c-driver.tgz  | awk '{ print $1 }'`
           sed -i '' s/@SHA256@/$DRIVER_SHA/g merizo-embedded-c-driver.podspec
-          sed -i '' s/@MONGO_VERSION@/${version}/g merizo-embedded-c-driver.podspec
+          sed -i '' s/@MERIZO_VERSION@/${version}/g merizo-embedded-c-driver.podspec
 
           sed s/@VERSION@/${version}/g src/src/merizo/embedded/merizo_embedded/merizo_embedded.podspec.in | tee merizo_embedded.podspec
-          MONGO_SHA=`shasum -a 256 merizo-embedded-sdk-${version}-merizo-embedded.tgz  | awk '{ print $1 }'`
-          sed -i '' s/@SHA256@/$MONGO_SHA/g merizo_embedded.podspec
+          MERIZO_SHA=`shasum -a 256 merizo-embedded-sdk-${version}-merizo-embedded.tgz  | awk '{ print $1 }'`
+          sed -i '' s/@SHA256@/$MERIZO_SHA/g merizo_embedded.podspec
 
           sed s/@VERSION@/${version}/g src/src/merizo/embedded/merizoc_embedded/merizoc_embedded.podspec.in | tee merizoc_embedded.podspec
-          MONGOC_SHA=`shasum -a 256 merizo-embedded-sdk-${version}-merizoc-embedded.tgz  | awk '{ print $1 }'`
-          sed -i '' s/@SHA256@/$MONGOC_SHA/g merizoc_embedded.podspec
+          MERIZOC_SHA=`shasum -a 256 merizo-embedded-sdk-${version}-merizoc-embedded.tgz  | awk '{ print $1 }'`
+          sed -i '' s/@SHA256@/$MERIZOC_SHA/g merizoc_embedded.podspec
 
           pod trunk push merizo-embedded-c-driver.podspec
           pod trunk push merizo_embedded.podspec
@@ -4497,7 +4497,7 @@ tasks:
         targets: install-stitch-support
         task_compile_flags: >-
           --install-mode=hygienic
-          --prefix='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
+          --prefix='$BUILD_ROOT/stitch-support-lib-$MERIZO_VERSION'
           --dbg=off
           --link-model=dynamic-sdk
           --enable-free-mon=off
@@ -4530,7 +4530,7 @@ tasks:
         targets: install-stitch-support-test
         task_compile_flags: >-
           --install-mode=hygienic
-          --prefix='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
+          --prefix='$BUILD_ROOT/stitch-support-lib-$MERIZO_VERSION'
           --dbg=off
 
 - name: stitch_support_run_tests
@@ -5957,11 +5957,11 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 11
 
-- name: noPassthroughWithMongod_gen
+- name: noPassthroughWithMerizod_gen
   commands:
   - func: "generate resmoke tasks"
     vars:
-      task: noPassthroughWithMongod
+      task: noPassthroughWithMerizod
       suite: no_passthrough_with_merizod
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
@@ -7865,7 +7865,7 @@ buildvariants:
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -7968,7 +7968,7 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: merizosTest
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: parallel_gen
   - name: parallel_compatibility
   - name: serial_run
@@ -8026,7 +8026,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1404
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1404
     multiversion_edition: targeted
     has_packages: true
@@ -8075,7 +8075,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -8133,7 +8133,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
     has_packages: true
@@ -8180,7 +8180,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -8232,7 +8232,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1804 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     has_packages: true
@@ -8294,7 +8294,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1604
     lang_environment: LANG=C
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1604
     multiversion_edition: targeted
     has_packages: true
@@ -8357,7 +8357,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -8410,7 +8410,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: arm64-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many merizod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -8454,7 +8454,7 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: merizosTest
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -8503,7 +8503,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: arm64-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many merizod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -8542,7 +8542,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: arm64-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many merizod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -8585,7 +8585,7 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: merizosTest
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -8634,7 +8634,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: arm64-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many merizod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -8673,7 +8673,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: ppc64le-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -8719,7 +8719,7 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: merizosTest
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -8770,7 +8770,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: ppc64le-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1804 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -8817,7 +8817,7 @@ buildvariants:
   - name: noPassthrough_gen
     distros:
     - ubuntu1804-power8-build
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -8873,7 +8873,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1604 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -8943,7 +8943,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -8996,7 +8996,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: s390x-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1804 --release --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
     multiversion_architecture: s390x
@@ -9037,7 +9037,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1804 --release --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -9107,7 +9107,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -9160,7 +9160,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
-    compile_flags: --ssl MONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -9203,7 +9203,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
@@ -9244,7 +9244,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-amazon
-    compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: amazon
     multiversion_edition: targeted
     has_packages: true
@@ -9293,7 +9293,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -9351,7 +9351,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=amazon2 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9396,7 +9396,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
@@ -9438,7 +9438,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-amazon2
-    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9489,7 +9489,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -9545,7 +9545,7 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2012plus
+    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MERIZO_DISTMOD=2012plus
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9613,7 +9613,7 @@ buildvariants:
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: rollback_fuzzer_gen
   - name: rollback_fuzzer_clean_shutdowns_gen
   - name: rollback_fuzzer_unclean_shutdowns_gen
@@ -9731,7 +9731,7 @@ buildvariants:
     push_arch: x86_64-enterprise-windows-64
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MERIZO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9790,7 +9790,7 @@ buildvariants:
   - name: jstestfuzz_replication_gen
   - name: jstestfuzz_sharded_gen
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gen
   - name: replica_sets_jscore_passthrough
@@ -9843,7 +9843,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     <<: *enterprise-windows-64-2k8-nopush-expansions-template
-    compile_flags: --release --ssl --ssl-provider=openssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl --ssl-provider=openssl MERIZO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
 
 - name: enterprise-windows-64-2k8-async
   display_name: "~ Enterprise Windows 2008R2 async"
@@ -9858,7 +9858,7 @@ buildvariants:
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MERIZO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9892,7 +9892,7 @@ buildvariants:
     exe: ".exe"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MERIZO_DISTMOD=windows-64 CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9969,7 +9969,7 @@ buildvariants:
     multiversion_platform: windows_x86_64-2008plus-ssl
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=2012plus -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MERIZO_DISTMOD=2012plus -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10040,7 +10040,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: multiversion_auth
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -10090,7 +10090,7 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2012plus CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --dbg=on --opt=off --ssl MERIZO_DISTMOD=2012plus CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -10202,7 +10202,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -10382,7 +10382,7 @@ buildvariants:
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --variables-files=etc/scons/xcode_macosx.vars
-      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/Frameworks'
       --lto
     cdriver_cmake_osx_deployment_target: "10.12"
     cdriver_cmake_flags: >-
@@ -10412,7 +10412,7 @@ buildvariants:
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --variables-files=etc/scons/xcode_ios.vars
-      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/Frameworks'
       --lto
     cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
@@ -10444,7 +10444,7 @@ buildvariants:
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --variables-files=etc/scons/xcode_ios_sim.vars
-      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/Frameworks'
       --lto
     cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
@@ -10479,7 +10479,7 @@ buildvariants:
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --variables-files=etc/scons/xcode_tvos.vars
-      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/Frameworks'
       --lto
     cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
@@ -10511,7 +10511,7 @@ buildvariants:
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --variables-files=etc/scons/xcode_tvos_sim.vars
-      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/Frameworks'
       --lto
     cdriver_cmake_osx_deployment_target: "11.0"
     cdriver_cmake_flags: >-
@@ -10546,7 +10546,7 @@ buildvariants:
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --variables-files=etc/scons/xcode_watchos.vars
-      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/Frameworks'
       --lto
     cdriver_cmake_osx_deployment_target: "4.2"
     cdriver_cmake_flags: >-
@@ -10578,7 +10578,7 @@ buildvariants:
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --variables-files=etc/scons/xcode_watchos_sim.vars
-      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      FRAMEWORKPATH='$BUILD_ROOT/merizo-embedded-sdk-$MERIZO_VERSION/Frameworks'
       --lto
     cdriver_cmake_osx_deployment_target: "4.2"
     cdriver_cmake_flags: >-
@@ -10625,7 +10625,7 @@ buildvariants:
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
-      LIBPATH="\$BUILD_ROOT/merizo-embedded-sdk-\$MONGO_VERSION/lib"
+      LIBPATH="\$BUILD_ROOT/merizo-embedded-sdk-\$MERIZO_VERSION/lib"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_C_COMPILER=/opt/merizodbtoolchain/v3/bin/gcc
@@ -10651,7 +10651,7 @@ buildvariants:
       --toolchain-root=$(dirname $(pwd))/android_toolchain-arm-21
       --variables-files=etc/scons/android_toolchain.vars
       LIBS=clang_rt.builtins-arm-android
-      LIBPATH="$(dirname $($(dirname $(pwd))/android_toolchain-arm-21/bin/clang -print-file-name=libclang_rt.builtins-arm-android.a)) \$BUILD_ROOT/merizo-embedded-sdk-\$MONGO_VERSION/lib"
+      LIBPATH="$(dirname $($(dirname $(pwd))/android_toolchain-arm-21/bin/clang -print-file-name=libclang_rt.builtins-arm-android.a)) \$BUILD_ROOT/merizo-embedded-sdk-\$MERIZO_VERSION/lib"
       --lto
       AR=$(dirname $(pwd))/android_toolchain-arm-21/bin/llvm-ar
     cdriver_cmake_flags: >-
@@ -10692,7 +10692,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --toolchain-root=$(dirname $(pwd))/android_toolchain-arm64-21
       --variables-files=etc/scons/android_toolchain.vars
-      LIBPATH="\$BUILD_ROOT/merizo-embedded-sdk-\$MONGO_VERSION/lib"
+      LIBPATH="\$BUILD_ROOT/merizo-embedded-sdk-\$MERIZO_VERSION/lib"
       --lto
       AR=$(dirname $(pwd))/android_toolchain-arm64-21/bin/llvm-ar
     cdriver_cmake_flags: >-
@@ -10733,7 +10733,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --toolchain-root=$(dirname $(pwd))/android_toolchain-x86_64-21
       --variables-files=etc/scons/android_toolchain.vars
-      LIBPATH="\$BUILD_ROOT/merizo-embedded-sdk-\$MONGO_VERSION/lib"
+      LIBPATH="\$BUILD_ROOT/merizo-embedded-sdk-\$MERIZO_VERSION/lib"
       --lto
       AR=$(dirname $(pwd))/android_toolchain-x86_64-21/bin/llvm-ar
     cdriver_cmake_flags: >-
@@ -10808,7 +10808,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel62
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     has_packages: true
@@ -10972,7 +10972,7 @@ buildvariants:
   - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -11073,7 +11073,7 @@ buildvariants:
       --ssl
       --release
       --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
-      MONGO_DISTMOD=rhel62
+      MERIZO_DISTMOD=rhel62
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     repo_edition: enterprise
@@ -11187,7 +11187,7 @@ buildvariants:
   - name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
   - name: multiversion
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -11283,7 +11283,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --dbg=on --gcov --ssl MERIZO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.5  # Avoid starting too many merizod's
@@ -11376,7 +11376,7 @@ buildvariants:
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -11440,7 +11440,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -11509,7 +11509,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl --use-cpu-profiler MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl --use-cpu-profiler MERIZO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     additional_targets: dagger # If this moves to another variant, update the compile_all task
   tasks:
   - name: compile_all_run_unittests_TG
@@ -11528,7 +11528,7 @@ buildvariants:
   - rhel70
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
-    compile_flags: --ssl --use-cpu-profiler MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
+    compile_flags: --ssl --use-cpu-profiler MERIZO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars --enterprise-features=hot_backups
     has_packages: false
   tasks:
   - name: compile_all_run_unittests_TG
@@ -11541,7 +11541,7 @@ buildvariants:
   - ubuntu1604-test
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many merizod's
-    compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: MERIZO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     scons_cache_scope: shared
     tooltags: ""
     build_merizoreplay: true
@@ -11570,7 +11570,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-rhel62
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: targeted
     has_packages: true
@@ -11631,7 +11631,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -11680,7 +11680,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel70
     multiversion_edition: targeted
     has_packages: true
@@ -11729,7 +11729,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -11788,7 +11788,7 @@ buildvariants:
   - rhel76-test
   batchtime: 1440 # 1 day
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
   tasks:
   - name: compile_TG
     distros:
@@ -11807,7 +11807,7 @@ buildvariants:
   stepback: false
   expansions:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
-    compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_factor: 0.25
     has_packages: true
     packager_script: packager_enterprise.py
@@ -11883,7 +11883,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -11936,7 +11936,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -12010,7 +12010,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -12063,7 +12063,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   stepback: false
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
+    compile_flags: --ssl MERIZO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -12126,7 +12126,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -12176,7 +12176,7 @@ buildvariants:
   - rhel72-zseries-test
   batchtime: 1440 # 1 day
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x
@@ -12211,7 +12211,7 @@ buildvariants:
   - rhel67-zseries-test
   batchtime: 1440 # 1 day
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
+    compile_flags: --ssl MERIZO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x
@@ -12256,7 +12256,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1404
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -12317,7 +12317,7 @@ buildvariants:
     push_name: linux
     lang_environment: LANG=C
     push_arch: x86_64-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -12442,7 +12442,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -12505,7 +12505,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=suse12 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: s390x
@@ -12574,7 +12574,7 @@ buildvariants:
   - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -12629,7 +12629,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: s390x-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=suse12 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager.py
     packager_arch: s390x
@@ -12668,7 +12668,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -12715,7 +12715,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -12772,7 +12772,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian81
-    compile_flags: --ssl MONGO_DISTMOD=debian81 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=debian81 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -12831,7 +12831,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-debian81
-    compile_flags: --ssl MONGO_DISTMOD=debian81 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=debian81 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: debian81
     multiversion_edition: targeted
     has_packages: true
@@ -12878,7 +12878,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -12930,7 +12930,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian92
-    compile_flags: --ssl MONGO_DISTMOD=debian92 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=debian92 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -12992,7 +12992,7 @@ buildvariants:
     push_bucket: downloads.merizodb.org
     push_name: linux
     push_arch: x86_64-debian92
-    compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -13042,7 +13042,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -13097,7 +13097,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --storageEngine=biggie --excludeWithAnyTags=SERVER-38379,requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
-    compile_flags: MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: MERIZO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     tooltags: ""
@@ -13120,7 +13120,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions: &enterprise-rhel-62-64-bit-inmem-expansions
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MERIZO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     scons_cache_scope: shared
@@ -13253,7 +13253,7 @@ buildvariants:
   - name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   - name: merizosTest
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
@@ -13343,7 +13343,7 @@ buildvariants:
       --mobile-se=on
       --ssl=off
       --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
-      MONGO_DISTMOD=rhel62
+      MERIZO_DISTMOD=rhel62
     scons_cache_scope: shared
     build_merizoreplay: true
     additional_targets: merizoebench merizoed
@@ -13402,7 +13402,7 @@ buildvariants:
   - name: jstestfuzz_gen
   - name: jstestfuzz_concurrent_gen
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: powercycle_mobile
   - name: serial_run
   - name: session_jscore_passthrough
@@ -13425,7 +13425,7 @@ buildvariants:
         --release
         --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
         CCFLAGS="-march=armv8-a+crc -mtune=generic"
-        MONGO_DISTMOD=ubuntu1604
+        MERIZO_DISTMOD=ubuntu1604
     resmoke_jobs_max: 8 # Avoid starting too many merizod's on ARM test servers
     build_merizoreplay: true
     additional_targets: merizoebench merizoed
@@ -13454,7 +13454,7 @@ buildvariants:
   - name: jstestfuzz_gen
   - name: jstestfuzz_concurrent_gen
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: serial_run
   - name: session_jscore_passthrough
 
@@ -13532,7 +13532,7 @@ buildvariants:
   - name: jstestfuzz_gen
   - name: jstestfuzz_concurrent_gen
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: serial_run
   - name: session_jscore_passthrough
 
@@ -13606,7 +13606,7 @@ buildvariants:
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: bulk_gle_passthrough
   - name: parallel_gen
   - name: parallel_compatibility
@@ -13642,7 +13642,7 @@ buildvariants:
   stepback: false
   expansions:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
-    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --dbg=on --opt=on --ssl MERIZO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_factor: 0.25
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     tooltags: "ssl sasl"
@@ -13695,7 +13695,7 @@ buildvariants:
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
@@ -13736,7 +13736,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
+    compile_flags: --dbg=on --opt=on --ssl MERIZO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
     resmoke_jobs_max: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions
     tooltags: "ssl sasl"
@@ -13806,7 +13806,7 @@ buildvariants:
   - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   - name: merizosTest
   - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: parallel_gen
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
@@ -13956,7 +13956,7 @@ buildvariants:
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -14157,7 +14157,7 @@ buildvariants:
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -14318,7 +14318,7 @@ buildvariants:
   - name: merizosTest
   - name: multiversion_auth
   - name: multiversion
-  - name: noPassthroughWithMongod_gen
+  - name: noPassthroughWithMerizod_gen
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
@@ -14367,7 +14367,7 @@ buildvariants:
   expansions:
     lang_environment: LANG=C
     # We need --allocator=system here solely due to SERVER-27675
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars --link-model=dynamic --allocator=system
+    compile_flags: MERIZO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars --link-model=dynamic --allocator=system
     scons_cache_scope: shared
     scons_cache_mode: all
     tooltags: "ssl sasl"

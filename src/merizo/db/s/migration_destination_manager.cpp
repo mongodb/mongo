@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -106,7 +106,7 @@ std::string stateToString(MigrationDestinationManager::State state) {
         case MigrationDestinationManager::ABORT:
             return "abort";
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -203,15 +203,15 @@ BSONObj createTransferModsRequest(const NamespaceString& nss, const MigrationSes
 
 // Enabling / disabling these fail points pauses / resumes MigrateStatus::_go(), the thread which
 // receives a chunk migration from the donor.
-MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep1);
-MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep2);
-MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep3);
-MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep4);
-MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep5);
-MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
+MERIZO_FAIL_POINT_DEFINE(migrateThreadHangAtStep1);
+MERIZO_FAIL_POINT_DEFINE(migrateThreadHangAtStep2);
+MERIZO_FAIL_POINT_DEFINE(migrateThreadHangAtStep3);
+MERIZO_FAIL_POINT_DEFINE(migrateThreadHangAtStep4);
+MERIZO_FAIL_POINT_DEFINE(migrateThreadHangAtStep5);
+MERIZO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
 
-MONGO_FAIL_POINT_DEFINE(failMigrationLeaveOrphans);
-MONGO_FAIL_POINT_DEFINE(failMigrationReceivedOutOfRangeOperation);
+MERIZO_FAIL_POINT_DEFINE(failMigrationLeaveOrphans);
+MERIZO_FAIL_POINT_DEFINE(failMigrationReceivedOutOfRangeOperation);
 
 }  // namespace
 
@@ -707,7 +707,7 @@ void MigrationDestinationManager::_migrateThread() {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
     }
 
-    if (getState() != DONE && !MONGO_FAIL_POINT(failMigrationLeaveOrphans)) {
+    if (getState() != DONE && !MERIZO_FAIL_POINT(failMigrationLeaveOrphans)) {
         _forgetPending(opCtx.get(), ChunkRange(_min, _max));
     }
 
@@ -744,7 +744,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         cloneCollectionIndexesAndOptions(opCtx, _nss, _fromShard);
 
         timing.done(1);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep1);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep1);
     }
 
     auto fromShard =
@@ -770,7 +770,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         }
 
         timing.done(2);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep2);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep2);
     }
 
     {
@@ -864,9 +864,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         cloneDocumentsFromDonor(opCtx, insertBatchFn, fetchBatchFn);
 
         timing.done(3);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep3);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep3);
 
-        if (MONGO_FAIL_POINT(failMigrationLeaveOrphans)) {
+        if (MERIZO_FAIL_POINT(failMigrationLeaveOrphans)) {
             _setStateFail(str::stream() << "failing migration after cloning " << _numCloned
                                         << " docs due to failMigrationLeaveOrphans failpoint");
             return;
@@ -933,7 +933,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         }
 
         timing.done(4);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep4);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep4);
     }
 
     {
@@ -1008,7 +1008,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
         }
 
         timing.done(5);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep5);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep5);
     }
 
     _sessionMigration->join();
@@ -1020,7 +1020,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx) {
     setState(DONE);
 
     timing.done(6);
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep6);
+    MERIZO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep6);
 }
 
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
@@ -1051,8 +1051,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             BSONObj fullObj;
             if (Helpers::findById(opCtx, autoColl.getDb(), _nss.ns(), id, fullObj)) {
                 if (!isInRange(fullObj, _min, _max, _shardKeyPattern)) {
-                    if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
-                        MONGO_UNREACHABLE;
+                    if (MERIZO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
+                        MERIZO_UNREACHABLE;
                     }
                     continue;
                 }
@@ -1089,8 +1089,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
 
             // do not apply insert/update if doc does not belong to the chunk being migrated
             if (!isInRange(updatedDoc, _min, _max, _shardKeyPattern)) {
-                if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
-                    MONGO_UNREACHABLE;
+                if (MERIZO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
+                    MERIZO_UNREACHABLE;
                 }
                 continue;
             }

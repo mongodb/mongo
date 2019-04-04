@@ -39,19 +39,19 @@ namespace mozjs {
  * Wraps a Session in javascript
  *
  * Note that the install is private, so this class should only be constructible
- * from C++. Current callers are all via the Mongo object.
+ * from C++. Current callers are all via the Merizo object.
  */
 struct SessionInfo : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(end);
-        MONGO_DECLARE_JS_FUNCTION(getId);
-        MONGO_DECLARE_JS_FUNCTION(getTxnState);
-        MONGO_DECLARE_JS_FUNCTION(setTxnState);
-        MONGO_DECLARE_JS_FUNCTION(getTxnNumber);
-        MONGO_DECLARE_JS_FUNCTION(setTxnNumber);
-        MONGO_DECLARE_JS_FUNCTION(incrementTxnNumber);
+        MERIZO_DECLARE_JS_FUNCTION(end);
+        MERIZO_DECLARE_JS_FUNCTION(getId);
+        MERIZO_DECLARE_JS_FUNCTION(getTxnState);
+        MERIZO_DECLARE_JS_FUNCTION(setTxnState);
+        MERIZO_DECLARE_JS_FUNCTION(getTxnNumber);
+        MERIZO_DECLARE_JS_FUNCTION(setTxnNumber);
+        MERIZO_DECLARE_JS_FUNCTION(incrementTxnNumber);
     };
 
     static const JSFunctionSpec methods[8];

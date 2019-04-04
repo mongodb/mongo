@@ -10,7 +10,7 @@
 
     function transactionFn(isPrepared) {
         const collName = 'currentop_active_transaction';
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDB = session.getDatabase('test');
 
         session.startTransaction({readConcern: {level: 'snapshot'}});

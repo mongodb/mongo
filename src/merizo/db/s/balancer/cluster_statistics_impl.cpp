@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -52,13 +52,13 @@ const char kVersionField[] = "version";
 
 /**
  * Executes the serverStatus command against the specified shard and obtains the version of the
- * running MongoD service.
+ * running MerizoD service.
  *
- * Returns the MongoD version in strig format or an error. Known error codes are:
+ * Returns the MerizoD version in strig format or an error. Known error codes are:
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the version could not be retrieved
  */
-StatusWith<std::string> retrieveShardMongoDVersion(OperationContext* opCtx, ShardId shardId) {
+StatusWith<std::string> retrieveShardMerizoDVersion(OperationContext* opCtx, ShardId shardId) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto shardStatus = shardRegistry->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
@@ -135,7 +135,7 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(Operati
 
         std::string merizoDVersion;
 
-        auto merizoDVersionStatus = retrieveShardMongoDVersion(opCtx, shard.getName());
+        auto merizoDVersionStatus = retrieveShardMerizoDVersion(opCtx, shard.getName());
         if (merizoDVersionStatus.isOK()) {
             merizoDVersion = std::move(merizoDVersionStatus.getValue());
         } else {

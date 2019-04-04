@@ -9,7 +9,7 @@
     const failpoint = 'hangAfterStartingIndexBuildUnlocked';
     assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));
 
-    const conn = db.getMongo();
+    const conn = db.getMerizo();
 
     const collName = 'collStats';
     const coll = db.getCollection(collName);

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -49,8 +49,8 @@ namespace repl {
 
 Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
 
-MONGO_FAIL_POINT_DEFINE(stopReplProducer);
-MONGO_FAIL_POINT_DEFINE(stopReplProducerOnDocument);
+MERIZO_FAIL_POINT_DEFINE(stopReplProducer);
+MERIZO_FAIL_POINT_DEFINE(stopReplProducerOnDocument);
 
 namespace {
 
@@ -383,14 +383,14 @@ StatusWith<BSONObj> OplogFetcher::_onSuccessfulBatch(const Fetcher::QueryRespons
     // Stop fetching and return on fail point.
     // This fail point makes the oplog fetcher ignore the downloaded batch of operations and not
     // error out. The FailPointEnabled error will be caught by the AbstractOplogFetcher.
-    if (MONGO_FAIL_POINT(stopReplProducer)) {
+    if (MERIZO_FAIL_POINT(stopReplProducer)) {
         return Status(ErrorCodes::FailPointEnabled, "stopReplProducer fail point is enabled");
     }
 
     // Stop fetching and return when we reach a particular document. This failpoint should be used
     // with the setParameter bgSyncOplogFetcherBatchSize=1, so that documents are fetched one at a
     // time.
-    MONGO_FAIL_POINT_BLOCK(stopReplProducerOnDocument, fp) {
+    MERIZO_FAIL_POINT_BLOCK(stopReplProducerOnDocument, fp) {
         if (!queryResponse.documents.empty() &&
             SimpleBSONObjComparator::kInstance.evaluate(
                 fp.getData()["document"].Obj() == queryResponse.documents.front()["o"].Obj())) {

@@ -13,7 +13,7 @@
     assert.commandWorked(cmdLineOpts);
 
     // The initial sync hooks only work for replica sets.
-    var rst = new ReplSetTest(db.getMongo().host);
+    var rst = new ReplSetTest(db.getMerizo().host);
 
     // Call getPrimary to populate rst with information about the nodes.
     var primary = rst.getPrimary();

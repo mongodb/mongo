@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -183,7 +183,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // since a merizos may forward a change stream in an invalid position (e.g. in a nested $lookup
     // or $facet pipeline). In this case, merizod is responsible for parsing the pipeline and
     // throwing an error without ever executing the change stream.
-    if (pExpCtx->fromMongos) {
+    if (pExpCtx->fromMerizos) {
         invariant(pExpCtx->needsMerge);
     }
 
@@ -312,7 +312,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                                           input[repl::OplogEntry::kObject2FieldName]}});
             break;
         }
-        default: { MONGO_UNREACHABLE; }
+        default: { MERIZO_UNREACHABLE; }
     }
 
     // UUID should always be present except for invalidate and dropDatabase entries.
@@ -373,7 +373,7 @@ Value DocumentSourceChangeStreamTransform::serialize(
     Document changeStreamOptions(_changeStreamSpec);
     // If we're on a merizos and no other start time is specified, we want to start at the current
     // cluster time on the merizos.  This ensures all shards use the same start time.
-    if (pExpCtx->inMongos &&
+    if (pExpCtx->inMerizos &&
         changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterFieldName].missing() &&
         changeStreamOptions[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName]
             .missing() &&
@@ -463,7 +463,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::getNext() {
     uassert(50988,
             "Illegal attempt to execute an internal change stream stage on merizos. A $changeStream "
             "stage must be the first stage in a pipeline",
-            !pExpCtx->inMongos);
+            !pExpCtx->inMerizos);
 
     while (1) {
         // If we're unwinding an 'applyOps' from a transaction, check if there are any documents we

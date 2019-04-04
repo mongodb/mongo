@@ -191,7 +191,7 @@ func (socket *merizoSocket) Login(cred Credential) error {
 		case maxWire >= 3:
 			cred.Mechanism = "SCRAM-SHA-1"
 		default:
-			cred.Mechanism = "MONGODB-CR"
+			cred.Mechanism = "MERIZODB-CR"
 		}
 	}
 
@@ -215,11 +215,11 @@ func (socket *merizoSocket) Login(cred Credential) error {
 
 	var err error
 	switch cred.Mechanism {
-	case "MONGODB-CR", "MONGO-CR": // Name changed to MONGODB-CR in SERVER-8501.
+	case "MERIZODB-CR", "MONGO-CR": // Name changed to MERIZODB-CR in SERVER-8501.
 		err = socket.loginClassic(cred)
 	case "PLAIN":
 		err = socket.loginPlain(cred)
-	case "MONGODB-X509":
+	case "MERIZODB-X509":
 		err = socket.loginX509(cred)
 	default:
 		// Try SASL for everything else, if it is available.
@@ -296,7 +296,7 @@ type authX509Cmd struct {
 }
 
 func (socket *merizoSocket) loginX509(cred Credential) error {
-	cmd := authX509Cmd{Authenticate: 1, User: cred.Username, Mechanism: "MONGODB-X509"}
+	cmd := authX509Cmd{Authenticate: 1, User: cred.Username, Mechanism: "MERIZODB-X509"}
 	res := authResult{}
 	return socket.loginRun(cred.Source, &cmd, &res, func() error {
 		if !res.Ok {

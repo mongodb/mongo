@@ -42,7 +42,7 @@
 #include "merizo/util/uuid.h"
 
 #define LOG_CATALOG_REFRESH(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kShardingCatalogRefresh)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kShardingCatalogRefresh)
 
 namespace merizo {
 

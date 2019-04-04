@@ -41,13 +41,13 @@ using std::string;
 
 namespace {
 
-const char kMongosRemoveShardFromZone[] = "removeShardFromZone";
+const char kMerizosRemoveShardFromZone[] = "removeShardFromZone";
 const char kConfigsvrRemoveShardFromZone[] = "_configsvrRemoveShardFromZone";
 const char kZoneName[] = "zone";
 
 }  // unnamed namespace
 
-StatusWith<RemoveShardFromZoneRequest> RemoveShardFromZoneRequest::parseFromMongosCommand(
+StatusWith<RemoveShardFromZoneRequest> RemoveShardFromZoneRequest::parseFromMerizosCommand(
     const BSONObj& cmdObj) {
     return _parseFromCommand(cmdObj, true);
 }
@@ -66,11 +66,11 @@ RemoveShardFromZoneRequest::RemoveShardFromZoneRequest(string shardName, string 
     : _shardName(std::move(shardName)), _zoneName(std::move(zoneName)) {}
 
 StatusWith<RemoveShardFromZoneRequest> RemoveShardFromZoneRequest::_parseFromCommand(
-    const BSONObj& cmdObj, bool forMongos) {
+    const BSONObj& cmdObj, bool forMerizos) {
     string shardName;
     auto parseShardNameStatus = bsonExtractStringField(
         cmdObj,
-        (forMongos ? kMongosRemoveShardFromZone : kConfigsvrRemoveShardFromZone),
+        (forMerizos ? kMerizosRemoveShardFromZone : kConfigsvrRemoveShardFromZone),
         &shardName);
 
     if (!parseShardNameStatus.isOK()) {

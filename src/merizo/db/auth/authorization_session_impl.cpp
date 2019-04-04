@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -61,7 +61,7 @@ namespace merizo {
 namespace dps = ::merizo::dotted_path_support;
 using std::vector;
 
-MONGO_REGISTER_SHIM(AuthorizationSession::create)
+MERIZO_REGISTER_SHIM(AuthorizationSession::create)
 (AuthorizationManager* authzManager)->std::unique_ptr<AuthorizationSession> {
     return std::make_unique<AuthorizationSessionImpl>(
         AuthzSessionExternalState::create(authzManager),
@@ -78,7 +78,7 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
                                       const NamespaceString& viewNs,
                                       const NamespaceString& viewOnNs,
                                       const BSONArray& viewPipeline,
-                                      bool isMongos) {
+                                      bool isMerizos) {
     // It's safe to allow a user to create or modify a view if they can't read it anyway.
     if (!authzSession->isAuthorizedForActionsOnNamespace(viewNs, ActionType::find)) {
         return Status::OK();
@@ -90,7 +90,7 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
     auto statusWithPrivs = authzSession->getPrivilegesForAggregate(
         viewOnNs,
         BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()),
-        isMongos);
+        isMerizos);
     PrivilegeVector privileges = uassertStatusOK(statusWithPrivs);
     if (!authzSession->isAuthorizedForPrivileges(privileges)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
@@ -253,7 +253,7 @@ PrivilegeVector AuthorizationSessionImpl::getDefaultPrivileges() {
 }
 
 StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
-    const NamespaceString& nss, const BSONObj& cmdObj, bool isMongos) {
+    const NamespaceString& nss, const BSONObj& cmdObj, bool isMerizos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
                       merizoutils::str::stream() << "Invalid input namespace, " << nss.ns());
@@ -295,14 +295,14 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
     // Confirm privileges for the pipeline.
     for (auto&& pipelineStage : pipeline) {
         liteParsedDocSource = LiteParsedDocumentSource::parse(aggRequest, pipelineStage);
-        PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(isMongos);
+        PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(isMerizos);
         Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);
     }
     return privileges;
 }
 
 Status AuthorizationSessionImpl::checkAuthForFind(const NamespaceString& ns, bool hasTerm) {
-    if (MONGO_unlikely(ns.isCommand())) {
+    if (MERIZO_unlikely(ns.isCommand())) {
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Checking query auth on command namespace " << ns.ns());
     }
@@ -424,7 +424,7 @@ Status AuthorizationSessionImpl::checkAuthForKillCursors(const NamespaceString& 
 
 Status AuthorizationSessionImpl::checkAuthForCreate(const NamespaceString& ns,
                                                     const BSONObj& cmdObj,
-                                                    bool isMongos) {
+                                                    bool isMerizos) {
     if (cmdObj["capped"].trueValue() &&
         !isAuthorizedForActionsOnNamespace(ns, ActionType::convertToCapped)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
@@ -446,7 +446,7 @@ Status AuthorizationSessionImpl::checkAuthForCreate(const NamespaceString& ns,
         NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
         auto pipeline =
             cmdObj.hasField("pipeline") ? BSONArray(cmdObj["pipeline"].Obj()) : BSONArray();
-        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, pipeline, isMongos);
+        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, pipeline, isMerizos);
     }
 
     // To create a regular collection, ActionType::createCollection or ActionType::insert are
@@ -460,7 +460,7 @@ Status AuthorizationSessionImpl::checkAuthForCreate(const NamespaceString& ns,
 
 Status AuthorizationSessionImpl::checkAuthForCollMod(const NamespaceString& ns,
                                                      const BSONObj& cmdObj,
-                                                     bool isMongos) {
+                                                     bool isMerizos) {
     if (!isAuthorizedForActionsOnNamespace(ns, ActionType::collMod)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
@@ -479,7 +479,7 @@ Status AuthorizationSessionImpl::checkAuthForCollMod(const NamespaceString& ns,
     if (hasViewOn) {
         NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
         auto viewPipeline = BSONArray(cmdObj["pipeline"].Obj());
-        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, viewPipeline, isMongos);
+        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, viewPipeline, isMerizos);
     }
 
     return Status::OK();

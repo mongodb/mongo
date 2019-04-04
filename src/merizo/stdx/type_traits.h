@@ -33,7 +33,7 @@
 
 #include "merizo/config.h"
 
-#if defined(MONGO_CONFIG_HAVE_STD_ENABLE_IF_T)
+#if defined(MERIZO_CONFIG_HAVE_STD_ENABLE_IF_T)
 
 namespace merizo {
 namespace stdx {

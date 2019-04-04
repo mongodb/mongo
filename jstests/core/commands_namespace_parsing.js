@@ -53,7 +53,7 @@
 
     const isMaster = db.runCommand("ismaster");
     assert.commandWorked(isMaster);
-    const isMongos = (isMaster.msg === "isdbgrid");
+    const isMerizos = (isMaster.msg === "isdbgrid");
 
     db.commands_namespace_parsing.drop();
     assert.writeOK(db.commands_namespace_parsing.insert({a: 1}));
@@ -99,7 +99,7 @@
                                              isNotFullyQualified,
                                              isNotAdminCommand);
 
-    if (!isMongos) {
+    if (!isMerizos) {
         // Test geoSearch fails with an invalid collection name.
         assertFailsWithInvalidNamespacesForField(
             "geoSearch",
@@ -142,7 +142,7 @@
                                              isNotFullyQualified,
                                              isNotAdminCommand);
 
-    if (!isMongos) {
+    if (!isMerizos) {
         // Test godinsert fails with an invalid collection name.
         assertFailsWithInvalidNamespacesForField(
             "godinsert", {godinsert: "", obj: {_id: 1}}, isNotFullyQualified, isNotAdminCommand);
@@ -180,13 +180,13 @@
     assertFailsWithInvalidNamespacesForField(
         "planCacheClear", {planCacheClear: ""}, isNotFullyQualified, isNotAdminCommand);
 
-    if (!isMongos) {
+    if (!isMerizos) {
         // Test cleanupOrphaned fails with an invalid collection name.
         assertFailsWithInvalidNamespacesForField(
             "cleanupOrphaned", {cleanupOrphaned: ""}, isFullyQualified, isAdminCommand);
     }
 
-    if (isMongos) {
+    if (isMerizos) {
         // Test enableSharding fails with an invalid database name.
         assertFailsWithInvalidNamespacesForField(
             "enableSharding", {enableSharding: ""}, isNotFullyQualified, isAdminCommand);
@@ -242,7 +242,7 @@
     assertFailsWithInvalidNamespacesForField(
         "create", {create: ""}, isNotFullyQualified, isNotAdminCommand);
 
-    if (!isMongos) {
+    if (!isMerizos) {
         // Test cloneCollection fails with an invalid collection name.
         assertFailsWithInvalidNamespacesForField("cloneCollection",
                                                  {cloneCollection: "", from: "fakehost"},
@@ -291,7 +291,7 @@
     assertFailsWithInvalidNamespacesForField(
         "dropIndexes", {dropIndexes: "", index: "*"}, isNotFullyQualified, isNotAdminCommand);
 
-    if (!isMongos) {
+    if (!isMerizos) {
         // Test compact fails with an invalid collection name.
         assertFailsWithInvalidNamespacesForField(
             "compact", {compact: ""}, isNotFullyQualified, isNotAdminCommand);
@@ -305,7 +305,7 @@
         isNotAdminCommand);
 
     // Test reIndex fails with an invalid collection name.
-    if (!isMongos) {
+    if (!isMerizos) {
         assertFailsWithInvalidNamespacesForField(
             "reIndex", {reIndex: ""}, isNotFullyQualified, isNotAdminCommand);
     }

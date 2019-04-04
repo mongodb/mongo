@@ -5,7 +5,7 @@
 
     load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const testDB = session.getDatabase("test");
     const coll = testDB.getCollection("aggregation_in_transaction");
     const foreignColl = testDB.getCollection("aggregation_in_transaction_lookup");

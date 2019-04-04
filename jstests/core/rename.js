@@ -1,6 +1,6 @@
 // @tags: [requires_non_retryable_commands, requires_fastcount, requires_capped]
 
-admin = db.getMongo().getDB("admin");
+admin = db.getMerizo().getDB("admin");
 
 a = db.jstests_rename_a;
 b = db.jstests_rename_b;

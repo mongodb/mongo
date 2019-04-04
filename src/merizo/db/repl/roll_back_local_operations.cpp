@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
 
 #include "merizo/platform/basic.h"
 
@@ -45,10 +45,10 @@ namespace repl {
 // functionality for rs_rollback_no_uuid.cpp. See SERVER-29766.
 
 // Failpoint which causes rollback to hang before finishing.
-MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeFinish);
+MERIZO_FAIL_POINT_DEFINE(rollbackHangBeforeFinish);
 
 // Failpoint which causes rollback to hang and then fail after minValid is written.
-MONGO_FAIL_POINT_DEFINE(rollbackHangThenFailAfterWritingMinValid);
+MERIZO_FAIL_POINT_DEFINE(rollbackHangThenFailAfterWritingMinValid);
 
 
 namespace {

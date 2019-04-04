@@ -47,7 +47,7 @@ using unittest::assertGet;
 
 const BSONObj kNestedOplog(BSON("$sessionMigrateInfo" << 1));
 
-using WriteOpsRetryability = ServiceContextMongoDTest;
+using WriteOpsRetryability = ServiceContextMerizoDTest;
 
 /**
  * Creates OplogEntry with given field values.

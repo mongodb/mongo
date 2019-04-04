@@ -33,7 +33,7 @@
 
 #include "merizo/config.h"
 
-#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#if defined(MERIZO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 
@@ -63,11 +63,11 @@
 #include <sanitizer/lsan_interface.h>
 #endif
 
-#if defined(MONGO_CPU_PROFILER)
+#if defined(MERIZO_CPU_PROFILER)
 #include <gperftools/profiler.h>
 #endif
 
-#ifdef MONGO_GCOV
+#ifdef MERIZO_GCOV
 extern "C" void __gcov_flush();
 #endif
 
@@ -83,11 +83,11 @@ void quickExit(int code) {
     if (quickExitMutex)
         quickExitMutex->lock();
 
-#if defined(MONGO_CPU_PROFILER)
+#if defined(MERIZO_CPU_PROFILER)
     ::ProfilerStop();
 #endif
 
-#ifdef MONGO_GCOV
+#ifdef MERIZO_GCOV
     __gcov_flush();
 #endif
 

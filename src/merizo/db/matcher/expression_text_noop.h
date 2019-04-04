@@ -43,7 +43,7 @@ public:
     }
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final;

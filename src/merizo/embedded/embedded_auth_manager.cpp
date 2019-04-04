@@ -149,7 +149,7 @@ private:
 }  // namespace
 }  // namespace embedded
 
-MONGO_REGISTER_SHIM(AuthorizationManager::create)()->std::unique_ptr<AuthorizationManager> {
+MERIZO_REGISTER_SHIM(AuthorizationManager::create)()->std::unique_ptr<AuthorizationManager> {
     return std::make_unique<embedded::AuthorizationManager>();
 }
 }  // namespace merizo

@@ -45,7 +45,7 @@ Status parseCommandLineOptions(int argc,
                                char* argv[],
                                const optionenvironment::OptionSection& startupOptions) {
     // We manually run the options parsing code that's equivalent to the logic in the
-    // MONGO_INITIALIZERs for merizod. We cannot do this in initializers because embedded uses a
+    // MERIZO_INITIALIZERs for merizod. We cannot do this in initializers because embedded uses a
     // different options format and we therefore need to have parsed the command line options before
     // embedded::initialize() is called. However, as long as we store the options in the same place
     // they will be valid for embedded too.

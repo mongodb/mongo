@@ -19,7 +19,7 @@ func TestSkipCollection(t *testing.T) {
 
 	Convey("With a merizodump that excludes collections 'test' and 'fake'"+
 		" and excludes prefixes 'pre-' and 'no'", t, func() {
-		md := &MongoDump{
+		md := &MerizoDump{
 			OutputOptions: &OutputOptions{
 				ExcludedCollections:        []string{"test", "fake"},
 				ExcludedCollectionPrefixes: []string{"pre-", "no"},

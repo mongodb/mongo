@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -179,7 +179,7 @@
 
 #include "merizo/db/storage/flow_control.h"
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 #include "merizo/util/net/ssl_options.h"
 #endif
 
@@ -258,7 +258,7 @@ void initWireSpec() {
     spec.isInternalClient = true;
 }
 
-MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
+MERIZO_FAIL_POINT_DEFINE(shutdownAtStartup);
 
 ExitCode _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
@@ -308,7 +308,7 @@ ExitCode _initAndListen(int listenPort) {
     logProcessDetails();
 
     serviceContext->setServiceEntryPoint(
-        stdx::make_unique<ServiceEntryPointMongod>(serviceContext));
+        stdx::make_unique<ServiceEntryPointMerizod>(serviceContext));
 
     if (!storageGlobalParams.repair) {
         auto tl =
@@ -332,7 +332,7 @@ ExitCode _initAndListen(int listenPort) {
 
     initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
 
-#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
+#ifdef MERIZO_CONFIG_WIREDTIGER_ENABLED
     if (EncryptionHooks::get(serviceContext)->restartRequired()) {
         exitCleanly(EXIT_CLEAN);
     }
@@ -375,12 +375,12 @@ ExitCode _initAndListen(int listenPort) {
         exitCleanly(EXIT_BADOPTIONS);
     }
 
-    logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, serviceContext);
+    logMerizodStartupWarnings(storageGlobalParams, serverGlobalParams, serviceContext);
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (sslGlobalParams.sslAllowInvalidCertificates &&
         ((serverGlobalParams.clusterAuthMode.load() == ServerGlobalParams::ClusterAuthMode_x509) ||
-         sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))) {
+         sequenceContains(saslGlobalParams.authenticationMechanisms, "MERIZODB-X509"))) {
         log() << "** WARNING: While invalid X509 certificates may be used to" << startupWarningsLog;
         log() << "**          connect to this server, they will not be considered"
               << startupWarningsLog;
@@ -480,7 +480,7 @@ ExitCode _initAndListen(int listenPort) {
         }
 
         if (foundSchemaVersion <= AuthorizationManager::schemaVersion26Final) {
-            log() << "This server is using MONGODB-CR, an authentication mechanism which "
+            log() << "This server is using MERIZODB-CR, an authentication mechanism which "
                   << "has been removed from MerizoDB 4.0. In order to upgrade the auth schema, "
                   << "first downgrade MerizoDB binaries to version 3.6 and then run the "
                   << "authSchemaUpgrade command. "
@@ -503,7 +503,7 @@ ExitCode _initAndListen(int listenPort) {
     }
 
     // This function may take the global lock.
-    auto shardingInitialized = ShardingInitializationMongoD::get(startupOpCtx.get())
+    auto shardingInitialized = ShardingInitializationMerizoD::get(startupOpCtx.get())
                                    ->initializeShardingAwarenessIfNeeded(startupOpCtx.get());
     if (shardingInitialized) {
         waitForShardRegistryReload(startupOpCtx.get()).transitional_ignore();
@@ -519,7 +519,7 @@ ExitCode _initAndListen(int listenPort) {
             logStartup(startupOpCtx.get());
         }
 
-        startMongoDFTDC();
+        startMerizoDFTDC();
 
         startFreeMonitoring(serviceContext);
 
@@ -538,7 +538,7 @@ ExitCode _initAndListen(int listenPort) {
                 }
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            initializeGlobalShardingStateForMongoD(startupOpCtx.get(),
+            initializeGlobalShardingStateForMerizoD(startupOpCtx.get(),
                                                    ConnectionString::forLocal(),
                                                    kDistLockProcessIdForConfigServer);
 
@@ -655,12 +655,12 @@ ExitCode _initAndListen(int listenPort) {
     }
 #endif
 
-    if (MONGO_FAIL_POINT(shutdownAtStartup)) {
+    if (MERIZO_FAIL_POINT(shutdownAtStartup)) {
         log() << "starting clean exit via failpoint";
         exitCleanly(EXIT_CLEAN);
     }
 
-    MONGO_IDLE_THREAD_BLOCK;
+    MERIZO_IDLE_THREAD_BLOCK;
     return waitForShutdown();
 }
 
@@ -688,7 +688,7 @@ ExitCode initService() {
 }
 #endif
 
-MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
+MERIZO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     merizo::forkServerOrDie();
     return Status::OK();
@@ -713,13 +713,13 @@ void startupConfigActions(const std::vector<std::string>& args) {
 
         if (command[0].compare("run") != 0) {
             std::cout << "Invalid command: " << command[0] << endl;
-            printMongodHelp(moe::startupOptions);
+            printMerizodHelp(moe::startupOptions);
             quickExit(EXIT_FAILURE);
         }
 
         if (command.size() > 1) {
             std::cout << "Too many parameters to 'run' command" << endl;
-            printMongodHelp(moe::startupOptions);
+            printMerizodHelp(moe::startupOptions);
             quickExit(EXIT_FAILURE);
         }
     }
@@ -838,11 +838,11 @@ void setUpReplication(ServiceContext* serviceContext) {
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName(serviceContext);
 
-    IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
+    IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMerizod>());
 }
 
-#ifdef MONGO_CONFIG_SSL
-MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))
+#ifdef MERIZO_CONFIG_SSL
+MERIZO_INITIALIZER_GENERAL(setSSLManagerType, MERIZO_NO_PREREQUISITES, ("SSLManager"))
 (InitializerContext* context) {
     isSSLServer = true;
     return Status::OK();
@@ -921,7 +921,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // it is building an index.
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
 
-        ShardingInitializationMongoD::get(serviceContext)->shutDown(opCtx);
+        ShardingInitializationMerizoD::get(serviceContext)->shutDown(opCtx);
 
         // Acquire the RSTL in mode X. First we enqueue the lock request, then kill all operations,
         // destroy all stashed transaction resources in order to release locks, and finally wait
@@ -980,7 +980,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     stopFreeMonitoring();
 
     // Shutdown Full-Time Data Capture
-    stopMongoDFTDC();
+    stopMerizoDFTDC();
 
     HealthLog::get(serviceContext).shutdown();
 
@@ -1038,7 +1038,7 @@ int merizoDbMain(int argc, char* argv[], char** envp) {
     auto service = getGlobalServiceContext();
     setUpCatalog(service);
     setUpReplication(service);
-    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
+    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMerizod>(service));
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

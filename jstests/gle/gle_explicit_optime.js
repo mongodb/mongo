@@ -34,7 +34,7 @@ printjson(opTimeAfterFailure);
 printjson(primary.getDB("admin").runCommand({replSetGetStatus: true}));
 
 // Create a new connection with new client and no opTime
-var newClientConn = new Mongo(primary.host);
+var newClientConn = new Merizo(primary.host);
 
 // New client has no set opTime, so w : 2 has no impact
 gleObj = newClientConn.getCollection(coll.toString()).getDB().getLastErrorObj(2);  // w : 2

@@ -1,7 +1,7 @@
 /**
  * Tests that logged users will not show up in the log.
  *
- * @param merizo {Mongo} connection object.
+ * @param merizo {Merizo} connection object.
  * @tags: [requires_sharding]
  */
 var doTest = function(merizo, callSetParam) {
@@ -31,9 +31,9 @@ var doTest = function(merizo, callSetParam) {
     });
 };
 
-var merizo = MongoRunner.runMongod({verbose: 5});
+var merizo = MerizoRunner.runMerizod({verbose: 5});
 doTest(merizo);
-MongoRunner.stopMongod(merizo);
+MerizoRunner.stopMerizod(merizo);
 
 var st = new ShardingTest({shards: 1, verbose: 5});
 doTest(st.s);

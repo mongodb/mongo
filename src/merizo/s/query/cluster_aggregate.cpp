@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -83,8 +83,8 @@ namespace merizo {
 
 using SplitPipeline = cluster_aggregation_planner::SplitPipeline;
 
-MONGO_FAIL_POINT_DEFINE(clusterAggregateFailToEstablishMergingShardCursor);
-MONGO_FAIL_POINT_DEFINE(clusterAggregateFailToDispatchExchangeConsumerPipeline);
+MERIZO_FAIL_POINT_DEFINE(clusterAggregateFailToEstablishMergingShardCursor);
+MERIZO_FAIL_POINT_DEFINE(clusterAggregateFailToDispatchExchangeConsumerPipeline);
 
 constexpr unsigned ClusterAggregate::kMaxViewRetries;
 
@@ -111,7 +111,7 @@ BSONObj createCommandForMergingShard(const AggregationRequest& request,
     MutableDocument mergeCmd(request.serializeToCommandObj());
 
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
-    mergeCmd[AggregationRequest::kFromMongosName] = Value(true);
+    mergeCmd[AggregationRequest::kFromMerizosName] = Value(true);
 
     mergeCmd[AggregationRequest::kRuntimeConstants] =
         Value(mergeCtx->getRuntimeConstants().toBSON());
@@ -148,7 +148,7 @@ sharded_agg_helpers::DispatchShardPipelineResults dispatchExchangeConsumerPipeli
     invariant(!litePipe.hasChangeStream());
     auto opCtx = expCtx->opCtx;
 
-    if (MONGO_FAIL_POINT(clusterAggregateFailToDispatchExchangeConsumerPipeline)) {
+    if (MERIZO_FAIL_POINT(clusterAggregateFailToDispatchExchangeConsumerPipeline)) {
         log() << "clusterAggregateFailToDispatchExchangeConsumerPipeline fail point enabled.";
         uasserted(ErrorCodes::FailPointEnabled,
                   "Asserting on exhange consumer pipeline dispatch due to failpoint.");
@@ -236,7 +236,7 @@ Status appendExplainResults(sharded_agg_helpers::DispatchShardPipelineResults&& 
     if (dispatchResults.splitPipeline) {
         auto* mergePipeline = dispatchResults.splitPipeline->mergePipeline.get();
         const char* mergeType = [&]() {
-            if (mergePipeline->canRunOnMongos()) {
+            if (mergePipeline->canRunOnMerizos()) {
                 return "merizos";
             } else if (dispatchResults.exchangeSpec) {
                 return "exchange";
@@ -302,7 +302,7 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
                                                           const AggregationRequest& request,
                                                           const BSONObj mergeCmdObj,
                                                           const ShardId& mergingShardId) {
-    if (MONGO_FAIL_POINT(clusterAggregateFailToEstablishMergingShardCursor)) {
+    if (MERIZO_FAIL_POINT(clusterAggregateFailToEstablishMergingShardCursor)) {
         log() << "clusterAggregateFailToEstablishMergingShardCursor fail point enabled.";
         uasserted(ErrorCodes::FailPointEnabled,
                   "Asserting on establishing merging shard cursor due to failpoint.");
@@ -320,7 +320,7 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
     return response;
 }
 
-BSONObj establishMergingMongosCursor(OperationContext* opCtx,
+BSONObj establishMergingMerizosCursor(OperationContext* opCtx,
                                      const AggregationRequest& request,
                                      const NamespaceString& requestedNss,
                                      const LiteParsedPipeline& liteParsedPipeline,
@@ -568,7 +568,7 @@ auto resolveInvolvedNamespaces(OperationContext* opCtx, const LiteParsedPipeline
 }
 
 // Build an appropriate ExpressionContext for the pipeline. This helper instantiates an appropriate
-// collator, creates a MongoProcessInterface for use by the pipeline's stages, and optionally
+// collator, creates a MerizoProcessInterface for use by the pipeline's stages, and optionally
 // extracts the UUID from the collection info if present.
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
@@ -585,22 +585,22 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationObj));
     }
 
-    // Create the expression context, and set 'inMongos' to true. We explicitly do *not* set
+    // Create the expression context, and set 'inMerizos' to true. We explicitly do *not* set
     // mergeCtx->tempDir.
     auto mergeCtx = new ExpressionContext(opCtx,
                                           request,
                                           std::move(collation),
-                                          std::make_shared<MongoSInterface>(),
+                                          std::make_shared<MerizoSInterface>(),
                                           std::move(resolvedNamespaces),
                                           uuid);
 
-    mergeCtx->inMongos = true;
+    mergeCtx->inMerizos = true;
     return mergeCtx;
 }
 
 // Runs a pipeline on merizoS, having first validated that it is eligible to do so. This can be a
 // pipeline which is split for merging, or an intact pipeline which must run entirely on merizoS.
-Status runPipelineOnMongoS(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+Status runPipelineOnMerizoS(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            const ClusterAggregate::Namespaces& namespaces,
                            const AggregationRequest& request,
                            const LiteParsedPipeline& litePipe,
@@ -609,7 +609,7 @@ Status runPipelineOnMongoS(const boost::intrusive_ptr<ExpressionContext>& expCtx
                            const PrivilegeVector& privileges) {
     // We should never receive a pipeline which cannot run on merizoS.
     invariant(!expCtx->explain);
-    invariant(pipeline->canRunOnMongos());
+    invariant(pipeline->canRunOnMerizos());
 
     const auto& requestedNss = namespaces.requestedNss;
     const auto opCtx = expCtx->opCtx;
@@ -622,7 +622,7 @@ Status runPipelineOnMongoS(const boost::intrusive_ptr<ExpressionContext>& expCtx
             !pipeline->getSources().front()->constraints().requiresInputDocSource);
 
     // Register the new merizoS cursor, and retrieve the initial batch of results.
-    auto cursorResponse = establishMergingMongosCursor(
+    auto cursorResponse = establishMergingMerizosCursor(
         opCtx, request, requestedNss, litePipe, std::move(pipeline), privileges);
 
     // We don't need to storePossibleCursor or propagate writeConcern errors; an $out pipeline
@@ -662,10 +662,10 @@ Status dispatchMergingPipeline(
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
 
     // First, check whether we can merge on the merizoS. If the merge pipeline MUST run on merizoS,
-    // then ignore the internalQueryProhibitMergingOnMongoS parameter.
-    if (mergePipeline->requiredToRunOnMongos() ||
-        (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnMongos())) {
-        return runPipelineOnMongoS(expCtx,
+    // then ignore the internalQueryProhibitMergingOnMerizoS parameter.
+    if (mergePipeline->requiredToRunOnMerizos() ||
+        (!internalQueryProhibitMergingOnMerizoS.load() && mergePipeline->canRunOnMerizos())) {
+        return runPipelineOnMerizoS(expCtx,
                                    namespaces,
                                    request,
                                    litePipe,
@@ -739,11 +739,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     uassert(51089,
             str::stream() << "Internal parameter(s) [" << AggregationRequest::kNeedsMergeName
                           << ", "
-                          << AggregationRequest::kFromMongosName
+                          << AggregationRequest::kFromMerizosName
                           << ", "
                           << AggregationRequest::kMergeByPBRTName
                           << "] cannot be set to 'true' when sent to merizos",
-            !request.needsMerge() && !request.isFromMongos() && !request.mergeByPBRT());
+            !request.needsMerge() && !request.isFromMerizos() && !request.mergeByPBRT());
     auto executionNsRoutingInfoStatus =
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
     boost::optional<CachedCollectionRoutingInfo> routingInfo;
@@ -788,7 +788,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // 3. Does not need to run on all shards.
     // 4. Doesn't need transformation via DocumentSource::serialize().
     if (routingInfo && !routingInfo->cm() && !mustRunOnAll &&
-        litePipe.allowedToForwardFromMongos() && litePipe.allowedToPassthroughFromMongos() &&
+        litePipe.allowedToForwardFromMerizos() && litePipe.allowedToPassthroughFromMerizos() &&
         !involvesShardedCollections) {
         const auto primaryShardId = routingInfo->db().primary()->getId();
         return aggPassthrough(
@@ -801,7 +801,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     boost::optional<UUID> uuid = collInfo.second;
 
     // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
-    // resolves all involved namespaces, and creates a shared MongoProcessInterface for use by the
+    // resolves all involved namespaces, and creates a shared MerizoProcessInterface for use by the
     // pipeline's stages.
     auto expCtx = makeExpressionContext(
         opCtx, request, litePipe, collationObj, uuid, std::move(resolvedNamespaces));
@@ -811,7 +811,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     pipeline->optimizePipeline();
 
     // Check whether the entire pipeline must be run on merizoS.
-    if (pipeline->requiredToRunOnMongos()) {
+    if (pipeline->requiredToRunOnMerizos()) {
         // If this is an explain write the explain output and return.
         if (expCtx->explain) {
             *result << "splitPipeline" << BSONNULL << "merizos"
@@ -820,7 +820,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             return Status::OK();
         }
 
-        return runPipelineOnMongoS(
+        return runPipelineOnMerizoS(
             expCtx, namespaces, request, litePipe, std::move(pipeline), result, privileges);
     }
 
@@ -878,7 +878,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                                         const LiteParsedPipeline& liteParsedPipeline,
                                         const PrivilegeVector& privileges,
                                         BSONObjBuilder* out) {
-    // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
+    // Format the command for the shard. This adds the 'fromMerizos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     BSONObj cmdObj = CommandHelpers::filterCommandRequestForPassthrough(
         sharded_agg_helpers::createPassthroughCommandForShard(

@@ -447,7 +447,7 @@ Collator* U_EXPORT2 Collator::createInstance(const Locale& desiredLocale,
         // Either returns NULL with U_FAILURE(status), or non-NULL with U_SUCCESS(status)
     }
 
-    // MONGODB MODIFICATION
+    // MERIZODB MODIFICATION
     // Fix for SERVER-38348 by applying
     // https://github.com/unicode-org/icu/commit/643e8756c8f8d2a7f2ffe306467e28a9896d7986.
     // The use of *coll in setAttributesFromKeywords can cause causes the NULL check

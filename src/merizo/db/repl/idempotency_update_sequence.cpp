@@ -183,9 +183,9 @@ void UpdateSequenceGenerator::_appendSetArgToBuilder(const std::string& setPath,
             setArgBuilder->append(setPath, _generateDocToSet(setPath));
             return;
         case SetChoice::kNumTotalSetChoices:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 BSONObj UpdateSequenceGenerator::_generateUnset() const {

@@ -209,7 +209,7 @@ void RamLog::getNames(std::vector<string>& names) {
  * Ensures that RamLog::get() is called at least once during single-threaded operation,
  * ensuring that _namedLock and _named are initialized safely.
  */
-MONGO_INITIALIZER(RamLogCatalog)(InitializerContext*) {
+MERIZO_INITIALIZER(RamLogCatalog)(InitializerContext*) {
     if (!_namedLock) {
         if (_named) {
             return Status(ErrorCodes::InternalError,

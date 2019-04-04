@@ -30,7 +30,7 @@
         load("jstests/libs/check_log.js");
 
         // Do not start reads until we are blocked in 'prepareTransaction'.
-        checkLog.contains(db.getMongo(), "hangAfterReservingPrepareTimestamp fail point enabled");
+        checkLog.contains(db.getMerizo(), "hangAfterReservingPrepareTimestamp fail point enabled");
 
         // Create a 'readFuncObj' from the 'readFunc'.
         const readFuncObj = readFunc(_collName);
@@ -39,7 +39,7 @@
         // Let the transaction finish preparing and wait for 'prepareTransaction' to complete.
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: 'hangAfterReservingPrepareTimestamp', mode: 'off'}));
-        checkLog.contains(db.getMongo(), "command: prepareTransaction");
+        checkLog.contains(db.getMerizo(), "command: prepareTransaction");
 
         readFuncObj.prepareConflict();
     };
@@ -64,7 +64,7 @@
         assert.commandWorked(testColl.insert(TestData.otherDoc));
 
         // Start a transaction with a single update on the 'txnDoc'.
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDB = session.getDatabase(TestData.dbName);
         session.startTransaction({readConcern: {level: 'snapshot'}});
         assert.commandWorked(sessionDB[collName].update(TestData.txnDoc, {$inc: {x: 1}}));
@@ -89,7 +89,7 @@
     const snapshotRead = function(_collName) {
         const _db = db.getSiblingDB(TestData.dbName);
 
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDB = session.getDatabase(TestData.dbName);
         session.startTransaction({readConcern: {level: 'snapshot'}});
 

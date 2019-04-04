@@ -9,11 +9,11 @@
 
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
 
-    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
-    if (isMongos) {
+    const isMerizos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    if (isMerizos) {
         // Access the collection before creating indexes so it can be implicitly sharded.
         assert.eq(sessionDB[collName].find().itcount(), 0);
     }

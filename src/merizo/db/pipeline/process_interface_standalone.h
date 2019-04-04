@@ -44,13 +44,13 @@ using write_ops::Update;
  * Class to provide access to merizod-specific implementations of methods required by some
  * document sources.
  */
-class MongoInterfaceStandalone : public MongoProcessCommon {
+class MerizoInterfaceStandalone : public MerizoProcessCommon {
 public:
-    // static std::shared_ptr<MongoProcessInterface> create(OperationContext* opCtx);
+    // static std::shared_ptr<MerizoProcessInterface> create(OperationContext* opCtx);
 
-    MongoInterfaceStandalone(OperationContext* opCtx);
+    MerizoInterfaceStandalone(OperationContext* opCtx);
 
-    virtual ~MongoInterfaceStandalone() = default;
+    virtual ~MerizoInterfaceStandalone() = default;
 
     void setOperationContext(OperationContext* opCtx) final;
     DBClientBase* directClient() final;

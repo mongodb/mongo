@@ -63,7 +63,7 @@
     // TODO SERVER-33039 When running against a merizos, a non-existent database will cause all
     // aggregations to return an empty result set.
     assert.commandWorked(testDB.dropDatabase());
-    if (FixtureHelpers.isMongos(testDB)) {
+    if (FixtureHelpers.isMerizos(testDB)) {
         assert.eq([], coll.aggregate(pipeline).toArray());
     } else {
         assertErrorCode(coll, pipeline, 40481);

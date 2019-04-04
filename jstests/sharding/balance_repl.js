@@ -40,10 +40,10 @@
         assert.commandWorked(s.s0.adminCommand({split: 'TestDB.TestColl', middle: {_id: i * 100}}));
     }
 
-    var collPrimary = (new Mongo(s.s0.host)).getDB('TestDB').TestColl;
+    var collPrimary = (new Merizo(s.s0.host)).getDB('TestDB').TestColl;
     assert.eq(2100, collPrimary.find().itcount());
 
-    var collSlaveOk = (new Mongo(s.s0.host)).getDB('TestDB').TestColl;
+    var collSlaveOk = (new Merizo(s.s0.host)).getDB('TestDB').TestColl;
     collSlaveOk.setSlaveOk();
     assert.eq(2100, collSlaveOk.find().itcount());
 

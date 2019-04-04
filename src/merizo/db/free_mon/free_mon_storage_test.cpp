@@ -51,7 +51,7 @@
 namespace merizo {
 namespace {
 
-class FreeMonStorageTest : public ServiceContextMongoDTest {
+class FreeMonStorageTest : public ServiceContextMerizoDTest {
 private:
     void setUp() final;
     void tearDown() final;
@@ -73,7 +73,7 @@ protected:
 };
 
 void FreeMonStorageTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
     auto service = getServiceContext();
 
     repl::ReplicationCoordinator::set(service,
@@ -90,7 +90,7 @@ void FreeMonStorageTest::setUp() {
 
 void FreeMonStorageTest::tearDown() {
     _opCtx = {};
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 repl::ReplicationCoordinatorMock* FreeMonStorageTest::_getReplCoord() const {

@@ -14,10 +14,10 @@
         assert.eq(res.ok, false);
         assert.eq(res["errmsg"], "Traffic recording directory not set");
 
-        const path = MongoRunner.toRealDir("$dataDir/traffic_recording/");
+        const path = MerizoRunner.toRealDir("$dataDir/traffic_recording/");
         mkdir(path);
 
-        if (!jsTest.isMongos(client)) {
+        if (!jsTest.isMerizos(client)) {
             setJsTestOption("enableTestCommands", 0);
             client = restartCommand({
                 trafficRecordingDirectory: path,
@@ -81,7 +81,7 @@
     }
 
     {
-        let m = MongoRunner.runMongod({auth: ""});
+        let m = MerizoRunner.runMerizod({auth: ""});
 
         let db = m.getDB("admin");
 
@@ -90,9 +90,9 @@
 
         m = runTest(m, function(setParams) {
             if (m) {
-                MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'pass'});
+                MerizoRunner.stopMerizod(m, null, {user: 'admin', pwd: 'pass'});
             }
-            m = MongoRunner.runMongod({auth: "", setParameter: setParams});
+            m = MerizoRunner.runMerizod({auth: "", setParameter: setParams});
 
             if (m) {
                 m.getDB("admin").createUser(
@@ -102,7 +102,7 @@
             return m;
         });
 
-        MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'pass'});
+        MerizoRunner.stopMerizod(m, null, {user: 'admin', pwd: 'pass'});
     }
 
     {
@@ -113,7 +113,7 @@
         });
 
         runTest(shardTest.s, function(setParams) {
-            shardTest.restartMongos(0, {
+            shardTest.restartMerizos(0, {
                 restart: true,
                 setParameter: setParams,
             });

@@ -175,7 +175,7 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
         conn.reset(new DBClientConnection(
             false,  // auto reconnect
             0,      // socket timeout
-            {},     // MongoURI
+            {},     // MerizoURI
             [this, target](const executor::RemoteCommandResponse& isMasterReply) {
                 return _hook->validateHost(target, BSONObj(), isMasterReply);
             }));

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
 #include "merizo/platform/basic.h"
 
@@ -59,7 +59,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeUpsertPerformsInsert);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeUpsertPerformsInsert);
 
 using std::string;
 using std::unique_ptr;
@@ -574,7 +574,7 @@ void UpdateStage::doInsert() {
         return;
     }
 
-    if (MONGO_FAIL_POINT(hangBeforeUpsertPerformsInsert)) {
+    if (MERIZO_FAIL_POINT(hangBeforeUpsertPerformsInsert)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeUpsertPerformsInsert, getOpCtx(), "hangBeforeUpsertPerformsInsert");
     }

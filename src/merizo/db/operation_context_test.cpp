@@ -59,7 +59,7 @@ std::ostream& operator<<(std::ostream& os, stdx::cv_status cvStatus) {
         case stdx::cv_status::no_timeout:
             return os << "no_timeout";
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -72,7 +72,7 @@ std::ostream& operator<<(std::ostream& os, stdx::future_status futureStatus) {
         case stdx::future_status::timeout:
             return os << "timeout";
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

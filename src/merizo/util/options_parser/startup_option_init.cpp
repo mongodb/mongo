@@ -35,66 +35,66 @@
  */
 
 /* Groups for all of option handling */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionHandling,
+MERIZO_INITIALIZER_GROUP(BeginStartupOptionHandling,
                         ("GlobalLogManager", "ValidateLocale"),
                         ("EndStartupOptionHandling"))
 
 /* Groups for option registration */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionRegistration,
+MERIZO_INITIALIZER_GROUP(BeginStartupOptionRegistration,
                         ("BeginStartupOptionHandling"),
                         ("EndStartupOptionRegistration"))
 
 /* Groups for general option registration (useful for controlling the order in which options are
  * registered for modules, which affects the order in which they are printed in help output) */
-MONGO_INITIALIZER_GROUP(BeginGeneralStartupOptionRegistration,
+MERIZO_INITIALIZER_GROUP(BeginGeneralStartupOptionRegistration,
                         ("BeginStartupOptionRegistration"),
                         ("EndGeneralStartupOptionRegistration"))
-MONGO_INITIALIZER_GROUP(EndGeneralStartupOptionRegistration,
+MERIZO_INITIALIZER_GROUP(EndGeneralStartupOptionRegistration,
                         ("BeginGeneralStartupOptionRegistration"),
                         ("EndStartupOptionRegistration"))
 
-MONGO_INITIALIZER_GROUP(EndStartupOptionRegistration,
+MERIZO_INITIALIZER_GROUP(EndStartupOptionRegistration,
                         ("BeginStartupOptionRegistration"),
                         ("BeginStartupOptionParsing"))
 
 /* Groups for option parsing */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionParsing,
+MERIZO_INITIALIZER_GROUP(BeginStartupOptionParsing,
                         ("EndStartupOptionRegistration"),
                         ("EndStartupOptionParsing"))
-MONGO_INITIALIZER_GROUP(EndStartupOptionParsing,
+MERIZO_INITIALIZER_GROUP(EndStartupOptionParsing,
                         ("BeginStartupOptionParsing"),
                         ("BeginStartupOptionValidation"))
 
 /* Groups for option validation */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionValidation,
+MERIZO_INITIALIZER_GROUP(BeginStartupOptionValidation,
                         ("EndStartupOptionParsing"),
                         ("EndStartupOptionValidation"))
-MONGO_INITIALIZER_GROUP(EndStartupOptionValidation,
+MERIZO_INITIALIZER_GROUP(EndStartupOptionValidation,
                         ("BeginStartupOptionValidation"),
                         ("BeginStartupOptionSetup"))
 
 /* Groups for option setup */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionSetup,
+MERIZO_INITIALIZER_GROUP(BeginStartupOptionSetup,
                         ("EndStartupOptionValidation"),
                         ("EndStartupOptionSetup"))
-MONGO_INITIALIZER_GROUP(EndStartupOptionSetup,
+MERIZO_INITIALIZER_GROUP(EndStartupOptionSetup,
                         ("BeginStartupOptionSetup"),
                         ("BeginStartupOptionStorage"))
 
 /* Groups for option storage */
-MONGO_INITIALIZER_GROUP(BeginStartupOptionStorage,
+MERIZO_INITIALIZER_GROUP(BeginStartupOptionStorage,
                         ("EndStartupOptionSetup"),
                         ("EndStartupOptionStorage"))
-MONGO_INITIALIZER_GROUP(EndStartupOptionStorage,
+MERIZO_INITIALIZER_GROUP(EndStartupOptionStorage,
                         ("BeginStartupOptionStorage"),
                         ("BeginPostStartupOptionStorage"))
 
 /* Groups for post option storage */
-MONGO_INITIALIZER_GROUP(BeginPostStartupOptionStorage,
+MERIZO_INITIALIZER_GROUP(BeginPostStartupOptionStorage,
                         ("EndStartupOptionStorage"),
                         ("EndPostStartupOptionStorage"))
-MONGO_INITIALIZER_GROUP(EndPostStartupOptionStorage,
+MERIZO_INITIALIZER_GROUP(EndPostStartupOptionStorage,
                         ("BeginPostStartupOptionStorage"),
                         ("EndStartupOptionHandling"))
 
-MONGO_INITIALIZER_GROUP(EndStartupOptionHandling, ("BeginStartupOptionHandling"), ("default"))
+MERIZO_INITIALIZER_GROUP(EndStartupOptionHandling, ("BeginStartupOptionHandling"), ("default"))

@@ -32,35 +32,35 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#pragma push_macro("MONGO_API_CALL")
-#undef MONGO_API_CALL
+#pragma push_macro("MERIZO_API_CALL")
+#undef MERIZO_API_CALL
 
-#pragma push_macro("MONGO_API_IMPORT")
-#undef MONGO_API_IMPORT
+#pragma push_macro("MERIZO_API_IMPORT")
+#undef MERIZO_API_IMPORT
 
-#pragma push_macro("MONGO_API_EXPORT")
-#undef MONGO_API_EXPORT
+#pragma push_macro("MERIZO_API_EXPORT")
+#undef MERIZO_API_EXPORT
 
 #pragma push_macro("STITCH_SUPPORT_API")
 #undef STITCH_SUPPORT_API
 
 #if defined(_WIN32)
-#define MONGO_API_CALL __cdecl
-#define MONGO_API_IMPORT __declspec(dllimport)
-#define MONGO_API_EXPORT __declspec(dllexport)
+#define MERIZO_API_CALL __cdecl
+#define MERIZO_API_IMPORT __declspec(dllimport)
+#define MERIZO_API_EXPORT __declspec(dllexport)
 #else
-#define MONGO_API_CALL
-#define MONGO_API_IMPORT __attribute__((visibility("default")))
-#define MONGO_API_EXPORT __attribute__((used, visibility("default")))
+#define MERIZO_API_CALL
+#define MERIZO_API_IMPORT __attribute__((visibility("default")))
+#define MERIZO_API_EXPORT __attribute__((used, visibility("default")))
 #endif
 
 #if defined(STITCH_SUPPORT_STATIC)
 #define STITCH_SUPPORT_API
 #else
 #if defined(STITCH_SUPPORT_COMPILING)
-#define STITCH_SUPPORT_API MONGO_API_EXPORT
+#define STITCH_SUPPORT_API MERIZO_API_EXPORT
 #else
-#define STITCH_SUPPORT_API MONGO_API_IMPORT
+#define STITCH_SUPPORT_API MERIZO_API_IMPORT
 #endif
 #endif
 
@@ -99,7 +99,7 @@ typedef struct stitch_support_v1_status stitch_support_v1_status;
  *
  * This function may be called before stitch_support_v1_lib_init().
  */
-STITCH_SUPPORT_API stitch_support_v1_status* MONGO_API_CALL stitch_support_v1_status_create(void);
+STITCH_SUPPORT_API stitch_support_v1_status* MERIZO_API_CALL stitch_support_v1_status_create(void);
 
 /**
  * Destroys a valid status object.
@@ -118,7 +118,7 @@ STITCH_SUPPORT_API stitch_support_v1_status* MONGO_API_CALL stitch_support_v1_st
  * including the storage referenced by functions that returned observable storage buffers from this
  * status, such as strings.
  */
-STITCH_SUPPORT_API void MONGO_API_CALL
+STITCH_SUPPORT_API void MERIZO_API_CALL
 stitch_support_v1_status_destroy(stitch_support_v1_status* status);
 
 /**
@@ -155,7 +155,7 @@ typedef enum {
  *
  * This function does not report its own failures.
  */
-STITCH_SUPPORT_API int MONGO_API_CALL
+STITCH_SUPPORT_API int MERIZO_API_CALL
 stitch_support_v1_status_get_error(const stitch_support_v1_status* status);
 
 /**
@@ -172,7 +172,7 @@ stitch_support_v1_status_get_error(const stitch_support_v1_status* status);
  *
  * This function does not report its own failures.
  */
-STITCH_SUPPORT_API const char* MONGO_API_CALL
+STITCH_SUPPORT_API const char* MERIZO_API_CALL
 stitch_support_v1_status_get_explanation(const stitch_support_v1_status* status);
 
 /**
@@ -186,7 +186,7 @@ stitch_support_v1_status_get_explanation(const stitch_support_v1_status* status)
  *
  * This function does not report its own failures.
  */
-STITCH_SUPPORT_API int MONGO_API_CALL
+STITCH_SUPPORT_API int MERIZO_API_CALL
 stitch_support_v1_status_get_code(const stitch_support_v1_status* status);
 
 /**
@@ -210,7 +210,7 @@ typedef struct stitch_support_v1_lib stitch_support_v1_lib;
  *
  * On failure, returns NULL and populates the 'status' object if it is not NULL.
  */
-STITCH_SUPPORT_API stitch_support_v1_lib* MONGO_API_CALL
+STITCH_SUPPORT_API stitch_support_v1_lib* MERIZO_API_CALL
 stitch_support_v1_init(stitch_support_v1_status* status);
 
 /**
@@ -226,7 +226,7 @@ stitch_support_v1_init(stitch_support_v1_status* status);
  * Returns STITCH_SUPPORT_V1_ERROR_LIBRARY_NOT_INITIALIZED and modifies 'status' if
  * stitch_support_v1_lib_init() has not been called previously.
  */
-STITCH_SUPPORT_API int MONGO_API_CALL
+STITCH_SUPPORT_API int MERIZO_API_CALL
 stitch_support_v1_fini(stitch_support_v1_lib* const lib, stitch_support_v1_status* const status);
 
 /**
@@ -246,7 +246,7 @@ typedef struct stitch_support_v1_collator stitch_support_v1_collator;
  * This function will fail if the collationBSON is invalid. On failure, it returns NULL and
  * populates the 'status' object if it is not NULL.
  */
-STITCH_SUPPORT_API stitch_support_v1_collator* MONGO_API_CALL
+STITCH_SUPPORT_API stitch_support_v1_collator* MERIZO_API_CALL
 stitch_support_v1_collator_create(stitch_support_v1_lib* lib,
                                   const uint8_t* collationBSON,
                                   stitch_support_v1_status* const status);
@@ -260,7 +260,7 @@ stitch_support_v1_collator_create(stitch_support_v1_lib* lib,
  *
  * This function does not report failures.
  */
-STITCH_SUPPORT_API void MONGO_API_CALL
+STITCH_SUPPORT_API void MERIZO_API_CALL
 stitch_support_v1_collator_destroy(stitch_support_v1_collator* collator);
 
 /**
@@ -284,7 +284,7 @@ typedef struct stitch_support_v1_matcher stitch_support_v1_matcher;
  * the given collator if provided but the pointer can be NULL to cause the matcher to use no
  * collator. The newly created matcher does _not_ take ownership of its 'collator' object.
  */
-STITCH_SUPPORT_API stitch_support_v1_matcher* MONGO_API_CALL
+STITCH_SUPPORT_API stitch_support_v1_matcher* MERIZO_API_CALL
 stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
                                  const uint8_t* filterBSON,
                                  stitch_support_v1_collator* collator,
@@ -303,7 +303,7 @@ stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
  *
  * This function does not report failures.
  */
-STITCH_SUPPORT_API void MONGO_API_CALL
+STITCH_SUPPORT_API void MERIZO_API_CALL
 stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher);
 
 /**
@@ -315,7 +315,7 @@ stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher);
  * When the check is successful, this function returns STITCH_SUPPORT_V1_SUCCESS, sets 'isMatch' to
  * indicate whether the document matched.
  */
-STITCH_SUPPORT_API int MONGO_API_CALL
+STITCH_SUPPORT_API int MERIZO_API_CALL
 stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
                               const uint8_t* documentBSON,
                               bool* isMatch,
@@ -359,7 +359,7 @@ typedef struct stitch_support_v1_projection stitch_support_v1_projection;
  * for the lifetime of the projection and for ultimately destroying all three of the projection,
  * matcher and collator.
  */
-STITCH_SUPPORT_API stitch_support_v1_projection* MONGO_API_CALL
+STITCH_SUPPORT_API stitch_support_v1_projection* MERIZO_API_CALL
 stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
                                     const uint8_t* specBSON,
                                     stitch_support_v1_matcher* matcher,
@@ -379,7 +379,7 @@ stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
  *
  * This function does not report failures.
  */
-STITCH_SUPPORT_API void MONGO_API_CALL
+STITCH_SUPPORT_API void MERIZO_API_CALL
 stitch_support_v1_projection_destroy(stitch_support_v1_projection* const projection);
 
 /**
@@ -392,7 +392,7 @@ stitch_support_v1_projection_destroy(stitch_support_v1_projection* const project
  * that the associated matcher matches the input document. A non-matching input document will
  * trigger an assertion failure.
  */
-STITCH_SUPPORT_API uint8_t* MONGO_API_CALL
+STITCH_SUPPORT_API uint8_t* MERIZO_API_CALL
 stitch_support_v1_projection_apply(stitch_support_v1_projection* const projection,
                                    const uint8_t* documentBSON,
                                    stitch_support_v1_status* status);
@@ -405,7 +405,7 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
  * unless the projection has a matcher (passed in during stitch_support_v1_projection_create) and
  * the matcher matches the input document.
  */
-STITCH_SUPPORT_API bool MONGO_API_CALL
+STITCH_SUPPORT_API bool MERIZO_API_CALL
 stitch_support_v1_projection_requires_match(stitch_support_v1_projection* const projection);
 
 /**
@@ -421,7 +421,7 @@ typedef struct stitch_support_v1_update_details stitch_support_v1_update_details
  * Clients can reuse the same update details object for multiple calls to
  * stitch_support_v1_update_apply().
  */
-STITCH_SUPPORT_API stitch_support_v1_update_details* MONGO_API_CALL
+STITCH_SUPPORT_API stitch_support_v1_update_details* MERIZO_API_CALL
 stitch_support_v1_update_details_create(void);
 
 /**
@@ -432,21 +432,21 @@ stitch_support_v1_update_details_create(void);
  *
  * This function does not report failures.
  */
-STITCH_SUPPORT_API void MONGO_API_CALL
+STITCH_SUPPORT_API void MERIZO_API_CALL
 stitch_support_v1_update_details_destroy(stitch_support_v1_update_details* update_details);
 
 /**
  * The number of modified paths in an update details object. Always call this function to ensure an
  * index is in bounds before calling stitch_support_v1_update_details_path().
  */
-STITCH_SUPPORT_API size_t MONGO_API_CALL stitch_support_v1_update_details_num_modified_paths(
+STITCH_SUPPORT_API size_t MERIZO_API_CALL stitch_support_v1_update_details_num_modified_paths(
     stitch_support_v1_update_details* update_details);
 
 /**
  * Return a dotted-path string from the given index of the modified paths in the update details
  * object.
  */
-STITCH_SUPPORT_API const char* MONGO_API_CALL stitch_support_v1_update_details_path(
+STITCH_SUPPORT_API const char* MERIZO_API_CALL stitch_support_v1_update_details_path(
     stitch_support_v1_update_details* update_details, size_t path_index);
 
 /**
@@ -481,7 +481,7 @@ typedef struct stitch_support_v1_update stitch_support_v1_update;
  * for the lifetime of the update and for ultimately destroying all three of the update, matcher,
  * and collator.
  */
-STITCH_SUPPORT_API stitch_support_v1_update* MONGO_API_CALL
+STITCH_SUPPORT_API stitch_support_v1_update* MERIZO_API_CALL
 stitch_support_v1_update_create(stitch_support_v1_lib* lib,
                                 const uint8_t* updateBSON,
                                 const uint8_t* arrayFiltersBSON,
@@ -502,7 +502,7 @@ stitch_support_v1_update_create(stitch_support_v1_lib* lib,
  *
  * This function does not report failures.
  */
-STITCH_SUPPORT_API void MONGO_API_CALL
+STITCH_SUPPORT_API void MERIZO_API_CALL
 stitch_support_v1_update_destroy(stitch_support_v1_update* const update);
 
 /**
@@ -515,7 +515,7 @@ stitch_support_v1_update_destroy(stitch_support_v1_update* const update);
  * that the associated matcher matches the input document. A non-matching input document will
  * trigger an assertion failure.
  */
-STITCH_SUPPORT_API uint8_t* MONGO_API_CALL
+STITCH_SUPPORT_API uint8_t* MERIZO_API_CALL
 stitch_support_v1_update_apply(stitch_support_v1_update* const update,
                                const uint8_t* documentBSON,
                                stitch_support_v1_update_details* update_details,
@@ -542,7 +542,7 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
  * an '_id' field, this function does not populate an '_id' field if one is not in the match or
  * update document.
  */
-STITCH_SUPPORT_API uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(
+STITCH_SUPPORT_API uint8_t* MERIZO_API_CALL stitch_support_v1_update_upsert(
     stitch_support_v1_update* const update, stitch_support_v1_status* status);
 
 /**
@@ -553,7 +553,7 @@ STITCH_SUPPORT_API uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(
  * the update has a matcher (passed in during stitch_support_v1_update_create) and the matcher
  * matches the input document.
  */
-STITCH_SUPPORT_API bool MONGO_API_CALL
+STITCH_SUPPORT_API bool MERIZO_API_CALL
 stitch_support_v1_update_requires_match(stitch_support_v1_update* const update);
 
 /**
@@ -563,7 +563,7 @@ stitch_support_v1_update_requires_match(stitch_support_v1_update* const update);
  * This function can be called at any time to deallocate a BSON buffer and will not invalidate any
  * library object.
  */
-STITCH_SUPPORT_API void MONGO_API_CALL stitch_support_v1_bson_free(uint8_t* bson);
+STITCH_SUPPORT_API void MERIZO_API_CALL stitch_support_v1_bson_free(uint8_t* bson);
 
 #ifdef __cplusplus
 }  // extern "C"
@@ -572,13 +572,13 @@ STITCH_SUPPORT_API void MONGO_API_CALL stitch_support_v1_bson_free(uint8_t* bson
 #undef STITCH_SUPPORT_API
 #pragma pop_macro("STITCH_SUPPORT_API")
 
-#undef MONGO_API_EXPORT
-#pragma push_macro("MONGO_API_EXPORT")
+#undef MERIZO_API_EXPORT
+#pragma push_macro("MERIZO_API_EXPORT")
 
-#undef MONGO_API_IMPORT
-#pragma push_macro("MONGO_API_IMPORT")
+#undef MERIZO_API_IMPORT
+#pragma push_macro("MERIZO_API_IMPORT")
 
-#undef MONGO_API_CALL
-#pragma pop_macro("MONGO_API_CALL")
+#undef MERIZO_API_CALL
+#pragma pop_macro("MERIZO_API_CALL")
 
 #endif  // HEADERUUID_645147E3_14CB_4DFC_8F05_16CE4D190C18_DEFINED

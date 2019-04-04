@@ -27,7 +27,7 @@
     jsTest.log("Start " + numTxns + " transactions, each inserting two documents");
     var sessions = [];
     for (let txnNr = 0; txnNr < numTxns; ++txnNr) {
-        const session = testDB.getMongo().startSession(sessionOptions);
+        const session = testDB.getMerizo().startSession(sessionOptions);
         sessions[txnNr] = session;
         const sessionDb = session.getDatabase(dbName);
         const sessionColl = sessionDb[collName];

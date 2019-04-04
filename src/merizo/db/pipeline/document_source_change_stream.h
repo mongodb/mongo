@@ -57,11 +57,11 @@ public:
             return true;
         }
 
-        bool allowedToForwardFromMongos() const final {
+        bool allowedToForwardFromMerizos() const final {
             return false;
         }
 
-        bool allowedToPassthroughFromMongos() const final {
+        bool allowedToPassthroughFromMerizos() const final {
             return false;
         }
 
@@ -70,7 +70,7 @@ public:
         }
 
         ActionSet actions{ActionType::changeStream, ActionType::find};
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const final {
             if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
                 // Watching a whole cluster.
                 return {Privilege(ResourcePattern::forAnyNormalResource(), actions)};
@@ -223,7 +223,7 @@ public:
         // cursor feeding the pipeline, and executing this stage may result in the use of the wrong
         // collation. The comparisons against the oplog must use the simple collation, regardless of
         // the collation on the ExpressionContext.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;

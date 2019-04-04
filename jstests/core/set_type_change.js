@@ -19,7 +19,7 @@
     var newVal = new NumberLong(2);
     var res = coll.update({}, {$set: {a: newVal}});
     assert.eq(res.nMatched, 1);
-    if (coll.getMongo().writeMode() == "commands")
+    if (coll.getMerizo().writeMode() == "commands")
         assert.eq(res.nModified, 1);
 
     // Make sure it actually changed the type.

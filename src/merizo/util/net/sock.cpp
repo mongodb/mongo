@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -77,7 +77,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-MONGO_FAIL_POINT_DEFINE(throwSockExcep);
+MERIZO_FAIL_POINT_DEFINE(throwSockExcep);
 
 namespace {
 
@@ -213,7 +213,7 @@ void Socket::_init() {
     _bytesOut = 0;
     _bytesIn = 0;
     _awaitingHandshake = true;
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     _sslManager = 0;
 #endif
 }
@@ -231,7 +231,7 @@ void Socket::close() {
     }
 }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 bool Socket::secure(SSLManagerInterface* mgr, const std::string& remoteHost) {
     fassert(16503, mgr);
     if (_fd == INVALID_SOCKET) {
@@ -381,7 +381,7 @@ bool Socket::connect(SockAddr& remote) {
 
 // throws if SSL_write or send fails
 int Socket::_send(const char* data, int len, const char* context) {
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (_sslConnection.get()) {
         return _sslManager->SSL_write(_sslConnection.get(), data, len);
     }
@@ -395,7 +395,7 @@ int Socket::_send(const char* data, int len, const char* context) {
 void Socket::send(const char* data, int len, const char* context) {
     while (len > 0) {
         int ret = -1;
-        if (MONGO_FAIL_POINT(throwSockExcep)) {
+        if (MERIZO_FAIL_POINT(throwSockExcep)) {
 #if defined(_WIN32)
             WSASetLastError(WSAENETUNREACH);
 #else
@@ -430,7 +430,7 @@ void Socket::_send(const vector<pair<char*, int>>& data, const char* context) {
  * @param context descriptive for logging
  */
 void Socket::send(const vector<pair<char*, int>>& data, const char* context) {
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (_sslConnection.get()) {
         _send(data, context);
         return;
@@ -458,7 +458,7 @@ void Socket::send(const vector<pair<char*, int>>& data, const char* context) {
 
     while (meta.msg_iovlen > 0) {
         int ret = -1;
-        if (MONGO_FAIL_POINT(throwSockExcep)) {
+        if (MERIZO_FAIL_POINT(throwSockExcep)) {
 #if defined(_WIN32)
             WSASetLastError(WSAENETUNREACH);
 #else
@@ -491,7 +491,7 @@ void Socket::send(const vector<pair<char*, int>>& data, const char* context) {
 void Socket::recv(char* buf, int len) {
     while (len > 0) {
         int ret = -1;
-        if (MONGO_FAIL_POINT(throwSockExcep)) {
+        if (MERIZO_FAIL_POINT(throwSockExcep)) {
 #if defined(_WIN32)
             WSASetLastError(WSAENETUNREACH);
 #else
@@ -519,7 +519,7 @@ int Socket::unsafe_recv(char* buf, int max) {
 
 // throws if SSL_read fails or recv returns an error
 int Socket::_recv(char* buf, int max) {
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (_sslConnection.get()) {
         return _sslManager->SSL_read(_sslConnection.get(), buf, max);
     }

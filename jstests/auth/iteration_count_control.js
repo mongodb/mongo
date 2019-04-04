@@ -5,7 +5,7 @@
 
     load('./jstests/multiVersion/libs/auth_helpers.js');
 
-    const conn = MongoRunner.runMongod({auth: ''});
+    const conn = MerizoRunner.runMerizod({auth: ''});
     const adminDB = conn.getDB('admin');
 
     adminDB.createUser({user: 'user1', pwd: 'pass', roles: jsTest.adminUserRoles});
@@ -39,5 +39,5 @@
     assert.commandWorked(adminDB.runCommand({setParameter: 1, scramSHA256IterationCount: 10000}));
     assert.commandWorked(adminDB.runCommand({setParameter: 1, scramSHA256IterationCount: 1000000}));
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/noPassthroughWithMongod/*.js
+  - jstests/noPassthroughWithMerizod/*.js
 
 executor:
   archive:
@@ -16,7 +16,7 @@ executor:
   - class: CleanEveryN
     n: 20
   fixture:
-    class: MongoDFixture
+    class: MerizoDFixture
     merizod_options:
       set_parameters:
         enableTestCommands: 1

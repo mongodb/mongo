@@ -36,7 +36,7 @@
 
 namespace merizo {
 
-/** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a
+/** Represents a Merizo query expression.  Typically one uses the QUERY(...) macro to construct a
  * Query object.
     Examples:
        QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
@@ -99,10 +99,10 @@ public:
      */
     Query& explain();
 
-    /** Queries to the Mongo database support a $where parameter option which contains
+    /** Queries to the Merizo database support a $where parameter option which contains
         a javascript function that is evaluated to see whether objects being queried match
         its criteria.  Use this helper to append such a function to a query object.
-        Your query may also contain other traditional Mongo query terms.
+        Your query may also contain other traditional Merizo query terms.
 
         @param jscode The javascript function to evaluate against each potential object
                match.  The function must return true for matched objects.  Use the this

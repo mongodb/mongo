@@ -44,7 +44,7 @@ SnapshotWindowParams snapshotWindowParams;
  * pressure is zero to begin with, so the user should not have to wait for the target to slowly
  * adjust to max.
  */
-MONGO_STARTUP_OPTIONS_POST(SetTargetSnapshotWindowSize)
+MERIZO_STARTUP_OPTIONS_POST(SetTargetSnapshotWindowSize)
 (InitializerContext* context) {
     snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.store(
         snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load());

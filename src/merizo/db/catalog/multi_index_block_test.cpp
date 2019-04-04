@@ -46,7 +46,7 @@ namespace {
  * Using a mocked Collection object ensures that we are pulling in a minimal set of library
  * dependencies.
  * For integration tests, it may be necessary to make this test fixture inherit from
- * ServiceContextMongoDTest.
+ * ServiceContextMerizoDTest.
  */
 class MultiIndexBlockTest : public ServiceContextTest {
 private:

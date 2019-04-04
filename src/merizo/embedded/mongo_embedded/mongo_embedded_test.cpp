@@ -78,7 +78,7 @@ struct ClientDestructor {
             return;
 
         auto status = makeStatusPtr();
-        if (merizo_embedded_v1_client_destroy(p, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
+        if (merizo_embedded_v1_client_destroy(p, status.get()) != MERIZO_EMBEDDED_V1_SUCCESS) {
             std::cerr << "libmerizodb_capi_client_destroy failed." << std::endl;
             if (status) {
                 std::cerr << "Error code: " << merizo_embedded_v1_status_get_error(status.get())
@@ -103,7 +103,7 @@ protected:
         }
 
         merizo_embedded_v1_init_params params;
-        params.log_flags = MONGO_EMBEDDED_V1_LOG_STDOUT;
+        params.log_flags = MERIZO_EMBEDDED_V1_LOG_STDOUT;
         params.log_callback = nullptr;
         params.log_user_data = nullptr;
 
@@ -128,9 +128,9 @@ protected:
     }
 
     void tearDown() {
-        ASSERT_EQUALS(merizo_embedded_v1_instance_destroy(db, status), MONGO_EMBEDDED_V1_SUCCESS)
+        ASSERT_EQUALS(merizo_embedded_v1_instance_destroy(db, status), MERIZO_EMBEDDED_V1_SUCCESS)
             << merizo_embedded_v1_status_get_explanation(status);
-        ASSERT_EQUALS(merizo_embedded_v1_lib_fini(lib, status), MONGO_EMBEDDED_V1_SUCCESS)
+        ASSERT_EQUALS(merizo_embedded_v1_lib_fini(lib, status), MERIZO_EMBEDDED_V1_SUCCESS)
             << merizo_embedded_v1_status_get_explanation(status);
         merizo_embedded_v1_status_destroy(status);
     }
@@ -162,7 +162,7 @@ protected:
         // call the wire protocol
         int err = merizo_embedded_v1_client_invoke(
             client.get(), inputMessage.buf(), inputMessage.size(), &output, &outputSize, status);
-        ASSERT_EQUALS(err, MONGO_EMBEDDED_V1_SUCCESS);
+        ASSERT_EQUALS(err, MERIZO_EMBEDDED_V1_SUCCESS);
 
         // convert the shared buffer to a merizo::message and ensure that it is valid
         auto outputMessage = messageFromBuffer(output, outputSize);
@@ -193,7 +193,7 @@ TEST_F(MerizodbCAPITest, CreateAndDestroyDBAndClient) {
 // This test is to make sure that destroying the db will fail if there's remaining clients left.
 TEST_F(MerizodbCAPITest, DoNotDestroyClient) {
     auto client = createClient();
-    ASSERT(merizo_embedded_v1_instance_destroy(getDB(), nullptr) != MONGO_EMBEDDED_V1_SUCCESS);
+    ASSERT(merizo_embedded_v1_instance_destroy(getDB(), nullptr) != MERIZO_EMBEDDED_V1_SUCCESS);
 }
 
 TEST_F(MerizodbCAPITest, CreateMultipleClients) {
@@ -323,7 +323,7 @@ TEST_F(MerizodbCAPITest, InsertDocument) {
     auto client = createClient();
 
     merizo::BSONObj insertObj = merizo::fromjson(
-        "{insert: 'collection_name', documents: [{firstName: 'Mongo', lastName: 'DB', age: 10}]}");
+        "{insert: 'collection_name', documents: [{firstName: 'Merizo', lastName: 'DB', age: 10}]}");
     auto insertOpMsg = merizo::OpMsgRequest::fromDBAndBody("db_name", insertObj);
     auto outputBSON = performRpc(client, insertOpMsg);
     ASSERT(outputBSON.hasField("n"));
@@ -426,7 +426,7 @@ TEST_F(MerizodbCAPITest, InsertAndRead) {
     auto client = createClient();
 
     merizo::BSONObj insertObj = merizo::fromjson(
-        "{insert: 'collection_name', documents: [{firstName: 'Mongo', lastName: 'DB', age: 10}]}");
+        "{insert: 'collection_name', documents: [{firstName: 'Merizo', lastName: 'DB', age: 10}]}");
     auto insertOpMsg = merizo::OpMsgRequest::fromDBAndBody("db_name", insertObj);
     auto outputBSON1 = performRpc(client, insertOpMsg);
     ASSERT(outputBSON1.valid(merizo::BSONVersion::kLatest));
@@ -461,7 +461,7 @@ TEST_F(MerizodbCAPITest, InsertAndReadDifferentClients) {
     auto client2 = createClient();
 
     merizo::BSONObj insertObj = merizo::fromjson(
-        "{insert: 'collection_name', documents: [{firstName: 'Mongo', lastName: 'DB', age: 10}]}");
+        "{insert: 'collection_name', documents: [{firstName: 'Merizo', lastName: 'DB', age: 10}]}");
     auto insertOpMsg = merizo::OpMsgRequest::fromDBAndBody("db_name", insertObj);
     auto outputBSON1 = performRpc(client1, insertOpMsg);
     ASSERT(outputBSON1.valid(merizo::BSONVersion::kLatest));
@@ -663,7 +663,7 @@ TEST_F(MerizodbCAPITest, CreateMultipleDBs) {
     merizo_embedded_v1_instance* db2 = merizo_embedded_v1_instance_create(lib, nullptr, status.get());
     ASSERT(db2 == nullptr);
     ASSERT_EQUALS(merizo_embedded_v1_status_get_error(status.get()),
-                  MONGO_EMBEDDED_V1_ERROR_DB_MAX_OPEN);
+                  MERIZO_EMBEDDED_V1_ERROR_DB_MAX_OPEN);
 }
 }  // namespace
 
@@ -675,7 +675,7 @@ int main(const int argc, const char* const* const argv) {
     moe::Environment environment;
     moe::OptionSection options;
 
-    auto ret = merizo::embedded::addMongoEmbeddedTestOptions(&options);
+    auto ret = merizo::embedded::addMerizoEmbeddedTestOptions(&options);
     if (!ret.isOK()) {
         std::cerr << ret << std::endl;
         return EXIT_FAILURE;
@@ -711,7 +711,7 @@ int main(const int argc, const char* const* const argv) {
         return EXIT_FAILURE;
     }
 
-    if (merizo_embedded_v1_lib_fini(lib, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
+    if (merizo_embedded_v1_lib_fini(lib, status.get()) != MERIZO_EMBEDDED_V1_SUCCESS) {
         std::cerr << "merizo_embedded_v1_fini() failed with "
                   << merizo_embedded_v1_status_get_error(status.get()) << ": "
                   << merizo_embedded_v1_status_get_explanation(status.get()) << std::endl;
@@ -723,7 +723,7 @@ int main(const int argc, const char* const* const argv) {
     merizo_embedded_v1_init_params params{};
 
     bool receivedCallback = false;
-    params.log_flags = MONGO_EMBEDDED_V1_LOG_STDOUT | MONGO_EMBEDDED_V1_LOG_CALLBACK;
+    params.log_flags = MERIZO_EMBEDDED_V1_LOG_STDOUT | MERIZO_EMBEDDED_V1_LOG_CALLBACK;
     params.log_callback = [](void* user_data,
                              const char* message,
                              const char* component,
@@ -742,7 +742,7 @@ int main(const int argc, const char* const* const argv) {
                   << merizo_embedded_v1_status_get_explanation(status.get()) << std::endl;
     }
 
-    if (merizo_embedded_v1_lib_fini(lib, nullptr) != MONGO_EMBEDDED_V1_SUCCESS) {
+    if (merizo_embedded_v1_lib_fini(lib, nullptr) != MERIZO_EMBEDDED_V1_SUCCESS) {
         std::cerr << "merizo_embedded_v1_fini() failed with "
                   << merizo_embedded_v1_status_get_error(status.get()) << ": "
                   << merizo_embedded_v1_status_get_explanation(status.get()) << std::endl;

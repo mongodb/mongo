@@ -155,7 +155,7 @@ executor:
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
       eval: |
-        jsTest.authenticate(db.getMongo());
+        jsTest.authenticate(db.getMerizo());
         (function() {
           const username = "misha";
           const password = "pwd";
@@ -186,13 +186,13 @@ executor:
     shell_options:
       global_vars:
         TestData: *TestData
-        eval: jsTest.authenticate(db.getMongo())
+        eval: jsTest.authenticate(db.getMerizo())
       <<: *authOptions
   - class: ValidateCollections
     shell_options:
       global_vars:
         TestData: *TestData
-        eval: jsTest.authenticate(db.getMongo())
+        eval: jsTest.authenticate(db.getMerizo())
       <<: *authOptions
   - class: CleanEveryN
     n: 20

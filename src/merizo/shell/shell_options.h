@@ -84,17 +84,17 @@ struct ShellGlobalParams {
 
 extern ShellGlobalParams shellGlobalParams;
 
-std::string getMongoShellHelp(StringData name, const moe::OptionSection& options);
+std::string getMerizoShellHelp(StringData name, const moe::OptionSection& options);
 
 /**
  * Handle options that should come before validation, such as "help".
  *
  * Returns false if an option was found that implies we should prematurely exit with success.
  */
-bool handlePreValidationMongoShellOptions(const moe::Environment& params,
+bool handlePreValidationMerizoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args);
 
-Status storeMongoShellOptions(const moe::Environment& params, const std::vector<std::string>& args);
+Status storeMerizoShellOptions(const moe::Environment& params, const std::vector<std::string>& args);
 
 void redactPasswordOptions(int argc, char** argv);
 }

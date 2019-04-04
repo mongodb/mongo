@@ -20,9 +20,9 @@
             .commandWorked(
                 db.runCommand({find: collName, tailable: true, awaitData: true, batchSize: 0}))
             .cursor.id;
-    const isMongos = db.adminCommand({isdbgrid: 1}).isdbgrid;
-    if (isMongos) {
-        // Mongos will let you establish a cursor with batch size 0 and return to you before it
+    const isMerizos = db.adminCommand({isdbgrid: 1}).isdbgrid;
+    if (isMerizos) {
+        // Merizos will let you establish a cursor with batch size 0 and return to you before it
         // realizes the shard's cursor is exhausted. The next getMore should return a 0 cursor id
         // though.
         assert.neq(emptyBatchCursorId, 0);

@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -80,7 +80,7 @@ public:
     }
 
     DbResponse handleRequest(OperationContext* opCtx, const Message& request) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void setTransportLayer(transport::TransportLayer* tl) {
@@ -165,7 +165,7 @@ TEST(TransportLayerASIO, PortZeroConnect) {
 class TimeoutSEP : public ServiceEntryPoint {
 public:
     void endAllSessions(transport::Session::TagMask tags) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool shutdown(Milliseconds timeout) override {
@@ -183,7 +183,7 @@ public:
     }
 
     DbResponse handleRequest(OperationContext* opCtx, const Message& request) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool waitForTimeout(boost::optional<Milliseconds> timeout = boost::none) {

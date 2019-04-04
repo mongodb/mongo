@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -62,7 +62,7 @@ static Counter64 gleWtimeouts;
 static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
                                                               &gleWtimeouts);
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
 
 bool commandSpecifiesWriteConcern(const BSONObj& cmdObj) {
     return cmdObj.hasField(WriteConcernOptions::kWriteConcernField);
@@ -171,7 +171,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
 
     if (!opCtx->getClient()->isInDirectClient()) {
         // Respecting this failpoint for internal clients prevents stepup from working properly.
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForWriteConcern);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForWriteConcern);
     }
 
     // Next handle blocking on disk

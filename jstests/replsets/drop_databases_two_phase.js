@@ -86,7 +86,7 @@
     // Drop the collection on the primary.
     var dropDatabaseFn = function() {
         var dbNameToDrop = 'dbToDrop';
-        var primary = db.getMongo();
+        var primary = db.getMerizo();
         jsTestLog(
             'Dropping database ' + dbNameToDrop + ' on primary node ' + primary.host +
             '. This command will block because oplog application is paused on the secondary.');
@@ -170,8 +170,8 @@
     var exitCode = dropDatabaseProcess();
 
     let db = primary.getDB(dbNameToDrop);
-    checkLog.contains(db.getMongo(), "dropping collection: " + dbNameToDrop + "." + collNameToDrop);
-    checkLog.contains(db.getMongo(), "dropped 1 collection(s)");
+    checkLog.contains(db.getMerizo(), "dropping collection: " + dbNameToDrop + "." + collNameToDrop);
+    checkLog.contains(db.getMerizo(), "dropped 1 collection(s)");
 
     assert.eq(0, exitCode, 'dropDatabase command on ' + primary.host + ' failed.');
     jsTestLog('Completed dropDatabase command on ' + primary.host);

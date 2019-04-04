@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -175,7 +175,7 @@ public:
             return;
         }
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
         invariant(owned == Ownership::kUnowned);
         _ssm->_owningThread.store(stdx::this_thread::get_id());
 #endif
@@ -215,7 +215,7 @@ public:
     }
 
     explicit operator bool() const {
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
         if (_haveTakenOwnership) {
             invariant(_ssm->_owned.load() != Ownership::kUnowned);
             invariant(_ssm->_owningThread.load() == stdx::this_thread::get_id());
@@ -236,7 +236,7 @@ public:
     void release() {
         auto owned = _ssm->_owned.load();
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
         dassert(_haveTakenOwnership);
         dassert(owned != Ownership::kUnowned);
         dassert(_ssm->_owningThread.load() == stdx::this_thread::get_id());
@@ -308,7 +308,7 @@ void ServiceStateMachine::_sourceMessage(ThreadGuard guard) {
 
     auto sourceMsgImpl = [&] {
         if (_transportMode == transport::Mode::kSynchronous) {
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             return Future<Message>::makeReady(_session()->sourceMessage());
         } else {
             invariant(_transportMode == transport::Mode::kAsynchronous);
@@ -518,7 +518,7 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
                 _cleanupSession(std::move(guard));
                 break;
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
 
         return;

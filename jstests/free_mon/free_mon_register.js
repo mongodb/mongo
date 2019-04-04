@@ -18,7 +18,7 @@ load("jstests/free_mon/libs/free_mon.js");
         verbose: 1,
     };
 
-    const conn = MongoRunner.runMongod(options);
+    const conn = MerizoRunner.runMerizod(options);
     assert.neq(null, conn, 'merizod was unable to start up');
 
     WaitForRegistration(conn);
@@ -47,7 +47,7 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(last_metrics.version, 2);
     assert.gt(new Date().setTime(last_metrics.localTime["$date"]), localTime);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     mock_web.stop();
 })();

@@ -18,7 +18,7 @@ func TestTimestampValue(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("When converting JSON with Timestamp values", t, func() {
-		testTS := bson.MongoTimestamp(123456<<32 | 55)
+		testTS := bson.MerizoTimestamp(123456<<32 | 55)
 
 		Convey("works for Timestamp literal", func() {
 

@@ -12,7 +12,7 @@
         // Unfortunately, having bind_ip = ::1 won't work in the test framework (But does work when
         // tested manually), so 127.0.0.1 is also present so the test merizo shell can connect
         // with that address.
-        var merizod = MongoRunner.runMongod({ipv6: "", bind_ip: "::1,127.0.0.1"});
+        var merizod = MerizoRunner.runMerizod({ipv6: "", bind_ip: "::1,127.0.0.1"});
         if (merizod == null) {
             jsTest.log("Unable to run test because ipv6 is not on machine, see BF-10990");
             return;
@@ -27,16 +27,16 @@
             merizod.port,
             "--eval",
             "inner_mode=true;port=" + merizod.port + ";",
-            "jstests/noPassthroughWithMongod/ipv6_connection_string_validation.js"
+            "jstests/noPassthroughWithMerizod/ipv6_connection_string_validation.js"
         ];
-        var exitCode = _runMongoProgram.apply(null, args);
+        var exitCode = _runMerizoProgram.apply(null, args);
         jsTest.log("Inner mode test finished, exit code was " + exitCode);
 
         // Pass the inner test's exit code back as the outer test's exit code
         if (exitCode != 0) {
             doassert("inner test failed with exit code " + exitCode);
         }
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
         return;
     }
 

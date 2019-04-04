@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -90,7 +90,7 @@ public:
                                                    aggregationRequest,
                                                    _privileges,
                                                    result));
-            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>& ex) {
                 // If the aggregation failed because the namespace is a view, re-run the command
                 // with the resolved view pipeline and namespace.
                 uassertStatusOK(ClusterAggregate::retryOnViewError(opCtx,

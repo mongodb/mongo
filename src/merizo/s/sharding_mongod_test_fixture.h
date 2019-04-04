@@ -54,11 +54,11 @@ class ReplSettings;
  * components (including a NetworkInterface/TaskExecutor subsystem backed by the NetworkTestEnv),
  * but allows subclasses to replace any component with its real implementation, a mock, or nullptr.
  */
-class ShardingMongodTestFixture : public ServiceContextMongoDTest,
+class ShardingMerizodTestFixture : public ServiceContextMerizoDTest,
                                   public ShardingTestFixtureCommon {
 public:
-    ShardingMongodTestFixture();
-    ~ShardingMongodTestFixture();
+    ShardingMerizodTestFixture();
+    ~ShardingMerizodTestFixture();
 
     /**
      * Initializes sharding components according to the cluster role in
@@ -68,7 +68,7 @@ public:
      * It is illegal to call this if serverGlobalParams.clusterRole is not ClusterRole::ShardServer
      * or ClusterRole::ConfigServer.
      */
-    Status initializeGlobalShardingStateForMongodForTest(const ConnectionString& configConnStr);
+    Status initializeGlobalShardingStateForMerizodForTest(const ConnectionString& configConnStr);
 
     // Syntactic sugar for getting sharding components off the Grid, if they have been initialized.
 

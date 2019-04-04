@@ -26,7 +26,7 @@ const required = new TransportMode("requireSSL", "requireTLS");
 
 function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
     var conn =
-        MongoRunner.runMongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
+        MerizoRunner.runMerizod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
 
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
@@ -35,23 +35,23 @@ function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
 
     assert(res["ok"] == shouldSucceed, tojson(res));
     if (!shouldSucceed) {
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
         return;
     }
 
     if (newMode != "requireSSL") {
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
         return;
     }
 
     let uri = `merizodb://localhost:${conn.port}/admin`;
-    let exitCode = runMongoProgram("merizo", uri, "--eval", "assert.commandWorked(db.isMaster())");
+    let exitCode = runMerizoProgram("merizo", uri, "--eval", "assert.commandWorked(db.isMaster())");
     assert.neq(exitCode, 0, "Was able to connect without SSL when SSLMode was requireSSL");
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }
 
 function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
-    var conn = MongoRunner.runMongod({
+    var conn = MerizoRunner.runMerizod({
         sslMode: sslMode,
         sslPEMKeyFile: SERVER_CERT,
         sslCAFile: CA_CERT,
@@ -64,7 +64,7 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
     var res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newMode});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }
 
 function testTransportTransitions(scheme) {

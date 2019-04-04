@@ -4,7 +4,7 @@
  */
 (function() {
     load("jstests/aggregation/extras/out_helpers.js");  // For withEachOutMode().
-    load("jstests/libs/fixture_helpers.js");            // For isMongos().
+    load("jstests/libs/fixture_helpers.js");            // For isMerizos().
     load("jstests/libs/profiler.js");  // For profilerHasSingleMatchingEntryOrThrow.
 
     const kDBName = "test";
@@ -128,11 +128,11 @@
 
     // Run on a standalone.
     (function() {
-        const conn = MongoRunner.runMongod({});
+        const conn = MerizoRunner.runMerizod({});
         assert.neq(null, conn, 'merizod was unable to start up');
         insertDocs(conn.getDB(kDBName)[kSourceCollName]);
         withEachOutMode((mode) => runUnshardedTest(mode, conn));
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     })();
 
     // Runs a $out against 'merizosConn' and verifies that the maxTimeMS value is included in the

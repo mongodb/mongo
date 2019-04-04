@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #if defined(_WIN32)
 

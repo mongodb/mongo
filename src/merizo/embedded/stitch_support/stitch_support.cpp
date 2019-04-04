@@ -49,9 +49,9 @@
 #include <string>
 
 #if defined(_WIN32)
-#define MONGO_API_CALL __cdecl
+#define MERIZO_API_CALL __cdecl
 #else
-#define MONGO_API_CALL
+#define MERIZO_API_CALL
 #endif
 
 namespace merizo {
@@ -419,38 +419,38 @@ auto fromInterfaceType(const uint8_t* bson) noexcept {
 
 extern "C" {
 
-stitch_support_v1_lib* MONGO_API_CALL stitch_support_v1_init(stitch_support_v1_status* status) {
+stitch_support_v1_lib* MERIZO_API_CALL stitch_support_v1_init(stitch_support_v1_status* status) {
     return enterCXX(merizo::getStatusImpl(status), [&]() { return merizo::stitch_lib_init(); });
 }
 
-int MONGO_API_CALL stitch_support_v1_fini(stitch_support_v1_lib* const lib,
+int MERIZO_API_CALL stitch_support_v1_fini(stitch_support_v1_lib* const lib,
                                           stitch_support_v1_status* const status) {
     return enterCXX(merizo::getStatusImpl(status), [&]() { return merizo::stitch_lib_fini(lib); });
 }
 
-int MONGO_API_CALL
+int MERIZO_API_CALL
 stitch_support_v1_status_get_error(const stitch_support_v1_status* const status) {
     return merizo::capi_status_get_error(status);
 }
 
-const char* MONGO_API_CALL
+const char* MERIZO_API_CALL
 stitch_support_v1_status_get_explanation(const stitch_support_v1_status* const status) {
     return merizo::capi_status_get_what(status);
 }
 
-int MONGO_API_CALL stitch_support_v1_status_get_code(const stitch_support_v1_status* const status) {
+int MERIZO_API_CALL stitch_support_v1_status_get_code(const stitch_support_v1_status* const status) {
     return merizo::capi_status_get_code(status);
 }
 
-stitch_support_v1_status* MONGO_API_CALL stitch_support_v1_status_create(void) {
+stitch_support_v1_status* MERIZO_API_CALL stitch_support_v1_status_create(void) {
     return new stitch_support_v1_status;
 }
 
-void MONGO_API_CALL stitch_support_v1_status_destroy(stitch_support_v1_status* const status) {
+void MERIZO_API_CALL stitch_support_v1_status_destroy(stitch_support_v1_status* const status) {
     delete status;
 }
 
-stitch_support_v1_collator* MONGO_API_CALL
+stitch_support_v1_collator* MERIZO_API_CALL
 stitch_support_v1_collator_create(stitch_support_v1_lib* lib,
                                   const uint8_t* collationBSON,
                                   stitch_support_v1_status* const status) {
@@ -460,12 +460,12 @@ stitch_support_v1_collator_create(stitch_support_v1_lib* lib,
     });
 }
 
-void MONGO_API_CALL stitch_support_v1_collator_destroy(stitch_support_v1_collator* const collator) {
+void MERIZO_API_CALL stitch_support_v1_collator_destroy(stitch_support_v1_collator* const collator) {
     merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete collator; }));
 }
 
-stitch_support_v1_matcher* MONGO_API_CALL
+stitch_support_v1_matcher* MERIZO_API_CALL
 stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
                                  const uint8_t* filterBSON,
                                  stitch_support_v1_collator* collator,
@@ -476,12 +476,12 @@ stitch_support_v1_matcher_create(stitch_support_v1_lib* lib,
     });
 }
 
-void MONGO_API_CALL stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher) {
+void MERIZO_API_CALL stitch_support_v1_matcher_destroy(stitch_support_v1_matcher* const matcher) {
     merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete matcher; }));
 }
 
-stitch_support_v1_projection* MONGO_API_CALL
+stitch_support_v1_projection* MERIZO_API_CALL
 stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
                                     const uint8_t* specBSON,
                                     stitch_support_v1_matcher* matcher,
@@ -493,13 +493,13 @@ stitch_support_v1_projection_create(stitch_support_v1_lib* lib,
     });
 }
 
-void MONGO_API_CALL
+void MERIZO_API_CALL
 stitch_support_v1_projection_destroy(stitch_support_v1_projection* const projection) {
     merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete projection; }));
 }
 
-int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
+int MERIZO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matcher,
                                                  const uint8_t* documentBSON,
                                                  bool* isMatch,
                                                  stitch_support_v1_status* status) {
@@ -509,7 +509,7 @@ int MONGO_API_CALL stitch_support_v1_check_match(stitch_support_v1_matcher* matc
     });
 }
 
-uint8_t* MONGO_API_CALL
+uint8_t* MERIZO_API_CALL
 stitch_support_v1_projection_apply(stitch_support_v1_projection* const projection,
                                    const uint8_t* documentBSON,
                                    stitch_support_v1_status* status) {
@@ -530,7 +530,7 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
     });
 }
 
-bool MONGO_API_CALL
+bool MERIZO_API_CALL
 stitch_support_v1_projection_requires_match(stitch_support_v1_projection* const projection) {
     return [projection]() noexcept {
         return projection->projectionExec.projectRequiresQueryExpression();
@@ -538,7 +538,7 @@ stitch_support_v1_projection_requires_match(stitch_support_v1_projection* const 
     ();
 }
 
-stitch_support_v1_update* MONGO_API_CALL
+stitch_support_v1_update* MERIZO_API_CALL
 stitch_support_v1_update_create(stitch_support_v1_lib* lib,
                                 const uint8_t* updateExprBSON,
                                 const uint8_t* arrayFiltersBSON,
@@ -554,12 +554,12 @@ stitch_support_v1_update_create(stitch_support_v1_lib* lib,
     });
 }
 
-void MONGO_API_CALL stitch_support_v1_update_destroy(stitch_support_v1_update* const update) {
+void MERIZO_API_CALL stitch_support_v1_update_destroy(stitch_support_v1_update* const update) {
     merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete update; }));
 }
 
-uint8_t* MONGO_API_CALL
+uint8_t* MERIZO_API_CALL
 stitch_support_v1_update_apply(stitch_support_v1_update* const update,
                                const uint8_t* documentBSON,
                                stitch_support_v1_update_details* update_details,
@@ -616,7 +616,7 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
     });
 }
 
-uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update* const update,
+uint8_t* MERIZO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update* const update,
                                                         stitch_support_v1_status* status) {
     return enterCXX(merizo::getStatusImpl(status), [=] {
         merizo::FieldRefSet immutablePaths;  //  Empty set
@@ -654,33 +654,33 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
     });
 }
 
-bool MONGO_API_CALL
+bool MERIZO_API_CALL
 stitch_support_v1_update_requires_match(stitch_support_v1_update* const update) {
     return [update]() { return update->updateDriver.needMatchDetails(); }();
 }
 
-stitch_support_v1_update_details* MONGO_API_CALL stitch_support_v1_update_details_create(void) {
+stitch_support_v1_update_details* MERIZO_API_CALL stitch_support_v1_update_details_create(void) {
     return new stitch_support_v1_update_details;
 };
 
-void MONGO_API_CALL
+void MERIZO_API_CALL
 stitch_support_v1_update_details_destroy(stitch_support_v1_update_details* update_details) {
     merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete update_details; }));
 };
 
-size_t MONGO_API_CALL stitch_support_v1_update_details_num_modified_paths(
+size_t MERIZO_API_CALL stitch_support_v1_update_details_num_modified_paths(
     stitch_support_v1_update_details* update_details) {
     return update_details->modifiedPaths.size();
 }
 
-const char* MONGO_API_CALL stitch_support_v1_update_details_path(
+const char* MERIZO_API_CALL stitch_support_v1_update_details_path(
     stitch_support_v1_update_details* update_details, size_t path_index) {
     invariant(path_index < update_details->modifiedPaths.size());
     return update_details->modifiedPaths[path_index].c_str();
 }
 
-void MONGO_API_CALL stitch_support_v1_bson_free(uint8_t* bson) {
+void MERIZO_API_CALL stitch_support_v1_bson_free(uint8_t* bson) {
     merizo::StitchSupportStatusImpl* nullStatus = nullptr;
     static_cast<void>(enterCXX(nullStatus, [=]() { delete[](bson); }));
 }

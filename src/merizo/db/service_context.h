@@ -88,8 +88,8 @@ protected:
 };
 
 /**
- * Class representing the context of a service, such as a MongoD database service or
- * a MongoS routing service.
+ * Class representing the context of a service, such as a MerizoD database service or
+ * a MerizoS routing service.
  *
  * A ServiceContext is the root of a hierarchy of contexts.  A ServiceContext owns
  * zero or more Clients, which in turn each own OperationContexts.
@@ -245,7 +245,7 @@ public:
      * also register a function to execute before those contexts are destroyed.
      *
      * Construct instances of this type during static initialization only, as they register
-     * MONGO_INITIALIZERS.
+     * MERIZO_INITIALIZERS.
      */
     class ConstructorActionRegisterer {
     public:

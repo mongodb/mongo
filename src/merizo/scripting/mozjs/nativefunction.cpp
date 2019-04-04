@@ -47,7 +47,7 @@ const char* const NativeFunctionInfo::inheritFrom = "Function";
 const char* const NativeFunctionInfo::className = "NativeFunction";
 
 const JSFunctionSpec NativeFunctionInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NativeFunctionInfo), JS_FS_END,
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toString, NativeFunctionInfo), JS_FS_END,
 };
 
 namespace {

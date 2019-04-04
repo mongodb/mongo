@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -204,7 +204,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             }
             default:
                 // A collection scan plan which does not yield should never fail.
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
 
         try {
@@ -237,7 +237,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         }
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void convertToCapped(OperationContext* opCtx,

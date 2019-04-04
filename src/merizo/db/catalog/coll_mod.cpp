@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -63,9 +63,9 @@ namespace {
 
 // Causes the server to hang when it attempts to assign UUIDs to the provided database (or all
 // databases if none are provided).
-MONGO_FAIL_POINT_DEFINE(hangBeforeDatabaseUpgrade);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeDatabaseUpgrade);
 
-MONGO_FAIL_POINT_DEFINE(assertAfterIndexUpdate);
+MERIZO_FAIL_POINT_DEFINE(assertAfterIndexUpdate);
 
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
@@ -402,7 +402,7 @@ Status _collModInternal(OperationContext* opCtx,
             cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
             result->appendAs(newExpireSecs, "expireAfterSeconds_new");
 
-            if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
+            if (MERIZO_FAIL_POINT(assertAfterIndexUpdate)) {
                 log() << "collMod - assertAfterIndexUpdate fail point enabled.";
                 uasserted(50970, "trigger rollback after the index update");
             }
@@ -450,7 +450,7 @@ Status _collModInternal(OperationContext* opCtx,
             // Refresh the in-memory instance of the index.
             desc = coll->getIndexCatalog()->refreshEntry(opCtx, desc);
 
-            if (MONGO_FAIL_POINT(assertAfterIndexUpdate)) {
+            if (MERIZO_FAIL_POINT(assertAfterIndexUpdate)) {
                 log() << "collMod - assertAfterIndexUpdate fail point enabled.";
                 uasserted(50971, "trigger rollback for unique index update");
             }

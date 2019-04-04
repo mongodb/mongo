@@ -115,9 +115,9 @@ class Fixture(object):
             "get_driver_connection_url must be implemented by Fixture subclasses")
 
     def merizo_client(self, read_preference=pymerizo.ReadPreference.PRIMARY, timeout_millis=30000):
-        """Return a pymerizo.MongoClient connecting to this fixture with specified 'read_preference'.
+        """Return a pymerizo.MerizoClient connecting to this fixture with specified 'read_preference'.
 
-        The PyMongo driver will wait up to 'timeout_millis' milliseconds
+        The PyMerizo driver will wait up to 'timeout_millis' milliseconds
         before concluding that the server is unavailable.
         """
 
@@ -126,7 +126,7 @@ class Fixture(object):
             kwargs["serverSelectionTimeoutMS"] = timeout_millis
             kwargs["connect"] = True
 
-        return pymerizo.MongoClient(host=self.get_driver_connection_url(),
+        return pymerizo.MerizoClient(host=self.get_driver_connection_url(),
                                    read_preference=read_preference, **kwargs)
 
     def __str__(self):
@@ -181,7 +181,7 @@ class ReplFixture(Fixture):
                 message = "Replication of write operation timed out."
                 self.logger.error(message)
                 raise errors.ServerFailure(message)
-            except pymerizo.errors.PyMongoError as err:
+            except pymerizo.errors.PyMerizoError as err:
                 message = "Write operation on {} failed: {}".format(
                     self.get_driver_connection_url(), err)
                 raise errors.ServerFailure(message)
@@ -190,7 +190,7 @@ class ReplFixture(Fixture):
 class NoOpFixture(Fixture):
     """A Fixture implementation that does not start any servers.
 
-    Used when the MerizoDB deployment is started by the JavaScript test itself with MongoRunner,
+    Used when the MerizoDB deployment is started by the JavaScript test itself with MerizoRunner,
     ReplSetTest, or ShardingTest.
     """
 

@@ -37,8 +37,8 @@
 namespace merizo {
 namespace {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
+MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
+MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
 boost::optional<ChunkVersion> extractOptionalVersion(const BSONObj& obj, StringData field) {
     auto swChunkVersion = ChunkVersion::parseLegacyWithField(obj, field);

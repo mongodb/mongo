@@ -40,24 +40,24 @@
 namespace merizo {
 namespace {
 
-MONGO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<void()>>, void>::value);
-MONGO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<Status()>>, void>::value);
-MONGO_STATIC_ASSERT(
+MERIZO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<void()>>, void>::value);
+MERIZO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<Status()>>, void>::value);
+MERIZO_STATIC_ASSERT(
     std::is_same<FutureContinuationResult<std::function<Future<void>()>>, void>::value);
-MONGO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<int()>>, int>::value);
-MONGO_STATIC_ASSERT(
+MERIZO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<int()>>, int>::value);
+MERIZO_STATIC_ASSERT(
     std::is_same<FutureContinuationResult<std::function<StatusWith<int>()>>, int>::value);
-MONGO_STATIC_ASSERT(
+MERIZO_STATIC_ASSERT(
     std::is_same<FutureContinuationResult<std::function<Future<int>()>>, int>::value);
-MONGO_STATIC_ASSERT(
+MERIZO_STATIC_ASSERT(
     std::is_same<FutureContinuationResult<std::function<int(bool)>, bool>, int>::value);
 
 template <typename T>
 auto overloadCheck(T) -> FutureContinuationResult<std::function<std::true_type(bool)>, T>;
 auto overloadCheck(...) -> std::false_type;
 
-MONGO_STATIC_ASSERT(decltype(overloadCheck(bool()))::value);          // match.
-MONGO_STATIC_ASSERT(!decltype(overloadCheck(std::string()))::value);  // SFINAE-failure.
+MERIZO_STATIC_ASSERT(decltype(overloadCheck(bool()))::value);          // match.
+MERIZO_STATIC_ASSERT(!decltype(overloadCheck(std::string()))::value);  // SFINAE-failure.
 
 
 TEST(Future, Success_getLvalue) {
@@ -288,7 +288,7 @@ TEST(Future, Success_thenError_Status) {
                         [](Future<int>&& fut) {
                             auto fut2 = std::move(fut).then(
                                 [](int i) { return Status(ErrorCodes::BadValue, "oh no!"); });
-                            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
+                            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
                             ASSERT_THROWS(fut2.get(), ExceptionFor<ErrorCodes::BadValue>);
                         });
 }
@@ -299,7 +299,7 @@ TEST(Future, Success_thenError_StatusWith) {
         [](Future<int>&& fut) {
             auto fut2 = std::move(fut).then(
                 [](int i) { return StatusWith<double>(ErrorCodes::BadValue, "oh no!"); });
-            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<double>>::value);
+            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<double>>::value);
             ASSERT_THROWS(fut2.get(), ExceptionFor<ErrorCodes::BadValue>);
         });
 }
@@ -517,7 +517,7 @@ TEST(Future, Fail_onErrorCodeMismatch) {
         ASSERT_EQ(std::move(fut)
                       .onError<ErrorCodes::InternalError>([](Status s) -> int {
                           FAIL("Why was this called?") << s;
-                          MONGO_UNREACHABLE;
+                          MERIZO_UNREACHABLE;
                       })
                       .onError([](Status s) {
                           ASSERT_EQ(s, failStatus());
@@ -562,7 +562,7 @@ TEST(Future, Fail_onErrorCategoryMismatch) {
         ASSERT_EQ(std::move(fut)
                       .onErrorCategory<ErrorCategory::NetworkError>([](Status s) -> int {
                           FAIL("Why was this called?") << s;
-                          MONGO_UNREACHABLE;
+                          MERIZO_UNREACHABLE;
                       })
                       .onError([](Status s) {
                           ASSERT_EQ(s, failStatus());
@@ -787,7 +787,7 @@ TEST(Future, Success_onCompletionError_Status) {
                             auto fut2 = std::move(fut).onCompletion([](StatusWith<int> i) {
                                 return Status(ErrorCodes::BadValue, "oh no!");
                             });
-                            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
+                            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
                             ASSERT_THROWS(fut2.get(), ExceptionFor<ErrorCodes::BadValue>);
                         });
 }
@@ -798,7 +798,7 @@ TEST(Future, Success_onCompletionError_StatusWith) {
                             auto fut2 = std::move(fut).onCompletion([](StatusWith<int> i) {
                                 return StatusWith<double>(ErrorCodes::BadValue, "oh no!");
                             });
-                            MONGO_STATIC_ASSERT(
+                            MERIZO_STATIC_ASSERT(
                                 std::is_same<decltype(fut2), Future<double>>::value);
                             ASSERT_THROWS(fut2.get(), ExceptionFor<ErrorCodes::BadValue>);
                         });

@@ -10,7 +10,7 @@
  * Intended for use by workloads testing sharding (i.e., workloads starting with 'sharded_').
  */
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos & isMongod
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMerizos & isMerizod
 
 var ChunkHelper = (function() {
     // exponential backoff
@@ -89,7 +89,7 @@ var ChunkHelper = (function() {
         assertAlways(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
 
         for (var conn of connArr) {
-            assert(isMongod(conn.getDB('admin')), tojson(conn) + ' is not to a merizod');
+            assert(isMerizod(conn.getDB('admin')), tojson(conn) + ' is not to a merizod');
             var res = conn.adminCommand({isMaster: 1});
             assertAlways.commandWorked(res);
 
@@ -102,17 +102,17 @@ var ChunkHelper = (function() {
 
     // Take a set of merizos connections to a sharded cluster and return a
     // random connection.
-    function getRandomMongos(connArr) {
+    function getRandomMerizos(connArr) {
         assertAlways(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
         var conn = connArr[Random.randInt(connArr.length)];
-        assert(isMongos(conn.getDB('admin')), tojson(conn) + ' is not to a merizos');
+        assert(isMerizos(conn.getDB('admin')), tojson(conn) + ' is not to a merizos');
         return conn;
     }
 
     // Intended for use on merizos connections only.
     // Return all shards containing documents in [lower, upper).
     function getShardsForRange(conn, collName, lower, upper) {
-        assert(isMongos(conn.getDB('admin')), tojson(conn) + ' is not to a merizos');
+        assert(isMerizos(conn.getDB('admin')), tojson(conn) + ' is not to a merizos');
         var adminDB = conn.getDB('admin');
         var shardVersion = adminDB.runCommand({getShardVersion: collName, fullMetadata: true});
         assertAlways.commandWorked(shardVersion);
@@ -146,7 +146,7 @@ var ChunkHelper = (function() {
     // Get number of chunks containing values in [lower, upper). The upper bound on a chunk is
     // exclusive, but to capture the chunk we must provide it with less than or equal to 'upper'.
     function getNumChunks(conn, ns, lower, upper) {
-        assert(isMongos(conn.getDB('admin')) || isMongodConfigsvr(conn.getDB('admin')),
+        assert(isMerizos(conn.getDB('admin')) || isMerizodConfigsvr(conn.getDB('admin')),
                tojson(conn) + ' is not to a merizos or a merizod config server');
         assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
                ns + ' is not a valid namespace');
@@ -158,7 +158,7 @@ var ChunkHelper = (function() {
     // For getting chunks containing values in [lower, upper). The upper bound on a chunk is
     // exclusive, but to capture the chunk we must provide it with less than or equal to 'upper'.
     function getChunks(conn, ns, lower, upper) {
-        assert(isMongos(conn.getDB('admin')) || isMongodConfigsvr(conn.getDB('admin')),
+        assert(isMerizos(conn.getDB('admin')) || isMerizodConfigsvr(conn.getDB('admin')),
                tojson(conn) + ' is not to a merizos or a merizod config server');
         assert(isString(ns) && ns.indexOf('.') !== -1 && !ns.startsWith('.') && !ns.endsWith('.'),
                ns + ' is not a valid namespace');
@@ -170,7 +170,7 @@ var ChunkHelper = (function() {
     // For debug printing chunks containing values in [lower, upper). The upper bound on a chunk is
     // exclusive, but to capture the chunk we must provide it with less than or equal to 'upper'.
     function stringifyChunks(conn, lower, upper) {
-        assert(isMongos(conn.getDB('admin')) || isMongodConfigsvr(conn.getDB('admin')),
+        assert(isMerizos(conn.getDB('admin')) || isMerizodConfigsvr(conn.getDB('admin')),
                tojson(conn) + ' is not to a merizos or a merizod config server');
         return getChunks(conn, lower, upper).map(chunk => tojson(chunk)).join('\n');
     }
@@ -181,7 +181,7 @@ var ChunkHelper = (function() {
         moveChunk: moveChunk,
         mergeChunks: mergeChunks,
         getPrimary: getPrimary,
-        getRandomMongos: getRandomMongos,
+        getRandomMerizos: getRandomMerizos,
         getShardsForRange: getShardsForRange,
         getNumDocs: getNumDocs,
         getNumChunks: getNumChunks,

@@ -32,35 +32,35 @@
 #include <merizo_embedded/merizo_embedded.h>
 #include <merizoc/merizoc.h>
 
-#pragma push_macro("MONGO_API_CALL")
-#undef MONGO_API_CALL
+#pragma push_macro("MERIZO_API_CALL")
+#undef MERIZO_API_CALL
 
-#pragma push_macro("MONGO_API_IMPORT")
-#undef MONGO_API_IMPORT
+#pragma push_macro("MERIZO_API_IMPORT")
+#undef MERIZO_API_IMPORT
 
-#pragma push_macro("MONGO_API_EXPORT")
-#undef MONGO_API_EXPORT
+#pragma push_macro("MERIZO_API_EXPORT")
+#undef MERIZO_API_EXPORT
 
-#pragma push_macro("MONGOC_EMBEDDED_API")
-#undef MONGOC_EMBEDDED_API
+#pragma push_macro("MERIZOC_EMBEDDED_API")
+#undef MERIZOC_EMBEDDED_API
 
 #if defined(_WIN32)
-#define MONGO_API_CALL __cdecl
-#define MONGO_API_IMPORT __declspec(dllimport)
-#define MONGO_API_EXPORT __declspec(dllexport)
+#define MERIZO_API_CALL __cdecl
+#define MERIZO_API_IMPORT __declspec(dllimport)
+#define MERIZO_API_EXPORT __declspec(dllexport)
 #else
-#define MONGO_API_CALL
-#define MONGO_API_IMPORT __attribute__((visibility("default")))
-#define MONGO_API_EXPORT __attribute__((used, visibility("default")))
+#define MERIZO_API_CALL
+#define MERIZO_API_IMPORT __attribute__((visibility("default")))
+#define MERIZO_API_EXPORT __attribute__((used, visibility("default")))
 #endif
 
-#if defined(MONGOC_EMBEDDED_STATIC)
-#define MONGOC_EMBEDDED_API
+#if defined(MERIZOC_EMBEDDED_STATIC)
+#define MERIZOC_EMBEDDED_API
 #else
-#if defined(MONGOC_EMBEDDED_COMPILING)
-#define MONGOC_EMBEDDED_API MONGO_API_EXPORT
+#if defined(MERIZOC_EMBEDDED_COMPILING)
+#define MERIZOC_EMBEDDED_API MERIZO_API_EXPORT
 #else
-#define MONGOC_EMBEDDED_API MONGO_API_IMPORT
+#define MERIZOC_EMBEDDED_API MERIZO_API_IMPORT
 #endif
 #endif
 
@@ -73,23 +73,23 @@ extern "C" {
  * @param db must be a valid instance handle created by `merizo_embedded_v1_instance_create`
  * @returns a merizoc client or `NULL` on error
  */
-MONGOC_EMBEDDED_API merizoc_client_t* MONGO_API_CALL
+MERIZOC_EMBEDDED_API merizoc_client_t* MERIZO_API_CALL
 merizoc_embedded_v1_client_create(merizo_embedded_v1_instance* instance);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#undef MONGOC_EMBEDDED_API
-#pragma pop_macro("MONGOC_EMBEDDED_API")
+#undef MERIZOC_EMBEDDED_API
+#pragma pop_macro("MERIZOC_EMBEDDED_API")
 
-#undef MONGO_API_EXPORT
-#pragma push_macro("MONGO_API_EXPORT")
+#undef MERIZO_API_EXPORT
+#pragma push_macro("MERIZO_API_EXPORT")
 
-#undef MONGO_API_IMPORT
-#pragma push_macro("MONGO_API_IMPORT")
+#undef MERIZO_API_IMPORT
+#pragma push_macro("MERIZO_API_IMPORT")
 
-#undef MONGO_API_CALL
-#pragma pop_macro("MONGO_API_CALL")
+#undef MERIZO_API_CALL
+#pragma pop_macro("MERIZO_API_CALL")
 
 #endif  // HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -54,7 +54,7 @@ namespace {
  */
 ThreadPool::Options makeDefaultThreadPoolOptions() {
     ThreadPool::Options options;
-    options.poolName = "IndexBuildsCoordinatorMongod";
+    options.poolName = "IndexBuildsCoordinatorMerizod";
     options.minThreads = 0;
     options.maxThreads = 10;
 
@@ -68,12 +68,12 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
 
 }  // namespace
 
-IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
+IndexBuildsCoordinatorMerizod::IndexBuildsCoordinatorMerizod()
     : _threadPool(makeDefaultThreadPoolOptions()) {
     _threadPool.startup();
 }
 
-void IndexBuildsCoordinatorMongod::shutdown() {
+void IndexBuildsCoordinatorMerizod::shutdown() {
     // Stop new scheduling.
     _threadPool.shutdown();
 
@@ -85,7 +85,7 @@ void IndexBuildsCoordinatorMongod::shutdown() {
 }
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
-IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
+IndexBuildsCoordinatorMerizod::startIndexBuild(OperationContext* opCtx,
                                               CollectionUUID collectionUUID,
                                               const std::vector<BSONObj>& specs,
                                               const UUID& buildUUID,
@@ -207,35 +207,35 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     return replState->sharedPromise.getFuture();
 }
 
-Status IndexBuildsCoordinatorMongod::commitIndexBuild(OperationContext* opCtx,
+Status IndexBuildsCoordinatorMerizod::commitIndexBuild(OperationContext* opCtx,
                                                       const std::vector<BSONObj>& specs,
                                                       const UUID& buildUUID) {
     // TODO: not yet implemented.
     return Status::OK();
 }
 
-void IndexBuildsCoordinatorMongod::signalChangeToPrimaryMode() {
+void IndexBuildsCoordinatorMerizod::signalChangeToPrimaryMode() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _replMode = ReplState::Primary;
 }
 
-void IndexBuildsCoordinatorMongod::signalChangeToSecondaryMode() {
+void IndexBuildsCoordinatorMerizod::signalChangeToSecondaryMode() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _replMode = ReplState::Secondary;
 }
 
-void IndexBuildsCoordinatorMongod::signalChangeToInitialSyncMode() {
+void IndexBuildsCoordinatorMerizod::signalChangeToInitialSyncMode() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _replMode = ReplState::InitialSync;
 }
 
-Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(const UUID& buildUUID,
+Status IndexBuildsCoordinatorMerizod::voteCommitIndexBuild(const UUID& buildUUID,
                                                           const HostAndPort& hostAndPort) {
     // TODO: not yet implemented.
     return Status::OK();
 }
 
-Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
+Status IndexBuildsCoordinatorMerizod::setCommitQuorum(OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      const std::vector<StringData>& indexNames,
                                                      const CommitQuorumOptions& newCommitQuorum) {
@@ -297,28 +297,28 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     return indexbuildentryhelpers::setCommitQuorum(opCtx, buildUUID, newCommitQuorum);
 }
 
-Status IndexBuildsCoordinatorMongod::_finishScanningPhase() {
+Status IndexBuildsCoordinatorMerizod::_finishScanningPhase() {
     // TODO: implement.
     return Status::OK();
 }
 
-Status IndexBuildsCoordinatorMongod::_finishVerificationPhase() {
+Status IndexBuildsCoordinatorMerizod::_finishVerificationPhase() {
     // TODO: implement.
     return Status::OK();
 }
 
-Status IndexBuildsCoordinatorMongod::_finishCommitPhase() {
+Status IndexBuildsCoordinatorMerizod::_finishCommitPhase() {
     // TODO: implement.
     return Status::OK();
 }
 
-StatusWith<bool> IndexBuildsCoordinatorMongod::_checkCommitQuorum(
+StatusWith<bool> IndexBuildsCoordinatorMerizod::_checkCommitQuorum(
     const BSONObj& commitQuorum, const std::vector<HostAndPort>& confirmedMembers) {
     // TODO: not yet implemented.
     return false;
 }
 
-void IndexBuildsCoordinatorMongod::_refreshReplStateFromPersisted(OperationContext* opCtx,
+void IndexBuildsCoordinatorMerizod::_refreshReplStateFromPersisted(OperationContext* opCtx,
                                                                   const UUID& buildUUID) {
     // TODO: not yet implemented.
 }

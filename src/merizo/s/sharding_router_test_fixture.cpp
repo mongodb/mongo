@@ -111,7 +111,7 @@ ShardingTestFixture::ShardingTestFixture() {
         auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
         hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
         hookList->addHook(stdx::make_unique<rpc::CommittedOpTimeMetadataHook>(service));
-        hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(service));
+        hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMerizos>(service));
         return hookList;
     };
 

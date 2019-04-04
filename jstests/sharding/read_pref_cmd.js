@@ -39,15 +39,15 @@ var tearDown = function() {
 /**
  * Performs a series of tests on commands with read preference.
  *
- * @param conn {Mongo} the connection object of which to test the read
+ * @param conn {Merizo} the connection object of which to test the read
  *     preference functionality.
- * @param hostList {Array.<Mongo>} list of the replica set host members.
- * @param isMongos {boolean} true if conn is a merizos connection.
+ * @param hostList {Array.<Merizo>} list of the replica set host members.
+ * @param isMerizos {boolean} true if conn is a merizos connection.
  * @param mode {string} a read preference mode like 'secondary'
  * @param tagSets {Array.<Object>} list of tag sets to use
  * @param secExpected {boolean} true if we expect to run any commands on secondary
  */
-var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secExpected) {
+var testReadPreference = function(conn, hostList, isMerizos, mode, tagSets, secExpected) {
     var testDB = conn.getDB('test');
     var adminDB = conn.getDB('admin');
     conn.setSlaveOk(false);  // purely rely on readPref
@@ -132,7 +132,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     // Test inline mapReduce on sharded collection.
     // Note that in sharded map reduce, it will output the result in a temp collection
     // even if out is inline.
-    if (isMongos) {
+    if (isMerizos) {
         cmdTest({mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
                 false,
                 formatProfileQuery({mapreduce: 'user', shardedFirstPass: true}));
@@ -144,7 +144,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
             formatProfileQuery({mapreduce: 'mrIn', 'out.inline': 1}));
 
     // Test non-inline mapReduce on sharded collection.
-    if (isMongos) {
+    if (isMerizos) {
         cmdTest({mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: {replace: 'mrOut'}},
                 false,
                 formatProfileQuery({mapreduce: 'user', shardedFirstPass: true}));
@@ -171,8 +171,8 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     assert.commandWorked(testDB.runCommand({collMod: 'user', usePowerOf2Sizes: true}));
     assert.commandWorked(testDB.runCommand({getLastError: 1, w: NODE_COUNT}));
 
-    // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
-    if (!isMongos) {
+    // Merizos doesn't implement geoSearch; test it only with ReplicaSetConnection.
+    if (!isMerizos) {
         cmdTest({geoSearch: 'user', near: [1, 1], search: {type: 'restaurant'}, maxDistance: 10},
                 true,
                 formatProfileQuery({geoSearch: 'user'}));
@@ -189,7 +189,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
             formatProfileQuery({aggregate: 'mrIn'}));
 
     // Test $currentOp aggregation stage.
-    if (!isMongos) {
+    if (!isMerizos) {
         let curOpComment = 'agg_currentOp_' + ObjectId();
 
         // A $currentOp without any foreign namespaces takes no collection locks and will not be
@@ -215,14 +215,14 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
 /**
  * Verify that commands fail with the given combination of mode and tags.
  *
- * @param conn {Mongo} the connection object of which to test the read
+ * @param conn {Merizo} the connection object of which to test the read
  *     preference functionality.
- * @param hostList {Array.<Mongo>} list of the replica set host members.
- * @param isMongos {boolean} true if conn is a merizos connection.
+ * @param hostList {Array.<Merizo>} list of the replica set host members.
+ * @param isMerizos {boolean} true if conn is a merizos connection.
  * @param mode {string} a read preference mode like 'secondary'
  * @param tagSets {Array.<Object>} list of tag sets to use
  */
-var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
+var testBadMode = function(conn, hostList, isMerizos, mode, tagSets) {
     var failureMsg, testDB, cmdResult;
 
     jsTest.log('Expecting failure for mode: ' + mode + ', tag sets: ' + tojson(tagSets));
@@ -231,7 +231,7 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
     testDB = conn.getDB('test');
 
     // Test that a command that could be routed to a secondary fails with bad mode / tags.
-    if (isMongos) {
+    if (isMerizos) {
         // Command result should have ok: 0.
         cmdResult = testDB.runReadCommand({distinct: 'user', key: 'x'});
         jsTest.log('cmd result: ' + tojson(cmdResult));
@@ -250,7 +250,7 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
     }
 };
 
-var testAllModes = function(conn, hostList, isMongos) {
+var testAllModes = function(conn, hostList, isMerizos) {
 
     // The primary is tagged with { tag: 'one' } and the secondary with
     // { tag: 'two' } so we can test the interaction of modes and tags. Test
@@ -283,7 +283,7 @@ var testAllModes = function(conn, hostList, isMongos) {
         var mode = args[0], tagSets = args[1], secExpected = args[2];
 
         setUp();
-        testReadPreference(conn, hostList, isMongos, mode, tagSets, secExpected);
+        testReadPreference(conn, hostList, isMerizos, mode, tagSets, secExpected);
         tearDown();
     });
 
@@ -304,7 +304,7 @@ var testAllModes = function(conn, hostList, isMongos) {
         var mode = args[0], tagSets = args[1];
 
         setUp();
-        testBadMode(conn, hostList, isMongos, mode, tagSets);
+        testBadMode(conn, hostList, isMerizos, mode, tagSets);
         tearDown();
     });
 };
@@ -360,7 +360,7 @@ reconnect(secondary);
 rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log('got rsconf ' + tojson(rsConfig));
 
-var replConn = new Mongo(st.rs0.getURL());
+var replConn = new Merizo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
 _awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: PRIMARY_TAG}, st.rs0.name);

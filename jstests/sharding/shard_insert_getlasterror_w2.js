@@ -73,8 +73,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     replSet1.stop(secondary2);
     replSet1.waitForState(primary, ReplSetTest.State.SECONDARY);
 
-    testDB.getMongo().adminCommand({setParameter: 1, logLevel: 1});
-    testDB.getMongo().setSlaveOk();
+    testDB.getMerizo().adminCommand({setParameter: 1, logLevel: 1});
+    testDB.getMerizo().setSlaveOk();
     print("trying some queries");
     assert.soon(function() {
         try {

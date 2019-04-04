@@ -35,7 +35,7 @@ func (e ErrPacketsDropped) Error() string {
 
 type packetHandlerContext struct {
 	packetHandler *PacketHandler
-	merizoOpStream *MongoOpStream
+	merizoOpStream *MerizoOpStream
 	pcapHandle    *pcap.Handle
 }
 
@@ -102,7 +102,7 @@ func getOpstream(cfg OpStreamSettings) (*packetHandlerContext, error) {
 	h.Verbose = userInfoLogger.isInVerbosity(DebugLow)
 
 	toolDebugLogger.Logvf(Info, "Created packet buffer size %d", cfg.PacketBufSize)
-	m := NewMongoOpStream(cfg.PacketBufSize)
+	m := NewMerizoOpStream(cfg.PacketBufSize)
 	return &packetHandlerContext{h, m, pcapHandle}, nil
 }
 

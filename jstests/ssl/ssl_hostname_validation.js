@@ -9,11 +9,11 @@ var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
     var merizod =
-        MongoRunner.runMongod({sslMode: "requireSSL", sslPEMKeyFile: certPath, sslCAFile: CA_CERT});
+        MerizoRunner.runMerizod({sslMode: "requireSSL", sslPEMKeyFile: certPath, sslCAFile: CA_CERT});
 
     var merizo;
     if (allowInvalidCert) {
-        merizo = runMongoProgram("merizo",
+        merizo = runMerizoProgram("merizo",
                                 "--port",
                                 merizod.port,
                                 "--ssl",
@@ -25,7 +25,7 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
                                 "--eval",
                                 ";");
     } else if (allowInvalidHost) {
-        merizo = runMongoProgram("merizo",
+        merizo = runMerizoProgram("merizo",
                                 "--port",
                                 merizod.port,
                                 "--ssl",
@@ -37,7 +37,7 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
                                 "--eval",
                                 ";");
     } else {
-        merizo = runMongoProgram("merizo",
+        merizo = runMerizoProgram("merizo",
                                 "--port",
                                 merizod.port,
                                 "--ssl",
@@ -50,15 +50,15 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
     }
 
     if (shouldSucceed) {
-        // runMongoProgram returns 0 on success
+        // runMerizoProgram returns 0 on success
         assert.eq(
             0, merizo, "Connection attempt failed when it should succeed certPath: " + certPath);
     } else {
-        // runMongoProgram returns 1 on failure
+        // runMerizoProgram returns 1 on failure
         assert.eq(
             1, merizo, "Connection attempt succeeded when it should fail certPath: " + certPath);
     }
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 }
 
 // 1. Test client connections with different server certificates

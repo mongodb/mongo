@@ -7,7 +7,7 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/explain.js');              // for $config
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMerizos
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -34,7 +34,7 @@ var $config = extendWorkload($config, function($config, $super) {
             var stage = res.executionStats.executionStages;
 
             // if explaining a write command through merizos
-            if (isMongos(db)) {
+            if (isMerizos(db)) {
                 stage = stage.shards[0].executionStages;
             }
             assertAlways.eq(stage.stage, 'UPDATE');
@@ -54,7 +54,7 @@ var $config = extendWorkload($config, function($config, $super) {
             var stage = res.executionStats.executionStages;
 
             // if explaining a write command through merizos
-            if (isMongos(db)) {
+            if (isMerizos(db)) {
                 stage = stage.shards[0].executionStages;
             }
             assertAlways.eq(stage.stage, 'UPDATE');

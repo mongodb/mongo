@@ -47,67 +47,67 @@ public:
     }
 
     virtual ClientState getClientState() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual LockerId getId() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     stdx::thread::id getThreadId() const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void updateThreadIdToCurrentThread() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void unsetThreadId() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void setMaxLockTimeout(Milliseconds maxTimeout) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool hasMaxLockTimeout() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void unsetMaxLockTimeout() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void lockGlobal(OperationContext* opCtx, LockMode mode) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void lockGlobal(LockMode mode) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void lockGlobalComplete(OperationContext* opCtx, Date_t deadline) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void lockGlobalComplete(Date_t deadline) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual bool unlockGlobal() {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void beginWriteUnitOfWork() override {}
@@ -119,15 +119,15 @@ public:
     }
 
     virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void lockRSTLComplete(OperationContext* opCtx, LockMode mode, Date_t deadline) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual bool unlockRSTLforPrepare() {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void lock(OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline) {}
@@ -135,7 +135,7 @@ public:
     virtual void lock(ResourceId resId, LockMode mode, Date_t deadline) {}
 
     virtual void downgrade(ResourceId resId, LockMode newMode) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual bool unlock(ResourceId resId) {
@@ -143,7 +143,7 @@ public:
     }
 
     virtual LockMode getLockMode(ResourceId resId) const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual bool isLockHeldForMode(ResourceId resId, LockMode mode) const {
@@ -159,12 +159,12 @@ public:
     }
 
     virtual ResourceId getWaitingResource() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void getLockerInfo(LockerInfo* lockerInfo,
                                boost::optional<SingleThreadedLockStats> lockStatsBase) const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual boost::optional<LockerInfo> getLockerInfo(
@@ -173,35 +173,35 @@ public:
     }
 
     virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     virtual void restoreLockState(const LockSnapshot& stateToRestore) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool releaseWriteUnitOfWork(LockSnapshot* stateOut) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void restoreWriteUnitOfWork(OperationContext* opCtx,
                                 const LockSnapshot& stateToRestore) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     };
 
     virtual void releaseTicket() {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void reacquireTicket(OperationContext* opCtx) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual void dump() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual bool isW() const {
@@ -209,7 +209,7 @@ public:
     }
 
     virtual bool isR() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual bool isLocked() const {
@@ -235,7 +235,7 @@ public:
     }
 
     virtual bool hasLockPending() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool isGlobalLockedRecursively() override {

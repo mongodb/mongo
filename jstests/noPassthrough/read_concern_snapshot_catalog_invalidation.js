@@ -52,7 +52,7 @@
             {configureFailPoint: "hangAfterPreallocateSnapshot", mode: "alwaysOn"}));
 
         const awaitCommand = startParallelShell(
-            "const session = db.getMongo().startSession();" +
+            "const session = db.getMerizo().startSession();" +
                 "const sessionDb = session.getDatabase('test');" +
                 "session.startTransaction({readConcern: {level: 'snapshot'}});" +
                 "const res = sessionDb.runCommand(" + tojson(cmd) + ");" +

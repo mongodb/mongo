@@ -107,7 +107,7 @@ void operator+=(ActionSet& target, const ActionSet& source) {
 // Note: we suppress clang-format for this function because we want each enum value on a separate
 // line
 // clang-format off
-MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
+MERIZO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
     // Read role
     readRoleActions
         << ActionType::changeStream

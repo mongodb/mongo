@@ -45,7 +45,7 @@
     for (let i = 0; i < kNumWriteTickets; ++i) {
         const thread = new ScopedThread(function(host) {
             try {
-                const conn = new Mongo(host);
+                const conn = new Merizo(host);
                 const db = conn.getDB("test");
 
                 // Dropping a collection requires a database X lock and therefore blocks behind the

@@ -45,17 +45,17 @@
 
 namespace merizo {
 
-MongoeBenchGlobalParams merizoeBenchGlobalParams;
+MerizoeBenchGlobalParams merizoeBenchGlobalParams;
 
-void printMongoeBenchHelp(std::ostream* out) {
+void printMerizoeBenchHelp(std::ostream* out) {
     *out << "Usage: merizoebench <config file> [options]" << std::endl;
     *out << moe::startupOptions.helpString();
     *out << std::flush;
 }
 
-bool handlePreValidationMongoeBenchOptions(const moe::Environment& params) {
+bool handlePreValidationMerizoeBenchOptions(const moe::Environment& params) {
     if (params.count("help")) {
-        printMongoeBenchHelp(&std::cout);
+        printMerizoeBenchHelp(&std::cout);
         return false;
     }
     return true;
@@ -73,7 +73,7 @@ boost::filesystem::path kDefaultOutputFile("perf.json");
 
 }  // namespace
 
-Status storeMongoeBenchOptions(const moe::Environment& params,
+Status storeMerizoeBenchOptions(const moe::Environment& params,
                                const std::vector<std::string>& args) {
     if (!params.count("benchRunConfigFile")) {
         return {ErrorCodes::BadValue, "No benchRun config file was specified"};

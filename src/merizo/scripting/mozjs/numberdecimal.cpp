@@ -44,8 +44,8 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec NumberDecimalInfo::methods[3] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberDecimalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, NumberDecimalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberDecimalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, NumberDecimalInfo),
     JS_FS_END,
 };
 

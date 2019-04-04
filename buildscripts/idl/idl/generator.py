@@ -238,7 +238,7 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
         # type: (unicode) -> None
         self._writer.write_line('auto push_result = usedFields.insert(%s);' % (field_name))
         with writer.IndentedScopedBlock(self._writer,
-                                        'if (MONGO_unlikely(push_result.second == false)) {', '}'):
+                                        'if (MERIZO_unlikely(push_result.second == false)) {', '}'):
             self._writer.write_line('ctxt.throwDuplicateField(%s);' % (field_name))
 
     def add(self, field, bson_element_variable):
@@ -250,7 +250,7 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
         # type: () -> None
         for field in self._fields:
             if (not field.optional) and (not field.ignore) and (not field.chained):
-                pred = 'if (MONGO_unlikely(usedFields.find(%s) == usedFields.end())) {' % \
+                pred = 'if (MERIZO_unlikely(usedFields.find(%s) == usedFields.end())) {' % \
                     (_get_field_constant_name(field))
                 with writer.IndentedScopedBlock(self._writer, pred, '}'):
                     if field.default:
@@ -313,7 +313,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
         if not field in self._fields:
             self._fields.append(field)
 
-        with writer.IndentedScopedBlock(self._writer, 'if (MONGO_unlikely(usedFields[%s])) {' %
+        with writer.IndentedScopedBlock(self._writer, 'if (MERIZO_unlikely(usedFields[%s])) {' %
                                         (_gen_field_usage_constant(field)), '}'):
             self._writer.write_line('ctxt.throwDuplicateField(%s);' % (bson_element_variable))
         self._writer.write_empty_line()
@@ -324,7 +324,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
     def add_final_checks(self):
         # type: () -> None
         """Output the code to check for missing fields."""
-        with writer.IndentedScopedBlock(self._writer, 'if (MONGO_unlikely(!usedFields.all())) {',
+        with writer.IndentedScopedBlock(self._writer, 'if (MERIZO_unlikely(!usedFields.all())) {',
                                         '}'):
             for field in self._fields:
                 if (not field.optional) and (not field.ignore):
@@ -446,7 +446,7 @@ class _CppFileWriterBase(object):
     def get_initializer_lambda(self, decl, unused=False, return_type=None):
         # type: (unicode, bool, unicode) -> writer.IndentedScopedBlock
         """Generate an indented block lambda initializing an outer scope variable."""
-        prefix = 'MONGO_COMPILER_VARIABLE_UNUSED ' if unused else ''
+        prefix = 'MERIZO_COMPILER_VARIABLE_UNUSED ' if unused else ''
         prefix = prefix + decl + ' = ([]'
         if return_type:
             prefix = prefix + '() -> ' + return_type
@@ -1200,7 +1200,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         else:
             predicate = _get_bson_type_check(bson_element, 'ctxt', field)
             if predicate:
-                predicate = "MONGO_likely(%s)" % (predicate)
+                predicate = "MERIZO_likely(%s)" % (predicate)
             with self._predicate(predicate):
 
                 self._gen_usage_check(field, bson_element, field_usage_check)
@@ -1998,7 +1998,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line(
                 common.template_args(
                     '${unused} auto* ${alias_var} = new IDLServerParameterDeprecatedAlias(${name}, ${param_var});',
-                    unused='MONGO_COMPILER_VARIABLE_UNUSED', alias_var='scp_%d_%d' %
+                    unused='MERIZO_COMPILER_VARIABLE_UNUSED', alias_var='scp_%d_%d' %
                     (param_no, alias_no), name=_encaps(alias), param_var='scp_%d' % (param_no)))
 
     def gen_server_parameters(self, params, header_file_name):
@@ -2018,7 +2018,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                                           init))
 
         blockname = 'idl_' + hashlib.sha1(header_file_name).hexdigest()
-        with self._block('MONGO_SERVER_PARAMETER_REGISTER(%s)(InitializerContext*) {' % (blockname),
+        with self._block('MERIZO_SERVER_PARAMETER_REGISTER(%s)(InitializerContext*) {' % (blockname),
                          '}'):
             # ServerParameter instances.
             for param_no, param in enumerate(params):
@@ -2194,7 +2194,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         else:
             with self.gen_namespace_block(''):
                 with self._block(
-                        'MONGO_MODULE_STARTUP_OPTIONS_REGISTER(%s)(InitializerContext*) {' %
+                        'MERIZO_MODULE_STARTUP_OPTIONS_REGISTER(%s)(InitializerContext*) {' %
                     (blockname), '}'):
                     self._writer.write_line('auto& options = optionenvironment::startupOptions;')
                     self._gen_config_options_register(root_opts, sections)
@@ -2208,11 +2208,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._gen_config_options_store(spec.configs)
             else:
                 with self.gen_namespace_block(''):
-                    with self._block('MONGO_STARTUP_OPTIONS_STORE(%s)(InitializerContext*) {' %
+                    with self._block('MERIZO_STARTUP_OPTIONS_STORE(%s)(InitializerContext*) {' %
                                      (blockname), '}'):
                         # If all options are guarded by non-passing #ifdefs, then params will be unused.
                         self._writer.write_line(
-                            'MONGO_COMPILER_VARIABLE_UNUSED const auto& params = optionenvironment::startupOptionsParsed;'
+                            'MERIZO_COMPILER_VARIABLE_UNUSED const auto& params = optionenvironment::startupOptionsParsed;'
                         )
                         self._gen_config_options_store(spec.configs)
 

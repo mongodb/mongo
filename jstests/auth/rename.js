@@ -3,7 +3,7 @@
 // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-var m = MongoRunner.runMongod({auth: ""});
+var m = MerizoRunner.runMerizod({auth: ""});
 
 var db1 = m.getDB("foo");
 var db2 = m.getDB("bar");
@@ -45,4 +45,4 @@ assert.eq(db1.a.count(), 0);
 assert.eq(db1.b.count(), 0);
 assert.eq(db2.a.count(), 1);
 
-MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'password'});
+MerizoRunner.stopMerizod(m, null, {user: 'admin', pwd: 'password'});

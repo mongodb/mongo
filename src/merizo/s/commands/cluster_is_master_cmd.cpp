@@ -97,7 +97,7 @@ public:
 
             swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
 
-            swParseClientMetadata.getValue().get().setMongoSMetadata(
+            swParseClientMetadata.getValue().get().setMerizoSMetadata(
                 getHostNameCachedAndPort(),
                 opCtx->getClient()->clientAddress(true),
                 VersionInfoInterface::instance().version());
@@ -115,7 +115,7 @@ public:
         result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
         result.appendNumber("connectionId", opCtx->getClient()->getConnectionId());
 
-        // Mongos tries to keep exactly the same version range of the server for which
+        // Merizos tries to keep exactly the same version range of the server for which
         // it is compiled.
         result.append("maxWireVersion", WireSpec::instance().incomingExternalClient.maxWireVersion);
         result.append("minWireVersion", WireSpec::instance().incomingExternalClient.minWireVersion);

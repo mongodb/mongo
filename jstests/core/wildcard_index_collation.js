@@ -15,7 +15,7 @@
     load("jstests/libs/analyze_plan.js");              // For getPlanStages.
     load("jstests/libs/get_index_helpers.js");         // For GetIndexHelpers.
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-    load("jstests/libs/fixture_helpers.js");           // For isMongos.
+    load("jstests/libs/fixture_helpers.js");           // For isMerizos.
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r));
 
@@ -24,7 +24,7 @@
         db, "wildcard_collation", {collation: {locale: "en_US", strength: 1}});
 
     // Extracts the winning plan for the given query and projection from the explain output.
-    const winningPlan = (query, proj) => FixtureHelpers.isMongos(db)
+    const winningPlan = (query, proj) => FixtureHelpers.isMerizos(db)
         ? coll.find(query, proj).explain().queryPlanner.winningPlan.shards[0].winningPlan
         : coll.find(query, proj).explain().queryPlanner.winningPlan;
 

@@ -30,7 +30,7 @@
 
 #pragma once
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "asio/detail/config.hpp"
 

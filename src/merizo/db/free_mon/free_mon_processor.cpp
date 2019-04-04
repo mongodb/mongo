@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -249,7 +249,7 @@ void FreeMonProcessor::run() {
                     break;
                 }
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
 
             // Record that we have finished processing the message for testing purposes.

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -54,13 +54,13 @@ namespace {
 // created with a valid non-zero max time will also fail immediately.
 //
 // This fail point cannot be used with the maxTimeNeverTimeOut fail point.
-MONGO_FAIL_POINT_DEFINE(maxTimeAlwaysTimeOut);
+MERIZO_FAIL_POINT_DEFINE(maxTimeAlwaysTimeOut);
 
 // Enabling the maxTimeNeverTimeOut fail point will cause the server to never time out any
 // query, command, or getmore operation, regardless of whether a max time is set.
 //
 // This fail point cannot be used with the maxTimeAlwaysTimeOut fail point.
-MONGO_FAIL_POINT_DEFINE(maxTimeNeverTimeOut);
+MERIZO_FAIL_POINT_DEFINE(maxTimeNeverTimeOut);
 
 // Enabling the checkForInterruptFail fail point will start a game of random chance on the
 // connection specified in the fail point data, generating an interrupt with a given fixed
@@ -74,7 +74,7 @@ MONGO_FAIL_POINT_DEFINE(maxTimeNeverTimeOut);
 // name 'threadName' will generate a kill on the current operation with probability p(.01),
 // including interrupt points of nested operations. "chance" must be a double between 0 and 1,
 // inclusive.
-MONGO_FAIL_POINT_DEFINE(checkForInterruptFail);
+MERIZO_FAIL_POINT_DEFINE(checkForInterruptFail);
 
 const auto kNoWaiterThread = stdx::thread::id();
 
@@ -140,16 +140,16 @@ bool OperationContext::hasDeadlineExpired() const {
     if (!hasDeadline()) {
         return false;
     }
-    if (MONGO_FAIL_POINT(maxTimeNeverTimeOut)) {
+    if (MERIZO_FAIL_POINT(maxTimeNeverTimeOut)) {
         return false;
     }
-    if (MONGO_FAIL_POINT(maxTimeAlwaysTimeOut)) {
+    if (MERIZO_FAIL_POINT(maxTimeAlwaysTimeOut)) {
         return true;
     }
 
     // TODO: Remove once all OperationContexts are properly connected to Clients and ServiceContexts
     // in tests.
-    if (MONGO_unlikely(!getClient() || !getServiceContext())) {
+    if (MERIZO_unlikely(!getClient() || !getServiceContext())) {
         return false;
     }
 
@@ -199,9 +199,9 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
 }  // namespace
 
 Status OperationContext::checkForInterruptNoAssert() noexcept {
-    // TODO: Remove the MONGO_likely(getClient()) once all operation contexts are constructed with
+    // TODO: Remove the MERIZO_likely(getClient()) once all operation contexts are constructed with
     // clients.
-    if (MONGO_likely(getClient() && getServiceContext()) &&
+    if (MERIZO_likely(getClient() && getServiceContext()) &&
         getServiceContext()->getKillAllOperations() && !_isExecutingShutdown) {
         return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
     }
@@ -217,7 +217,7 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
         return Status::OK();
     }
 
-    MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
+    MERIZO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
         if (opShouldFail(getClient(), scopedFailPoint.getData())) {
             log() << "set pending kill on op " << getOpID() << ", for checkForInterruptFail";
             markKilled();
@@ -276,7 +276,7 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
     // maxTimeNeverTimeOut is set) then we assume that the incongruity is due to a clock mismatch
     // and return _timeoutError regardless. To prevent this behaviour, only consider the op's
     // deadline in the event that the maxTimeNeverTimeOut failpoint is not set.
-    bool opHasDeadline = (hasDeadline() && !MONGO_FAIL_POINT(maxTimeNeverTimeOut));
+    bool opHasDeadline = (hasDeadline() && !MERIZO_FAIL_POINT(maxTimeNeverTimeOut));
 
     if (opHasDeadline) {
         deadline = std::min(deadline, getDeadline());

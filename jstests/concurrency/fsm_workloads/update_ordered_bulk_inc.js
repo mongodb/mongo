@@ -11,7 +11,7 @@
  * Uses an ordered, bulk operation to perform the updates.
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMerizod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -46,7 +46,7 @@ var $config = (function() {
             // our collection scan or index scan.
             assertWhenOwnColl.eq(this.docCount, docs.length);
 
-            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+            if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
                 // Storage engines which support document-level concurrency will automatically retry
                 // any operations when there are conflicts, so we should have updated all matching
                 // documents.

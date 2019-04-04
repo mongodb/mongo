@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -107,7 +107,7 @@ int runDbTests(int argc, char** argv) {
     initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);
     DatabaseHolder::set(globalServiceContext, std::make_unique<DatabaseHolderImpl>());
     IndexBuildsCoordinator::set(globalServiceContext,
-                                std::make_unique<IndexBuildsCoordinatorMongod>());
+                                std::make_unique<IndexBuildsCoordinatorMerizod>());
     auto registry = stdx::make_unique<OpObserverRegistry>();
     registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     globalServiceContext->setOpObserver(std::move(registry));

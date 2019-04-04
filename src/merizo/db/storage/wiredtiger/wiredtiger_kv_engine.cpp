@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 #define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
 #define LOG_FOR_ROLLBACK(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationRollback)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationRollback)
 
 #include "merizo/platform/basic.h"
 
@@ -114,7 +114,7 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
     }
 
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        // If the FCV document hasn't been read, trust the WT compatibility. MongoD will
+        // If the FCV document hasn't been read, trust the WT compatibility. MerizoD will
         // downgrade to the same compatibility it discovered on startup.
         return _startupVersion == StartupVersion::IS_40 ||
             _startupVersion == StartupVersion::IS_36 || _startupVersion == StartupVersion::IS_34;
@@ -156,7 +156,7 @@ std::string WiredTigerFileVersion::getDowngradeString() {
             case StartupVersion::IS_40:
                 return "compatibility=(release=3.1)";
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
     return "compatibility=(release=3.1)";
@@ -185,7 +185,7 @@ public:
         while (!_shuttingDown.load()) {
             {
                 stdx::unique_lock<stdx::mutex> lock(_mutex);
-                MONGO_IDLE_THREAD_BLOCK;
+                MERIZO_IDLE_THREAD_BLOCK;
                 // Check every 10 seconds or sooner in the debug builds
                 _condvar.wait_for(lock, stdx::chrono::seconds(kDebugBuild ? 1 : 10));
             }
@@ -244,7 +244,7 @@ public:
                 ms = kDefaultJournalDelayMillis;
             }
 
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             sleepmillis(ms);
         }
         LOG(1) << "stopping " << name() << " thread";
@@ -293,7 +293,7 @@ public:
         while (!_shuttingDown.load()) {
             {
                 stdx::unique_lock<stdx::mutex> lock(_mutex);
-                MONGO_IDLE_THREAD_BLOCK;
+                MERIZO_IDLE_THREAD_BLOCK;
                 _condvar.wait_for(lock,
                                   stdx::chrono::seconds(static_cast<std::int64_t>(
                                       wiredTigerGlobalOptions.checkpointDelaySecs)));
@@ -1559,8 +1559,8 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
-MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
+MERIZO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
+MERIZO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 
 }  // namespace
 
@@ -1635,7 +1635,7 @@ void WiredTigerKVEngine::setOldestTimestampFromStable() {
 
     // Set the oldest timestamp to the stable timestamp to ensure that there is no lag window
     // between the two.
-    if (MONGO_FAIL_POINT(WTSetOldestTSToStableTS)) {
+    if (MERIZO_FAIL_POINT(WTSetOldestTSToStableTS)) {
         setOldestTimestamp(stableTimestamp, false);
         return;
     }
@@ -1663,7 +1663,7 @@ void WiredTigerKVEngine::setOldestTimestampFromStable() {
 }
 
 void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
-    if (MONGO_FAIL_POINT(WTPreserveSnapshotHistoryIndefinitely)) {
+    if (MERIZO_FAIL_POINT(WTPreserveSnapshotHistoryIndefinitely)) {
         return;
     }
 

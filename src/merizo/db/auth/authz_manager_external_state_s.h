@@ -43,13 +43,13 @@ namespace merizo {
 /**
  * The implementation of AuthzManagerExternalState functionality for merizos.
  */
-class AuthzManagerExternalStateMongos : public AuthzManagerExternalState {
-    AuthzManagerExternalStateMongos(const AuthzManagerExternalStateMongos&) = delete;
-    AuthzManagerExternalStateMongos& operator=(const AuthzManagerExternalStateMongos&) = delete;
+class AuthzManagerExternalStateMerizos : public AuthzManagerExternalState {
+    AuthzManagerExternalStateMerizos(const AuthzManagerExternalStateMerizos&) = delete;
+    AuthzManagerExternalStateMerizos& operator=(const AuthzManagerExternalStateMerizos&) = delete;
 
 public:
-    AuthzManagerExternalStateMongos();
-    ~AuthzManagerExternalStateMongos() override;
+    AuthzManagerExternalStateMerizos();
+    ~AuthzManagerExternalStateMerizos() override;
 
     Status initialize(OperationContext* opCtx) override;
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(

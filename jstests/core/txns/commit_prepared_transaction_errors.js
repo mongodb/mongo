@@ -15,7 +15,7 @@
     testColl.drop({writeConcern: {w: "majority"}});
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
 
@@ -28,7 +28,7 @@
     assert.commandFailedWithCode(sessionDB.adminCommand({commitTransaction: 1}),
                                  ErrorCodes.InvalidOptions);
     // Make sure the transaction is still running by observing write conflicts.
-    const anotherSession = db.getMongo().startSession({causalConsistency: false});
+    const anotherSession = db.getMerizo().startSession({causalConsistency: false});
     anotherSession.startTransaction();
     assert.commandFailedWithCode(
         anotherSession.getDatabase(dbName).getCollection(collName).insert(doc),

@@ -40,65 +40,65 @@ namespace {
 using namespace merizo;
 
 TEST(Validity, MissingName) {
-    BSONObj obj = BSON(MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj = BSON(MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::uptime(100)
+                       << MerizosType::waiting(false)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::configVersion(0)
+                       << MerizosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::NoSuchKey, merizosTypeResult.getStatus());
 }
 
 TEST(Validity, MissingPing) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::uptime(100)
+                       << MerizosType::waiting(false)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::configVersion(0)
+                       << MerizosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::NoSuchKey, merizosTypeResult.getStatus());
 }
 
 TEST(Validity, MissingUp) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::waiting(false)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::waiting(false)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::configVersion(0)
+                       << MerizosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::NoSuchKey, merizosTypeResult.getStatus());
 }
 
 TEST(Validity, MissingWaiting) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::uptime(100)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::configVersion(0)
+                       << MerizosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::NoSuchKey, merizosTypeResult.getStatus());
 }
 
-TEST(Validity, MissingMongoVersion) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+TEST(Validity, MissingMerizoVersion) {
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::uptime(100)
+                       << MerizosType::waiting(false)
+                       << MerizosType::configVersion(0)
+                       << MerizosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_OK(merizosTypeResult.getStatus());
 
-    MongosType& mtype = merizosTypeResult.getValue();
+    MerizosType& mtype = merizosTypeResult.getValue();
     /**
      * Note: merizoVersion should eventually become mandatory, but is optional now
      *       for backward compatibility reasons.
@@ -107,17 +107,17 @@ TEST(Validity, MissingMongoVersion) {
 }
 
 TEST(Validity, MissingConfigVersion) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::uptime(100)
+                       << MerizosType::waiting(false)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_OK(merizosTypeResult.getStatus());
 
-    MongosType& mtype = merizosTypeResult.getValue();
+    MerizosType& mtype = merizosTypeResult.getValue();
     /**
      * Note: configVersion should eventually become mandatory, but is optional now
      *       for backward compatibility reasons.
@@ -126,74 +126,74 @@ TEST(Validity, MissingConfigVersion) {
 }
 
 TEST(Validity, MissingAdvisoryHostFQDNs) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::configVersion(0));
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::uptime(100)
+                       << MerizosType::waiting(false)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::configVersion(0));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_OK(merizosTypeResult.getStatus());
 
-    MongosType& mType = merizosTypeResult.getValue();
+    MerizosType& mType = merizosTypeResult.getValue();
     // advisoryHostFQDNs is optional
     ASSERT_OK(mType.validate());
 }
 
 TEST(Validity, EmptyAdvisoryHostFQDNs) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::uptime(100)
+                       << MerizosType::waiting(false)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::configVersion(0)
+                       << MerizosType::advisoryHostFQDNs(BSONArrayBuilder().arr()));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_OK(merizosTypeResult.getStatus());
 
-    MongosType& mType = merizosTypeResult.getValue();
+    MerizosType& mType = merizosTypeResult.getValue();
     ASSERT_OK(mType.validate());
 
     ASSERT_EQUALS(mType.getAdvisoryHostFQDNs().size(), 0UL);
 }
 
 TEST(Validity, BadTypeAdvisoryHostFQDNs) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSON_ARRAY("foo" << 0 << "baz")));
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::uptime(100)
+                       << MerizosType::waiting(false)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::configVersion(0)
+                       << MerizosType::advisoryHostFQDNs(BSON_ARRAY("foo" << 0 << "baz")));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::TypeMismatch, merizosTypeResult.getStatus());
 }
 
 TEST(Validity, Valid) {
-    BSONObj obj = BSON(MongosType::name("localhost:27017")
-                       << MongosType::ping(Date_t::fromMillisSinceEpoch(1))
-                       << MongosType::uptime(100)
-                       << MongosType::waiting(false)
-                       << MongosType::merizoVersion("x.x.x")
-                       << MongosType::configVersion(0)
-                       << MongosType::advisoryHostFQDNs(BSON_ARRAY("foo"
+    BSONObj obj = BSON(MerizosType::name("localhost:27017")
+                       << MerizosType::ping(Date_t::fromMillisSinceEpoch(1))
+                       << MerizosType::uptime(100)
+                       << MerizosType::waiting(false)
+                       << MerizosType::merizoVersion("x.x.x")
+                       << MerizosType::configVersion(0)
+                       << MerizosType::advisoryHostFQDNs(BSON_ARRAY("foo"
                                                                    << "bar"
                                                                    << "baz")));
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_OK(merizosTypeResult.getStatus());
 
-    MongosType& mType = merizosTypeResult.getValue();
+    MerizosType& mType = merizosTypeResult.getValue();
     ASSERT_OK(mType.validate());
 
     ASSERT_EQUALS(mType.getName(), "localhost:27017");
     ASSERT_EQUALS(mType.getPing(), Date_t::fromMillisSinceEpoch(1));
     ASSERT_EQUALS(mType.getUptime(), 100);
     ASSERT_EQUALS(mType.getWaiting(), false);
-    ASSERT_EQUALS(mType.getMongoVersion(), "x.x.x");
+    ASSERT_EQUALS(mType.getMerizoVersion(), "x.x.x");
     ASSERT_EQUALS(mType.getConfigVersion(), 0);
     ASSERT_EQUALS(mType.getAdvisoryHostFQDNs().size(), 3UL);
     ASSERT_EQUALS(mType.getAdvisoryHostFQDNs()[0], "foo");
@@ -202,9 +202,9 @@ TEST(Validity, Valid) {
 }
 
 TEST(Validity, BadType) {
-    BSONObj obj = BSON(MongosType::name() << 0);
+    BSONObj obj = BSON(MerizosType::name() << 0);
 
-    auto merizosTypeResult = MongosType::fromBSON(obj);
+    auto merizosTypeResult = MerizosType::fromBSON(obj);
     ASSERT_EQ(ErrorCodes::TypeMismatch, merizosTypeResult.getStatus());
 }
 

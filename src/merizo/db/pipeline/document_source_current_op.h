@@ -35,12 +35,12 @@ namespace merizo {
 
 class DocumentSourceCurrentOp final : public DocumentSource {
 public:
-    using TruncationMode = MongoProcessInterface::CurrentOpTruncateMode;
-    using ConnMode = MongoProcessInterface::CurrentOpConnectionsMode;
-    using LocalOpsMode = MongoProcessInterface::CurrentOpLocalOpsMode;
-    using SessionMode = MongoProcessInterface::CurrentOpSessionsMode;
-    using UserMode = MongoProcessInterface::CurrentOpUserMode;
-    using CursorMode = MongoProcessInterface::CurrentOpCursorMode;
+    using TruncationMode = MerizoProcessInterface::CurrentOpTruncateMode;
+    using ConnMode = MerizoProcessInterface::CurrentOpConnectionsMode;
+    using LocalOpsMode = MerizoProcessInterface::CurrentOpLocalOpsMode;
+    using SessionMode = MerizoProcessInterface::CurrentOpSessionsMode;
+    using UserMode = MerizoProcessInterface::CurrentOpUserMode;
+    using CursorMode = MerizoProcessInterface::CurrentOpCursorMode;
 
     static constexpr StringData kStageName = "$currentOp"_sd;
 
@@ -56,25 +56,25 @@ public:
             return stdx::unordered_set<NamespaceString>();
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const final {
             PrivilegeVector privileges;
 
             // In a sharded cluster, we always need the inprog privilege to run $currentOp on the
             // shards. If we are only looking up local merizoS operations, we do not need inprog to
             // view our own ops but *do* require it to view other users' ops.
             if (_allUsers == UserMode::kIncludeAll ||
-                (isMongos && _localOps == LocalOpsMode::kRemoteShardOps)) {
+                (isMerizos && _localOps == LocalOpsMode::kRemoteShardOps)) {
                 privileges.push_back({ResourcePattern::forClusterResource(), ActionType::inprog});
             }
 
             return privileges;
         }
 
-        bool allowedToForwardFromMongos() const final {
+        bool allowedToForwardFromMerizos() const final {
             return _localOps == LocalOpsMode::kRemoteShardOps;
         }
 
-        bool allowedToPassthroughFromMongos() const final {
+        bool allowedToPassthroughFromMerizos() const final {
             return _localOps == LocalOpsMode::kRemoteShardOps;
         }
 
@@ -101,7 +101,7 @@ public:
         ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
         SessionMode includeIdleSessions = SessionMode::kIncludeIdle,
         UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
-        LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps,
+        LocalOpsMode showLocalOpsOnMerizoS = LocalOpsMode::kRemoteShardOps,
         TruncationMode truncateOps = TruncationMode::kNoTruncation,
         CursorMode idleCursors = CursorMode::kExcludeCursors);
 
@@ -112,7 +112,7 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     (_showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps
+                                     (_showLocalOpsOnMerizoS == LocalOpsMode::kLocalMerizosOps
                                           ? HostTypeRequirement::kLocalOnly
                                           : HostTypeRequirement::kAnyShard),
                                      DiskUseRequirement::kNoDiskUse,
@@ -138,21 +138,21 @@ private:
                             ConnMode includeIdleConnections,
                             SessionMode includeIdleSessions,
                             UserMode includeOpsFromAllUsers,
-                            LocalOpsMode showLocalOpsOnMongoS,
+                            LocalOpsMode showLocalOpsOnMerizoS,
                             TruncationMode truncateOps,
                             CursorMode idleCursors)
         : DocumentSource(pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
-          _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
+          _showLocalOpsOnMerizoS(showLocalOpsOnMerizoS),
           _truncateOps(truncateOps),
           _idleCursors(idleCursors) {}
 
     ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
     SessionMode _includeIdleSessions = SessionMode::kIncludeIdle;
     UserMode _includeOpsFromAllUsers = UserMode::kExcludeOthers;
-    LocalOpsMode _showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
+    LocalOpsMode _showLocalOpsOnMerizoS = LocalOpsMode::kRemoteShardOps;
     TruncationMode _truncateOps = TruncationMode::kNoTruncation;
     CursorMode _idleCursors = CursorMode::kExcludeCursors;
 

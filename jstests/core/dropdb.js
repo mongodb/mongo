@@ -2,7 +2,7 @@
 // Disabled in the small oplog suite because the slave may create a master db
 // with the same name as the dropped db when requesting a clone.
 
-m = db.getMongo();
+m = db.getMerizo();
 baseName = "jstests_dropdb";
 ddb = db.getSisterDB(baseName);
 

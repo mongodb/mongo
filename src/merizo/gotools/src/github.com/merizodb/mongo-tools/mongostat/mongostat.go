@@ -22,13 +22,13 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-// MongoStat is a container for the user-specified options and
+// MerizoStat is a container for the user-specified options and
 // internal cluster state used for running merizostat.
-type MongoStat struct {
+type MerizoStat struct {
 	// Generic merizo tool options.
 	Options *options.ToolOptions
 
-	// Mongostat-specific output options.
+	// Merizostat-specific output options.
 	StatOptions *StatOptions
 
 	// How long to sleep between printing the rows, and polling the server.
@@ -295,7 +295,7 @@ func (node *NodeMonitor) Poll(discover chan string, checkShards bool) (*status.S
 	}
 	node.alias = stat.Host
 	stat.Host = node.host
-	if discover != nil && stat != nil && status.IsMongos(stat) && checkShards {
+	if discover != nil && stat != nil && status.IsMerizos(stat) && checkShards {
 		log.Logvf(log.DebugLow, "checking config database to discover shards")
 		shardCursor := s.DB("config").C("shards").Find(bson.M{}).Iter()
 		shard := ConfigShard{}
@@ -341,7 +341,7 @@ func parseHostPort(fullHostName string) (string, string) {
 
 // AddNewNode adds a new host name to be monitored and spawns the necessary
 // goroutine to collect data from it.
-func (mstat *MongoStat) AddNewNode(fullhost string) error {
+func (mstat *MerizoStat) AddNewNode(fullhost string) error {
 	mstat.nodesLock.Lock()
 	defer mstat.nodesLock.Unlock()
 
@@ -370,7 +370,7 @@ func (mstat *MongoStat) AddNewNode(fullhost string) error {
 
 // Run is the top-level function that starts the monitoring
 // and discovery goroutines
-func (mstat *MongoStat) Run() error {
+func (mstat *MerizoStat) Run() error {
 	if mstat.Discovered != nil {
 		go func() {
 			for {

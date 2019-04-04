@@ -46,9 +46,9 @@ var workerThread = (function() {
 
             let merizo;
             if (TestData.pinningSecondary) {
-                merizo = new SpecificSecondaryReaderMongo(connectionString, args.secondaryHost);
+                merizo = new SpecificSecondaryReaderMerizo(connectionString, args.secondaryHost);
             } else {
-                merizo = new Mongo(connectionString);
+                merizo = new Merizo(connectionString);
             }
 
             // Retry operations that fail due to in-progress background operations. Load this early

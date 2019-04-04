@@ -1,10 +1,10 @@
 /*
  * This file tests that credentials are flushed
- * from the Mongo shell authCache when logging out.
+ * from the Merizo shell authCache when logging out.
  * It is a regression test for SERVER-8798.
  */
 
-var conn = MongoRunner.runMongod({auth: "", remember: true});
+var conn = MerizoRunner.runMerizod({auth: "", remember: true});
 
 // create user with rw permissions and login
 var testDB = conn.getDB('test');
@@ -25,8 +25,8 @@ assert.throws(function() {
     testDB.foo.findOne();
 }, [], "user should not be able to read after logging out");
 
-MongoRunner.stopMongod(conn);
-conn = MongoRunner.runMongod({restart: conn, noCleanData: true});
+MerizoRunner.stopMerizod(conn);
+conn = MerizoRunner.runMerizod({restart: conn, noCleanData: true});
 
 // expect to fail on first attempt since the socket is no longer valid
 try {
@@ -39,6 +39,6 @@ assert.throws(function() {
     testDB.foo.findOne();
 }, [], "user should not be able to read after logging out");
 
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 print("SUCCESS logout_reconnect.js");

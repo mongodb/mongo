@@ -20,7 +20,7 @@
     // transaction coordinator being canceled after a timeout happen in a reasonable amount of time.
     TestData.transactionLifetimeLimitSeconds = 15;
 
-    const startNewReadOnlyTransactionThroughMongos = function() {
+    const startNewReadOnlyTransactionThroughMerizos = function() {
         let res = assert.commandWorked(testDB.runCommand({
             find: 'user',
             lsid: lsid,
@@ -34,7 +34,7 @@
         return res.recoveryToken;
     };
 
-    const startNewSingleShardTransactionThroughMongos = function() {
+    const startNewSingleShardTransactionThroughMerizos = function() {
         const updateDocumentOnShard0 = {
             q: {x: -1},
             u: {"$set": {lastTxnNumber: txnNumber}},
@@ -55,7 +55,7 @@
         return res.recoveryToken;
     };
 
-    const startNewCrossShardTransactionThroughMongos = function() {
+    const startNewCrossShardTransactionThroughMerizos = function() {
         const updateDocumentOnShard0 = {
             q: {x: -1},
             u: {"$set": {lastTxnNumber: txnNumber}},
@@ -93,7 +93,7 @@
                                                                 writeConcern));
     };
 
-    const sendCommitViaOtherMongos = function(lsid, txnNumber, recoveryToken, writeConcern) {
+    const sendCommitViaOtherMerizos = function(lsid, txnNumber, recoveryToken, writeConcern) {
         writeConcern = writeConcern || {};
         return st.s1.getDB('admin').runCommand(Object.merge({
             commitTransaction: 1,
@@ -137,7 +137,7 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
+        const recoveryToken = startNewCrossShardTransactionThroughMerizos();
         assert.commandWorked(st.rs0.getPrimary().adminCommand({
             abortTransaction: 1,
             lsid: lsid,
@@ -157,7 +157,7 @@
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber, []),
                                      ErrorCodes.NoSuchTransaction);
 
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
 
     })();
@@ -167,7 +167,7 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
+        const recoveryToken = startNewCrossShardTransactionThroughMerizos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -178,7 +178,7 @@
         assert.commandWorked(runCoordinateCommit(txnNumber, participantList));
         assert.commandWorked(runCoordinateCommit(txnNumber, []));
 
-        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
+        assert.commandWorked(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken));
     })();
 
     (function() {
@@ -187,7 +187,7 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
+        const recoveryToken = startNewCrossShardTransactionThroughMerizos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -213,7 +213,7 @@
         assert.eq(1, res.ok, tojson(res));
         checkWriteConcernTimedOut(res);
 
-        res = sendCommitViaOtherMongos(
+        res = sendCommitViaOtherMerizos(
             lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority", wtimeout: 500}});
         assert.eq(1, res.ok, tojson(res));
         checkWriteConcernTimedOut(res);
@@ -226,7 +226,7 @@
         assert.commandWorked(
             runCoordinateCommit(txnNumber, participantList, {writeConcern: {w: "majority"}}));
         assert.commandWorked(runCoordinateCommit(txnNumber, [], {writeConcern: {w: "majority"}}));
-        assert.commandWorked(sendCommitViaOtherMongos(
+        assert.commandWorked(sendCommitViaOtherMerizos(
             lsid, txnNumber, recoveryToken, {writeConcern: {w: "majority"}}));
     })();
 
@@ -237,7 +237,7 @@
         ++txnNumber;
 
         const oldTxnNumber = txnNumber;
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
+        const recoveryToken = startNewCrossShardTransactionThroughMerizos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -247,7 +247,7 @@
 
         txnNumber++;
 
-        startNewCrossShardTransactionThroughMongos();
+        startNewCrossShardTransactionThroughMerizos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -259,13 +259,13 @@
                                      ErrorCodes.TransactionTooOld);
         assert.commandFailedWithCode(runCoordinateCommit(oldTxnNumber, []),
                                      ErrorCodes.TransactionTooOld);
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, oldTxnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, oldTxnNumber, recoveryToken),
                                      ErrorCodes.TransactionTooOld);
 
         // Can still recover decision for current transaction number.
         assert.commandWorked(runCoordinateCommit(txnNumber, participantList));
         assert.commandWorked(runCoordinateCommit(txnNumber, []));
-        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
+        assert.commandWorked(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken));
     })();
 
     (function() {
@@ -273,7 +273,7 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
+        const recoveryToken = startNewCrossShardTransactionThroughMerizos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -289,7 +289,7 @@
                                      ErrorCodes.NoSuchTransaction);
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber, []),
                                      ErrorCodes.NoSuchTransaction);
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();
 
@@ -298,14 +298,14 @@
             "try to recover decision for higher transaction number than participant has seen.");
 
         txnNumber++;
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
+        const recoveryToken = startNewCrossShardTransactionThroughMerizos();
 
         txnNumber++;
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber, participantList),
                                      ErrorCodes.NoSuchTransaction);
         assert.commandFailedWithCode(runCoordinateCommit(txnNumber, []),
                                      ErrorCodes.NoSuchTransaction);
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
 
         // We can still commit the active transaction with the lower transaction number.
@@ -323,12 +323,12 @@
         txnNumber++;
 
         // Start transaction and run CRUD ops on several shards.
-        const recoveryToken = startNewCrossShardTransactionThroughMongos();
+        const recoveryToken = startNewCrossShardTransactionThroughMerizos();
 
         // Try to recover decision from other merizos. This should block until the transaction
         // coordinator is canceled after transactionLifetimeLimitSeconds, after which it should
         // abort the local participant and return NoSuchTransaction.
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();
 
@@ -338,7 +338,7 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewSingleShardTransactionThroughMongos();
+        const recoveryToken = startNewSingleShardTransactionThroughMerizos();
 
         // Commit the transaction from the first merizos.
         assert.commandWorked(testDB.adminCommand({
@@ -350,7 +350,7 @@
         }));
 
         // Try to recover decision from other merizos.
-        assert.commandWorked(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken));
+        assert.commandWorked(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken));
     }());
 
     (function() {
@@ -358,7 +358,7 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewSingleShardTransactionThroughMongos();
+        const recoveryToken = startNewSingleShardTransactionThroughMerizos();
         assert.commandWorked(st.rs0.getPrimary().adminCommand({
             abortTransaction: 1,
             lsid: lsid,
@@ -377,7 +377,7 @@
                                      ErrorCodes.NoSuchTransaction);
 
         // Try to recover the decision from other merizos.
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     }());
 
@@ -386,9 +386,9 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
+        const recoveryToken = startNewReadOnlyTransactionThroughMerizos();
 
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();
 
@@ -397,7 +397,7 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
+        const recoveryToken = startNewReadOnlyTransactionThroughMerizos();
         assert.commandWorked(st.rs0.getPrimary().adminCommand({
             abortTransaction: 1,
             lsid: lsid,
@@ -405,7 +405,7 @@
             autocommit: false
         }));
 
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();
 
@@ -414,7 +414,7 @@
 
         txnNumber++;
 
-        const recoveryToken = startNewReadOnlyTransactionThroughMongos();
+        const recoveryToken = startNewReadOnlyTransactionThroughMerizos();
         assert.commandWorked(testDB.adminCommand({
             commitTransaction: 1,
             lsid: lsid,
@@ -422,7 +422,7 @@
             autocommit: false
         }));
 
-        assert.commandFailedWithCode(sendCommitViaOtherMongos(lsid, txnNumber, recoveryToken),
+        assert.commandFailedWithCode(sendCommitViaOtherMerizos(lsid, txnNumber, recoveryToken),
                                      ErrorCodes.NoSuchTransaction);
     })();
 

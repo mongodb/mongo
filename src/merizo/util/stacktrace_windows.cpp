@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -126,7 +126,7 @@ private:
     DWORD _origOptions;
 };
 
-MONGO_INITIALIZER(IntializeSymbolHandler)(::merizo::InitializerContext* ctx) {
+MERIZO_INITIALIZER(IntializeSymbolHandler)(::merizo::InitializerContext* ctx) {
     // We call this to ensure that the symbol handler is initialized in a single-threaded
     // context. The constructor of SymbolHandler does all the error handling, so we don't need to
     // do anything with the return value. Just make sure it gets called.

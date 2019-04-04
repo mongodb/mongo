@@ -1190,7 +1190,7 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
         [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
             onInsertsCalled = true;
             uasserted(ErrorCodes::OperationFailed, "");
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         };
     createCollectionWithUuid(_opCtx.get(), nss);
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0));
@@ -2149,7 +2149,7 @@ public:
     void setUp() override {
         SyncTailTest::setUp();
 
-        MongoDSessionCatalog::onStepUp(_opCtx.get());
+        MerizoDSessionCatalog::onStepUp(_opCtx.get());
 
         DBDirectClient client(_opCtx.get());
         BSONObj result;

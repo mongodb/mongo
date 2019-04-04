@@ -19,7 +19,7 @@ benchArgs = {
     }],
     parallel: 2,
     seconds: 1,
-    host: db.getMongo().host
+    host: db.getMerizo().host
 };
 
 if (jsTest.options().auth) {

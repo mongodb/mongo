@@ -299,10 +299,10 @@ server_parameters:
     validator: 
       gte: 0
 
-  internalQueryProhibitBlockingMergeOnMongoS:
+  internalQueryProhibitBlockingMergeOnMerizoS:
     description: "If true, blocking stages such as $group or non-merging $sort will be prohibited from running on merizoS."
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryProhibitBlockingMergeOnMongoS"
+    cpp_varname: "internalQueryProhibitBlockingMergeOnMerizoS"
     cpp_vartype: AtomicWord<bool>
     default: false
 

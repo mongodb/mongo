@@ -5,7 +5,7 @@
 
 (function() {
     "use strict";
-    let node = MongoRunner.runMongod();
+    let node = MerizoRunner.runMerizod();
     let hostname = node.host;
 
     jsTestLog("Test connecting to a healthy node.");
@@ -14,17 +14,17 @@
     let attempts = 0;
     retryOnNetworkError(function() {
         attempts++;
-        new Mongo(hostname);
+        new Merizo(hostname);
     }, numRetries, sleepMs);
     assert.eq(attempts, 1);
 
     jsTestLog("Test connecting to a node that is down.");
-    MongoRunner.stopMongod(node);
+    MerizoRunner.stopMerizod(node);
     attempts = 0;
     try {
         retryOnNetworkError(function() {
             attempts++;
-            new Mongo(hostname);
+            new Merizo(hostname);
         }, numRetries, sleepMs);
     } catch (e) {
         jsTestLog("Caught exception after exhausting retries: " + e);
@@ -37,7 +37,7 @@
     try {
         retryOnNetworkError(function() {
             attempts++;
-            new Mongo(invalidHostname);
+            new Merizo(invalidHostname);
         }, numRetries, sleepMs);
     } catch (e) {
         jsTestLog("Caught exception after exhausting retries: " + e);

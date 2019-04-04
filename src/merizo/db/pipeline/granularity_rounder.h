@@ -53,7 +53,7 @@ namespace merizo {
  * REGISTER_GRANULARITY_ROUNDER_GENERAL("foo-bar", foo_bar, GranularityRounderFooBar::create);
  */
 #define REGISTER_GRANULARITY_ROUNDER_GENERAL(name, key, rounder)               \
-    MONGO_INITIALIZER(addToGranularityRounderMap_##key)(InitializerContext*) { \
+    MERIZO_INITIALIZER(addToGranularityRounderMap_##key)(InitializerContext*) { \
         GranularityRounder::registerGranularityRounder(name, rounder);         \
         return Status::OK();                                                   \
     }

@@ -37,7 +37,7 @@
 #include "merizo/stdx/memory.h"
 #include "merizo/util/assert_util.h"
 
-#ifndef MONGO_CONFIG_SSL
+#ifndef MERIZO_CONFIG_SSL
 #error This file should only be included in SSL-enabled builds
 #endif
 

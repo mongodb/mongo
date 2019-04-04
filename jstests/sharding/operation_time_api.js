@@ -60,7 +60,7 @@
     replTest.stopSet();
 
     // A standalone merizod does not return an operationTime.
-    var standalone = MongoRunner.runMongod();
+    var standalone = MerizoRunner.runMerizod();
 
     testDB = standalone.getDB("test");
     res = assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 5}]}));
@@ -68,5 +68,5 @@
            "Expected response from a standalone merizod to not contain an operationTime, " +
                "received: " + tojson(res));
 
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 })();

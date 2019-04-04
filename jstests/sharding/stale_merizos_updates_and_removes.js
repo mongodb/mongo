@@ -23,133 +23,133 @@
     // Create a new sharded collection with numDocs documents, with two docs sharing each shard key
     // (used for testing *multi* removes to a *specific* shard key).
     function resetCollection() {
-        assert(staleMongos.getCollection(collNS).drop());
-        assert.commandWorked(staleMongos.adminCommand({shardCollection: collNS, key: {x: 1}}));
+        assert(staleMerizos.getCollection(collNS).drop());
+        assert.commandWorked(staleMerizos.adminCommand({shardCollection: collNS, key: {x: 1}}));
 
         for (let i = 0; i < numShardKeys; i++) {
-            assert.writeOK(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
-            assert.writeOK(staleMongos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
+            assert.writeOK(staleMerizos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
+            assert.writeOK(staleMerizos.getCollection(collNS).insert({x: i, fieldToUpdate: 0}));
         }
 
-        // Make sure data has replicated to all config servers so freshMongos finds a sharded
-        // collection: freshMongos has an older optime and won't wait to see what staleMongos did
+        // Make sure data has replicated to all config servers so freshMerizos finds a sharded
+        // collection: freshMerizos has an older optime and won't wait to see what staleMerizos did
         // (shardCollection).
         st.configRS.awaitLastOpCommitted();
     }
 
     // Create a new sharded collection, then split it into two chunks on different shards using the
     // stale merizos. Then use the fresh merizos to consolidate the chunks onto one of the shards.
-    // staleMongos will see:
+    // staleMerizos will see:
     //  shard0: (-inf, splitPoint]
     //  shard1: (splitPoint, inf]
-    // freshMongos will see:
+    // freshMerizos will see:
     //  shard0: (-inf, splitPoint], (splitPoint, inf]
     //  shard1:
-    function makeStaleMongosTargetMultipleShardsWhenAllChunksAreOnOneShard() {
+    function makeStaleMerizosTargetMultipleShardsWhenAllChunksAreOnOneShard() {
         resetCollection();
 
-        // Make sure staleMongos sees all data on first shard.
-        const chunk = staleMongos.getCollection("config.chunks")
+        // Make sure staleMerizos sees all data on first shard.
+        const chunk = staleMerizos.getCollection("config.chunks")
                           .findOne({min: {x: MinKey}, max: {x: MaxKey}});
         assert(chunk.shard === st.shard0.shardName);
 
-        // Make sure staleMongos sees two chunks on two different shards.
-        assert.commandWorked(staleMongos.adminCommand({split: collNS, middle: {x: splitPoint}}));
-        assert.commandWorked(staleMongos.adminCommand(
+        // Make sure staleMerizos sees two chunks on two different shards.
+        assert.commandWorked(staleMerizos.adminCommand({split: collNS, middle: {x: splitPoint}}));
+        assert.commandWorked(staleMerizos.adminCommand(
             {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
 
         st.configRS.awaitLastOpCommitted();
 
-        // Use freshMongos to consolidate the chunks on one shard.
-        assert.commandWorked(freshMongos.adminCommand(
+        // Use freshMerizos to consolidate the chunks on one shard.
+        assert.commandWorked(freshMerizos.adminCommand(
             {moveChunk: collNS, find: {x: 0}, to: st.shard0.shardName, _waitForDelete: true}));
     }
 
     // Create a new sharded collection with a single chunk, then move that chunk from the primary
     // shard to another shard using the fresh merizos.
-    // staleMongos will see:
+    // staleMerizos will see:
     //  shard0: (-inf, inf]
     //  shard1:
-    // freshMongos will see:
+    // freshMerizos will see:
     //  shard0:
     //  shard1: (-inf, inf]
-    function makeStaleMongosTargetOneShardWhenAllChunksAreOnAnotherShard() {
+    function makeStaleMerizosTargetOneShardWhenAllChunksAreOnAnotherShard() {
         resetCollection();
 
-        // Make sure staleMongos sees all data on first shard.
-        const chunk = staleMongos.getCollection("config.chunks")
+        // Make sure staleMerizos sees all data on first shard.
+        const chunk = staleMerizos.getCollection("config.chunks")
                           .findOne({min: {x: MinKey}, max: {x: MaxKey}});
         assert(chunk.shard === st.shard0.shardName);
 
-        // Use freshMongos to move chunk to another shard.
-        assert.commandWorked(freshMongos.adminCommand(
+        // Use freshMerizos to move chunk to another shard.
+        assert.commandWorked(freshMerizos.adminCommand(
             {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
     }
 
     // Create a new sharded collection, then split it into two chunks on different shards using the
     // fresh merizos.
-    // staleMongos will see:
+    // staleMerizos will see:
     //  shard0: (-inf, inf]
     //  shard1:
-    // freshMongos will see:
+    // freshMerizos will see:
     //  shard0: (-inf, splitPoint]
     //  shard1: (splitPoint, inf]
-    function makeStaleMongosTargetOneShardWhenChunksAreOnMultipleShards() {
+    function makeStaleMerizosTargetOneShardWhenChunksAreOnMultipleShards() {
         resetCollection();
 
-        // Make sure staleMongos sees all data on first shard.
-        const chunk = staleMongos.getCollection("config.chunks")
+        // Make sure staleMerizos sees all data on first shard.
+        const chunk = staleMerizos.getCollection("config.chunks")
                           .findOne({min: {x: MinKey}, max: {x: MaxKey}});
         assert(chunk.shard === st.shard0.shardName);
 
-        // Use freshMongos to split and move chunks to both shards.
-        assert.commandWorked(freshMongos.adminCommand({split: collNS, middle: {x: splitPoint}}));
-        assert.commandWorked(freshMongos.adminCommand(
+        // Use freshMerizos to split and move chunks to both shards.
+        assert.commandWorked(freshMerizos.adminCommand({split: collNS, middle: {x: splitPoint}}));
+        assert.commandWorked(freshMerizos.adminCommand(
             {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
 
         st.configRS.awaitLastOpCommitted();
     }
 
-    function checkAllRemoveQueries(makeMongosStaleFunc) {
+    function checkAllRemoveQueries(makeMerizosStaleFunc) {
         const multi = {justOne: false};
         const single = {justOne: true};
 
-        function doRemove(query, multiOption, makeMongosStaleFunc) {
-            makeMongosStaleFunc();
-            assert.writeOK(staleMongos.getCollection(collNS).remove(query, multiOption));
+        function doRemove(query, multiOption, makeMerizosStaleFunc) {
+            makeMerizosStaleFunc();
+            assert.writeOK(staleMerizos.getCollection(collNS).remove(query, multiOption));
             if (multiOption.justOne) {
                 // A total of one document should have been removed from the collection.
-                assert.eq(numDocs - 1, staleMongos.getCollection(collNS).find().itcount());
+                assert.eq(numDocs - 1, staleMerizos.getCollection(collNS).find().itcount());
             } else {
                 // All documents matching the query should have been removed.
-                assert.eq(0, staleMongos.getCollection(collNS).find(query).itcount());
+                assert.eq(0, staleMerizos.getCollection(collNS).find(query).itcount());
             }
         }
 
-        function checkRemoveIsInvalid(query, multiOption, makeMongosStaleFunc) {
-            makeMongosStaleFunc();
-            const res = staleMongos.getCollection(collNS).remove(query, multiOption);
+        function checkRemoveIsInvalid(query, multiOption, makeMerizosStaleFunc) {
+            makeMerizosStaleFunc();
+            const res = staleMerizos.getCollection(collNS).remove(query, multiOption);
             assert.writeError(res);
         }
 
         // Not possible because single remove requires equality match on shard key.
-        checkRemoveIsInvalid(emptyQuery, single, makeMongosStaleFunc);
-        doRemove(emptyQuery, multi, makeMongosStaleFunc);
+        checkRemoveIsInvalid(emptyQuery, single, makeMerizosStaleFunc);
+        doRemove(emptyQuery, multi, makeMerizosStaleFunc);
 
-        doRemove(pointQuery, single, makeMongosStaleFunc);
-        doRemove(pointQuery, multi, makeMongosStaleFunc);
+        doRemove(pointQuery, single, makeMerizosStaleFunc);
+        doRemove(pointQuery, multi, makeMerizosStaleFunc);
 
         // Not possible because can't do range query on a single remove.
-        checkRemoveIsInvalid(rangeQuery, single, makeMongosStaleFunc);
-        doRemove(rangeQuery, multi, makeMongosStaleFunc);
+        checkRemoveIsInvalid(rangeQuery, single, makeMerizosStaleFunc);
+        doRemove(rangeQuery, multi, makeMerizosStaleFunc);
 
         // Not possible because single remove must contain _id or shard key at top level
         // (not within $or).
-        checkRemoveIsInvalid(multiPointQuery, single, makeMongosStaleFunc);
-        doRemove(multiPointQuery, multi, makeMongosStaleFunc);
+        checkRemoveIsInvalid(multiPointQuery, single, makeMerizosStaleFunc);
+        doRemove(multiPointQuery, multi, makeMerizosStaleFunc);
     }
 
-    function checkAllUpdateQueries(makeMongosStaleFunc) {
+    function checkAllUpdateQueries(makeMerizosStaleFunc) {
         const oUpdate = {$inc: {fieldToUpdate: 1}};  // op-style update (non-idempotent)
         const rUpdate = {x: 0, fieldToUpdate: 1};    // replacement-style update (idempotent)
         const queryAfterUpdate = {fieldToUpdate: 1};
@@ -157,31 +157,31 @@
         const multi = {multi: true};
         const single = {multi: false};
 
-        function doUpdate(query, update, multiOption, makeMongosStaleFunc) {
-            makeMongosStaleFunc();
-            assert.writeOK(staleMongos.getCollection(collNS).update(query, update, multiOption));
+        function doUpdate(query, update, multiOption, makeMerizosStaleFunc) {
+            makeMerizosStaleFunc();
+            assert.writeOK(staleMerizos.getCollection(collNS).update(query, update, multiOption));
             if (multiOption.multi) {
                 // All documents matching the query should have been updated.
-                assert.eq(staleMongos.getCollection(collNS).find(query).itcount(),
-                          staleMongos.getCollection(collNS).find(queryAfterUpdate).itcount());
+                assert.eq(staleMerizos.getCollection(collNS).find(query).itcount(),
+                          staleMerizos.getCollection(collNS).find(queryAfterUpdate).itcount());
             } else {
                 // A total of one document should have been updated.
-                assert.eq(1, staleMongos.getCollection(collNS).find(queryAfterUpdate).itcount());
+                assert.eq(1, staleMerizos.getCollection(collNS).find(queryAfterUpdate).itcount());
             }
         }
 
-        function assertUpdateIsInvalid(query, update, multiOption, makeMongosStaleFunc) {
-            makeMongosStaleFunc();
-            const res = staleMongos.getCollection(collNS).update(query, update, multiOption);
+        function assertUpdateIsInvalid(query, update, multiOption, makeMerizosStaleFunc) {
+            makeMerizosStaleFunc();
+            const res = staleMerizos.getCollection(collNS).update(query, update, multiOption);
             assert.writeError(res);
         }
 
         function assertUpdateIsValidIfAllChunksOnSingleShard(
-            query, update, multiOption, makeMongosStaleFunc) {
-            if (makeMongosStaleFunc == makeStaleMongosTargetOneShardWhenChunksAreOnMultipleShards) {
-                assertUpdateIsInvalid(query, update, multiOption, makeMongosStaleFunc);
+            query, update, multiOption, makeMerizosStaleFunc) {
+            if (makeMerizosStaleFunc == makeStaleMerizosTargetOneShardWhenChunksAreOnMultipleShards) {
+                assertUpdateIsInvalid(query, update, multiOption, makeMerizosStaleFunc);
             } else {
-                doUpdate(query, update, multiOption, makeMongosStaleFunc);
+                doUpdate(query, update, multiOption, makeMerizosStaleFunc);
             }
         }
 
@@ -192,41 +192,41 @@
         // on a single shard in two of the three test cases, this second update attempt succeeds.
 
         // This update has inconsistent behavior as explained in SERVER-22895.
-        // doUpdate(emptyQuery, rUpdate, single, makeMongosStaleFunc);
+        // doUpdate(emptyQuery, rUpdate, single, makeMerizosStaleFunc);
 
         // Not possible because replacement-style requires equality match on shard key.
-        assertUpdateIsInvalid(emptyQuery, rUpdate, multi, makeMongosStaleFunc);
+        assertUpdateIsInvalid(emptyQuery, rUpdate, multi, makeMerizosStaleFunc);
 
         // Single op-style update succeeds if all chunks are on one shard, regardless of staleness.
         assertUpdateIsValidIfAllChunksOnSingleShard(
-            emptyQuery, oUpdate, single, makeMongosStaleFunc);
-        doUpdate(emptyQuery, oUpdate, multi, makeMongosStaleFunc);
+            emptyQuery, oUpdate, single, makeMerizosStaleFunc);
+        doUpdate(emptyQuery, oUpdate, multi, makeMerizosStaleFunc);
 
-        doUpdate(pointQuery, rUpdate, single, makeMongosStaleFunc);
-
-        // Not possible because replacement-style requires multi=false.
-        assertUpdateIsInvalid(pointQuery, rUpdate, multi, makeMongosStaleFunc);
-        doUpdate(pointQuery, oUpdate, single, makeMongosStaleFunc);
-        doUpdate(pointQuery, oUpdate, multi, makeMongosStaleFunc);
-
-        doUpdate(rangeQuery, rUpdate, single, makeMongosStaleFunc);
+        doUpdate(pointQuery, rUpdate, single, makeMerizosStaleFunc);
 
         // Not possible because replacement-style requires multi=false.
-        assertUpdateIsInvalid(rangeQuery, rUpdate, multi, makeMongosStaleFunc);
+        assertUpdateIsInvalid(pointQuery, rUpdate, multi, makeMerizosStaleFunc);
+        doUpdate(pointQuery, oUpdate, single, makeMerizosStaleFunc);
+        doUpdate(pointQuery, oUpdate, multi, makeMerizosStaleFunc);
+
+        doUpdate(rangeQuery, rUpdate, single, makeMerizosStaleFunc);
+
+        // Not possible because replacement-style requires multi=false.
+        assertUpdateIsInvalid(rangeQuery, rUpdate, multi, makeMerizosStaleFunc);
 
         // Range query for a single update succeeds because the range falls entirely on one shard.
-        doUpdate(rangeQuery, oUpdate, single, makeMongosStaleFunc);
-        doUpdate(rangeQuery, oUpdate, multi, makeMongosStaleFunc);
+        doUpdate(rangeQuery, oUpdate, single, makeMerizosStaleFunc);
+        doUpdate(rangeQuery, oUpdate, multi, makeMerizosStaleFunc);
 
-        doUpdate(multiPointQuery, rUpdate, single, makeMongosStaleFunc);
+        doUpdate(multiPointQuery, rUpdate, single, makeMerizosStaleFunc);
 
         // Not possible because replacement-style requires multi=false.
-        assertUpdateIsInvalid(multiPointQuery, rUpdate, multi, makeMongosStaleFunc);
+        assertUpdateIsInvalid(multiPointQuery, rUpdate, multi, makeMerizosStaleFunc);
 
         // Multi-point single-doc update succeeds if all points are on a single shard.
         assertUpdateIsValidIfAllChunksOnSingleShard(
-            multiPointQuery, oUpdate, single, makeMongosStaleFunc);
-        doUpdate(multiPointQuery, oUpdate, multi, makeMongosStaleFunc);
+            multiPointQuery, oUpdate, single, makeMerizosStaleFunc);
+        doUpdate(multiPointQuery, oUpdate, multi, makeMerizosStaleFunc);
     }
 
     // TODO: SERVER-33954 remove shardAsReplicaSet: false.
@@ -243,8 +243,8 @@
 
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
-    const freshMongos = st.s0;
-    const staleMongos = st.s1;
+    const freshMerizos = st.s0;
+    const staleMerizos = st.s1;
 
     const emptyQuery = {};
     const pointQuery = {x: 0};
@@ -256,12 +256,12 @@
     // Choose points that would fall on two different shards.
     const multiPointQuery = {$or: [{x: 0}, {x: numShardKeys}]};
 
-    checkAllRemoveQueries(makeStaleMongosTargetOneShardWhenAllChunksAreOnAnotherShard);
-    checkAllRemoveQueries(makeStaleMongosTargetMultipleShardsWhenAllChunksAreOnOneShard);
+    checkAllRemoveQueries(makeStaleMerizosTargetOneShardWhenAllChunksAreOnAnotherShard);
+    checkAllRemoveQueries(makeStaleMerizosTargetMultipleShardsWhenAllChunksAreOnOneShard);
 
-    checkAllUpdateQueries(makeStaleMongosTargetOneShardWhenAllChunksAreOnAnotherShard);
-    checkAllUpdateQueries(makeStaleMongosTargetMultipleShardsWhenAllChunksAreOnOneShard);
-    checkAllUpdateQueries(makeStaleMongosTargetOneShardWhenChunksAreOnMultipleShards);
+    checkAllUpdateQueries(makeStaleMerizosTargetOneShardWhenAllChunksAreOnAnotherShard);
+    checkAllUpdateQueries(makeStaleMerizosTargetMultipleShardsWhenAllChunksAreOnOneShard);
+    checkAllUpdateQueries(makeStaleMerizosTargetOneShardWhenChunksAreOnMultipleShards);
 
     st.stop();
 })();

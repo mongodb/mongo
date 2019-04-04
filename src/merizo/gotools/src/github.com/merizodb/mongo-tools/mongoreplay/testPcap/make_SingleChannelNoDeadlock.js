@@ -9,7 +9,7 @@ for (var i = 0; i < 100; i++) {
     db.test.insert(toInsert);
 }
 
-db1 = (new Mongo()).getDB("merizoreplay");
+db1 = (new Merizo()).getDB("merizoreplay");
 
 var c = db1.runCommand({
     aggregate: "test",
@@ -22,7 +22,7 @@ cursorId = c.cursor.id;
 
 print("got cursor fron cxn1: ", cursorId);
 
-var cursor1 = db1.getMongo().cursorFromId("merizoreplay.test", cursorId);
+var cursor1 = db1.getMerizo().cursorFromId("merizoreplay.test", cursorId);
 
 while (c.hasNext()) {
     printjson(c.next());

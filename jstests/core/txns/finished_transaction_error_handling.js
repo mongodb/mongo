@@ -16,7 +16,7 @@
     let stmtId = 0;
 
     const sessionOptions = {causalConsistency: false};
-    const session = db.getMongo().startSession(sessionOptions);
+    const session = db.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
 
     jsTestLog("Test aborted transaction number cannot be reused.");

@@ -52,7 +52,7 @@ Message messageFromOpMsgRequest(Protocol proto, const OpMsgRequest& request) {
         case Protocol::kOpQuery:
             return legacyRequestFromOpMsgRequest(request);
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
@@ -88,7 +88,7 @@ std::unique_ptr<ReplyBuilderInterface> makeReplyBuilder(Protocol protocol) {
         case Protocol::kOpQuery:
             return stdx::make_unique<LegacyReplyBuilder>();
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace rpc

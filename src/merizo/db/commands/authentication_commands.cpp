@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -70,11 +70,11 @@ static const char _nonceAuthenticationDisabledMessage[] =
     "Challenge-response authentication using getnonce and authenticate commands is disabled.";
 static const char _x509AuthenticationDisabledMessage[] = "x.509 authentication is disabled.";
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj) {
     if (!getSSLManager()) {
         return Status(ErrorCodes::ProtocolError,
-                      "SSL support is required for the MONGODB-X509 mechanism.");
+                      "SSL support is required for the MERIZODB-X509 mechanism.");
     }
     if (user.getDB() != "$external") {
         return Status(ErrorCodes::ProtocolError,
@@ -136,7 +136,7 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
         return Status::OK();
     }
 }
-#endif  // MONGO_CONFIG_SSL
+#endif  // MERIZO_CONFIG_SSL
 
 class CmdAuthenticate : public BasicCommand {
 public:
@@ -185,7 +185,7 @@ private:
  * Returns a random 64-bit nonce.
  *
  * Previously, this command would have been called prior to {authenticate: ...}
- * when using the MONGODB-CR authentication mechanism.
+ * when using the MERIZODB-CR authentication mechanism.
  * Since that mechanism has been removed from MerizoDB 3.8,
  * it is nominally no longer required.
  *
@@ -264,7 +264,7 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     }
 
     UserName user(cmdObj.getStringField("user"), dbname);
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (mechanism == kX509AuthMechanism && user.getUser().empty()) {
         auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
         user = UserName(sslPeerInfo.subjectName.toString(), dbname);
@@ -313,7 +313,7 @@ Status CmdAuthenticate::_authenticate(OperationContext* opCtx,
                                       const std::string& mechanism,
                                       const UserName& user,
                                       const BSONObj& cmdObj) {
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (mechanism == kX509AuthMechanism) {
         return _authenticateX509(opCtx, user, cmdObj);
     }

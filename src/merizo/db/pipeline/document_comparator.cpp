@@ -52,7 +52,7 @@ bool DocumentComparator::evaluate(Document::DeferredComparison deferredCompariso
             return cmp != 0;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

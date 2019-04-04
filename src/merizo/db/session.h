@@ -37,7 +37,7 @@
 namespace merizo {
 
 /**
- * A decorable container for state associated with an active session running on a MongoD or MongoS
+ * A decorable container for state associated with an active session running on a MerizoD or MerizoS
  * server. Refer to SessionCatalog for more information on the semantics of sessions.
  */
 class Session : public Decorable<Session> {

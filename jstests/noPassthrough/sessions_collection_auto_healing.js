@@ -10,7 +10,7 @@ load('jstests/libs/sessions_collection.js');
     let timeoutMinutes = 5;
 
     var startSession = {startSession: 1};
-    var conn = MongoRunner.runMongod(
+    var conn = MerizoRunner.runMerizod(
         {setParameter: "localLogicalSessionTimeoutMinutes=" + timeoutMinutes});
 
     var admin = conn.getDB("admin");
@@ -37,10 +37,10 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(conn, true, true, timeoutMinutes);
     }
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     timeoutMinutes = 4;
-    conn = MongoRunner.runMongod({
+    conn = MerizoRunner.runMerizod({
         restart: conn,
         cleanData: false,
         setParameter: "localLogicalSessionTimeoutMinutes=" + timeoutMinutes
@@ -55,6 +55,6 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(conn, true, true, timeoutMinutes);
     }
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
 })();

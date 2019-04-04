@@ -17,10 +17,10 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
      * Restarts the merizod backing the specified shard instance, without restarting the merizobridge.
      */
     function restartShard(shard, waitForConnect) {
-        MongoRunner.stopMongod(shard);
+        MerizoRunner.stopMerizod(shard);
         shard.restart = true;
         shard.waitForConnect = waitForConnect;
-        MongoRunner.runMongod(shard);
+        MerizoRunner.runMerizod(shard);
     }
 
     // TODO: SERVER-33830 remove shardAsReplicaSet: false
@@ -49,11 +49,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     }
 
     jsTestLog("Starting a new merizos when there are no config servers up");
-    var newMongosInfo = MongoRunner.runMongos({configdb: st._configDB, waitForConnect: false});
+    var newMerizosInfo = MerizoRunner.runMerizos({configdb: st._configDB, waitForConnect: false});
     // The new merizos won't accept any new connections, but it should stay up and continue trying
     // to contact the config servers to finish startup.
     assert.throws(function() {
-        new Mongo(newMongosInfo.host);
+        new Merizo(newMerizosInfo.host);
     });
 
     jsTestLog("Restarting a shard while there are no config servers up");
@@ -80,12 +80,12 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     jsTestLog("Should now be possible to connect to the merizos that was started while the config " +
               "servers were down");
-    var newMongosConn = null;
+    var newMerizosConn = null;
     var caughtException = null;
     assert.soon(
         function() {
             try {
-                newMongosConn = new Mongo(newMongosInfo.host);
+                newMerizosConn = new Merizo(newMerizosInfo.host);
                 return true;
             } catch (e) {
                 caughtException = e;
@@ -95,8 +95,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         "Failed to connect to merizos after config servers were restarted: " +
             tojson(caughtException));
 
-    assert.eq(100, newMongosConn.getDB('test').foo.find().itcount());
+    assert.eq(100, newMerizosConn.getDB('test').foo.find().itcount());
 
     st.stop();
-    MongoRunner.stopMongos(newMongosInfo);
+    MerizoRunner.stopMerizos(newMerizosInfo);
 }());

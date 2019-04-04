@@ -62,7 +62,7 @@ EncryptSchemaKeyId EncryptSchemaKeyId::parseFromBSON(const BSONElement& element)
                       << "Expected either string or array of UUID for EncryptSchemaKeyId, found "
                       << element.type());
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void EncryptSchemaKeyId::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {

@@ -51,8 +51,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     st.printShardingStatus();
 
-    MongoRunner.stopMongod(st.shard0);
-    st.shard0 = MongoRunner.runMongod({restart: st.shard0});
+    MerizoRunner.stopMerizod(st.shard0);
+    st.shard0 = MerizoRunner.runMerizod({restart: st.shard0});
 
     // May fail the first couple times due to socket exceptions
     assert.soon(function() {

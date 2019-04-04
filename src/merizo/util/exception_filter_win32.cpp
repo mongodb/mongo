@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #ifdef _WIN32
 
@@ -99,7 +99,7 @@ void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
     aMiniDumpInfo.ClientPointers = FALSE;
 
     MINIDUMP_TYPE miniDumpType =
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
         MiniDumpWithFullMemory;
 #else
         static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithIndirectlyReferencedMemory |

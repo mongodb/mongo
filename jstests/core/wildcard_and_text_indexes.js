@@ -7,7 +7,7 @@
 
     load("jstests/aggregation/extras/utils.js");  // For arrayEq.
     load("jstests/libs/analyze_plan.js");         // For getPlanStages and planHasStage.
-    load("jstests/libs/fixture_helpers.js");      // For isMongos.
+    load("jstests/libs/fixture_helpers.js");      // For isMerizos.
 
     const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 

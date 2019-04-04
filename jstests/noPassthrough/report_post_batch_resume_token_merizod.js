@@ -49,7 +49,7 @@
     assert.neq(undefined, initialAggPBRT);
 
     // Test that the PBRT is correctly updated when reading events from within a transaction.
-    const session = db.getMongo().startSession();
+    const session = db.getMerizo().startSession();
     const sessionDB = session.getDatabase(db.getName());
 
     const sessionColl = sessionDB[testCollection.getName()];

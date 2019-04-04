@@ -1,6 +1,6 @@
 // Check that username information gets recorded properly in profiler.
 // @tags: [requires_profiling]
-var conn = MongoRunner.runMongod();
+var conn = MerizoRunner.runMerizod();
 var db1 = conn.getDB("profile-a");
 var db2 = db1.getSisterDB("profile-b");
 var username = "user";
@@ -50,4 +50,4 @@ assert((db1 == last.allUsers[0].db && db2 == last.allUsers[1].db) ||
 db1.setProfilingLevel(0);
 db1.dropDatabase();
 db2.dropDatabase();
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);

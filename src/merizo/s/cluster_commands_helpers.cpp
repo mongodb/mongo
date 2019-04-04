@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -217,7 +217,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
             // message will include an expanded view definition and collection namespace. We pass
             // the definition back to the caller by throwing the error. This allows the caller to
             // rewrite the request as an aggregation and retry it.
-            if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == status) {
+            if (ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod == status) {
                 uassertStatusOK(status);
             }
 

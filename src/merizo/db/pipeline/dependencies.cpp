@@ -158,7 +158,7 @@ bool DepsTracker::getNeedsMetadata(MetadataType type) const {
         case MetadataType::GEO_NEAR_POINT:
             return _needGeoNearPoint;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool DepsTracker::isMetadataAvailable(MetadataType type) const {
@@ -166,13 +166,13 @@ bool DepsTracker::isMetadataAvailable(MetadataType type) const {
         case MetadataType::TEXT_SCORE:
             return _metadataAvailable & MetadataAvailable::kTextScore;
         case MetadataType::SORT_KEY:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case MetadataType::GEO_NEAR_DISTANCE:
             return _metadataAvailable & MetadataAvailable::kGeoNearDistance;
         case MetadataType::GEO_NEAR_POINT:
             return _metadataAvailable & MetadataAvailable::kGeoNearPoint;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void DepsTracker::setNeedsMetadata(MetadataType type, bool required) {
@@ -202,7 +202,7 @@ void DepsTracker::setNeedsMetadata(MetadataType type, bool required) {
             _needGeoNearPoint = required;
             return;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::vector<DepsTracker::MetadataType> DepsTracker::getAllRequiredMetadataTypes() const {

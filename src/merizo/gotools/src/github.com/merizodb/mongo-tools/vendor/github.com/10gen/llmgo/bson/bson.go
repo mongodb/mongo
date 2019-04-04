@@ -331,9 +331,9 @@ func Now() time.Time {
 	return time.Unix(0, time.Now().UnixNano()/1e6*1e6)
 }
 
-// MongoTimestamp is a special internal type used by MerizoDB that for some
+// MerizoTimestamp is a special internal type used by MerizoDB that for some
 // strange reason has its own datatype defined in BSON.
-type MongoTimestamp int64
+type MerizoTimestamp int64
 
 type orderKey int64
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/db/storage/kv/kv_database_catalog_entry.h"
 

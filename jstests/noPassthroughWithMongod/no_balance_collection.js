@@ -19,8 +19,8 @@ st.shardColl(collB, {_id: 1}, false);
 
 // Split into a lot of chunks so balancing can occur
 for (var i = 0; i < 10 - 1; i++) {  // 10 chunks total
-    collA.getMongo().getDB("admin").runCommand({split: collA + "", middle: {_id: i}});
-    collA.getMongo().getDB("admin").runCommand({split: collB + "", middle: {_id: i}});
+    collA.getMerizo().getDB("admin").runCommand({split: collA + "", middle: {_id: i}});
+    collA.getMerizo().getDB("admin").runCommand({split: collB + "", middle: {_id: i}});
 }
 
 // Disable balancing on one collection

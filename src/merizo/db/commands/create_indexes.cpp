@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
 #include "merizo/platform/basic.h"
 
@@ -354,7 +354,7 @@ bool runCreateIndexes(OperationContext* opCtx,
 
     // The 'indexer' can throw, so ensure the build cleanup occurs.
     ON_BLOCK_EXIT([&] {
-        if (MONGO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
+        if (MERIZO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
             // Set a flag to leave the persisted index build state intact when cleanUpAfterBuild()
             // is called below. The index build will be found on server startup.
             //
@@ -405,9 +405,9 @@ bool runCreateIndexes(OperationContext* opCtx,
         uassertStatusOK(indexer.insertAllDocumentsInCollection(opCtx, collection));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
+    if (MERIZO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
         log() << "Hanging after dumping inserts from bulk builder";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildDumpsInsertsFromBulk);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildDumpsInsertsFromBulk);
     }
 
     // Perform the first drain while holding an intent lock.
@@ -420,9 +420,9 @@ bool runCreateIndexes(OperationContext* opCtx,
         uassertStatusOK(indexer.drainBackgroundWrites(opCtx, RecoveryUnit::ReadSource::kNoOverlap));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
+    if (MERIZO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
         log() << "Hanging after index build first drain";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildFirstDrain);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildFirstDrain);
     }
 
     // Perform the second drain while stopping writes on the collection.
@@ -433,9 +433,9 @@ bool runCreateIndexes(OperationContext* opCtx,
         uassertStatusOK(indexer.drainBackgroundWrites(opCtx));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
+    if (MERIZO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
         log() << "Hanging after index build second drain";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
     }
 
     relockOnErrorGuard.dismiss();

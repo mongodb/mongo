@@ -8,7 +8,7 @@ from ... import core
 from ... import utils
 
 
-class MongosTestCase(interface.ProcessTestCase):
+class MerizosTestCase(interface.ProcessTestCase):
     """A TestCase which runs a merizos binary with the given parameters."""
 
     REGISTERED_NAME = "merizos_test"
@@ -16,8 +16,8 @@ class MongosTestCase(interface.ProcessTestCase):
     def __init__(self, logger, merizos_options):
         """Initialize the merizos test and saves the options."""
 
-        self.merizos_executable = utils.default_if_none(config.MONGOS_EXECUTABLE,
-                                                       config.DEFAULT_MONGOS_EXECUTABLE)
+        self.merizos_executable = utils.default_if_none(config.MERIZOS_EXECUTABLE,
+                                                       config.DEFAULT_MERIZOS_EXECUTABLE)
         # Use the executable as the test name.
         interface.ProcessTestCase.__init__(self, logger, "merizos test", self.merizos_executable)
         self.options = merizos_options.copy()

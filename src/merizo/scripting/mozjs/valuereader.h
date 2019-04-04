@@ -38,7 +38,7 @@ namespace merizo {
 namespace mozjs {
 
 /**
- * Reads into a JS Value from some Mongo C++ primitive
+ * Reads into a JS Value from some Merizo C++ primitive
  */
 class ValueReader {
 public:

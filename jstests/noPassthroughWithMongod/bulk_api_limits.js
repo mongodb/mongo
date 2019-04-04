@@ -131,7 +131,7 @@ var executeTestsOrdered = function() {
 
 var buildVersion = parseInt(db.runCommand({buildInfo: 1}).versionArray.slice(0, 3).join(""), 10);
 // Save the existing useWriteCommands function
-var _useWriteCommands = coll.getMongo().useWriteCommands;
+var _useWriteCommands = coll.getMerizo().useWriteCommands;
 
 //
 // Only execute write command tests if we have > 2.5.5 otherwise
@@ -157,4 +157,4 @@ executeTestsUnordered();
 executeTestsOrdered();
 
 // Reset the function
-coll.getMongo().useWriteCommands = _useWriteCommands;
+coll.getMerizo().useWriteCommands = _useWriteCommands;

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/db/exec/geo_near.h"
 
@@ -517,20 +517,20 @@ public:
     //
 
     BSONObj getSerializedRightHandSide() const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void debugString(StringBuilder& debug, int level = 0) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool equivalent(const MatchExpression* other) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
         return false;
     }
 
     unique_ptr<MatchExpression> shallowClone() const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
         return NULL;
     }
 

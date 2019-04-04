@@ -15,7 +15,7 @@
  */
 
 baseName = "jstests_restorewithauth";
-var conn = MongoRunner.runMongod({nojournal: "", bind_ip: "127.0.0.1"});
+var conn = MerizoRunner.runMerizod({nojournal: "", bind_ip: "127.0.0.1"});
 
 // write to ns foo.bar
 var foo = conn.getDB("foo");
@@ -37,10 +37,10 @@ assert.eq(foo.bar.getIndexes().length, 2);
 assert.eq(foo.baz.getIndexes().length, 1);
 
 // get data dump
-var dumpdir = MongoRunner.dataDir + "/restorewithauth-dump1/";
+var dumpdir = MerizoRunner.dataDir + "/restorewithauth-dump1/";
 resetDbpath(dumpdir);
 
-var exitCode = MongoRunner.runMongoTool("merizodump", {
+var exitCode = MerizoRunner.runMerizoTool("merizodump", {
     db: "foo",
     host: "127.0.0.1:" + conn.port,
     out: dumpdir,
@@ -51,10 +51,10 @@ assert.eq(0, exitCode, "merizodump failed to dump data from merizod without auth
 foo.dropDatabase();
 
 // stop merizod
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 // start merizod with --auth
-conn = MongoRunner.runMongod({auth: "", nojournal: "", bind_ip: "127.0.0.1"});
+conn = MerizoRunner.runMerizod({auth: "", nojournal: "", bind_ip: "127.0.0.1"});
 
 // admin user
 var admin = conn.getDB("admin");
@@ -69,7 +69,7 @@ assert.eq(-1, collNames.indexOf("bar"), "bar collection already exists");
 assert.eq(-1, collNames.indexOf("baz"), "baz collection already exists");
 
 // now try to restore dump
-exitCode = MongoRunner.runMongoTool("merizorestore", {
+exitCode = MerizoRunner.runMerizoTool("merizorestore", {
     host: "127.0.0.1:" + conn.port,
     dir: dumpdir,
     verbose: 5,
@@ -84,7 +84,7 @@ assert.eq(-1, collNames.indexOf("bar"), "bar collection was restored");
 assert.eq(-1, collNames.indexOf("baz"), "baz collection was restored");
 
 // now try to restore dump with correct credentials
-exitCode = MongoRunner.runMongoTool("merizorestore", {
+exitCode = MerizoRunner.runMerizoTool("merizorestore", {
     host: "127.0.0.1:" + conn.port,
     db: "foo",
     authenticationDatabase: "admin",
@@ -109,7 +109,7 @@ foo.dropDatabase();
 foo.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
 
 // now try to restore dump with foo database credentials
-exitCode = MongoRunner.runMongoTool("merizorestore", {
+exitCode = MerizoRunner.runMerizoTool("merizorestore", {
     host: "127.0.0.1:" + conn.port,
     db: "foo",
     username: "user",
@@ -128,4 +128,4 @@ assert.eq(foo.baz.count(), 4);
 assert.eq(foo.bar.getIndexes().length + foo.baz.getIndexes().length,
           3);  // _id on foo, _id on bar, x on foo
 
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);

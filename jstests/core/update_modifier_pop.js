@@ -28,7 +28,7 @@
     // $pop is a no-op when the path does not exist.
     let writeRes = assert.writeOK(coll.update({_id: 0}, {$pop: {"a.b": 1}}));
     assert.eq(writeRes.nMatched, 1);
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.eq(writeRes.nModified, 0);
     }
 
@@ -37,7 +37,7 @@
     assert.writeOK(coll.insert({_id: 0, a: {c: 1}}));
     writeRes = assert.writeOK(coll.update({_id: 0}, {$pop: {"a.b": 1}}));
     assert.eq(writeRes.nMatched, 1);
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.eq(writeRes.nModified, 0);
     }
 
@@ -61,7 +61,7 @@
     assert.writeOK(coll.insert({_id: 0, a: {b: []}}));
     writeRes = assert.writeOK(coll.update({_id: 0}, {$pop: {"a.b": 1}}));
     assert.eq(writeRes.nMatched, 1);
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.eq(writeRes.nModified, 0);
     }
 
@@ -70,7 +70,7 @@
     assert.writeOK(coll.insert({_id: 0, a: {b: [1, 2, 3]}}));
     writeRes = assert.writeOK(coll.update({_id: 0}, {$pop: {"a.b": 1}}));
     assert.eq(writeRes.nMatched, 1);
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.eq(writeRes.nModified, 1);
     }
     assert.eq({_id: 0, a: {b: [1, 2]}}, coll.findOne());
@@ -78,7 +78,7 @@
     // Successfully pop from the beginning of an array.
     writeRes = assert.writeOK(coll.update({_id: 0}, {$pop: {"a.b": -1}}));
     assert.eq(writeRes.nMatched, 1);
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.eq(writeRes.nModified, 1);
     }
     assert.eq({_id: 0, a: {b: [2]}}, coll.findOne());
@@ -90,7 +90,7 @@
     assert.eq({_id: 0, a: [{b: [1, 2, 3]}, {b: [4, 5]}]}, coll.findOne());
 
     // $pop with arrayFilters.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.remove({}));
         assert.writeOK(coll.insert({_id: 0, a: [{b: [1, 2]}, {b: [4, 5]}, {b: [2, 3]}]}));
         assert.writeOK(
@@ -109,7 +109,7 @@
     assert.writeOK(coll.insert({_id: 0, a: [{b: 0}, {b: 1}]}));
     writeRes = assert.writeOK(coll.update({_id: 0}, {$pop: {"a.2.b": 1}}));
     assert.eq(writeRes.nMatched, 1);
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.eq(writeRes.nModified, 0);
     }
 }());

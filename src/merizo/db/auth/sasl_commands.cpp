@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -347,7 +347,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
 }
 
 // The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
-MONGO_INITIALIZER(PreSaslCommands)
+MERIZO_INITIALIZER(PreSaslCommands)
 (InitializerContext*) {
     if (!sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism))
         disableAuthMechanism(kX509AuthMechanism);

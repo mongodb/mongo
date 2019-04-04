@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -133,7 +133,7 @@ DBClientReplicaSet::DBClientReplicaSet(const string& name,
                                        const vector<HostAndPort>& servers,
                                        StringData applicationName,
                                        double so_timeout,
-                                       MongoURI uri)
+                                       MerizoURI uri)
     : _setName(name),
       _applicationName(applicationName.toString()),
       _so_timeout(so_timeout),
@@ -296,7 +296,7 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
 
     _masterHost = h;
 
-    MongoURI masterUri = _uri.cloneURIForServer(_masterHost);
+    MerizoURI masterUri = _uri.cloneURIForServer(_masterHost);
 
     string errmsg;
     DBClientConnection* newConn = NULL;
@@ -744,7 +744,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     if (_authPooledSecondaryConn) {
         _authConnection(_lastSlaveOkConn.get());
     } else {
-        // Mongos pooled connections are authenticated through ShardingConnectionHook::onCreate()
+        // Merizos pooled connections are authenticated through ShardingConnectionHook::onCreate()
     }
 
     LOG(3) << "dbclient_rs selecting node " << _lastSlaveOkHost << endl;
@@ -976,7 +976,7 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientReplicaSet::r
             return _master;
         }
 
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }();
 
     return {std::move(out.first), std::move(conn)};
@@ -1094,7 +1094,7 @@ void DBClientReplicaSet::resetSlaveOkConn() {
         if (_authPooledSecondaryConn) {
             logoutAll(_lastSlaveOkConn.get());
         } else {
-            // Mongos pooled connections are all authenticated with the same credentials;
+            // Merizos pooled connections are all authenticated with the same credentials;
             // so no need to logout.
         }
 

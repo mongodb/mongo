@@ -33,7 +33,7 @@
 
 namespace merizo {
 
-class MongoDSessionCatalog {
+class MerizoDSessionCatalog {
 public:
     /**
      * Invoked when the node enters the primary state. Ensures that the transactions collection is
@@ -69,10 +69,10 @@ public:
  * it for later access by the command. The session is installed at construction time and is removed
  * at destruction.
  */
-class MongoDOperationContextSession {
+class MerizoDOperationContextSession {
 public:
-    MongoDOperationContextSession(OperationContext* opCtx);
-    ~MongoDOperationContextSession();
+    MerizoDOperationContextSession(OperationContext* opCtx);
+    ~MerizoDOperationContextSession();
 
     /**
      * This method takes an operation context with a checked-out session and allows it to be
@@ -93,16 +93,16 @@ private:
 };
 
 /**
- * Similar to MongoDOperationContextSession, but marks the TransactionParticipant as valid without
+ * Similar to MerizoDOperationContextSession, but marks the TransactionParticipant as valid without
  * refreshing from disk and starts a new transaction unconditionally.
  *
  * NOTE: Only used by the replication oplog application logic on secondaries in order to replay
  * prepared transactions.
  */
-class MongoDOperationContextSessionWithoutRefresh {
+class MerizoDOperationContextSessionWithoutRefresh {
 public:
-    MongoDOperationContextSessionWithoutRefresh(OperationContext* opCtx);
-    ~MongoDOperationContextSessionWithoutRefresh();
+    MerizoDOperationContextSessionWithoutRefresh(OperationContext* opCtx);
+    ~MerizoDOperationContextSessionWithoutRefresh();
 
 private:
     OperationContextSession _operationContextSession;

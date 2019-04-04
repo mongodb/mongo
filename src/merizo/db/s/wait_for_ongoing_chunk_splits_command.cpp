@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -83,7 +83,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterWaitForOngoingChunkSplitsCommand)(InitializerContext* context) {
+MERIZO_INITIALIZER(RegisterWaitForOngoingChunkSplitsCommand)(InitializerContext* context) {
     if (getTestCommandsEnabled()) {
         // Leaked intentionally: a Command registers itself when constructed.
         new WaitForOngoingChunksSplitsCommand();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -129,7 +129,7 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
                 break;  // Try again with the next document.
             }
             case GetNextResult::ReturnStatus::kPauseExecution: {
-                MONGO_UNREACHABLE;  // Our input should be a random cursor, which should never
+                MERIZO_UNREACHABLE;  // Our input should be a random cursor, which should never
                                     // result in kPauseExecution.
             }
             case GetNextResult::ReturnStatus::kEOF: {

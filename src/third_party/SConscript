@@ -101,7 +101,7 @@ if True:
         ],
     }
 
-if "tom" in env["MONGO_CRYPTO"]:
+if "tom" in env["MERIZO_CRYPTO"]:
     thirdPartyEnvironmentModifications['tomcrypt'] = {
         'CPPPATH' : ['#/src/third_party/tomcrypt' + tomcryptSuffix + '/src/headers'],
     }
@@ -168,12 +168,12 @@ murmurEnv.SConscript('murmurhash3/SConscript', exports={ 'env' : murmurEnv })
 
 s2Env = env.Clone()
 s2Env.InjectThirdParty(libraries=['s2', 'boost', 'abseil-cpp'])
-s2Env.InjectMongoIncludePaths()
+s2Env.InjectMerizoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
 
 fmtEnv = env.Clone()
 fmtEnv.InjectThirdParty(libraries=['fmt'])
-fmtEnv.InjectMongoIncludePaths()
+fmtEnv.InjectMerizoIncludePaths()
 fmtEnv.SConscript('fmt/SConscript', exports={'env' : fmtEnv})
 
 if use_system_version_of_library("pcre"):
@@ -261,7 +261,7 @@ if use_system_version_of_library("snappy"):
 else:
     snappyEnv = env.Clone()
     snappyEnv.InjectThirdParty(libraries=['snappy'])
-    snappyEnv.InjectMongoIncludePaths()
+    snappyEnv.InjectMerizoIncludePaths()
     snappyEnv.SConscript('snappy' + snappySuffix + '/SConscript', exports={ 'env' : snappyEnv })
     snappyEnv = snappyEnv.Clone(
         LIBDEPS_INTERFACE=[
@@ -351,7 +351,7 @@ if usemozjs:
             'shim_mozjs.cpp',
         ])
 
-if "tom" in env["MONGO_CRYPTO"]:
+if "tom" in env["MERIZO_CRYPTO"]:
     tomcryptEnv = env.Clone()
     tomcryptEnv.SConscript('tomcrypt' + tomcryptSuffix + '/SConscript', exports={'env' : tomcryptEnv })
     tomcryptEnv = tomcryptEnv.Clone(
@@ -366,7 +366,7 @@ if "tom" in env["MONGO_CRYPTO"]:
         ])
 
 gperftoolsEnv = env
-if gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]:
+if gperftoolsEnv['MERIZO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]:
     if use_system_version_of_library("tcmalloc"):
         gperftoolsEnv = env.Clone(
             SYSLIBDEPS=[

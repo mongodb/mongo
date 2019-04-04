@@ -32,14 +32,14 @@ var FSMShardingTest = class {
          }
          */
 
-        const conn = new Mongo(connStr);
+        const conn = new Merizo(connStr);
 
         const topology = DiscoverTopology.findConnectedNodes(conn);
         assert.eq(topology.type, Topology.kShardedCluster, 'Topology must be a sharded cluster');
 
         this._merizoses = [];
         for (let connStr of topology.merizos.nodes) {
-            this._merizoses.push(new Mongo(connStr));
+            this._merizoses.push(new Merizo(connStr));
         }
         for (let merizos of this._merizoses) {
             merizos.name = merizos.host;
@@ -61,10 +61,10 @@ var FSMShardingTest = class {
                 const shard_rst = new ReplSetTest(shardTopology.nodes[0]);
                 this._shard_rsts.push(shard_rst);
 
-                shard = new Mongo(shard_rst.getURL());
+                shard = new Merizo(shard_rst.getURL());
                 shard.name = shard_rst.getURL();
             } else {
-                shard = new Mongo(shardTopology.merizod);
+                shard = new Merizo(shardTopology.merizod);
                 shard.name = shard.host;
             }
             shard.shardName = shardName;

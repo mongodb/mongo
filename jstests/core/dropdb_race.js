@@ -6,7 +6,7 @@
 //   does_not_support_stepdowns,
 // ]
 
-m = db.getMongo();
+m = db.getMerizo();
 baseName = "jstests_dur_droprace";
 d = db.getSisterDB(baseName);
 t = d.foo;

@@ -4,25 +4,25 @@
     "use strict";
 
     var shouldSucceed = function(uri) {
-        var conn = new Mongo(uri);
+        var conn = new Merizo(uri);
         var res = conn.getDB('admin').runCommand({"ismaster": 1});
         assert(res.ok);
     };
 
     var shouldFail = function(uri) {
         assert.throws(function(uri) {
-            var conn = new Mongo(uri);
+            var conn = new Merizo(uri);
         }, [uri], "network error while attempting to run command");
     };
 
     // Start up a merizod with ssl required.
-    var sslMongo = MongoRunner.runMongod({
+    var sslMerizo = MerizoRunner.runMerizod({
         sslMode: "requireSSL",
         sslPEMKeyFile: "jstests/libs/server.pem",
         sslCAFile: "jstests/libs/ca.pem",
     });
 
-    var sslURI = "merizodb://localhost:" + sslMongo.port + "/admin";
+    var sslURI = "merizodb://localhost:" + sslMerizo.port + "/admin";
 
     // When talking to a server with SSL, connecting with ssl=false fails.
     shouldSucceed(sslURI);
@@ -30,7 +30,7 @@
     shouldFail(sslURI + "?ssl=false");
 
     var connectWithURI = function(uri) {
-        return runMongoProgram('./merizo',
+        return runMerizoProgram('./merizo',
                                '--ssl',
                                '--sslAllowInvalidCertificates',
                                '--sslCAFile',
@@ -57,9 +57,9 @@
 
     // Connecting with ssl=true without --ssl will not work
     var res =
-        runMongoProgram('./merizo', sslURI + "?ssl=true", '--eval', 'db.runCommand({ismaster: 1})');
+        runMerizoProgram('./merizo', sslURI + "?ssl=true", '--eval', 'db.runCommand({ismaster: 1})');
     assert.eq(res, 1, "should not have been able to connect without --ssl");
 
     // Clean up
-    MongoRunner.stopMongod(sslMongo);
+    MerizoRunner.stopMerizod(sslMerizo);
 }());

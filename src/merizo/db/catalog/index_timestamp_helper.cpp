@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
 #include "merizo/db/catalog/index_timestamp_helper.h"
 

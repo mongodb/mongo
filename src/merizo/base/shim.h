@@ -43,18 +43,18 @@
  * ```
  * class MyClass {
  *   public:
- *     static MONGO_DECLARE_SHIM((int)->std::string) helloWorldFunction;
+ *     static MERIZO_DECLARE_SHIM((int)->std::string) helloWorldFunction;
  * };
  * ```
  *
  * In the corresponding C++ file (which is a link dependency):
  * ```
- * MONGO_DEFINE_SHIM(MyClass::helloWorldFunction);
+ * MERIZO_DEFINE_SHIM(MyClass::helloWorldFunction);
  * ```
  *
  * And in any number of implementation files:
  * ```
- * MONGO_REGISTER_SHIM(MyClass::helloWorldFunction)(int value)->std::string {
+ * MERIZO_REGISTER_SHIM(MyClass::helloWorldFunction)(int value)->std::string {
  *     if (value == 42) {
  *         return "Hello World";
  *     } else {
@@ -116,16 +116,16 @@ template <typename T, typename tag>
 T storage<T, tag>::data = {};
 }  // namespace shim_detail
 
-#define MONGO_SHIM_DEPENDENTS ("ShimHooks")
+#define MERIZO_SHIM_DEPENDENTS ("ShimHooks")
 
 namespace merizo {
-#ifdef MONGO_CONFIG_CHECK_SHIM_DEPENDENCIES
+#ifdef MERIZO_CONFIG_CHECK_SHIM_DEPENDENCIES
 const bool checkShimsViaTUHook = true;
-#define MONGO_SHIM_TU_HOOK(name) \
+#define MERIZO_SHIM_TU_HOOK(name) \
     name {}
 #else
 const bool checkShimsViaTUHook = false;
-#define MONGO_SHIM_TU_HOOK(name)
+#define MERIZO_SHIM_TU_HOOK(name)
 #endif
 }  // namespace merizo
 
@@ -133,12 +133,12 @@ const bool checkShimsViaTUHook = false;
  * Declare a shimmable function with signature `SHIM_SIGNATURE`.  Declare such constructs in a C++
  * header as static members of a class.
  */
-#define MONGO_DECLARE_SHIM(/*SHIM_SIGNATURE*/...) MONGO_DECLARE_SHIM_1(__LINE__, __VA_ARGS__)
-#define MONGO_DECLARE_SHIM_1(LN, ...) MONGO_DECLARE_SHIM_2(LN, __VA_ARGS__)
-#define MONGO_DECLARE_SHIM_2(LN, ...)                                                             \
+#define MERIZO_DECLARE_SHIM(/*SHIM_SIGNATURE*/...) MERIZO_DECLARE_SHIM_1(__LINE__, __VA_ARGS__)
+#define MERIZO_DECLARE_SHIM_1(LN, ...) MERIZO_DECLARE_SHIM_2(LN, __VA_ARGS__)
+#define MERIZO_DECLARE_SHIM_2(LN, ...)                                                             \
     const struct ShimBasis_##LN {                                                                 \
         ShimBasis_##LN() = default;                                                               \
-        struct MongoShimImplGuts {                                                                \
+        struct MerizoShimImplGuts {                                                                \
             template <bool required = merizo::checkShimsViaTUHook>                                 \
             struct AbiCheckType {                                                                 \
                 AbiCheckType() = default;                                                         \
@@ -161,26 +161,26 @@ const bool checkShimsViaTUHook = false;
             /* Workaround for Microsoft -- by taking the address of this function pointer, we     \
              * avoid the problems that their compiler has with default * arguments in deduced     \
              * typedefs. */                                                                       \
-            using function_type_pointer = decltype(&MongoShimImplGuts::functionTypeHelper);       \
+            using function_type_pointer = decltype(&MerizoShimImplGuts::functionTypeHelper);       \
             using function_type = std::remove_pointer_t<function_type_pointer>;                   \
-            MongoShimImplGuts* abi(const AbiCheck* const) {                                       \
+            MerizoShimImplGuts* abi(const AbiCheck* const) {                                       \
                 return this;                                                                      \
             }                                                                                     \
-            MongoShimImplGuts* lib(const LibTUHook* const) {                                      \
+            MerizoShimImplGuts* lib(const LibTUHook* const) {                                      \
                 LibTUHook{};                                                                      \
                 return this;                                                                      \
             }                                                                                     \
-            MongoShimImplGuts* impl(const ImplTUHook* const) {                                    \
-                MONGO_SHIM_TU_HOOK(ImplTUHook);                                                   \
+            MerizoShimImplGuts* impl(const ImplTUHook* const) {                                    \
+                MERIZO_SHIM_TU_HOOK(ImplTUHook);                                                   \
                 return this;                                                                      \
             }                                                                                     \
             virtual auto implementation __VA_ARGS__ = 0;                                          \
                                                                                                   \
             using tag =                                                                           \
-                std::tuple<MongoShimImplGuts::function_type, AbiCheck, LibTUHook, ImplTUHook>;    \
+                std::tuple<MerizoShimImplGuts::function_type, AbiCheck, LibTUHook, ImplTUHook>;    \
         };                                                                                        \
                                                                                                   \
-        using storage = shim_detail::storage<MongoShimImplGuts*, MongoShimImplGuts::tag>;         \
+        using storage = shim_detail::storage<MerizoShimImplGuts*, MerizoShimImplGuts::tag>;         \
                                                                                                   \
         /* TODO: When the dependency graph is fixed, add the `impl()->` call to the call chain */ \
         template <typename... Args>                                                               \
@@ -196,12 +196,12 @@ const bool checkShimsViaTUHook = false;
 
 
 /**
- * Evaluates to a string which represents the `MONGO_INITIALIZER` step name in which this specific
+ * Evaluates to a string which represents the `MERIZO_INITIALIZER` step name in which this specific
  * shim is registered.  This can be useful to make sure that some initializers depend upon a shim's
  * execution and presence in a binary.
  */
-#define MONGO_SHIM_DEPENDENCY(...) MONGO_SHIM_EVIL_STRINGIFY_(__VA_ARGS__)
-#define MONGO_SHIM_EVIL_STRINGIFY_(args) #args
+#define MERIZO_SHIM_DEPENDENCY(...) MERIZO_SHIM_EVIL_STRINGIFY_(__VA_ARGS__)
+#define MERIZO_SHIM_EVIL_STRINGIFY_(args) #args
 
 /**
  * Define a shimmable function with name `SHIM_NAME`, returning a value of type `RETURN_TYPE`, with
@@ -209,9 +209,9 @@ const bool checkShimsViaTUHook = false;
  * where a SHIM was defined.  This macro does not emit a function definition, only the customization
  * point's machinery.
  */
-#define MONGO_DEFINE_SHIM(/*SHIM_NAME*/...) MONGO_DEFINE_SHIM_1(__LINE__, __VA_ARGS__)
-#define MONGO_DEFINE_SHIM_1(LN, ...) MONGO_DEFINE_SHIM_2(LN, __VA_ARGS__)
-#define MONGO_DEFINE_SHIM_2(LN, ...)                                                          \
+#define MERIZO_DEFINE_SHIM(/*SHIM_NAME*/...) MERIZO_DEFINE_SHIM_1(__LINE__, __VA_ARGS__)
+#define MERIZO_DEFINE_SHIM_1(LN, ...) MERIZO_DEFINE_SHIM_2(LN, __VA_ARGS__)
+#define MERIZO_DEFINE_SHIM_2(LN, ...)                                                          \
     namespace {                                                                               \
     namespace shim_namespace##LN {                                                            \
         using ShimType = decltype(__VA_ARGS__);                                               \
@@ -219,13 +219,13 @@ const bool checkShimsViaTUHook = false;
             return Status::OK();                                                              \
         }                                                                                     \
         ::merizo::GlobalInitializerRegisterer _merizoInitializerRegisterer(                     \
-            std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__)),                                  \
+            std::string(MERIZO_SHIM_DEPENDENCY(__VA_ARGS__)),                                  \
             {},                                                                               \
-            {MONGO_SHIM_DEPENDENTS},                                                          \
+            {MERIZO_SHIM_DEPENDENTS},                                                          \
             merizo::InitializerFunction(initializerGroupStartup));                             \
     } /*namespace shim_namespace*/                                                            \
     } /*namespace*/                                                                           \
-    shim_namespace##LN::ShimType::MongoShimImplGuts::LibTUHookTypeBase::LibTUHookTypeBase() = \
+    shim_namespace##LN::ShimType::MerizoShimImplGuts::LibTUHookTypeBase::LibTUHookTypeBase() = \
         default;                                                                              \
     shim_namespace##LN::ShimType __VA_ARGS__{};
 
@@ -235,17 +235,17 @@ const bool checkShimsViaTUHook = false;
  * C++ implementation file to the header where a SHIM was defined.   Such a file would be a mock
  * implementation or a real implementation, for example.
  */
-#define MONGO_REGISTER_SHIM(/*SHIM_NAME*/...) MONGO_REGISTER_SHIM_1(__LINE__, __VA_ARGS__)
-#define MONGO_REGISTER_SHIM_1(LN, ...) MONGO_REGISTER_SHIM_2(LN, __VA_ARGS__)
-#define MONGO_REGISTER_SHIM_2(LN, ...)                                                          \
+#define MERIZO_REGISTER_SHIM(/*SHIM_NAME*/...) MERIZO_REGISTER_SHIM_1(__LINE__, __VA_ARGS__)
+#define MERIZO_REGISTER_SHIM_1(LN, ...) MERIZO_REGISTER_SHIM_2(LN, __VA_ARGS__)
+#define MERIZO_REGISTER_SHIM_2(LN, ...)                                                          \
     namespace {                                                                                 \
     namespace shim_namespace##LN {                                                              \
         using ShimType = decltype(__VA_ARGS__);                                                 \
                                                                                                 \
-        class Implementation final : public ShimType::MongoShimImplGuts {                       \
+        class Implementation final : public ShimType::MerizoShimImplGuts {                       \
             /* Some compilers don't work well with the trailing `override` in this kind of      \
              * function declaration. */                                                         \
-            ShimType::MongoShimImplGuts::function_type implementation; /* override */           \
+            ShimType::MerizoShimImplGuts::function_type implementation; /* override */           \
         };                                                                                      \
                                                                                                 \
         ::merizo::Status createInitializerRegistration(::merizo::InitializerContext* const) {     \
@@ -255,14 +255,14 @@ const bool checkShimsViaTUHook = false;
         }                                                                                       \
                                                                                                 \
         const ::merizo::GlobalInitializerRegisterer registrationHook{                            \
-            std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__) "_registration"),                    \
+            std::string(MERIZO_SHIM_DEPENDENCY(__VA_ARGS__) "_registration"),                    \
             {},                                                                                 \
-            {MONGO_SHIM_DEPENDENCY(__VA_ARGS__), MONGO_SHIM_DEPENDENTS},                        \
+            {MERIZO_SHIM_DEPENDENCY(__VA_ARGS__), MERIZO_SHIM_DEPENDENTS},                        \
             merizo::InitializerFunction(createInitializerRegistration)};                         \
     } /*namespace shim_namespace*/                                                              \
     } /*namespace*/                                                                             \
                                                                                                 \
-    shim_namespace##LN::ShimType::MongoShimImplGuts::ImplTUHookTypeBase::ImplTUHookTypeBase() = \
+    shim_namespace##LN::ShimType::MerizoShimImplGuts::ImplTUHookTypeBase::ImplTUHookTypeBase() = \
         default;                                                                                \
                                                                                                 \
     auto shim_namespace##LN::Implementation::implementation /* After this point someone just    \
@@ -278,17 +278,17 @@ const bool checkShimsViaTUHook = false;
  * specifying an override would be a C++ implementation used by a merizodb extension module.
  * This creates a runtime dependency upon the original registration being linked in.
  */
-#define MONGO_OVERRIDE_SHIM(/*SHIM_NAME*/...) MONGO_OVERRIDE_SHIM_1(__LINE__, __VA_ARGS__)
-#define MONGO_OVERRIDE_SHIM_1(LN, ...) MONGO_OVERRIDE_SHIM_2(LN, __VA_ARGS__)
-#define MONGO_OVERRIDE_SHIM_2(LN, ...)                                                           \
+#define MERIZO_OVERRIDE_SHIM(/*SHIM_NAME*/...) MERIZO_OVERRIDE_SHIM_1(__LINE__, __VA_ARGS__)
+#define MERIZO_OVERRIDE_SHIM_1(LN, ...) MERIZO_OVERRIDE_SHIM_2(LN, __VA_ARGS__)
+#define MERIZO_OVERRIDE_SHIM_2(LN, ...)                                                           \
     namespace {                                                                                  \
     namespace shim_namespace##LN {                                                               \
         using ShimType = decltype(__VA_ARGS__);                                                  \
                                                                                                  \
-        class OverrideImplementation final : public ShimType::MongoShimImplGuts {                \
+        class OverrideImplementation final : public ShimType::MerizoShimImplGuts {                \
             /* Some compilers don't work well with the trailing `override` in this kind of       \
              * function declaration. */                                                          \
-            ShimType::MongoShimImplGuts::function_type implementation; /* override */            \
+            ShimType::MerizoShimImplGuts::function_type implementation; /* override */            \
         };                                                                                       \
                                                                                                  \
         ::merizo::Status createInitializerOverride(::merizo::InitializerContext* const) {          \
@@ -298,11 +298,11 @@ const bool checkShimsViaTUHook = false;
         }                                                                                        \
                                                                                                  \
         const ::merizo::GlobalInitializerRegisterer overrideHook{                                 \
-            std::string(MONGO_SHIM_DEPENDENCY(__VA_ARGS__) "_override"),                         \
-            {MONGO_SHIM_DEPENDENCY(                                                              \
+            std::string(MERIZO_SHIM_DEPENDENCY(__VA_ARGS__) "_override"),                         \
+            {MERIZO_SHIM_DEPENDENCY(                                                              \
                 __VA_ARGS__) "_registration"},   /* Override happens after first registration */ \
-            {MONGO_SHIM_DEPENDENCY(__VA_ARGS__), /* Provides impl for this shim */               \
-             MONGO_SHIM_DEPENDENTS},             /* Still a shim registration */                 \
+            {MERIZO_SHIM_DEPENDENCY(__VA_ARGS__), /* Provides impl for this shim */               \
+             MERIZO_SHIM_DEPENDENTS},             /* Still a shim registration */                 \
             merizo::InitializerFunction(createInitializerOverride)};                              \
     } /*namespace shim_namespace*/                                                               \
     } /*namespace*/                                                                              \

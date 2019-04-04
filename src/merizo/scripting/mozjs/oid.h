@@ -44,9 +44,9 @@ struct OIDInfo : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(getter);
-        MONGO_DECLARE_JS_FUNCTION(toString);
-        MONGO_DECLARE_JS_FUNCTION(toJSON);
+        MERIZO_DECLARE_JS_FUNCTION(getter);
+        MERIZO_DECLARE_JS_FUNCTION(toString);
+        MERIZO_DECLARE_JS_FUNCTION(toJSON);
     };
 
     static const JSFunctionSpec methods[3];

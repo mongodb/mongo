@@ -20,11 +20,11 @@ var rs3cfg = {_id: "rs3",
 
 for (var i = 0; i != 60; i++) {
 	try {
-		db1 = new Mongo("127.0.0.1:40001").getDB("admin")
-		db2 = new Mongo("127.0.0.1:40002").getDB("admin")
-		rs1a = new Mongo("127.0.0.1:40011").getDB("admin")
-		rs2a = new Mongo("127.0.0.1:40021").getDB("admin")
-		rs3a = new Mongo("127.0.0.1:40031").getDB("admin")
+		db1 = new Merizo("127.0.0.1:40001").getDB("admin")
+		db2 = new Merizo("127.0.0.1:40002").getDB("admin")
+		rs1a = new Merizo("127.0.0.1:40011").getDB("admin")
+		rs2a = new Merizo("127.0.0.1:40021").getDB("admin")
+		rs3a = new Merizo("127.0.0.1:40031").getDB("admin")
 		break
 	} catch(err) {
 		print("Can't connect yet...")
@@ -41,14 +41,14 @@ rs2a.runCommand({replSetInitiate: rs2cfg})
 rs3a.runCommand({replSetInitiate: rs3cfg})
 
 function configShards() {
-    cfg1 = new Mongo("127.0.0.1:40201").getDB("admin")
+    cfg1 = new Merizo("127.0.0.1:40201").getDB("admin")
     cfg1.runCommand({addshard: "127.0.0.1:40001"})
     cfg1.runCommand({addshard: "rs1/127.0.0.1:40011"})
 
-    cfg2 = new Mongo("127.0.0.1:40202").getDB("admin")
+    cfg2 = new Merizo("127.0.0.1:40202").getDB("admin")
     cfg2.runCommand({addshard: "rs2/127.0.0.1:40021"})
 
-    cfg3 = new Mongo("127.0.0.1:40203").getDB("admin")
+    cfg3 = new Merizo("127.0.0.1:40203").getDB("admin")
     cfg3.runCommand({addshard: "rs3/127.0.0.1:40031"})
 }
 
@@ -59,7 +59,7 @@ function configAuth() {
     }
     for (var i in addrs) {
         print("Configuring auth for", addrs[i])
-        var db = new Mongo(addrs[i]).getDB("admin")
+        var db = new Merizo(addrs[i]).getDB("admin")
         var v = db.serverBuildInfo().versionArray
         var timedOut = false
         if (v < [2, 5]) {

@@ -20,11 +20,11 @@ const test = () => {
         tlsAllowConnectionsWithoutCertificates: "",
     };
 
-    let merizod = MongoRunner.runMongod(tlsOptions);
+    let merizod = MerizoRunner.runMerizod(tlsOptions);
 
     // Verify we can connect
     assert.eq(0,
-              runMongoProgram('merizo',
+              runMerizoProgram('merizo',
                               '--tls',
                               '--tlsCAFile',
                               ECDSA_CA_CERT,
@@ -40,7 +40,7 @@ const test = () => {
                          'Failed to create X509 user using ECDSA certificates');
 
     const command = function() {
-        assert(db.getSiblingDB('$external').auth({mechanism: 'MONGODB-X509', user: "CLIENT_USER"}));
+        assert(db.getSiblingDB('$external').auth({mechanism: 'MERIZODB-X509', user: "CLIENT_USER"}));
 
         const connStatus = db.getSiblingDB('admin').runCommand({connectionStatus: 1});
         assert(connStatus.authInfo.authenticatedUsers[0].user === "CLIENT_USER");
@@ -49,7 +49,7 @@ const test = () => {
     // Verify we can authenticate via X509
     assert.eq(
         0,
-        runMongoProgram('merizo',
+        runMerizoProgram('merizo',
                         '--tls',
                         '--tlsCertificateKeyFile',
                         ECDSA_CLIENT_CERT,
@@ -60,7 +60,7 @@ const test = () => {
                         '--eval',
                         '(' + command.toString().replace(/CLIENT_USER/g, CLIENT_USER) + ')();'),
         "ECDSA X509 authentication failed");
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 };
 
 const EXCLUDED_BUILDS = ['amazon', 'amzn64'];

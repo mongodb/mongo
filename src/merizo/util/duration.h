@@ -150,8 +150,8 @@ inline long long durationCount(const stdx::chrono::duration<RepIn, PeriodIn>& d)
 template <typename Period>
 class Duration {
 public:
-    MONGO_STATIC_ASSERT_MSG(Period::num > 0, "Duration::period's numerator must be positive");
-    MONGO_STATIC_ASSERT_MSG(Period::den > 0, "Duration::period's denominator must be positive");
+    MERIZO_STATIC_ASSERT_MSG(Period::num > 0, "Duration::period's numerator must be positive");
+    MERIZO_STATIC_ASSERT_MSG(Period::den > 0, "Duration::period's denominator must be positive");
 
     using rep = int64_t;
     using period = Period;
@@ -163,9 +163,9 @@ public:
     template <typename OtherDuration>
     struct IsHigherPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
-        MONGO_STATIC_ASSERT_MSG(
+        MERIZO_STATIC_ASSERT_MSG(
             OtherOverThis::den == 1 || OtherOverThis::num == 1,
-            "Mongo duration types are only compatible with each other when one's period "
+            "Merizo duration types are only compatible with each other when one's period "
             "is an even multiple of the other's.");
         static constexpr bool value = OtherOverThis::den == 1 && OtherOverThis::num != 1;
     };
@@ -177,9 +177,9 @@ public:
     template <typename OtherDuration>
     struct IsLowerPrecisionThan {
         using OtherOverThis = std::ratio_divide<typename OtherDuration::period, period>;
-        MONGO_STATIC_ASSERT_MSG(
+        MERIZO_STATIC_ASSERT_MSG(
             OtherOverThis::den == 1 || OtherOverThis::num == 1,
-            "Mongo duration types are only compatible with each other when one's period "
+            "Merizo duration types are only compatible with each other when one's period "
             "is an even multiple of the other's.");
         static constexpr bool value = OtherOverThis::num == 1 && OtherOverThis::den != 1;
     };
@@ -225,7 +225,7 @@ public:
         stdx::enable_if_t<std::is_convertible<Rep2, rep>::value && std::is_integral<Rep2>::value,
                           int> = 0>
     constexpr explicit Duration(const Rep2& r) : _count(r) {
-        MONGO_STATIC_ASSERT_MSG(
+        MERIZO_STATIC_ASSERT_MSG(
             std::is_signed<Rep2>::value || sizeof(Rep2) < sizeof(rep),
             "Durations must be constructed from values of integral type that are "
             "representable as 64-bit signed integers");
@@ -242,7 +242,7 @@ public:
     template <typename FromPeriod>
     /*implicit*/ Duration(const Duration<FromPeriod>& from)
         : Duration(duration_cast<Duration>(from)) {
-        MONGO_STATIC_ASSERT_MSG(
+        MERIZO_STATIC_ASSERT_MSG(
             !isLowerPrecisionThan<Duration<FromPeriod>>(),
             "Use duration_cast to convert from higher precision Duration types to lower "
             "precision ones");
@@ -344,7 +344,7 @@ public:
 
     template <typename Rep2>
     Duration& operator*=(const Rep2& scale) {
-        MONGO_STATIC_ASSERT_MSG(
+        MERIZO_STATIC_ASSERT_MSG(
             std::is_integral<Rep2>::value && std::is_signed<Rep2>::value,
             "Durations may only be multiplied by values of signed integral type");
         uassert(ErrorCodes::DurationOverflow,
@@ -355,7 +355,7 @@ public:
 
     template <typename Rep2>
     Duration& operator/=(const Rep2& scale) {
-        MONGO_STATIC_ASSERT_MSG(std::is_integral<Rep2>::value && std::is_signed<Rep2>::value,
+        MERIZO_STATIC_ASSERT_MSG(std::is_integral<Rep2>::value && std::is_signed<Rep2>::value,
                                 "Durations may only be divided by values of signed integral type");
         uassert(ErrorCodes::DurationOverflow,
                 str::stream() << "Overflow while dividing " << *this << " by -1",

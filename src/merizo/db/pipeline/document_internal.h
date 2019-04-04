@@ -126,7 +126,7 @@ private:
 };
 // Real size is sizeof(ValueElement) + nameLen
 #pragma pack()
-MONGO_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1));
+MERIZO_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1));
 
 // This is an internal class for Document. See FieldIterator for the public version.
 class DocumentStorageIterator {

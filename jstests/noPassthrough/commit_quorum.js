@@ -64,7 +64,7 @@
                 indexes: [{key: {a: 1}, name: 'a_1'}],
                 commitQuorum: "majority"
             }));
-        }, testDB.getMongo().port);
+        }, testDB.getMerizo().port);
 
         checkLog.containsWithCount(replSet.getPrimary(), "Waiting for index build to complete", 5);
 

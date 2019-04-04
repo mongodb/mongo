@@ -17,7 +17,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
         "C=US,ST=New York,L=New York City,O=MerizoDB,OU=Kernel Users,CN=Kernel Client Peer Role";
 
     function authAndTest(port) {
-        const merizo = runMongoProgram("merizo",
+        const merizo = runMerizoProgram("merizo",
                                       "--host",
                                       "localhost",
                                       "--port",
@@ -29,10 +29,10 @@ load('jstests/ssl/libs/ssl_helpers.js');
                                       CLIENT_CERT,
                                       "jstests/ssl/libs/ssl_x509_role_auth.js");
 
-        // runMongoProgram returns 0 on success
+        // runMerizoProgram returns 0 on success
         assert.eq(0, merizo, "Connection attempt failed");
 
-        const escaped = runMongoProgram("merizo",
+        const escaped = runMerizoProgram("merizo",
                                         "--host",
                                         "localhost",
                                         "--port",
@@ -44,10 +44,10 @@ load('jstests/ssl/libs/ssl_helpers.js');
                                         CLIENT_ESCAPE_CERT,
                                         "jstests/ssl/libs/ssl_x509_role_auth_escape.js");
 
-        // runMongoProgram returns 0 on success
+        // runMerizoProgram returns 0 on success
         assert.eq(0, escaped, "Connection attempt failed");
 
-        const utf8 = runMongoProgram("merizo",
+        const utf8 = runMerizoProgram("merizo",
                                      "--host",
                                      "localhost",
                                      "--port",
@@ -59,10 +59,10 @@ load('jstests/ssl/libs/ssl_helpers.js');
                                      CLIENT_UTF8_CERT,
                                      "jstests/ssl/libs/ssl_x509_role_auth_utf8.js");
 
-        // runMongoProgram returns 0 on success
+        // runMerizoProgram returns 0 on success
         assert.eq(0, utf8, "Connection attempt failed");
 
-        const email = runMongoProgram("merizo",
+        const email = runMerizoProgram("merizo",
                                       "--host",
                                       "localhost",
                                       "--port",
@@ -74,7 +74,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
                                       CLIENT_EMAIL_CERT,
                                       "jstests/ssl/libs/ssl_x509_role_auth_email.js");
 
-        // runMongoProgram returns 0 on success
+        // runMerizoProgram returns 0 on success
         assert.eq(0, email, "Connection attempt failed");
     }
 
@@ -82,11 +82,11 @@ load('jstests/ssl/libs/ssl_helpers.js');
 
     print("1. Testing x.509 auth to merizod");
     {
-        let merizo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
+        let merizo = MerizoRunner.runMerizod(Object.merge(x509_options, {auth: ""}));
 
         authAndTest(merizo.port);
 
-        MongoRunner.stopMongod(merizo);
+        MerizoRunner.stopMerizod(merizo);
     }
 
     print("2. Testing x.509 auth to merizos");

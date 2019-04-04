@@ -35,7 +35,7 @@
 
     // Add a shard that is a standalone merizod.
 
-    var standaloneConn = MongoRunner.runMongod({shardsvr: ''});
+    var standaloneConn = MerizoRunner.runMerizod({shardsvr: ''});
     waitForIsMaster(standaloneConn);
 
     jsTest.log("Going to add standalone as shard: " + standaloneConn);
@@ -44,7 +44,7 @@
     checkShardingStateInitialized(standaloneConn, st.configRS.getURL(), newShardName, clusterId);
     checkShardMarkedAsShardAware(st.s, newShardName);
 
-    MongoRunner.stopMongod(standaloneConn);
+    MerizoRunner.stopMerizod(standaloneConn);
 
     // Add a shard that is a replica set.
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -597,7 +597,7 @@ TEST_F(AddShardTest, UnreachableHost) {
 }
 
 // Cannot add merizos as a shard.
-TEST_F(AddShardTest, AddMongosAsShard) {
+TEST_F(AddShardTest, AddMerizosAsShard) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         stdx::make_unique<RemoteCommandTargeterMock>());
     HostAndPort shardTarget("StandaloneHost:12345");

@@ -31,6 +31,6 @@
 
 #include "merizo/config.h"
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 #include "merizo/util/net/ssl/impl/src.hpp"
 #endif

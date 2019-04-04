@@ -44,14 +44,14 @@ var db;
         db = testCase.conn.getDB("test");
         TestData.forceValidationWithFeatureCompatibilityVersion = latestFCV;
         try {
-            clearRawMongoProgramOutput();
+            clearRawMerizoProgramOutput();
 
             load("jstests/hooks/run_validate_collections.js");
 
-            // We terminate the processes to ensure that the next call to rawMongoProgramOutput()
+            // We terminate the processes to ensure that the next call to rawMerizoProgramOutput()
             // will return all of their output.
             testCase.teardown();
-            return rawMongoProgramOutput();
+            return rawMerizoProgramOutput();
         } finally {
             db = undefined;
             TestData.forceValidationWithFeatureCompatibilityVersion = undefined;
@@ -64,7 +64,7 @@ var db;
         expectedSetLatestFCV: expectedSetLatestFCV = 0
     } = {}) {
         const conn =
-            MongoRunner.runMongod({setParameter: {logComponentVerbosity: tojson({command: 1})}});
+            MerizoRunner.runMerizod({setParameter: {logComponentVerbosity: tojson({command: 1})}});
         assert.neq(conn, "merizod was unable to start up");
 
         // Insert a document so the "validate" command has some actual work to do.
@@ -79,7 +79,7 @@ var db;
                 // The validate hook should leave the server with a feature compatibility version of
                 // 'expectedAtTeardownFCV' and no targetVersion.
                 checkFCV(conn.getDB("admin"), expectedAtTeardownFCV);
-                MongoRunner.stopMongod(conn);
+                MerizoRunner.stopMerizod(conn);
             }
         });
 
@@ -92,7 +92,7 @@ var db;
                                                    [latestFCV, expectedSetLatestFCV]]) {
             // Since the additionalSetupFn() function may run the setFeatureCompatibilityVersion
             // command and we don't have a guarantee those log messages were cleared when
-            // clearRawMongoProgramOutput() was called, we assert 'expectedSetLastStableFCV' and
+            // clearRawMerizoProgramOutput() was called, we assert 'expectedSetLastStableFCV' and
             // 'expectedSetLatestFCV' as lower bounds.
             const pattern = makePatternForSetFCV(targetVersion);
             assert.lte(expectedCount,
@@ -105,7 +105,7 @@ var db;
         // We create a separate connection to the server exclusively for running the
         // setFeatureCompatibilityVersion command so only that operation is ever interrupted by
         // the checkForInterruptFail failpoint.
-        const setFCVConn = new Mongo(conn.host);
+        const setFCVConn = new Merizo(conn.host);
         const myUriRes = assert.commandWorked(setFCVConn.adminCommand({whatsmyuri: 1}));
         const myUri = myUriRes.you;
 

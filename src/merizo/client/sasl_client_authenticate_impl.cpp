@@ -34,7 +34,7 @@
  * The primary entry point at runtime is saslClientAuthenticateImpl().
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -273,7 +273,7 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
                                  saslLogLevel);
 }
 
-MONGO_INITIALIZER(SaslClientAuthenticateFunction)(InitializerContext* context) {
+MERIZO_INITIALIZER(SaslClientAuthenticateFunction)(InitializerContext* context) {
     saslClientAuthenticate = saslClientAuthenticateImpl;
     return Status::OK();
 }

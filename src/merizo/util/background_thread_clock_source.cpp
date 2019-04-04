@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -66,7 +66,7 @@ Milliseconds BackgroundThreadClockSource::getPrecision() {
 }
 
 Status BackgroundThreadClockSource::setAlarm(Date_t when, unique_function<void()> action) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Date_t BackgroundThreadClockSource::now() {
@@ -75,7 +75,7 @@ Date_t BackgroundThreadClockSource::now() {
     //
     // If we read ReaderHasRead, we have at least the last time from a previous reader, or the
     // background thread.
-    if (MONGO_unlikely(_state.load() != kReaderHasRead)) {  // acquire
+    if (MERIZO_unlikely(_state.load() != kReaderHasRead)) {  // acquire
         _updateClockAndWakeTimerIfNeeded();
     }
 
@@ -183,11 +183,11 @@ void BackgroundThreadClockSource::_startTimerThread() {
 
                 // We don't care about spurious wake ups here, at worst we'll update the clock an
                 // extra time.
-                MONGO_IDLE_THREAD_BLOCK;
+                MERIZO_IDLE_THREAD_BLOCK;
                 _condition.wait(lock);
             }
 
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             _clockSource->waitForConditionUntil(
                 _condition, lock, _lastUpdate + _granularity, [this] { return _inShutdown; });
         }

@@ -99,6 +99,6 @@ ShardingNetworkConnectionHook::makeRequest(const HostAndPort& remoteHost) {
 
 Status ShardingNetworkConnectionHook::handleReply(const HostAndPort& remoteHost,
                                                   executor::RemoteCommandResponse&& response) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 }  // namespace merizo

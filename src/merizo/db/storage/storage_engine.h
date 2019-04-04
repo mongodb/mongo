@@ -405,7 +405,7 @@ public:
      * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false.
      */
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**
@@ -419,7 +419,7 @@ public:
      * rollback may not succeed before establishment, and restart will require resync.
      */
     virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**

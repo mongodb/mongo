@@ -6,7 +6,7 @@
     const dbName = "test";
     const collName = "kill_transaction_cursors";
     const testDB = db.getSiblingDB(dbName);
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
 

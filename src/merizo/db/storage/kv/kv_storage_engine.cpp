@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 #define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
 
 #include "merizo/db/storage/kv/kv_storage_engine.h"
 

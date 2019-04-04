@@ -71,28 +71,28 @@ CatalogCacheLoaderMock::~CatalogCacheLoaderMock() {
 }
 
 void CatalogCacheLoaderMock::initializeReplicaSetRole(bool isPrimary) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void CatalogCacheLoaderMock::onStepDown() {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void CatalogCacheLoaderMock::onStepUp() {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void CatalogCacheLoaderMock::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void CatalogCacheLoaderMock::waitForCollectionFlush(OperationContext* opCtx,
                                                     const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void CatalogCacheLoaderMock::waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(

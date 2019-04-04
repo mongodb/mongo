@@ -144,7 +144,7 @@
             // Test renaming a collection to a different database. Do not run this in the merizos
             // passthrough suites since we cannot guarantee the primary shard of the target database
             // and renameCollection requires the source and destination to be on the same shard.
-            if (!FixtureHelpers.isMongos(testDB)) {
+            if (!FixtureHelpers.isMerizos(testDB)) {
                 const otherDB = testDB.getSiblingDB(testDB.getName() + "_rename_target");
                 // Ensure the target database exists.
                 const collOtherDB = assertDropAndRecreateCollection(otherDB, "test");

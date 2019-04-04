@@ -25,7 +25,7 @@ type testDoc struct {
 }
 
 func TestOpGetMore(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := GetMoreOp{}
@@ -57,7 +57,7 @@ func TestOpGetMore(t *testing.T) {
 }
 
 func TestOpDelete(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := DeleteOp{}
@@ -90,7 +90,7 @@ func TestOpDelete(t *testing.T) {
 }
 
 func TestInsertOp(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := InsertOp{}
@@ -137,7 +137,7 @@ func TestInsertOp(t *testing.T) {
 }
 
 func TestKillCursorsOp(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := KillCursorsOp{}
@@ -162,7 +162,7 @@ func TestKillCursorsOp(t *testing.T) {
 }
 
 func TestQueryOp(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := QueryOp{}
@@ -207,7 +207,7 @@ func TestQueryOp(t *testing.T) {
 }
 
 func TestOpUpdate(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := UpdateOp{}
@@ -245,7 +245,7 @@ func TestOpUpdate(t *testing.T) {
 }
 
 func TestCommandOp(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := CommandOp{}
@@ -306,7 +306,7 @@ func TestCommandOp(t *testing.T) {
 }
 
 func TestOpMsg(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	var testDocs []interface{}
 	testDocs = append(testDocs, bson.D{{"doc", 1}})
 	testDocs = append(testDocs, bson.D{{"doc", 2}})
@@ -453,7 +453,7 @@ func TestOpMsg(t *testing.T) {
 }
 
 func comparePayloadType0(t *testing.T, p1, p2 interface{}) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	dataAsRaw, ok := p1.(*bson.Raw)
 	if !ok {
 		t.Errorf("type of section data incorrect")
@@ -472,7 +472,7 @@ func comparePayloadType0(t *testing.T, p1, p2 interface{}) {
 }
 
 func comparePayloadType1(t *testing.T, p1, p2 interface{}) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	p1AsPayload, ok := p1.(mgo.PayloadType1)
 	if !ok {
 		t.Error("incorrect type when expecting PayloadType1")
@@ -492,7 +492,7 @@ func comparePayloadType1(t *testing.T, p1, p2 interface{}) {
 }
 
 func TestPreciseTimeMarshal(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	t1 := time.Date(2015, 4, 8, 15, 16, 23, 651387237, time.UTC)
 	preciseTime := &PreciseTime{t1}
 	asBson, err := bson.Marshal(preciseTime)
@@ -511,7 +511,7 @@ func TestPreciseTimeMarshal(t *testing.T) {
 }
 
 func TestCommandOpGetMoreCursorsRewriteable(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	oldCursorID := int64(1234)
 	newCursorID := int64(5678)
 
@@ -580,7 +580,7 @@ func TestCommandOpGetMoreCursorsRewriteable(t *testing.T) {
 }
 
 func TestOpGetMoreCursorsRewriteable(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	oldCursorID := int64(1234)
 	newCursorID := int64(5678)
 
@@ -622,7 +622,7 @@ func TestOpGetMoreCursorsRewriteable(t *testing.T) {
 }
 
 func TestKillCursorsRewriteable(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	oldCursorIDs := []int64{11, 12, 13}
 	newCursorIDs := []int64{21, 22}
 
@@ -664,7 +664,7 @@ func TestKillCursorsRewriteable(t *testing.T) {
 }
 
 func TestOpCommandReplyGetCursorID(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	testCursorID := int64(123)
 	doc := &struct {
 		Cursor struct {
@@ -700,7 +700,7 @@ func TestOpCommandReplyGetCursorID(t *testing.T) {
 }
 
 func TestShortenLegacyReply(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := ReplyOp{}
@@ -778,7 +778,7 @@ type findReply struct {
 }
 
 func TestShortenCommandReply(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	generator := newRecordedOpGenerator()
 
 	op := CommandReplyOp{}
@@ -873,7 +873,7 @@ func TestShortenCommandReply(t *testing.T) {
 }
 
 func TestLegacyOpReplyGetCursorID(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	testCursorID := int64(123)
 	doc := &struct {
 		Cursor struct {
@@ -923,7 +923,7 @@ func TestLegacyOpReplyGetCursorID(t *testing.T) {
 }
 
 func TestFilterCommandOpMetadata(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	testMetadata := &bson.D{{"test", 1}}
 
 	testCases := []struct {
@@ -973,7 +973,7 @@ func TestFilterCommandOpMetadata(t *testing.T) {
 	}
 }
 func TestReadSection(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	data := bson.D{{"k", "v"}}
 	dataAsSlice, err := bson.Marshal(data)
 	if err != nil {

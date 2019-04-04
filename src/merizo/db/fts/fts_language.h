@@ -44,9 +44,9 @@ namespace fts {
 class FTSTokenizer;
 
 // Legacy language initialization.
-#define MONGO_FTS_LANGUAGE_DECLARE(language, name, version)                                    \
+#define MERIZO_FTS_LANGUAGE_DECLARE(language, name, version)                                    \
     BasicFTSLanguage language;                                                                 \
-    MONGO_INITIALIZER_GENERAL(language, MONGO_NO_PREREQUISITES, ("FTSAllLanguagesRegistered")) \
+    MERIZO_INITIALIZER_GENERAL(language, MERIZO_NO_PREREQUISITES, ("FTSAllLanguagesRegistered")) \
     (::merizo::InitializerContext * context) {                                                  \
         FTSLanguage::registerLanguage(name, version, &language);                               \
         return Status::OK();                                                                   \

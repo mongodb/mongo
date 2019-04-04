@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -49,7 +49,7 @@ using std::endl;
 using std::string;
 using std::stringstream;
 
-MONGO_FAIL_POINT_DEFINE(validateCmdCollectionNotValid);
+MERIZO_FAIL_POINT_DEFINE(validateCmdCollectionNotValid);
 
 namespace {
 
@@ -95,7 +95,7 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        if (MONGO_FAIL_POINT(validateCmdCollectionNotValid)) {
+        if (MERIZO_FAIL_POINT(validateCmdCollectionNotValid)) {
             result.appendBool("valid", false);
             return true;
         }

@@ -42,7 +42,7 @@ static LogManager* theGlobalLogManager;  // NULL at program start, before even s
 static RotatableFileManager theGlobalRotatableFileManager;
 
 LogManager* globalLogManager() {
-    if (MONGO_unlikely(!theGlobalLogManager)) {
+    if (MERIZO_unlikely(!theGlobalLogManager)) {
         theGlobalLogManager = new LogManager;
     }
     return theGlobalLogManager;
@@ -56,7 +56,7 @@ RotatableFileManager* globalRotatableFileManager() {
  * Just in case no static initializer called globalLogManager, make sure that the global log
  * manager is instantiated while we're still in a single-threaded context.
  */
-MONGO_INITIALIZER_GENERAL(GlobalLogManager, ("ValidateLocale"), ("default"))(InitializerContext*) {
+MERIZO_INITIALIZER_GENERAL(GlobalLogManager, ("ValidateLocale"), ("default"))(InitializerContext*) {
     globalLogManager();
     return Status::OK();
 }

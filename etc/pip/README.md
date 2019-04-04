@@ -26,7 +26,7 @@ constraints file.
 
 The most common edit of our requirements is likely a change to the constraints on a pypa project
 that we already use. For example, say that we currently require `pymerizo >= 3.0, < 3.6.0` in the
-component `core`. You would like to use PyMongo 3.7, so you instead modify the line in
+component `core`. You would like to use PyMerizo 3.7, so you instead modify the line in
 `etc/pip/components/core.req` to read `pymerizo >= 3.0, != 3.6.0`. Since this is a modification to an
 existing component, you do not need to modify any requirements file. However, you do need to
 regenerate the constraints file. The workflow will usually look like:

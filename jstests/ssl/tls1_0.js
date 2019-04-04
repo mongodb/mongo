@@ -1,4 +1,4 @@
-// Make sure MongoD starts with TLS 1.0 disabled (except w/ old OpenSSL).
+// Make sure MerizoD starts with TLS 1.0 disabled (except w/ old OpenSSL).
 
 (function() {
     'use strict';
@@ -46,8 +46,8 @@
         if (serverDP !== null) {
             serverOpts.sslDisabledProtocols = serverDP;
         }
-        clearRawMongoProgramOutput();
-        const merizod = MongoRunner.runMongod(serverOpts);
+        clearRawMerizoProgramOutput();
+        const merizod = MerizoRunner.runMerizod(serverOpts);
         assert(merizod);
 
         let clientOpts = [];
@@ -57,7 +57,7 @@
         const didSucceed = (function() {
             try {
                 assert.soon(function() {
-                    return 0 == runMongoProgram('merizo',
+                    return 0 == runMerizoProgram('merizo',
                                                 '--ssl',
                                                 '--port',
                                                 merizod.port,
@@ -80,7 +80,7 @@
             didSucceed, shouldSucceed, "Running with " + tojson(serverDP) + "/" + tojson(clientDP));
 
         assert.eq(expectLogMessage,
-                  rawMongoProgramOutput().search('Automatically disabling TLS 1.0') >= 0,
+                  rawMerizoProgramOutput().search('Automatically disabling TLS 1.0') >= 0,
                   "TLS 1.0 was/wasn't automatically disabled");
     }
 

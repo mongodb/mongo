@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -132,7 +132,7 @@ public:
 };
 constexpr StringData EchoCommand::Request::kCommandName;
 
-MONGO_REGISTER_TEST_COMMAND(EchoCommand);
+MERIZO_REGISTER_TEST_COMMAND(EchoCommand);
 
 class ListCommandsCmd : public BasicCommand {
 public:

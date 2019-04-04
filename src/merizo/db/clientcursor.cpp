@@ -281,7 +281,7 @@ public:
                 cursorStatsTimedOut.increment(
                     CursorManager::get(opCtx.get())->timeoutCursors(opCtx.get(), now));
             }
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             sleepsecs(getClientCursorMonitorFrequencySecs());
         }
     }

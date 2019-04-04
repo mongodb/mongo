@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kGeo
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kGeo
 
 #include "merizo/db/geo/geoparser.h"
 
@@ -724,7 +724,7 @@ Status GeoParser::parseGeometryCollection(const BSONObj& obj,
                 geoObj, skipValidation, out->multiPolygons.mutableVector().back());
         } else {
             // Should not reach here.
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
 
         // Check parsing result.

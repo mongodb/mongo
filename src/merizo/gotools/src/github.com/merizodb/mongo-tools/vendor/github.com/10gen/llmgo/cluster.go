@@ -22,7 +22,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Mongo cluster encapsulation.
+// Merizo cluster encapsulation.
 //
 // A cluster enables the communication with one or more servers participating
 // in a merizo cluster.  This works with individual servers, a replica set,
@@ -99,7 +99,7 @@ func (cluster *merizoCluster) LiveServers() (servers []string) {
 	return servers
 }
 
-func (cluster *merizoCluster) removeServer(server *MongoServer) {
+func (cluster *merizoCluster) removeServer(server *MerizoServer) {
 	cluster.Lock()
 	cluster.masters.Remove(server)
 	other := cluster.servers.Remove(server)
@@ -123,7 +123,7 @@ type isMasterResult struct {
 	MaxWireVersion int    `bson:"maxWireVersion"`
 }
 
-func (cluster *merizoCluster) isMaster(socket *MongoSocket, result *isMasterResult) error {
+func (cluster *merizoCluster) isMaster(socket *MerizoSocket, result *isMasterResult) error {
 	// Monotonic let's it talk to a slave and still hold the socket.
 	session := newSession(Monotonic, cluster, 10*time.Second)
 	session.setSocket(socket)
@@ -138,7 +138,7 @@ type possibleTimeout interface {
 
 var syncSocketTimeout = 5 * time.Second
 
-func (cluster *merizoCluster) syncServer(server *MongoServer) (info *merizoServerInfo, hosts []string, err error) {
+func (cluster *merizoCluster) syncServer(server *MerizoServer) (info *merizoServerInfo, hosts []string, err error) {
 	var syncTimeout time.Duration
 	if raceDetector {
 		// This variable is only ever touched by tests.
@@ -211,7 +211,7 @@ func (cluster *merizoCluster) syncServer(server *MongoServer) (info *merizoServe
 
 	info = &merizoServerInfo{
 		Master:         result.IsMaster,
-		Mongos:         result.Msg == "isdbgrid",
+		Merizos:         result.Msg == "isdbgrid",
 		Tags:           result.Tags,
 		SetName:        result.SetName,
 		MaxWireVersion: result.MaxWireVersion,
@@ -236,7 +236,7 @@ const (
 	partialSync  syncKind = false
 )
 
-func (cluster *merizoCluster) addServer(server *MongoServer, info *merizoServerInfo, syncKind syncKind) {
+func (cluster *merizoCluster) addServer(server *MerizoServer, info *merizoServerInfo, syncKind syncKind) {
 	cluster.Lock()
 	current := cluster.servers.Search(server.ResolvedAddr)
 	if current == nil {
@@ -382,7 +382,7 @@ func (cluster *merizoCluster) syncServersLoop() {
 	debugf("SYNC Cluster %p is stopping its sync loop.", cluster)
 }
 
-func (cluster *merizoCluster) server(addr string, tcpaddr *net.TCPAddr) *MongoServer {
+func (cluster *merizoCluster) server(addr string, tcpaddr *net.TCPAddr) *MerizoServer {
 	cluster.RLock()
 	server := cluster.servers.Search(tcpaddr.String())
 	cluster.RUnlock()
@@ -453,7 +453,7 @@ func resolveAddr(addr string) (*net.TCPAddr, error) {
 }
 
 type pendingAdd struct {
-	server *MongoServer
+	server *MerizoServer
 	info   *merizoServerInfo
 }
 
@@ -561,7 +561,7 @@ func (cluster *merizoCluster) syncServersIteration(direct bool) {
 // AcquireSocket returns a socket to a server in the cluster.  If slaveOk is
 // true, it will attempt to return a socket to a slave server.  If it is
 // false, the socket will necessarily be to a master server.
-func (cluster *merizoCluster) AcquireSocket(mode Mode, slaveOk bool, syncTimeout time.Duration, socketTimeout time.Duration, serverTags []bson.D, poolLimit int) (s *MongoSocket, err error) {
+func (cluster *merizoCluster) AcquireSocket(mode Mode, slaveOk bool, syncTimeout time.Duration, socketTimeout time.Duration, serverTags []bson.D, poolLimit int) (s *MerizoSocket, err error) {
 	var started time.Time
 	var syncCount uint
 	warnedLimit := false
@@ -589,7 +589,7 @@ func (cluster *merizoCluster) AcquireSocket(mode Mode, slaveOk bool, syncTimeout
 			cluster.serverSynced.Wait()
 		}
 
-		var server *MongoServer
+		var server *MerizoServer
 		if slaveOk {
 			server = cluster.servers.BestFit(mode, serverTags)
 		} else {

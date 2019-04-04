@@ -1270,7 +1270,7 @@ Value ExpressionDateFromParts::evaluate(const Document& root) const {
             isoWeekYear, isoWeek, isoDayOfWeek, hour, minute, second, millisecond));
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ExpressionDateFromParts::_doAddDependencies(DepsTracker* deps) const {
@@ -2496,7 +2496,7 @@ Value ExpressionMeta::serialize(bool explain) const {
             return Value(DOC("$meta"
                              << "randVal"_sd));
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Value ExpressionMeta::evaluate(const Document& root) const {
@@ -2506,7 +2506,7 @@ Value ExpressionMeta::evaluate(const Document& root) const {
         case MetaType::RAND_VAL:
             return root.hasRandMetaField() ? Value(root.getRandMetaField()) : Value();
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ExpressionMeta::_doAddDependencies(DepsTracker* deps) const {
@@ -3433,7 +3433,7 @@ Value ExpressionPow::evaluate(const Document& root) const {
         }
 
         // We should have checked earlier that 0 to a negative power is banned.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     } else if (baseLong == 1) {
         return formatResult(1);
     } else if (baseLong == -1) {
@@ -4855,7 +4855,7 @@ static Value evaluateRoundOrTrunc(const Document& root,
             return Value(static_cast<int>(outll));
         }
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -5353,7 +5353,7 @@ private:
                 inputDecimal.toLong(&signalingFlags, Decimal128::RoundingMode::kRoundTowardZero);
             result = Value(longVal);
         } else {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
 
         // NB: Decimal128::SignalingFlag has a values specifically for overflow, but it is used for
@@ -5416,7 +5416,7 @@ private:
                     performCastDecimalToInt(BSONType::NumberLong, inputValue).getLong();
                 break;
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
 
         return Value(Date_t::fromMillisSinceEpoch(millisSinceEpoch));

@@ -51,7 +51,7 @@
     const routerColl = st.s.getDB('test').user;
 
     const shardHost = st.config.shards.findOne({_id: st.shard1.shardName}).host;
-    const merizod = new Mongo(shardHost);
+    const merizod = new Merizo(shardHost);
     const shardColl = merizod.getCollection(routerColl.getFullName());
 
     assert.commandWorked(adminDB.runCommand({enableSharding: routerColl.getDB().getName()}));

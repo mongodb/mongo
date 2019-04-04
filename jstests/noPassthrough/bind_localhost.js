@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    const merizo = MongoRunner.runMongod({ipv6: '', bind_ip: 'localhost', useLogFiles: true});
+    const merizo = MerizoRunner.runMerizod({ipv6: '', bind_ip: 'localhost', useLogFiles: true});
     assert.neq(merizo, null, "Database is not running");
     const log = cat(merizo.fullOptions.logFile);
     print(log);
@@ -11,5 +11,5 @@
     if (!_isWindows()) {
         assert(log.match(/Listening on .*\.sock/), "Not listening on AF_UNIX");
     }
-    MongoRunner.stopMongod(merizo);
+    MerizoRunner.stopMerizod(merizo);
 }());

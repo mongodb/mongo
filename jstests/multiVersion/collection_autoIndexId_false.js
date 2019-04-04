@@ -12,19 +12,19 @@
         const dbpath = conn.dbpath;
 
         // Start with 4.0 because we can't skip more than one major version at a time.
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({binVersion: '4.0', dbpath: dbpath, noCleanData: true});
+        MerizoRunner.stopMerizod(conn);
+        conn = MerizoRunner.runMerizod({binVersion: '4.0', dbpath: dbpath, noCleanData: true});
         assert.neq(null, conn, 'merizod was unable to start with version 4.0');
         let adminDb = conn.getDB('admin');
         assert.commandWorked(adminDb.runCommand({'setFeatureCompatibilityVersion': '4.0'}));
 
         // Start again with latest.
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({binVersion: 'latest', dbpath: dbpath, noCleanData: true});
+        MerizoRunner.stopMerizod(conn);
+        conn = MerizoRunner.runMerizod({binVersion: 'latest', dbpath: dbpath, noCleanData: true});
 
         if (shouldPass) {
             assert.neq(null, conn, 'merizod failed to start with latest version');
-            MongoRunner.stopMongod(conn);
+            MerizoRunner.stopMerizod(conn);
         } else {
             assert.eq(null, conn, 'merizod started with latest version but should have failed');
         }
@@ -35,7 +35,7 @@
     // Create a collection with autoIndexId: false on a 3.6 server and asset that an upgrade to
     // latest fails.
     function cannotUpgradeWithoutIndex() {
-        let conn = MongoRunner.runMongod({binVersion: '3.6'});
+        let conn = MerizoRunner.runMerizod({binVersion: '3.6'});
         assert.neq(null, conn, 'merizod was unable able to start with version 3.6');
 
         // Create a collection with autoIndexId: false.
@@ -49,7 +49,7 @@
     // Create a collection with autoIndexId: false on a 3.6 server, manually create an index on the
     // _id field, and ensure that an upgrade to latest passes.
     function canUpgradeAfterCreatingIndex() {
-        let conn = MongoRunner.runMongod({binVersion: '3.6'});
+        let conn = MerizoRunner.runMerizod({binVersion: '3.6'});
         assert.neq(null, conn, 'merizod was unable able to start with version 3.6');
 
         // Create a collection with autoIndexId: false and then manually create the _id index.

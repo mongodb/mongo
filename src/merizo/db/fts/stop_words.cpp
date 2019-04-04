@@ -62,7 +62,7 @@ const StopWords* StopWords::getStopWords(const FTSLanguage* language) {
 }
 
 
-MONGO_INITIALIZER(StopWords)(InitializerContext* context) {
+MERIZO_INITIALIZER(StopWords)(InitializerContext* context) {
     StringMap<std::set<std::string>> raw;
     loadStopWordMap(&raw);
     for (StringMap<std::set<std::string>>::const_iterator i = raw.begin(); i != raw.end(); ++i) {

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/db/query/plan_enumerator.h"
 
@@ -343,7 +343,7 @@ PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
 
     if (_nodeToId.end() == it) {
         error() << "Trying to look up memo entry for node, none found.";
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     return it->second;
@@ -1524,7 +1524,7 @@ size_t PlanEnumerator::getPosition(const IndexEntry& indexEntry, MatchExpression
         }
         ++position;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,

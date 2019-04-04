@@ -24,14 +24,14 @@
     let lsid = {id: UUID()};
     let txnNumber = 0;
 
-    const runCommitThroughMongosInParallelShellExpectSuccess = function() {
+    const runCommitThroughMerizosInParallelShellExpectSuccess = function() {
         const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
             "commitTransaction: 1," + "lsid: " + tojson(lsid) + "," + "txnNumber: NumberLong(" +
             txnNumber + ")," + "stmtId: NumberInt(0)," + "autocommit: false," + "}));";
         return startParallelShell(runCommitExpectSuccessCode, st.s.port);
     };
 
-    const runCommitThroughMongosInParallelShellExpectAbort = function() {
+    const runCommitThroughMerizosInParallelShellExpectAbort = function() {
         const runCommitExpectSuccessCode = "assert.commandFailedWithCode(db.adminCommand({" +
             "commitTransaction: 1," + "lsid: " + tojson(lsid) + "," + "txnNumber: NumberLong(" +
             txnNumber + ")," + "stmtId: NumberInt(0)," + "autocommit: false," + "})," +
@@ -101,9 +101,9 @@
         // Run commitTransaction through a parallel shell.
         let awaitResult;
         if (shouldCommit) {
-            awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
+            awaitResult = runCommitThroughMerizosInParallelShellExpectSuccess();
         } else {
-            awaitResult = runCommitThroughMongosInParallelShellExpectAbort();
+            awaitResult = runCommitThroughMerizosInParallelShellExpectAbort();
         }
 
         // Deliver killOp once the failpoint has been hit.
@@ -167,14 +167,14 @@
 
     // failpointDataArr.forEach(function(failpointData) {
     //     testCommitProtocol(false /* shouldCommit */, failpointData);
-    //     clearRawMongoProgramOutput();
+    //     clearRawMerizoProgramOutput();
     // });
 
     // Test commit path.
 
     failpointDataArr.forEach(function(failpointData) {
         testCommitProtocol(true /* shouldCommit */, failpointData);
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
     });
 
     st.stop();

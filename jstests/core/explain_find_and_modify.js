@@ -83,7 +83,7 @@
     assert.eq(t.find().itcount(), 1, "Explaining an upsert should not insert any documents.");
 
     // 5. The reported stats should reflect how it would execute and what it would modify.
-    var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+    var isMerizos = db.runCommand({isdbgrid: 1}).isdbgrid;
 
     // List out the command to be explained, and the expected results of that explain.
     var testCases = [
@@ -223,7 +223,7 @@
      * to have the same format as though it had come from a merizod.
      */
     function transformIfSharded(explainOut) {
-        if (!isMongos) {
+        if (!isMerizos) {
             return explainOut;
         }
 
@@ -299,7 +299,7 @@
     }
 
     function assertDBDoesNotExist(db, msg) {
-        assert.eq(db.getMongo().getDBNames().indexOf(db.getName()),
+        assert.eq(db.getMerizo().getDBNames().indexOf(db.getName()),
                   -1,
                   msg + "db " + db.getName() + " exists.");
     }

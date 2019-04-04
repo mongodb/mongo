@@ -38,7 +38,7 @@
 
     admin.createUser({user: "admin2", pwd: "admin", roles: ["root"]});
 
-    let secondConn = new Mongo(merizod.host);
+    let secondConn = new Merizo(merizod.host);
     let secondAdmin = secondConn.getDB("admin");
     secondAdmin.auth("admin2", "admin");
 
@@ -114,7 +114,7 @@
     // Start a merizod with the user cache size set to zero, so we know that users who have
     // logged out always get fetched cleanly from disk.
     const merizod =
-        MongoRunner.runMongod({auth: "", setParameter: "authorizationManagerCacheSize=0"});
+        MerizoRunner.runMerizod({auth: "", setParameter: "authorizationManagerCacheSize=0"});
     let admin = merizod.getDB("admin");
 
     admin.createUser({user: "admin", pwd: "admin", roles: ["root"]});
@@ -142,5 +142,5 @@
           tojson(admin.aggregate([{$listCachedAndActiveUsers: {}}]).toArray()));
 
     assert.eq(admin.auth("admin2", "admin"), 0);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

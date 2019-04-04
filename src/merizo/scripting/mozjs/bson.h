@@ -71,8 +71,8 @@ struct BSONInfo : public BaseInfo {
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(bsonWoCompare);
-        MONGO_DECLARE_JS_FUNCTION(bsonBinaryEqual);
+        MERIZO_DECLARE_JS_FUNCTION(bsonWoCompare);
+        MERIZO_DECLARE_JS_FUNCTION(bsonBinaryEqual);
     };
 
     static const JSFunctionSpec freeFunctions[3];

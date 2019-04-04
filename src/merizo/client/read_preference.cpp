@@ -68,7 +68,7 @@ StringData readPreferenceName(ReadPreference pref) {
         case ReadPreference::Nearest:
             return StringData(kNearest);
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

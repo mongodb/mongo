@@ -75,7 +75,7 @@
     var explain = t.find({a: {$gte: 85}}).sort({b: 1}).batchSize(2).explain("executionStats");
     assert.eq(15, explain.executionStats.nReturned);
     explain = t.find({a: {$gte: 85}}).sort({b: 1}).limit(6).explain("executionStats");
-    if (FixtureHelpers.isMongos(db)) {
+    if (FixtureHelpers.isMerizos(db)) {
         // If we're talking to a merizos, we expect at most one batch from each shard.
         assert.eq(FixtureHelpers.numberOfShardsForCollection(t) * 6,
                   explain.executionStats.nReturned);
@@ -89,7 +89,7 @@
         t.find({a: {$gte: 50}}).sort({b: 1}).hint({a: 1}).limit(6).explain("executionStats");
     assert.lte(explain.executionStats.totalKeysExamined, 60);
     assert.lte(explain.executionStats.totalDocsExamined, 60);
-    if (FixtureHelpers.isMongos(db)) {
+    if (FixtureHelpers.isMerizos(db)) {
         // If we're talking to a merizos, we expect at most one batch from each shard.
         assert.eq(FixtureHelpers.numberOfShardsForCollection(t) * 6,
                   explain.executionStats.nReturned);

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault;
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault;
 
 #include "merizo/platform/basic.h"
 
@@ -64,7 +64,7 @@ const std::set<std::string> kSetShellParameterWhitelist = {
     "disabledSecureAllocatorDomains",
 };
 
-std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {
+std::string getMerizoShellHelp(StringData name, const moe::OptionSection& options) {
     StringBuilder sb;
     sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"
        << "db address can be:\n"
@@ -78,14 +78,14 @@ std::string getMongoShellHelp(StringData name, const moe::OptionSection& options
     return sb.str();
 }
 
-bool handlePreValidationMongoShellOptions(const moe::Environment& params,
+bool handlePreValidationMerizoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args) {
     auto&& vii = VersionInfoInterface::instance();
     if (params.count("version") || params.count("help")) {
         setPlainConsoleLogger();
         log() << merizoShellVersion(vii);
         if (params.count("help")) {
-            log() << getMongoShellHelp(args[0], moe::startupOptions);
+            log() << getMerizoShellHelp(args[0], moe::startupOptions);
         } else {
             vii.logBuildInfo();
         }
@@ -94,7 +94,7 @@ bool handlePreValidationMongoShellOptions(const moe::Environment& params,
     return true;
 }
 
-Status storeMongoShellOptions(const moe::Environment& params,
+Status storeMerizoShellOptions(const moe::Environment& params,
                               const std::vector<std::string>& args) {
     if (params.count("quiet")) {
         merizo::serverGlobalParams.quiet.store(true);
@@ -243,13 +243,13 @@ Status storeMongoShellOptions(const moe::Environment& params,
         StringBuilder sb;
         sb << "ERROR: "
            << "\"*\" is an invalid db address";
-        sb << getMongoShellHelp(args[0], moe::startupOptions);
+        sb << getMerizoShellHelp(args[0], moe::startupOptions);
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
     if ((shellGlobalParams.url.find("merizodb://") == 0) ||
         (shellGlobalParams.url.find("merizodb+srv://") == 0)) {
-        auto cs_status = MongoURI::parse(shellGlobalParams.url);
+        auto cs_status = MerizoURI::parse(shellGlobalParams.url);
         if (!cs_status.isOK()) {
             return cs_status.getStatus();
         }

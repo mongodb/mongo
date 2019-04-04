@@ -37,8 +37,8 @@ function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
     var B = b_conn.getDB("test");
     var AID = replTest.getNodeId(a_conn);
     var BID = replTest.getNodeId(b_conn);
-    var Apath = MongoRunner.dataDir + "/" + testName + "-0/";
-    var Bpath = MongoRunner.dataDir + "/" + testName + "-1/";
+    var Apath = MerizoRunner.dataDir + "/" + testName + "-0/";
+    var Bpath = MerizoRunner.dataDir + "/" + testName + "-1/";
     assert(master == conns[0], "conns[0] assumed to be master");
     assert(a_conn.host == master.host);
 

@@ -49,7 +49,7 @@ namespace merizo {
  * periodic runner for this merizos. The time will be returned from the
  * system clock.
  */
-class ServiceLiaisonMongos : public ServiceLiaison {
+class ServiceLiaisonMerizos : public ServiceLiaison {
 public:
     LogicalSessionIdSet getActiveOpSessions() const override;
     LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) const override;

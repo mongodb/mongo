@@ -6,7 +6,7 @@
  * Runs explain() on a collection.
  *
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMerizod
 
 var $config = (function() {
 
@@ -51,7 +51,7 @@ var $config = (function() {
             assertAlways.commandWorked(res);
             assertAlways(res.queryPlanner, tojson(res));
             assertAlways(res.queryPlanner.winningPlan, tojson(res));
-            if (isMongod(db)) {
+            if (isMerizod(db)) {
                 assertAlways.eq(res.queryPlanner.winningPlan.stage, 'EOF', tojson(res));
             } else {
                 // In the sharding case, each shard has a winningPlan

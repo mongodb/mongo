@@ -38,11 +38,11 @@
 
         // Set up two transactions with IX locks and cursors.
 
-        let session1 = db.getMongo().startSession(sessionOptions);
+        let session1 = db.getMerizo().startSession(sessionOptions);
         let sessionDb1 = session1.getDatabase(dbName);
         let sessionColl1 = sessionDb1[collName];
 
-        let session2 = db.getMongo().startSession(sessionOptions);
+        let session2 = db.getMerizo().startSession(sessionOptions);
         let sessionDb2 = session2.getDatabase(dbName);
         let sessionColl2 = sessionDb2[collName];
 

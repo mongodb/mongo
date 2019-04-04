@@ -14,7 +14,7 @@
     (function assertColletionDropCanBeInterrupted() {
         assert.commandWorked(txnDB.foo.insert({}));
         assert.commandWorked(dropDB.bar.insert({}));
-        const session = txnDB.getMongo().startSession({causalConsistency: false});
+        const session = txnDB.getMerizo().startSession({causalConsistency: false});
         const sessionDB = session.getDatabase("txn");
         session.startTransaction();
         assert.commandWorked(sessionDB.foo.insert({}));
@@ -43,7 +43,7 @@
             return res.hasNext();
         }, "Timeout waiting for dropDatabase to start");
 
-        const session = txnDB.getMongo().startSession({causalConsistency: false});
+        const session = txnDB.getMerizo().startSession({causalConsistency: false});
         const sessionDB = session.getDatabase("txn");
         session.startTransaction();
         assert.commandWorked(sessionDB.foo.insert({}));

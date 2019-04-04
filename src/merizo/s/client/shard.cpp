@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -136,7 +136,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
 
         return swResponse;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
@@ -173,7 +173,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
 
         return swResponse;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
@@ -192,7 +192,7 @@ StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
         }
         return result;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
@@ -218,7 +218,7 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
 
         return batchResponse;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
@@ -243,7 +243,7 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
 
         return result;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

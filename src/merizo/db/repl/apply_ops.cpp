@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -68,10 +68,10 @@ constexpr StringData ApplyOps::kOplogApplicationModeFieldName;
 namespace {
 
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
-MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
+MERIZO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
 
 // If enabled, causes _applyPrepareTransaction to hang before preparing the transaction participant.
-MONGO_FAIL_POINT_DEFINE(applyOpsHangBeforePreparingTransaction);
+MERIZO_FAIL_POINT_DEFINE(applyOpsHangBeforePreparingTransaction);
 
 /**
  * Return true iff the applyOpsCmd can be executed in a single WriteUnitOfWork.
@@ -267,8 +267,8 @@ Status _applyOps(OperationContext* opCtx,
 
         (*numApplied)++;
 
-        if (MONGO_FAIL_POINT(applyOpsPauseBetweenOperations)) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(applyOpsPauseBetweenOperations);
+        if (MERIZO_FAIL_POINT(applyOpsPauseBetweenOperations)) {
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET(applyOpsPauseBetweenOperations);
         }
     }
 
@@ -312,7 +312,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
     // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+    MerizoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
     auto transaction = TransactionParticipant::get(opCtx);
     transaction.unstashTransactionResources(opCtx, "prepareTransaction");
@@ -333,9 +333,9 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     }
     invariant(!entry.getOpTime().isNull());
 
-    if (MONGO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
+    if (MERIZO_FAIL_POINT(applyOpsHangBeforePreparingTransaction)) {
         LOG(0) << "Hit applyOpsHangBeforePreparingTransaction failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                         applyOpsHangBeforePreparingTransaction);
     }
 

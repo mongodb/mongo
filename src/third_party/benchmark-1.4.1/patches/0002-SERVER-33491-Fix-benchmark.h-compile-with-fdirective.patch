@@ -17,7 +17,7 @@ index c8360da..9529faf 100644
  // empty. If X is empty the expression becomes (+1 == +0).
 -#if defined(__COUNTER__) && (__COUNTER__ + 1 == __COUNTER__ + 0)
 +//
-+// MONGODB MODIFICATION: all of our supported compilers support __COUNTER__ so we don't need to test
++// MERIZODB MODIFICATION: all of our supported compilers support __COUNTER__ so we don't need to test
 +// for it here.  This test interferes with -E -fdirectives-only since it is illegal to use
 +// __COUNTER__ in an #if clause with that flag because its value could change between the partial
 +// preprocessing and the compile phases.

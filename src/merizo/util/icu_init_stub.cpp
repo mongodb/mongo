@@ -34,9 +34,9 @@
 namespace merizo {
 namespace {
 
-// This initializer provides a no-op definition of the LoadICUData MONGO_INITIALIZER, for use when
+// This initializer provides a no-op definition of the LoadICUData MERIZO_INITIALIZER, for use when
 // the system version of ICU is used instead of the vendored version.
-MONGO_INITIALIZER(LoadICUData)(InitializerContext* context) {
+MERIZO_INITIALIZER(LoadICUData)(InitializerContext* context) {
     return Status::OK();
 }
 

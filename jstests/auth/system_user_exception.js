@@ -4,7 +4,7 @@
     "use strict";
 
     // Start merizod with no authentication mechanisms enabled
-    var m = MongoRunner.runMongod(
+    var m = MerizoRunner.runMerizod(
         {keyFile: "jstests/libs/key1", setParameter: "authenticationMechanisms=PLAIN"});
 
     // Verify that it's possible to use SCRAM-SHA-1 to authenticate as the __system@local user
@@ -16,6 +16,6 @@
         {createUser: "guest", pwd: "guest", roles: jsTest.readOnlyUserRoles});
     assert.eq(0, m.getDB("test").auth({user: "guest", pwd: "guest", mechanism: "SCRAM-SHA-1"}));
 
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 
 })();

@@ -12,7 +12,7 @@
  * {
  *     upgradeShards: <bool>, // defaults to true
  *     upgradeConfigs: <bool>, // defaults to true
- *     upgradeMongos: <bool>, // defaults to true
+ *     upgradeMerizos: <bool>, // defaults to true
  * }
  */
 ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
@@ -21,8 +21,8 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
         options.upgradeShards = true;
     if (options.upgradeConfigs == undefined)
         options.upgradeConfigs = true;
-    if (options.upgradeMongos == undefined)
-        options.upgradeMongos = true;
+    if (options.upgradeMerizos == undefined)
+        options.upgradeMerizos = true;
 
     var upgradedSingleShards = [];
 
@@ -36,8 +36,8 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
             if (configSvr.host in upgradedSingleShards) {
                 configSvr = upgradedSingleShards[configSvr.host];
             } else {
-                MongoRunner.stopMongod(configSvr);
-                configSvr = MongoRunner.runMongod(
+                MerizoRunner.stopMerizod(configSvr);
+                configSvr = MerizoRunner.runMerizod(
                     {restart: configSvr, binVersion: binVersion, appendOptions: true});
             }
 
@@ -57,8 +57,8 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
             } else {
                 // Upgrade shard
                 var shard = this._connections[i];
-                MongoRunner.stopMongod(shard);
-                shard = MongoRunner.runMongod(
+                MerizoRunner.stopMerizod(shard);
+                shard = MerizoRunner.runMerizod(
                     {restart: shard, binVersion: binVersion, appendOptions: true});
 
                 upgradedSingleShards[shard.host] = shard;
@@ -67,15 +67,15 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
         }
     }
 
-    if (options.upgradeMongos) {
+    if (options.upgradeMerizos) {
         // Upgrade all merizos hosts if specified
-        var numMongoses = this._merizos.length;
+        var numMerizoses = this._merizos.length;
 
-        for (var i = 0; i < numMongoses; i++) {
+        for (var i = 0; i < numMerizoses; i++) {
             var merizos = this._merizos[i];
-            MongoRunner.stopMongos(merizos);
+            MerizoRunner.stopMerizos(merizos);
 
-            merizos = MongoRunner.runMongos(
+            merizos = MerizoRunner.runMerizos(
                 {restart: merizos, binVersion: binVersion, appendOptions: true});
 
             this["s" + i] = this._merizos[i] = merizos;
@@ -88,15 +88,15 @@ ShardingTest.prototype.upgradeCluster = function(binVersion, options) {
     }
 };
 
-ShardingTest.prototype.restartMongoses = function() {
+ShardingTest.prototype.restartMerizoses = function() {
 
-    var numMongoses = this._merizos.length;
+    var numMerizoses = this._merizos.length;
 
-    for (var i = 0; i < numMongoses; i++) {
+    for (var i = 0; i < numMerizoses; i++) {
         var merizos = this._merizos[i];
 
-        MongoRunner.stopMongos(merizos);
-        merizos = MongoRunner.runMongos({restart: merizos});
+        MerizoRunner.stopMerizos(merizos);
+        merizos = MerizoRunner.runMerizos({restart: merizos});
 
         this["s" + i] = this._merizos[i] = merizos;
         if (i == 0)
@@ -107,7 +107,7 @@ ShardingTest.prototype.restartMongoses = function() {
     this.admin = this.s.getDB("admin");
 };
 
-ShardingTest.prototype.getMongosAtVersion = function(binVersion) {
+ShardingTest.prototype.getMerizosAtVersion = function(binVersion) {
     var merizoses = this._merizos;
     for (var i = 0; i < merizoses.length; i++) {
         try {

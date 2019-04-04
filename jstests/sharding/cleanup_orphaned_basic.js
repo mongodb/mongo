@@ -11,7 +11,7 @@
      ****************************************************************************/
 
     // cleanupOrphaned fails against unsharded merizod.
-    var merizod = MongoRunner.runMongod();
+    var merizod = MerizoRunner.runMerizod();
     assert.commandFailed(merizod.getDB('admin').runCommand({cleanupOrphaned: 'foo.bar'}));
 
     /*****************************************************************************
@@ -117,6 +117,6 @@
         {cleanupOrphaned: coll2.getFullName(), startingFromKey: {a: 'someValue', c: 1}}));
 
     st.stop();
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
 })();

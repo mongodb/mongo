@@ -120,7 +120,7 @@ boost::optional<std::shared_ptr<FreeMonMessage>> FreeMonMessageQueue::dequeue(
                 }
             }
 
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
 
             _condvar.wait_until(lock, deadlineCV.toSystemTimePoint(), [this, clockSource]() {
                 if (_stop) {

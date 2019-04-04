@@ -3,7 +3,7 @@
 //
 
 /**
- * @param options {Object} see ReplSetTest.start & MongoRunner.runMongod.
+ * @param options {Object} see ReplSetTest.start & MerizoRunner.runMerizod.
  * @param user {string} optional, user name for authentication.
  * @param pwd {string} optional, password for authentication. Must be set if user is set.
  */
@@ -122,7 +122,7 @@ ReplSetTest.prototype.stepdown = function(nodeId) {
 
 ReplSetTest.prototype.reconnect = function(node) {
     var nodeId = this.getNodeId(node);
-    this.nodes[nodeId] = new Mongo(node.host);
+    this.nodes[nodeId] = new Merizo(node.host);
     var except = {};
     for (var i in node) {
         if (typeof(node[i]) == "function")

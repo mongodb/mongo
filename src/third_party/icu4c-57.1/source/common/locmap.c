@@ -839,7 +839,7 @@ static const ILcidPosixMap gPosixIDmap[] = {
     ILCID_POSIX_MAP(mi),    /*  mi  Maori                     0x81 */
     ILCID_POSIX_MAP(mk),    /*  mk  Macedonian                0x2f */
     ILCID_POSIX_MAP(ml),    /*  ml  Malayalam                 0x4c */
-    ILCID_POSIX_MAP(mn),    /*  mn  Mongolian                 0x50 */
+    ILCID_POSIX_MAP(mn),    /*  mn  Merizolian                 0x50 */
     ILCID_POSIX_MAP(mni),   /*  mni Manipuri                  0x58 */
     ILCID_POSIX_MAP(moh),   /*  moh Mohawk                    0x7c */
     ILCID_POSIX_MAP(mr),    /*  mr  Marathi                   0x4e */

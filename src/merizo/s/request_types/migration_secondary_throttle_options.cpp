@@ -38,8 +38,8 @@
 namespace merizo {
 namespace {
 
-const char kSecondaryThrottleMongos[] = "_secondaryThrottle";
-const char kSecondaryThrottleMongod[] = "secondaryThrottle";
+const char kSecondaryThrottleMerizos[] = "_secondaryThrottle";
+const char kSecondaryThrottleMerizod[] = "secondaryThrottle";
 const char kWriteConcern[] = "writeConcern";
 
 }  // namespace
@@ -73,9 +73,9 @@ StatusWith<MigrationSecondaryThrottleOptions> MigrationSecondaryThrottleOptions:
         bool isSecondaryThrottle;
 
         Status status =
-            bsonExtractBooleanField(obj, kSecondaryThrottleMongod, &isSecondaryThrottle);
+            bsonExtractBooleanField(obj, kSecondaryThrottleMerizod, &isSecondaryThrottle);
         if (status == ErrorCodes::NoSuchKey) {
-            status = bsonExtractBooleanField(obj, kSecondaryThrottleMongos, &isSecondaryThrottle);
+            status = bsonExtractBooleanField(obj, kSecondaryThrottleMerizos, &isSecondaryThrottle);
         }
 
         if (status == ErrorCodes::NoSuchKey) {
@@ -122,7 +122,7 @@ MigrationSecondaryThrottleOptions::createFromBalancerConfig(const BSONObj& obj) 
     {
         bool isSecondaryThrottle;
         Status status =
-            bsonExtractBooleanField(obj, kSecondaryThrottleMongos, &isSecondaryThrottle);
+            bsonExtractBooleanField(obj, kSecondaryThrottleMerizos, &isSecondaryThrottle);
         if (status.isOK()) {
             return MigrationSecondaryThrottleOptions::create(isSecondaryThrottle ? kOn : kOff);
         } else if (status == ErrorCodes::NoSuchKey) {
@@ -134,7 +134,7 @@ MigrationSecondaryThrottleOptions::createFromBalancerConfig(const BSONObj& obj) 
 
     // Try to load it as a BSON document
     BSONElement elem;
-    Status status = bsonExtractTypedField(obj, kSecondaryThrottleMongos, BSONType::Object, &elem);
+    Status status = bsonExtractTypedField(obj, kSecondaryThrottleMerizos, BSONType::Object, &elem);
     if (!status.isOK())
         return status;
 
@@ -162,7 +162,7 @@ void MigrationSecondaryThrottleOptions::append(BSONObjBuilder* builder) const {
         return;
     }
 
-    builder->appendBool(kSecondaryThrottleMongod, _secondaryThrottle == kOn);
+    builder->appendBool(kSecondaryThrottleMerizod, _secondaryThrottle == kOn);
 
     if (_secondaryThrottle == kOn && _writeConcernBSON) {
         builder->append(kWriteConcern, *_writeConcernBSON);

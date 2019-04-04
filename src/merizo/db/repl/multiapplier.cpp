@@ -177,7 +177,7 @@ std::ostream& operator<<(std::ostream& os, const MultiApplier::State& state) {
         case MultiApplier::State::kComplete:
             return os << "Complete";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace repl

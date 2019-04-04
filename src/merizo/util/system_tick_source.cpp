@@ -35,7 +35,7 @@
 
 #include <ctime>
 #include <limits>
-#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#if defined(MERIZO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 
@@ -96,7 +96,7 @@ void initTickSource() {
     _timerNow = &timerNowWindows;
 }
 
-#elif defined(MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK)
+#elif defined(MERIZO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK)
 
 /**
  * Implementation for timer on systems that support the
@@ -139,7 +139,7 @@ void initTickSource() {}
 
 }  // unnamed namespace
 
-MONGO_INITIALIZER(SystemTickSourceInit)(InitializerContext* context) {
+MERIZO_INITIALIZER(SystemTickSourceInit)(InitializerContext* context) {
     initTickSource();
     SystemTickSource::get();
     return Status::OK();

@@ -89,7 +89,7 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
 
 /**
  * Optional filtering function to adjust allowed index field names at startup.
- * Set it in a MONGO_INITIALIZER with 'FilterAllowedIndexFieldNames' as a dependant.
+ * Set it in a MERIZO_INITIALIZER with 'FilterAllowedIndexFieldNames' as a dependant.
  */
 extern std::function<void(std::set<StringData>& allowedIndexFieldNames)>
     filterAllowedIndexFieldNames;

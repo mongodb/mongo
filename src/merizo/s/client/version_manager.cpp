@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -158,7 +158,7 @@ DBClientBase* getVersionable(DBClientBase* conn) {
         case ConnectionString::LOCAL:
         case ConnectionString::INVALID:
         case ConnectionString::CUSTOM:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
 
         case ConnectionString::MASTER:
             return conn;
@@ -167,7 +167,7 @@ DBClientBase* getVersionable(DBClientBase* conn) {
             return &(set->masterConn());
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 /**
@@ -416,7 +416,7 @@ void VersionManager::resetShardVersionCB(DBClientBase* conn) {
 
 bool VersionManager::isVersionableCB(DBClientBase* conn) {
     // We do not version shard connections when issued from merizod
-    if (!isMongos()) {
+    if (!isMerizos()) {
         return false;
     }
 

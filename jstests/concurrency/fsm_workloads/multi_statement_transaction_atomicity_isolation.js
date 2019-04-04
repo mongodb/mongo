@@ -199,7 +199,7 @@ var $config = (function() {
                 // Set causalConsistency = true to ensure that in the checkConsistency state
                 // function, we will be able to read our own writes that were committed as a
                 // part of the update state function.
-                this.session = db.getMongo().startSession({causalConsistency: true});
+                this.session = db.getMerizo().startSession({causalConsistency: true});
                 this.collections = this.getAllCollections(db, collName);
                 this.totalIteration = 1;
             },
@@ -317,7 +317,7 @@ var $config = (function() {
         if (cluster.isSharded()) {
             // Advance each router's cluster time to be >= the time of the writes, so the first
             // global snapshots chosen by each is guaranteed to include the inserted documents.
-            cluster.synchronizeMongosClusterTimes();
+            cluster.synchronizeMerizosClusterTimes();
         }
     }
 

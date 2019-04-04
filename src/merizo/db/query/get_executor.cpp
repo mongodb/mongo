@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -631,7 +631,7 @@ std::pair<boost::optional<Timestamp>, boost::optional<Timestamp>> extractTsRange
             max = rawElem.timestamp();
             return {min, max};
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

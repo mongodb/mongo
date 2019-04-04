@@ -63,7 +63,7 @@ Status storeSASLSSPIOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-MONGO_STARTUP_OPTIONS_STORE(SASLSSPIOptions)(InitializerContext* context) {
+MERIZO_STARTUP_OPTIONS_STORE(SASLSSPIOptions)(InitializerContext* context) {
     return storeSASLSSPIOptions(moe::startupOptionsParsed);
 }
 

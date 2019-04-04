@@ -30,7 +30,7 @@
         print("FOUND: " + tojsononeline(parts));
     }
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod was unable to start up");
 
     const testDB = conn.getDB("log_getmore");
@@ -51,7 +51,7 @@
     //
     // Command tests.
     //
-    testDB.getMongo().forceReadMode("commands");
+    testDB.getMerizo().forceReadMode("commands");
 
     // TEST: Verify the log format of the find command.
     let cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).skip(1).limit(10).hint({a: 1}).batchSize(5);
@@ -112,7 +112,7 @@
     //
     // Legacy tests.
     //
-    testDB.getMongo().forceReadMode("legacy");
+    testDB.getMerizo().forceReadMode("legacy");
 
     // TEST: Verify the log format of a legacy find. This should be upconverted to resemble a find
     // command.
@@ -167,5 +167,5 @@
     ];
 
     assertLogLineContains(conn, logLine);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

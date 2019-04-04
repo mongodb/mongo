@@ -208,7 +208,7 @@ selector:
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/views/views_all_commands.js
 
-  # Fails with implicit sessions because it will use multiple sessions on the same Mongo connection.
+  # Fails with implicit sessions because it will use multiple sessions on the same Merizo connection.
   - jstests/core/dropdb.js
 
   # Committing a transaction when the server is fsync locked fails.

@@ -49,13 +49,13 @@
 
 namespace merizo {
 
-ServiceContextMongoDTest::ServiceContextMongoDTest()
-    : ServiceContextMongoDTest("ephemeralForTest") {}
+ServiceContextMerizoDTest::ServiceContextMerizoDTest()
+    : ServiceContextMerizoDTest("ephemeralForTest") {}
 
-ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine)
-    : ServiceContextMongoDTest(engine, RepairAction::kNoRepair) {}
+ServiceContextMerizoDTest::ServiceContextMerizoDTest(std::string engine)
+    : ServiceContextMerizoDTest(engine, RepairAction::kNoRepair) {}
 
-ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAction repair)
+ServiceContextMerizoDTest::ServiceContextMerizoDTest(std::string engine, RepairAction repair)
     : _tempDir("service_context_d_test_fixture") {
 
     _stashedStorageParams.engine = std::exchange(storageGlobalParams.engine, std::move(engine));
@@ -65,7 +65,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
         std::exchange(storageGlobalParams.repair, (repair == RepairAction::kRepair));
 
     auto const serviceContext = getServiceContext();
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
+    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMerizod>(serviceContext));
     auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
@@ -80,7 +80,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
 
-    IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
+    IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMerizod>());
 
     // Set up UUID Catalog observer. This is necessary because the Collection destructor contains an
     // invariant to ensure the UUID corresponding to that Collection object is no longer associated
@@ -92,7 +92,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     observerRegistry->addObserver(std::make_unique<UUIDCatalogObserver>());
 }
 
-ServiceContextMongoDTest::~ServiceContextMongoDTest() {
+ServiceContextMerizoDTest::~ServiceContextMerizoDTest() {
     {
         auto opCtx = getClient()->makeOperationContext();
         Lock::GlobalLock glk(opCtx.get(), MODE_X);

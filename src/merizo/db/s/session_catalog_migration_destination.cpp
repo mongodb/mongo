@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -250,7 +250,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
     auto opCtx = uniqueOpCtx.get();
     opCtx->setLogicalSessionId(result.sessionId);
     opCtx->setTxnNumber(result.txnNum);
-    MongoDOperationContextSession ocs(opCtx);
+    MerizoDOperationContextSession ocs(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx, result.txnNum, boost::none, boost::none);
 

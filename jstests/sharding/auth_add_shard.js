@@ -37,7 +37,7 @@
     assert.eq(1, st.config.shards.count(), "initial server count wrong");
 
     // start a merizod with NO keyfile
-    var conn = MongoRunner.runMongod({shardsvr: ""});
+    var conn = MerizoRunner.runMerizod({shardsvr: ""});
     print(conn);
 
     // --------------- Test 1 --------------------
@@ -45,11 +45,11 @@
     printjson(assert.commandFailed(admin.runCommand({addShard: conn.host})));
 
     // stop merizod
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     //--------------- Test 2 --------------------
     // start merizod again, this time with keyfile
-    var conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1", shardsvr: ""});
+    var conn = MerizoRunner.runMerizod({keyFile: "jstests/libs/key1", shardsvr: ""});
     // try adding the new shard
     assert.commandWorked(admin.runCommand({addShard: conn.host}));
 
@@ -95,7 +95,7 @@
 
     assert.eq(1, st.config.shards.count(), "removed server still appears in count");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     st.stop();
 })();

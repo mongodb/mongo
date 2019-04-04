@@ -49,7 +49,7 @@ namespace {
 using std::unique_ptr;
 using stdx::make_unique;
 
-class QueuedDataStageTest : public ServiceContextMongoDTest {
+class QueuedDataStageTest : public ServiceContextMerizoDTest {
 public:
     QueuedDataStageTest() {
         getServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());

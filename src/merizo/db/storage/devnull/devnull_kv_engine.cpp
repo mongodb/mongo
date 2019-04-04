@@ -137,7 +137,7 @@ public:
                                                      const RecordData& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
 

@@ -55,8 +55,8 @@
 
     const web = new ConfigExpandRestServer();
     web.start();
-    const merizod = MongoRunner.runMongod({setParameter: 'enableTestCommands=1'});
+    const merizod = MerizoRunner.runMerizod({setParameter: 'enableTestCommands=1'});
     runTest(merizod, web);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
     web.stop();
 })();

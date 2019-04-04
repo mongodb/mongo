@@ -39,25 +39,25 @@
 #include "merizo/transport/transport_layer_asio.h"
 #include "merizo/util/fail_point.h"
 #include "merizo/util/net/socket_utils.h"
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 #include "merizo/util/net/ssl_manager.h"
 #include "merizo/util/net/ssl_types.h"
 #endif
 
 #include "asio.hpp"
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 #include "merizo/util/net/ssl.hpp"
 #endif
 
 namespace merizo {
 namespace transport {
 
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOshortOpportunisticReadWrite);
+MERIZO_FAIL_POINT_DEFINE(transportLayerASIOshortOpportunisticReadWrite);
 
 template <typename SuccessValue>
 auto futurize(const std::error_code& ec, SuccessValue&& successValue) {
     using Result = Future<std::decay_t<SuccessValue>>;
-    if (MONGO_unlikely(ec)) {
+    if (MERIZO_unlikely(ec)) {
         return Result::makeReady(errorCodeToStatus(ec));
     }
     return Result::makeReady(successValue);
@@ -65,7 +65,7 @@ auto futurize(const std::error_code& ec, SuccessValue&& successValue) {
 
 Future<void> futurize(const std::error_code& ec) {
     using Result = Future<void>;
-    if (MONGO_unlikely(ec)) {
+    if (MERIZO_unlikely(ec)) {
         return Result::makeReady(errorCodeToStatus(ec));
     }
     return Result::makeReady();
@@ -210,7 +210,7 @@ protected:
     friend class TransportLayerASIO;
     friend TransportLayerASIO::BatonASIO;
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     // The unique_lock here is held by TransportLayerASIO to synchronize with the asyncConnect
     // timeout callback. It will be unlocked before the SSL actually handshake begins.
     Future<void> handshakeSSLForEgressWithLock(stdx::unique_lock<stdx::mutex> lk,
@@ -333,7 +333,7 @@ private:
     };
 
     GenericSocket& getSocket() {
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
         if (_sslSocket) {
             return static_cast<GenericSocket&>(_sslSocket->lowest_layer());
         }
@@ -387,7 +387,7 @@ private:
 
     template <typename MutableBufferSequence>
     Future<void> read(const MutableBufferSequence& buffers, const BatonHandle& baton = nullptr) {
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
         if (_sslSocket) {
             return opportunisticRead(*_sslSocket, buffers, baton);
         } else if (!_ranHandshake) {
@@ -412,7 +412,7 @@ private:
 
     template <typename ConstBufferSequence>
     Future<void> write(const ConstBufferSequence& buffers, const BatonHandle& baton = nullptr) {
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
         _ranHandshake = true;
         if (_sslSocket) {
 #ifdef __linux__
@@ -440,7 +440,7 @@ private:
         std::error_code ec;
         size_t size;
 
-        if (MONGO_FAIL_POINT(transportLayerASIOshortOpportunisticReadWrite) &&
+        if (MERIZO_FAIL_POINT(transportLayerASIOshortOpportunisticReadWrite) &&
             _blockingMode == Async) {
             asio::mutable_buffer localBuffer = buffers;
 
@@ -496,7 +496,7 @@ private:
         return boost::none;
     }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     template <typename ConstBufferSequence>
     boost::optional<Future<void>> moreToSend(asio::ssl::stream<GenericSocket>& socket,
                                              const ConstBufferSequence& buffers,
@@ -519,7 +519,7 @@ private:
         std::error_code ec;
         std::size_t size;
 
-        if (MONGO_FAIL_POINT(transportLayerASIOshortOpportunisticReadWrite) &&
+        if (MERIZO_FAIL_POINT(transportLayerASIOshortOpportunisticReadWrite) &&
             _blockingMode == Async) {
             asio::const_buffer localBuffer = buffers;
 
@@ -564,7 +564,7 @@ private:
         }
     }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     template <typename MutableBufferSequence>
     Future<bool> maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer) {
         invariant(asio::buffer_size(buffer) >= sizeof(MSGHEADER::Value));
@@ -703,7 +703,7 @@ private:
     boost::optional<Milliseconds> _socketTimeout;
 
     GenericSocket _socket;
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     boost::optional<asio::ssl::stream<decltype(_socket)>> _sslSocket;
     bool _ranHandshake = false;
 #endif

@@ -13,8 +13,8 @@
     let testDB = db.getSiblingDB(jsTestName());
     let testColl = testDB.test;
 
-    // getHostName() doesn't include port, db.getMongo().host is 127.0.0.1:<port>
-    const hostName = (getHostName() + ":" + db.getMongo().host.split(":")[1]);
+    // getHostName() doesn't include port, db.getMerizo().host is 127.0.0.1:<port>
+    const hostName = (getHostName() + ":" + db.getMerizo().host.split(":")[1]);
 
     // Test that the shard field is absent and the host field is present when run on merizoD.
     assert.eq(testColl

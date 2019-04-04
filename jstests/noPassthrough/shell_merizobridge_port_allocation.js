@@ -15,7 +15,7 @@
         assert.neq(bridgePort,
                    serverPort,
                    node + " is a connection to " + processType + " rather than to merizobridge");
-        assert.eq(bridgePort + MongoBridge.kBridgeOffset,
+        assert.eq(bridgePort + MerizoBridge.kBridgeOffset,
                   serverPort,
                   "corresponding merizobridge and " + processType +
                       " ports should be staggered by a multiple of 10");
@@ -46,17 +46,17 @@
     for (let options of[{rs: {nodes: 1}}, {rs: false, shardAsReplicaSet: false}]) {
         resetAllocatedPorts();
 
-        const numMongos = 5;
+        const numMerizos = 5;
         const numShards = 5;
         const st = new ShardingTest(Object.assign({
-            merizos: numMongos,
+            merizos: numMerizos,
             shards: numShards,
             config: {nodes: 1},
             useBridge: true,
         },
                                                   options));
 
-        for (let i = 0; i < numMongos; ++i) {
+        for (let i = 0; i < numMerizos; ++i) {
             checkBridgeOffset(st["s" + i], "merizos");
         }
 

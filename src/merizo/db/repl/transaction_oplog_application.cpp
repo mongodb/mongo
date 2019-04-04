@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -48,7 +48,7 @@ namespace merizo {
 using repl::OplogEntry;
 namespace {
 // If enabled, causes _applyPrepareTransaction to hang before preparing the transaction participant.
-MONGO_FAIL_POINT_DEFINE(applyPrepareCommandHangBeforePreparingTransaction);
+MERIZO_FAIL_POINT_DEFINE(applyPrepareCommandHangBeforePreparingTransaction);
 
 
 // Apply the oplog entries for a prepare or a prepared commit during recovery/initial sync.
@@ -175,7 +175,7 @@ Status applyCommitTransaction(OperationContext* opCtx,
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
     // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+    MerizoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
     auto transaction = TransactionParticipant::get(opCtx);
     invariant(transaction);
@@ -210,7 +210,7 @@ Status applyAbortTransaction(OperationContext* opCtx,
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
     // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+    MerizoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
     auto transaction = TransactionParticipant::get(opCtx);
     transaction.unstashTransactionResources(opCtx, "abortTransaction");
@@ -326,7 +326,7 @@ Status applyPrepareTransaction(OperationContext* opCtx,
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
     // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+    MerizoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
 
     auto transaction = TransactionParticipant::get(opCtx);
     transaction.unstashTransactionResources(opCtx, "prepareTransaction");
@@ -335,9 +335,9 @@ Status applyPrepareTransaction(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    if (MONGO_FAIL_POINT(applyPrepareCommandHangBeforePreparingTransaction)) {
+    if (MERIZO_FAIL_POINT(applyPrepareCommandHangBeforePreparingTransaction)) {
         LOG(0) << "Hit applyPrepareCommandHangBeforePreparingTransaction failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
             opCtx, applyPrepareCommandHangBeforePreparingTransaction);
     }
 

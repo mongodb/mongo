@@ -75,7 +75,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::vector<MatchExpression*>* getChildVector() override {

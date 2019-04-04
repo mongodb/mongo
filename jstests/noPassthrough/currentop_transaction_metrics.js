@@ -18,7 +18,7 @@
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(testDB[collName].insert({x: 1}, {writeConcern: {w: "majority"}}));
 
-    const session = adminDB.getMongo().startSession({causalConsistency: false});
+    const session = adminDB.getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase('test');
 
     session.startTransaction();

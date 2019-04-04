@@ -36,19 +36,19 @@
 namespace merizo {
 namespace {
 
-MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoeBenchOptions)(InitializerContext* context) {
-    return addMongoeBenchOptions(&moe::startupOptions);
+MERIZO_GENERAL_STARTUP_OPTIONS_REGISTER(MerizoeBenchOptions)(InitializerContext* context) {
+    return addMerizoeBenchOptions(&moe::startupOptions);
 }
 
 GlobalInitializerRegisterer merizoeBenchOptionsStore(
-    "MongoeBenchOptions_Store",
+    "MerizoeBenchOptions_Store",
     {"BeginStartupOptionStorage", "EmbeddedOptions_Store"},
     {"EndStartupOptionStorage"},
     [](InitializerContext* context) {
-        if (!handlePreValidationMongoeBenchOptions(moe::startupOptionsParsed)) {
+        if (!handlePreValidationMerizoeBenchOptions(moe::startupOptionsParsed)) {
             quickExit(EXIT_SUCCESS);
         }
-        return storeMongoeBenchOptions(moe::startupOptionsParsed, context->args());
+        return storeMerizoeBenchOptions(moe::startupOptionsParsed, context->args());
     });
 
 }  // namespace

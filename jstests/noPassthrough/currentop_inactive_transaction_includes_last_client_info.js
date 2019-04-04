@@ -45,7 +45,7 @@
     assert.eq(currentOpEntry.clientMetadata.driver.name, "MerizoDB Internal Client");
 
     // Create a new Client and run another operation on the same session.
-    const otherClient = new Mongo(rst.getPrimary().host);
+    const otherClient = new Merizo(rst.getPrimary().host);
     assert.commandWorked(otherClient.getDB(dbName).runCommand(
         {find: collName, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
 

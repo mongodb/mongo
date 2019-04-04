@@ -32,7 +32,7 @@
         stopServerReplication(secondary);
 
         // Initiate a session on the primary.
-        const session = testDB.getMongo().startSession(sessionOptions);
+        const session = testDB.getMerizo().startSession(sessionOptions);
         const sessionDb = session.getDatabase(dbName);
         const sessionColl = sessionDb.getCollection(collName);
 

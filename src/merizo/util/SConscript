@@ -384,7 +384,7 @@ env.CppUnitTest(
     ],
 )
 
-if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
+if env['MERIZO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
     tcmspEnv = env.Clone()
 
     if not use_system_version_of_library('tcmalloc'):
@@ -396,8 +396,8 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
         # level configure check, though its effects should still be scoped just to these files.
         tcmspEnv.Append(
             CPPDEFINES=[
-                'MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE',
-                'MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS'
+                'MERIZO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE',
+                'MERIZO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS'
             ]
         )
 
@@ -509,14 +509,14 @@ quick_exit_env = env.Clone()
 if has_option('gcov'):
     quick_exit_env.Append(
         CPPDEFINES=[
-            'MONGO_GCOV',
+            'MERIZO_GCOV',
         ],
     )
 
 if has_option('use-cpu-profiler'):
     quick_exit_env.Append(
         CPPDEFINES=[
-            'MONGO_CPU_PROFILER',
+            'MERIZO_CPU_PROFILER',
         ],
     )
 

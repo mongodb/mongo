@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -37,7 +37,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(doNotForgetCoordinator);
+MERIZO_FAIL_POINT_DEFINE(doNotForgetCoordinator);
 
 TransactionCoordinatorCatalog::TransactionCoordinatorCatalog() = default;
 
@@ -132,7 +132,7 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
         }
     }
 
-    if (MONGO_FAIL_POINT(doNotForgetCoordinator) && !coordinatorToReturn) {
+    if (MERIZO_FAIL_POINT(doNotForgetCoordinator) && !coordinatorToReturn) {
         // If the failpoint is on and we couldn't find the coordinator in the main catalog, fall
         // back to the "defunct" catalog, which stores coordinators that have completed and would
         // normally be forgotten.
@@ -188,7 +188,7 @@ void TransactionCoordinatorCatalog::_remove(const LogicalSessionId& lsid, TxnNum
         if (coordinatorForTxnIter != coordinatorsForSession.end()) {
             auto coordinator = coordinatorForTxnIter->second;
 
-            if (MONGO_FAIL_POINT(doNotForgetCoordinator)) {
+            if (MERIZO_FAIL_POINT(doNotForgetCoordinator)) {
                 auto decisionFuture = coordinator->getDecision();
                 // Only remember a coordinator that completed successfully. We expect that the
                 // coordinator only completes with an error if the node stepped down or was shut

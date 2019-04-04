@@ -77,7 +77,7 @@ private:
             case CompareMode::kMin:
                 return "$min";
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 

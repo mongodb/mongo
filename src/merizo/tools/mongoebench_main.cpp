@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -74,7 +74,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SignalProcessingStartup, ("ThreadNameInitializer"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SignalProcessingStartup, ("ThreadNameInitializer"))
 (InitializerContext*) {
     // Make sure we call this as soon as possible but before any other threads are started. Before
     // embedded::initialize is too early and after is too late. So instead we hook in during the
@@ -99,7 +99,7 @@ int merizoeBenchMain(int argc, char* argv[], char** envp) {
     try {
         optionenvironment::OptionSection startupOptions("Options");
         uassertStatusOK(embedded::addOptions(&startupOptions));
-        uassertStatusOK(addMongoeBenchOptions(&startupOptions));
+        uassertStatusOK(addMerizoeBenchOptions(&startupOptions));
         uassertStatusOK(
             embedded_integration_helpers::parseCommandLineOptions(argc, argv, startupOptions));
         serviceContext = embedded::initialize(nullptr);
@@ -146,7 +146,7 @@ int merizoeBenchMain(int argc, char* argv[], char** envp) {
 
 }  // namespace
 
-MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
+MERIZO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
 (const BenchRunConfig& config)->std::unique_ptr<DBClientBase> {
     return std::unique_ptr<DBClientBase>(new DBDirectClientWithOwnOpCtx());
 }

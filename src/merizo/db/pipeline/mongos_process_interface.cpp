@@ -112,14 +112,14 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     auto isIdIndex = index[IndexDescriptor::kIndexNameFieldName].String() == "_id_";
     return (isIdIndex || index.getBoolField(IndexDescriptor::kUniqueFieldName)) &&
         !index.hasField(IndexDescriptor::kPartialFilterExprFieldName) &&
-        MongoProcessCommon::keyPatternNamesExactPaths(
+        MerizoProcessCommon::keyPatternNamesExactPaths(
                index.getObjectField(IndexDescriptor::kKeyPatternFieldName), uniqueKeyPaths) &&
         CollatorInterface::collatorsMatch(collation.get(), expCtx->getCollator());
 }
 
 }  // namespace
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::makePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> MerizoSInterface::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions pipelineOptions) {
@@ -138,12 +138,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::makePipeline(
     return pipeline;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongoSInterface::attachCursorSourceToPipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> MerizoSInterface::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
     return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, ownedPipeline);
 }
 
-boost::optional<Document> MongoSInterface::lookupSingleDocument(
+boost::optional<Document> MerizoSInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
@@ -242,7 +242,7 @@ boost::optional<Document> MongoSInterface::lookupSingleDocument(
     return (!batch.empty() ? Document(batch.front()) : boost::optional<Document>{});
 }
 
-BSONObj MongoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,
+BSONObj MerizoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,
                                                    Client* client,
                                                    CurrentOpTruncateMode truncateOps) const {
     BSONObjBuilder builder;
@@ -253,7 +253,7 @@ BSONObj MongoSInterface::_reportCurrentOpForClient(OperationContext* opCtx,
     return builder.obj();
 }
 
-std::vector<GenericCursor> MongoSInterface::getIdleCursors(
+std::vector<GenericCursor> MerizoSInterface::getIdleCursors(
     const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     invariant(hasGlobalServiceContext());
     auto cursorManager = Grid::get(expCtx->opCtx->getServiceContext())->getCursorManager();
@@ -261,12 +261,12 @@ std::vector<GenericCursor> MongoSInterface::getIdleCursors(
     return cursorManager->getIdleCursors(expCtx->opCtx, userMode);
 }
 
-bool MongoSInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+bool MerizoSInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     auto routingInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
     return routingInfo.isOK() && routingInfo.getValue().cm();
 }
 
-bool MongoSInterface::uniqueKeyIsSupportedByIndex(
+bool MerizoSInterface::uniqueKeyIsSupportedByIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& uniqueKeyPaths) const {

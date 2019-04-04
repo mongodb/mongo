@@ -668,7 +668,7 @@ public:
 
     virtual bool isReplicaSetMember() const = 0;
 
-    virtual bool isMongos() const = 0;
+    virtual bool isMerizos() const = 0;
 
     /**
      * Parses command replies and runs them through the metadata reader.

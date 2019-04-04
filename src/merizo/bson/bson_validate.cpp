@@ -406,7 +406,7 @@ Status validateBSONIterative(Buffer* buffer) {
                 break;
             }
             case ValidationState::Done:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 

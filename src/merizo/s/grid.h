@@ -51,7 +51,7 @@ class TaskExecutorPool;
 }  // namespace executor
 
 /**
- * Contains the sharding context for a running server. Exists on both MongoD and MongoS.
+ * Contains the sharding context for a running server. Exists on both MerizoD and MerizoS.
  */
 class Grid {
 public:

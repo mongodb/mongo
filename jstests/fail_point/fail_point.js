@@ -81,9 +81,9 @@
         expectFailPointState(res["failpoint.dummy"], 1, {x: 1});
     }
 
-    var conn = MongoRunner.runMongod();
+    var conn = MerizoRunner.runMerizod();
     runTest(conn.getDB('admin'));
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     ///////////////////////////////////////////////////////////
     // Test merizos

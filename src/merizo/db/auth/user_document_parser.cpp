@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/db/auth/user_document_parser.h"
 
@@ -60,7 +60,7 @@ constexpr StringData ROLE_NAME_FIELD_NAME = "role"_sd;
 constexpr StringData ROLE_DB_FIELD_NAME = "db"_sd;
 constexpr StringData SCRAMSHA1_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1"_sd;
 constexpr StringData SCRAMSHA256_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-256"_sd;
-constexpr StringData MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external"_sd;
+constexpr StringData MERIZODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external"_sd;
 constexpr StringData AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRestrictions"_sd;
 constexpr StringData INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME =
     "inheritedAuthenticationRestrictions"_sd;
@@ -170,7 +170,7 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
         return _badValue("User document needs 'credentials' field to be a non-empty object");
     }
     if (userDBStr == "$external") {
-        BSONElement externalElement = credentialsObj[MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
+        BSONElement externalElement = credentialsObj[MERIZODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
         if (externalElement.eoo() || externalElement.type() != Bool || !externalElement.Bool()) {
             return _badValue(
                 "User documents for users defined on '$external' must have "
@@ -249,7 +249,7 @@ Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(
         }
         if (userDB == "$external") {
             BSONElement externalCredentialElement =
-                credentialsElement.Obj()[MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
+                credentialsElement.Obj()[MERIZODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
             if (!externalCredentialElement.eoo()) {
                 if (externalCredentialElement.type() != Bool || !externalCredentialElement.Bool()) {
                     return Status(ErrorCodes::UnsupportedFormat,

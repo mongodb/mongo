@@ -59,13 +59,13 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         // We only ever expect to add this stage if the pipeline is being executed locally on a
         // merizos. In this case, it should never be serialized.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual StageConstraints constraints(Pipeline::SplitState) const {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                HostTypeRequirement::kMongoS,
+                HostTypeRequirement::kMerizoS,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kNotAllowed,

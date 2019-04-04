@@ -22,12 +22,12 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
     StandaloneFixture = function() {};
 
     StandaloneFixture.prototype.runLoadPhase = function runLoadPhase(test) {
-        this.merizod = MongoRunner.runMongod({});
+        this.merizod = MerizoRunner.runMerizod({});
         this.dbpath = this.merizod.dbpath;
 
         test.load(this.merizod.getDB("test")[test.name]);
         assert.commandWorked(this.merizod.getDB("local").dropDatabase());
-        MongoRunner.stopMongod(this.merizod);
+        MerizoRunner.stopMerizod(this.merizod);
     };
 
     StandaloneFixture.prototype.runExecPhase = function runExecPhase(test) {
@@ -36,12 +36,12 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
             var options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
 
-            this.merizod = MongoRunner.runMongod(options);
+            this.merizod = MerizoRunner.runMerizod(options);
             assert.neq(this.merizod, null);
 
             test.exec(this.merizod.getDB("test")[test.name]);
 
-            MongoRunner.stopMongod(this.merizod);
+            MerizoRunner.stopMerizod(this.merizod);
         } finally {
             makeDirectoryWritable(this.dbpath);
         }
@@ -101,14 +101,14 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
                 };
 
                 assert.commandWorked(this.shardingTest["d" + i].getDB("local").dropDatabase());
-                this.shardingTest.restartMongod(i, opts, () => {
+                this.shardingTest.restartMerizod(i, opts, () => {
                     makeDirectoryReadOnly(this.paths[i]);
                 });
             }
 
             jsTest.log("restarting merizos...");
 
-            this.shardingTest.restartMongos(0);
+            this.shardingTest.restartMerizos(0);
 
             test.exec(this.shardingTest.getDB("test")[test.name]);
 

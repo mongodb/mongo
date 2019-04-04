@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
 
 #include "merizo/platform/basic.h"
 
@@ -804,8 +804,8 @@ DEATH_TEST_F(RollbackImplTest,
     _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     auto status = _rollback->runRollback(_opCtx.get());
-    unittest::log() << "Mongod did not crash. Status: " << status;
-    MONGO_UNREACHABLE;
+    unittest::log() << "Merizod did not crash. Status: " << status;
+    MERIZO_UNREACHABLE;
 }
 
 TEST_F(RollbackImplTest, RollbackSkipsTransitionToRollbackWhenShutDownImmediately) {
@@ -1610,8 +1610,8 @@ DEATH_TEST_F(RollbackImplObserverInfoTest,
         Timestamp(2, 2), boost::none, "admin.$cmd", BSON("applyOps" << subops.arr()), 2);
 
     auto status = _rollback->_namespacesForOp_forTest(OplogEntry(applyOpsCmdOp.first));
-    unittest::log() << "Mongod did not crash. Status: " << status.getStatus();
-    MONGO_UNREACHABLE;
+    unittest::log() << "Merizod did not crash. Status: " << status.getStatus();
+    MERIZO_UNREACHABLE;
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespacesOfApplyOpsOplogEntry) {
@@ -1718,8 +1718,8 @@ DEATH_TEST_F(RollbackImplObserverInfoTest,
     ASSERT_OK(_insertOplogEntry(unknownCmdOp.first));
 
     auto status = _rollback->runRollback(_opCtx.get());
-    unittest::log() << "Mongod did not crash. Status: " << status;
-    MONGO_UNREACHABLE;
+    unittest::log() << "Merizod did not crash. Status: " << status;
+    MERIZO_UNREACHABLE;
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsSessionIdFromOplogEntry) {

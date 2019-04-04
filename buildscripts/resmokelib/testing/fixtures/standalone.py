@@ -16,7 +16,7 @@ from ... import errors
 from ... import utils
 
 
-class MongoDFixture(interface.Fixture):
+class MerizoDFixture(interface.Fixture):
     """Fixture which provides JSTests with a standalone merizod to run against."""
 
     AWAIT_READY_TIMEOUT_SECS = 300
@@ -24,7 +24,7 @@ class MongoDFixture(interface.Fixture):
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, job_num, merizod_executable=None, merizod_options=None, dbpath_prefix=None,
             preserve_dbpath=False):
-        """Initialize MongoDFixture with different options for the merizod process."""
+        """Initialize MerizoDFixture with different options for the merizod process."""
 
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
@@ -32,7 +32,7 @@ class MongoDFixture(interface.Fixture):
             raise ValueError("Cannot specify both merizod_options.dbpath and dbpath_prefix")
 
         # Command line options override the YAML configuration.
-        self.merizod_executable = utils.default_if_none(config.MONGOD_EXECUTABLE, merizod_executable)
+        self.merizod_executable = utils.default_if_none(config.MERIZOD_EXECUTABLE, merizod_executable)
 
         self.merizod_options = utils.default_if_none(merizod_options, {}).copy()
         self.preserve_dbpath = preserve_dbpath
@@ -76,10 +76,10 @@ class MongoDFixture(interface.Fixture):
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
-        deadline = time.time() + MongoDFixture.AWAIT_READY_TIMEOUT_SECS
+        deadline = time.time() + MerizoDFixture.AWAIT_READY_TIMEOUT_SECS
 
         # Wait until the merizod is accepting connections. The retry logic is necessary to support
-        # versions of PyMongo <3.0 that immediately raise a ConnectionFailure if a connection cannot
+        # versions of PyMerizo <3.0 that immediately raise a ConnectionFailure if a connection cannot
         # be established.
         while True:
             # Check whether the merizod exited for some reason.
@@ -99,7 +99,7 @@ class MongoDFixture(interface.Fixture):
                 if remaining <= 0.0:
                     raise errors.ServerFailure(
                         "Failed to connect to merizod on port {} after {} seconds".format(
-                            self.port, MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
+                            self.port, MerizoDFixture.AWAIT_READY_TIMEOUT_SECS))
 
                 self.logger.info("Waiting to connect to merizod on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.

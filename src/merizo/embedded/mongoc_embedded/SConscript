@@ -7,7 +7,7 @@ Import("get_option")
 
 env = env.Clone()
 
-if not env['MONGO_HAVE_LIBMONGOC']:
+if not env['MERIZO_HAVE_LIBMERIZOC']:
     Return()
 
 if get_option('install-mode') == 'hygienic':
@@ -24,7 +24,7 @@ if get_option('install-mode') == 'hygienic':
 
 def create_merizoc_env(env):
     merizocEnv = env.Clone()
-    if merizocEnv['MONGO_HAVE_LIBMONGOC'] == "framework":
+    if merizocEnv['MERIZO_HAVE_LIBMERIZOC'] == "framework":
         merizocEnv.AppendUnique(FRAMEWORKS=['bson', 'merizoc'])
     else:
         merizocEnv.AppendUnique(LIBS=['bson-1.0', 'merizoc-1.0'])
@@ -34,14 +34,14 @@ merizocEmbeddedEnv = create_merizoc_env(env)
 
 merizocEmbeddedEnv.AppendUnique(
     CPPDEFINES=[
-        'MONGOC_EMBEDDED_COMPILING',
+        'MERIZOC_EMBEDDED_COMPILING',
      ],
 )
 
 if get_option('link-model') == 'static':
     merizocEmbeddedEnv.AppendUnique(
         CPPDEFINES=[
-            'MONGOC_EMBEDDED_STATIC',
+            'MERIZOC_EMBEDDED_STATIC',
         ],
     )
 
@@ -49,7 +49,7 @@ if get_option('link-model') == 'static':
 # interpret and adjust the current and compatibility versinos.
 merizocEmbeddedEnv.AppendUnique(
     SHLINKFLAGS=[
-        '$MONGO_EXPORT_FILE_SHLINKFLAGS',
+        '$MERIZO_EXPORT_FILE_SHLINKFLAGS',
     ],
 )
 
@@ -156,8 +156,8 @@ merizocEmbeddedPlist = env.Substfile(
     SUBST_DICT=[
         ('@CFBundleExecutable@', 'merizoc_embedded'),
         ('@CFBundleIdentifier@', 'org.merizodb.merizoc-embedded'),
-        ('@CFBundleVersion@', env['PLIST_MONGO_BUNDLE_VERSION']),
-        ('@CFBundleShortVersionString@', env['PLIST_MONGO_BUNDLE_VERSION']),
+        ('@CFBundleVersion@', env['PLIST_MERIZO_BUNDLE_VERSION']),
+        ('@CFBundleShortVersionString@', env['PLIST_MERIZO_BUNDLE_VERSION']),
         ('@MinimumOSVersion@', env['PLIST_MINIMUM_OS_VERSION'])
     ]
 )

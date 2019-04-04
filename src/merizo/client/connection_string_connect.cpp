@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -50,8 +50,8 @@ ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
 std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationName,
                                                         std::string& errmsg,
                                                         double socketTimeout,
-                                                        const MongoURI* uri) const {
-    MongoURI newURI{};
+                                                        const MerizoURI* uri) const {
+    MerizoURI newURI{};
     if (uri) {
         newURI = *uri;
     }
@@ -105,10 +105,10 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
 
         case LOCAL:
         case INVALID:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namepspace merizo

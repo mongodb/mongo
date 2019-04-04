@@ -5,14 +5,14 @@
 load('jstests/ssl/libs/ssl_helpers.js');
 
 requireSSLProvider(['openssl', 'windows'], function() {
-    var md = MongoRunner.runMongod({
+    var md = MerizoRunner.runMerizod({
         sslMode: "requireSSL",
         sslPEMKeyFile: "jstests/libs/server.pem",
         sslCAFile: "jstests/libs/ca.pem",
         sslCRLFile: "jstests/libs/crl_client_revoked.pem"
     });
 
-    var merizo = runMongoProgram("merizo",
+    var merizo = runMerizoProgram("merizo",
                                 "--port",
                                 md.port,
                                 "--ssl",
@@ -25,5 +25,5 @@ requireSSLProvider(['openssl', 'windows'], function() {
     // 1 is the exit code for the shell failing to connect, which is what we want
     // for a successful test.
     assert(merizo == 1);
-    MongoRunner.stopMongod(md);
+    MerizoRunner.stopMerizod(md);
 });

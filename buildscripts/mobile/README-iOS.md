@@ -8,8 +8,8 @@ How to profile a test application for iOS
 1. Enable the Developer app on the iOS device
    * Settings/General/Device Management: Select the Developer app and Trust
 
-## MongoProfiler
-The `MongoProfiler` is a custom profiling template which includes
+## MerizoProfiler
+The `MerizoProfiler` is a custom profiling template which includes
   * Energy Log - this must be imported from the iOS device and should be captured untethered
     Captures battery level
   * Activity Monitor - this can be captured via USB cable or wirelessly
@@ -22,7 +22,7 @@ The `MongoProfiler` is a custom profiling template which includes
 1. Start Instruments on Mac
   * Can be started from within Xcode or from the Spotlight Search
 1. Connect to the iOS device and select an app to profile
-1. Open a Custom profiling template and select `MongoProfiler`
+1. Open a Custom profiling template and select `MerizoProfiler`
 1. Start recording
 1. Start the application on the iOS device
 1. Stop recording in Instruments
@@ -43,5 +43,5 @@ Unfortunately Instruments cannot measure Energy usage by recording from the Mac,
 1. Enable Energy
 1. Select `Start Recording` (note this can be done before recording within Instruments for the other probes)
 1. After the test is completed, select `Stop Recording`
-1. From within Instruments on the Mac (note this can be done using the `MongoProfiler` so all probes are captured together)
+1. From within Instruments on the Mac (note this can be done using the `MerizoProfiler` so all probes are captured together)
   * Select File, `Import Logged Data From Device`

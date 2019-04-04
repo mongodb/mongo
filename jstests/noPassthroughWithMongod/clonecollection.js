@@ -2,23 +2,23 @@
 // Test cloneCollection command
 var baseName = "jstests_clonecollection";
 
-var fromMongod = MongoRunner.runMongod({bind_ip: "127.0.0.1"});
-var toMongod = MongoRunner.runMongod({bind_ip: "127.0.0.1"});
-var f = fromMongod.getDB(baseName);
-var t = toMongod.getDB(baseName);
+var fromMerizod = MerizoRunner.runMerizod({bind_ip: "127.0.0.1"});
+var toMerizod = MerizoRunner.runMerizod({bind_ip: "127.0.0.1"});
+var f = fromMerizod.getDB(baseName);
+var t = toMerizod.getDB(baseName);
 
 for (i = 0; i < 1000; ++i) {
     f.a.save({i: i});
 }
 assert.eq(1000, f.a.find().count(), "A1");
 
-assert.commandWorked(t.cloneCollection("localhost:" + fromMongod.port, "a"));
+assert.commandWorked(t.cloneCollection("localhost:" + fromMerizod.port, "a"));
 assert.eq(1000, t.a.find().count(), "A2");
 
 t.a.drop();
 
 assert.commandWorked(
-    t.cloneCollection("localhost:" + fromMongod.port, "a", {i: {$gte: 10, $lt: 20}}));
+    t.cloneCollection("localhost:" + fromMerizod.port, "a", {i: {$gte: 10, $lt: 20}}));
 assert.eq(10, t.a.find().count(), "A3");
 
 t.a.drop();
@@ -26,7 +26,7 @@ assert.eq(0, t.a.getIndexes().length, "prep 2");
 
 f.a.ensureIndex({i: 1});
 assert.eq(2, f.a.getIndexes().length, "expected index missing");
-assert.commandWorked(t.cloneCollection("localhost:" + fromMongod.port, "a"));
+assert.commandWorked(t.cloneCollection("localhost:" + fromMerizod.port, "a"));
 if (t.a.getIndexes().length != 2) {
     printjson(t.a.getIndexes());
 }
@@ -44,7 +44,7 @@ t.a.drop();
 
 f.createCollection("a", {capped: true, size: 1000});
 assert(f.a.isCapped());
-assert.commandWorked(t.cloneCollection("localhost:" + fromMongod.port, "a"));
+assert.commandWorked(t.cloneCollection("localhost:" + fromMerizod.port, "a"));
 assert(t.a.isCapped(), "cloned collection not capped");
 
 // Check that cloning to "system.profile" is disallowed.
@@ -54,7 +54,7 @@ assert.commandWorked(f.setProfilingLevel(2));
 assert.writeOK(f.a.insert({}));
 assert.gt(f.system.profile.count(), 0);
 t.system.profile.drop();
-assert.commandFailed(t.cloneCollection("localhost:" + fromMongod.port, "system.profile"));
+assert.commandFailed(t.cloneCollection("localhost:" + fromMerizod.port, "system.profile"));
 
 // Check that cloning a view is disallowed.
 f.a.drop();
@@ -62,8 +62,8 @@ t.a.drop();
 
 assert.commandWorked(f.createCollection("a"));
 assert.commandWorked(f.createView("viewA", "a", []));
-assert.commandFailedWithCode(t.cloneCollection("localhost:" + fromMongod.port, "viewA"),
+assert.commandFailedWithCode(t.cloneCollection("localhost:" + fromMerizod.port, "viewA"),
                              ErrorCodes.CommandNotSupportedOnView,
                              "cloneCollection on view expected to fail");
-MongoRunner.stopMongod(fromMongod);
-MongoRunner.stopMongod(toMongod);
+MerizoRunner.stopMerizod(fromMerizod);
+MerizoRunner.stopMerizod(toMerizod);

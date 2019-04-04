@@ -106,7 +106,7 @@ var (
 	Latvian              Tag = Tag{lang: _lv}                //  lv
 	Macedonian           Tag = Tag{lang: _mk}                //  mk
 	Malayalam            Tag = Tag{lang: _ml}                //  ml
-	Mongolian            Tag = Tag{lang: _mn}                //  mn
+	Merizolian            Tag = Tag{lang: _mn}                //  mn
 	Marathi              Tag = Tag{lang: _mr}                //  mr
 	Malay                Tag = Tag{lang: _ms}                //  ms
 	Burmese              Tag = Tag{lang: _my}                //  my

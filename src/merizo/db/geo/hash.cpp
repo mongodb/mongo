@@ -241,7 +241,7 @@ void GeoHash::unhash_fast(unsigned* x, unsigned* y) const {
         // it's an odd bitmask that we use to turn off all the even bits
         unsigned t = (unsigned)(c[i]) & 0x55;
         int leftShift;
-#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
+#if MERIZO_CONFIG_BYTE_ORDER == MERIZO_LITTLE_ENDIAN
         leftShift = 4 * i;
 #else
         leftShift = 28 - (4 * i);
@@ -265,7 +265,7 @@ void GeoHash::unhash_slow(unsigned* x, unsigned* y) const {
 }
 
 void GeoHash::unhash(unsigned* x, unsigned* y) const {
-#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
+#if MERIZO_CONFIG_BYTE_ORDER == MERIZO_LITTLE_ENDIAN
     unhash_fast(x, y);
 #else
     unhash_slow(x, y);
@@ -488,7 +488,7 @@ void GeoHash::clearUnusedBits() {
 
 static void appendHashToBuilder(long long hash, BSONObjBuilder* builder, const char* fieldName) {
     char buf[8];
-#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
+#if MERIZO_CONFIG_BYTE_ORDER == MERIZO_LITTLE_ENDIAN
     // Reverse the order of bytes when copying between BinData and GeoHash.
     // GeoHashes are meant to be compared from MSB to LSB, where the first 2 MSB indicate the
     // quadrant.

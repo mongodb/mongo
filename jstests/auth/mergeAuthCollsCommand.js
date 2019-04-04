@@ -116,9 +116,9 @@ function runTest(conn) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({});
+var conn = MerizoRunner.runMerizod({});
 runTest(conn);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 2, config: 3});

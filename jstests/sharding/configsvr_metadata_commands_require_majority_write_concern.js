@@ -28,8 +28,8 @@
     ];
 
     // Any write concern can be sent to a merizos, because merizos will upconvert it to majority.
-    const unacceptableWCsForMongos = [];
-    const acceptableWCsForMongos = [
+    const unacceptableWCsForMerizos = [];
+    const acceptableWCsForMerizos = [
         {},
         {writeConcern: {w: 0}},
         {writeConcern: {w: 0, wtimeout: 15000}},
@@ -105,11 +105,11 @@
         });
     }
 
-    function checkCommandMongos(command, setupFunc, cleanupFunc) {
+    function checkCommandMerizos(command, setupFunc, cleanupFunc) {
         checkCommand(st.s,
                      command,
-                     unacceptableWCsForMongos,
-                     acceptableWCsForMongos,
+                     unacceptableWCsForMerizos,
+                     acceptableWCsForMerizos,
                      true,
                      setupFunc,
                      cleanupFunc);
@@ -128,12 +128,12 @@
     var st = new ShardingTest({shards: 1});
 
     // enableSharding
-    checkCommandMongos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
+    checkCommandMerizos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
     checkCommandConfigSvr(
         {_configsvrEnableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
 
     // movePrimary
-    checkCommandMongos({movePrimary: dbName, to: st.shard0.name},
+    checkCommandMerizos({movePrimary: dbName, to: st.shard0.name},
                        setupFuncs.createDatabase,
                        cleanupFuncs.dropDatabase);
     checkCommandConfigSvr({_configsvrMovePrimary: dbName, to: st.shard0.name},
@@ -146,7 +146,7 @@
                           cleanupFuncs.dropDatabase);
 
     // shardCollection
-    checkCommandMongos(
+    checkCommandMerizos(
         {shardCollection: ns, key: {_id: 1}}, setupFuncs.enableSharding, cleanupFuncs.dropDatabase);
     checkCommandConfigSvr({_configsvrShardCollection: ns, key: {_id: 1}},
                           setupFuncs.enableSharding,
@@ -160,8 +160,8 @@
                           cleanupFuncs.dropDatabase);
 
     // addShard
-    var newShard = MongoRunner.runMongod({shardsvr: ""});
-    checkCommandMongos({addShard: newShard.name, name: newShardName},
+    var newShard = MerizoRunner.runMerizod({shardsvr: ""});
+    checkCommandMerizos({addShard: newShard.name, name: newShardName},
                        setupFuncs.noop,
                        cleanupFuncs.removeShardIfExists);
     checkCommandConfigSvr({_configsvrAddShard: newShard.name, name: newShardName},
@@ -169,29 +169,29 @@
                           cleanupFuncs.removeShardIfExists);
 
     // removeShard
-    checkCommandMongos({removeShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
+    checkCommandMerizos({removeShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
     checkCommandConfigSvr(
         {_configsvrRemoveShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
 
     // dropCollection
-    checkCommandMongos({drop: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
+    checkCommandMerizos({drop: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
     checkCommandConfigSvr(
         {_configsvrDropCollection: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
 
     // dropDatabase
 
-    // We can't use the checkCommandMongos wrapper because we need a connection to the test
+    // We can't use the checkCommandMerizos wrapper because we need a connection to the test
     // database.
     checkCommand(st.s.getDB(dbName),
                  {dropDatabase: 1},
-                 unacceptableWCsForMongos,
-                 acceptableWCsForMongos,
+                 unacceptableWCsForMerizos,
+                 acceptableWCsForMerizos,
                  false,
                  setupFuncs.createDatabase,
                  cleanupFuncs.dropDatabase);
     checkCommandConfigSvr(
         {_configsvrDropDatabase: dbName}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
 
-    MongoRunner.stopMongos(newShard);
+    MerizoRunner.stopMerizos(newShard);
     st.stop();
 })();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/db/query/planner_ixselect.h"
 
@@ -512,7 +512,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
         // Text index implies there is a separator implies we will always hit the 'return true'
         // above.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     } else if (IndexNames::HASHED == indexedFieldType) {
         if (ComparisonMatchExpressionBase::isEquality(exprtype)) {
             return true;

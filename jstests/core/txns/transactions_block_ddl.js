@@ -11,7 +11,7 @@
     const otherCollName = "transactions_block_ddl_other";
     const testDB = db.getSiblingDB(dbName);
 
-    const session = testDB.getMongo().startSession({causalConsistency: false});
+    const session = testDB.getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB[collName];
 

@@ -43,7 +43,7 @@
         }
     };
 
-    const conn = db.getMongo();
+    const conn = db.getMerizo();
     const topology = DiscoverTopology.findConnectedNodes(conn);
 
     if (topology.type !== Topology.kReplicaSet) {
@@ -82,7 +82,7 @@
         }),
                                                debugInfo);
         debugInfo.push({
-            "node": db.getMongo(),
+            "node": db.getMerizo(),
             "session": session,
             "preserveFailPointOpTime": preserveRes['operationTime']
         });
@@ -102,7 +102,7 @@
             dbNames.add(dbInfo.name);
         }
         debugInfo.push({
-            "node": db.getMongo(),
+            "node": db.getMerizo(),
             "session": session,
             "listDatabaseOpTime": res['operationTime']
         });
@@ -144,7 +144,7 @@
                 }),
                                                debugInfo);
                 debugInfo.push({
-                    "node": db.getMongo(),
+                    "node": db.getMerizo(),
                     "session": session,
                     "majorityReadOpTime": res['operationTime']
                 });
@@ -161,7 +161,7 @@
                         const appliedOpTime = rsStatus.optimes.appliedOpTime;
                         if (bsonWoCompare(appliedOpTime.ts, clusterTime) >= 0) {
                             debugInfo.push({
-                                "node": db.getMongo(),
+                                "node": db.getMerizo(),
                                 "session": session,
                                 "appliedOpTime": appliedOpTime.ts
                             });

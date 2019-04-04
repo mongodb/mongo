@@ -8,26 +8,26 @@
     'use strict';
 
     //  The following test verifies that writeConcern: {j: true} ensures that data is durable.
-    var dbpath = MongoRunner.dataPath + 'sync_write';
+    var dbpath = MerizoRunner.dataPath + 'sync_write';
     resetDbpath(dbpath);
 
     var merizodArgs = {dbpath: dbpath, noCleanData: true, journal: ''};
 
     // Start a merizod.
-    var conn = MongoRunner.runMongod(merizodArgs);
+    var conn = MerizoRunner.runMerizod(merizodArgs);
     assert.neq(null, conn, 'merizod was unable to start up');
 
     // Now connect to the merizod, do a journaled write and abruptly stop the server.
     var testDB = conn.getDB('test');
     assert.writeOK(testDB.synced.insert({synced: true}, {writeConcern: {j: true}}));
-    MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+    MerizoRunner.stopMerizod(conn, 9, {allowedExitCode: MerizoRunner.EXIT_SIGKILL});
 
     // Restart the merizod.
-    conn = MongoRunner.runMongod(merizodArgs);
+    conn = MerizoRunner.runMerizod(merizodArgs);
     assert.neq(null, conn, 'merizod was unable to restart after receiving a SIGKILL');
 
     // Check that our journaled write still is present.
     testDB = conn.getDB('test');
     assert.eq(1, testDB.synced.count({synced: true}), 'synced write was not found');
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

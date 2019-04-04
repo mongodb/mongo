@@ -101,13 +101,13 @@ var setLogVerbosity;
     };
 
     /**
-     * Attempt to re-establish and re-authenticate a Mongo connection if it was dropped, with
+     * Attempt to re-establish and re-authenticate a Merizo connection if it was dropped, with
      * multiple retries.
      *
      * Returns upon successful re-connnection. If connection cannot be established after 200
      * retries, throws an exception.
      *
-     * @param conn - a Mongo connection object or DB object.
+     * @param conn - a Merizo connection object or DB object.
      */
     reconnect = function(conn) {
         var retries = 200;
@@ -126,7 +126,7 @@ var setLogVerbosity;
 
                 // SERVER-4241: Shell connections don't re-authenticate on reconnect.
                 if (jsTest.options().keyFile) {
-                    return jsTest.authenticate(db.getMongo());
+                    return jsTest.authenticate(db.getMerizo());
                 }
                 return true;
             } catch (e) {
@@ -137,7 +137,7 @@ var setLogVerbosity;
     };
 
     getLatestOp = function(server) {
-        server.getDB("admin").getMongo().setSlaveOk();
+        server.getDB("admin").getMerizo().setSlaveOk();
         var log = server.getDB("local")['oplog.rs'];
         var cursor = log.find({}).sort({'$natural': -1}).limit(1);
         if (cursor.hasNext()) {
@@ -147,7 +147,7 @@ var setLogVerbosity;
     };
 
     getLeastRecentOp = function({server, readConcern}) {
-        server.getDB("admin").getMongo().setSlaveOk();
+        server.getDB("admin").getMerizo().setSlaveOk();
         const oplog = server.getDB("local").oplog.rs;
         const cursor = oplog.find().sort({$natural: 1}).limit(1).readConcern(readConcern);
         if (cursor.hasNext()) {

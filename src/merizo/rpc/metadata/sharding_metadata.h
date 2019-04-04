@@ -42,8 +42,8 @@ class StatusWith;
 namespace rpc {
 
 /**
- * This class compromises the reply metadata fields that concern sharding. MongoD attaches
- * this information to a command reply, which MongoS uses to process getLastError.
+ * This class compromises the reply metadata fields that concern sharding. MerizoD attaches
+ * this information to a command reply, which MerizoS uses to process getLastError.
  * TODO(spencer): Rename this to ShardingResponseMetadata.
  */
 class ShardingMetadata {

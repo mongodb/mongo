@@ -12,7 +12,7 @@
     const st = new ShardingTest({shards: 1, merizos: 1});
 
     const adminDB = st.shard0.getDB("admin");
-    const session = st.shard0.getDB("test").getMongo().startSession();
+    const session = st.shard0.getDB("test").getMerizo().startSession();
     const shardDB = session.getDatabase("test");
     const coll = shardDB.exchange_in_session;
 

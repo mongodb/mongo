@@ -1649,29 +1649,29 @@ def make_polyfill_regex():
   qualified_names.extend('std::' + name  + "\\b" for name in polyfill_required_names)
   qualified_names_regex = '|'.join(qualified_names)
   return re.compile(qualified_names_regex)
-_RE_PATTERN_MONGO_POLYFILL=make_polyfill_regex()
+_RE_PATTERN_MERIZO_POLYFILL=make_polyfill_regex()
 
-def CheckForMongoPolyfill(filename, clean_lines, linenum, error):
+def CheckForMerizoPolyfill(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]
-  if re.search(_RE_PATTERN_MONGO_POLYFILL, line):
+  if re.search(_RE_PATTERN_MERIZO_POLYFILL, line):
     error(filename, linenum, 'merizodb/polyfill', 5,
           'Illegal use of banned name from std::/boost::, use merizo::stdx:: variant instead')
 
-def CheckForMongoAtomic(filename, clean_lines, linenum, error):
+def CheckForMerizoAtomic(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]
   if re.search('std::atomic', line):
     error(filename, linenum, 'merizodb/stdatomic', 5,
           'Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types '
           'from "merizo/platform/atomic_word.h"')
 
-def CheckForMongoVolatile(filename, clean_lines, linenum, error):
+def CheckForMerizoVolatile(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]
   if re.search('[^_]volatile', line) and not "__asm__" in line:
     error(filename, linenum, 'merizodb/volatile', 5,
           'Illegal use of the volatile storage keyword, use AtomicWord instead '
           'from "merizo/platform/atomic_word.h"')
 
-def CheckForNonMongoAssert(filename, clean_lines, linenum, error):
+def CheckForNonMerizoAssert(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]
   if re.search(r'\bassert\s*\(', line):
     error(filename, linenum, 'merizodb/assert', 5,
@@ -5889,10 +5889,10 @@ def ProcessLine(filename, file_extension, clean_lines, line,
   nesting_state.Update(filename, clean_lines, line, error)
   CheckForNamespaceIndentation(filename, nesting_state, clean_lines, line,
                                error)
-  CheckForMongoPolyfill(filename, clean_lines, line, error)
-  CheckForMongoAtomic(filename, clean_lines, line, error)
-  CheckForMongoVolatile(filename, clean_lines, line, error)
-  CheckForNonMongoAssert(filename, clean_lines, line, error)
+  CheckForMerizoPolyfill(filename, clean_lines, line, error)
+  CheckForMerizoAtomic(filename, clean_lines, line, error)
+  CheckForMerizoVolatile(filename, clean_lines, line, error)
+  CheckForNonMerizoAssert(filename, clean_lines, line, error)
   if nesting_state.InAsmBlock(): return
   CheckForFunctionLengths(filename, clean_lines, line, function_state, error)
   CheckForMultilineCommentsAndStrings(filename, clean_lines, line, error)

@@ -12,10 +12,10 @@
     const dbName = baseName;
     const collName = "test";
 
-    const dbpath = MongoRunner.dataPath + baseName + "/";
+    const dbpath = MerizoRunner.dataPath + baseName + "/";
     resetDbpath(dbpath);
 
-    let merizod = MongoRunner.runMongod({dbpath: dbpath});
+    let merizod = MerizoRunner.runMerizod({dbpath: dbpath});
     const port = merizod.port;
 
     let testColl = merizod.getDB(dbName)[collName];
@@ -25,7 +25,7 @@
     let collUri = getUriForColl(testColl);
     let collFile = dbpath + "/" + collUri + ".wt";
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     jsTestLog("Deleting collection file: " + collFile);
     removeFile(collFile);

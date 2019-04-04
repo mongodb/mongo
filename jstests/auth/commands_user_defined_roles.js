@@ -205,9 +205,9 @@ var opts = {auth: "", enableExperimentalStorageDetailsCmd: ""};
 var impls = {createUsers: createUsers, runOneTest: runOneTest};
 
 // run all tests standalone
-var conn = MongoRunner.runMongod(opts);
+var conn = MerizoRunner.runMerizod(opts);
 authCommandsLib.runTests(conn, impls);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 // run all tests sharded
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

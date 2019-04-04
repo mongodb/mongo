@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -149,7 +149,7 @@ const LogComponent componentE = LogComponent::kJournal;
 // No log component declared at file scope.
 // Component severity configuration:
 //     LogComponent::kDefault: 2
-TEST_F(LogTestUnadornedEncoder, MongoLogMacroNoFileScopeLogComponent) {
+TEST_F(LogTestUnadornedEncoder, MerizoLogMacroNoFileScopeLogComponent) {
     globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Debug(2));
 
     LOG(2) << "This is logged";
@@ -157,24 +157,24 @@ TEST_F(LogTestUnadornedEncoder, MongoLogMacroNoFileScopeLogComponent) {
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
 
-    // MONGO_LOG_COMPONENT
+    // MERIZO_LOG_COMPONENT
     _logLines.clear();
-    MONGO_LOG_COMPONENT(2, componentA) << "This is logged";
-    MONGO_LOG_COMPONENT(3, componentA) << "This is not logged";
+    MERIZO_LOG_COMPONENT(2, componentA) << "This is logged";
+    MERIZO_LOG_COMPONENT(3, componentA) << "This is not logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
 
-    // MONGO_LOG_COMPONENT2
+    // MERIZO_LOG_COMPONENT2
     _logLines.clear();
-    MONGO_LOG_COMPONENT2(2, componentA, componentB) << "This is logged";
-    MONGO_LOG_COMPONENT2(3, componentA, componentB) << "This is not logged";
+    MERIZO_LOG_COMPONENT2(2, componentA, componentB) << "This is logged";
+    MERIZO_LOG_COMPONENT2(3, componentA, componentB) << "This is not logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
 
-    // MONGO_LOG_COMPONENT3
+    // MERIZO_LOG_COMPONENT3
     _logLines.clear();
-    MONGO_LOG_COMPONENT3(2, componentA, componentB, componentC) << "This is logged";
-    MONGO_LOG_COMPONENT3(3, componentA, componentB, componentC) << "This is not logged";
+    MERIZO_LOG_COMPONENT3(2, componentA, componentB, componentC) << "This is logged";
+    MERIZO_LOG_COMPONENT3(3, componentA, componentB, componentC) << "This is not logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_EQUALS(std::string("This is logged\n"), _logLines[0]);
 }
@@ -182,7 +182,7 @@ TEST_F(LogTestUnadornedEncoder, MongoLogMacroNoFileScopeLogComponent) {
 //
 // Component log level tests.
 // The global log manager holds the component log level configuration for the global log domain.
-// LOG() and MONGO_LOG_COMPONENT() macros in util/log.h determine at runtime if a log message
+// LOG() and MERIZO_LOG_COMPONENT() macros in util/log.h determine at runtime if a log message
 // should be written to the log domain.
 //
 
@@ -428,27 +428,27 @@ TEST_F(LogTestDetailsEncoder, ) {
     globalLogDomain()->setMinimumLoggedSeverity(LogSeverity::Log());
 
     // Default log component short name should not appear in detailed log line.
-    MONGO_LOG_COMPONENT(0, componentDefault) << "This is logged";
+    MERIZO_LOG_COMPONENT(0, componentDefault) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(componentDefault.getNameForLog().toString()),
                       std::string::npos);
 
     // Non-default log component short name should appear in detailed log line.
     _logLines.clear();
-    MONGO_LOG_COMPONENT(0, componentA) << "This is logged";
+    MERIZO_LOG_COMPONENT(0, componentA) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()), std::string::npos);
 
-    // MONGO_LOG_COMPONENT2 - only the first component is sent to LogStreamBuilder.
+    // MERIZO_LOG_COMPONENT2 - only the first component is sent to LogStreamBuilder.
     _logLines.clear();
-    MONGO_LOG_COMPONENT2(0, componentA, componentB) << "This is logged";
+    MERIZO_LOG_COMPONENT2(0, componentA, componentB) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()), std::string::npos);
     ASSERT_EQUALS(_logLines[0].find(componentB.getNameForLog().toString()), std::string::npos);
 
-    // MONGO_LOG_COMPONENT3 - only the first component is sent to LogStreamBuilder.
+    // MERIZO_LOG_COMPONENT3 - only the first component is sent to LogStreamBuilder.
     _logLines.clear();
-    MONGO_LOG_COMPONENT3(0, componentA, componentB, componentC) << "This is logged";
+    MERIZO_LOG_COMPONENT3(0, componentA, componentB, componentC) << "This is logged";
     ASSERT_EQUALS(1U, _logLines.size());
     ASSERT_NOT_EQUALS(_logLines[0].find(componentA.getNameForLog().toString()), std::string::npos);
     ASSERT_EQUALS(_logLines[0].find(componentB.getNameForLog().toString()), std::string::npos);

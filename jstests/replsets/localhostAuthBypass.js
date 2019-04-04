@@ -135,14 +135,14 @@ var runTest = function(useHostName) {
         secHosts.push("localhost:" + rs.getPort(sec));
     });
 
-    var merizo = new Mongo(host);
+    var merizo = new Merizo(host);
 
     assertCannotRunCommands(merizo, true);
 
     // Test localhost access on secondaries
     var merizoSecs = [];
     secHosts.forEach(function(h) {
-        merizoSecs.push(new Mongo(h));
+        merizoSecs.push(new Merizo(h));
     });
 
     merizoSecs.forEach(function(m) {
@@ -167,7 +167,7 @@ var runTest = function(useHostName) {
     print("reconnecting with a new client.");
     print("===============================");
 
-    merizo = new Mongo(host);
+    merizo = new Merizo(host);
 
     assertCannotRunCommands(merizo, true);
 
@@ -177,7 +177,7 @@ var runTest = function(useHostName) {
 
     // Test localhost access on secondaries on new connection
     secHosts.forEach(function(h) {
-        var m = new Mongo(h);
+        var m = new Merizo(h);
         assertCannotRunCommands(m, false);
         authenticate(m);
     });
@@ -199,14 +199,14 @@ var runNonlocalTest = function(ipAddr) {
         secHosts.push(ipAddr + ":" + rs.getPort(sec));
     });
 
-    var merizo = new Mongo(host);
+    var merizo = new Merizo(host);
 
     assertCannotRunCommands(merizo, true);
 
     // Test localhost access on secondaries
     var merizoSecs = [];
     secHosts.forEach(function(h) {
-        merizoSecs.push(new Mongo(h));
+        merizoSecs.push(new Merizo(h));
     });
 
     merizoSecs.forEach(function(m) {

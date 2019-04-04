@@ -186,7 +186,7 @@ function runTest(conn) {
         assert.eq(0, db.getUser('user1').roles.length);
         assert.eq(null, db.getUser('user1').customData);
         // Make sure password didn't change
-        assert(new Mongo(db.getMongo().host).getDB(db.getName()).auth('user1', 'pwd'));
+        assert(new Merizo(db.getMerizo().host).getDB(db.getName()).auth('user1', 'pwd'));
     })();
 
     (function testRevokeRolesFromUser() {
@@ -276,10 +276,10 @@ function runTest(conn) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = MerizoRunner.runMerizod({auth: ''});
 conn.getDB('admin').runCommand({setParameter: 1, newCollectionsUsePowerOf2Sizes: false});
 runTest(conn);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 jsTest.log('Test sharding');
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

@@ -349,7 +349,7 @@ splitMatchExpressionByWithoutRenames(unique_ptr<MatchExpression> expr,
             // If we aren't independent, we can't safely split.
             return {nullptr, std::move(expr)};
         }
-        default: { MONGO_UNREACHABLE; }
+        default: { MERIZO_UNREACHABLE; }
     }
 }
 
@@ -428,7 +428,7 @@ bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& p
         }
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionBy(

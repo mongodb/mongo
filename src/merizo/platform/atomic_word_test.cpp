@@ -67,7 +67,7 @@ void testAtomicWordBasicOperations() {
 enum TestEnum { E0, E1, E2, E3 };
 
 TEST(AtomicWordTests, BasicOperationsEnum) {
-    MONGO_STATIC_ASSERT(sizeof(AtomicWord<TestEnum>) == sizeof(TestEnum));
+    MERIZO_STATIC_ASSERT(sizeof(AtomicWord<TestEnum>) == sizeof(TestEnum));
     AtomicWord<TestEnum> w;
     ASSERT_EQUALS(E0, w.load());
     ASSERT_EQUALS(E0, w.compareAndSwap(E0, E1));

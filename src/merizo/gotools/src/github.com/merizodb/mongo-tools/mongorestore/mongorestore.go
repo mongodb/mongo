@@ -29,9 +29,9 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-// MongoRestore is a container for the user-specified options and
+// MerizoRestore is a container for the user-specified options and
 // internal state used for running merizorestore.
-type MongoRestore struct {
+type MerizoRestore struct {
 	ToolOptions   *options.ToolOptions
 	InputOptions  *InputOptions
 	OutputOptions *OutputOptions
@@ -50,8 +50,8 @@ type MongoRestore struct {
 	safety  *mgo.Safe
 
 	objCheck         bool
-	oplogLimit       bson.MongoTimestamp
-	isMongos         bool
+	oplogLimit       bson.MerizoTimestamp
+	isMerizos         bool
 	useWriteCommands bool
 	authVersions     authVersionPair
 
@@ -79,7 +79,7 @@ type MongoRestore struct {
 type collectionIndexes map[string][]IndexDocument
 
 // ParseAndValidateOptions returns a non-nil error if user-supplied options are invalid.
-func (restore *MongoRestore) ParseAndValidateOptions() error {
+func (restore *MerizoRestore) ParseAndValidateOptions() error {
 	// Can't use option pkg defaults for --objcheck because it's two separate flags,
 	// and we need to be able to see if they're both being used. We default to
 	// true here and then see if noobjcheck is enabled.
@@ -113,11 +113,11 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	}
 
 	var err error
-	restore.isMongos, err = restore.SessionProvider.IsMongos()
+	restore.isMerizos, err = restore.SessionProvider.IsMerizos()
 	if err != nil {
 		return err
 	}
-	if restore.isMongos {
+	if restore.isMerizos {
 		log.Logv(log.DebugLow, "restoring to a sharded system")
 	}
 
@@ -258,7 +258,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 }
 
 // Restore runs the merizorestore program.
-func (restore *MongoRestore) Restore() error {
+func (restore *MerizoRestore) Restore() error {
 	var target archive.DirLike
 	err := restore.ParseAndValidateOptions()
 	if err != nil {
@@ -379,7 +379,7 @@ func (restore *MongoRestore) Restore() error {
 		return fmt.Errorf("error scanning filesystem: %v", err)
 	}
 
-	if restore.isMongos && restore.manager.HasConfigDBIntent() && restore.NSOptions.DB == "" {
+	if restore.isMerizos && restore.manager.HasConfigDBIntent() && restore.NSOptions.DB == "" {
 		return fmt.Errorf("cannot do a full restore on a sharded system - " +
 			"remove the 'config' directory from the dump directory first")
 	}
@@ -521,7 +521,7 @@ func (restore *MongoRestore) Restore() error {
 	return nil
 }
 
-func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
+func (restore *MerizoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 	if restore.InputOptions.Archive == "-" {
 		rc = ioutil.NopCloser(restore.InputReader)
 	} else {
@@ -555,7 +555,7 @@ func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 	return rc, nil
 }
 
-func (restore *MongoRestore) HandleInterrupt() {
+func (restore *MerizoRestore) HandleInterrupt() {
 	if restore.termChan != nil {
 		close(restore.termChan)
 	}

@@ -44,14 +44,14 @@ struct BinDataInfo : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(base64);
-        MONGO_DECLARE_JS_FUNCTION(hex);
-        MONGO_DECLARE_JS_FUNCTION(toString);
-        MONGO_DECLARE_JS_FUNCTION(toJSON);
+        MERIZO_DECLARE_JS_FUNCTION(base64);
+        MERIZO_DECLARE_JS_FUNCTION(hex);
+        MERIZO_DECLARE_JS_FUNCTION(toString);
+        MERIZO_DECLARE_JS_FUNCTION(toJSON);
 
-        MONGO_DECLARE_JS_FUNCTION(HexData);
-        MONGO_DECLARE_JS_FUNCTION(MD5);
-        MONGO_DECLARE_JS_FUNCTION(UUID);
+        MERIZO_DECLARE_JS_FUNCTION(HexData);
+        MERIZO_DECLARE_JS_FUNCTION(MD5);
+        MERIZO_DECLARE_JS_FUNCTION(UUID);
     };
 
     static const JSFunctionSpec methods[5];

@@ -28,10 +28,10 @@
  */
 
 /**
- * Connect to a Mongo database as a database, from C++.
+ * Connect to a Merizo database as a database, from C++.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -160,7 +160,7 @@ rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
     // level. Routing clients only expect StaleConfig from shards, so the exception should not be
     // thrown when connected to a merizos, which allows StaleConfig to be returned to clients that
     // connect to a merizos with DBClient, e.g. the shell.
-    if (!isMongos()) {
+    if (!isMerizos()) {
         auto status = getStatusFromCommandResult(commandReply->getCommandReply());
         if (status == ErrorCodes::StaleConfig) {
             uassertStatusOK(status.withContext("stale config in runCommand"));
@@ -450,7 +450,7 @@ void DBClientBase::_auth(const BSONObj& params) {
 
     // We will only have a client name if SSL is enabled
     std::string clientName = "";
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (getSSLManager() != nullptr) {
         clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
     }
@@ -477,7 +477,7 @@ Status DBClientBase::authenticateInternalUser() {
 
     // We will only have a client name if SSL is enabled
     std::string clientName = "";
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (getSSLManager() != nullptr) {
         clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
     }
@@ -674,7 +674,7 @@ std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(const std::strin
 
     uassertStatusOKWithContext(getStatusFromCommandResult(res),
                                str::stream() << "find command using UUID failed. Command: " << cmd);
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = std::numeric_limits<uint64_t>::max();

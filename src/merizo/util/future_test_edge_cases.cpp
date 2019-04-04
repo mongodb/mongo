@@ -78,25 +78,25 @@ class DummyInterruptable final : public Interruptible {
         return Status(ErrorCodes::Interrupted, "");
     }
     Date_t getDeadline() const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     Status checkForInterruptNoAssert() noexcept override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     IgnoreInterruptsState pushIgnoreInterrupts() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     void popIgnoreInterrupts(IgnoreInterruptsState iis) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     void popArtificialDeadline(DeadlineState) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 };
 

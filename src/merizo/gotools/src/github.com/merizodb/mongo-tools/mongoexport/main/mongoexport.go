@@ -72,9 +72,9 @@ func main() {
 	}
 	defer provider.Close()
 
-	// temporarily allow secondary reads for the isMongos check
+	// temporarily allow secondary reads for the isMerizos check
 	provider.SetReadPreference(mgo.Nearest)
-	isMongos, err := provider.IsMongos()
+	isMerizos, err := provider.IsMerizos()
 	if err != nil {
 		log.Logvf(log.Always, "%v", err)
 		os.Exit(util.ExitError)
@@ -92,7 +92,7 @@ func main() {
 	}
 
 	var mode mgo.Mode
-	if opts.ReplicaSetName != "" || isMongos {
+	if opts.ReplicaSetName != "" || isMerizos {
 		mode = mgo.Primary
 	} else {
 		mode = mgo.Nearest
@@ -110,8 +110,8 @@ func main() {
 	}
 
 	// warn if we are trying to export from a secondary in a sharded cluster
-	if isMongos && mode != mgo.Primary {
-		log.Logvf(log.Always, db.WarningNonPrimaryMongosConnection)
+	if isMerizos && mode != mgo.Primary {
+		log.Logvf(log.Always, db.WarningNonPrimaryMerizosConnection)
 	}
 
 	provider.SetReadPreference(mode)
@@ -125,7 +125,7 @@ func main() {
 	progressManager.Start()
 	defer progressManager.Stop()
 
-	exporter := merizoexport.MongoExport{
+	exporter := merizoexport.MerizoExport{
 		ToolOptions:     *opts,
 		OutputOpts:      outputOpts,
 		InputOpts:       inputOpts,

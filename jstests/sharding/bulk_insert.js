@@ -6,7 +6,7 @@
     var st = new ShardingTest({shards: 2, merizos: 2, other: {shardAsReplicaSet: false}});
 
     var merizos = st.s;
-    var staleMongos = st.s1;
+    var staleMerizos = st.s1;
     var admin = merizos.getDB("admin");
 
     var collSh = merizos.getCollection(jsTestName() + ".collSharded");
@@ -239,7 +239,7 @@
 
     var inserts = [{ukey: 1}, {ukey: -1}];
 
-    var staleCollSh = staleMongos.getCollection(collSh + "");
+    var staleCollSh = staleMerizos.getCollection(collSh + "");
     assert.eq(null, staleCollSh.findOne(), 'Collections should be empty');
 
     assert.commandWorked(admin.runCommand(
@@ -266,10 +266,10 @@
         ];
     })();
 
-    var staleMongosWithLegacyWrites = new Mongo(staleMongos.name);
-    staleMongosWithLegacyWrites.forceWriteMode('legacy');
+    var staleMerizosWithLegacyWrites = new Merizo(staleMerizos.name);
+    staleMerizosWithLegacyWrites.forceWriteMode('legacy');
 
-    staleCollSh = staleMongos.getCollection(collSh + "");
+    staleCollSh = staleMerizos.getCollection(collSh + "");
     assert.eq(null, staleCollSh.findOne(), 'Collections should be empty');
 
     assert.commandWorked(admin.runCommand(

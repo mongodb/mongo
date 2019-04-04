@@ -63,7 +63,7 @@ FTDCController* getGlobalFTDCController() {
 }
 
 /**
- * Expose diagnosticDataCollectionDirectoryPath set parameter to specify the MongoD and MongoS FTDC
+ * Expose diagnosticDataCollectionDirectoryPath set parameter to specify the MerizoD and MerizoS FTDC
  * path.
  */
 synchronized_value<boost::filesystem::path> ftdcDirectoryPathParameter;
@@ -197,7 +197,7 @@ void startFTDC(boost::filesystem::path& path,
                RegisterCollectorsFunction registerCollectors) {
     FTDCConfig config;
     config.period = Milliseconds(ftdcStartupParams.periodMillis.load());
-    // Only enable FTDC if our caller says to enable FTDC, MongoS may not have a valid path to write
+    // Only enable FTDC if our caller says to enable FTDC, MerizoS may not have a valid path to write
     // files to so update the diagnosticDataCollectionEnabled set parameter to reflect that.
     ftdcStartupParams.enabled.store(startupMode == FTDCStartMode::kStart &&
                                     ftdcStartupParams.enabled.load());
@@ -224,7 +224,7 @@ void startFTDC(boost::filesystem::path& path,
     // hurt ftdc compression efficiency, because its output varies depending on the list of active
     // migrations.
     // "timing" is filtered out because it triggers frequent schema changes.
-    // TODO: do we need to enable "sharding" on MongoS?
+    // TODO: do we need to enable "sharding" on MerizoS?
     controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
         "serverStatus",
         "serverStatus",

@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -58,7 +58,7 @@ Milliseconds kMaxRefreshWaitTime(10 * 60 * 1000);
 
 // Prevents the refresher thread from waiting longer than the given number of milliseconds, even on
 // a successful refresh.
-MONGO_FAIL_POINT_DEFINE(maxKeyRefreshWaitTimeOverrideMS);
+MERIZO_FAIL_POINT_DEFINE(maxKeyRefreshWaitTimeOverrideMS);
 
 /**
  * Returns the amount of time to wait until the monitoring thread should attempt to refresh again.
@@ -264,7 +264,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             }
         }
 
-        MONGO_FAIL_POINT_BLOCK(maxKeyRefreshWaitTimeOverrideMS, data) {
+        MERIZO_FAIL_POINT_BLOCK(maxKeyRefreshWaitTimeOverrideMS, data) {
             const BSONObj& dataObj = data.getData();
             auto overrideMS = Milliseconds(dataObj["overrideMS"].numberInt());
             if (nextWakeup > overrideMS) {
@@ -291,7 +291,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         // Use a new opCtx so we won't be holding any RecoveryUnit while this thread goes to sleep.
         auto opCtx = cc().makeOperationContext();
 
-        MONGO_IDLE_THREAD_BLOCK;
+        MERIZO_IDLE_THREAD_BLOCK;
         auto sleepStatus = opCtx->waitForConditionOrInterruptNoAssertUntil(
             _refreshNeededCV, lock, Date_t::now() + nextWakeup);
 

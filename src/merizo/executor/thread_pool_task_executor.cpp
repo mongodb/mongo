@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT merizo::logger::LogComponent::kExecutor
+#define MERIZO_LOG_DEFAULT_COMPONENT merizo::logger::LogComponent::kExecutor
 
 #include "merizo/platform/basic.h"
 
@@ -52,11 +52,11 @@
 namespace merizo {
 namespace executor {
 
-MONGO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint1);
-MONGO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint2);
+MERIZO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint1);
+MERIZO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint2);
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(scheduleIntoPoolSpinsUntilThreadPoolShutsDown);
+MERIZO_FAIL_POINT_DEFINE(scheduleIntoPoolSpinsUntilThreadPoolShutsDown);
 }
 
 class ThreadPoolTaskExecutor::CallbackState : public TaskExecutor::CallbackState {
@@ -83,11 +83,11 @@ public:
     }
 
     void cancel() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void waitForCompletion() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     // All fields except for "canceled" are guarded by the owning task executor's _mutex. The
@@ -117,13 +117,13 @@ public:
     EventState() = default;
 
     void signal() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     void waitUntilSignaled() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     bool isSignaled() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     // All fields guarded by the owning task executor's _mutex.
@@ -197,7 +197,7 @@ stdx::unique_lock<stdx::mutex> ThreadPoolTaskExecutor::_join(stdx::unique_lock<s
             case shutdownComplete:
                 return true;
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     });
     if (_state == shutdownComplete) {
         return lk;
@@ -415,7 +415,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
 
-    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
+    if (MERIZO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
         // We are only going to pause on these failpoints if the command issued is for the
         // collection cloning part of initial sync.
         const auto cmdName = request.cmdObj.firstElementFieldName();
@@ -426,11 +426,11 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
             log() << "Collection Cloner scheduled a remote command on the " << request.dbname
                   << " db: " << request.cmdObj;
             log() << "initialSyncFuzzerSynchronizationPoint1 fail point enabled.";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint1);
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint1);
 
-            if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
+            if (MERIZO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
                 log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
+                MERIZO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
             }
         }
     }
@@ -595,7 +595,7 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
 
     lk.unlock();
 
-    if (MONGO_FAIL_POINT(scheduleIntoPoolSpinsUntilThreadPoolShutsDown)) {
+    if (MERIZO_FAIL_POINT(scheduleIntoPoolSpinsUntilThreadPoolShutsDown)) {
         scheduleIntoPoolSpinsUntilThreadPoolShutsDown.setMode(FailPoint::off);
         while (_pool->schedule([] {}) != ErrorCodes::ShutdownInProgress) {
             sleepmillis(100);

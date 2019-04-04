@@ -16,14 +16,14 @@
     rst.initiate();
 
     const primarySession =
-        rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+        rst.getPrimary().getDB(dbName).getMerizo().startSession({causalConsistency: false});
     const primaryDB = primarySession.getDatabase(dbName);
 
     const secondaryConns = rst.getSecondaries();
     const secondaryConn0 = secondaryConns[0];
     const secondaryConn1 = secondaryConns[1];
     const secondarySession =
-        secondaryConn0.getDB(dbName).getMongo().startSession({causalConsistency: false});
+        secondaryConn0.getDB(dbName).getMerizo().startSession({causalConsistency: false});
     const secondaryDB0 = secondarySession.getDatabase(dbName);
 
     // Create the collection and insert one document. Get the op time of the write.

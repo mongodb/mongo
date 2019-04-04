@@ -2,7 +2,7 @@
 // can be used to connect to a server with a given SSL configuration.
 // This is necessary because SSL settings are currently process global - so if the merizo shell
 // started by resmoke.py has an SSL configuration that's incompatible with a server created with
-// MongoRunner, it will not be able to connect to it.
+// MerizoRunner, it will not be able to connect to it.
 
 /**
  * A utility for checking if a shell configured with the specified command line options can
@@ -35,7 +35,7 @@ function SSLTest(serverOpts, clientOpts) {
         return canonical;
     };
 
-    this.serverOpts = MongoRunner.merizodOptions(canonicalServerOpts(serverOpts));
+    this.serverOpts = MerizoRunner.merizodOptions(canonicalServerOpts(serverOpts));
     this.port = this.serverOpts.port;
     resetDbpath(this.serverOpts.dbpath);
 
@@ -68,19 +68,19 @@ SSLTest.prototype.noSSLClientOptions = {
 SSLTest.prototype.connectWorked = function() {
     var connectTimeoutMillis = 600000;
 
-    var serverArgv = MongoRunner.arrOptions("merizod", this.serverOpts);
-    var clientArgv = MongoRunner.arrOptions("merizo", this.clientOpts);
+    var serverArgv = MerizoRunner.arrOptions("merizod", this.serverOpts);
+    var clientArgv = MerizoRunner.arrOptions("merizo", this.clientOpts);
 
-    var serverPID = _startMongoProgram.apply(null, serverArgv);
+    var serverPID = _startMerizoProgram.apply(null, serverArgv);
     try {
         assert.soon(function() {
             return checkProgram(serverPID).alive &&
-                (0 === _runMongoProgram.apply(null, clientArgv));
+                (0 === _runMerizoProgram.apply(null, clientArgv));
         }, "connect failed", connectTimeoutMillis);
     } catch (ex) {
         return false;
     } finally {
-        _stopMongoProgram(this.port);
+        _stopMerizoProgram(this.port);
     }
     return true;
 };

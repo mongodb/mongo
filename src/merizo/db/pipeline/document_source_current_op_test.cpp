@@ -57,14 +57,14 @@ public:
 };
 
 /**
- * A MongoProcessInterface used for testing which returns artificial currentOp entries.
+ * A MerizoProcessInterface used for testing which returns artificial currentOp entries.
  */
-class MockMongoInterface final : public StubMongoProcessInterface {
+class MockMerizoInterface final : public StubMerizoProcessInterface {
 public:
-    MockMongoInterface(std::vector<BSONObj> ops, bool hasShardName = true)
+    MockMerizoInterface(std::vector<BSONObj> ops, bool hasShardName = true)
         : _ops(std::move(ops)), _hasShardName(hasShardName) {}
 
-    MockMongoInterface(bool hasShardName = true) : _hasShardName(hasShardName) {}
+    MockMerizoInterface(bool hasShardName = true) : _hasShardName(hasShardName) {}
 
     std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        CurrentOpConnectionsMode connMode,
@@ -202,7 +202,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldNotSerializeOmittedOptionalArguments) 
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>();
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>();
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -211,10 +211,10 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
 
 TEST_F(DocumentSourceCurrentOpTest,
        ShouldAddShardNameModifyOpIDAndClientFieldNameInShardedContext) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromMerizos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(ops);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -228,10 +228,10 @@ TEST_F(DocumentSourceCurrentOpTest,
 
 TEST_F(DocumentSourceCurrentOpTest,
        ShouldReturnOpIDAndClientFieldNameUnmodifiedWhenNotInShardedContext) {
-    getExpCtx()->fromMongos = false;
+    getExpCtx()->fromMerizos = false;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(ops);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -242,9 +242,9 @@ TEST_F(DocumentSourceCurrentOpTest,
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRequest) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromMerizos = true;
 
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(false);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(false);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -252,10 +252,10 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRe
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInShardedContext) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromMerizos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 'string' }")};
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(ops);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 

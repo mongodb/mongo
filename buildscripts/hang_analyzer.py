@@ -534,7 +534,7 @@ def signal_event_object(logger, pid):
     """Signal the Windows event object."""
 
     # Use unique event_name created.
-    event_name = "Global\\Mongo_Python_" + str(pid)
+    event_name = "Global\\Merizo_Python_" + str(pid)
 
     try:
         desired_access = win32event.EVENT_MODIFY_STATE

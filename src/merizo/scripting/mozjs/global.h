@@ -42,12 +42,12 @@ namespace mozjs {
  */
 struct GlobalInfo : public BaseInfo {
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(sleep);
-        MONGO_DECLARE_JS_FUNCTION(gc);
-        MONGO_DECLARE_JS_FUNCTION(print);
-        MONGO_DECLARE_JS_FUNCTION(version);
-        MONGO_DECLARE_JS_FUNCTION(buildInfo);
-        MONGO_DECLARE_JS_FUNCTION(getJSHeapLimitMB);
+        MERIZO_DECLARE_JS_FUNCTION(sleep);
+        MERIZO_DECLARE_JS_FUNCTION(gc);
+        MERIZO_DECLARE_JS_FUNCTION(print);
+        MERIZO_DECLARE_JS_FUNCTION(version);
+        MERIZO_DECLARE_JS_FUNCTION(buildInfo);
+        MERIZO_DECLARE_JS_FUNCTION(getJSHeapLimitMB);
     };
 
     static const JSFunctionSpec freeFunctions[7];

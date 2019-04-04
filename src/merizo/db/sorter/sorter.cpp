@@ -41,9 +41,9 @@
  * }
  *
  * #include "merizo/db/sorter/sorter.cpp"
- * MONGO_CREATE_SORTER(MyKeyType, MyValueType, MyComparatorType);
+ * MERIZO_CREATE_SORTER(MyKeyType, MyValueType, MyComparatorType);
  *
- * Do this once for each unique set of parameters to MONGO_CREATE_SORTER.
+ * Do this once for each unique set of parameters to MERIZO_CREATE_SORTER.
  */
 
 #include "merizo/db/sorter/sorter.h"
@@ -84,7 +84,7 @@ inline std::string myErrnoWithDescription() {
 
 template <typename Data, typename Comparator>
 void dassertCompIsSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
-#if defined(MONGO_CONFIG_DEBUG_BUILD) && !defined(_MSC_VER)
+#if defined(MERIZO_CONFIG_DEBUG_BUILD) && !defined(_MSC_VER)
     // MSVC++ already does similar verification in debug mode in addition to using
     // algorithms that do more comparisons. Doing our own verification in addition makes
     // debug builds considerably slower without any additional safety.
@@ -908,7 +908,7 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
 
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(
-        16946, "Attempting to use external sort from merizos. This is not allowed.", !isMongos());
+        16946, "Attempting to use external sort from merizos. This is not allowed.", !isMerizos());
 
     uassert(17148,
             "Attempting to use external sort without setting SortOptions::tempDir",
@@ -1037,7 +1037,7 @@ Sorter<Key, Value>* Sorter<Key, Value>::make(const SortOptions& opts,
     // This should be checked by consumers, but if it isn't try to fail early.
     uassert(16947,
             "Attempting to use external sort from merizos. This is not allowed.",
-            !(isMongos() && opts.extSortAllowed));
+            !(isMerizos() && opts.extSortAllowed));
 
     uassert(17149,
             "Attempting to use external sort without setting SortOptions::tempDir",

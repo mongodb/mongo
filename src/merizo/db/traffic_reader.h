@@ -37,5 +37,5 @@ namespace merizo {
 BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile);
 
 // This is the function that traffic_reader_main.cpp calls
-void trafficRecordingFileToMongoReplayFile(int inFile, std::ostream& outFile);
+void trafficRecordingFileToMerizoReplayFile(int inFile, std::ostream& outFile);
 }  // namespace merizo

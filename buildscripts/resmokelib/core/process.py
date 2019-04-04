@@ -161,7 +161,7 @@ class Process(object):
                 try:
                     merizo_signal_handle = win32event.OpenEvent(
                         win32event.EVENT_MODIFY_STATE, False,
-                        "Global\\Mongo_" + str(self._process.pid))
+                        "Global\\Merizo_" + str(self._process.pid))
 
                     if not merizo_signal_handle:
                         # The process has already died.

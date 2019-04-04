@@ -33,7 +33,7 @@ global:
     configs:
         source: [ yaml, cli, ini ]
         initializer:
-            register: addMongodReplicationOptions
+            register: addMerizodReplicationOptions
 
 configs:
     #

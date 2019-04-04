@@ -124,7 +124,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             *out = id;
             return PlanStage::ADVANCED;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool DistinctScan::isEOF() {

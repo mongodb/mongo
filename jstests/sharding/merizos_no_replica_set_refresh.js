@@ -11,7 +11,7 @@ load("jstests/replsets/rslib.js");
         return result.hosts.length + result.passives.length;
     };
 
-    var numMongosHosts = function() {
+    var numMerizosHosts = function() {
         var commandResult = assert.commandWorked(merizos.adminCommand("connPoolStats"));
         var result = commandResult.replicaSets[rsObj.name];
         return result.hosts.length;
@@ -42,18 +42,18 @@ load("jstests/replsets/rslib.js");
 
         jsTest.log("Waiting for the merizos to discover that the shard now has " + expectedNumHosts +
                    " hosts.");
-        var numHostsSeenByMongos;
+        var numHostsSeenByMerizos;
 
         // Use a high timeout (5 minutes) because replica set refreshes are only done every 30
         // seconds.
         assert.soon(
             function() {
-                numHostsSeenByMongos = numMongosHosts();
-                return numHostsSeenByMongos === expectedNumHosts;
+                numHostsSeenByMerizos = numMerizosHosts();
+                return numHostsSeenByMerizos === expectedNumHosts;
             },
             function() {
                 return ("Expected merizos to see " + expectedNumHosts +
-                        " hosts on shard but found " + numHostsSeenByMongos);
+                        " hosts on shard but found " + numHostsSeenByMerizos);
             },
             five_minutes);
     };

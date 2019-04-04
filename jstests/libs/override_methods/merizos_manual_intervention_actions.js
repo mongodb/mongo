@@ -51,9 +51,9 @@ var ManualInterventionActions = (function() {
 
 (function() {
 
-    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
+    const merizoRunCommandOriginal = Merizo.prototype.runCommand;
 
-    Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
+    Merizo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
         const cmdName = Object.keys(cmdObj)[0];
         const commandsToRetry =
             new Set(["mapReduce", "mapreduce", "shardCollection", "shardcollection"]);

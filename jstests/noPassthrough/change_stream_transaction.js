@@ -51,7 +51,7 @@
         //
         // Start transaction 1.
         //
-        const session1 = db.getMongo().startSession();
+        const session1 = db.getMerizo().startSession();
         const sessionDb1 = session1.getDatabase(dbName);
         const sessionColl1 = sessionDb1[collName];
         session1.startTransaction({readConcern: {level: "majority"}});
@@ -59,7 +59,7 @@
         //
         // Start transaction 2.
         //
-        const session2 = db.getMongo().startSession();
+        const session2 = db.getMerizo().startSession();
         const sessionDb2 = session2.getDatabase(dbName);
         const sessionColl2 = sessionDb2[collName];
         session2.startTransaction({readConcern: {level: "majority"}});
@@ -67,7 +67,7 @@
         //
         // Start transaction 3.
         //
-        const session3 = db.getMongo().startSession();
+        const session3 = db.getMerizo().startSession();
         const sessionDb3 = session3.getDatabase(dbName);
         const sessionColl3 = sessionDb3[collName];
         session3.startTransaction({readConcern: {level: "majority"}});

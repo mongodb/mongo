@@ -76,11 +76,11 @@ public:
     /**
      * Returns a list of the priviliges required for this pipeline.
      */
-    PrivilegeVector requiredPrivileges(bool isMongos) const {
+    PrivilegeVector requiredPrivileges(bool isMerizos) const {
         PrivilegeVector requiredPrivileges;
         for (auto&& spec : _stageSpecs) {
             Privilege::addPrivilegesToPrivilegeVector(&requiredPrivileges,
-                                                      spec->requiredPrivileges(isMongos));
+                                                      spec->requiredPrivileges(isMerizos));
         }
 
         return requiredPrivileges;
@@ -105,18 +105,18 @@ public:
     /**
      * Returns false if the pipeline has any stage which must be run locally on merizos.
      */
-    bool allowedToForwardFromMongos() const {
+    bool allowedToForwardFromMerizos() const {
         return std::all_of(_stageSpecs.cbegin(), _stageSpecs.cend(), [](const auto& spec) {
-            return spec->allowedToForwardFromMongos();
+            return spec->allowedToForwardFromMerizos();
         });
     }
 
     /**
      * Returns false if the pipeline has any Document Source which requires rewriting via serialize.
      */
-    bool allowedToPassthroughFromMongos() const {
+    bool allowedToPassthroughFromMerizos() const {
         return std::all_of(_stageSpecs.cbegin(), _stageSpecs.cend(), [](const auto& spec) {
-            return spec->allowedToPassthroughFromMongos();
+            return spec->allowedToPassthroughFromMerizos();
         });
     }
 

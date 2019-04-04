@@ -18,7 +18,7 @@
 #include "asio/detail/config.hpp"
 #include "asio/error_code.hpp"
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "merizo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 
@@ -46,7 +46,7 @@ enum stream_errors {
     stream_truncated,
     no_renegotiation
 #elif (OPENSSL_VERSION_NUMBER < 0x10100000L) && !defined(OPENSSL_IS_BORINGSSL) && \
-    MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+    MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
     stream_truncated = ERR_PACK(ERR_LIB_SSL, 0, SSL_R_SHORT_READ)
 #else
     stream_truncated = 1,

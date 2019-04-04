@@ -7,7 +7,7 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/explain.js');              // for $config
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMerizos
 load('jstests/libs/analyze_plan.js');                              // for planHasStage
 
 var $config = extendWorkload($config, function($config, $super) {
@@ -15,7 +15,7 @@ var $config = extendWorkload($config, function($config, $super) {
     function assertNCounted(num, obj, db) {
         var stage = obj.executionStats.executionStages;
         // get sharded stage(s) if counting on merizos
-        if (isMongos(db)) {
+        if (isMerizos(db)) {
             stage = stage.shards[0].executionStages;
         }
         assertWhenOwnColl.eq(num, stage.nCounted);

@@ -80,9 +80,9 @@
         assert.commandWorked(st.s.adminCommand({split: 'test.sharded', middle: {_id: x}}));
     }
 
-    var newMongod = MongoRunner.runMongod({shardsvr: ''});
+    var newMerizod = MerizoRunner.runMerizod({shardsvr: ''});
 
-    assert.commandWorked(st.s.adminCommand({addShard: newMongod.name, name: 'toRemoveLater'}));
+    assert.commandWorked(st.s.adminCommand({addShard: newMerizod.name, name: 'toRemoveLater'}));
 
     for (x = 0; x < 2; x++) {
         assert.commandWorked(
@@ -102,7 +102,7 @@
         return res.state == 'completed';
     });
 
-    MongoRunner.stopMongod(newMongod);
+    MerizoRunner.stopMerizod(newMerizod);
 
     checkBasicCRUD(st.s.getDB('test').unsharded);
     checkBasicCRUD(st.s.getDB('test').sharded);

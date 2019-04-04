@@ -33,14 +33,14 @@ var (
 	testArchiveWithOplog = "testdata/dump-w-oplog.archive"
 )
 
-func TestMongorestoreShortArchive(t *testing.T) {
+func TestMerizorestoreShortArchive(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")
 	}
 
-	Convey("With a test MongoRestore", t, func() {
+	Convey("With a test MerizoRestore", t, func() {
 		inputOptions := &InputOptions{
 			Archive: testArchive,
 		}
@@ -68,7 +68,7 @@ func TestMongorestoreShortArchive(t *testing.T) {
 			_, err = file.Seek(0, 0)
 			So(err, ShouldBeNil)
 
-			restore := MongoRestore{
+			restore := MerizoRestore{
 				ToolOptions:     toolOpts,
 				OutputOptions:   outputOptions,
 				InputOptions:    inputOptions,
@@ -89,14 +89,14 @@ func TestMongorestoreShortArchive(t *testing.T) {
 	})
 }
 
-func TestMongorestoreArchiveWithOplog(t *testing.T) {
+func TestMerizorestoreArchiveWithOplog(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")
 	}
 
-	Convey("With a test MongoRestore", t, func() {
+	Convey("With a test MerizoRestore", t, func() {
 		inputOptions := &InputOptions{
 			Archive:     testArchiveWithOplog,
 			OplogReplay: true,
@@ -107,7 +107,7 @@ func TestMongorestoreArchiveWithOplog(t *testing.T) {
 		nsOptions := &NSOptions{}
 		provider, toolOpts, err := testutil.GetBareSessionProvider()
 
-		restore := MongoRestore{
+		restore := MerizoRestore{
 			ToolOptions:     toolOpts,
 			OutputOptions:   outputOptions,
 			InputOptions:    inputOptions,

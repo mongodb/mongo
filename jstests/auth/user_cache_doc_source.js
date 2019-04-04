@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    var merizod = MongoRunner.runMongod({auth: ""});
+    var merizod = MerizoRunner.runMerizod({auth: ""});
     var db = merizod.getDB("admin");
     db.createUser({user: "root", pwd: "root", roles: ["userAdminAnyDatabase"]});
     db.auth("root", "root");
@@ -18,7 +18,7 @@
     assert.eq(expectedOnlyRoot, readUserCache());
 
     /* This is broken because of SERVER-36384
-    var newConn = new Mongo(merizod.name);
+    var newConn = new Merizo(merizod.name);
     assert.eq(newConn.getDB("admin").auth("readOnlyUser", "foobar"), 1);
 
     const expectedBothActive = [
@@ -42,6 +42,6 @@
         return friendlyEqual(expectedReadOnlyInactive, readUserCache());
     });
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
     awaitShell({checkExitSuccess: false});
 })();

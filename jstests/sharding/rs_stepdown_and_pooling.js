@@ -32,7 +32,7 @@
         // jstest ->(x10)-> merizos ->(x10)-> primary
         var conns = [];
         for (var i = 0; i < 50; i++) {
-            conns.push(new Mongo(merizos.host));
+            conns.push(new Merizo(merizos.host));
             conns[i].getCollection(coll + "").findOne();
         }
 
@@ -83,7 +83,7 @@
 
         var numErrors = 0;
         for (var i = 0; i < conns.length; i++) {
-            var newConn = new Mongo(merizos.host);
+            var newConn = new Merizo(merizos.host);
             try {
                 printjson(newConn.getCollection("foo.bar").findOne());
             } catch (e) {

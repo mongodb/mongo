@@ -1,6 +1,6 @@
 /**
  * When a network connection to the merizo shell is closed, attempting to call
- * Mongo.prototype.runCommand() and Mongo.prototype.runCommandWithMetadata() throws a JavaScript
+ * Merizo.prototype.runCommand() and Merizo.prototype.runCommandWithMetadata() throws a JavaScript
  * exception. This override catches these exceptions (i.e. ones where isNetworkError() returns true)
  * and automatically re-sends the command request to the server, or propagates the error if the
  * command should already be using the shell's existing retryability logic. The goal of this
@@ -19,10 +19,10 @@
     // Store a session to access ServerSession#canRetryWrites.
     let _serverSession;
 
-    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
-    const merizoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
+    const merizoRunCommandOriginal = Merizo.prototype.runCommand;
+    const merizoRunCommandWithMetadataOriginal = Merizo.prototype.runCommandWithMetadata;
 
-    Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
+    Merizo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
         if (typeof _serverSession === "undefined") {
             _serverSession = this.startSession()._serverSession;
         }
@@ -30,7 +30,7 @@
         return runWithRetriesOnNetworkErrors(this, cmdObj, merizoRunCommandOriginal, arguments);
     };
 
-    Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
+    Merizo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
         dbName, metadata, cmdObj) {
         if (typeof _serverSession === "undefined") {
             _serverSession = this.startSession()._serverSession;

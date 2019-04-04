@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -43,7 +43,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(exchangeFailLoadNextBatch);
+MERIZO_FAIL_POINT_DEFINE(exchangeFailLoadNextBatch);
 
 class MutexAndResourceLock {
     OperationContext* _opCtx;
@@ -318,7 +318,7 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                 // The return value is an index of a full consumer buffer.
                 size_t fullConsumerId = loadNextBatch();
 
-                if (MONGO_FAIL_POINT(exchangeFailLoadNextBatch)) {
+                if (MERIZO_FAIL_POINT(exchangeFailLoadNextBatch)) {
                     log() << "exchangeFailLoadNextBatch fail point enabled.";
                     uasserted(ErrorCodes::FailPointEnabled,
                               "Asserting on loading the next batch due to failpoint.");
@@ -384,7 +384,7 @@ size_t Exchange::loadNextBatch() {
                     return target;
             } break;
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 

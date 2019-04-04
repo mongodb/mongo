@@ -89,7 +89,7 @@
     replTest.stopSet();
 
     // A standalone merizod does not return logicalTime.
-    var standalone = MongoRunner.runMongod();
+    var standalone = MerizoRunner.runMerizod();
 
     testDB = standalone.getDB("test");
     res = assert.commandWorked(testDB.runCommand("insert", {insert: "foo", documents: [{x: 5}]}));
@@ -97,5 +97,5 @@
            "Expected command body from a standalone merizod to not contain logicalTime, " +
                "received: " + tojson(res));
 
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 })();

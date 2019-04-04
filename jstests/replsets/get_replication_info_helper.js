@@ -31,7 +31,7 @@
     var merizo =
         startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
     merizo();
-    assert(rawMongoProgramOutput().match("behind the primary"));
+    assert(rawMerizoProgramOutput().match("behind the primary"));
 
     // get to a primaryless state
     for (i in replSet._slaves) {
@@ -43,7 +43,7 @@
     merizo =
         startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
     merizo();
-    assert(rawMongoProgramOutput().match("behind the freshest"));
+    assert(rawMerizoProgramOutput().match("behind the freshest"));
 
     replSet.stopSet();
 })();

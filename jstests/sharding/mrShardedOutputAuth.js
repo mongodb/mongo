@@ -52,7 +52,7 @@
     var adminDb = merizos.getDB("admin");
     adminDb.createUser({user: "user", pwd: "pass", roles: jsTest.adminUserRoles});
 
-    var authenticatedConn = new Mongo(merizos.host);
+    var authenticatedConn = new Merizo(merizos.host);
     authenticatedConn.getDB('admin').auth("user", "pass");
     adminDb = authenticatedConn.getDB("admin");
 
@@ -72,20 +72,20 @@
     assert.eq(inputDb.numbers.count(), 50);
 
     // Setup a connection authenticated to both input and output db
-    var inputOutputAuthConn = new Mongo(merizos.host);
+    var inputOutputAuthConn = new Merizo(merizos.host);
     inputOutputAuthConn.getDB('input').auth("user", "pass");
     inputOutputAuthConn.getDB('output').auth("user", "pass");
     doMapReduce(inputOutputAuthConn, outputDb);
     assertSuccess(configDb, outputDb);
 
     // setup a connection authenticated to only input db
-    var inputAuthConn = new Mongo(merizos.host);
+    var inputAuthConn = new Merizo(merizos.host);
     inputAuthConn.getDB('input').auth("user", "pass");
     doMapReduce(inputAuthConn, outputDb);
     assertFailure(configDb, outputDb);
 
     // setup a connection authenticated to only output db
-    var outputAuthConn = new Mongo(merizos.host);
+    var outputAuthConn = new Merizo(merizos.host);
     outputAuthConn.getDB('output').auth("user", "pass");
     doMapReduce(outputAuthConn, outputDb);
     assertFailure(configDb, outputDb);

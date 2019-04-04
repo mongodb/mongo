@@ -11,12 +11,12 @@
     'use strict';
 
     var baseDir = "jstests_directoryperdb";
-    var dbpath = MongoRunner.dataPath + baseDir + "/";
+    var dbpath = MerizoRunner.dataPath + baseDir + "/";
 
     var isDirectoryPerDBSupported =
         jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
 
-    var m = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: ''});
+    var m = MerizoRunner.runMerizod({dbpath: dbpath, directoryperdb: ''});
 
     if (!isDirectoryPerDBSupported) {
         assert.isnull(m, 'storage engine without directoryperdb support should fail to start up');
@@ -39,8 +39,8 @@
     files = listFiles(files[0].name);
     assert(files.length > 0);
 
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 
     // Subsequent attempt to start server using same dbpath without directoryperdb should fail.
-    assert.isnull(MongoRunner.runMongod({dbpath: dbpath, restart: true}));
+    assert.isnull(MerizoRunner.runMerizod({dbpath: dbpath, restart: true}));
 }());

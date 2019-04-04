@@ -81,7 +81,7 @@ std::string currentJSStackToString(JSContext* cx);
  *
  * The altCode and altReason are used if no JS exception is pending
  */
-MONGO_COMPILER_NORETURN void throwCurrentJSException(JSContext* cx,
+MERIZO_COMPILER_NORETURN void throwCurrentJSException(JSContext* cx,
                                                      ErrorCodes::Error altCode,
                                                      StringData altReason);
 

@@ -167,7 +167,7 @@ protected:
     void setUp() {
         MockReplCoordServerFixture::setUp();
 
-        MongoDSessionCatalog::onStepUp(opCtx());
+        MerizoDSessionCatalog::onStepUp(opCtx());
 
         const auto service = opCtx()->getServiceContext();
 

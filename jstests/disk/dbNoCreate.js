@@ -1,6 +1,6 @@
 var baseName = "jstests_dbNoCreate";
 
-var m = MongoRunner.runMongod({});
+var m = MerizoRunner.runMerizod({});
 
 var t = m.getDB(baseName).t;
 
@@ -9,9 +9,9 @@ t.remove({});
 t.update({}, {a: 1});
 t.drop();
 
-MongoRunner.stopMongod(m);
+MerizoRunner.stopMerizod(m);
 
-m = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: m.dbpath});
+m = MerizoRunner.runMerizod({restart: true, cleanData: false, dbpath: m.dbpath});
 assert.eq(
     -1, m.getDBNames().indexOf(baseName), "found " + baseName + " in " + tojson(m.getDBNames()));
-MongoRunner.stopMongod(m);
+MerizoRunner.stopMerizod(m);

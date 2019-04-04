@@ -29,7 +29,7 @@
 
 #pragma once
 
-#ifndef _WIN32  // TODO(schwerin): Should be #if MONGO_CONFIG_HAVE_SYSLOG_H?
+#ifndef _WIN32  // TODO(schwerin): Should be #if MERIZO_CONFIG_HAVE_SYSLOG_H?
 
 #include <sstream>
 #include <syslog.h>

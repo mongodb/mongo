@@ -50,9 +50,9 @@ const (
 
 type replyFunc func(err error, rfl *replyFuncLegacyArgs, rfc *replyFuncCommandArgs, rfm *replyFuncMsgArgs)
 
-type MongoSocket struct {
+type MerizoSocket struct {
 	sync.Mutex
-	server        *MongoServer // nil when cached
+	server        *MerizoServer // nil when cached
 	Conn          net.Conn
 	timeout       time.Duration
 	addr          string // For debugging only.
@@ -109,8 +109,8 @@ type QueryWrapper struct {
 	Comment        string      "$comment,omitempty"
 }
 
-func (op *QueryOp) finalQuery(socket *MongoSocket) interface{} {
-	if op.Flags&flagSlaveOk != 0 && socket.ServerInfo().Mongos {
+func (op *QueryOp) finalQuery(socket *MerizoSocket) interface{} {
+	if op.Flags&flagSlaveOk != 0 && socket.ServerInfo().Merizos {
 		var modeName string
 		switch op.mode {
 		case Strong:
@@ -309,8 +309,8 @@ type requestInfo struct {
 	replyFunc replyFunc
 }
 
-func NewSocket(server *MongoServer, conn net.Conn, timeout time.Duration) *MongoSocket {
-	socket := &MongoSocket{
+func NewSocket(server *MerizoServer, conn net.Conn, timeout time.Duration) *MerizoSocket {
+	socket := &MerizoSocket{
 		Conn:       conn,
 		addr:       server.Addr,
 		server:     server,
@@ -326,9 +326,9 @@ func NewSocket(server *MongoServer, conn net.Conn, timeout time.Duration) *Mongo
 	return socket
 }
 
-func NewDumbSocket(conn net.Conn) *MongoSocket {
-	server := &MongoServer{}
-	return &MongoSocket{
+func NewDumbSocket(conn net.Conn) *MerizoSocket {
+	server := &MerizoServer{}
+	return &MerizoSocket{
 		server:     server,
 		addr:       server.Addr,
 		Conn:       conn,
@@ -338,7 +338,7 @@ func NewDumbSocket(conn net.Conn) *MongoSocket {
 
 // Server returns the server that the socket is associated with.
 // It returns nil while the socket is cached in its respective server.
-func (socket *MongoSocket) Server() *MongoServer {
+func (socket *MerizoSocket) Server() *MerizoServer {
 	socket.Lock()
 	server := socket.server
 	socket.Unlock()
@@ -347,7 +347,7 @@ func (socket *MongoSocket) Server() *MongoServer {
 
 // ServerInfo returns details for the server at the time the socket
 // was initially acquired.
-func (socket *MongoSocket) ServerInfo() *merizoServerInfo {
+func (socket *MerizoSocket) ServerInfo() *merizoServerInfo {
 	socket.Lock()
 	serverInfo := socket.serverInfo
 	socket.Unlock()
@@ -357,7 +357,7 @@ func (socket *MongoSocket) ServerInfo() *merizoServerInfo {
 // InitialAcquire obtains the first reference to the socket, either
 // right after the connection is made or once a recycled socket is
 // being put back in use.
-func (socket *MongoSocket) InitialAcquire(serverInfo *merizoServerInfo, timeout time.Duration) error {
+func (socket *MerizoSocket) InitialAcquire(serverInfo *merizoServerInfo, timeout time.Duration) error {
 	socket.Lock()
 	if socket.references > 0 {
 		panic("Socket acquired out of cache with references")
@@ -379,7 +379,7 @@ func (socket *MongoSocket) InitialAcquire(serverInfo *merizoServerInfo, timeout 
 // Acquire obtains an additional reference to the socket.
 // The socket will only be recycled when it's released as many
 // times as it's been acquired.
-func (socket *MongoSocket) Acquire() (info *merizoServerInfo) {
+func (socket *MerizoSocket) Acquire() (info *merizoServerInfo) {
 	socket.Lock()
 	if socket.references == 0 {
 		panic("Socket got non-initial acquire with references == 0")
@@ -395,7 +395,7 @@ func (socket *MongoSocket) Acquire() (info *merizoServerInfo) {
 
 // Release decrements a socket reference. The socket will be
 // recycled once its released as many times as it's been acquired.
-func (socket *MongoSocket) Release() {
+func (socket *MerizoSocket) Release() {
 	socket.Lock()
 	if socket.references == 0 {
 		panic("socket.Release() with references == 0")
@@ -417,7 +417,7 @@ func (socket *MongoSocket) Release() {
 }
 
 // SetTimeout changes the timeout used on socket operations.
-func (socket *MongoSocket) SetTimeout(d time.Duration) {
+func (socket *MerizoSocket) SetTimeout(d time.Duration) {
 	socket.Lock()
 	socket.timeout = d
 	socket.Unlock()
@@ -430,7 +430,7 @@ const (
 	writeDeadline deadlineType = 2
 )
 
-func (socket *MongoSocket) updateDeadline(which deadlineType) {
+func (socket *MerizoSocket) updateDeadline(which deadlineType) {
 	var when time.Time
 	if socket.timeout > 0 {
 		when = time.Now().Add(socket.timeout)
@@ -453,11 +453,11 @@ func (socket *MongoSocket) updateDeadline(which deadlineType) {
 }
 
 // Close terminates the socket use.
-func (socket *MongoSocket) Close() {
+func (socket *MerizoSocket) Close() {
 	socket.kill(errors.New("Closed explicitly"), false)
 }
 
-func (socket *MongoSocket) kill(err error, abend bool) {
+func (socket *MerizoSocket) kill(err error, abend bool) {
 	socket.Lock()
 	if socket.dead != nil {
 		debugf("Socket %p to %s: killed again: %s (previously: %s)", socket, socket.addr, err.Error(), socket.dead.Error())
@@ -483,7 +483,7 @@ func (socket *MongoSocket) kill(err error, abend bool) {
 	}
 }
 
-func (socket *MongoSocket) SimpleQuery(op *QueryOp) (data []byte, replyOp *ReplyOp, err error) {
+func (socket *MerizoSocket) SimpleQuery(op *QueryOp) (data []byte, replyOp *ReplyOp, err error) {
 	var wait, change sync.Mutex
 	var replyDone bool
 	var replyData []byte
@@ -516,7 +516,7 @@ func (socket *MongoSocket) SimpleQuery(op *QueryOp) (data []byte, replyOp *Reply
 	return data, replyOp, err
 }
 
-func (socket *MongoSocket) Query(ops ...interface{}) (err error) {
+func (socket *MerizoSocket) Query(ops ...interface{}) (err error) {
 	if lops := socket.flushLogout(); len(lops) > 0 {
 		ops = append(lops, ops...)
 	}
@@ -756,7 +756,7 @@ func (socket *MongoSocket) Query(ops ...interface{}) (err error) {
 
 // Estimated minimum cost per socket: 1 goroutine + memory for the largest
 // document ever seen.
-func (socket *MongoSocket) readLoop() {
+func (socket *MerizoSocket) readLoop() {
 	headerBuf := make([]byte, 16) // 16 from header
 	bodyBuf := make([]byte, 20)   // 20 from OP_REPLY fixed fields or other general uses
 	for {

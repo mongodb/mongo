@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -343,7 +343,7 @@ bool BalancerSettingsType::isTimeInBalancingWindow(const boost::posix_time::ptim
             return true;
         }
     } else {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     return false;

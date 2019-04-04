@@ -21,7 +21,7 @@ DBCollection.prototype.verify = function() {
     assert.eq(this._fullName, this._db._name + "." + this._shortName, "name mismatch");
 
     assert(this._merizo, "no merizo in DBCollection");
-    assert(this.getMongo(), "no merizo from getMongo()");
+    assert(this.getMerizo(), "no merizo from getMerizo()");
 };
 
 DBCollection.prototype.getName = function() {
@@ -151,8 +151,8 @@ DBCollection.prototype.help = function() {
 DBCollection.prototype.getFullName = function() {
     return this._fullName;
 };
-DBCollection.prototype.getMongo = function() {
-    return this._db.getMongo();
+DBCollection.prototype.getMerizo = function() {
+    return this._db.getMerizo();
 };
 DBCollection.prototype.getDB = function() {
     return this._db;
@@ -301,7 +301,7 @@ DBCollection.prototype.insert = function(obj, options) {
     var startTime =
         (typeof(_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
-    if (this.getMongo().writeMode() != "legacy") {
+    if (this.getMerizo().writeMode() != "legacy") {
         // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
         var bulk = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
         var isMultiInsert = Array.isArray(obj);
@@ -337,7 +337,7 @@ DBCollection.prototype.insert = function(obj, options) {
             }
         }
 
-        this.getMongo().insert(this._fullName, obj, flags);
+        this.getMerizo().insert(this._fullName, obj, flags);
 
         // enforce write concern, if required
         if (wc)
@@ -392,7 +392,7 @@ DBCollection.prototype.remove = function(t, justOne) {
     var startTime =
         (typeof(_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
-    if (this.getMongo().writeMode() != "legacy") {
+    if (this.getMerizo().writeMode() != "legacy") {
         var bulk = this.initializeOrderedBulkOp();
         var removeOp = bulk.find(query);
 
@@ -423,7 +423,7 @@ DBCollection.prototype.remove = function(t, justOne) {
             throw new Error("collation requires use of write commands");
         }
 
-        this.getMongo().remove(this._fullName, query, justOne);
+        this.getMerizo().remove(this._fullName, query, justOne);
 
         // enforce write concern, if required
         if (wc)
@@ -500,7 +500,7 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
     var startTime =
         (typeof(_verboseShell) === 'undefined' || !_verboseShell) ? 0 : new Date().getTime();
 
-    if (this.getMongo().writeMode() != "legacy") {
+    if (this.getMerizo().writeMode() != "legacy") {
         var bulk = this.initializeOrderedBulkOp();
         var updateOp = bulk.find(query);
 
@@ -543,7 +543,7 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
             throw new Error("arrayFilters requires use of write commands");
         }
 
-        this.getMongo().update(this._fullName, query, obj, upsert, multi);
+        this.getMerizo().update(this._fullName, query, obj, upsert, multi);
 
         // Enforce write concern, if required
         if (wc) {
@@ -652,7 +652,7 @@ DBCollection.prototype.createIndexes = function(keys, options, commitQuorum) {
 DBCollection.prototype.ensureIndex = function(keys, options) {
     var result = this.createIndex(keys, options);
 
-    if (this.getMongo().writeMode() != "legacy") {
+    if (this.getMerizo().writeMode() != "legacy") {
         return result;
     }
 
@@ -700,8 +700,8 @@ DBCollection.prototype.findAndModify = function(args) {
     {
         const kWireVersionSupportingRetryableWrites = 6;
         const serverSupportsRetryableWrites =
-            this.getMongo().getMinWireVersion() <= kWireVersionSupportingRetryableWrites &&
-            kWireVersionSupportingRetryableWrites <= this.getMongo().getMaxWireVersion();
+            this.getMerizo().getMinWireVersion() <= kWireVersionSupportingRetryableWrites &&
+            kWireVersionSupportingRetryableWrites <= this.getMerizo().getMaxWireVersion();
 
         const session = this.getDB().getSession();
         if (serverSupportsRetryableWrites && session.getOptions().shouldRetryWrites() &&
@@ -1101,7 +1101,7 @@ merizo <merizos>
 Loading custom sharding extensions...
 true
 
-> var collection = db.getMongo().getCollection("foo.bar")
+> var collection = db.getMerizo().getCollection("foo.bar")
 > collection.getShardDistribution() // prints statistics related to the collection's data
 distribution
 
@@ -1198,7 +1198,7 @@ DBCollection.prototype.getSplitKeysForChunks = function(chunkSize) {
         var shardDoc = shardDocs[i];
         var shard = shardDoc._id;
         var host = shardDoc.host;
-        var sconn = new Mongo(host);
+        var sconn = new Merizo(host);
 
         var chunks = config.chunks.find({_id: sh._collRE(this), shard: shard}).toArray();
 
@@ -1489,7 +1489,7 @@ DBCollection.prototype.watch = function(pipeline, options) {
     pipeline = pipeline || [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
     let changeStreamStage;
-    [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
+    [changeStreamStage, aggOptions] = this.getMerizo()._extractChangeStreamOptions(options);
     pipeline.unshift(changeStreamStage);
     return this.aggregate(pipeline, aggOptions);
 };

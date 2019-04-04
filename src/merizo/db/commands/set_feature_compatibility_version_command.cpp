@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -65,10 +65,10 @@ namespace merizo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
-MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
-MONGO_FAIL_POINT_DEFINE(pauseBeforeUpgradingSessions);
-MONGO_FAIL_POINT_DEFINE(pauseBeforeDowngradingSessions);
+MERIZO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
+MERIZO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
+MERIZO_FAIL_POINT_DEFINE(pauseBeforeUpgradingSessions);
+MERIZO_FAIL_POINT_DEFINE(pauseBeforeDowngradingSessions);
 
 /**
  * Returns a set of the logical session ids of each entry in config.transactions that matches the
@@ -111,7 +111,7 @@ void forEachSessionWithCheckout(
 
         const auto opCtxForCheckout = cc().makeOperationContext();
         opCtxForCheckout->setLogicalSessionId(sessionId);
-        MongoDOperationContextSession ocs(opCtxForCheckout.get());
+        MerizoDOperationContextSession ocs(opCtxForCheckout.get());
 
         // Now that the session is checked out, verify it still needs to be modified using its
         // transaction participant.
@@ -148,9 +148,9 @@ void downgradeTransactionTable(OperationContext* opCtx) {
     LogicalSessionIdSet sessionIdsWithState =
         getMatchingSessionIdsFromTransactionTable(opCtx, query);
 
-    if (MONGO_FAIL_POINT(pauseBeforeDowngradingSessions)) {
+    if (MERIZO_FAIL_POINT(pauseBeforeDowngradingSessions)) {
         LOG(0) << "Hit pauseBeforeDowngradingSessions failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseBeforeDowngradingSessions);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(pauseBeforeDowngradingSessions);
     }
 
     // Remove all transaction table entries associated with a committed / aborted transaction. Note
@@ -186,9 +186,9 @@ void upgradeTransactionTable(OperationContext* opCtx) {
     // query to return all session ids in the transaction table.
     LogicalSessionIdSet allSessionIds = getMatchingSessionIdsFromTransactionTable(opCtx, Query());
 
-    if (MONGO_FAIL_POINT(pauseBeforeUpgradingSessions)) {
+    if (MERIZO_FAIL_POINT(pauseBeforeUpgradingSessions)) {
         LOG(0) << "Hit pauseBeforeUpgradingSessions failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseBeforeUpgradingSessions);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(pauseBeforeUpgradingSessions);
     }
 
     // Add state=committed to the transaction table entry for each session that most recently

@@ -24,7 +24,7 @@ for (var i = 0; i < 10; i++) {
 assert.eq(9, t.find().sort({a: 1}).limit(2147483647).skip(1).itcount());
 assert.eq(0, t.find().sort({a: 1}).skip(2147483647).limit(1).itcount());
 
-if (!db.getMongo().useReadCommands()) {
+if (!db.getMerizo().useReadCommands()) {
     // If we're using OP_QUERY/OP_GET_MORE reads rather than find/getMore command, then the skip and
     // limit fields must fit inside a 32-bit signed integer.
     assert.throws(function() {

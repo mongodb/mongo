@@ -206,7 +206,7 @@ func (f *stdinFile) Close() error {
 }
 
 // getInfoFromFilename pulls the base collection name and FileType from a given file.
-func (restore *MongoRestore) getInfoFromFilename(filename string) (string, FileType) {
+func (restore *MerizoRestore) getInfoFromFilename(filename string) (string, FileType) {
 	baseFileName := filepath.Base(filename)
 	// .bin supported for legacy reasons
 	if strings.HasSuffix(baseFileName, ".bin") {
@@ -238,7 +238,7 @@ func (restore *MongoRestore) getInfoFromFilename(filename string) (string, FileT
 
 // CreateAllIntents drills down into a dump folder, creating intents for all of
 // the databases and collections it finds.
-func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike) error {
+func (restore *MerizoRestore) CreateAllIntents(dir archive.DirLike) error {
 	log.Logvf(log.DebugHigh, "using %v as dump root directory", dir.Path())
 	entries, err := dir.ReadDir()
 	if err != nil {
@@ -302,7 +302,7 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike) error {
 }
 
 // CreateIntentForOplog creates an intent for a file that we want to treat as an oplog.
-func (restore *MongoRestore) CreateIntentForOplog() error {
+func (restore *MerizoRestore) CreateIntentForOplog() error {
 	target, err := newActualPath(restore.InputOptions.OplogFile)
 	db := ""
 	collection := "oplog"
@@ -329,7 +329,7 @@ func (restore *MongoRestore) CreateIntentForOplog() error {
 
 // CreateIntentsForDB drills down into the dir folder, creating intents
 // for all of the collection dump files it finds for the db database.
-func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) (err error) {
+func (restore *MerizoRestore) CreateIntentsForDB(db string, dir archive.DirLike) (err error) {
 	var entries []archive.DirLike
 	log.Logvf(log.DebugHigh, "reading collections for database %v in %v", db, dir.Name())
 	entries, err = dir.ReadDir()
@@ -465,7 +465,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 
 // CreateStdinIntentForCollection builds an intent for the given database and collection name
 // that is to be read from standard input
-func (restore *MongoRestore) CreateStdinIntentForCollection(db string, collection string) error {
+func (restore *MerizoRestore) CreateStdinIntentForCollection(db string, collection string) error {
 	log.Logvf(log.DebugLow, "reading collection %v for database %v from standard input",
 		collection, db)
 	intent := &intents.Intent{
@@ -484,7 +484,7 @@ func (restore *MongoRestore) CreateStdinIntentForCollection(db string, collectio
 //
 // This method is not called by CreateIntentsForDB,
 // it is only used in the case where --db and --collection flags are set.
-func (restore *MongoRestore) CreateIntentForCollection(db string, collection string, dir archive.DirLike) error {
+func (restore *MerizoRestore) CreateIntentForCollection(db string, collection string, dir archive.DirLike) error {
 	log.Logvf(log.DebugLow, "reading collection %v for database %v from %v",
 		collection, db, dir.Path())
 	// first make sure the bson file exists and is valid
@@ -559,7 +559,7 @@ func hasMetadataFiles(files []archive.DirLike) bool {
 //
 // As an example, when the user passes 'dump/mydb/col.bson', this method
 // will infer that 'mydb' is the database and 'col' is the collection name.
-func (restore *MongoRestore) handleBSONInsteadOfDirectory(path string) error {
+func (restore *MerizoRestore) handleBSONInsteadOfDirectory(path string) error {
 	// we know we have been given a non-directory, so we should handle it
 	// like a bson file and infer as much as we can
 	if restore.NSOptions.Collection == "" {

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -96,7 +96,7 @@ AtomicWord<long long> nextUnnamedThreadId{1};
 // therefore after dynamic initialization is complete) to signal that it is safe to use
 // 'threadName'.
 bool merizoInitializersHaveRun{};
-MONGO_INITIALIZER(ThreadNameInitializer)(InitializerContext*) {
+MERIZO_INITIALIZER(ThreadNameInitializer)(InitializerContext*) {
     merizoInitializersHaveRun = true;
     // The global initializers should only ever be run from main, so setting thread name
     // here makes sense.
@@ -134,7 +134,7 @@ void setThreadName(StringData name) {
     if (error) {
         log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
     }
-#elif defined(__linux__) && defined(MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP)
+#elif defined(__linux__) && defined(MERIZO_CONFIG_HAVE_PTHREAD_SETNAME_NP)
     // Do not set thread name on the main() thread. Setting the name on main thread breaks
     // pgrep/pkill since these programs base this name on /proc/*/status which displays the thread
     // name, not the executable name.
@@ -160,7 +160,7 @@ void setThreadName(StringData name) {
 }
 
 StringData getThreadName() {
-    if (MONGO_unlikely(!merizoInitializersHaveRun)) {
+    if (MERIZO_unlikely(!merizoInitializersHaveRun)) {
         // 'getThreadName' has been called before dynamic initialization for this
         // translation unit has completed, so return a fallback value rather than accessing
         // the 'threadName' variable, which requires dynamic initialization. We assume that

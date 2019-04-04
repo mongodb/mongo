@@ -73,7 +73,7 @@ BSONObj CollationSpec::toBSON() const {
             builder.append(CollationSpec::kCaseFirstField, CollationSpec::kCaseFirstOff);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     builder.append(CollationSpec::kStrengthField, static_cast<int>(strength));
@@ -87,7 +87,7 @@ BSONObj CollationSpec::toBSON() const {
             builder.append(CollationSpec::kAlternateField, CollationSpec::kAlternateShifted);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     switch (maxVariable) {
@@ -98,7 +98,7 @@ BSONObj CollationSpec::toBSON() const {
             builder.append(CollationSpec::kMaxVariableField, CollationSpec::kMaxVariableSpace);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     builder.append(CollationSpec::kNormalizationField, normalization);

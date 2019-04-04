@@ -222,7 +222,7 @@ public:
                 return cmp != 0;
         }
 
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**

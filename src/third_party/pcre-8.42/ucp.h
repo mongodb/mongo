@@ -123,7 +123,7 @@ enum {
   ucp_Limbu,
   ucp_Linear_B,
   ucp_Malayalam,
-  ucp_Mongolian,
+  ucp_Merizolian,
   ucp_Myanmar,
   ucp_New_Tai_Lue,
   ucp_Ogham,

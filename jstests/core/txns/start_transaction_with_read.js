@@ -14,7 +14,7 @@
     testDB.runCommand({create: coll.getName(), writeConcern: {w: "majority"}});
 
     const sessionOptions = {causalConsistency: false};
-    const session = testDB.getMongo().startSession(sessionOptions);
+    const session = testDB.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
 

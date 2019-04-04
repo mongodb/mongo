@@ -4,7 +4,7 @@
     const dbName = 'test';
     const collName = 'tailable-cursor-ban';
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb.getCollection(collName);
 

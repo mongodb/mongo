@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -129,20 +129,20 @@ TEST_F(ClusterAggregateTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kAggregateCmdTargeted, kAggregateCmdScatterGather);
 }
 
-TEST_F(ClusterAggregateTest, ShouldFailWhenFromMongosIsTrue) {
-    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}, fromMongos: true}");
+TEST_F(ClusterAggregateTest, ShouldFailWhenFromMerizosIsTrue) {
+    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}, fromMerizos: true}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 
-TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsFalse) {
+TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMerizosIsFalse) {
     const BSONObj inputBson =
-        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMongos: false}");
+        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMerizos: false}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 
-TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsTrue) {
+TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMerizosIsTrue) {
     const BSONObj inputBson =
-        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMongos: true}");
+        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMerizos: true}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 

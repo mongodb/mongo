@@ -35,7 +35,7 @@
 namespace merizo {
 namespace embedded {
 
-MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(EmbeddedOptions)(InitializerContext* context) {
+MERIZO_GENERAL_STARTUP_OPTIONS_REGISTER(EmbeddedOptions)(InitializerContext* context) {
     return addOptions(&optionenvironment::startupOptions);
 }
 

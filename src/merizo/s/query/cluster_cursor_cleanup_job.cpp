@@ -65,7 +65,7 @@ void ClusterCursorCleanupJob::run() {
         manager->incrementCursorsTimedOut(
             manager->killMortalCursorsInactiveSince(opCtx.get(), cutoff));
 
-        MONGO_IDLE_THREAD_BLOCK;
+        MERIZO_IDLE_THREAD_BLOCK;
         sleepsecs(getClientCursorMonitorFrequencySecs());
     }
 }

@@ -35,7 +35,7 @@
     // Run the dropDatabase command and stepdown the primary while it is running.
     const awaitShell = startParallelShell(() => {
         db.dropDatabase();
-    }, testDB.getMongo().port);
+    }, testDB.getMerizo().port);
 
     // Ensure the dropDatabase command has begun before stepping down.
     checkLog.contains(primary,

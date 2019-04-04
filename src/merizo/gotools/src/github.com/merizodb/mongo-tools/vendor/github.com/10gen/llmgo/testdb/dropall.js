@@ -1,7 +1,7 @@
 
 var ports = [40001, 40002, 40011, 40012, 40013, 40021, 40022, 40023, 40041, 40101, 40102, 40103, 40201, 40202, 40203]
 var auth = [40002, 40103, 40203, 40031]
-var db1 = new Mongo("localhost:40001")
+var db1 = new Merizo("localhost:40001")
 
 if (db1.getDB("admin").serverBuildInfo().OpenSSLVersion) {
     ports.push(40003)
@@ -11,7 +11,7 @@ if (db1.getDB("admin").serverBuildInfo().OpenSSLVersion) {
 for (var i in ports) {
     var port = ports[i]
     var server = "localhost:" + port
-    var merizo = new Mongo("localhost:" + port)
+    var merizo = new Merizo("localhost:" + port)
     var admin = merizo.getDB("admin")
 
     for (var j in auth) {

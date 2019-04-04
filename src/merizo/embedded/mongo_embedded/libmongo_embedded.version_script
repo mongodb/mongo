@@ -1,4 +1,4 @@
-MONGO_EMBEDDED_ABI_1.0 {
+MERIZO_EMBEDDED_ABI_1.0 {
     global: merizo_embedded_v1_*;
     local: *;
 };

@@ -102,7 +102,7 @@ ConfigServerTestFixture::ConfigServerTestFixture() = default;
 ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 
 void ConfigServerTestFixture::setUp() {
-    ShardingMongodTestFixture::setUp();
+    ShardingMerizodTestFixture::setUp();
 
     // TODO: SERVER-26919 set the flag on the mock repl coordinator just for the window where it
     // actually needs to bypass the op observer.
@@ -128,7 +128,7 @@ void ConfigServerTestFixture::setUp() {
     CatalogCacheLoader::set(getServiceContext(),
                             stdx::make_unique<ConfigServerCatalogCacheLoader>());
 
-    uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
+    uassertStatusOK(initializeGlobalShardingStateForMerizodForTest(ConnectionString::forLocal()));
 }
 
 void ConfigServerTestFixture::tearDown() {
@@ -140,7 +140,7 @@ void ConfigServerTestFixture::tearDown() {
 
     CatalogCacheLoader::clearForTests(getServiceContext());
 
-    ShardingMongodTestFixture::tearDown();
+    ShardingMerizodTestFixture::tearDown();
 }
 
 std::unique_ptr<DistLockCatalog> ConfigServerTestFixture::makeDistLockCatalog() {

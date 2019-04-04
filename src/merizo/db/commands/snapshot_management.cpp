@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -85,7 +85,7 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdMakeSnapshot);
+MERIZO_REGISTER_TEST_COMMAND(CmdMakeSnapshot);
 
 class CmdSetCommittedSnapshot final : public BasicCommand {
 public:
@@ -127,5 +127,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdSetCommittedSnapshot);
+MERIZO_REGISTER_TEST_COMMAND(CmdSetCommittedSnapshot);
 }

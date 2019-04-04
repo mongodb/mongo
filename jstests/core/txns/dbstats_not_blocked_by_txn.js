@@ -11,11 +11,11 @@
     mydb.foo.drop({writeConcern: {w: "majority"}});
     mydb.createCollection("foo", {writeConcern: {w: "majority"}});
 
-    var session = db.getMongo().startSession();
+    var session = db.getMerizo().startSession();
     var sessionDb = session.getDatabase(dbName);
 
-    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
-    if (isMongos) {
+    const isMerizos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    if (isMerizos) {
         // Before starting the transaction below, access the collection so it can be implicitly
         // sharded and force all shards to refresh their database versions because the refresh
         // requires an exclusive lock and would block behind the transaction.

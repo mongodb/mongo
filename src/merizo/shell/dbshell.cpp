@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -89,16 +89,16 @@ bool inMultiLine = false;
 static AtomicWord<bool> atPrompt(false);  // can eval before getting to prompt
 
 namespace {
-const std::string kDefaultMongoHost = "127.0.0.1"s;
-const std::string kDefaultMongoPort = "27017"s;
-const std::string kDefaultMongoURL = "merizodb://"s + kDefaultMongoHost + ":"s + kDefaultMongoPort;
+const std::string kDefaultMerizoHost = "127.0.0.1"s;
+const std::string kDefaultMerizoPort = "27017"s;
+const std::string kDefaultMerizoURL = "merizodb://"s + kDefaultMerizoHost + ":"s + kDefaultMerizoPort;
 
 // Initialize the featureCompatibilityVersion server parameter since the merizo shell does not have a
 // featureCompatibilityVersion document from which to initialize the parameter. The parameter is set
 // to the latest version because there is no feature gating that currently occurs at the merizo shell
 // level. The server is responsible for rejecting usages of new features if its
 // featureCompatibilityVersion is lower.
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion42, ("EndStartupOptionSetup"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion42, ("EndStartupOptionSetup"))
 (InitializerContext* context) {
     merizo::serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
@@ -159,7 +159,7 @@ enum ShellExitCode : int {
     kDBException = 1,
     kInputFileError = -3,
     kEvalError = -4,
-    kMongorcError = -5,
+    kMerizorcError = -5,
     kUnterminatedProcess = -6,
     kProcessTerminationError = -7,
 };
@@ -280,7 +280,7 @@ std::string getURIFromArgs(const std::string& arg,
                            const std::string& port) {
     if (host.empty() && arg.empty() && port.empty()) {
         // Nothing provided, just play the default.
-        return kDefaultMongoURL;
+        return kDefaultMerizoURL;
     }
 
     if ((str::startsWith(arg, "merizodb://") || str::startsWith(arg, "merizodb+srv://")) &&
@@ -777,9 +777,9 @@ static void edit(const std::string& whatToEdit) {
 }
 
 namespace {
-bool mechanismRequiresPassword(const MongoURI& uri) {
+bool mechanismRequiresPassword(const MerizoURI& uri) {
     if (const auto authMechanisms = uri.getOption("authMechanism")) {
-        constexpr std::array<StringData, 2> passwordlessMechanisms{"GSSAPI"_sd, "MONGODB-X509"_sd};
+        constexpr std::array<StringData, 2> passwordlessMechanisms{"GSSAPI"_sd, "MERIZODB-X509"_sd};
         const std::string& authMechanism = authMechanisms.get();
         for (const auto& mechanism : passwordlessMechanisms) {
             if (mechanism.toString() == authMechanism) {
@@ -842,8 +842,8 @@ int _main(int argc, char* argv[], char** envp) {
     std::string& cmdlineURI = shellGlobalParams.url;
 
     // Parse the output of getURIFromArgs which will determine if --host passed in a URI
-    MongoURI parsedURI;
-    parsedURI = uassertStatusOK(MongoURI::parse(getURIFromArgs(
+    MerizoURI parsedURI;
+    parsedURI = uassertStatusOK(MerizoURI::parse(getURIFromArgs(
         cmdlineURI, escape(shellGlobalParams.dbhost), escape(shellGlobalParams.port))));
 
     // TODO: add in all of the relevant shellGlobalParams to parsedURI
@@ -897,8 +897,8 @@ int _main(int argc, char* argv[], char** envp) {
         if (shellGlobalParams.shouldRetryWrites || parsedURI.getRetryWrites()) {
             // If the --retryWrites cmdline argument or retryWrites URI param was specified, then
             // replace the global `db` object with a DB object started in a session. The resulting
-            // Mongo connection checks its _retryWrites property.
-            ss << "db = db.getMongo().startSession().getDatabase(db.getName());" << std::endl;
+            // Merizo connection checks its _retryWrites property.
+            ss << "db = db.getMerizo().startSession().getDatabase(db.getName());" << std::endl;
         }
 
         merizo::shell_utils::dbConnect += ss.str();
@@ -939,7 +939,7 @@ int _main(int argc, char* argv[], char** envp) {
     }
 
     if (!shellGlobalParams.script.empty()) {
-        merizo::shell_utils::MongoProgramScope s;
+        merizo::shell_utils::MerizoProgramScope s;
         if (!scope->exec(shellGlobalParams.script, "(shell eval)", false, true, false)) {
             error() << "exiting with code " << static_cast<int>(kEvalError);
             return kEvalError;
@@ -948,7 +948,7 @@ int _main(int argc, char* argv[], char** envp) {
     }
 
     for (size_t i = 0; i < shellGlobalParams.files.size(); ++i) {
-        merizo::shell_utils::MongoProgramScope s;
+        merizo::shell_utils::MerizoProgramScope s;
 
         if (shellGlobalParams.files.size() > 1)
             std::cout << "loading file: " << shellGlobalParams.files[i] << std::endl;
@@ -960,7 +960,7 @@ int _main(int argc, char* argv[], char** envp) {
         }
 
         // Check if the process left any running child processes.
-        std::vector<ProcessId> pids = merizo::shell_utils::getRunningMongoChildProcessIds();
+        std::vector<ProcessId> pids = merizo::shell_utils::getRunningMerizoChildProcessIds();
 
         if (!pids.empty()) {
             std::cout << "terminating the following processes started by "
@@ -968,7 +968,7 @@ int _main(int argc, char* argv[], char** envp) {
             std::copy(pids.begin(), pids.end(), std::ostream_iterator<ProcessId>(std::cout, " "));
             std::cout << std::endl;
 
-            if (merizo::shell_utils::KillMongoProgramInstances() != EXIT_SUCCESS) {
+            if (merizo::shell_utils::KillMerizoProgramInstances() != EXIT_SUCCESS) {
                 severe() << "one more more child processes exited with an error during "
                          << shellGlobalParams.files[i];
                 error() << "exiting with code " << static_cast<int>(kProcessTerminationError);
@@ -985,7 +985,7 @@ int _main(int argc, char* argv[], char** envp) {
 
             if (failIfUnterminatedProcesses) {
                 severe() << "exiting with a failure due to unterminated processes, "
-                            "a call to MongoRunner.stopMongod(), ReplSetTest#stopSet(), or "
+                            "a call to MerizoRunner.stopMerizod(), ReplSetTest#stopSet(), or "
                             "ShardingTest#stop() may be missing from the test";
                 error() << "exiting with code " << static_cast<int>(kUnterminatedProcess);
                 return kUnterminatedProcess;
@@ -998,9 +998,9 @@ int _main(int argc, char* argv[], char** envp) {
 
     bool lastLineSuccessful = true;
     if (shellGlobalParams.runShell) {
-        merizo::shell_utils::MongoProgramScope s;
+        merizo::shell_utils::MerizoProgramScope s;
         // If they specify norc, assume it's not their first time
-        bool hasMongoRC = shellGlobalParams.norc;
+        bool hasMerizoRC = shellGlobalParams.norc;
         std::string rcLocation;
         if (!shellGlobalParams.norc) {
 #ifndef _WIN32
@@ -1013,17 +1013,17 @@ int _main(int argc, char* argv[], char** envp) {
                                            << "\\.merizorc.js";
 #endif
             if (!rcLocation.empty() && ::merizo::shell_utils::fileExists(rcLocation)) {
-                hasMongoRC = true;
+                hasMerizoRC = true;
                 if (!scope->execFile(rcLocation, false, true)) {
                     severe() << "The \".merizorc.js\" file located in your home folder could not be "
                                 "executed";
-                    error() << "exiting with code " << static_cast<int>(kMongorcError);
-                    return kMongorcError;
+                    error() << "exiting with code " << static_cast<int>(kMerizorcError);
+                    return kMerizorcError;
                 }
             }
         }
 
-        if (!hasMongoRC && isatty(fileno(stdin))) {
+        if (!hasMerizoRC && isatty(fileno(stdin))) {
             std::cout
                 << "Welcome to the MerizoDB shell.\n"
                    "For interactive help, type \"help\".\n"

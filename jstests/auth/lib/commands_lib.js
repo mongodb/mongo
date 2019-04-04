@@ -6003,7 +6003,7 @@ var authCommandsLib = {
      * Returns true if conn is a connection to merizos,
      * and false otherwise.
      */
-    isMongos: function(conn) {
+    isMerizos: function(conn) {
         var res = conn.getDB("admin").runCommand({isdbgrid: 1});
         return (res.ok == 1 && res.isdbgrid == 1);
     },
@@ -6027,11 +6027,11 @@ var authCommandsLib = {
             return [];
         }
         // some tests shouldn't run in a sharded environment
-        if (t.skipSharded && this.isMongos(conn)) {
+        if (t.skipSharded && this.isMerizos(conn)) {
             return [];
         }
         // others shouldn't run in a standalone environment
-        if (t.skipUnlessSharded && !this.isMongos(conn)) {
+        if (t.skipUnlessSharded && !this.isMerizos(conn)) {
             return [];
         }
         // some tests require replica sets to be enabled.

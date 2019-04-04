@@ -31,7 +31,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
             throw Error("Unrecognized TLS implementation!");
         }
 
-        var md = MongoRunner.runMongod({
+        var md = MerizoRunner.runMerizod({
             sslMode: "requireSSL",
             sslCAFile: "jstests/libs/ca.pem",
             sslPEMKeyFile: "jstests/libs/server.pem",
@@ -42,18 +42,18 @@ load('jstests/ssl/libs/ssl_helpers.js');
         let merizoOutput;
 
         assert.soon(function() {
-            clearRawMongoProgramOutput();
-            shell = runMongoProgram("merizo",
+            clearRawMerizoProgramOutput();
+            shell = runMerizoProgram("merizo",
                                     "--port",
                                     md.port,
                                     ...clientOptions,
                                     "--sslDisabledProtocols",
                                     clientDisabledProtos);
-            merizoOutput = rawMongoProgramOutput();
+            merizoOutput = rawMerizoProgramOutput();
             return merizoOutput.match(expectedRegex);
-        }, "Mongo shell output was as follows:\n" + merizoOutput + "\n************");
+        }, "Merizo shell output was as follows:\n" + merizoOutput + "\n************");
 
-        MongoRunner.stopMongod(md);
+        MerizoRunner.stopMerizod(md);
     }
 
     // Client recieves and reports a protocol version alert if it advertises a protocol older than

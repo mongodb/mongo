@@ -95,7 +95,7 @@ static void Init() {
   InitLookupCell(0, 0, 0, kSwapMask|kInvertMask, 0, kSwapMask|kInvertMask);
 }
 
-MONGO_INITIALIZER(S2CellIdInit)(merizo::InitializerContext *context) {
+MERIZO_INITIALIZER(S2CellIdInit)(merizo::InitializerContext *context) {
     Init();
     return merizo::Status::OK();
 }

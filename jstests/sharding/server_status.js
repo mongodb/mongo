@@ -20,7 +20,7 @@
         assert.neq(shardingSection, null);
 
         var configConnStr = shardingSection.configsvrConnectionString;
-        var configConn = new Mongo(configConnStr);
+        var configConn = new Merizo(configConnStr);
         var configIsMaster = configConn.getDB('admin').runCommand({isMaster: 1});
 
         var configOpTimeObj = shardingSection.lastSeenConfigServerOpTime;

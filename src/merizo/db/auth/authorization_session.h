@@ -71,7 +71,7 @@ class AuthorizationSession {
     AuthorizationSession& operator=(const AuthorizationSession&) = delete;
 
 public:
-    static MONGO_DECLARE_SHIM(
+    static MERIZO_DECLARE_SHIM(
         (AuthorizationManager * authzManager)->std::unique_ptr<AuthorizationSession>) create;
 
     AuthorizationSession() = default;
@@ -226,19 +226,19 @@ public:
     // status if it is unable to parse the pipeline.
     virtual StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString& ns,
                                                                   const BSONObj& cmdObj,
-                                                                  bool isMongos) = 0;
+                                                                  bool isMerizos) = 0;
 
     // Checks if this connection has the privileges necessary to create 'ns' with the options
     // supplied in 'cmdObj' either directly on merizoD or via merizoS.
     virtual Status checkAuthForCreate(const NamespaceString& ns,
                                       const BSONObj& cmdObj,
-                                      bool isMongos) = 0;
+                                      bool isMerizos) = 0;
 
     // Checks if this connection has the privileges necessary to modify 'ns' with the options
     // supplied in 'cmdObj' either directly on merizoD or via merizoS.
     virtual Status checkAuthForCollMod(const NamespaceString& ns,
                                        const BSONObj& cmdObj,
-                                       bool isMongos) = 0;
+                                       bool isMerizos) = 0;
 
     // Checks if this connection has the privileges necessary to grant the given privilege
     // to a role.

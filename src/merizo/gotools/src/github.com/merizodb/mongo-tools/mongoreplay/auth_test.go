@@ -18,7 +18,7 @@ import (
 // database that requires authentication when the driver has proper
 // authentication credentials
 func TestCommandsAgainstAuthedDBWhenAuthed(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if !authTestServerMode {
 		t.Skipf("Skipping auth test with non-auth DB")
 	}
@@ -92,7 +92,7 @@ func TestCommandsAgainstAuthedDBWhenAuthed(t *testing.T) {
 // authentication. It generates a series of inserts and ensures that the docs
 // they are attempting to insert are not later found in the database
 func TestCommandsAgainstAuthedDBWhenNotAuthed(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if !authTestServerMode {
 		t.Skipf("Skipping auth test with non-auth DB")
 	}

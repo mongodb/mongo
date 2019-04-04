@@ -26,7 +26,7 @@ executor:
   - class: CleanEveryN
     n: 20
   fixture:
-    class: MongoDFixture
+    class: MerizoDFixture
     merizod_options:
       enableEncryption: ''
       encryptionKeyFile: *keyFile

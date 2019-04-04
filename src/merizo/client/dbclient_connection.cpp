@@ -28,10 +28,10 @@
  */
 
 /**
- * Connect to a Mongo database as a database, from C++.
+ * Connect to a Merizo database as a database, from C++.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -111,7 +111,7 @@ private:
 */
 executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
                                                 StringData applicationName,
-                                                const MongoURI& uri,
+                                                const MerizoURI& uri,
                                                 std::vector<std::string>* saslMechsForAuth) {
     try {
         // We need to force the usage of OP_QUERY on this command, even if we have previously
@@ -260,11 +260,11 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
         auto msgFieldExtractStatus = bsonExtractStringField(swIsMasterReply.data, "msg", &msgField);
 
         if (msgFieldExtractStatus == ErrorCodes::NoSuchKey) {
-            _isMongos = false;
+            _isMerizos = false;
         } else if (!msgFieldExtractStatus.isOK()) {
             return msgFieldExtractStatus;
         } else {
-            _isMongos = (msgField == "isdbgrid");
+            _isMerizos = (msgField == "isdbgrid");
         }
     }
 
@@ -561,7 +561,7 @@ unsigned long long DBClientConnection::query(stdx::function<void(DBClientCursorB
 
 DBClientConnection::DBClientConnection(bool _autoReconnect,
                                        double so_timeout,
-                                       MongoURI uri,
+                                       MerizoURI uri,
                                        const HandshakeValidationHook& hook)
     : autoReconnect(_autoReconnect),
       _autoReconnectBackoff(Seconds(1), Seconds(2)),

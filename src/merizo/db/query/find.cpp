@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -74,10 +74,10 @@ using std::unique_ptr;
 using stdx::make_unique;
 
 // Failpoint for checking whether we've received a getmore.
-MONGO_FAIL_POINT_DEFINE(failReceivedGetmore);
+MERIZO_FAIL_POINT_DEFINE(failReceivedGetmore);
 
 // Failpoint to keep a cursor pinned.
-MONGO_FAIL_POINT_DEFINE(legacyGetMoreWaitWithCursor)
+MERIZO_FAIL_POINT_DEFINE(legacyGetMoreWaitWithCursor)
 
 bool shouldSaveCursor(OperationContext* opCtx,
                       const Collection* collection,
@@ -211,7 +211,7 @@ void generateBatch(int ntoreturn,
             return;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Message makeCursorNotFoundResponse() {
@@ -247,8 +247,8 @@ Message getMore(OperationContext* opCtx,
     curOp.ensureStarted();
 
     // For testing, we may want to fail if we receive a getmore.
-    if (MONGO_FAIL_POINT(failReceivedGetmore)) {
-        MONGO_UNREACHABLE;
+    if (MERIZO_FAIL_POINT(failReceivedGetmore)) {
+        MERIZO_UNREACHABLE;
     }
 
     *exhaust = false;
@@ -369,7 +369,7 @@ Message getMore(OperationContext* opCtx,
     // repeatedly release and re-acquire the collection readLock at regular intervals until
     // the failpoint is released. This is done in order to avoid deadlocks caused by the
     // pinned-cursor failpoints in this file (see SERVER-21997).
-    MONGO_FAIL_POINT_BLOCK(waitAfterPinningCursorBeforeGetMoreBatch, options) {
+    MERIZO_FAIL_POINT_BLOCK(waitAfterPinningCursorBeforeGetMoreBatch, options) {
         const BSONObj& data = options.getData();
         if (data["shouldNotdropLock"].booleanSafe()) {
             dropAndReaquireReadLock = []() {};
@@ -452,7 +452,7 @@ Message getMore(OperationContext* opCtx,
     // accumulate over the course of a cursor's lifetime.
     PlanSummaryStats preExecutionStats;
     Explain::getSummaryStats(*exec, &preExecutionStats);
-    if (MONGO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
+    if (MERIZO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitWithPinnedCursorDuringGetMoreBatch,
                                                          opCtx,
                                                          "waitWithPinnedCursorDuringGetMoreBatch",
@@ -541,7 +541,7 @@ Message getMore(OperationContext* opCtx,
     // If the 'waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch' failpoint is active, we
     // set the 'msg' field of this operation's CurOp to signal that we've hit this point and
     // then spin until the failpoint is released.
-    if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
+    if (MERIZO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
             opCtx,
@@ -700,7 +700,7 @@ std::string runQuery(OperationContext* opCtx,
                 << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
         uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(obj),
                                    "Executor error during OP_QUERY find");
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     // Before saving the cursor, ensure that whatever plan we established happened with the expected

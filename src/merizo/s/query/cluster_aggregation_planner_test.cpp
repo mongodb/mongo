@@ -58,7 +58,7 @@ const NamespaceString kTestOutNss = NamespaceString{"unittests", "out_ns"};
  * setup. For example, to compute its constraints, the $out stage needs to know if the output
  * collection is sharded.
  */
-class FakeMongoProcessInterface : public StubMongoProcessInterface {
+class FakeMerizoProcessInterface : public StubMerizoProcessInterface {
 public:
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
         return true;
@@ -71,8 +71,8 @@ public:
         CatalogCacheTestFixture::setUp();
         _expCtx = new ExpressionContextForTest(operationContext(),
                                                AggregationRequest{kTestAggregateNss, {}});
-        _expCtx->merizoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
-        _expCtx->inMongos = true;
+        _expCtx->merizoProcessInterface = std::make_shared<FakeMerizoProcessInterface>();
+        _expCtx->inMerizos = true;
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx() {
@@ -139,9 +139,9 @@ TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineEndsWithReplaceCollection
 
     // For this test pretend 'kTestOutNss' is not sharded so that we can use a "replaceCollection"
     // $out.
-    const auto originalMongoProcessInterface = expCtx()->merizoProcessInterface;
-    expCtx()->merizoProcessInterface = std::make_shared<StubMongoProcessInterface>();
-    ON_BLOCK_EXIT([&]() { expCtx()->merizoProcessInterface = originalMongoProcessInterface; });
+    const auto originalMerizoProcessInterface = expCtx()->merizoProcessInterface;
+    expCtx()->merizoProcessInterface = std::make_shared<StubMerizoProcessInterface>();
+    ON_BLOCK_EXIT([&]() { expCtx()->merizoProcessInterface = originalMerizoProcessInterface; });
 
     auto mergePipe = unittest::assertGet(Pipeline::create(
         {DocumentSourceOut::create(kTestOutNss, expCtx(), WriteModeEnum::kModeReplaceCollection)},

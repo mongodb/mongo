@@ -111,7 +111,7 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-class DropDatabaseTest : public ServiceContextMongoDTest {
+class DropDatabaseTest : public ServiceContextMerizoDTest {
 public:
     static ServiceContext::UniqueOperationContext makeOpCtx();
 
@@ -133,7 +133,7 @@ ServiceContext::UniqueOperationContext DropDatabaseTest::makeOpCtx() {
 
 void DropDatabaseTest::setUp() {
     // Set up merizod.
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
@@ -173,7 +173,7 @@ void DropDatabaseTest::tearDown() {
     repl::DropPendingCollectionReaper::set(service, {});
     repl::StorageInterface::set(service, {});
 
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 /**

@@ -37,7 +37,7 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-      eval: jsTest.authenticate(db.getMongo())
+      eval: jsTest.authenticate(db.getMerizo())
       <<: *authOptions
       readMode: commands
   hooks:
@@ -47,12 +47,12 @@ executor:
         TestData:
           <<: *TestData
           skipValidationOnNamespaceNotFound: false
-      eval: jsTest.authenticate(db.getMongo())
+      eval: jsTest.authenticate(db.getMerizo())
       <<: *authOptions
   - class: CleanEveryN
     n: 20
   fixture:
-    class: MongoDFixture
+    class: MerizoDFixture
     merizod_options:
       auth: ''
       keyFile: *keyFile

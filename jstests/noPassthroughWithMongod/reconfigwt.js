@@ -9,7 +9,7 @@ var ss = db.serverStatus();
 if (ss.storageEngine.name !== "wiredTiger") {
     print("Skipping reconfigwt.js since this server does not have WiredTiger enabled");
 } else {
-    var conn = MongoRunner.runMongod();
+    var conn = MerizoRunner.runMerizod();
 
     var admin = conn.getDB("admin");
 
@@ -45,5 +45,5 @@ if (ss.storageEngine.name !== "wiredTiger") {
         admin.adminCommand({getParameter: 1,
                             "wiredTigerEngineRuntimeConfig": 1})["wiredTigerEngineRuntimeConfig"]);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }

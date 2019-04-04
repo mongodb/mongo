@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
-#undef MONGO_PCH_WHITELISTED  // needed for log.h
+#undef MERIZO_PCH_WHITELISTED  // needed for log.h
 
 #include "merizo/util/progress_meter.h"
 

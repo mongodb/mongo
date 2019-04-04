@@ -36,7 +36,7 @@ expected = {
     "3": 2,
     "4": 1
 };
-outDb = db.getMongo().getDB(outDbStr);
+outDb = db.getMerizo().getDB(outDbStr);
 outColl = outDb[outCollStr];
 str = tos(outColl.convertToSingleObject("value"));
 print("Received result: " + str);

@@ -38,9 +38,9 @@
 #include "merizo/base/status.h"
 #include "merizo/platform/compiler.h"
 
-#define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#define MERIZO_INCLUDE_INVARIANT_H_WHITELISTED
 #include "merizo/util/invariant.h"
-#undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#undef MERIZO_INCLUDE_INVARIANT_H_WHITELISTED
 
 
 namespace merizo {
@@ -85,9 +85,9 @@ using StatusOrStatusWith = std::conditional_t<std::is_void<T>::value, Status, St
  * }
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS StatusWith {
+class MERIZO_WARN_UNUSED_RESULT_CLASS StatusWith {
 private:
-    MONGO_STATIC_ASSERT_MSG(!isStatusOrStatusWith<T>,
+    MERIZO_STATIC_ASSERT_MSG(!isStatusOrStatusWith<T>,
                             "StatusWith<Status> and StatusWith<StatusWith<T>> are banned.");
     // `TagTypeBase` is used as a base for the `TagType` type, to prevent it from being an
     // aggregate.
@@ -108,20 +108,20 @@ public:
     /**
      * for the error case
      */
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, StringData reason)
+    MERIZO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, StringData reason)
         : _status(code, reason) {}
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, std::string reason)
+    MERIZO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, std::string reason)
         : _status(code, std::move(reason)) {}
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, const char* reason)
+    MERIZO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, const char* reason)
         : _status(code, reason) {}
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code,
+    MERIZO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code,
                                             const merizoutils::str::stream& reason)
         : _status(code, reason) {}
 
     /**
      * for the error case
      */
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(Status status) : _status(std::move(status)) {
+    MERIZO_COMPILER_COLD_FUNCTION StatusWith(Status status) : _status(std::move(status)) {
         dassert(!isOK());
     }
 

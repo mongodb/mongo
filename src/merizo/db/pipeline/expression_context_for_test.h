@@ -51,7 +51,7 @@ public:
 
     ExpressionContextForTest(NamespaceString nss)
         : ExpressionContext(
-              std::move(nss), std::make_shared<StubMongoProcessInterface>(), kNullTimeZoneDatabase),
+              std::move(nss), std::make_shared<StubMerizoProcessInterface>(), kNullTimeZoneDatabase),
           _testOpCtx(_serviceContext.makeOperationContext()) {
         TimeZoneDatabase::set(_serviceContext.getServiceContext(),
                               stdx::make_unique<TimeZoneDatabase>());
@@ -66,7 +66,7 @@ public:
 
     ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
         : ExpressionContext(
-              opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}, {}) {}
+              opCtx, request, nullptr, std::make_shared<StubMerizoProcessInterface>(), {}, {}) {}
 
     /**
      * Sets the resolved definition for an involved namespace.

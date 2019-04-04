@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -52,7 +52,7 @@ namespace {
 const char kCollectionOplogBufferName[] = "collection";
 const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
 
-MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
+MERIZO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
     if ((initialSyncOplogBuffer != kCollectionOplogBufferName) &&
         (initialSyncOplogBuffer != kBlockingQueueOplogBufferName)) {
         return Status(ErrorCodes::BadValue,

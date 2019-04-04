@@ -11,7 +11,7 @@
         return;
     }
 
-    const standalone = MongoRunner.runMongod();
+    const standalone = MerizoRunner.runMerizod();
     const testDB = standalone.getDB("test");
 
     // Commands sent to standalone nodes are not allowed to have transaction numbers.
@@ -21,5 +21,5 @@
         ErrorCodes.IllegalOperation,
         "expected command with transaction number to fail on standalone merizod");
 
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 }());

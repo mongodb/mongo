@@ -29,7 +29,7 @@
 
 #include "merizo/config.h"
 
-#if defined(MONGO_CONFIG_HAVE_MEMSET_S)
+#if defined(MERIZO_CONFIG_HAVE_MEMSET_S)
 #define __STDC_WANT_LIB_EXT1__ 1
 #endif
 
@@ -50,7 +50,7 @@ void secureZeroMemory(void* mem, size_t size) {
 #if defined(_WIN32)
     // Windows provides a simple function for zeroing memory
     SecureZeroMemory(mem, size);
-#elif defined(MONGO_CONFIG_HAVE_MEMSET_S)
+#elif defined(MERIZO_CONFIG_HAVE_MEMSET_S)
     // Some C11 libraries provide a variant of memset which is guaranteed to not be optimized away
     fassert(28752, memset_s(mem, size, 0, size) == 0);
 #else

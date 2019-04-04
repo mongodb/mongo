@@ -97,7 +97,7 @@
 
     // --- not sharded ----
 
-    var m = new Mongo(s.s.name);
+    var m = new Merizo(s.s.name);
     var ts = m.getDB("test").foo;
 
     var before = rs.getPrimary().adminCommand("serverStatus").opcounters;
@@ -172,7 +172,7 @@
 
     // by non-shard key
 
-    m = new Mongo(s.s.name);
+    m = new Merizo(s.s.name);
     ts = m.getDB("test").foo;
 
     before = rs.getPrimary().adminCommand("serverStatus").opcounters;
@@ -192,7 +192,7 @@
 
     // by shard key
 
-    m = new Mongo(s.s.name);
+    m = new Merizo(s.s.name);
     m.forceWriteMode("commands");
 
     s.printShardingStatus();
@@ -237,14 +237,14 @@
     assert.writeOK(ts.remove({primaryOnly: true, x: 60}, {writeConcern: {w: 3}}));
 
     for (var i = 0; i < 10; i++) {
-        m = new Mongo(s.s.name);
+        m = new Merizo(s.s.name);
         m.setSlaveOk();
         ts = m.getDB("test").foo;
         assert.eq(100, ts.find().batchSize(5).itcount(), "F2." + i);
     }
 
     for (var i = 0; i < 10; i++) {
-        m = new Mongo(s.s.name);
+        m = new Merizo(s.s.name);
         ts = m.getDB("test").foo;
         assert.eq(100, ts.find().batchSize(5).itcount(), "F3." + i);
     }

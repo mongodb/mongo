@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -101,7 +101,7 @@ using std::stringstream;
 using std::unique_ptr;
 
 // Failpoint for making filemd5 hang.
-MONGO_FAIL_POINT_DEFINE(waitInFilemd5DuringManualYield);
+MERIZO_FAIL_POINT_DEFINE(waitInFilemd5DuringManualYield);
 
 namespace {
 

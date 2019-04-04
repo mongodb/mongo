@@ -276,7 +276,7 @@ class _EnumTypeString(EnumTypeInfoBase):
                         indented_writer.write_line(
                             'return %s;' % (_get_constant_enum_name(self._enum, enum_value)))
 
-                indented_writer.write_line('MONGO_UNREACHABLE;')
+                indented_writer.write_line('MERIZO_UNREACHABLE;')
                 indented_writer.write_line('return StringData();')
 
 

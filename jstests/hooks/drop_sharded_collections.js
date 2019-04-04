@@ -5,10 +5,10 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/fixture_helpers.js");  // For isMongos.
+    load("jstests/libs/fixture_helpers.js");  // For isMerizos.
 
     assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a merizod?');
-    assert(FixtureHelpers.isMongos(db), "not connected to merizos");
+    assert(FixtureHelpers.isMerizos(db), "not connected to merizos");
 
     let balSettingResult = assert.commandWorked(db.adminCommand({balancerStatus: 1}));
     if (balSettingResult.mode !== 'off') {

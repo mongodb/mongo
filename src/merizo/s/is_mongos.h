@@ -34,12 +34,12 @@ namespace merizo {
 /**
  * Returns true when the running process is `merizos` and false otherwise.
  */
-bool isMongos();
+bool isMerizos();
 
 /**
  * Set the global state flag indicating whether the running process is `merizos` or not.
  */
-void setMongos(const bool state = true);
+void setMerizos(const bool state = true);
 
 /**
  * Returns whether this node is config server or a shard.

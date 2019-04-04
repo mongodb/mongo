@@ -133,14 +133,14 @@
     };
 
     // Use write commands
-    coll.getMongo().useWriteCommands = function() {
+    coll.getMerizo().useWriteCommands = function() {
         return true;
     };
     executeTests();
 
     // FAILING currently due to incorrect batch api reading of GLE
     // Use legacy opcodes
-    coll.getMongo().useWriteCommands = function() {
+    coll.getMerizo().useWriteCommands = function() {
         return false;
     };
     executeTests();

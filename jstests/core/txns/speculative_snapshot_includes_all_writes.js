@@ -24,7 +24,7 @@
     const sessionOptions = {causalConsistency: false};
 
     function startSessionAndTransaction(readConcernLevel) {
-        let session = db.getMongo().startSession(sessionOptions);
+        let session = db.getMerizo().startSession(sessionOptions);
         jsTestLog("Start a transaction with readConcern " + readConcernLevel.level + ".");
         session.startTransaction({readConcern: readConcernLevel});
         return session;
@@ -61,7 +61,7 @@
     });
 
     checkLog.contains(
-        db.getMongo(),
+        db.getMerizo(),
         "hangAfterCollectionInserts fail point enabled for " + testColl2.getFullName());
 
     jsTest.log("Create a write following the uncommitted write.");

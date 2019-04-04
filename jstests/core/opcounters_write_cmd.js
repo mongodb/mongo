@@ -4,7 +4,7 @@
 // ]
 // Legacy write mode test also available at jstests/gle.
 
-var merizo = new Mongo(db.getMongo().host);
+var merizo = new Merizo(db.getMerizo().host);
 
 var newdb = merizo.getDB(db.toString());
 
@@ -41,7 +41,7 @@ assert.writeOK(res);
 assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
 // Test is not run when in compatibility mode as errors are not counted
-if (t.getMongo().writeMode() != "compatibility") {
+if (t.getMerizo().writeMode() != "compatibility") {
     // Single insert, with error.
     opCounters = newdb.serverStatus().opcounters;
     res = t.insert({_id: 0});

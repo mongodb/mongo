@@ -50,7 +50,7 @@ namespace detail {
 // Floating point numbers -> double
 template <typename T>
 typename stdx::enable_if_t<std::is_floating_point<T>::value, double> upconvert(T t) {
-    MONGO_STATIC_ASSERT(sizeof(double) >= sizeof(T));
+    MERIZO_STATIC_ASSERT(sizeof(double) >= sizeof(T));
     return static_cast<double>(t);
 }
 
@@ -58,7 +58,7 @@ typename stdx::enable_if_t<std::is_floating_point<T>::value, double> upconvert(T
 template <typename T>
 typename stdx::enable_if_t<std::is_integral<T>::value && std::is_signed<T>::value, int64_t>
 upconvert(T t) {
-    MONGO_STATIC_ASSERT(sizeof(int64_t) >= sizeof(T));
+    MERIZO_STATIC_ASSERT(sizeof(int64_t) >= sizeof(T));
     return static_cast<int64_t>(t);
 }
 
@@ -66,7 +66,7 @@ upconvert(T t) {
 template <typename T>
 typename stdx::enable_if_t<std::is_integral<T>::value && !std::is_signed<T>::value, uint64_t>
 upconvert(T t) {
-    MONGO_STATIC_ASSERT(sizeof(uint64_t) >= sizeof(T));
+    MERIZO_STATIC_ASSERT(sizeof(uint64_t) >= sizeof(T));
     return static_cast<uint64_t>(t);
 }
 

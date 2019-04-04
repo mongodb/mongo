@@ -100,5 +100,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(CmdHashElt);
+MERIZO_REGISTER_TEST_COMMAND(CmdHashElt);
 }

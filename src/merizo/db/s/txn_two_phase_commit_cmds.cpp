@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -44,7 +44,7 @@
 namespace merizo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic);
+MERIZO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic);
 
 class PrepareTransactionCmd : public TypedCommand<PrepareTransactionCmd> {
 public:
@@ -121,7 +121,7 @@ public:
                                         << " participant prepareOpTime: "
                                         << prepareOpTime.toString());
 
-                if (MONGO_FAIL_POINT(
+                if (MERIZO_FAIL_POINT(
                         participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic)) {
                     uasserted(ErrorCodes::HostUnreachable,
                               "returning network error because failpoint is on");
@@ -130,7 +130,7 @@ public:
             }
 
             const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx, {});
-            if (MONGO_FAIL_POINT(
+            if (MERIZO_FAIL_POINT(
                     participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic)) {
                 uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");

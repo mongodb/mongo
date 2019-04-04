@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     const session = conn.startSession();
     const sessionColl = session.getDatabase("test").getCollection("foo");
     const err = assert.throws(() => {
@@ -16,5 +16,5 @@
                     "wrong error message");
 
     session.endSession();
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

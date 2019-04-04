@@ -14,9 +14,9 @@
 
     // We create our own replica set connection because 'rst.nodes' is an array of direct
     // connections to each individual node.
-    var conn = new Mongo(rst.getURL());
+    var conn = new Merizo(rst.getURL());
 
-    // We force a read mode of "compatibility" so that we can test Mongo.prototype.readMode()
+    // We force a read mode of "compatibility" so that we can test Merizo.prototype.readMode()
     // resolves to "commands" independently of the --readMode passed to the merizo shell running this
     // test.
     conn.forceReadMode("compatibility");

@@ -14,7 +14,7 @@ function benchrun_sub_insert(use_write_command) {
         writeCmd: use_write_command,
     }];
 
-    res = benchRun({parallel: 1, seconds: 10, ops: ops, host: db.getMongo().host});
+    res = benchRun({parallel: 1, seconds: 10, ops: ops, host: db.getMerizo().host});
 
     assert.gt(res.insert, 0);
 
@@ -43,7 +43,7 @@ function benchrun_sub_update(use_write_command) {
         assert.writeOK(t.insert({x: i}));
     }
 
-    res = benchRun({parallel: 1, seconds: 10, ops: ops, host: db.getMongo().host});
+    res = benchRun({parallel: 1, seconds: 10, ops: ops, host: db.getMerizo().host});
 
     var field_sum = 0;
     t.find().forEach(function(doc) {
@@ -68,7 +68,7 @@ function benchrun_sub_remove(use_write_command) {
         assert.writeOK(t.insert({x: i}));
     }
 
-    res = benchRun({parallel: 1, seconds: 10, ops: ops, host: db.getMongo().host});
+    res = benchRun({parallel: 1, seconds: 10, ops: ops, host: db.getMerizo().host});
 
     assert.lt(t.count(), 100);
 }

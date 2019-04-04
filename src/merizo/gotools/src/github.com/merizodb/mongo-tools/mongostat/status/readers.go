@@ -152,7 +152,7 @@ func getStorageEngine(stat *ServerStatus) string {
 // merizosProcessRE matches merizos not followed by any slashes before next whitespace
 var merizosProcessRE = regexp.MustCompile(`^.*\bmerizos\b[^\\\/]*(\s.*)?$`)
 
-func IsMongos(stat *ServerStatus) bool {
+func IsMerizos(stat *ServerStatus) bool {
 	return stat.ShardCursorType != nil || merizosProcessRE.MatchString(stat.Process)
 }
 
@@ -258,7 +258,7 @@ func ReadFlushes(_ *ReaderConfig, newStat, oldStat *ServerStatus) string {
 }
 
 func ReadMapped(c *ReaderConfig, newStat, _ *ServerStatus) (val string) {
-	if util.IsTruthy(newStat.Mem.Supported) && IsMongos(newStat) {
+	if util.IsTruthy(newStat.Mem.Supported) && IsMerizos(newStat) {
 		val = formatMegabyteAmount(c.HumanReadable, newStat.Mem.Mapped)
 	}
 	return
@@ -279,7 +279,7 @@ func ReadRes(c *ReaderConfig, newStat, _ *ServerStatus) (val string) {
 }
 
 func ReadNonMapped(c *ReaderConfig, newStat, _ *ServerStatus) (val string) {
-	if util.IsTruthy(newStat.Mem.Supported) && !IsMongos(newStat) {
+	if util.IsTruthy(newStat.Mem.Supported) && !IsMerizos(newStat) {
 		val = formatMegabyteAmount(c.HumanReadable, newStat.Mem.Virtual-newStat.Mem.Mapped)
 	}
 	return
@@ -299,7 +299,7 @@ func ReadFaults(_ *ReaderConfig, newStat, oldStat *ServerStatus) string {
 }
 
 func ReadLRW(_ *ReaderConfig, newStat, oldStat *ServerStatus) (val string) {
-	if !IsMongos(newStat) && newStat.Locks != nil && oldStat.Locks != nil {
+	if !IsMerizos(newStat) && newStat.Locks != nil && oldStat.Locks != nil {
 		global, ok := oldStat.Locks["Global"]
 		if ok && global.AcquireCount != nil {
 			newColl, inNew := newStat.Locks["Collection"]
@@ -319,7 +319,7 @@ func ReadLRW(_ *ReaderConfig, newStat, oldStat *ServerStatus) (val string) {
 }
 
 func ReadLRWT(_ *ReaderConfig, newStat, oldStat *ServerStatus) (val string) {
-	if !IsMongos(newStat) && newStat.Locks != nil && oldStat.Locks != nil {
+	if !IsMerizos(newStat) && newStat.Locks != nil && oldStat.Locks != nil {
 		global, ok := oldStat.Locks["Global"]
 		if ok && global.AcquireCount != nil {
 			newColl, inNew := newStat.Locks["Collection"]
@@ -339,7 +339,7 @@ func ReadLRWT(_ *ReaderConfig, newStat, oldStat *ServerStatus) (val string) {
 }
 
 func ReadLockedDB(_ *ReaderConfig, newStat, oldStat *ServerStatus) (val string) {
-	if !IsMongos(newStat) && newStat.Locks != nil && oldStat.Locks != nil {
+	if !IsMerizos(newStat) && newStat.Locks != nil && oldStat.Locks != nil {
 		global, ok := oldStat.Locks["Global"]
 		if !ok || global.AcquireCount == nil {
 			prevLocks := parseLocks(oldStat)
@@ -444,7 +444,7 @@ func ReadSet(_ *ReaderConfig, newStat, _ *ServerStatus) (name string) {
 
 func ReadRepl(_ *ReaderConfig, newStat, _ *ServerStatus) string {
 	switch {
-	case newStat.Repl == nil && IsMongos(newStat):
+	case newStat.Repl == nil && IsMerizos(newStat):
 		return "RTR"
 	case newStat.Repl == nil:
 		return ""

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/bson/json.h"
 
@@ -50,11 +50,11 @@ using std::ostringstream;
 using std::string;
 
 #if 0
-#define MONGO_JSON_DEBUG(message)                                                          \
+#define MERIZO_JSON_DEBUG(message)                                                          \
     log() << "JSON DEBUG @ " << __FILE__ << ":" << __LINE__ << " " << __FUNCTION__ << ": " \
           << message << endl;
 #else
-#define MONGO_JSON_DEBUG(message)
+#define MERIZO_JSON_DEBUG(message)
 #endif
 
 #define ALPHA "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -96,7 +96,7 @@ Status JParse::parseError(StringData msg) {
 }
 
 Status JParse::value(StringData fieldName, BSONObjBuilder& builder) {
-    MONGO_JSON_DEBUG("fieldName: " << fieldName);
+    MERIZO_JSON_DEBUG("fieldName: " << fieldName);
     if (peekToken(LBRACE)) {
         Status ret = object(fieldName, builder);
         if (ret != Status::OK()) {
@@ -188,7 +188,7 @@ Status JParse::parse(BSONObjBuilder& builder) {
 }
 
 Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObject) {
-    MONGO_JSON_DEBUG("fieldName: " << fieldName);
+    MERIZO_JSON_DEBUG("fieldName: " << fieldName);
     if (!readToken(LBRACE)) {
         return parseError("Expecting '{'");
     }
@@ -707,7 +707,7 @@ Status JParse::maxKeyObject(StringData fieldName, BSONObjBuilder& builder) {
 }
 
 Status JParse::array(StringData fieldName, BSONObjBuilder& builder, bool subObject) {
-    MONGO_JSON_DEBUG("fieldName: " << fieldName);
+    MERIZO_JSON_DEBUG("fieldName: " << fieldName);
     uint32_t index(0);
     if (!readToken(LBRACKET)) {
         return parseError("Expecting '['");
@@ -981,17 +981,17 @@ Status JParse::regex(StringData fieldName, BSONObjBuilder& builder) {
 }
 
 Status JParse::regexPat(std::string* result) {
-    MONGO_JSON_DEBUG("");
+    MERIZO_JSON_DEBUG("");
     return chars(result, "/");
 }
 
 Status JParse::regexOpt(std::string* result) {
-    MONGO_JSON_DEBUG("");
+    MERIZO_JSON_DEBUG("");
     return chars(result, "", JOPTIONS);
 }
 
 Status JParse::regexOptCheck(StringData opt) {
-    MONGO_JSON_DEBUG("opt: " << opt);
+    MERIZO_JSON_DEBUG("opt: " << opt);
     std::size_t i;
     for (i = 0; i < opt.size(); i++) {
         if (!match(opt[i], JOPTIONS)) {
@@ -1027,15 +1027,15 @@ Status JParse::number(StringData fieldName, BSONObjBuilder& builder) {
     if (endptrll < endptrd || errno == ERANGE) {
         // The number either had characters only meaningful for a double or
         // could not fit in a 64 bit int
-        MONGO_JSON_DEBUG("Type: double");
+        MERIZO_JSON_DEBUG("Type: double");
         builder.append(fieldName, retd);
     } else if (retll == static_cast<int>(retll)) {
         // The number can fit in a 32 bit int
-        MONGO_JSON_DEBUG("Type: 32 bit int");
+        MERIZO_JSON_DEBUG("Type: 32 bit int");
         builder.append(fieldName, static_cast<int>(retll));
     } else {
         // The number can fit in a 64 bit int
-        MONGO_JSON_DEBUG("Type: 64 bit int");
+        MERIZO_JSON_DEBUG("Type: 64 bit int");
         builder.append(fieldName, retll);
     }
     _input = endptrd;
@@ -1046,7 +1046,7 @@ Status JParse::number(StringData fieldName, BSONObjBuilder& builder) {
 }
 
 Status JParse::field(std::string* result) {
-    MONGO_JSON_DEBUG("");
+    MERIZO_JSON_DEBUG("");
     if (peekToken(DOUBLEQUOTE) || peekToken(SINGLEQUOTE)) {
         // Quoted key
         // TODO: make sure quoted field names cannot contain null characters
@@ -1070,7 +1070,7 @@ Status JParse::field(std::string* result) {
 }
 
 Status JParse::quotedString(std::string* result) {
-    MONGO_JSON_DEBUG("");
+    MERIZO_JSON_DEBUG("");
     if (readToken(DOUBLEQUOTE)) {
         Status ret = chars(result, "\"");
         if (ret != Status::OK()) {
@@ -1098,13 +1098,13 @@ Status JParse::quotedString(std::string* result) {
  * allowedSet are the characters that are allowed, if this is set
  */
 Status JParse::chars(std::string* result, const char* terminalSet, const char* allowedSet) {
-    MONGO_JSON_DEBUG("terminalSet: " << terminalSet);
+    MERIZO_JSON_DEBUG("terminalSet: " << terminalSet);
     if (_input >= _input_end) {
         return parseError("Unexpected end of input");
     }
     const char* q = _input;
     while (q < _input_end && !match(*q, terminalSet)) {
-        MONGO_JSON_DEBUG("q: " << q);
+        MERIZO_JSON_DEBUG("q: " << q);
         if (allowedSet != NULL) {
             if (!match(*q, allowedSet)) {
                 _input = q;
@@ -1221,7 +1221,7 @@ inline bool JParse::readToken(const char* token) {
 }
 
 bool JParse::readTokenImpl(const char* token, bool advance) {
-    MONGO_JSON_DEBUG("token: " << token);
+    MERIZO_JSON_DEBUG("token: " << token);
     const char* check = _input;
     if (token == NULL) {
         return false;
@@ -1247,7 +1247,7 @@ bool JParse::readTokenImpl(const char* token, bool advance) {
 }
 
 bool JParse::readField(StringData expectedField) {
-    MONGO_JSON_DEBUG("expectedField: " << expectedField);
+    MERIZO_JSON_DEBUG("expectedField: " << expectedField);
     std::string nextField;
     nextField.reserve(FIELD_RESERVE_SIZE);
     Status ret = field(&nextField);
@@ -1271,7 +1271,7 @@ inline bool JParse::match(char matchChar, const char* matchSet) const {
 }
 
 bool JParse::isHexString(StringData str) const {
-    MONGO_JSON_DEBUG("str: " << str);
+    MERIZO_JSON_DEBUG("str: " << str);
     std::size_t i;
     for (i = 0; i < str.size(); i++) {
         if (!isxdigit(str[i])) {
@@ -1282,7 +1282,7 @@ bool JParse::isHexString(StringData str) const {
 }
 
 bool JParse::isBase64String(StringData str) const {
-    MONGO_JSON_DEBUG("str: " << str);
+    MERIZO_JSON_DEBUG("str: " << str);
     return base64::validate(str);
 }
 
@@ -1291,7 +1291,7 @@ bool JParse::isArray() {
 }
 
 BSONObj fromjson(const char* jsonString, int* len) {
-    MONGO_JSON_DEBUG("jsonString: " << jsonString);
+    MERIZO_JSON_DEBUG("jsonString: " << jsonString);
     if (jsonString[0] == '\0') {
         if (len)
             *len = 0;

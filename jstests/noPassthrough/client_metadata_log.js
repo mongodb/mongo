@@ -21,18 +21,18 @@
                 "\n************************************************************");
     };
 
-    // Test MongoD
-    let testMongoD = function() {
-        let conn = MongoRunner.runMongod({useLogFiles: true});
+    // Test MerizoD
+    let testMerizoD = function() {
+        let conn = MerizoRunner.runMerizod({useLogFiles: true});
         assert.neq(null, conn, 'merizod was unable to start up');
 
         checkLog(conn);
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     };
 
-    // Test MongoS
-    let testMongoS = function() {
+    // Test MerizoS
+    let testMerizoS = function() {
         let options = {
             merizosOptions: {useLogFiles: true},
         };
@@ -61,6 +61,6 @@
         st.stop();
     };
 
-    testMongoD();
-    testMongoS();
+    testMerizoD();
+    testMerizoS();
 })();

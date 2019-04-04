@@ -60,7 +60,7 @@
 
     // Now that both merizod shards are restarted, they don't know yet that they are part of a
     // sharded
-    // cluster until they get a setShardVerion command. Mongos instance s1 has stale metadata and
+    // cluster until they get a setShardVerion command. Merizos instance s1 has stale metadata and
     // doesn't know that chunk with key 19 has moved to st.shard0.shardName so it will send it to
     // st.shard1.shardName at
     // first.

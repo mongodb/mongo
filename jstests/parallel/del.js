@@ -1,7 +1,7 @@
 load('jstests/libs/parallelTester.js');
 
 N = 1000;
-HOST = db.getMongo().host;
+HOST = db.getMerizo().host;
 
 a = db.getSisterDB("fooa");
 b = db.getSisterDB("foob");
@@ -16,7 +16,7 @@ var kCursorKilledErrorCodes = [
 
 function del1(dbname, host, max, kCursorKilledErrorCodes) {
     try {
-        var m = new Mongo(host);
+        var m = new Merizo(host);
         var db = m.getDB("foo" + dbname);
         var t = db.del;
 
@@ -50,7 +50,7 @@ function del1(dbname, host, max, kCursorKilledErrorCodes) {
 
 function del2(dbname, host, max, kCursorKilledErrorCodes) {
     try {
-        var m = new Mongo(host);
+        var m = new Merizo(host);
         var db = m.getDB("foo" + dbname);
         var t = db.del;
 

@@ -105,7 +105,7 @@
     <NMakeOutput>merizod.exe</NMakeOutput>
     <NMakeCleanCommandLine>ninja.exe -t clean</NMakeCleanCommandLine>
     <NMakeReBuildCommandLine>not_supported</NMakeReBuildCommandLine>
-    <NMakePreprocessorDefinitions>MONGO_SSL;WIN32;_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <NMakePreprocessorDefinitions>MERIZO_SSL;WIN32;_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <NMakeIncludeSearchPath>$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Release'">

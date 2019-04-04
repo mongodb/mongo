@@ -30,7 +30,7 @@
 #include <limits>
 
 #include "merizo/platform/basic.h"
-#undef MONGO_PCH_WHITELISTED  // for malloc/realloc pulled from bson
+#undef MERIZO_PCH_WHITELISTED  // for malloc/realloc pulled from bson
 
 #include "merizo/bson/bsonobj.h"
 #include "merizo/bson/bsontypes.h"

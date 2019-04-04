@@ -28,13 +28,13 @@ def merizo_export_file_generator(target, source, env, for_signature):
         return script.get_csig() if for_signature else "-Wl,--version-script," + str(script)
     else:
         pass
-frameworksEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = merizo_export_file_generator
+frameworksEnv['MERIZO_EXPORT_FILE_SHLINKFLAGS'] = merizo_export_file_generator
 
 # We need to set our bundle version in the plist file, but the format
 # is contrained to major.minor.patch. So trim off any '-pre' or '-rc'
-# information from the MONGO_VERSION and rename it to
-# MONGO_BUNDLE_VERSION.
-frameworksEnv['PLIST_MONGO_BUNDLE_VERSION'] = env['MONGO_VERSION'].split('-')[0]
+# information from the MERIZO_VERSION and rename it to
+# MERIZO_BUNDLE_VERSION.
+frameworksEnv['PLIST_MERIZO_BUNDLE_VERSION'] = env['MERIZO_VERSION'].split('-')[0]
 
 # Similarly, we need to derive a MinimumOSVersion based on the
 # -mXXX-version-minimum flag. Really, we should pull this out into an

@@ -4,7 +4,7 @@
  * once the replica set come back up.
  *
  * ReplSetMonitor is tested indirectly through merizos. This is because
- * attempting to create a connection through the Mongo constructor won't
+ * attempting to create a connection through the Merizo constructor won't
  * work because the shell will throw an exception before the merizo shell
  * binds the variable properly to the js environment (in simple terms,
  * the connection object is never returned when it cannot connect to it).
@@ -34,7 +34,7 @@
     // Don't clear the data directory so that the shardIdentity is not deleted.
     replTest.stopSet(undefined /* send default signal */, true /* don't clear data directory */);
 
-    st.restartMongos(0);
+    st.restartMerizos(0);
 
     replTest.startSet({restart: true, noCleanData: true});
     replTest.awaitSecondaryNodes();

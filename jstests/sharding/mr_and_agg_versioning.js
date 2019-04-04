@@ -14,10 +14,10 @@
     st.s.adminCommand({shardCollection: collName, key: {key: 1}});
 
     // Load chunk data to the stale merizoses before moving a chunk
-    var staleMongos1 = st.s1;
-    var staleMongos2 = st.s2;
-    staleMongos1.getCollection(collName).find().itcount();
-    staleMongos2.getCollection(collName).find().itcount();
+    var staleMerizos1 = st.s1;
+    var staleMerizos2 = st.s2;
+    staleMerizos1.getCollection(collName).find().itcount();
+    staleMerizos2.getCollection(collName).find().itcount();
 
     st.s.adminCommand({split: collName, middle: {key: numKeys / 2}});
     st.s.adminCommand({moveChunk: collName, find: {key: 0}, to: st.shard1.shardName});
@@ -51,12 +51,12 @@
         }
     }
 
-    var res = staleMongos1.getCollection(collName).mapReduce(map, reduce, {out: {inline: 1}});
+    var res = staleMerizos1.getCollection(collName).mapReduce(map, reduce, {out: {inline: 1}});
     validateOutput(res.results);
 
     jsTest.log("Doing aggregation");
 
-    res = staleMongos2.getCollection(collName).aggregate(
+    res = staleMerizos2.getCollection(collName).aggregate(
         [{'$group': {_id: "$key", value: {"$sum": "$value"}}}, {'$sort': {_id: 1}}]);
     validateOutput(res.toArray());
 

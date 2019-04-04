@@ -62,7 +62,7 @@ ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
     "CreateAuthorizationManager",
     {"OIDGeneration",
      "EndStartupOptionStorage",
-     MONGO_SHIM_DEPENDENCY(AuthorizationManager::create)},
+     MERIZO_SHIM_DEPENDENCY(AuthorizationManager::create)},
     [](ServiceContext* service) {
         auto authzManager = AuthorizationManager::create();
         authzManager->setAuthEnabled(serverGlobalParams.authState ==

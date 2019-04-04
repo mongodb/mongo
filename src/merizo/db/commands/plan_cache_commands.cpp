@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -86,7 +86,7 @@ static Status getPlanCache(OperationContext* opCtx,
 // available to the client.
 //
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupPlanCacheCommands, MONGO_NO_PREREQUISITES)
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SetupPlanCacheCommands, MERIZO_NO_PREREQUISITES)
 (InitializerContext* context) {
     // PlanCacheCommand constructors refer to static ActionType instances.
     // Registering commands in a merizo static initializer ensures that

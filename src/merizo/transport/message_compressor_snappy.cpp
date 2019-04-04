@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -77,7 +77,7 @@ StatusWith<std::size_t> SnappyMessageCompressor::decompressData(ConstDataRange i
 }
 
 
-MONGO_INITIALIZER_GENERAL(SnappyMessageCompressorInit,
+MERIZO_INITIALIZER_GENERAL(SnappyMessageCompressorInit,
                           ("EndStartupOptionHandling"),
                           ("AllCompressorsRegistered"))
 (InitializerContext* context) {

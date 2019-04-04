@@ -220,7 +220,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._is_idle_evt.wait()
         # Wait until we all the replica sets have primaries.
         self._await_primaries()
-        # Wait for Mongos to retarget the primary for each shard and the config server.
+        # Wait for Merizos to retarget the primary for each shard and the config server.
         self._do_wait_for_merizos_retarget()
 
     def resume(self):
@@ -299,7 +299,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             except pymerizo.errors.AutoReconnect:
                 # AutoReconnect exceptions are expected as connections are closed during stepdown.
                 pass
-            except pymerizo.errors.PyMongoError:
+            except pymerizo.errors.PyMerizoError:
                 self.logger.exception(
                     "Error while stepping down the primary on port %d of replica set '%s'.",
                     primary.port, rs_fixture.replset_name)

@@ -4,7 +4,7 @@
 
     // Auth as user in certificate
     let ret = db.getSiblingDB("$external").auth({
-        mechanism: "MONGODB-X509",
+        mechanism: "MERIZODB-X509",
         user:
             "CN=Kernel Client Peer Role,OU=Kernel Users,O=MerizoDB,L=New York City,ST=New York,C=US"
     });

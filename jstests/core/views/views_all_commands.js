@@ -132,7 +132,7 @@
             skip: "Tested in views/views_sharded.js",
         },
         clearLog: {skip: isUnrelated},
-        cloneCollection: {skip: "Tested in noPassthroughWithMongod/clonecollection.js"},
+        cloneCollection: {skip: "Tested in noPassthroughWithMerizod/clonecollection.js"},
         cloneCollectionAsCapped: {
             command: {cloneCollectionAsCapped: "view", toCollection: "testcapped", size: 10240},
             expectFailure: true,
@@ -570,7 +570,7 @@
     // Are we on a merizos?
     var isMaster = db.runCommand("ismaster");
     assert.commandWorked(isMaster);
-    var isMongos = (isMaster.msg === "isdbgrid");
+    var isMerizos = (isMaster.msg === "isdbgrid");
 
     // Obtain a list of all commands.
     let res = db.runCommand({listCommands: 1});
@@ -597,12 +597,12 @@
             let commandHandle = dbHandle;
 
             // Skip tests depending on sharding configuration.
-            if (subtest.skipSharded && isMongos) {
+            if (subtest.skipSharded && isMerizos) {
                 print("Skipping " + command + ": not applicable to merizoS");
                 continue;
             }
 
-            if (subtest.skipStandalone && !isMongos) {
+            if (subtest.skipStandalone && !isMerizos) {
                 print("Skipping " + command + ": not applicable to merizoD");
                 continue;
             }

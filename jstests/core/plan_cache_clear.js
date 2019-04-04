@@ -87,8 +87,8 @@
     //     Populate the cache with 1 entry.
     //     Run reIndex on the collection.
     //     Confirm that cache is empty.
-    const isMongos = db.adminCommand({isdbgrid: 1}).isdbgrid;
-    if (!isMongos) {
+    const isMerizos = db.adminCommand({isdbgrid: 1}).isdbgrid;
+    if (!isMerizos) {
         assert.eq(1, t.find({a: 1, b: 1}).itcount(), 'unexpected document count');
         assert.eq(1, getShapes().length, 'plan cache should not be empty after query');
         res = t.reIndex();

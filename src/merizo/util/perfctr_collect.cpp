@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
 
 #include "merizo/platform/basic.h"
 
@@ -50,7 +50,7 @@ HANDLE hPdhLibrary = nullptr;
 /**
  * Load PDH.DLL for good error messages.
  */
-MONGO_INITIALIZER(PdhInit)(InitializerContext* context) {
+MERIZO_INITIALIZER(PdhInit)(InitializerContext* context) {
 
     hPdhLibrary = LoadLibraryW(L"pdh.dll");
     if (nullptr == hPdhLibrary) {

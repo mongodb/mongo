@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -214,7 +214,7 @@ TEST_F(MerizodbEmbeddedTransportLayerTest, InsertAndCount) {
     bson_error_t err;
     int64_t count;
     ASSERT(insert_data(collection));
-    count = merizoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
+    count = merizoc_collection_count(collection, MERIZOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
     ASSERT(count == 4);
 }
 TEST_F(MerizodbEmbeddedTransportLayerTest, InsertAndDelete) {
@@ -231,14 +231,14 @@ TEST_F(MerizodbEmbeddedTransportLayerTest, InsertAndDelete) {
     bson_oid_init(&oid, NULL);
     BSON_APPEND_OID(doc, "_id", &oid);
     BSON_APPEND_UTF8(doc, "hello", "world");
-    ASSERT(merizoc_collection_insert(collection, MONGOC_INSERT_NONE, doc, NULL, &err));
-    count = merizoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
+    ASSERT(merizoc_collection_insert(collection, MERIZOC_INSERT_NONE, doc, NULL, &err));
+    count = merizoc_collection_count(collection, MERIZOC_QUERY_NONE, nullptr, 0, 0, NULL, &err);
     ASSERT(1 == count);
     bson_destroy(doc);
     doc = bson_new();
     BSON_APPEND_OID(doc, "_id", &oid);
-    ASSERT(merizoc_collection_remove(collection, MONGOC_REMOVE_SINGLE_REMOVE, doc, NULL, &err));
-    ASSERT(0 == merizoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err));
+    ASSERT(merizoc_collection_remove(collection, MERIZOC_REMOVE_SINGLE_REMOVE, doc, NULL, &err));
+    ASSERT(0 == merizoc_collection_count(collection, MERIZOC_QUERY_NONE, nullptr, 0, 0, NULL, &err));
     bson_destroy(doc);
 }
 
@@ -263,7 +263,7 @@ int main(int argc, char** argv, char** envp) {
     moe::OptionSection options;
     std::map<std::string, std::string> env;
 
-    auto ret = merizo::embedded::addMongocEmbeddedTestOptions(&options);
+    auto ret = merizo::embedded::addMerizocEmbeddedTestOptions(&options);
     if (!ret.isOK()) {
         std::cerr << ret << std::endl;
         return EXIT_FAILURE;
@@ -288,7 +288,7 @@ int main(int argc, char** argv, char** envp) {
     merizoc_init();
 
     merizo_embedded_v1_init_params params;
-    params.log_flags = MONGO_EMBEDDED_V1_LOG_STDOUT;
+    params.log_flags = MERIZO_EMBEDDED_V1_LOG_STDOUT;
     params.log_callback = nullptr;
     params.log_user_data = nullptr;
 
@@ -300,7 +300,7 @@ int main(int argc, char** argv, char** envp) {
 
     auto result = ::merizo::unittest::Suite::run(std::vector<std::string>(), "", 1);
 
-    if (merizo_embedded_v1_lib_fini(global_lib_handle, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
+    if (merizo_embedded_v1_lib_fini(global_lib_handle, status.get()) != MERIZO_EMBEDDED_V1_SUCCESS) {
         std::cerr << "Error: " << merizo_embedded_v1_status_get_explanation(status.get());
         return EXIT_FAILURE;
     }

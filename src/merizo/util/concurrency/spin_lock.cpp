@@ -31,7 +31,7 @@
 
 #include "merizo/config.h"
 
-#if !(defined(_WIN32) || MONGO_CONFIG_DEBUG_BUILD)
+#if !(defined(_WIN32) || MERIZO_CONFIG_DEBUG_BUILD)
 
 #include <sched.h>
 #include <time.h>
@@ -55,7 +55,7 @@ void SpinLock::_lockSlowPath() {
         if (_tryLock())
             return;
 
-        MONGO_YIELD_CORE_FOR_SMT();
+        MERIZO_YIELD_CORE_FOR_SMT();
     }
 
     for (int i = 0; i < 1000; i++) {

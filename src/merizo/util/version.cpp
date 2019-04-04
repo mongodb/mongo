@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -35,8 +35,8 @@
 
 #include "merizo/config.h"
 
-#ifdef MONGO_CONFIG_SSL
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#ifdef MERIZO_CONFIG_SSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/crypto.h>
 #endif
 #endif
@@ -148,18 +148,18 @@ void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
     versionArray.done();
 
     BSONObjBuilder opensslInfo(result->subobjStart("openssl"));
-#ifdef MONGO_CONFIG_SSL
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#ifdef MERIZO_CONFIG_SSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
     opensslInfo << "running" << openSSLVersion() << "compiled" << OPENSSL_VERSION_TEXT;
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_WINDOWS
     opensslInfo << "running"
                 << "Windows SChannel";
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_APPLE
     opensslInfo << "running"
                 << "Apple Secure Transport";
 #else
 #error "Unknown SSL Provider"
-#endif  // MONGO_CONFIG_SSL_PROVIDER
+#endif  // MERIZO_CONFIG_SSL_PROVIDER
 #else
     opensslInfo << "running"
                 << "disabled"
@@ -182,9 +182,9 @@ void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
 }
 
 std::string VersionInfoInterface::openSSLVersion(StringData prefix, StringData suffix) const {
-#if !defined(MONGO_CONFIG_SSL) || MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if !defined(MERIZO_CONFIG_SSL) || MERIZO_CONFIG_SSL_PROVIDER != MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
     return "";
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
     return prefix.toString() + SSLeay_version(SSLEAY_VERSION) + suffix;
 #endif
 }
@@ -196,7 +196,7 @@ void VersionInfoInterface::logTargetMinOS() const {
 void VersionInfoInterface::logBuildInfo() const {
     log() << "git version: " << gitVersion();
 
-#if defined(MONGO_CONFIG_SSL) && MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if defined(MERIZO_CONFIG_SSL) && MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
     log() << openSSLVersion("OpenSSL version: ");
 #endif
 

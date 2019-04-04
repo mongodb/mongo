@@ -296,7 +296,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
     ASSERT_EQ(100, *_opCtx->getTxnNumber());
 }
 
-TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IsReplSetMemberOrMongosFalse) {
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IsReplSetMemberOrMerizosFalse) {
     addSimpleUser(UserName("simple", "test"));
     LogicalSessionFromClient lsid;
     lsid.setId(UUID::gen());

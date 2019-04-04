@@ -9,7 +9,7 @@
     // transactions.
     db.getSiblingDB(dbName).getCollection(collName).drop({writeConcern: {w: "majority"}});
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb.getCollection(collName);
 

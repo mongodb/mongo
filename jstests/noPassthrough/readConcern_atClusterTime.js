@@ -35,7 +35,7 @@ function _getClusterTime(rst) {
         return;
     }
 
-    const session = testDB.getMongo().startSession({causalConsistency: false});
+    const session = testDB.getMerizo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);
 
     const clusterTime = _getClusterTime(rst);
@@ -125,7 +125,7 @@ function _getClusterTime(rst) {
         rst.startSet();
         rst.initiate();
         let session =
-            rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+            rst.getPrimary().getDB(dbName).getMerizo().startSession({causalConsistency: false});
         let sessionDb = session.getDatabase(dbName);
         session.startTransaction(
             {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
@@ -139,7 +139,7 @@ function _getClusterTime(rst) {
         rst.startSet();
         rst.initiate();
         session =
-            rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+            rst.getPrimary().getDB(dbName).getMerizo().startSession({causalConsistency: false});
         sessionDb = session.getDatabase(dbName);
         session.startTransaction(
             {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
@@ -155,7 +155,7 @@ function _getClusterTime(rst) {
         rst.startSet();
         rst.initiate();
         let session =
-            rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+            rst.getPrimary().getDB(dbName).getMerizo().startSession({causalConsistency: false});
         let sessionDb = session.getDatabase(dbName);
         session.startTransaction(
             {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});

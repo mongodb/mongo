@@ -60,7 +60,7 @@ StringData getMessageCompressorName(MessageCompressor id) {
         default:
             fassert(40269, "Invalid message compressor ID");
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 MessageCompressorRegistry& MessageCompressorRegistry::get() {
@@ -128,7 +128,7 @@ Status storeMessageCompressionOptions(const std::string& compressors) {
 
 // This instantiates and registers the "noop" compressor. It must happen after option storage
 // because that's when the configuration of the compressors gets set.
-MONGO_INITIALIZER_GENERAL(NoopMessageCompressorInit,
+MERIZO_INITIALIZER_GENERAL(NoopMessageCompressorInit,
                           ("EndStartupOptionStorage"),
                           ("AllCompressorsRegistered"))
 (InitializerContext* context) {
@@ -140,7 +140,7 @@ MONGO_INITIALIZER_GENERAL(NoopMessageCompressorInit,
 // This cleans up any compressors that were requested by the user, but weren't registered by
 // any compressor. It must be run after all the compressors have registered themselves with
 // the global registry.
-MONGO_INITIALIZER(AllCompressorsRegistered)(InitializerContext* context) {
+MERIZO_INITIALIZER(AllCompressorsRegistered)(InitializerContext* context) {
     return MessageCompressorRegistry::get().finalizeSupportedCompressors();
 }
 }  // namespace merizo

@@ -29,7 +29,7 @@
 
 // CHECK_LOG_REDACTION
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -582,7 +582,7 @@ StringData getProtoString(int op) {
     } else if (op == dbQuery) {
         return "op_query";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 }  // namespace
 

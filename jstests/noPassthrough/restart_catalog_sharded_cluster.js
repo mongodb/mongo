@@ -133,7 +133,7 @@
 
     // Run queries on the metadata stored in the config servers.
     function assertConfigServersHaveExpectedData() {
-        const configDBViaMongos = merizos.getDB("config");
+        const configDBViaMerizos = merizos.getDB("config");
         const configDBViaConfigSvr = st.config0.getDB("config");
         const projectOnlyShard = {_id: 0, shard: 1};
 
@@ -141,14 +141,14 @@
         // config server primary directly.
         const smallestChunk = {"max.price": splitPoint};
         const smallestChunkShard = {shard: "restart_catalog_sharded_cluster-rs0"};
-        assert.eq(configDBViaMongos.chunks.find(smallestChunk, projectOnlyShard).toArray(),
+        assert.eq(configDBViaMerizos.chunks.find(smallestChunk, projectOnlyShard).toArray(),
                   [smallestChunkShard]);
         assert.eq(configDBViaConfigSvr.chunks.find(smallestChunk, projectOnlyShard).toArray(),
                   [smallestChunkShard]);
 
         const largestChunk = {"min.price": splitPoint};
         const largestChunkShard = {shard: "restart_catalog_sharded_cluster-rs1"};
-        assert.eq(configDBViaMongos.chunks.find(largestChunk, projectOnlyShard).toArray(),
+        assert.eq(configDBViaMerizos.chunks.find(largestChunk, projectOnlyShard).toArray(),
                   [largestChunkShard]);
         assert.eq(configDBViaConfigSvr.chunks.find(largestChunk, projectOnlyShard).toArray(),
                   [largestChunkShard]);

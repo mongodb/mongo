@@ -102,7 +102,7 @@ void OpObserverMock::onPreparedTransactionCommit(
 /**
  * Test fixture for doTxn().
  */
-class DoTxnTest : public ServiceContextMongoDTest {
+class DoTxnTest : public ServiceContextMerizoDTest {
 private:
     void setUp() override;
     void tearDown() override;
@@ -136,12 +136,12 @@ protected:
     OpObserverMock* _opObserver = nullptr;
     std::unique_ptr<StorageInterface> _storage;
     ServiceContext::UniqueOperationContext _opCtx;
-    boost::optional<MongoDOperationContextSession> _ocs;
+    boost::optional<MerizoDOperationContextSession> _ocs;
 };
 
 void DoTxnTest::setUp() {
     // Set up merizod.
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     const auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
@@ -156,7 +156,7 @@ void DoTxnTest::setUp() {
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
 
     // Set up session catalog
-    MongoDSessionCatalog::onStepUp(_opCtx.get());
+    MerizoDSessionCatalog::onStepUp(_opCtx.get());
 
     // Need the OpObserverImpl in the registry in order for doTxn to work.
     OpObserverRegistry* opObserverRegistry =
@@ -197,7 +197,7 @@ void DoTxnTest::tearDown() {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplication,
                                                         logger::LogSeverity::Debug(0));
 
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 /**

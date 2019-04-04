@@ -162,7 +162,7 @@ public:
 
 StringMap<BridgeCommand*> bridgeCommandMap;
 
-MONGO_INITIALIZER(RegisterBridgeCommands)(InitializerContext* context) {
+MERIZO_INITIALIZER(RegisterBridgeCommands)(InitializerContext* context) {
     bridgeCommandMap["delayMessagesFrom"] = new CmdDelayMessagesFrom();
     bridgeCommandMap["acceptConnectionsFrom"] = new CmdAcceptConnectionsFrom();
     bridgeCommandMap["rejectConnectionsFrom"] = new CmdRejectConnectionsFrom();

@@ -70,25 +70,25 @@ bool BackupCursorHooks::enabled() const {
  * The following methods cannot be called when BackupCursorHooks is not enabled.
  */
 void BackupCursorHooks::fsyncLock(OperationContext* opCtx) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void BackupCursorHooks::fsyncUnlock(OperationContext* opCtx) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 BackupCursorState BackupCursorHooks::openBackupCursor(OperationContext* opCtx) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void BackupCursorHooks::closeBackupCursor(OperationContext* opCtx, const UUID& backupId) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 BackupCursorExtendState BackupCursorHooks::extendBackupCursor(OperationContext* opCtx,
                                                               const UUID& backupId,
                                                               const Timestamp& extendTo) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool BackupCursorHooks::isBackupCursorOpen() const {

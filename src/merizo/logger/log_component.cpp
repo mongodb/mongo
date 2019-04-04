@@ -48,7 +48,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents + 1];
 // Fully initialize _dottedNames before we enter multithreaded execution.
 //
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupDottedNames, MONGO_NO_PREREQUISITES)
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SetupDottedNames, MERIZO_NO_PREREQUISITES)
 (InitializerContext* context) {
     for (int i = 0; i <= int(LogComponent::kNumLogComponents); ++i) {
         logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
@@ -66,7 +66,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupDottedNames, MONGO_NO_PREREQUISITES)
 #define DECLARE_LOG_COMPONENT_PARENT(CHILD, PARENT)        \
     case (CHILD):                                          \
         do {                                               \
-            MONGO_STATIC_ASSERT(int(CHILD) > int(PARENT)); \
+            MERIZO_STATIC_ASSERT(int(CHILD) > int(PARENT)); \
             return (PARENT);                               \
         } while (0)
 
@@ -89,7 +89,7 @@ LogComponent LogComponent::parent() const {
         default:
             return kDefault;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StringData LogComponent::toStringData() const {
@@ -150,7 +150,7 @@ StringData LogComponent::toStringData() const {
             return "total"_sd;
             // No default. Compiler should complain if there's a log component that's not handled.
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::string LogComponent::getShortName() const {
@@ -238,7 +238,7 @@ StringData LogComponent::getNameForLog() const {
             return "TOTAL   "_sd;
             // No default. Compiler should complain if there's a log component that's not handled.
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::ostream& operator<<(std::ostream& os, LogComponent component) {

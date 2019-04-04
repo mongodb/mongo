@@ -2455,7 +2455,7 @@ var langHeaders = [261]header{
 			"ctitwtJapaneegJafanaegGeorgegCongoKikuyuKuanyamaCasachegKalaallisutC" +
 			"hmeregKannadaCoreegCanwriCashmiregCwrdegComiCernywegCirgisegLladinLw" +
 			"csembwrgegGandaLimbwrgegLingalaLaoegLithwanegLuba-KatangaLatfiegMala" +
-			"gasegMarsialegMaoriMacedonegMalayalamMongolegMarathiMaleiegMaltegByr" +
+			"gasegMarsialegMaoriMacedonegMalayalamMerizolegMarathiMaleiegMaltegByr" +
 			"manegNawrŵegNdebele GogleddolNepalegNdongaIseldiregNorwyeg NynorskNo" +
 			"rwyeg BokmålNdebele DeheuolNafahoNianjaOcsitanegOjibwaOromoOdiaOsete" +
 			"gPwnjabegPaliPwylegPashtoPortiwgeegQuechuaRománshRwndiRwmanegRwsegCi" +
@@ -2483,7 +2483,7 @@ var langHeaders = [261]header{
 			"abardiegTyapegMacondegCaboferdianegKoroCàsegKoyra ChiiniChowaregKako" +
 			"KalenjinKimbunduKomi-PermyakConcaniKpelleKarachay-BalkarCarelegKuruk" +
 			"hShambalaBaffiaCwlenegCwmicegIddew-SbaenegLangiLahndaLambaLezghegLak" +
-			"otaLombardegMongoLoziLuri GogleddolLatgalegLuba-LuluaLwndaLŵoLwshaie" +
+			"otaLombardegMerizoLoziLuri GogleddolLatgalegLuba-LuluaLwndaLŵoLwshaie" +
 			"gLwyiaMadwregMagahiMaithiliMacasaregMandingoMasaiMocsiaMandaregMende" +
 			"gMêrwMorisyenGwyddeleg CanolMakhuwa-MeettoMetaMicmacegMinangkabauMan" +
 			"shwManipwriMohocegMosiMari GorllewinolMundangMwy nag un iaithCreekMi" +
@@ -6122,7 +6122,7 @@ var langHeaders = [261]header{
 			"nsItaliaanskInuktitutJapansJavaanskGeorgyskKongoKikuyuKuanyamaKazach" +
 			"sGrienlânsKhmerKannadaKoreaanskKanuriKasjmiriKoerdyskKomiCornishKirg" +
 			"izyskLatynLuxemburgsGandaLimburgsLingalaLaotiaanskLitouwsLuba-Katang" +
-			"aLetlânsMalagasyskMarshalleesMaoriMacedonyskMalayalamMongoolsMarathi" +
+			"aLetlânsMalagasyskMarshalleesMaoriMacedonyskMalayalamMerizoolsMarathi" +
 			"MaleisMalteesBirmeesNauruaanskNoard-NdbeleNepaleesNdongaNederlânskNo" +
 			"ors - NynorskNoors - BokmålSûd-NdbeleNavajoNyanjaOccitaanskOjibwaOro" +
 			"moOdiaOssetyskPunjabiPaliPoalskPasjtoePortugeeskQuechuaReto-Romaansk" +
@@ -6147,7 +6147,7 @@ var langHeaders = [261]header{
 			"akalpaksKabyleKachinJjuKambaKawiKabardyskKanembuTyapMakondeKaapverdy" +
 			"sk CreoolsKoroKhasiKhotaneeskKoyra ChiiniKakoKalenjinKimbunduKonkani" +
 			"KosraeaanskKpelleKarachay-BalkarKarelyskKurukhShambalaBafiaKölschKoe" +
-			"muksKutenaiLadinoLangiLahndaLambaLezgyskLakotaMongoLoziLuba-LuluaLui" +
+			"muksKutenaiLadinoLangiLahndaLambaLezgyskLakotaMerizoLoziLuba-LuluaLui" +
 			"senoLundaLuoLushaiLuyiaMadureesMafaMagahiMaithiliMakassaarsMandingoM" +
 			"asaiMabaMokshaMandarMendeMeruMorisyenMiddeliersMakhuwa-MeettoMeta’Mi" +
 			"’kmaqMinangkabauMantsjoeManipoeriMohawkMossiMundangMeardere talenC" +
@@ -6418,7 +6418,7 @@ var langHeaders = [261]header{
 			"eàbhanaisCairtbheilisKongoKikuyuKuanyamaCasachaisKalaallisutCmèarKan" +
 			"nadaCoirèanaisKanuriCaismirisCùrdaisKomiCòrnaisCìorgasaisLaideannLug" +
 			"samburgaisGandaCànan LimburgLingalaLàthoLiotuainisLuba-KatangaLaitbh" +
-			"eisMalagasaisMarshallaisMāoriMasadonaisMalayalamMongolaisMarathiMala" +
+			"eisMalagasaisMarshallaisMāoriMasadonaisMalayalamMerizolaisMarathiMala" +
 			"idhisMaltaisBurmaisNabhruNdebele ThuathachNeapàlaisNdongaDuitsisNyno" +
 			"rsk na NirribhidhBokmål na NirribhidhNdebele DheasachNavajoNyanjaOgs" +
 			"atanaisOjibwaOromoOdiaOsseticPanjabiPaliPòlainnisPashtoPortagailisQu" +
@@ -6453,7 +6453,7 @@ var langHeaders = [261]header{
 			"ra ChiiniKhowarKirmanjkiKakoKalenjinKimbunduKomi-PermyakKonkaniKpell" +
 			"eKarachay-BalkarKrioKinaray-aCairealaisKurukhShambalaBafiaGearmailti" +
 			"s ChologneKumykKutenaiLadinoLangiLahndaLambaLeasgaisLingua Franca No" +
-			"vaLiogùraisLakhótaLombardaisMongoLoziLuri ThuathachLuba-LuluaLuiseño" +
+			"vaLiogùraisLakhótaLombardaisMerizoLoziLuri ThuathachLuba-LuluaLuiseño" +
 			"LundaLuoMizoLuyiaSìnis an LitreachaisLazCànan MadhuraMafaMagahiMaith" +
 			"iliMakasarMandingoMaasaiMabaMokshaMandarMendeMeruMorisyenMeadhan-Gha" +
 			"eilgeMakhuwa-MeettoMeta’Mi’kmaqMinangkabauManchuManipuriMohawkMossiM" +
@@ -6728,7 +6728,7 @@ var langHeaders = [261]header{
 			"ischKambodschanischKannadaKoreaanischKanuri-SchpraachKaschmirischKur" +
 			"dischKomi-SchpraachKornischKirgiisischLatiinLuxemburgischGanda-Schpr" +
 			"aachLimburgischLingalaLaozischLitauischLubaLettischMadagassischMarsc" +
-			"hallesischMaoriMazedonischMalayalamMongolischMarathiMalaiischMaltesi" +
+			"hallesischMaoriMazedonischMalayalamMerizolischMarathiMalaiischMaltesi" +
 			"schBirmanischNauruischNord-Ndebele-SchpraachNepalesischNdongaNiderlä" +
 			"ndischNorwegisch NynorskNorwegisch BokmålSüüd-Ndebele-SchpraachNavaj" +
 			"o-SchpraachChewa-SchpraachOkzitanischOjibwa-SchpraachOromoOrijaOssez" +
@@ -6750,13 +6750,13 @@ var langHeaders = [261]header{
 			"ikischAltägyptischEkajukElamischMittelänglischEwondoPangwe-Schpraach" +
 			"FilipinoFonMittelfranzösischAltfranzösischNordfriesischOschtfriesisc" +
 			"hFriulischGaGayoGbayaGeezGilbertesischMittelhochtüütschAlthochtüütsc" +
-			"hGondiMongondouGotischGreboAltgriechischSchwiizertüütschKutchinischH" +
+			"hGondiMerizondouGotischGreboAltgriechischSchwiizertüütschKutchinischH" +
 			"aidaHawaiianischHiligaynonischHethitischMiaoObersorbischHupaIbanisch" +
 			"IlokanoInguschischLojbanischJüüdisch-PersischJüüdisch-ArabischKaraka" +
 			"lpakischKabylischKachin-SchpraachJjuKambaKawiKabardinischTyapKoroKha" +
 			"sischSakischKimbundu-SchpraachKonkaniKosraeanischKpelle-SchpraachKar" +
 			"atschaiisch-BalkarischKarelischOraon-SchpraachKumükischKutenai-Schpr" +
-			"aachLadinoLahndanischLambanischLesgischMongoRotse-SchpraachLuba-Lulu" +
+			"aachLadinoLahndanischLambanischLesgischMerizoRotse-SchpraachLuba-Lulu" +
 			"aLuiseno-SchpraachLunda-SchpraachLuo-SchpraachLushai-SchpraachMadure" +
 			"sischKhottaMaithiliMakassarischManding-SchpraachMassai-SchpraachMoks" +
 			"chamordwinischMandaresischMende-SchpraachMittelirischMicmac-Schpraac" +
@@ -8735,7 +8735,7 @@ var langHeaders = [261]header{
 			"i-SproochKaschmireschKurdeschKomi-SproochKorneschKirgiseschLatäinLët" +
 			"zebuergeschGanda-SproochLimburgeschLingalaLaoteschLitaueschLuba-Kata" +
 			"ngaLetteschMalagassi-SproochMarschalleseschMaoriMazedoneschMalayalam" +
-			"MongoleschMarathiMalaieschMalteseschBirmaneschNaurueschNord-Ndebele-" +
+			"MerizoleschMarathiMalaieschMalteseschBirmaneschNaurueschNord-Ndebele-" +
 			"SproochNepaleseschNdongaHollänneschNorwegesch NynorskNorwegesch Bokm" +
 			"ålSüd-Ndebele-SproochNavajoNyanja-SproochOkzitaneschOjibwa-SproochO" +
 			"romoOrijaOsseteschPandschabeschPaliPolneschPaschtuPortugiseschQuechu" +
@@ -8764,7 +8764,7 @@ var langHeaders = [261]header{
 			"ischAlfranséischFrankoprovenzaleschNordfrieseschOstfrieseschFriulesc" +
 			"hGa-SproochGagauseschGan-ChineseschGayoGbaya-SproochZoroastrianescht" +
 			" DariGeezGilberteseschGilakiMëttelhéichdäitschAlhéichdäitschGoan-Kon" +
-			"kaniGondi-SproochMongondouGoteschGrebo-SproochAlgriicheschSchwäizerd" +
+			"kaniGondi-SproochMerizondouGoteschGrebo-SproochAlgriicheschSchwäizerd" +
 			"äitschWayuuFarefareGusii-SproochKutchin-SproochHaida-SproochHakka-C" +
 			"hineseschHawaieschFidschi-HindiHiligaynon-SproochHethiteschMiao-Spro" +
 			"ochUewersorbeschXiang-ChineseschHupaIbanIbibioIlokano-SproochIngusch" +
@@ -8775,7 +8775,7 @@ var langHeaders = [261]header{
 			"u-SproochKomi-PermiakKonkaniKosraeaneschKpelle-SproochKaratschaiesch" +
 			"-BalkareschKrioKinaray-aKareleschOraon-SproochShambalaBafiaKölschKum" +
 			"ükeschKutenai-SproochLadinoLangiLahndaLamba-SproochLesgeschLingua F" +
-			"ranca NovaLigureschLiveschLakota-SproochLombardeschMongoRotse-Sprooc" +
+			"ranca NovaLigureschLiveschLakota-SproochLombardeschMerizoRotse-Sprooc" +
 			"hLettgalleschLuba-LuluaLuiseno-SproochLunda-SproochLuo-SproochLushai" +
 			"-SproochOlulujiaKlassescht ChineseschLasesch SproochMadureseschMafaK" +
 			"hottaMaithiliMakassareschManding-SproochMassai-SproochMabaMokshaMand" +
@@ -9832,7 +9832,7 @@ var langHeaders = [261]header{
 			"aniżĠorġjanKongoKikujuKuanyamaKażakKalallisutKhmerKannadaKoreanKanur" +
 			"iKashmiriKurdKomiKornikuKirgiżLatinLussemburgiżGandaLimburgishLingal" +
 			"janLaosjanLitwanLuba-KatangaLatvjanMalagasyMarshalljaniżMaoriMaċedon" +
-			"janMalayalamMongoljanMarathiMalayMaltiBurmiżNaurujanNdebeli tat-Tram" +
+			"janMalayalamMerizoljanMarathiMalayMaltiBurmiżNaurujanNdebeli tat-Tram" +
 			"untanaNepaliżNdongaOlandiżNinorsk NorveġiżBokmal NorveġiżNdebele tan" +
 			"-NofsinharNavajoNyanjaOċċitanOġibwaOromoOdiaOssettikuPunjabiPaliPoll" +
 			"akkPashtoPortugiżQuechuaRomanzRundiRumenRussuKinjarwandaSanskritSard" +
@@ -9856,7 +9856,7 @@ var langHeaders = [261]header{
 			"alpakKabuljanKachinJjuKambaKawiKabardianTyapMakondeCape VerdjanKoroK" +
 			"hasiKotaniżKoyra ChiiniKakoKalenjinKimbunduKonkaniKosrejanKpelleKara" +
 			"chay-BalkarKareljanKuruxShambalaBafiaKolonjanKumykKutenajLadinoLangi" +
-			"LahndaLambaLeżgjanLakotaMongoLożiLuri tat-TramuntanaLuba-LuluwaLuise" +
+			"LahndaLambaLeżgjanLakotaMerizoLożiLuri tat-TramuntanaLuba-LuluwaLuise" +
 			"noLundaLuoMizoLuyiaMaduriżMagahiMaithiliMakasarMandingoMasaiMokshaMa" +
 			"ndarMendeMeruMorisyenIrlandiż MedjevaliMakhuwa-MeettoMetàMicmacMinan" +
 			"gkabauManchuManipuriMohawkMossiMundangLingwi DiversiKriekMirandiżMar" +
@@ -11333,7 +11333,7 @@ var langHeaders = [261]header{
 			"nio SimiIndonesio SimiIgbo SimiYi SimiIslandes SimiItaliano SimiInuk" +
 			"titut SimiJapones SimiGeorgiano SimiKazajo SimiGroenlandes SimiKhmer" +
 			" SimiKannada SimiCoreano SimiKirghiz SimiLuxemburgues SimiLao SimiLi" +
-			"tuano SimiLeton SimiMaori SimiMacedonio SimiMalayalam SimiMongol Sim" +
+			"tuano SimiLeton SimiMaori SimiMacedonio SimiMalayalam SimiMerizol Sim" +
 			"iMarathi SimiMalayo SimiMaltes SimiNepali SimiNeerlandes SimiNoruego" +
 			" SimiOccitano SimiOdia SimiPunyabi SimiPolaco SimiPashto SimiPortugu" +
 			"es SimiRunasimiRomanche SimiRumano SimiRuso SimiKinyarwanda SimiSans" +
@@ -14257,7 +14257,7 @@ var langHeaders = [261]header{
 			"nd diliKhmer diliKannada diliKoreý diliKanuriKaşmiri diliKürt diliKo" +
 			"mi diliKorn diliGyrgyz diliLatyn diliLýuksemburg diliGanda diliLimbu" +
 			"rg diliLingala diliLaos diliLitwa diliLuba-Katanga diliLatyş diliMal" +
-			"agasiý diliMarşall diliMaori diliMakedon diliMalaýalam diliMongol di" +
+			"agasiý diliMarşall diliMaori diliMakedon diliMalaýalam diliMerizol di" +
 			"liMarathi diliMalaý diliMalta diliBirma diliNauru diliDemirgazyk nde" +
 			"bele diliNepal diliNdonga diliNiderland diliNorwegiýa nýunorsk diliN" +
 			"orwegiýa bukmol diliGünorta ndebele diliNawaho diliNýanja diliOksita" +
@@ -15630,7 +15630,7 @@ var langHeaders = [261]header{
 			"uaraniGujaratiHausaHebräišHindiKroatišHaitianišUngarišArmenišIndones" +
 			"išIgboIisländišItalienišJapanišGeorgišKazačišKambodšanišKannadaKorea" +
 			"nišKašmirišKurdišKirgisišLatinišLuxemburgišLingalaLaotišLitauišLetti" +
-			"šMalagásiMaoriMazedonišMalayalamMongolišMarathiMalaíšMaltesišBurmes" +
+			"šMalagásiMaoriMazedonišMalayalamMerizolišMarathiMalaíšMaltesišBurmes" +
 			"išNordndebeleNepalesišHoländišNorwegiš NynorskNorwegiš BokmålNyanjaO" +
 			"riyaOsétišPandšabišPolnišPaštuPortugisišQuečuaRätromanišRundiRumäniš" +
 			"RusišRuandišSanskritSindhiNordsamišSangoSingalesišSlowakišSlowenišSa" +
@@ -15740,7 +15740,7 @@ var langHeaders = [261]header{
 			"u EkosGalisiyeGaraniGujaratiHawsaEbrëEndoKrowatKereyolu AytiOngruwaa" +
 			"ArmaniyeHereroEndonesiyeIgboIslàndeItaliyeInuktititSaponeSorsiyeKasa" +
 			"xXmerKannadaaKoreyeKanuriKashmiriKurdiKirgiisLatinLiksàmbursuwaaLaaw" +
-			"LituyaniyeLetoniyeMalagasiMawriMaseduwaaneMalayalamMongoliyeMaratiMa" +
+			"LituyaniyeLetoniyeMalagasiMawriMaseduwaaneMalayalamMerizoliyeMaratiMa" +
 			"layMaltBirmesNepaleNeyerlàndeNerwesiyeSewaOsitanOromoOjaPunjabiPolon" +
 			"ePastoPurtugeesKesuwaRomaasRumaniyeeRusKinyarwàndaSanskritSindiPenku" +
 			" SamiSinalaEslowaki (Eslowak)EsloweniyeSomali (làkk)AlbaneSerbSuwedu" +
@@ -16753,7 +16753,7 @@ const afLangStr string = "" + // Size: 3085 bytes
 	"nuïtiesJapanneesJavaansGeorgiesKongoleesKikuyuKuanyamaKazaksKalaallisutK" +
 	"hmerKannadaKoreaansKanuriKasjmirsKoerdiesKomiKorniesKirgisiesLatynLuxemb" +
 	"urgsGandaLimburgsLingaalsLaoLitausLuba-KatangaLettiesMalgassiesMarshalle" +
-	"esMaoriMasedoniesMalabaarsMongoolsMarathiMaleisMalteesBirmaansNauruNoord" +
+	"esMaoriMasedoniesMalabaarsMerizoolsMarathiMaleisMalteesBirmaansNauruNoord" +
 	"-NdebeleNepaleesNdongaNederlandsNoorweegse NynorskNoorse BokmålSuid-Ndeb" +
 	"eleNavajoNyanjaOksitaansOromoOriyaOssetiesPandjabiPoolsPasjtoPortugeesQu" +
 	"echuaReto-RomaansRundiRoemeensRussiesRwandeesSanskritSardiniesSindhiNoor" +
@@ -18113,7 +18113,7 @@ const deLangStr string = "" + // Size: 5631 bytes
 	"JavanischGeorgischKongolesischKikuyuKwanyamaKasachischGrönländischKhmerK" +
 	"annadaKoreanischKanuriKaschmiriKurdischKomiKornischKirgisischLateinLuxem" +
 	"burgischGandaLimburgischLingalaLaotischLitauischLuba-KatangaLettischMada" +
-	"gassischMarschallesischMaoriMazedonischMalayalamMongolischMarathiMalaiis" +
+	"gassischMarschallesischMaoriMazedonischMalayalamMerizolischMarathiMalaiis" +
 	"chMaltesischBirmanischNauruischNord-NdebeleNepalesischNdongaNiederländis" +
 	"chNorwegisch NynorskNorwegisch BokmålSüd-NdebeleNavajoNyanjaOkzitanischO" +
 	"jibwaOromoOriyaOssetischPunjabiPaliPolnischPaschtuPortugiesischQuechuaRä" +
@@ -18138,7 +18138,7 @@ const deLangStr string = "" + // Size: 5631 bytes
 	"ral-Alaska-YupikEwondoExtremadurischPangweFilipinoMeänkieliFonCajunMitte" +
 	"lfranzösischAltfranzösischFrankoprovenzalischNordfriesischOstfriesischFr" +
 	"iaulischGaGagausischGanGayoGbayaGabriGeezKiribatischGilakiMittelhochdeut" +
-	"schAlthochdeutschGoa-KonkaniGondiMongondouGotischGreboAltgriechischSchwe" +
+	"schAlthochdeutschGoa-KonkaniGondiMerizondouGotischGreboAltgriechischSchwe" +
 	"izerdeutschWayúuFarefareGusiiKutchinHaidaHakkaHawaiischFidschi-HindiHili" +
 	"gaynonHethitischMiaoObersorbischXiangHupaIbanIbibioIlokanoInguschischIsc" +
 	"horischJamaikanisch-KreolischLojbanNgombaMachameJüdisch-PersischJüdisch-" +
@@ -18147,7 +18147,7 @@ const deLangStr string = "" + // Size: 5631 bytes
 	"warKirmanjkiKakoKalenjinKimbunduKomi-PermjakischKonkaniKosraeanischKpell" +
 	"eKaratschaiisch-BalkarischKrioKinaray-aKarelischOraonShambalaBafiaKölsch" +
 	"KumükischKutenaiLadinoLangiLahndaLambaLesgischLingua Franca NovaLigurisc" +
-	"hLivischLakotaLombardischMongoKreol (Louisiana)LoziNördliches LuriLettga" +
+	"hLivischLakotaLombardischMerizoKreol (Louisiana)LoziNördliches LuriLettga" +
 	"llischLuba-LuluaLuisenoLundaLuoLushaiLuhyaKlassisches ChinesischLasischM" +
 	"aduresischMafaKhottaMaithiliMakassarischMalinkeMassaiMabaMokschanischMan" +
 	"daresischMendeMeruMorisyenMittelirischMakhuwa-MeettoMeta’MicmacMinangkab" +
@@ -18439,7 +18439,7 @@ const enLangStr string = "" + // Size: 4978 bytes
 	"nupiaqIdoIcelandicItalianInuktitutJapaneseJavaneseGeorgianKongoKikuyuKua" +
 	"nyamaKazakhKalaallisutKhmerKannadaKoreanKanuriKashmiriKurdishKomiCornish" +
 	"KyrgyzLatinLuxembourgishGandaLimburgishLingalaLaoLithuanianLuba-KatangaL" +
-	"atvianMalagasyMarshalleseMaoriMacedonianMalayalamMongolianMarathiMalayMa" +
+	"atvianMalagasyMarshalleseMaoriMacedonianMalayalamMerizolianMarathiMalayMa" +
 	"lteseBurmeseNauruNorth NdebeleNepaliNdongaDutchNorwegian NynorskNorwegia" +
 	"n BokmålSouth NdebeleNavajoNyanjaOccitanOjibwaOromoOdiaOsseticPunjabiPal" +
 	"iPolishPashtoPortugueseQuechuaRomanshRundiRomanianRussianKinyarwandaSans" +
@@ -18470,7 +18470,7 @@ const enLangStr string = "" + // Size: 4978 bytes
 	"hotaneseKoyra ChiiniKhowarKirmanjkiKakoKalenjinKimbunduKomi-PermyakKonka" +
 	"niKosraeanKpelleKarachay-BalkarKrioKinaray-aKarelianKurukhShambalaBafiaC" +
 	"olognianKumykKutenaiLadinoLangiLahndaLambaLezghianLingua Franca NovaLigu" +
-	"rianLivonianLakotaLombardMongoLouisiana CreoleLoziNorthern LuriLatgalian" +
+	"rianLivonianLakotaLombardMerizoLouisiana CreoleLoziNorthern LuriLatgalian" +
 	"Luba-LuluaLuisenoLundaLuoMizoLuyiaLiterary ChineseLazMadureseMafaMagahiM" +
 	"aithiliMakasarMandingoMasaiMabaMokshaMandarMendeMeruMorisyenMiddle Irish" +
 	"Makhuwa-MeettoMetaʼMi'kmaqMinangkabauManchuManipuriMohawkMossiWestern Ma" +
@@ -19406,7 +19406,7 @@ const filLangStr string = "" + // Size: 3178 bytes
 	"tJapaneseJavaneseGeorgianKongoKikuyuKuanyamaKazakhKalaallisutKhmerKannad" +
 	"aKoreanKanuriKashmiriKurdishKomiCornishKirghizLatinLuxembourgishGandaLim" +
 	"burgishLingalaLaoLithuanianLuba-KatangaLatvianMalagasyMarshalleseMaoriMa" +
-	"cedonianMalayalamMongolianMarathiMalayMalteseBurmeseNauruHilagang Ndebel" +
+	"cedonianMalayalamMerizolianMarathiMalayMalteseBurmeseNauruHilagang Ndebel" +
 	"eNepaliNdongaDutchNorwegian NynorskNorwegian BokmålSouth NdebeleNavajoNy" +
 	"anjaOccitanOromoOdiaOsseticPunjabiPolishPashtoPortugueseQuechuaRomanshRu" +
 	"ndiRomanianRussianKinyarwandaSanskritSardinianSindhiHilagang SamiSangoSi" +
@@ -20730,7 +20730,7 @@ const idLangStr string = "" + // Size: 4042 bytes
 	"ardiKanembuTyapMakondeKabuverdianuKenyangKoroKhasiKhotanKoyra ChiiniKako" +
 	"KalenjinKimbunduKomi-PermyakKonkaniKosreKpelleKarachai BalkarKrioKarelia" +
 	"KurukShambalaBafiaDialek KolschKumykKutenaiLadinoLangiLahndaLambaLezghia" +
-	"LiguriaLakotaMongoKreol LouisianaLoziLuri UtaraLuba-LuluaLuisenoLundaLuo" +
+	"LiguriaLakotaMerizoKreol LouisianaLoziLuri UtaraLuba-LuluaLuisenoLundaLuo" +
 	"MizoLuyiaLazMaduraMafaMagahiMaithiliMakasarMandingoMasaiMabaMokshaMandar" +
 	"MendeMeruMorisienIrlandia Abad PertengahanMakhuwa-MeettoMeta’MikmakMinan" +
 	"gkabauManchuriaManipuriMohawkMossiMundangBeberapa BahasaBahasa MuskogeeM" +
@@ -23232,7 +23232,7 @@ const msLangStr string = "" + // Size: 3309 bytes
 	"terlingueIgboSichuan YiIdoIcelandItaliInuktitutJepunJawaGeorgiaKongoKiku" +
 	"yaKuanyamaKazakhstanKalaallisutKhmerKannadaKoreaKanuriKashmirKurdishKomi" +
 	"CornishKirghizLatinLuxembourgGandaLimburgishLingalaLaosLithuaniaLuba-Kat" +
-	"angaLatviaMalagasyMarshallMaoriMacedoniaMalayalamMongoliaMarathiMelayuMa" +
+	"angaLatviaMalagasyMarshallMaoriMacedoniaMalayalamMerizoliaMarathiMelayuMa" +
 	"ltaBurmaNauruNdebele UtaraNepalNdongaBelandaNynorsk NorwayBokmål NorwayN" +
 	"debele SelatanNavajoNyanjaOccitaniaOromoOdiaOssetePunjabiPolandPashtoPor" +
 	"tugisQuechuaRomanshRundiRomaniaRusiaKinyarwandaSanskritSardiniaSindhiSam" +
@@ -23672,7 +23672,7 @@ const nlLangStr string = "" + // Size: 4765 bytes
 	"orgischKongoGikuyuKuanyamaKazachsGroenlandsKhmerKannadaKoreaansKanuriKas" +
 	"jmiriKoerdischKomiCornishKirgizischLatijnLuxemburgsLugandaLimburgsLingal" +
 	"aLaotiaansLitouwsLuba-KatangaLetsMalagassischMarshalleesMaoriMacedonisch" +
-	"MalayalamMongoolsMarathiMaleisMalteesBirmaansNauruaansNoord-NdebeleNepal" +
+	"MalayalamMerizoolsMarathiMaleisMalteesBirmaansNauruaansNoord-NdebeleNepal" +
 	"eesNdongaNederlandsNoors - NynorskNoors - BokmålZuid-NdbeleNavajoNyanjaO" +
 	"ccitaansOjibwaAfaan OromoOdiaOssetischPunjabiPaliPoolsPasjtoePortugeesQu" +
 	"echuaReto-RomaansKirundiRoemeensRussischKinyarwandaSanskrietSardijnsSind" +
@@ -23703,7 +23703,7 @@ const nlLangStr string = "" + // Size: 4765 bytes
 	"KirmanckîKakoKalenjinKimbunduKomi-PermjaaksKonkaniKosraeaansKpelleKarats" +
 	"jaj-BalkarischKrioKinaray-aKarelischKurukhShambalaBafiaKölschKoemuksKute" +
 	"naiLadinoLangiLahndaLambaLezgischLingua Franca NovaLigurischLijfsLakotaL" +
-	"ombardischMongoLouisiana-CreoolsLoziNoordelijk LuriLetgaalsLuba-LuluaLui" +
+	"ombardischMerizoLouisiana-CreoolsLoziNoordelijk LuriLetgaalsLuba-LuluaLui" +
 	"senoLundaLuoMizoLuyiaKlassiek ChineesLazischMadoereesMafaMagahiMaithiliM" +
 	"akassaarsMandingoMaaMabaMoksjaMandarMendeMeruMorisyenMiddeliersMakhuwa-M" +
 	"eettoMeta’Mi’kmaqMinangkabauMantsjoeMeiteiMohawkMossiWest-MariMundangMee" +
@@ -26602,7 +26602,7 @@ const trLangStr string = "" + // Size: 5998 bytes
 	"bunduKomi-PermyakKonkani diliKosraeanKpelle diliKaraçay-BalkarcaKrioKina" +
 	"ray-aKarelyacaKurukh diliShambalaBafiaKöln lehçesiKumukçaKutenai diliLad" +
 	"inoLangiLahndaLamba diliLezgiceLingua Franca NovaLigurcaLivoncaLakotacaL" +
-	"ombardçaMongoLouisiana KreolcesiLoziKuzey LuriLatgalianLuba-LuluaLuiseno" +
+	"ombardçaMerizoLouisiana KreolcesiLoziKuzey LuriLatgalianLuba-LuluaLuiseno" +
 	"LundaLuoLushaiLuyiaEdebi ÇinceLazcaMadura DiliMafaMagahiMaithiliMakasarM" +
 	"andingoMasaiMabaMokşa diliMandarMende diliMeruMorisyenOrtaçağ İrlandacas" +
 	"ıMakhuwa-MeettoMeta’MicmacMinangkabauMançurya diliManipuri diliMohavk d" +
@@ -27216,7 +27216,7 @@ const viLangStr string = "" + // Size: 8700 bytes
 	"Tiếng KimbunduTiếng Komi-PermyakTiếng KonkaniTiếng KosraeTiếng KpelleTiế" +
 	"ng Karachay-BalkarTiếng KarelianTiếng KurukhTiếng ShambalaTiếng BafiaTiế" +
 	"ng CologneTiếng KumykTiếng KutenaiTiếng LadinoTiếng LangiTiếng LahndaTiế" +
-	"ng LambaTiếng LezghianTiếng LakotaTiếng MongoTiếng Creole LouisianaTiếng" +
+	"ng LambaTiếng LezghianTiếng LakotaTiếng MerizoTiếng Creole LouisianaTiếng" +
 	" LoziTiếng Bắc LuriTiếng Luba-LuluaTiếng LuisenoTiếng LundaTiếng LuoTiến" +
 	"g LushaiTiếng LuyiaTiếng MaduraTiếng MafaTiếng MagahiTiếng MaithiliTiếng" +
 	" MakasarTiếng MandingoTiếng MasaiTiếng MabaTiếng MokshaTiếng MandarTiếng" +
@@ -27611,7 +27611,7 @@ const zuLangStr string = "" + // Size: 4680 bytes
 	"risi-Kannadaisi-Koreanisi-Kanuriisi-Kashmiriisi-Kurdishisi-Komiisi-Corni" +
 	"shisi-Kyrgyzisi-Latinisi-Luxembourgishisi-Gandaisi-Limburgishisi-Lingala" +
 	"i-Laoisi-Lithuanianisi-Luba-Katangaisi-Latvianisi-Malagasyisi-Marshalles" +
-	"eisi-Maoriisi-Macedonianisi-Malayalamisi-Mongolianisi-Marathiisi-Malayis" +
+	"eisi-Maoriisi-Macedonianisi-Malayalamisi-Merizolianisi-Marathiisi-Malayis" +
 	"i-Malteseisi-Burmeseisi-Nauruisi-North Ndebeleisi-Nepaliisi-Ndongaisi-Du" +
 	"tchi-Norwegian Nynorskisi-Norwegian Bokmåli-South Ndebeleisi-Navajoisi-N" +
 	"yanjaisi-Occitani-Oromoisi-Odiaisi-Osseticisi-Punjabiisi-Polishisi-Pasht" +
@@ -28318,7 +28318,7 @@ var scriptHeaders = [261]header{
 		"ArabaiddArmenaiddBanglaBopomofoBrailleCyriligDevanagariEthiopigGeorgaidd" +
 			"GroegaiddGwjarataiddGwrmwciHan gyda BopomofoHangulHanHan symledigHan" +
 			" traddodiadolHebreigHiraganaSyllwyddor JapaneaiddJamoJapaneaiddCatac" +
-			"anaChmeraiddCanaraiddCoreaiddLaoaiddLladinMalayalamaiddMongolaiddMya" +
+			"anaChmeraiddCanaraiddCoreaiddLaoaiddLladinMalayalamaiddMerizolaiddMya" +
 			"nmaraiddOgamOrïaiddSinhanaiddTamilaiddTeluguThaanaTaiTibetaiddNodian" +
 			"t MathemategolEmojiSymbolauAnysgrifenedigCyffredinSgript anhysbys",
 		[]uint16{ // 179 elements
@@ -28770,7 +28770,7 @@ var scriptHeaders = [261]header{
 			"kanaKharoshthiKhmerKhojkiKannadaKoreaanskKpelleKaithiLannaLaoGotysk " +
 			"LatynGaelysk LatynLatynLepchaLimbuLineair ALineair BFraserLomaLycysk" +
 			"LydyskMandaeansManicheaanskMayahiërogliefenMendeMeroitysk cursiefMer" +
-			"oïtyskMalayalamMongoolsMoonMroMeiteiMyanmarAld Noard-ArabyskNabateaa" +
+			"oïtyskMalayalamMerizoolsMoonMroMeiteiMyanmarAld Noard-ArabyskNabateaa" +
 			"nskNaxi GebaN’KoNüshuOghamOl ChikiOrkhonOdiaOsmanyaPalmyreensAldperm" +
 			"yskPhags-paInscriptioneel PahlaviPsalmen PahlaviBoek PahlaviFoenicys" +
 			"kPollard-fonetyskInscriptioneel ParthyskRejangRongorongoRunicSamarit" +
@@ -28873,7 +28873,7 @@ var scriptHeaders = [261]header{
 			"hthiCmèarKhojkiKannadaCoirèanaisKpelleKaithiLannaLàthoLaideann frakt" +
 			"urLaideann GhàidhealachLaideannLepchaLimbuLinear ALinear BLisuLomaLy" +
 			"cianLydianMahajaniMandaeanManichaeanMarchenDealbh-sgrìobhadh MayachM" +
-			"endeMeroiticeach ceangailteMeroiticeachMalayalamModiMongolaisMroMeit" +
+			"endeMeroiticeach ceangailteMeroiticeachMalayalamModiMerizolaisMroMeit" +
 			"ei MayekMultaniMiànmarSeann-Arabach ThuathachNabataeanNewaNaxi GebaN" +
 			"’koNüshuOgham-chraobhOl ChikiOrkhonOriyaOsageOsmanyaPalmyrenePau C" +
 			"in HauSeann-PhermicPhags-paPahlavi nan snaidh-sgrìobhaidheanPahlavi " +
@@ -28963,7 +28963,7 @@ var scriptHeaders = [261]header{
 			"iKatakanaKharoshthiKhmerKannadaKoreanischLannaLaotischLatiinisch - F" +
 			"raktur-VarianteLatiinisch - Gäälischi VarianteLatiinischLepchaLimbuL" +
 			"inear ALinear BLykischLydischMandäischManichäischMaya-HieroglyphäMer" +
-			"oitischMalaysischMongolischMoonMeitei MayekBurmesischN’KoOghamOl Chi" +
+			"oitischMalaysischMerizolischMoonMeitei MayekBurmesischN’KoOghamOl Chi" +
 			"kiOrchon-RunäOriyaOsmanischAltpermischPhags-paPahlaviPhönizischPolla" +
 			"rd PhonetischRejangRongorongoRunäschriftSamaritanischSaratiSaurashtr" +
 			"aGebäärdeschpraachShaw-AlphabetSinghalesischSundanesischSyloti Nagri" +
@@ -29351,7 +29351,7 @@ var scriptHeaders = [261]header{
 			"chrëftAlitaleschJavaneseschJapaneschKayah LiKatakanaKharoshthiKhmerK" +
 			"annadaKoreaneschLannaLaoteschLaténgesch-Fraktur-VariantLaténgesch-Gä" +
 			"llesch VariantLaténgeschLepchaLimbuLinear ALinear BLykeschLydeschMan" +
-			"däeschManichäeschMaya-HieroglyphenMeroiteschMalayseschMongoleschMoon" +
+			"däeschManichäeschMaya-HieroglyphenMeroiteschMalayseschMerizoleschMoon" +
 			"Meitei MayekBirmaneschN’KoOghamOl ChikiOrchon-RunenOriyaOsmaneschAlp" +
 			"ermeschPhags-paPahlaviPhönizeschPollard PhoneteschRejangRongorongoRu" +
 			"neschrëftSamaritaneschSaratiSaurashtraZeechesproochShaw-AlphabetSing" +
@@ -30130,7 +30130,7 @@ var scriptHeaders = [261]header{
 			"yl elipbiýiHan elipbiýiÝönekeýleşdirilen han elipbiýiAdaty han elipb" +
 			"iýiÝewreý elipbiýiHiragana elipbiýiÝapon bogun elipbiýleriJamo elipb" +
 			"iýiÝapon elipbiýiKatakana elipbiýiKhmer elipbiýiKannada elipbiýiKore" +
-			"ý elipbiýiLaos elipbiýiLatyn elipbiýiMalaýalam elipbiýiMongol elipb" +
+			"ý elipbiýiLaos elipbiýiLatyn elipbiýiMalaýalam elipbiýiMerizol elipb" +
 			"iýiMýanma elipbiýiOriýa elipbiýiSingal elipbiýiTamil elipbiýiTelugu " +
 			"elipbiýiTaana elipbiýiTaý elipbiýiTibet elipbiýiMatematiki belgilerE" +
 			"mojiNyşanlarÝazuwsyzUmumyNäbelli elipbiý",
@@ -30620,7 +30620,7 @@ const afScriptStr string = "" + // Size: 372 bytes
 	"ArabiesArmeensBengaalsBopomofoBrailleSirilliesDevanagariEtiopiesGeorgies" +
 	"GrieksGudjaratiGurmukhiHanbHangulHanVereenvoudigde HanTradisionele HanHe" +
 	"breeusHiraganaJapannese lettergreepskrifJamoJapanneesKatakanaKhmerKannad" +
-	"aKoreaansLaoLatynMalabaarsMongoolsMianmarOriyaSinhalaTamilTeloegoeThaana" +
+	"aKoreaansLaoLatynMalabaarsMerizoolsMianmarOriyaSinhalaTamilTeloegoeThaana" +
 	"ThaiTibettaansWiskundige notasieEmojiSimboleOngeskreweAlgemeenOnbekende " +
 	"skryfstelsel"
 
@@ -31051,7 +31051,7 @@ const deScriptStr string = "" + // Size: 1697 bytes
 	"anaKharoshthiKhmerKhojkiKannadaKoreanischKpelleKaithiLannaLaotischLatein" +
 	"isch - Fraktur-VarianteLateinisch - Gälische VarianteLateinischLepchaLim" +
 	"buLinear ALinear BFraserLomaLykischLydischMahajaniMandäischManichäischMa" +
-	"ya-HieroglyphenMendeMeroitisch kursivMeroitischMalayalamModiMongolischMo" +
+	"ya-HieroglyphenMendeMeroitisch kursivMeroitischMalayalamModiMerizolischMo" +
 	"onMroMeitei MayekBirmanischAltnordarabischNabatäischGebaN’KoFrauenschrif" +
 	"tOghamOl ChikiOrchon-RunenOriyaOsmanischPalmyrenischPau Cin HauAltpermis" +
 	"chPhags-paBuch-PahlaviPsalter-PahlaviPahlaviPhönizischPollard Phonetisch" +
@@ -31157,7 +31157,7 @@ const enScriptStr string = "" + // Size: 1621 bytes
 	"yah LiKatakanaKharoshthiKhmerKhojkiKannadaKoreanKpelleKaithiLannaLaoFrak" +
 	"tur LatinGaelic LatinLatinLepchaLimbuLinear ALinear BFraserLomaLycianLyd" +
 	"ianMahajaniMandaeanManichaeanMarchenMayan hieroglyphsMendeMeroitic Cursi" +
-	"veMeroiticMalayalamModiMongolianMoonMroMeitei MayekMultaniMyanmarOld Nor" +
+	"veMeroiticMalayalamModiMerizolianMoonMroMeitei MayekMultaniMyanmarOld Nor" +
 	"th ArabianNabataeanNewaNaxi GebaN’KoNüshuOghamOl ChikiOrkhonOdiaOsageOsm" +
 	"anyaPalmyrenePau Cin HauOld PermicPhags-paInscriptional PahlaviPsalter P" +
 	"ahlaviBook PahlaviPhoenicianPollard PhoneticInscriptional ParthianRejang" +
@@ -31465,7 +31465,7 @@ const filScriptStr string = "" + // Size: 363 bytes
 	"ArabicArmenianBanglaBopomofoBrailleCyrillicDevanagariEthiopicGeorgianGre" +
 	"ekGujaratiGurmukhiHanbHangulHanPinasimpleng HanTradisyonal na HanHebrewH" +
 	"iraganaJapanese syllabariesJamoJapaneseKatakanaKhmerKannadaKoreanLaoLati" +
-	"nMalayalamMongolianMyanmarOdiaSinhalaTamilTeluguThaanaThaiTibetanMathema" +
+	"nMalayalamMerizolianMyanmarOdiaSinhalaTamilTeluguThaanaThaiTibetanMathema" +
 	"tical NotationEmojiMga SimboloHindi NakasulatKaraniwanHindi Kilalang Scr" +
 	"ipt"
 
@@ -31790,7 +31790,7 @@ const huScriptStr string = "" + // Size: 1286 bytes
 	"naÓmagyarIndusRégi olaszJamoJávaiJapánKajah liKatakanaKharoshthiKhmerKan" +
 	"nadaKoreaiKaithiLannaLaoFraktur latinGael latinLatinLepchaLimbuLineáris " +
 	"ALineáris BLíciaiLídiaiMandaiManicheusMaja hieroglifákMeroitikusMalajála" +
-	"mMongolMoonMeitei mayekBurmaiN’koOghamOl chikiOrhonOriyaOszmánÓpermikusP" +
+	"mMerizolMoonMeitei mayekBurmaiN’koOghamOl chikiOrhonOriyaOszmánÓpermikusP" +
 	"hags-paFelriatos pahlaviPsalter pahlaviKönyv pahlaviFőniciaiPollard fone" +
 	"tikusFeliratos parthianRedzsangRongorongoRunikusSzamaritánSzaratiSzauras" +
 	"traJelírásShaw ábécéSzingalézSzundanézSylheti nagáriSzíriaiEstrangelo sz" +
@@ -31876,7 +31876,7 @@ const idScriptStr string = "" + // Size: 1408 bytes
 	"KunoIndusItalia LamaJamoJawaJepangJurchenKayah LiKatakanaKharoshthiKhmer" +
 	"KhojkiKannadaKoreaKpelleKaithiLannaLaosLatin FrakturLatin GaelikLatinLep" +
 	"chaLimbuLinear ALinear BLisuLomaLyciaLydiaMandaeManikheiHieroglip MayaMe" +
-	"ndeKursif MeroitikMeroitikMalayalamModiMongoliaMoonMroMeitei MayekMyanma" +
+	"ndeKursif MeroitikMeroitikMalayalamModiMerizoliaMoonMroMeitei MayekMyanma" +
 	"rArab Utara KunoNabataeaNaxi GebaN’KoNushuOghamChiki LamaOrkhonOriyaOsma" +
 	"nyaPalmiraPermik KunoPhags-paPahleviMazmur PahleviKitab PahleviPhoenixFo" +
 	"netik PollardPrasasti ParthiaRejangRongorongoRunikSamariaSaratiArab Sela" +
@@ -32651,7 +32651,7 @@ const msScriptStr string = "" + // Size: 357 bytes
 	"ArabArmeniaBaliBamuBenggalaBopomofoBrailleCansCyrilDevanagariEthiopiaGeo" +
 	"rgiaGreekGujaratGurmukhiHan dengan BopomofoHangulHanHan RingkasHan Tradi" +
 	"sionalIbraniHiraganaEjaan sukuan JepunJamoJepunKatakanaKhmerKannadaKorea" +
-	"LaoLatinMalayalamMongoliaMyammarOriyaSinhalaTamilTeluguThaanaThaiTibetTa" +
+	"LaoLatinMalayalamMerizoliaMyammarOriyaSinhalaTamilTeluguThaanaThaiTibetTa" +
 	"tatanda matematikEmojiSimbolTidak ditulisLazimTulisan Tidak Diketahui"
 
 var msScriptIdx = []uint16{ // 179 elements
@@ -32781,7 +32781,7 @@ const nlScriptStr string = "" + // Size: 1716 bytes
 	"iKannadaKoreaansKpelleKaithiLannaLaotiaansGotisch LatijnsGaelisch Latijn" +
 	"sLatijnsLepchaLimbuLineair ALineair BFraserLomaLycischLydischMahajaniMan" +
 	"daeansManicheaansMarchenMayahiërogliefenMendeMeroitisch cursiefMeroïtisc" +
-	"hMalayalamModiMongoolsMoonMroMeiteiMultaniBirmaansOud Noord-ArabischNaba" +
+	"hMalayalamModiMerizoolsMoonMroMeiteiMultaniBirmaansOud Noord-ArabischNaba" +
 	"teaansNewariNaxi GebaN’KoNüshuOghamOl ChikiOrkhonOdiaOsageOsmanyaPalmyre" +
 	"ensPau Cin HauOudpermischPhags-paInscriptioneel PahlaviPsalmen PahlaviBo" +
 	"ek PahlaviFoenicischPollard-fonetischInscriptioneel ParthischRejangRongo" +
@@ -33998,7 +33998,7 @@ const zuScriptStr string = "" + // Size: 504 bytes
 	"anagariisi-Ethiopicisi-Georgianisi-Greekisi-Gujaratiisi-Gurmukhiisi-Hanb" +
 	"isi-Hangulisi-Hanisi-Han esenziwe lulaisi-Han sosikoisi-Hebrewisi-Hiraga" +
 	"nai-Japanese syllabariesisi-Jamoisi-Japaneseisi-Katakanaisi-Khmerisi-Kan" +
-	"nadaisi-Koreanisi-Laoisi-Latinisi-Malayalamisi-Mongolianisi-Myanmarisi-O" +
+	"nadaisi-Koreanisi-Laoisi-Latinisi-Malayalamisi-Merizolianisi-Myanmarisi-O" +
 	"diaisi-Sinhalaisi-Tamilisi-Teluguisi-Thaanaisi-Thaii-Tibetani-Mathematic" +
 	"al Notationi-Emojiamasimbuliokungabhaliwejwayelekileiskripthi esingaziwa"
 
@@ -34391,7 +34391,7 @@ var regionHeaders = [261]header{
 			" KathkaziniKorea KuthiniKuwaitiVithiwa vya KaymanKazakithtaniLaothiL" +
 			"ebanoniThantaluthiaLishenteniThirilankaLiberiaLethotoLitwaniaLathemb" +
 			"agiLativiaLibyaMorokoMonakoMoldovaBukiniVithiwa vya MarshalMathedoni" +
-			"aMaliMyamaMongoliaVithiwa vya Mariana vya KathkaziniMartinikiMoritan" +
+			"aMaliMyamaMerizoliaVithiwa vya Mariana vya KathkaziniMartinikiMoritan" +
 			"iaMonttherratiMaltaMorithiModivuMalawiMekthikoMalethiaMthumbijiNamib" +
 			"iaNyukaledoniaNijeriKithiwa cha NorfokNijeriaNikaragwaUholandhiNorwe" +
 			"NepaliNauruNiueNyudhilandiOmaniPanamaPeruPolinesia ya UfaranthaPapua" +
@@ -34470,7 +34470,7 @@ var regionHeaders = [261]header{
 			"eCorea del SurKuwaitIslles CaimánKazakstánLaosLíbanuSanta LlucíaLiec" +
 			"htensteinSri LankaLiberiaLesothuLituaniaLuxemburguLetoniaLibiaMarrue" +
 			"cosMónacuMoldaviaMontenegruSaint MartinMadagascarIslles MarshallMace" +
-			"doniaMalíMyanmar (Birmania)MongoliaARE China de MacáuIslles Marianes" +
+			"doniaMalíMyanmar (Birmania)MerizoliaARE China de MacáuIslles Marianes" +
 			" del NorteLa MartinicaMauritaniaMontserratMaltaMauriciuLes MaldivesM" +
 			"alauiMéxicuMalasiaMozambiqueNamibiaNueva CaledoniaEl NíxerIslla Norf" +
 			"olkNixeriaNicaraguaPaíses BaxosNoruegaNepalNauruNiueNueva ZelandaOmá" +
@@ -35151,7 +35151,7 @@ var regionHeaders = [261]header{
 			"ts ha NevisKorea an NorzhKorea ar SuKoweitInizi CaymanKazakstanLaosL" +
 			"ibanSaint LuciaLiechtensteinSri LankaLiberiaLesothoLituaniaLuksembou" +
 			"rgLatviaLibiaMarokoMonacoMoldovaMontenegroSaint MartinMadagaskarIniz" +
-			"i MarshallMakedoniaMaliMyanmar (Birmania)MongoliaMacau RMD SinaInizi" +
+			"i MarshallMakedoniaMaliMyanmar (Birmania)MerizoliaMacau RMD SinaInizi" +
 			" Mariana an NorzhMartinikMaouritaniaMontserratMaltaMorisMaldivezMala" +
 			"wiMecʼhikoMalaysiaMozambikNamibiaKaledonia NevezNigerEnez NorfolkNig" +
 			"eriaNicaraguaIzelvroioùNorvegiaNepalNauruNiueZeland-NevezOmanPanamáP" +
@@ -35330,7 +35330,7 @@ var regionHeaders = [261]header{
 			"na KorejaJužna KorejaKuvajtKajmanska ostrvaKazahstanLaosLibanSveta L" +
 			"ucijaLihtenštajnŠri LankaLiberijaLesotoLitvanijaLuksemburgLatvijaLib" +
 			"ijaMarokoMonakoMoldavijaCrna GoraSveti MartinMadagaskarMaršalova ost" +
-			"rvaMakedonijaMaliMjanmarMongolijaMakao (SAR Kina)Sjeverna Marijanska" +
+			"rvaMakedonijaMaliMjanmarMerizolijaMakao (SAR Kina)Sjeverna Marijanska" +
 			" ostrvaMartinikMauritanijaMonseratMaltaMauricijusMaldiviMalaviMeksik" +
 			"oMalezijaMozambikNamibijaNova KaledonijaNigerOstrvo NorfolkNigerijaN" +
 			"ikaragvaHolandijaNorveškaNepalNauruNiueNovi ZelandOmanPanamaPeruFran" +
@@ -35702,7 +35702,7 @@ var regionHeaders = [261]header{
 			"reya AmashuumaKuweitiEbizinga bya KayimaniKazakisitaniLayosiLebanoni" +
 			"Senti RusiyaLishenteniSirirankaLiberiyaLesothoLithuaniaLakizembaagaL" +
 			"atviyaLibyaMoroccoMonacoMoridovaMadagasikaEbizinga bya MarshaaMasedo" +
-			"oniaMariMyanamarMongoriaEbizinga by’amatemba ga MarianaMartiniqueMau" +
+			"oniaMariMyanamarMerizoriaEbizinga by’amatemba ga MarianaMartiniqueMau" +
 			"riteeniyaMontserratiMaritaMaurishiasiMaridivesMarawiMexicomarayiziaM" +
 			"ozambiqueNamibiyaNiukaredoniaNaigyaEkizinga NorifokoNaigyeriyaNikara" +
 			"gwaHoorandiNoorweNepoNauruNiueNiuzirandiOmaaniPanamaPeruPolinesia ya" +
@@ -35932,7 +35932,7 @@ var regionHeaders = [261]header{
 			"eaDe KoreaKuwaitYnysoedd CaymanKazakstanLaosLibanusSaint LuciaLiecht" +
 			"ensteinSri LankaLiberiaLesothoLithuaniaLwcsembwrgLatfiaLibyaMorocoMo" +
 			"nacoMoldofaMontenegroSaint MartinMadagascarYnysoedd MarshallMacedoni" +
-			"aMaliMyanmar (Burma)MongoliaMacau RhGA TsieinaYnysoedd Gogledd Maria" +
+			"aMaliMyanmar (Burma)MerizoliaMacau RhGA TsieinaYnysoedd Gogledd Maria" +
 			"naMartiniqueMauritaniaMontserratMaltaMauritiusY MaldivesMalawiMecsic" +
 			"oMalaysiaMozambiqueNamibiaCaledonia NewyddNigerYnys NorfolkNigeriaNi" +
 			"caraguaYr IseldiroeddNorwyNepalNauruNiueSeland NewyddOmanPanamaPeriw" +
@@ -36021,7 +36021,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -36179,7 +36179,7 @@ var regionHeaders = [261]header{
 			"eŋ Kitts nda NevisGurma KooreeHawsa KooreeKuweetKayman gungeyKaazaks" +
 			"tanLaawosLubnaanSeŋ LussiaLiechtensteinSrilankaLiberiaLeesotoLituaan" +
 			"iLuxembourgLetooniLiibiMaarokMonakoMoldoviMadagascarMaršal gungeyMaa" +
-			"cedooniMaaliMaynamarMongooliMariana Gurma GungeyMartiniikiMooritaani" +
+			"cedooniMaaliMaynamarMerizooliMariana Gurma GungeyMartiniikiMooritaani" +
 			"MontserratMaltaMooris gungeyMaldiivuMalaawiMexikiMaleeziMozambikNaam" +
 			"ibiKaaledooni TaagaaNižerNorfolk GungooNaajiriiaNikaragwaHollanduNor" +
 			"veejNeepalNauruNiueZeelandu TaagaOmaanPanamaPeeruFaransi PolineeziPa" +
@@ -36259,7 +36259,7 @@ var regionHeaders = [261]header{
 			"njowa KorejaKuwaitKajmaniske kupyKazachstanLaosLibanonSt. LuciaLiech" +
 			"tensteinSri LankaLiberijaLesothoLitawskaLuxemburgskaLetiskaLibyskaMa" +
 			"rokkoMonacoMoldawskaCarna GóraSt. MartinMadagaskarMarshallowe kupyMa" +
-			"kedońskaMaliMyanmarMongolskaWósebna zastojnstwowa cona MacaoPódpołno" +
+			"kedońskaMaliMyanmarMerizolskaWósebna zastojnstwowa cona MacaoPódpołno" +
 			"cne MarianyMartiniqueMawretańskaMontserratMaltaMauritiusMalediwyMala" +
 			"wiMexikoMalajzijaMosambikNamibijaNowa KaledoniskaNigerNorfolkowa kup" +
 			"aNigerijaNikaraguaNižozemskaNorwegskaNepalNauruNiueNowoseelandskaOma" +
@@ -36509,7 +36509,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -36603,7 +36603,7 @@ var regionHeaders = [261]header{
 			"nutomeLituania nutomeLazembɔg nutomeLatvia nutomeLibya nutomeMoroko " +
 			"nutomeMonako nutomeMoldova nutomeMontenegro nutomeSaint Martin nutom" +
 			"eMadagaska nutomeMarshal ƒudomekpowo nutomeMakedonia nutomeMali nuto" +
-			"meMyanmar (Burma) nutomeMongolia nutomeMacau SAR Tsaina nutomeDziehe" +
+			"meMyanmar (Burma) nutomeMerizolia nutomeMacau SAR Tsaina nutomeDziehe" +
 			" Marina ƒudomekpowo nutomeMartiniki nutomeMauritania nutomeMontserra" +
 			"t nutomeMalta nutomemauritiusdukɔmaldivesdukɔMalawi nutomeMexico nut" +
 			"omeMalaysia nutomeMozambiki nutomeNamibia nutomeNew Kaledonia nutome" +
@@ -36716,7 +36716,7 @@ var regionHeaders = [261]header{
 			"ioJapanujoKenjoKirgizistanoKamboĝoKiribatoKomorojSent-Kristofo kaj N" +
 			"evisoNord-KoreoSud-KoreoKuvajtoKejmanojKazaĥstanoLaosoLibanoSent-Luc" +
 			"ioLiĥtenŝtejnoSri-LankoLiberioLesotoLitovujoLuksemburgoLatvujoLibioM" +
-			"arokoMonakoMoldavujoMadagaskaroMarŝalojMakedonujoMalioMjanmaoMongolu" +
+			"arokoMonakoMoldavujoMadagaskaroMarŝalojMakedonujoMalioMjanmaoMerizolu" +
 			"joNord-MarianojMartinikoMaŭritanujoMaltoMaŭricioMaldivojMalavioMeksi" +
 			"koMalajzioMozambikoNamibioNov-KaledonioNiĝeroNorfolkinsuloNiĝerioNik" +
 			"aragvoNederlandoNorvegujoNepaloNauroNiuoNov-ZelandoOmanoPanamoPeruoF" +
@@ -37567,7 +37567,7 @@ var regionHeaders = [261]header{
 			"visIpar KoreaHego KoreaKuwaitKaiman uharteakKazakhstanLaosLibanoSant" +
 			"a LuziaLiechtensteinSri LankaLiberiaLesothoLituaniaLuxenburgoLetonia" +
 			"LibiaMarokoMonakoMoldaviaMontenegroSan MartinMadagaskarMarshall Uhar" +
-			"teakMazedoniaMaliMyanmar (Birmania)MongoliaMacau Txinako AEBIpar Mar" +
+			"teakMazedoniaMaliMyanmar (Birmania)MerizoliaMacau Txinako AEBIpar Mar" +
 			"iana uharteakMartinikaMauritaniaMontserratMaltaMaurizioMaldivakMalaw" +
 			"iMexikoMalaysiaMozambikeNamibiaKaledonia BerriaNigerNorfolk uharteaN" +
 			"igeriaNikaraguaHerbehereakNorvegiaNepalNauruNiueZeelanda BerriaOmanP" +
@@ -37870,7 +37870,7 @@ var regionHeaders = [261]header{
 			"eaKuvaitCaymanoyggjarKasakstanLaosLibanonSt. LusiaLiktinsteinSri Lan" +
 			"kaLiberiaLesotoLitavaLuksemborgLettlandLibyaMarokkoMonakoMoldovaMont" +
 			"enegroSt-MartinMadagaskarMarshalloyggjarMakedóniaMaliMyanmar (Burma)" +
-			"MongoliaMakao SAR KinaNorðaru MariuoyggjarMartiniqueMóritaniaMontser" +
+			"MerizoliaMakao SAR KinaNorðaru MariuoyggjarMartiniqueMóritaniaMontser" +
 			"ratMaltaMóritiusMaldivoyggjarMalaviMeksikoMalaisiaMosambikNamibiaNýk" +
 			"aledóniaNigerNorfolksoyggjNigeriaNikaraguaNiðurlondNoregNepalNauruNi" +
 			"ueNýsælandOmanPanamaPeruFranska PolynesiaPapua NýguineaFilipsoyggjar" +
@@ -37989,7 +37989,7 @@ var regionHeaders = [261]header{
 			"l sudKuwaitIsulis CaymanKazachistanLaosLibanSante LusieLiechtenstein" +
 			"Sri LankaLiberieLesothoLituanieLussemburcLetonieLibieMarocMonacoMold" +
 			"avieMontenegroSant MartinMadagascarIsulis MarshallMacedonieMaliBirma" +
-			"nieMongolieRegjon aministrative speciâl de Cine di MacaoIsulis Maria" +
+			"nieMerizolieRegjon aministrative speciâl de Cine di MacaoIsulis Maria" +
 			"na dal NordMartinicheMauritanieMontserratMaltaMauriziMaldivisMalawiM" +
 			"essicMalaysiaMozambicNamibieGnove CaledonieNigerIsole NorfolkNigerie" +
 			"NicaraguaPaîs basNorvegjeNepalNauruNiueGnove ZelandeOmanPanamàPerùPo" +
@@ -38079,7 +38079,7 @@ var regionHeaders = [261]header{
 			"renSaint Kitts en NevisNoard-KoreaSûd-KoreaKoeweitCaymaneilannenKaza" +
 			"chstanLaosLibanonSaint LuciaLiechtensteinSri LankaLiberiaLesothoLito" +
 			"uwenLuxemburgLetlânLibiëMarokkoMonacoMoldaviëMontenegroSaint-MartinM" +
-			"adeiaskarMarshalleilannenMacedoniëMaliMyanmar (Birma)MongoliëMacao S" +
+			"adeiaskarMarshalleilannenMacedoniëMaliMyanmar (Birma)MerizoliëMacao S" +
 			"AR van SinaNoardlike MarianeneilannenMartiniqueMauritaniëMontserratM" +
 			"altaMauritiusMaldivenMalawiMexicoMaleisiëMozambiqueNamibiëNij-Caledo" +
 			"niëNigerNorfolkeilânNigeriaNicaraguaNederlânNoarwegenNepalNauruNiueN" +
@@ -38277,7 +38277,7 @@ var regionHeaders = [261]header{
 			"eanCasachstànLàthosLeabanonNaomh LùiseaLichtensteinSri LancaLibèirLe" +
 			"asotoAn LiotuainLugsamburgAn LaitbheLibiaMorocoMonacoA’ MholdobhaAm " +
 			"Monadh NeagrachNaomh MàrtainnMadagasgarEileanan MharshallA’ Mhasadon" +
-			"MàiliMiànmarDùthaich nam MongolMacàthu SAR na SìneNa h-Eileanan Mair" +
+			"MàiliMiànmarDùthaich nam MerizolMacàthu SAR na SìneNa h-Eileanan Mair" +
 			"ianach a TuathMairtinicMoratàineaMontsaratMaltaNa h-Eileanan Mhoiris" +
 			"easNa h-Eileanan MhaladaibhMalabhaidhMeagsagoMalaidhseaMòsaimbicAn N" +
 			"amaibCailleann NuadhNìgeirEilean NorfolkNigèiriaNiocaraguaNa Tìrean " +
@@ -38375,7 +38375,7 @@ var regionHeaders = [261]header{
 			"o SurKuwaitIllas CaimánCasaquistánLaosLíbanoSanta LucíaLiechtenstein" +
 			"Sri LankaLiberiaLesotoLituaniaLuxemburgoLetoniaLibiaMarrocosMónacoMo" +
 			"ldaviaMontenegroSaint-MartinMadagascarIllas MarshallMacedoniaMalíMya" +
-			"nmar (Birmania)MongoliaMacau RAE da ChinaIllas Marianas do NorteMart" +
+			"nmar (Birmania)MerizoliaMacau RAE da ChinaIllas Marianas do NorteMart" +
 			"inicaMauritaniaMontserratMaltaMauricioMaldivasMalawiMéxicoMalaisiaMo" +
 			"zambiqueNamibiaNova CaledoniaNíxerIlla NorfolkNixeriaNicaraguaPaíses" +
 			" BaixosNoruegaNepalNauruNiueNova ZelandiaOmánPanamáPerúPolinesia Fra" +
@@ -38467,7 +38467,7 @@ var regionHeaders = [261]header{
 			"eKasachschtanLaaosLibanonSt. LutschiiaLiächteschtäiSchri LankaLibeer" +
 			"iaLesootoLittaueLuxemburgLettlandLüübieMarokkoMonacoRepublik MoldauM" +
 			"onteneegroSt. MartinMadagaschkarMarshallinsleMazedoonieMaaliMyanmar " +
-			"(Burma)MongoleiSonderverwaltigszone MacaoNördlichi MariaaneMartinigg" +
+			"(Burma)MerizoleiSonderverwaltigszone MacaoNördlichi MariaaneMartinigg" +
 			"MauretaanieMoosörratMaltaMauriiziusMalediiweMalaawiMexikoMaläisiaMos" +
 			"ambikNamiibiaNöikaledoonieNigerNorfolk-InsleNigeeriaNicaraaguaHollan" +
 			"dNorweegeNeepalNauruNiueNöiseelandOmaanPanamaPeruFranzösisch-Polinee" +
@@ -38556,7 +38556,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -38783,7 +38783,7 @@ var regionHeaders = [261]header{
 			"iKomorySt. Kitts a NevisSewjerna KorejaJužna KorejaKuwaitKajmanske k" +
 			"upyKazachstanLaosLibanonSt. LuciaLiechtensteinSri LankaLiberijaLesot" +
 			"hoLitawskaLuxemburgskaLetiskaLibyskaMarokkoMonacoMoldawskaMontenegro" +
-			"St. MartinMadagaskarMarshallowe kupyMakedonskaMaliMyanmarMongolskaWo" +
+			"St. MartinMadagaskarMarshallowe kupyMakedonskaMaliMyanmarMerizolskaWo" +
 			"sebita zarjadniska cona MacaoSewjerne MarianyMartiniqueMawretanskaMo" +
 			"ntserratMaltaMauritiusMalediwyMalawiMexikoMalajzijaMosambikNamibijaN" +
 			"owa KaledoniskaNigerNorfolkowa kupaNigerijaNikaraguaNižozemskaNorweg" +
@@ -39021,7 +39021,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -39170,7 +39170,7 @@ var regionHeaders = [261]header{
 			"diaKiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwai" +
 			"tiIsiwa sya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirila" +
 			"nkaLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBuki" +
-			"niVisiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya" +
+			"niVisiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya" +
 			" KaskaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksik" +
 			"oMalesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNik" +
 			"aragwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia" +
@@ -39244,7 +39244,7 @@ var regionHeaders = [261]header{
 			"tzi na NevisKolea KasikaziniKolea KusiniKuwaitiChisiwa cha KemenKaza" +
 			"chistaniLaosiLebanoniSantalusiaLishenteniSililankaLibeliaLesotoLitwa" +
 			"niaLasembagiLativiaLibyaMolokoMonakoMoldovaBukiniChisiwa cha Malusha" +
-			"lMasedoniaMaliMyamaMongoliaChisiwa cha Marian cha KasikaziniMalitini" +
+			"lMasedoniaMaliMyamaMerizoliaChisiwa cha Marian cha KasikaziniMalitini" +
 			"kiMolitaniaMonselatiMaltaMolisiModivuMalawiMeksikoMalesiaMsumbijiNam" +
 			"ibiaNyukaledoniaNidyeliChisiwa cha NolufokNidyeliaNikalagwaUholanziN" +
 			"orweNepaliNauluNiueNyuzilandiOmaniPanamaPeluPolinesia ya UfalansaPap" +
@@ -39406,7 +39406,7 @@ var regionHeaders = [261]header{
 			"tiKomoorSeŋ Kitts nda NevisKooree, GurmaKooree, HawsaKuweetKayman gu" +
 			"ngeyKaazakstanLaawosLubnaanSeŋ LussiaLiechtensteinSrilankaLiberiaLee" +
 			"sotoLituaaniLuxembourgLetooniLiibiMaarokMonakoMoldoviMadagascarMarša" +
-			"l gungeyMaacedooniMaaliMaynamarMongooliMariana Gurma GungeyMartiniik" +
+			"l gungeyMaacedooniMaaliMaynamarMerizooliMariana Gurma GungeyMartiniik" +
 			"iMooritaaniMontserratMaltaMooris gungeyMaldiivuMalaawiMexikiMaleeziM" +
 			"ozambikNaamibiKaaledooni TaagaaNižerNorfolk GungooNaajiriiaNikaragwa" +
 			"HollanduNorveejNeepalNauruNiueZeelandu TaagaOmaanPanamaPeeruFaransi " +
@@ -39479,7 +39479,7 @@ var regionHeaders = [261]header{
 			"mbodiaKiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKu" +
 			"waitiVisiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSi" +
 			"rilankaLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldova" +
-			"BukiniVisiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana" +
+			"BukiniVisiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana" +
 			" vya KaskaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMe" +
 			"ksikoMalesiaMsumbijiNamimbiaNyukaledoniaNijeriKisiwa cha NorfokNainj" +
 			"eriaNikaragwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPo" +
@@ -39601,7 +39601,7 @@ var regionHeaders = [261]header{
 			" Sri LankaEmetab LiberiaEmetab LesothoEmetab LithuaniaEmetab Luxembo" +
 			"urgEmetab LatviaEmetab LibyaEmetab MoroccoEmetab MonacoEmetab Moldov" +
 			"aEmetab MadagascarIkwembeiyotab MarshallEmetab MacedoniaEmetab MaliE" +
-			"metab MyanmarEmetab MongoliaIkwembeiyotab Mariana nebo murot katamEm" +
+			"metab MyanmarEmetab MerizoliaIkwembeiyotab Mariana nebo murot katamEm" +
 			"etab MartiniqueEmetab MauritaniaEmetab MontserratEmetab MaltaEmetab " +
 			"MauritiusEmetab MaldivesEmetab MalawiEmetab MexicoEmetab MalaysiaEme" +
 			"tab MozambiqueEmetab NamibiaEmetab New CaledoniaEmetab nigerIkwembei" +
@@ -39902,7 +39902,7 @@ var regionHeaders = [261]header{
 			"akitzi na NevisKolea KaskaziniKolea KusiniKuwaitiVisiwa vya KaymanKa" +
 			"zakistaniLaosiLebanoniSantalusiaLishenteniSililankaLibeliaLesotoLitw" +
 			"aniaLasembagiLativiaLibyaMolokoMonakoMoldovaBukiniVisiwa vya MashalM" +
-			"asedoniaMaliMyamaMongoliaVisiwa vya Maliana vya KaskaziniMaltinikiMa" +
+			"asedoniaMaliMyamaMerizoliaVisiwa vya Maliana vya KaskaziniMaltinikiMa" +
 			"ulitaniaMontselatiMaltaMolisiModivuMalawiMeksikoMalesiaMsumbijiNamib" +
 			"iaNyukaledoniaNaijaKisiwa cha NolfokNaijeliaNikalagwaUholanziNolweiN" +
 			"epaliNauluNiueNyuzilandiOmaniPanamaPeluPolinesia ya UfalansaPapuaFil" +
@@ -40247,7 +40247,7 @@ var regionHeaders = [261]header{
 			" an NevisNordkoreaSüdkoreaKuwaitKaimaninselenKasachstanLaosLibanonSt" +
 			". LuciaLiechtensteinSri LankaLiberiaLesothoLitauenLëtzebuergLettland" +
 			"LibyenMarokkoMonacoMoldawienMontenegroSt. MartinMadagaskarMarshallin" +
-			"selenMazedonienMaliMyanmarMongoleiSpezialverwaltungszon MacauNërdlec" +
+			"selenMazedonienMaliMyanmarMerizoleiSpezialverwaltungszon MacauNërdlec" +
 			"h MarianenMartiniqueMauretanienMontserratMaltaMauritiusMaldivenMalaw" +
 			"iMexikoMalaysiaMosambikNamibiaNeikaledonienNigerNorfolkinselNigeriaN" +
 			"icaraguaHollandNorwegenNepalNauruNiueNeiséilandOmanPanamaPeruFranséi" +
@@ -40333,7 +40333,7 @@ var regionHeaders = [261]header{
 			"iKoreya ey’omumambukaKoreya ey’omumaserengetaKuwetiBizinga ebya Kayi" +
 			"maaniKazakisitaaniLawosiLebanoniSenti LuciyaLicitensitayiniSirilanka" +
 			"LiberyaLesosoLisuwenyaLukisembaagaLativyaLibyaMorokoMonakoMolodovaMa" +
-			"dagasikaBizinga bya MarisoMasedoniyaMaliMyanimaMongoliyaBizinga bya " +
+			"dagasikaBizinga bya MarisoMasedoniyaMaliMyanimaMerizoliyaBizinga bya " +
 			"Mariyana eby’omumambukaMaritiniikiMawulitenyaMonteseraatiMalitaMawul" +
 			"isyasiBizinga by’eMalidiveMalawiMekisikoMalezyaMozambiikiNamibiyaKal" +
 			"edonya mupyaNijeKizinga ky’eNorofokoNayijeryaNikaraguwaHolandiNoweNe" +
@@ -40458,7 +40458,7 @@ var regionHeaders = [261]header{
 			"ɛ ya súdiKowetiBisanga bya KayímaKazakisitáLawosiLibáSántu lisiLish" +
 			"ɛteniSirilankaLibériyaLesotoLitwaniLikisambuluLetoniLibíMarokɛMonak" +
 			"oMolidaviMonténégroMadagasikariBisanga bya MarishalɛMasedwanɛMalíBir" +
-			"manieMongolíBisanga bya Marianɛ ya nɔ́rdiMartinikiMoritaniMɔseraMali" +
+			"manieMerizolíBisanga bya Marianɛ ya nɔ́rdiMartinikiMoritaniMɔseraMali" +
 			"tɛMorisɛMadívɛMalawiMeksikeMaleziMozambíkiNamibiKaledoni ya sikaNizɛ" +
 			"rɛEsanga NorfokɛNizeryaNikaragwaOlandɛNorivezɛNepálɛNauruNyuéZelandɛ" +
 			" ya sikaOmánɛPanamaPéruPolinezi ya FalánsɛPapwazi Ginɛ ya sikaFilipi" +
@@ -40588,7 +40588,7 @@ var regionHeaders = [261]header{
 			"izisitaKambodzaKiribatiKomoruSantu krístofe ne NevesKore wa muuluKor" +
 			"e wa mwinshiKowetiLutanda lua KayimaKazakusitaLawosiLibaSantu lisiLi" +
 			"shuteniSirilankaLiberiyaLesotoLitwaniLikisambuluLetoniLibiMarokeMona" +
-			"kuMolidaviMadagasikariLutanda lua MarishaleMasedwaneMaliMyamareMongo" +
+			"kuMolidaviMadagasikariLutanda lua MarishaleMasedwaneMaliMyamareMerizo" +
 			"liLutanda lua Mariane wa muuluMartinikiMoritaniMuseraMaliteMoriseMad" +
 			"iveMalawiMeksikeMaleziMozambikiNamibiKaledoni wa mumuNijereLutanda l" +
 			"ua NorfokNijeryaNikaragwaOlandɛNorivejeNepálɛNauruNyueZelanda wa mum" +
@@ -40661,7 +40661,7 @@ var regionHeaders = [261]header{
 			"iribatiComorosSaint Kitts gi NevisKorea MasawaKorea MilamboKuwaitCay" +
 			"man IslandsKazakhstanLaosLebanonSaint LuciaLiechtensteinSri LankaLib" +
 			"eriaLesothoLithuaniaLuxembourgLatviaLibyaMoroccoMonacoMoldovaMadagas" +
-			"carChuia mar MarshallMacedoniaMaliMyanmarMongoliaNorthern Mariana Is" +
+			"carChuia mar MarshallMacedoniaMaliMyanmarMerizoliaNorthern Mariana Is" +
 			"landsMartiniqueMauritaniaMontserratMaltaMauritiusMaldivesMalawiMexic" +
 			"oMalaysiaMozambiqueNamibiaNew CaledoniaNigerChuia mar NorfolkNigeria" +
 			"NicaraguaNetherlandsNorwayNepalNauruNiueNew ZealandOmanPanamaPeruFre" +
@@ -40734,7 +40734,7 @@ var regionHeaders = [261]header{
 			"aKiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaiti" +
 			"Visiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilan" +
 			"kaLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukin" +
-			"iVisiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya " +
+			"iVisiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya " +
 			"KaskaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksiko" +
 			"MalesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNika" +
 			"ragwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia " +
@@ -40811,7 +40811,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -40884,7 +40884,7 @@ var regionHeaders = [261]header{
 			"rigizistaniKambodiaKiribatiKomoroSantakitzi na NevisKorea NothiKorea" +
 			" SaũthiKuwĩ tiAĩrandi cia KaymanKazakistaniLaosiLebanoniSantalusiaLi" +
 			"shenteniSirilankaLiberiaLesothoLithuaniaLuxemboguLativiaLĩbiaMorokoM" +
-			"onakoMoldovaMadagasikaAĩrandi cia MarshalMacedoniaMaliMyanimaMongoli" +
+			"onakoMoldovaMadagasikaAĩrandi cia MarshalMacedoniaMaliMyanimaMerizoli" +
 			"aAĩrandi cia Mariana ya nothiMartinikiMauritaniaMontserratiMaltaMaur" +
 			"ĩtiasiModivuMalawiMexikoMalĩsiaMozambikiNamibiaKalendoia ĨnjeruNija" +
 			"Aĩrandi cia NorfokNijeriaNikaragwaHolandiNorwiNepaliNauruNiueNiuzila" +
@@ -40956,7 +40956,7 @@ var regionHeaders = [261]header{
 			"ribatiKomorSaint-Christophe-ek-NiévèsLakore-dinorLakore-disidKoweitZ" +
 			"il KaymanKazakstanLaosLibanSainte-LucieLiechtensteinSri LankaLiberia" +
 			"LezotoLituaniLuxembourgLetoniLibiMarokMonakoMoldaviMadagaskarZil Mar" +
-			"shallMasedwannMaliMyanmarMongoliZil Maryann dinorMartinikMoritaniMon" +
+			"shallMasedwannMaliMyanmarMerizoliZil Maryann dinorMartinikMoritaniMon" +
 			"tseraMaltMorisMaldivMalawiMexikMaleziMozambikNamibiNouvel-KaledoniNi" +
 			"zerLil NorfolkNizeriaNicaraguaOlandNorvezNepalNauruNioweNouvel Zelan" +
 			"dOmanPanamaPerouPolinezi fransePapouazi-Nouvel-GineFilipinnPakistanP" +
@@ -41235,7 +41235,7 @@ var regionHeaders = [261]header{
 			"ibanuSaint Luciail-Liechtensteinis-Sri Lankail-Liberjail-Lesotoil-Li" +
 			"twanjail-Lussemburguil-Latvjail-Libjail-MarokkMonacoil-Moldovail-Mon" +
 			"tenegroSaint MartinMadagascarGżejjer Marshalll-Eks-Repubblika Jugosl" +
-			"ava tal-Maċedoniail-Maliil-Myanmar/Burmail-Mongoljair-Reġjun Amminis" +
+			"ava tal-Maċedoniail-Maliil-Myanmar/Burmail-Merizoljair-Reġjun Amminis" +
 			"trattiv Speċjali tal-Macao tar-Repubblika tal-Poplu taċ-ĊinaĠżejjer " +
 			"Mariana tat-TramuntanaMartiniqueil-MauritaniaMontserratMaltaMauritiu" +
 			"sil-Maldiviil-Malawiil-Messikuil-Malasjail-Mozambiquein-NamibjaNew C" +
@@ -41326,7 +41326,7 @@ var regionHeaders = [261]header{
 			"itkayman ma laŋneKazakstaŋSǝr LaosLibaŋSǝr LuciaLichtǝnsteiŋSǝr Lank" +
 			"aLiberiyaSǝr LesothoLituaniyaSǝr LuxemburgLetoniyaLibiyaMarokMonakoM" +
 			"oldoviyaMadagaskarSǝr Marshall ma laŋneMacedoniyaSǝr MaliSǝr Myanmar" +
-			"MongoliyaSǝr Maria ma laŋneMartinikaMauritaniyaSǝr MontserratSǝr Mal" +
+			"MerizoliyaSǝr Maria ma laŋneMartinikaMauritaniyaSǝr MontserratSǝr Mal" +
 			"taSǝr MauricǝMaldivǝSǝr MalawiMexikoMalaysiyaMozambikaNamibiyaKaledo" +
 			"niya mafuuSǝr NigerNorfolk ma laŋneNigeriyaNikaragwaSǝr ma kasǝŋNorv" +
 			"egǝSǝr NepalSǝr NauruNiweZeland mafuuOmaŋSǝr PanamaPeruSǝr Polynesiy" +
@@ -41490,7 +41490,7 @@ var regionHeaders = [261]header{
 			", NoordKoreab, SuidKuwaitiCayman IslandsKazakhstanniLaosLebanonniSai" +
 			"nt LuciaLiechtensteinniSri LankabLiberiabLesothobLithuaniabLuxembour" +
 			"giLatviaLibyabMoroccoMonacoMoldovaMadagascariMarshall IslandsMacedon" +
-			"iabMalibMyanmarMongoliaNorthern Mariana IslandsMartiniqueMauritaniaM" +
+			"iabMalibMyanmarMerizoliaNorthern Mariana IslandsMartiniqueMauritaniaM" +
 			"ontserratMaltaMauritiusMaldivesMalawibMexicobMalaysiabMozambikiNamib" +
 			"iabNew CaledoniaNigeriNorfolk IslandNigeriebNicaraguabNetherlandsNoo" +
 			"rweebNepaliNauruNiueNew ZealandiOmanPanamaPerubFrench PolynesiaPapua" +
@@ -41564,7 +41564,7 @@ var regionHeaders = [261]header{
 			"aint Kitts and NevisNorth KoreaSouth KoreaKhuweitiCayman IslandsKaza" +
 			"khstanLaosLebhanoniSaint LuciaLiechtensteinSri LankaLibheriyaLesotho" +
 			"LithuaniaLuxembourgLatviaLibhiyaMorokhoMonakhoMoldovaMadagaskaMarsha" +
-			"ll IslandsMacedoniaMaliMyanmarMongoliaNorthern Mariana IslandsMartin" +
+			"ll IslandsMacedoniaMaliMyanmarMerizoliaNorthern Mariana IslandsMartin" +
 			"iqueMauritaniaMontserratMaltaMauritiusMaldivesMalawiMeksikhoMalezhiy" +
 			"aMozambiqueNamibhiyaNew CaledoniaNigerNorfolk IslandNigeriyaNicaragu" +
 			"aNetherlandsNoweyiNephaliNauruNiueNew ZealandOmaniPanamaPheruPholine" +
@@ -41721,7 +41721,7 @@ var regionHeaders = [261]header{
 			"ord-KoreaSør-KoreaKuwaitCaymanøyaneKasakhstanLaosLibanonSt. LuciaLie" +
 			"chtensteinSri LankaLiberiaLesothoLitauenLuxembourgLatviaLibyaMarokko" +
 			"MonacoMoldovaMontenegroSaint MartinMadagaskarMarshalløyaneMakedoniaM" +
-			"aliMyanmar (Burma)MongoliaMacao S.A.R. KinaNord-MariananeMartiniqueM" +
+			"aliMyanmar (Burma)MerizoliaMacao S.A.R. KinaNord-MariananeMartiniqueM" +
 			"auritaniaMontserratMaltaMauritiusMaldivaneMalawiMexicoMalaysiaMosamb" +
 			"ikNamibiaNy-CaledoniaNigerNorfolkøyaNigeriaNicaraguaNederlandNoregNe" +
 			"palNauruNiueNew ZealandOmanPanamaPeruFransk PolynesiaPapua Ny-Guinea" +
@@ -41870,7 +41870,7 @@ var regionHeaders = [261]header{
 			"i Kittis na NevisiKoreya AmatembaKoreya AmashuumaKuweitiEbizinga bya" +
 			" KayimaniKazakisitaniLayosiLebanoniSenti RusiyaLishenteniSirirankaLi" +
 			"beriyaLesothoLithuaniaLakizembaagaLatviyaLibyaMoroccoMonacoMoridovaM" +
-			"adagasikaEbizinga bya MarshaaMasedooniaMariMyanamarMongoriaEbizinga " +
+			"adagasikaEbizinga bya MarshaaMasedooniaMariMyanamarMerizoriaEbizinga " +
 			"by’amatemba ga MarianaMartiniqueMauriteeniyaMontserratiMaritaMaurish" +
 			"iasiMaridivesMarawiMexicomarayiziaMozambiqueNamibiyaNiukaredoniaNaig" +
 			"yaEkizinga NorifokoNaigyeriyaNikaragwaHoorandiNoorweNepoNauruNiueNiu" +
@@ -42335,7 +42335,7 @@ var regionHeaders = [261]header{
 			"rea dal NordCorea dal SidKuwaitInslas CaymanKasachstanLaosLibanonSai" +
 			"nt LuciaLiechtensteinSri LankaLiberiaLesothoLituaniaLuxemburgLettoni" +
 			"aLibiaMarocMonacoMoldaviaMontenegroSaint MartinMadagascarInslas da M" +
-			"arshallMacedoniaMaliMyanmarMongoliaRegiun d’administraziun speziala " +
+			"arshallMacedoniaMaliMyanmarMerizoliaRegiun d’administraziun speziala " +
 			"Macao, ChinaInslas Mariannas dal NordMartiniqueMauretaniaMontserratM" +
 			"altaMauritiusMaldivasMalawiMexicoMalaisiaMosambicNamibiaNova Caledon" +
 			"iaNigerInsla NorfolkNigeriaNicaraguaPajais BassNorvegiaNepalNauruNiu" +
@@ -42424,7 +42424,7 @@ var regionHeaders = [261]header{
 			"oreSekitsi na NevisiKoreya y’amajaruguruKoreya y’amajepfoKowetiIbirw" +
 			"a bya KeyimaniKazakisitaniLayosiLibaniSelusiyaLishyitenshitayiniSiri" +
 			"lankaLiberiyaLesotoLituwaniyaLukusamburuLativaLibiyaMarokeMonakoMolu" +
-			"daviMadagasikariIzinga rya MarishariMasedoniyaMaliBirimaniyaMongoliy" +
+			"daviMadagasikariIzinga rya MarishariMasedoniyaMaliBirimaniyaMerizoliy" +
 			"aAmazinga ya Mariyana ryo mu majaruguruMaritinikiMoritaniyaMontesera" +
 			"tiMalitaIzinga rya MoriseMoludaveMalawiMigizikeMaleziyaMozambikiNami" +
 			"biyaNiyukaledoniyaNijeriizinga rya NorufolukeNijeriyaNikaragwaUbuhol" +
@@ -42532,7 +42532,7 @@ var regionHeaders = [261]header{
 			"batiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiVisiw" +
 			"a vya KaimaiKazakistaniLaosiLebanoniSantalusiaLishenteniSirilankaLib" +
 			"eriaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukiniVisi" +
-			"wa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya Kaska" +
+			"wa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya Kaska" +
 			"ziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoMales" +
 			"iaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikaragwa" +
 			"UholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia ya Uf" +
@@ -42690,7 +42690,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -42810,7 +42810,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -42885,7 +42885,7 @@ var regionHeaders = [261]header{
 			"ya ya luvala lwa KunyamandeKoleya ya KusiniKuwaitiFigunguli ifya Kay" +
 			"imayiKasakisitaniLayosiLebanoniSantalusiyaLisheniteniSililankaLibeli" +
 			"yaLesotoLitwaniyaLasembagiLativiyaLibiyaMolokoMonakoMolidovaBukiniFi" +
-			"gunguli ifya MalishaliMasedoniyaMaliMuyamaMongoliyaFigunguli fya Mal" +
+			"gunguli ifya MalishaliMasedoniyaMaliMuyamaMerizoliyaFigunguli fya Mal" +
 			"iyana ifya luvala lwa KunyamandeMalitinikiMolitaniyaMonitiselatiMali" +
 			"taMolisiModivuMalawiMekisikoMalesiyaMusumbijiNamibiyaNyukaledoniyaNi" +
 			"jeliShigunguli sha NolifokiNijeliyaNikalagwaWuholansiNolweNepaliNawu" +
@@ -43046,7 +43046,7 @@ var regionHeaders = [261]header{
 			"iribatiKomorosSaint Kitts ja NevisDavvi-KoreaMátta-KoreaKuwaitCayman" +
 			"-sullotKasakstanLaosLibanonSaint LuciaLiechtensteinSri LankaLiberiaL" +
 			"esothoLietuvaLuxembourgLátviaLibyaMarokkoMonacoMoldáviaMontenegroFra" +
-			"nkriikka Saint MartinMadagaskarMarshallsullotMakedoniaMaliBurmaMongo" +
+			"nkriikka Saint MartinMadagaskarMarshallsullotMakedoniaMaliBurmaMerizo" +
 			"liaMakáoDavvi-MariánatMartiniqueMauretániaMontserratMáltaMauritiusMa" +
 			"lediivvatMalawiMeksikoMalesiaMosambikNamibiaOđđa-KaledoniaNigerNorfo" +
 			"lksullotNigeriaNicaraguaVuolleeatnamatNorgaNepalNauruNiueOđđa-Selánd" +
@@ -43252,7 +43252,7 @@ var regionHeaders = [261]header{
 			"tiKomoorSeŋ Kitts nda NevisKooree, GurmaKooree, HawsaKuweetKayman gu" +
 			"ngeyKaazakstanLaawosLubnaanSeŋ LussiaLiechtensteinSrilankaLiberiaLee" +
 			"sotoLituaaniLuxembourgLetooniLiibiMaarokMonakoMoldoviMadagascarMarša" +
-			"l gungeyMaacedooniMaaliMaynamarMongooliMariana Gurma GungeyMartiniik" +
+			"l gungeyMaacedooniMaaliMaynamarMerizooliMariana Gurma GungeyMartiniik" +
 			"iMooritaaniMontserratMaltaMooris gungeyMaldiivuMalaawiMexikiMaleeziM" +
 			"ozambikNaamibiKaaledooni TaagaaNižerNorfolk GungooNaajiriiaNikaragwa" +
 			"HollanduNorveejNeepalNauruNiueZeelandu TaagaOmaanPanamaPeeruFaransi " +
@@ -43327,7 +43327,7 @@ var regionHeaders = [261]header{
 			"rëe tî BangaKorëe tî MbongoKöwêtiÂzûâ Ngundë, KaimäniKazakisitäanLùa" +
 			"ôsiLibùaanSênt-LisïiLiechtenstein,Sirî-LankaLiberïaLesôthoLituanïiL" +
 			"ugzambûruLetonùiiLibïiMarôkoMonaköoMoldavùiiMadagaskäraÂzûâ MärshâlM" +
-			"aseduäniMalïiMyämâraMongolïiÂzûâ Märïâni tî BangaMärtïnîkiMoritanïiM" +
+			"aseduäniMalïiMyämâraMerizolïiÂzûâ Märïâni tî BangaMärtïnîkiMoritanïiM" +
 			"onserâteMâltaMörîsiMaldîvaMalawïiMekisîkiMalezïiMözämbîkaNamibùiiFin" +
 			"î KaledonïiNizëreZûâ NôrfôlkoNizerïaNikaraguaHoländeNörvêziNëpâliNa" +
 			"uruNiueFinî ZelândeOmâniPanamaPerüuPolinezïi tî farânziPapû Finî Gin" +
@@ -43560,7 +43560,7 @@ var regionHeaders = [261]header{
 			"KambodžaKiribatiKomorehSt. Kitts já NevisTave-KoreaMaadâ-KoreaKuwait" +
 			"CaymansuolluuhKazakstanLaosLibanonSt. LuciaLiechtensteinSri LankaLib" +
 			"eriaLesothoLiettuaLuxemburgLatviaLibyaMarokkoMonacoMoldovaMontenegro" +
-			"St. MartinMadagaskarMarshallsuolluuhMaliMyanmar (Burma)MongoliaMacao" +
+			"St. MartinMadagaskarMarshallsuolluuhMaliMyanmar (Burma)MerizoliaMacao" +
 			" - – Kiina e.h.k.Tave-MarianehMartiniqueMauritaniaMontserratMaltaMau" +
 			"ritiusMaledivehMalawiMeksikoMalaysiaMosambikNamibiaUđđâ-KaledoniaNig" +
 			"erNorfolksuáluiNigeriaNicaraguaVuáládâhenâmehTaažâNepalNauruNiueUđđâ" +
@@ -43710,7 +43710,7 @@ var regionHeaders = [261]header{
 			"itts and NevisKuuriyada WaqooyiKuuriyada KoonfureedKuwaytCayman Isla" +
 			"ndsKasaakhistaanLaosLubnaanSaint LuciaLiechtensteinSirilaankaLaybeer" +
 			"iyaLosootoLituweeniyaLuksemboorgLatfiyaLiibiyaMarookoMoonakoMoldofaM" +
-			"adagaskarMarshall IslandsMakadooniyaMaaliMiyanmarMongooliyaNorthern " +
+			"adagaskarMarshall IslandsMakadooniyaMaaliMiyanmarMerizooliyaNorthern " +
 			"Mariana IslandsMartiniqueMuritaaniyaMontserratMaaldaMurishiyoosMaald" +
 			"iqeenMalaawiMeksikoMalaysiaMusambiigNamiibiyaNew CaledoniaNayjerNorf" +
 			"olk IslandNayjeeriyaNikaraaguwaNetherlandsNoorweeyNebaalNauruNiueNey" +
@@ -44161,7 +44161,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -44482,7 +44482,7 @@ var regionHeaders = [261]header{
 			" tokelauKōlea tongaKueitiʻOtumotu KeimeniKasakitaniLauLepanoniSā Lūs" +
 			"iaLikitenisiteiniSīlangikāLaipeliaLesotoLituaniaLakisimipekiLativiaL" +
 			"īpiaMolokoMonakoMolotovaMonitenikaloSā Mātini (fakafalanisē)Matakas" +
-			"ikaʻOtumotu MāsoloMasetōniaMāliPemaMongokōliaMakau SAR SiainaʻOtumot" +
+			"ikaʻOtumotu MāsoloMasetōniaMāliPemaMerizokōliaMakau SAR SiainaʻOtumot" +
 			"u Maliana tokelauMātinikiMauliteniaMoʻungaselatiMalitaMaulitiusiMala" +
 			"tivisiMalauiMekisikouMalēsiaMosēmipikiNamipiaNiu KaletōniaNisiaMotu " +
 			"NōfolikiNaisiliaNikalakuaHōlaniNoauēNepaliNauluNiuēNuʻusilaʻOmaniPan" +
@@ -44651,7 +44651,7 @@ var regionHeaders = [261]header{
 			"tiKomoorSeŋ Kitts nda NevisKooree, GurmaKooree, HawsaKuweetKayman gu" +
 			"ngeyKaazakstanLaawosLubnaanSeŋ LussiaLiechtensteinSrilankaLiberiaLee" +
 			"sotoLituaaniLuxembourgLetooniLiibiMaarokMonakoMoldoviMadagascarMarša" +
-			"l gungeyMaacedooniMaaliMaynamarMongooliMariana Gurma GungeyMartiniik" +
+			"l gungeyMaacedooniMaaliMaynamarMerizooliMariana Gurma GungeyMartiniik" +
 			"iMooritaaniMontserratMaltaMooris gungeyMaldiivuMalaawiMexikiMaleeziM" +
 			"ozambikNaamibiKaaledooni TaagaaNižerNorfolk GungooNaajiriiaNikaragwa" +
 			"HollanduNorveejNeepalNauruNiueZeelandu TaagaOmaanPanamaPeeruFaransi " +
@@ -45187,7 +45187,7 @@ var regionHeaders = [261]header{
 			"KiribatiKomoroSantakitzi na NevisKorea KaskaziniKorea KusiniKuwaitiV" +
 			"isiwa vya KaymanKazakistaniLaosiLebanoniSantalusiaLishenteniSirilank" +
 			"aLiberiaLesotoLitwaniaLasembagiLativiaLibyaMorokoMonakoMoldovaBukini" +
-			"Visiwa vya MarshalMasedoniaMaliMyamaMongoliaVisiwa vya Mariana vya K" +
+			"Visiwa vya MarshalMasedoniaMaliMyamaMerizoliaVisiwa vya Mariana vya K" +
 			"askaziniMartinikiMoritaniaMontserratiMaltaMorisiModivuMalawiMeksikoM" +
 			"alesiaMsumbijiNamibiaNyukaledoniaNijeriKisiwa cha NorfokNijeriaNikar" +
 			"agwaUholanziNorweNepaliNauruNiueNyuzilandiOmaniPanamaPeruPolinesia y" +
@@ -45264,7 +45264,7 @@ var regionHeaders = [261]header{
 			"irgištanKambodšaKiribatiKomoreSt. Kitts und NevisNordkoreaSüdkoreaKu" +
 			"weitKaimaninsläKasačstanLaosLibanonSt. LuciaLiečtešteiSri LankaLiber" +
 			"iaLesothoLitaueLuxeburgLettlandLübieMarokoMonagoMoldauMontenegroSt. " +
-			"MartinMadagaskarMaršalinsläMazedonieMaliBurmaMongoleiSonderverwaltig" +
+			"MartinMadagaskarMaršalinsläMazedonieMaliBurmaMerizoleiSonderverwaltig" +
 			"szona MakauNördliči MarianeMartiniqueMauretanieMonserratMaltaMauriti" +
 			"usMalediweMalawiMexikoMalaysiaMosambikNamibiaNiwkaledonieNigerNorfol" +
 			"kinslaNigeriaNicaraguaHolandNorwägeNepalNauruNiueNiwsélandOmanPanama" +
@@ -45348,7 +45348,7 @@ var regionHeaders = [261]header{
 			"àppoŋKeeñaKirgistaŋKàmbojKiribatiKomoorSaŋ Kits ak NewisKore NoorKo" +
 			"wetDuni KaymaŋKasaxstaŋLawosLibaaSaŋ LusiLiktensteyinSiri LànkaLiber" +
 			"iyaLesotoLitiyaniLiksàmburLetoniLibiMarogMonakoMoldawiMontenegoroSaŋ" +
-			" MarteŋMadagaskaarDuni MarsaalMaseduwaanMaliMiyanmaarMongoliDuni Mar" +
+			" MarteŋMadagaskaarDuni MarsaalMaseduwaanMaliMiyanmaarMerizoliDuni Mar" +
 			"iyaan NoorMartinikMooritaniMooseraaMaltMoriisMaldiiwMalawiMeksikoMal" +
 			"esiMosàmbigNamibiNuwel KaledoniNiiseerDunu NorfolkNiseriyaNikaraguwa" +
 			"Peyi BaaNorweesNepaalNawruNiwNuwel SelàndOmaanPanamaPeruPolinesi Far" +
@@ -45423,7 +45423,7 @@ var regionHeaders = [261]header{
 			"eya mumambukaKoreya eya mumaserengetaKuwetiEbizinga bya KayimaaniKaz" +
 			"akisitaaniLawosiLebanoniSenti LuciyaLicitensitayiniSirilankaLiberyaL" +
 			"esosoLisuwenyaLukisembaagaLativyaLibyaMorokoMonakoMolodovaMadagasika" +
-			"Bizinga bya MarisoMasedoniyaMaliMyanimaMongoliyaBizinga bya Mariyana" +
+			"Bizinga bya MarisoMasedoniyaMaliMyanimaMerizoliyaBizinga bya Mariyana" +
 			" ebyamumambukaMaritiniikiMawulitenyaMonteseraatiMalitaMawulisyasiEbi" +
 			"zinga bya MalidiveMalawiMekisikoMalezyaMozambiikiNamibiyaKaledonya m" +
 			"upyaNijeKizinga ky’eNorofokoNayijeryaNikaraguwaHolandiNoweNepaloNawu" +
@@ -46127,7 +46127,7 @@ const afRegionStr string = "" + // Size: 3031 bytes
 	"isNoord-KoreaSuid-KoreaKoeweitKaaimanseilandeKazakstanLaosLibanonSint Lu" +
 	"ciaLiechtensteinSri LankaLiberiëLesothoLitaueLuxemburgLetlandLibiëMarokk" +
 	"oMonacoMoldowaMontenegroSint MartinMadagaskarMarshalleilandeMacedoniëMal" +
-	"iMianmar (Birma)MongoliëMacau SAS SjinaNoord-Mariane-eilandeMartiniqueMa" +
+	"iMianmar (Birma)MerizoliëMacau SAS SjinaNoord-Mariane-eilandeMartiniqueMa" +
 	"uritaniëMontserratMaltaMauritiusMalediveMalawiMeksikoMaleisiëMosambiekNa" +
 	"mibiëNieu-KaledoniëNigerNorfolkeilandNigeriëNicaraguaNederlandNoorweëNep" +
 	"alNauruNiueNieu-SeelandOmanPanamaPeruFrans-PolinesiëPapoea-Nieu-GuineeFi" +
@@ -46742,7 +46742,7 @@ const csRegionStr string = "" + // Size: 3244 bytes
 	"oreaKuvajtKajmanské ostrovyKazachstánLaosLibanonSvatá LucieLichtenštejns" +
 	"koSrí LankaLibérieLesothoLitvaLucemburskoLotyšskoLibyeMarokoMonakoMoldav" +
 	"skoČerná HoraSvatý Martin (Francie)MadagaskarMarshallovy ostrovyMakedoni" +
-	"eMaliMyanmar (Barma)MongolskoMacao – ZAO ČínySeverní MarianyMartinikMaur" +
+	"eMaliMyanmar (Barma)MerizolskoMacao – ZAO ČínySeverní MarianyMartinikMaur" +
 	"itánieMontserratMaltaMauriciusMaledivyMalawiMexikoMalajsieMosambikNamibi" +
 	"eNová KaledonieNigerNorfolkNigérieNikaraguaNizozemskoNorskoNepálNauruNiu" +
 	"eNový ZélandOmánPanamaPeruFrancouzská PolynésiePapua-Nová GuineaFilipíny" +
@@ -47101,7 +47101,7 @@ const enRegionStr string = "" + // Size: 2953 bytes
 	"atiComorosSt. Kitts & NevisNorth KoreaSouth KoreaKuwaitCayman IslandsKaz" +
 	"akhstanLaosLebanonSt. LuciaLiechtensteinSri LankaLiberiaLesothoLithuania" +
 	"LuxembourgLatviaLibyaMoroccoMonacoMoldovaMontenegroSt. MartinMadagascarM" +
-	"arshall IslandsMacedoniaMaliMyanmar (Burma)MongoliaMacau SAR ChinaNorthe" +
+	"arshall IslandsMacedoniaMaliMyanmar (Burma)MerizoliaMacau SAR ChinaNorthe" +
 	"rn Mariana IslandsMartiniqueMauritaniaMontserratMaltaMauritiusMaldivesMa" +
 	"lawiMexicoMalaysiaMozambiqueNamibiaNew CaledoniaNigerNorfolk IslandNiger" +
 	"iaNicaraguaNetherlandsNorwayNepalNauruNiueNew ZealandOmanPanamaPeruFrenc" +
@@ -47232,7 +47232,7 @@ const esRegionStr string = "" + // Size: 3122 bytes
 	"KiribatiComorasSan Cristóbal y NievesCorea del NorteCorea del SurKuwaitI" +
 	"slas CaimánKazajistánLaosLíbanoSanta LucíaLiechtensteinSri LankaLiberiaL" +
 	"esotoLituaniaLuxemburgoLetoniaLibiaMarruecosMónacoMoldaviaMontenegroSan " +
-	"MartínMadagascarIslas MarshallMacedoniaMaliMyanmar (Birmania)MongoliaRAE" +
+	"MartínMadagascarIslas MarshallMacedoniaMaliMyanmar (Birmania)MerizoliaRAE" +
 	" de Macao (China)Islas Marianas del NorteMartinicaMauritaniaMontserratMa" +
 	"ltaMauricioMaldivasMalauiMéxicoMalasiaMozambiqueNamibiaNueva CaledoniaNí" +
 	"gerIsla NorfolkNigeriaNicaraguaPaíses BajosNoruegaNepalNauruNiueNueva Ze" +
@@ -47375,7 +47375,7 @@ const etRegionStr string = "" + // Size: 3018 bytes
 	"žaKiribatiKomooridSaint Kitts ja NevisPõhja-KoreaLõuna-KoreaKuveitKaima" +
 	"nisaaredKasahstanLaosLiibanonSaint LuciaLiechtensteinSri LankaLibeeriaLe" +
 	"sothoLeeduLuksemburgLätiLiibüaMarokoMonacoMoldovaMontenegroSaint-MartinM" +
-	"adagaskarMarshalli SaaredMakedooniaMaliMyanmar (Birma)MongooliaMacau eri" +
+	"adagaskarMarshalli SaaredMakedooniaMaliMyanmar (Birma)MerizooliaMacau eri" +
 	"halduspiirkondPõhja-MariaanidMartiniqueMauritaaniaMontserratMaltaMauriti" +
 	"usMaldiividMalawiMehhikoMalaisiaMosambiikNamiibiaUus-KaledooniaNigerNorf" +
 	"olkNigeeriaNicaraguaHollandNorraNepalNauruNiueUus-MeremaaOmaanPanamaPeru" +
@@ -47550,7 +47550,7 @@ const fiRegionStr string = "" + // Size: 3028 bytes
 	"jois-KoreaEtelä-KoreaKuwaitCaymansaaretKazakstanLaosLibanonSaint LuciaLi" +
 	"echtensteinSri LankaLiberiaLesothoLiettuaLuxemburgLatviaLibyaMarokkoMona" +
 	"coMoldovaMontenegroSaint-MartinMadagaskarMarshallinsaaretMakedoniaMaliMy" +
-	"anmar (Burma)MongoliaMacao – Kiinan e.h.a.Pohjois-MariaanitMartiniqueMau" +
+	"anmar (Burma)MerizoliaMacao – Kiinan e.h.a.Pohjois-MariaanitMartiniqueMau" +
 	"ritaniaMontserratMaltaMauritiusMalediivitMalawiMeksikoMalesiaMosambikNam" +
 	"ibiaUusi-KaledoniaNigerNorfolkinsaariNigeriaNicaraguaAlankomaatNorjaNepa" +
 	"lNauruNiueUusi-SeelantiOmanPanamaPeruRanskan PolynesiaPapua-Uusi-GuineaF" +
@@ -47638,7 +47638,7 @@ const filRegionStr string = "" + // Size: 2985 bytes
 	"iribatiComorosSt. Kitts & NevisHilagang KoreaTimog KoreaKuwaitCayman Isl" +
 	"andsKazakhstanLaosLebanonSaint LuciaLiechtensteinSri LankaLiberiaLesotho" +
 	"LithuaniaLuxembourgLatviaLibyaMoroccoMonacoMoldovaMontenegroSaint Martin" +
-	"MadagascarMarshall IslandsMacedoniaMaliMyanmar (Burma)MongoliaMacau SAR " +
+	"MadagascarMarshall IslandsMacedoniaMaliMyanmar (Burma)MerizoliaMacau SAR " +
 	"ChinaNorthern Mariana IslandsMartiniqueMauritaniaMontserratMaltaMauritiu" +
 	"sMaldivesMalawiMexicoMalaysiaMozambiqueNamibiaNew CaledoniaNigerNorfolk " +
 	"IslandNigeriaNicaraguaNetherlandsNorwayNepalNauruNiueNew ZealandOmanPana" +
@@ -47728,7 +47728,7 @@ const frRegionStr string = "" + // Size: 3315 bytes
 	"évèsCorée du NordCorée du SudKoweïtÎles CaïmansKazakhstanLaosLibanSaint" +
 	"e-LucieLiechtensteinSri LankaLibériaLesothoLituanieLuxembourgLettonieLib" +
 	"yeMarocMonacoMoldavieMonténégroSaint-MartinMadagascarÎles MarshallMacédo" +
-	"ineMaliMyanmar (Birmanie)MongolieR.A.S. chinoise de MacaoÎles Mariannes " +
+	"ineMaliMyanmar (Birmanie)MerizolieR.A.S. chinoise de MacaoÎles Mariannes " +
 	"du NordMartiniqueMauritanieMontserratMalteMauriceMaldivesMalawiMexiqueMa" +
 	"laisieMozambiqueNamibieNouvelle-CalédonieNigerÎle NorfolkNigériaNicaragu" +
 	"aPays-BasNorvègeNépalNauruNiueNouvelle-ZélandeOmanPanamaPérouPolynésie f" +
@@ -48140,7 +48140,7 @@ const hrRegionStr string = "" + // Size: 3137 bytes
 	"visSjeverna KorejaJužna KorejaKuvajtKajmanski otociKazahstanLaosLibanonS" +
 	"veta LucijaLihtenštajnŠri LankaLiberijaLesotoLitvaLuksemburgLatvijaLibij" +
 	"aMarokoMonakoMoldavijaCrna GoraSaint MartinMadagaskarMaršalovi OtociMake" +
-	"donijaMaliMjanmar (Burma)MongolijaPUP Makao KinaSjevernomarijanski otoci" +
+	"donijaMaliMjanmar (Burma)MerizolijaPUP Makao KinaSjevernomarijanski otoci" +
 	"MartiniqueMauretanijaMontserratMaltaMauricijusMaldiviMalaviMeksikoMalezi" +
 	"jaMozambikNamibijaNova KaledonijaNigerOtok NorfolkNigerijaNikaragvaNizoz" +
 	"emskaNorveškaNepalNauruNiueNovi ZelandOmanPanamaPeruFrancuska Polinezija" +
@@ -48413,7 +48413,7 @@ const idRegionStr string = "" + // Size: 3073 bytes
 	"ojaKiribatiKomoroSaint Kitts dan NevisKorea UtaraKorea SelatanKuwaitKepu" +
 	"lauan CaymanKazakstanLaosLebanonSaint LuciaLiechtensteinSri LankaLiberia" +
 	"LesothoLituaniaLuksemburgLatviaLibiaMarokoMonakoMoldovaMontenegroSaint M" +
-	"artinMadagaskarKepulauan MarshallMakedoniaMaliMyanmar (Burma)MongoliaMak" +
+	"artinMadagaskarKepulauan MarshallMakedoniaMaliMyanmar (Burma)MerizoliaMak" +
 	"au SAR TiongkokKepulauan Mariana UtaraMartinikMauritaniaMontserratMaltaM" +
 	"auritiusMaladewaMalawiMeksikoMalaysiaMozambikNamibiaKaledonia BaruNigerK" +
 	"epulauan NorfolkNigeriaNikaraguaBelandaNorwegiaNepalNauruNiueSelandia Ba" +
@@ -48593,7 +48593,7 @@ const itRegionStr string = "" + // Size: 3036 bytes
 	"itIsole CaymanKazakistanLaosLibanoSaint LuciaLiechtensteinSri LankaLiber" +
 	"iaLesothoLituaniaLussemburgoLettoniaLibiaMaroccoMonacoMoldaviaMontenegro" +
 	"Saint MartinMadagascarIsole MarshallRepubblica di MacedoniaMaliMyanmar (" +
-	"Birmania)MongoliaRAS di MacaoIsole Marianne settentrionaliMartinicaMauri" +
+	"Birmania)MerizoliaRAS di MacaoIsole Marianne settentrionaliMartinicaMauri" +
 	"taniaMontserratMaltaMauritiusMaldiveMalawiMessicoMalaysiaMozambicoNamibi" +
 	"aNuova CaledoniaNigerIsola NorfolkNigeriaNicaraguaPaesi BassiNorvegiaNep" +
 	"alNauruNiueNuova ZelandaOmanPanamáPerùPolinesia francesePapua Nuova Guin" +
@@ -49376,7 +49376,7 @@ const ltRegionStr string = "" + // Size: 3408 bytes
 	"tsas ir NevisŠiaurės KorėjaPietų KorėjaKuveitasKaimanų SalosKazachstanas" +
 	"LaosasLibanasSent LusijaLichtenšteinasŠri LankaLiberijaLesotasLietuvaLiu" +
 	"ksemburgasLatvijaLibijaMarokasMonakasMoldovaJuodkalnijaSen MartenasMadag" +
-	"askarasMaršalo SalosMakedonijaMalisMianmaras (Birma)MongolijaYpatingasis" +
+	"askarasMaršalo SalosMakedonijaMalisMianmaras (Birma)MerizolijaYpatingasis" +
 	" Administracinis Kinijos Regionas MakaoMarianos Šiaurinės SalosMartinika" +
 	"MauritanijaMontseratasMaltaMauricijusMaldyvaiMalavisMeksikaMalaizijaMoza" +
 	"mbikasNamibijaNaujoji KaledonijaNigerisNorfolko salaNigerijaNikaragvaNyd" +
@@ -49468,7 +49468,7 @@ const lvRegionStr string = "" + // Size: 3338 bytes
 	"Komoru salasSentkitsa un NevisaZiemeļkorejaDienvidkorejaKuveitaKaimanu s" +
 	"alasKazahstānaLaosaLibānaSentlūsijaLihtenšteinaŠrilankaLibērijaLesotoLie" +
 	"tuvaLuksemburgaLatvijaLībijaMarokaMonakoMoldovaMelnkalneSenmartēnaMadaga" +
-	"skaraMāršala salasMaķedonijaMaliMjanma (Birma)MongolijaĶīnas īpašās pārv" +
+	"skaraMāršala salasMaķedonijaMaliMjanma (Birma)MerizolijaĶīnas īpašās pārv" +
 	"aldes apgabals MakaoZiemeļu Marianas salasMartinikaMauritānijaMontserrat" +
 	"aMaltaMaurīcijaMaldīvijaMalāvijaMeksikaMalaizijaMozambikaNamībijaJaunkal" +
 	"edonijaNigēraNorfolkas salaNigērijaNikaragvaNīderlandeNorvēģijaNepālaNau" +
@@ -49921,7 +49921,7 @@ const msRegionStr string = "" + // Size: 2968 bytes
 	"KuwaitKepulauan CaymanKazakhstanLaosLubnanSaint LuciaLiechtensteinSri La" +
 	"nkaLiberiaLesothoLithuaniaLuxembourgLatviaLibyaMaghribiMonacoMoldovaMont" +
 	"enegroSaint MartinMadagaskarKepulauan MarshallMacedoniaMaliMyanmar (Burm" +
-	"a)MongoliaMacau SAR ChinaKepulauan Mariana UtaraMartiniqueMauritaniaMont" +
+	"a)MerizoliaMacau SAR ChinaKepulauan Mariana UtaraMartiniqueMauritaniaMont" +
 	"serratMaltaMauritiusMaldivesMalawiMexicoMalaysiaMozambiqueNamibiaNew Cal" +
 	"edoniaNigerPulau NorfolkNigeriaNicaraguaBelandaNorwayNepalNauruNiueNew Z" +
 	"ealandOmanPanamaPeruPolinesia PerancisPapua New GuineaFilipinaPakistanPo" +
@@ -50196,7 +50196,7 @@ const nlRegionStr string = "" + // Size: 3081 bytes
 	"KoreaKoeweitKaaimaneilandenKazachstanLaosLibanonSaint LuciaLiechtenstein" +
 	"Sri LankaLiberiaLesothoLitouwenLuxemburgLetlandLibiëMarokkoMonacoMoldavi" +
 	"ëMontenegroSaint-MartinMadagaskarMarshalleilandenMacedoniëMaliMyanmar (" +
-	"Birma)MongoliëMacau SAR van ChinaNoordelijke MarianenMartiniqueMauritani" +
+	"Birma)MerizoliëMacau SAR van ChinaNoordelijke MarianenMartiniqueMauritani" +
 	"ëMontserratMaltaMauritiusMaldivenMalawiMexicoMaleisiëMozambiqueNamibiëN" +
 	"ieuw-CaledoniëNigerNorfolkNigeriaNicaraguaNederlandNoorwegenNepalNauruNi" +
 	"ueNieuw-ZeelandOmanPanamaPeruFrans-PolynesiëPapoea-Nieuw-GuineaFilipijne" +
@@ -50285,7 +50285,7 @@ const noRegionStr string = "" + // Size: 2825 bytes
 	"KoreaSør-KoreaKuwaitCaymanøyeneKasakhstanLaosLibanonSt. LuciaLiechtenste" +
 	"inSri LankaLiberiaLesothoLitauenLuxemburgLatviaLibyaMarokkoMonacoMoldova" +
 	"MontenegroSaint-MartinMadagaskarMarshalløyeneMakedoniaMaliMyanmar (Burma" +
-	")MongoliaMacao S.A.R. KinaNord-MarianeneMartiniqueMauritaniaMontserratMa" +
+	")MerizoliaMacao S.A.R. KinaNord-MarianeneMartiniqueMauritaniaMontserratMa" +
 	"ltaMauritiusMaldiveneMalawiMexicoMalaysiaMosambikNamibiaNy-CaledoniaNige" +
 	"rNorfolkøyaNigeriaNicaraguaNederlandNorgeNepalNauruNiueNew ZealandOmanPa" +
 	"namaPeruFransk PolynesiaPapua Ny-GuineaFilippinenePakistanPolenSaint-Pie" +
@@ -50458,7 +50458,7 @@ const plRegionStr string = "" + // Size: 3189 bytes
 	"rea PółnocnaKorea PołudniowaKuwejtKajmanyKazachstanLaosLibanSaint LuciaL" +
 	"iechtensteinSri LankaLiberiaLesothoLitwaLuksemburgŁotwaLibiaMarokoMonako" +
 	"MołdawiaCzarnogóraSaint-MartinMadagaskarWyspy MarshallaMacedoniaMaliMjan" +
-	"ma (Birma)MongoliaSRA Makau (Chiny)Mariany PółnocneMartynikaMauretaniaMo" +
+	"ma (Birma)MerizoliaSRA Makau (Chiny)Mariany PółnocneMartynikaMauretaniaMo" +
 	"ntserratMaltaMauritiusMalediwyMalawiMeksykMalezjaMozambikNamibiaNowa Kal" +
 	"edoniaNigerNorfolkNigeriaNikaraguaHolandiaNorwegiaNepalNauruNiueNowa Zel" +
 	"andiaOmanPanamaPeruPolinezja FrancuskaPapua-Nowa GwineaFilipinyPakistanP" +
@@ -50696,7 +50696,7 @@ const roRegionStr string = "" + // Size: 3247 bytes
 	"int Kitts și NevisCoreea de NordCoreea de SudKuweitInsulele CaymanKazahs" +
 	"tanLaosLibanSfânta LuciaLiechtensteinSri LankaLiberiaLesothoLituaniaLuxe" +
 	"mburgLetoniaLibiaMarocMonacoRepublica MoldovaMuntenegruSfântul MartinMad" +
-	"agascarInsulele MarshallRepublica MacedoniaMaliMyanmar (Birmania)Mongoli" +
+	"agascarInsulele MarshallRepublica MacedoniaMaliMyanmar (Birmania)Merizoli" +
 	"aR.A.S. Macao a ChineiInsulele Mariane de NordMartinicaMauritaniaMontser" +
 	"ratMaltaMauritiusMaldiveMalawiMexicMalaysiaMozambicNamibiaNoua Caledonie" +
 	"NigerInsula NorfolkNigeriaNicaraguaȚările de JosNorvegiaNepalNauruNiueNo" +
@@ -50975,7 +50975,7 @@ const skRegionStr string = "" + // Size: 3252 bytes
 	"óreaJužná KóreaKuvajtKajmanie ostrovyKazachstanLaosLibanonSvätá LuciaLi" +
 	"chtenštajnskoSrí LankaLibériaLesothoLitvaLuxemburskoLotyšskoLíbyaMarokoM" +
 	"onakoMoldavskoČierna HoraSvätý Martin (fr.)MadagaskarMarshallove ostrovy" +
-	"MacedónskoMaliMjanmarskoMongolskoMacao – OAO ČínySeverné MariányMartinik" +
+	"MacedónskoMaliMjanmarskoMerizolskoMacao – OAO ČínySeverné MariányMartinik" +
 	"MauritániaMontserratMaltaMauríciusMaldivyMalawiMexikoMalajziaMozambikNam" +
 	"íbiaNová KaledóniaNigerNorfolkNigériaNikaraguaHolandskoNórskoNepálNauru" +
 	"NiueNový ZélandOmánPanamaPeruFrancúzska PolynéziaPapua-Nová GuineaFilipí" +
@@ -51065,7 +51065,7 @@ const slRegionStr string = "" + // Size: 3214 bytes
 	"ejaJužna KorejaKuvajtKajmanski otokiKazahstanLaosLibanonSaint LuciaLihte" +
 	"nštajnŠrilankaLiberijaLesotoLitvaLuksemburgLatvijaLibijaMarokoMonakoMold" +
 	"avijaČrna goraSaint MartinMadagaskarMarshallovi otokiMakedonijaMaliMjanm" +
-	"ar (Burma)MongolijaPosebno administrativno območje LR Kitajske MacaoSeve" +
+	"ar (Burma)MerizolijaPosebno administrativno območje LR Kitajske MacaoSeve" +
 	"rni Marianski otokiMartinikMavretanijaMontserratMaltaMauritiusMaldiviMal" +
 	"aviMehikaMalezijaMozambikNamibijaNova KaledonijaNigerNorfolški otokNiger" +
 	"ijaNikaragvaNizozemskaNorveškaNepalNauruNiueNova ZelandijaOmanPanamaPeru" +
@@ -51154,7 +51154,7 @@ const sqRegionStr string = "" + // Size: 3075 bytes
 	"iaKirgistanKamboxhiaKiribatiKomoreShën-Kits dhe NevisKoreja e VeriutKore" +
 	"ja e JugutKuvajtIshujt KajmanKazakistanLaosLibanShën-LuçiaLihtenshtajnSr" +
 	"i-LankëLiberiLesotoLituaniLuksemburgLetoniLibiMarokMonakoMoldaviMal i Zi" +
-	"Shën-MartinMadagaskarIshujt MarshallMaqedoniMaliMianmar (Burma)MongoliRP" +
+	"Shën-MartinMadagaskarIshujt MarshallMaqedoniMaliMianmar (Burma)MerizoliRP" +
 	"A i MakaosIshujt e Marianës VerioreMartinikëMauritaniMontseratMaltëMauri" +
 	"tiusMaldiveMalaviMeksikëMalajziMozambikNamibiKaledonia e ReNigerIshulli " +
 	"NorfolkNigeriNikaraguaHolandëNorvegjiNepalNauruNiueZelandë e ReOmanPanam" +
@@ -51425,7 +51425,7 @@ const svRegionStr string = "" + // Size: 2904 bytes
 	" och NevisNordkoreaSydkoreaKuwaitCaymanöarnaKazakstanLaosLibanonS:t Luci" +
 	"aLiechtensteinSri LankaLiberiaLesothoLitauenLuxemburgLettlandLibyenMaroc" +
 	"koMonacoMoldavienMontenegroSaint-MartinMadagaskarMarshallöarnaMakedonien" +
-	"MaliMyanmar (Burma)MongolietMacaoNordmarianernaMartiniqueMauretanienMont" +
+	"MaliMyanmar (Burma)MerizolietMacaoNordmarianernaMartiniqueMauretanienMont" +
 	"serratMaltaMauritiusMaldivernaMalawiMexikoMalaysiaMoçambiqueNamibiaNya K" +
 	"aledonienNigerNorfolkönNigeriaNicaraguaNederländernaNorgeNepalNauruNiueN" +
 	"ya ZeelandOmanPanamaPeruFranska PolynesienPapua Nya GuineaFilippinernaPa" +
@@ -51513,7 +51513,7 @@ const swRegionStr string = "" + // Size: 3120 bytes
 	"ribatiKomoroSt. Kitts na NevisKorea KaskaziniKorea KusiniKuwaitVisiwa vy" +
 	"a CaymanKazakistaniLaosLebanonSt. LuciaLiechtensteinSri LankaLiberiaLeso" +
 	"toLithuaniaLuxembourgLatviaLibyaMoroccoMonacoMoldovaMontenegroSt. Martin" +
-	"MadagaskaVisiwa vya MarshallMacedoniaMaliMyanmar (Burma)MongoliaMacau SA" +
+	"MadagaskaVisiwa vya MarshallMacedoniaMaliMyanmar (Burma)MerizoliaMacau SA" +
 	"R ChinaVisiwa vya Mariana vya KaskaziniMartiniqueMoritaniaMontserratMalt" +
 	"aMorisiMaldivesMalawiMeksikoMalesiaMsumbijiNamibiaNew CaledoniaNigerKisi" +
 	"wa cha NorfolkNigeriaNikaragwaUholanziNorwayNepalNauruNiueNyuzilandiOman" +
@@ -52149,7 +52149,7 @@ const uzRegionStr string = "" + // Size: 3237 bytes
 	"liy KoreyaJanubiy KoreyaQuvaytKayman orollariQozogʻistonLaosLivanSent-Ly" +
 	"usiyaLixtenshteynShri-LankaLiberiyaLesotoLitvaLyuksemburgLatviyaLiviyaMa" +
 	"rokashMonakoMoldovaChernogoriyaSent-MartinMadagaskarMarshall orollariMak" +
-	"edoniyaMaliMyanma (Birma)MongoliyaMakao (Xitoy MMH)Shimoliy Mariana orol" +
+	"edoniyaMaliMyanma (Birma)MerizoliyaMakao (Xitoy MMH)Shimoliy Mariana orol" +
 	"lariMartinikaMavritaniyaMontserratMaltaMavrikiyMaldiv orollariMalaviMeks" +
 	"ikaMalayziyaMozambikNamibiyaYangi KaledoniyaNigerNorfolk oroliNigeriyaNi" +
 	"karaguaNiderlandiyaNorvegiyaNepalNauruNiueYangi ZelandiyaUmmonPanamaPeru" +
@@ -52457,7 +52457,7 @@ const zuRegionStr string = "" + // Size: 3566 bytes
 	"-Lebanoni-Saint Luciai-Liechtensteini-Sri Lankai-LiberiaiLesothoi-Lithua" +
 	"niai-Luxembourgi-Latviai-Libyai-Moroccoi-Monacoi-Moldovai-Montenegroi-Sa" +
 	"int Martini-Madagascari-Marshall Islandsi-MacedoniaiMalii-Myanmar (Burma" +
-	")i-Mongoliai-Macau SAR Chinai-Northern Mariana Islandsi-Martiniquei-Maur" +
+	")i-Merizoliai-Macau SAR Chinai-Northern Mariana Islandsi-Martiniquei-Maur" +
 	"itaniai-Montserrati-Maltai-Mauritiusi-MaldivesiMalawii-Mexicoi-Malaysiai" +
 	"-Mozambiquei-Namibiai-New Caledoniai-Nigeri-Norfolk Islandi-Nigeriai-Nic" +
 	"araguai-Netherlandsi-Norwayi-Nepali-Naurui-Niuei-New Zealandi-Omani-Pana" +

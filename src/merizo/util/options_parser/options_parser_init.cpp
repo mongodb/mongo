@@ -41,7 +41,7 @@
 namespace merizo {
 namespace optionenvironment {
 
-MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
+MERIZO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
     OptionsParser parser;
     Status ret = parser.run(startupOptions, context->args(), context->env(), &startupOptionsParsed);
     if (!ret.isOK()) {

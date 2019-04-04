@@ -227,10 +227,10 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
             return {ErrorCodes::ConflictingOperationInProgress, "blah"};
         },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         },
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) -> Status {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }));
 
     startNetwork();
@@ -271,7 +271,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
             return {boost::none};
         },
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) -> Status {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }));
 
     startNetwork();
@@ -307,7 +307,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
             return {ErrorCodes::InvalidSyncSource, "blah"};
         },
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) -> Status {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }));
 
     startNetwork();

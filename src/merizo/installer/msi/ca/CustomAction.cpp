@@ -49,19 +49,19 @@
 
 #include "merizo/util/scopeguard.h"
 
-// UpdateMongoYAML CustomAction Constants
+// UpdateMerizoYAML CustomAction Constants
 constexpr wchar_t kBIN[] = L"BIN";
-constexpr wchar_t kMongoDataPath[] = L"MONGO_DATA_PATH";
-constexpr wchar_t kMongoLogPath[] = L"MONGO_LOG_PATH";
+constexpr wchar_t kMerizoDataPath[] = L"MERIZO_DATA_PATH";
+constexpr wchar_t kMerizoLogPath[] = L"MERIZO_LOG_PATH";
 
 // YAML Subsitution Constants
-constexpr char kMongoDataPathYaml[] = "%MONGO_DATA_PATH%";
-constexpr char kMongoLogPathYaml[] = "%MONGO_LOG_PATH%";
+constexpr char kMerizoDataPathYaml[] = "%MERIZO_DATA_PATH%";
+constexpr char kMerizoLogPathYaml[] = "%MERIZO_LOG_PATH%";
 
 // Service Account Constants - from Installer_64.wxs
-constexpr wchar_t kMongoServiceAccountName[] = L"MONGO_SERVICE_ACCOUNT_NAME";
-constexpr wchar_t kMongoServiceAccountPassword[] = L"MONGO_SERVICE_ACCOUNT_PASSWORD";
-constexpr wchar_t kMongoServiceAccountDomain[] = L"MONGO_SERVICE_ACCOUNT_DOMAIN";
+constexpr wchar_t kMerizoServiceAccountName[] = L"MERIZO_SERVICE_ACCOUNT_NAME";
+constexpr wchar_t kMerizoServiceAccountPassword[] = L"MERIZO_SERVICE_ACCOUNT_PASSWORD";
+constexpr wchar_t kMerizoServiceAccountDomain[] = L"MERIZO_SERVICE_ACCOUNT_DOMAIN";
 
 /**
  * Log a messge to MSIExec's log file.
@@ -210,13 +210,13 @@ std::string toUtf8String(MSIHANDLE hInstall, const std::wstring& wide) {
     { LogMessage(hInstall, INSTALLMESSAGE_INFO, __VA_ARGS__); }
 
 /**
- * UpdateMongoYAML - MSI custom action entry point
+ * UpdateMerizoYAML - MSI custom action entry point
  *
  * Transforms a template yaml file into a file contain data and log directory of user's choosing.
  *
  * TODO: ACL directories
  */
-extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
+extern "C" UINT __stdcall UpdateMerizoYAML(MSIHANDLE hInstall) {
     HRESULT hr = S_OK;
 
     try {
@@ -248,9 +248,9 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
 
             if (keyword == kBIN) {
                 binPath = value;
-            } else if (keyword == kMongoDataPath) {
+            } else if (keyword == kMerizoDataPath) {
                 dataDir = value;
-            } else if (keyword == kMongoLogPath) {
+            } else if (keyword == kMerizoLogPath) {
                 logDir = value;
             }
 
@@ -265,8 +265,8 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
         YamlFile += L"\\merizod.cfg";
 
         LOG_INFO("CA - BIN = %ls", binPath.c_str());
-        LOG_INFO("CA - MONGO_DATA_PATH = %ls", dataDir.c_str());
-        LOG_INFO("CA - MONGO_LOG_PATH = %ls", logDir.c_str());
+        LOG_INFO("CA - MERIZO_DATA_PATH = %ls", dataDir.c_str());
+        LOG_INFO("CA - MERIZO_LOG_PATH = %ls", logDir.c_str());
         LOG_INFO("CA - YAML_FILE = %ls", YamlFile.c_str());
 
         long gle = GetFileAttributesW(YamlFile.c_str());
@@ -312,8 +312,8 @@ extern "C" UINT __stdcall UpdateMongoYAML(MSIHANDLE hInstall) {
         std::string str(buf.get());
 
         // Do the string subsitutions
-        str = do_replace(hInstall, str, kMongoDataPathYaml, toUtf8String(hInstall, dataDir));
-        str = do_replace(hInstall, str, kMongoLogPathYaml, toUtf8String(hInstall, logDir));
+        str = do_replace(hInstall, str, kMerizoDataPathYaml, toUtf8String(hInstall, dataDir));
+        str = do_replace(hInstall, str, kMerizoLogPathYaml, toUtf8String(hInstall, logDir));
 
         LOG_INFO("CA - Writing file - '%s'", buf.get());
 
@@ -355,14 +355,14 @@ extern "C" UINT __stdcall ValidateServiceLogon(MSIHANDLE hInstall) {
         std::wstring password;
         std::wstring domain;
 
-        hr = GetProperty(hInstall, kMongoServiceAccountName, &userName);
-        CHECKHR_AND_LOG(hr, "Failed to get MONGO_SERVICE_ACCOUNT_NAME property");
+        hr = GetProperty(hInstall, kMerizoServiceAccountName, &userName);
+        CHECKHR_AND_LOG(hr, "Failed to get MERIZO_SERVICE_ACCOUNT_NAME property");
 
-        hr = GetProperty(hInstall, kMongoServiceAccountPassword, &password);
-        CHECKHR_AND_LOG(hr, "Failed to get MONGO_SERVICE_ACCOUNT_PASSWORD property");
+        hr = GetProperty(hInstall, kMerizoServiceAccountPassword, &password);
+        CHECKHR_AND_LOG(hr, "Failed to get MERIZO_SERVICE_ACCOUNT_PASSWORD property");
 
-        hr = GetProperty(hInstall, kMongoServiceAccountDomain, &domain);
-        CHECKHR_AND_LOG(hr, "Failed to get MONGO_SERVICE_ACCOUNT_DOMAIN property");
+        hr = GetProperty(hInstall, kMerizoServiceAccountDomain, &domain);
+        CHECKHR_AND_LOG(hr, "Failed to get MERIZO_SERVICE_ACCOUNT_DOMAIN property");
 
         // Check if the user name and password is valid, and the user has the "Log on as a service"
         // privilege.
@@ -376,7 +376,7 @@ extern "C" UINT __stdcall ValidateServiceLogon(MSIHANDLE hInstall) {
         if (ret) {
             // User name and password is right
             CloseHandle(hLogonToken);
-            CHECKUINT_AND_LOG(MsiSetPropertyA(hInstall, "MONGO_SERVICE_ACCOUNT_VALID", "1"));
+            CHECKUINT_AND_LOG(MsiSetPropertyA(hInstall, "MERIZO_SERVICE_ACCOUNT_VALID", "1"));
             return ERROR_SUCCESS;
         }
 
@@ -394,7 +394,7 @@ extern "C" UINT __stdcall ValidateServiceLogon(MSIHANDLE hInstall) {
             if (ret) {
                 // User name and password is right
                 CloseHandle(hLogonToken);
-                CHECKUINT_AND_LOG(MsiSetPropertyA(hInstall, "MONGO_SERVICE_ACCOUNT_VALID", "1"));
+                CHECKUINT_AND_LOG(MsiSetPropertyA(hInstall, "MERIZO_SERVICE_ACCOUNT_VALID", "1"));
                 return ERROR_SUCCESS;
             }
         } else if (gle != ERROR_LOGON_FAILURE) {
@@ -402,7 +402,7 @@ extern "C" UINT __stdcall ValidateServiceLogon(MSIHANDLE hInstall) {
         }
 
         // User name and/or password is wrong
-        CHECKUINT_AND_LOG(MsiSetPropertyA(hInstall, "MONGO_SERVICE_ACCOUNT_VALID", "0"));
+        CHECKUINT_AND_LOG(MsiSetPropertyA(hInstall, "MERIZO_SERVICE_ACCOUNT_VALID", "0"));
 
     } catch (const std::exception& e) {
         CHECKHR_AND_LOG(E_FAIL, "Caught C++ exception %s", e.what());

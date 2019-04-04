@@ -15,13 +15,13 @@ import (
 	"time"
 )
 
-// MongoTop is a container for the user-specified options and
+// MerizoTop is a container for the user-specified options and
 // internal state used for running merizotop.
-type MongoTop struct {
+type MerizoTop struct {
 	// Generic merizo tool options
 	Options *options.ToolOptions
 
-	// Mongotop-specific output options
+	// Merizotop-specific output options
 	OutputOptions *Output
 
 	// for connecting to the db
@@ -34,7 +34,7 @@ type MongoTop struct {
 	previousTop          *Top
 }
 
-func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
+func (mt *MerizoTop) runDiff() (outDiff FormattableDiff, err error) {
 	session, err := mt.SessionProvider.GetSession()
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
 }
 
 // Run executes the merizotop program.
-func (mt *MongoTop) Run() error {
+func (mt *MerizoTop) Run() error {
 
 	connURL := mt.Options.Host
 	if connURL == "" {

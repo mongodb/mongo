@@ -17,7 +17,7 @@
         var eventualDb = eventuallyConsistentConn.getDB("admin");
 
         // Create a session for modifying user data during the life of the test
-        var adminSession = new Mongo("localhost:" + conn.port);
+        var adminSession = new Merizo("localhost:" + conn.port);
         var admin = adminSession.getDB("admin");
         assert.commandWorked(admin.runCommand(
             {createUser: "admin", pwd: "admin", roles: [{role: "root", db: "admin"}]}));
@@ -28,8 +28,8 @@
 
         // Create a strongly consistent session for consuming user data, with a non-localhost
         // source IP.
-        var externalMongo = new Mongo(get_ipaddr() + ":" + conn.port);
-        var externalDb = externalMongo.getDB("admin");
+        var externalMerizo = new Merizo(get_ipaddr() + ":" + conn.port);
+        var externalDb = externalMerizo.getDB("admin");
 
         assert.commandWorked(admin.runCommand({
             createUser: "user2",
@@ -181,9 +181,9 @@
     }
 
     print("Testing standalone");
-    var conn = MongoRunner.runMongod({bind_ip_all: "", auth: ""});
+    var conn = MerizoRunner.runMerizod({bind_ip_all: "", auth: ""});
     testConnection(conn, conn, function() {}, function() {});
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     var keyfile = "jstests/libs/key1";
 

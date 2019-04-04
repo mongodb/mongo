@@ -649,15 +649,15 @@ TEST_F(BucketAutoTests, ShouldFailIfBufferingTooManyDocuments) {
     auto expCtx = getExpCtx();
 
     expCtx->allowDiskUse = false;
-    expCtx->inMongos = false;
+    expCtx->inMerizos = false;
     assertCannotSpillToDisk(expCtx);
 
     expCtx->allowDiskUse = true;
-    expCtx->inMongos = true;
+    expCtx->inMerizos = true;
     assertCannotSpillToDisk(expCtx);
 
     expCtx->allowDiskUse = false;
-    expCtx->inMongos = true;
+    expCtx->inMerizos = true;
     assertCannotSpillToDisk(expCtx);
 }
 

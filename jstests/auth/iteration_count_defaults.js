@@ -4,7 +4,7 @@
     'use strict';
 
     function runOpt(params, sha1Value, sha256Value) {
-        const conn = MongoRunner.runMongod({auth: '', setParameter: params});
+        const conn = MerizoRunner.runMerizod({auth: '', setParameter: params});
         const adminDB = conn.getDB('admin');
 
         adminDB.createUser({user: 'user1', pwd: 'pass', roles: jsTest.adminUserRoles});
@@ -15,7 +15,7 @@
         assert.eq(response.scramIterationCount, sha1Value);
         assert.eq(response.scramSHA256IterationCount, sha256Value);
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     }
 
     runOpt({}, 10000, 15000);

@@ -38,8 +38,8 @@
     //
     // Set legacy read mode for the merizos and shard connections.
     //
-    merizosDB.getMongo().forceReadMode("legacy");
-    shardDB.getMongo().forceReadMode("legacy");
+    merizosDB.getMerizo().forceReadMode("legacy");
+    shardDB.getMerizo().forceReadMode("legacy");
 
     // TEST CASE: A legacy string $comment meta-operator is propagated to the shards via merizos.
     assert.eq(merizosColl.find({$query: {a: 1}, $comment: "TEST"}).itcount(), 1);
@@ -63,8 +63,8 @@
     //
     // Revert to "commands" read mode for the find command test cases below.
     //
-    merizosDB.getMongo().forceReadMode("commands");
-    shardDB.getMongo().forceReadMode("commands");
+    merizosDB.getMerizo().forceReadMode("commands");
+    shardDB.getMerizo().forceReadMode("commands");
 
     // TEST CASE: Verify that string find.comment and non-string find.filter.$comment propagate.
     assert.eq(merizosColl.find({a: 1, $comment: {b: "TEST"}}).comment("TEST").itcount(), 1);

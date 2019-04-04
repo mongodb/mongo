@@ -58,11 +58,11 @@ namespace {
 using repl::OplogEntry;
 using unittest::assertGet;
 
-class OpObserverTest : public ServiceContextMongoDTest {
+class OpObserverTest : public ServiceContextMerizoDTest {
 public:
     void setUp() override {
         // Set up merizod.
-        ServiceContextMongoDTest::setUp();
+        ServiceContextMerizoDTest::setUp();
 
         auto service = getServiceContext();
         auto opCtx = cc().makeOperationContext();
@@ -441,7 +441,7 @@ public:
         OpObserverTest::setUp();
 
         auto opCtx = cc().makeOperationContext();
-        MongoDSessionCatalog::onStepUp(opCtx.get());
+        MerizoDSessionCatalog::onStepUp(opCtx.get());
     }
 
     /**
@@ -478,7 +478,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     {
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(sessionId);
-        MongoDOperationContextSession ocs(opCtx.get());
+        MerizoDOperationContextSession ocs(opCtx.get());
         auto txnParticipant = TransactionParticipant::get(opCtx.get());
         txnParticipant.refreshFromStorageIfNeeded(opCtx.get());
 
@@ -502,7 +502,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     {
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(sessionId);
-        MongoDOperationContextSession ocs(opCtx.get());
+        MerizoDOperationContextSession ocs(opCtx.get());
         auto txnParticipant = TransactionParticipant::get(opCtx.get());
         ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId));
     }
@@ -562,12 +562,12 @@ public:
 
         _opObserver.emplace();
 
-        MongoDSessionCatalog::onStepUp(opCtx());
+        MerizoDSessionCatalog::onStepUp(opCtx());
         _times.emplace(opCtx());
 
         opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
         opCtx()->setTxnNumber(txnNum());
-        _sessionCheckout = std::make_unique<MongoDOperationContextSession>(opCtx());
+        _sessionCheckout = std::make_unique<MerizoDOperationContextSession>(opCtx());
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, true);
@@ -677,7 +677,7 @@ private:
     boost::optional<OpObserverImpl> _opObserver;
     boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
 
-    std::unique_ptr<MongoDOperationContextSession> _sessionCheckout;
+    std::unique_ptr<MerizoDOperationContextSession> _sessionCheckout;
     TxnNumber _txnNum = 0;
 };
 

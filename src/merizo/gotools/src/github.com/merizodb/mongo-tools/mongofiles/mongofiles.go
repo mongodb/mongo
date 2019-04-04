@@ -36,9 +36,9 @@ const (
 	DeleteID = "delete_id"
 )
 
-// MongoFiles is a container for the user-specified options and
+// MerizoFiles is a container for the user-specified options and
 // internal state used for running merizofiles.
-type MongoFiles struct {
+type MerizoFiles struct {
 	// generic merizo tool options
 	ToolOptions *options.ToolOptions
 
@@ -73,7 +73,7 @@ type GFSFile struct {
 }
 
 // ValidateCommand ensures the arguments supplied are valid.
-func (mf *MongoFiles) ValidateCommand(args []string) error {
+func (mf *MerizoFiles) ValidateCommand(args []string) error {
 	// make sure a command is specified and that we don't have
 	// too many arguments
 	if len(args) == 0 {
@@ -130,7 +130,7 @@ func (mf *MongoFiles) ValidateCommand(args []string) error {
 }
 
 // Query GridFS for files and display the results.
-func (mf *MongoFiles) findAndDisplay(gfs *mgo.GridFS, query bson.M) (string, error) {
+func (mf *MerizoFiles) findAndDisplay(gfs *mgo.GridFS, query bson.M) (string, error) {
 	display := ""
 
 	cursor := gfs.Find(query).Iter()
@@ -150,7 +150,7 @@ func (mf *MongoFiles) findAndDisplay(gfs *mgo.GridFS, query bson.M) (string, err
 // Return the local filename, as specified by the --local flag. Defaults to
 // the GridFile's name if not present. If GridFile is nil, uses the filename
 // given on the command line.
-func (mf *MongoFiles) getLocalFileName(gridFile *mgo.GridFile) string {
+func (mf *MerizoFiles) getLocalFileName(gridFile *mgo.GridFile) string {
 	localFileName := mf.StorageOptions.LocalFileName
 	if localFileName == "" {
 		if gridFile != nil {
@@ -163,7 +163,7 @@ func (mf *MongoFiles) getLocalFileName(gridFile *mgo.GridFile) string {
 }
 
 // handle logic for 'get' command
-func (mf *MongoFiles) handleGet(gfs *mgo.GridFS) error {
+func (mf *MerizoFiles) handleGet(gfs *mgo.GridFS) error {
 	gFile, err := gfs.Open(mf.FileName)
 	if err != nil {
 		return fmt.Errorf("error opening GridFS file '%s': %v", mf.FileName, err)
@@ -177,7 +177,7 @@ func (mf *MongoFiles) handleGet(gfs *mgo.GridFS) error {
 }
 
 // handle logic for 'get_id' command
-func (mf *MongoFiles) handleGetID(gfs *mgo.GridFS) error {
+func (mf *MerizoFiles) handleGetID(gfs *mgo.GridFS) error {
 	id, err := mf.parseID()
 	if err != nil {
 		return err
@@ -196,7 +196,7 @@ func (mf *MongoFiles) handleGetID(gfs *mgo.GridFS) error {
 }
 
 // logic for deleting a file
-func (mf *MongoFiles) handleDelete(gfs *mgo.GridFS) error {
+func (mf *MerizoFiles) handleDelete(gfs *mgo.GridFS) error {
 	err := gfs.Remove(mf.FileName)
 	if err != nil {
 		return fmt.Errorf("error while removing '%v' from GridFS: %v\n", mf.FileName, err)
@@ -206,7 +206,7 @@ func (mf *MongoFiles) handleDelete(gfs *mgo.GridFS) error {
 }
 
 // logic for deleting a file with 'delete_id'
-func (mf *MongoFiles) handleDeleteID(gfs *mgo.GridFS) error {
+func (mf *MerizoFiles) handleDeleteID(gfs *mgo.GridFS) error {
 	id, err := mf.parseID()
 	if err != nil {
 		return err
@@ -219,7 +219,7 @@ func (mf *MongoFiles) handleDeleteID(gfs *mgo.GridFS) error {
 }
 
 // parse and convert extended JSON
-func (mf *MongoFiles) parseID() (interface{}, error) {
+func (mf *MerizoFiles) parseID() (interface{}, error) {
 	// parse the id using extended json
 	var asJSON interface{}
 	err := json.Unmarshal([]byte(mf.Id), &asJSON)
@@ -235,7 +235,7 @@ func (mf *MongoFiles) parseID() (interface{}, error) {
 }
 
 // writeFile writes a file from gridFS to stdout or the filesystem.
-func (mf *MongoFiles) writeFile(gridFile *mgo.GridFile) (err error) {
+func (mf *MerizoFiles) writeFile(gridFile *mgo.GridFile) (err error) {
 	localFileName := mf.getLocalFileName(gridFile)
 	var localFile io.WriteCloser
 	if localFileName == "-" {
@@ -254,7 +254,7 @@ func (mf *MongoFiles) writeFile(gridFile *mgo.GridFile) (err error) {
 	return nil
 }
 
-func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (err error) {
+func (mf *MerizoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (err error) {
 	localFileName := mf.getLocalFileName(nil)
 
 	// check if --replace flag turned on
@@ -319,7 +319,7 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (err error) {
 
 // Run the merizofiles utility. If displayHost is true, the connected host/port is
 // displayed.
-func (mf *MongoFiles) Run(displayHost bool) (string, error) {
+func (mf *MerizoFiles) Run(displayHost bool) (string, error) {
 	connUrl := mf.ToolOptions.Host
 	if connUrl == "" {
 		connUrl = util.DefaultHost

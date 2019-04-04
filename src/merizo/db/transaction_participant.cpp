@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #define LOG_FOR_TRANSACTION(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kTransaction)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kTransaction)
 
 #include "merizo/platform/basic.h"
 
@@ -71,13 +71,13 @@ namespace {
 
 // Failpoint which will pause an operation just after allocating a point-in-time storage engine
 // transaction.
-MONGO_FAIL_POINT_DEFINE(hangAfterPreallocateSnapshot);
+MERIZO_FAIL_POINT_DEFINE(hangAfterPreallocateSnapshot);
 
-MONGO_FAIL_POINT_DEFINE(hangAfterReservingPrepareTimestamp);
+MERIZO_FAIL_POINT_DEFINE(hangAfterReservingPrepareTimestamp);
 
-MONGO_FAIL_POINT_DEFINE(hangAfterSettingPrepareStartTime);
+MERIZO_FAIL_POINT_DEFINE(hangAfterSettingPrepareStartTime);
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeReleasingTransactionOplogHole);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeReleasingTransactionOplogHole);
 
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
@@ -284,7 +284,7 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
 // failBeforeCommitExceptionCode (int, default = not specified): If set, the specified exception
 //      code will be thrown, which will cause the write to not commit; if not specified, the write
 //      will be allowed to commit.
-MONGO_FAIL_POINT_DEFINE(onPrimaryTransactionalWrite);
+MERIZO_FAIL_POINT_DEFINE(onPrimaryTransactionalWrite);
 
 }  // namespace
 
@@ -642,11 +642,11 @@ TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* o
 }
 
 TransactionParticipant::OplogSlotReserver::~OplogSlotReserver() {
-    if (MONGO_FAIL_POINT(hangBeforeReleasingTransactionOplogHole)) {
+    if (MERIZO_FAIL_POINT(hangBeforeReleasingTransactionOplogHole)) {
         log()
             << "transaction - hangBeforeReleasingTransactionOplogHole fail point enabled. Blocking "
                "until fail point is disabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeReleasingTransactionOplogHole);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeReleasingTransactionOplogHole);
     }
 
     // If the constructor did not complete, we do not attempt to abort the units of work.
@@ -913,7 +913,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
 
     // The Client lock must not be held when executing this failpoint as it will block currentOp
     // execution.
-    if (MONGO_FAIL_POINT(hangAfterPreallocateSnapshot)) {
+    if (MERIZO_FAIL_POINT(hangAfterPreallocateSnapshot)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangAfterPreallocateSnapshot, opCtx, "hangAfterPreallocateSnapshot");
     }
@@ -1037,12 +1037,12 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             o(lk).prepareOpTime = prepareOplogSlot.opTime;
         }
 
-        if (MONGO_FAIL_POINT(hangAfterReservingPrepareTimestamp)) {
+        if (MERIZO_FAIL_POINT(hangAfterReservingPrepareTimestamp)) {
             // This log output is used in js tests so please leave it.
             log() << "transaction - hangAfterReservingPrepareTimestamp fail point "
                      "enabled. Blocking until fail point is disabled. Prepare OpTime: "
                   << prepareOplogSlot.opTime;
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterReservingPrepareTimestamp);
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterReservingPrepareTimestamp);
         }
     }
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.opTime.getTimestamp());
@@ -1069,10 +1069,10 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             ServerTransactionsMetrics::get(opCtx), *p().oldestOplogEntryOpTime, ticks);
     }
 
-    if (MONGO_FAIL_POINT(hangAfterSettingPrepareStartTime)) {
+    if (MERIZO_FAIL_POINT(hangAfterSettingPrepareStartTime)) {
         log() << "transaction - hangAfterSettingPrepareStartTime fail point enabled. Blocking "
                  "until fail point is disabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterSettingPrepareStartTime);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterSettingPrepareStartTime);
     }
 
     // We unlock the RSTL to allow prepared transactions to survive state transitions. This should
@@ -1600,7 +1600,7 @@ std::string TransactionParticipant::TransactionState::toString(StateFlag state) 
         case TransactionParticipant::TransactionState::kExecutedRetryableWrite:
             return "TxnState::ExecutedRetryableWrite";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldState,
@@ -1615,7 +1615,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case kInProgress:
             switch (newState) {
                 case kNone:
@@ -1626,7 +1626,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case kPrepared:
             switch (newState) {
                 case kCommittingWithPrepare:
@@ -1635,7 +1635,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case kCommittingWithPrepare:
             switch (newState) {
                 case kCommitted:
@@ -1643,7 +1643,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case kCommittingWithoutPrepare:
             switch (newState) {
                 case kNone:
@@ -1653,7 +1653,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case kCommitted:
             switch (newState) {
                 case kNone:
@@ -1661,7 +1661,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case kAbortedWithoutPrepare:
             switch (newState) {
                 case kNone:
@@ -1670,7 +1670,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case kAbortedWithPrepare:
             switch (newState) {
                 case kNone:
@@ -1678,7 +1678,7 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         case kExecutedRetryableWrite:
             switch (newState) {
                 case kNone:
@@ -1686,9 +1686,9 @@ bool TransactionParticipant::TransactionState::_isLegalTransition(StateFlag oldS
                 default:
                     return false;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void TransactionParticipant::TransactionState::transitionTo(StateFlag newState,
@@ -1866,7 +1866,7 @@ void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationCo
                     TransactionState::TransitionValidation::kRelaxTransitionValidation);
                 break;
             case ActiveTransactionHistory::TxnRecordState::kPrepared:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 
@@ -2011,7 +2011,7 @@ boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStat
             return entry;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool TransactionParticipant::Participant::checkStatementExecutedNoOplogEntryFetch(
@@ -2114,7 +2114,7 @@ void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
             }
         });
 
-    MONGO_FAIL_POINT_BLOCK(onPrimaryTransactionalWrite, customArgs) {
+    MERIZO_FAIL_POINT_BLOCK(onPrimaryTransactionalWrite, customArgs) {
         const auto& data = customArgs.getData();
 
         const auto closeConnectionElem = data["closeConnection"];

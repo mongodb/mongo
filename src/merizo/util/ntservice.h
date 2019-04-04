@@ -95,7 +95,7 @@ std::vector<std::string> constructServiceArgv(const std::vector<std::string>& in
 /**
  * Start the service.  Never returns.
  */
-MONGO_COMPILER_NORETURN void startService();
+MERIZO_COMPILER_NORETURN void startService();
 
 bool reportStatus(DWORD reportState, DWORD waitHint = 0, DWORD exitCode = 0);
 

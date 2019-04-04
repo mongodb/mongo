@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -112,11 +112,11 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 namespace repl {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
+MERIZO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
 // Failpoint to block after a write and its oplog entry have been written to the storage engine and
 // are visible, but before we have advanced 'lastApplied' for the write.
-MONGO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);
 
 /**
  * This structure contains per-service-context state related to the oplog.
@@ -389,7 +389,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
         IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
             /*commitQuorum=*/boost::none};
         // This spawns a new thread and returns immediately.
-        MONGO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(
+        MERIZO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(
             indexBuildsCoordinator->startIndexBuild(opCtx,
                                                     collUUID,
                                                     {indexSpec},
@@ -544,9 +544,9 @@ void _logOpsInner(OperationContext* opCtx,
             }
 
             // Optionally hang before advancing lastApplied.
-            if (MONGO_FAIL_POINT(hangBeforeLogOpAdvancesLastApplied)) {
+            if (MERIZO_FAIL_POINT(hangBeforeLogOpAdvancesLastApplied)) {
                 log() << "hangBeforeLogOpAdvancesLastApplied fail point enabled.";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                                 hangBeforeLogOpAdvancesLastApplied);
             }
 
@@ -711,7 +711,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         opTimes.push_back(insertStatementOplogSlot.opTime);
     }
 
-    MONGO_FAIL_POINT_BLOCK(sleepBetweenInsertOpTimeGenerationAndLogOp, customWait) {
+    MERIZO_FAIL_POINT_BLOCK(sleepBetweenInsertOpTimeGenerationAndLogOp, customWait) {
         const BSONObj& data = customWait.getData();
         auto numMillis = data["waitForMillis"].numberInt();
         log() << "Sleeping for " << numMillis << "ms after receiving " << count << " optimes from "
@@ -853,7 +853,7 @@ OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx) {
     return os;
 }
 
-MONGO_REGISTER_SHIM(GetNextOpTimeClass::getNextOpTimes)
+MERIZO_REGISTER_SHIM(GetNextOpTimeClass::getNextOpTimes)
 (OperationContext* opCtx, std::size_t count)->std::vector<OplogSlot> {
     // The local oplog collection pointer must already be established by this point.
     // We can't establish it here because that would require locking the local database, which would
@@ -1381,7 +1381,7 @@ StringData OplogApplication::modeToString(OplogApplication::Mode mode) {
         case OplogApplication::Mode::kApplyOpsCmd:
             return OplogApplication::kApplyOpsCmdOplogApplicationMode;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string& mode) {
@@ -1397,7 +1397,7 @@ StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Invalid oplog application mode provided: " << mode);
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 // @return failure status if an update should have happened and the document DNE.
@@ -1985,7 +1985,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 return mode == OplogApplication::Mode::kRecovering;
             }
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }();
     invariant(!assignCommandTimestamp || !opTime.isNull(),
               str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));

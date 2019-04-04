@@ -49,7 +49,7 @@ func (c *TLSDBConnector) Configure(opts options.ToolOptions) error {
 		if err != nil {
 			return err
 		}
-		if opts.Auth.Mechanism == "MONGODB-X509" && opts.Auth.Username == "" {
+		if opts.Auth.Mechanism == "MERIZODB-X509" && opts.Auth.Username == "" {
 			opts.Auth.Username = subject
 		}
 	}

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -123,7 +123,7 @@ const char meCollectionName[] = "local.me";
 const auto meDatabaseName = localDbName;
 const char tsFieldName[] = "ts";
 
-MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
+MERIZO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 
 // The count of items in the buffer
 OplogBuffer::Counters bufferGauge;
@@ -494,7 +494,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     // blocked by prepared transactions.
     _dropAllTempCollections(opCtx);
 
-    MongoDSessionCatalog::onStepUp(opCtx);
+    MerizoDSessionCatalog::onStepUp(opCtx);
 
     notifyFreeMonitoringOnTransitionToPrimary();
 
@@ -779,7 +779,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         const auto configsvrConnStr =
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
-        status = ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
+        status = ShardingInitializationMerizoD::get(opCtx)->updateShardIdentityConfigString(
             opCtx, configsvrConnStr);
         if (!status.isOK()) {
             warning() << "error encountered while trying to update config connection string to "
@@ -876,12 +876,12 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
             scheduleWork(
                 _taskExecutor.get(),
                 [committedOpTime, reaper](const executor::TaskExecutor::CallbackArgs& args) {
-                    if (MONGO_FAIL_POINT(dropPendingCollectionReaperHang)) {
+                    if (MERIZO_FAIL_POINT(dropPendingCollectionReaperHang)) {
                         log() << "fail point dropPendingCollectionReaperHang enabled. "
                                  "Blocking until fail point is disabled. "
                                  "committedOpTime: "
                               << committedOpTime;
-                        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropPendingCollectionReaperHang);
+                        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(dropPendingCollectionReaperHang);
                     }
                     auto opCtx = cc().makeOperationContext();
                     reaper->dropCollectionsOlderThan(opCtx.get(), committedOpTime);

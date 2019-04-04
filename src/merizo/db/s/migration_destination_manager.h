@@ -60,7 +60,7 @@ class OpTime;
 }
 
 /**
- * Drives the receiving side of the MongoD migration process. One instance exists per shard.
+ * Drives the receiving side of the MerizoD migration process. One instance exists per shard.
  */
 class MigrationDestinationManager {
     MigrationDestinationManager(const MigrationDestinationManager&) = delete;

@@ -49,9 +49,9 @@ function runTest(admindb) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = MerizoRunner.runMerizod({auth: ''});
 runTest(conn.getDB("admin"));
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 jsTest.log('Test sharding');
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

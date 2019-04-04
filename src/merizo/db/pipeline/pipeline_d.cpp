@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -267,7 +267,7 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx, Collection* c
                 return elem.fieldNameStringData();
             }
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     // If there are no 2d indexes, look for a 2dsphere index.
@@ -287,7 +287,7 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx, Collection* c
             return elem.fieldNameStringData();
         }
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 }  // namespace
 
@@ -448,7 +448,7 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
         } else {
             // A $geoNear stage, the only other stage that can produce an initial query, is also
             // a valid initial stage. However, we should be in prepareGeoNearCursorSource() instead.
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
     }
 

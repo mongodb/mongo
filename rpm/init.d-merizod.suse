@@ -8,8 +8,8 @@
 # Required-Stop: $network
 # Default-Start:  2 3 5
 # Default-Stop:   0 1 6
-# Short-Description: Mongod
-# Description:    Mongod
+# Short-Description: Merizod
+# Description:    Merizod
 ### END INIT INFO
 
 # Source function library.
@@ -21,10 +21,10 @@ rc_reset
 CONFIGFILE="/etc/merizod.conf"
 OPTIONS=" -f $CONFIGFILE"
 
-merizod=${MONGOD-/usr/bin/merizod}
+merizod=${MERIZOD-/usr/bin/merizod}
 
-MONGO_USER=merizod
-MONGO_GROUP=merizod
+MERIZO_USER=merizod
+MERIZO_GROUP=merizod
 
 # All variables set before this point can be overridden by users, by
 # setting them directly in the SYSCONFIG file. Use this to explicitly
@@ -53,7 +53,7 @@ start()
 
   # Make sure the default pidfile directory exists
   if [ ! -d $PIDDIR ]; then
-    install -d -m 0755 -o $MONGO_USER -g $MONGO_GROUP $PIDDIR
+    install -d -m 0755 -o $MERIZO_USER -g $MERIZO_GROUP $PIDDIR
   fi
 
   # Recommended ulimit values for merizod or merizos
@@ -68,7 +68,7 @@ start()
   ulimit -l unlimited
 
   echo -n "Starting merizod: "
-  $NUMACTL /sbin/start_daemon -u "$MONGO_USER" -p "$PIDFILEPATH" $merizod $OPTIONS >/dev/null 2>&1
+  $NUMACTL /sbin/start_daemon -u "$MERIZO_USER" -p "$PIDFILEPATH" $merizod $OPTIONS >/dev/null 2>&1
 
   RETVAL=$?
   [ $RETVAL -eq 0 ] && touch /var/lock/subsys/merizod

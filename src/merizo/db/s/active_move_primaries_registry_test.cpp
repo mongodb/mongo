@@ -39,7 +39,7 @@ namespace {
 
 using unittest::assertGet;
 
-class MovePrimaryRegistration : public ServiceContextMongoDTest {
+class MovePrimaryRegistration : public ServiceContextMerizoDTest {
 protected:
     ActiveMovePrimariesRegistry _registry;
 };

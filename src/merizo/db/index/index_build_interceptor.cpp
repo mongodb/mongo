@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
 #include "merizo/platform/basic.h"
 
@@ -50,7 +50,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYield);
+MERIZO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYield);
 
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
     : _indexCatalogEntry(entry),
@@ -337,11 +337,11 @@ void IndexBuildInterceptor::_tryYield(OperationContext* opCtx) {
     // Track the number of yields in CurOp.
     CurOp::get(opCtx)->yielded();
 
-    MONGO_FAIL_POINT_BLOCK(hangDuringIndexBuildDrainYield, config) {
+    MERIZO_FAIL_POINT_BLOCK(hangDuringIndexBuildDrainYield, config) {
         StringData ns{config.getData().getStringField("namespace")};
         if (ns == _indexCatalogEntry->ns().ns()) {
             log() << "Hanging index build during drain yield";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringIndexBuildDrainYield);
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringIndexBuildDrainYield);
         }
     }
 

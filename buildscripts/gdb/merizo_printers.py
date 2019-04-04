@@ -502,30 +502,30 @@ def find_match_brackets(search, opening='<', closing='>'):
     return -1
 
 
-class MongoSubPrettyPrinter(gdb.printing.SubPrettyPrinter):
+class MerizoSubPrettyPrinter(gdb.printing.SubPrettyPrinter):
     """Sub pretty printer managed by the pretty-printer collection."""
 
     def __init__(self, name, prefix, is_template, printer):
-        """Initialize MongoSubPrettyPrinter."""
-        super(MongoSubPrettyPrinter, self).__init__(name)
+        """Initialize MerizoSubPrettyPrinter."""
+        super(MerizoSubPrettyPrinter, self).__init__(name)
         self.prefix = prefix
         self.printer = printer
         self.is_template = is_template
 
 
-class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
+class MerizoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
     """MerizoDB-specific printer printer collection that ignores subtypes.
 
     It will match 'HashTable<T> but not 'HashTable<T>::iterator' when asked for 'HashTable'.
     """
 
     def __init__(self):
-        """Initialize MongoPrettyPrinterCollection."""
-        super(MongoPrettyPrinterCollection, self).__init__("merizo", [])
+        """Initialize MerizoPrettyPrinterCollection."""
+        super(MerizoPrettyPrinterCollection, self).__init__("merizo", [])
 
     def add(self, name, prefix, is_template, printer):
         """Add a subprinter."""
-        self.subprinters.append(MongoSubPrettyPrinter(name, prefix, is_template, printer))
+        self.subprinters.append(MerizoSubPrettyPrinter(name, prefix, is_template, printer))
 
     def __call__(self, val):
         """Return matched printer type."""
@@ -555,7 +555,7 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
 
 def build_pretty_printer():
     """Build a pretty printer."""
-    pp = MongoPrettyPrinterCollection()
+    pp = MerizoPrettyPrinterCollection()
     pp.add('BSONObj', 'merizo::BSONObj', False, BSONObjPrinter)
     pp.add('Decorable', 'merizo::Decorable', True, DecorablePrinter)
     pp.add('Status', 'merizo::Status', False, StatusPrinter)

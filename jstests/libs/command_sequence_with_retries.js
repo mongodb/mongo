@@ -5,7 +5,7 @@
  * attempted and the sequence will resume by sending the same command again. Any other errors
  * that occur while running a command will cause the entire sequence of commands to abort.
  *
- * @param {Mongo} conn - a connection to the server
+ * @param {Merizo} conn - a connection to the server
  */
 function CommandSequenceWithRetries(conn) {
     "use strict";

@@ -25,7 +25,7 @@ load("jstests/libs/kill_sessions.js");
             KillSessionsTestHelper.initializeAuth(forExec);
         }
 
-        var forKill = new Mongo(forExec.host);
+        var forKill = new Merizo(forExec.host);
 
         var r = forExec.getDB("admin").runCommand({
             multicast: {ping: 1},
@@ -35,7 +35,7 @@ load("jstests/libs/kill_sessions.js");
 
         var hosts = [];
         for (var host in r["hosts"]) {
-            var host = new Mongo(host);
+            var host = new Merizo(host);
             if (needAuth) {
                 host.getDB("local").auth("__system", "foopdedoop");
             }

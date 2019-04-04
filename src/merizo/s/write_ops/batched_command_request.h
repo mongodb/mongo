@@ -146,7 +146,7 @@ private:
             case BatchedCommandRequest::BatchType_Delete:
                 return std::forward<F>(f)(*r._deleteReq, std::forward<As>(as)...);
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     template <typename... As>
     decltype(auto) _visit(As&&... as) {

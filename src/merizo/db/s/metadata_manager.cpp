@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -114,7 +114,7 @@ namespace {
 using TaskExecutor = executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 
-MONGO_FAIL_POINT_DEFINE(suspendRangeDeletion);
+MERIZO_FAIL_POINT_DEFINE(suspendRangeDeletion);
 
 class UnshardedCollection : public ScopedCollectionMetadata::Impl {
 public:
@@ -148,7 +148,7 @@ void scheduleCleanup(executor::TaskExecutor* executor,
             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(suspendRangeDeletion);
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET(suspendRangeDeletion);
 
             auto next = CollectionRangeDeleter::cleanUpNextRange(opCtx, nss, epoch);
             if (next) {

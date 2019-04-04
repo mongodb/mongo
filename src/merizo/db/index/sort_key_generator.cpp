@@ -117,7 +117,7 @@ StatusWith<BSONObj> SortKeyGenerator::getSortKey(const BSONObj& obj,
                 mergedKeyBob.append("", metadata->randVal);
                 continue;
             }
-            default: { MONGO_UNREACHABLE; }
+            default: { MERIZO_UNREACHABLE; }
         }
     }
 

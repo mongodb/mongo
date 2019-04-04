@@ -26,7 +26,7 @@
     rst.initiate();
 
     const primary = rst.getPrimary();
-    const session = primary.getDB("test").getMongo().startSession({causalConsistency: false});
+    const session = primary.getDB("test").getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase("test");
     const coll = sessionDB.agg_explain_read_concern;
 

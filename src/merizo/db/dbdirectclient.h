@@ -100,7 +100,7 @@ public:
 
     bool isReplicaSetMember() const final;
 
-    bool isMongos() const final {
+    bool isMerizos() const final {
         return false;
     }
 

@@ -60,13 +60,13 @@ class ConfigExpandRestServer {
         print("Mock Web server is listening on port: " + this.port);
 
         const args = [this.python, "-u", this.web_server_py, "--port=" + this.port];
-        this.pid = _startMongoProgram({args: args});
+        this.pid = _startMerizoProgram({args: args});
 
         assert(checkProgram(this.pid));
 
         // Wait for the web server to start
         assert.soon(function() {
-            return rawMongoProgramOutput().search("Mock Web Server Listening") !== -1;
+            return rawMerizoProgramOutput().search("Mock Web Server Listening") !== -1;
         });
 
         print("Mock HTTP Server sucessfully started.");
@@ -76,7 +76,7 @@ class ConfigExpandRestServer {
      *  Stop the Mock HTTP Server.
      */
     stop() {
-        stopMongoProgramByPid(this.pid);
+        stopMerizoProgramByPid(this.pid);
     }
 }
 
@@ -138,26 +138,26 @@ function jsToYaml(config, toplevel = true) {
 }
 
 function configExpandSuccess(config, test = null, opts = {}) {
-    const configFile = MongoRunner.dataPath + '/configExpand.conf';
+    const configFile = MerizoRunner.dataPath + '/configExpand.conf';
     writeFile(configFile, jsToYaml(config));
 
-    const merizod = MongoRunner.runMongod(Object.assign({
+    const merizod = MerizoRunner.runMerizod(Object.assign({
         configExpand: 'rest,exec',
         config: configFile,
     },
                                                        opts));
 
-    assert(merizod, "Mongod failed to start up with config: " + cat(configFile));
+    assert(merizod, "Merizod failed to start up with config: " + cat(configFile));
     removeFile(configFile);
 
     if (test) {
         test(merizod.getDB('admin'));
     }
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 }
 
 function configExpandFailure(config, test = null, opts = {}) {
-    const configFile = MongoRunner.dataPath + '/configExpand.conf';
+    const configFile = MerizoRunner.dataPath + '/configExpand.conf';
     writeFile(configFile, jsToYaml(config));
 
     const options = Object.assign({
@@ -166,7 +166,7 @@ function configExpandFailure(config, test = null, opts = {}) {
         port: allocatePort(),
     },
                                   opts);
-    let args = [MongoRunner.merizodPath];
+    let args = [MerizoRunner.merizodPath];
     for (let k in options) {
         args.push('--' + k);
         if (options[k] != '') {
@@ -174,14 +174,14 @@ function configExpandFailure(config, test = null, opts = {}) {
         }
     }
 
-    clearRawMongoProgramOutput();
-    const merizod = _startMongoProgram({args: args});
+    clearRawMerizoProgramOutput();
+    const merizod = _startMerizoProgram({args: args});
 
     assert.soon(function() {
-        return rawMongoProgramOutput().match(test);
+        return rawMerizoProgramOutput().match(test);
     });
     if (merizod) {
-        stopMongoProgramByPid(merizod);
+        stopMerizoProgramByPid(merizod);
     }
     removeFile(configFile);
 }

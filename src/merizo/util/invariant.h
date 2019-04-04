@@ -43,11 +43,11 @@ namespace merizo {
  * one (and assert_util.h).
  */
 
-#if !defined(MONGO_INCLUDE_INVARIANT_H_WHITELISTED)
+#if !defined(MERIZO_INCLUDE_INVARIANT_H_WHITELISTED)
 #error "Include assert_util.h instead of invariant.h."
 #endif
 
-MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
+MERIZO_COMPILER_NORETURN void invariantFailed(const char* expr,
                                              const char* file,
                                              unsigned line) noexcept;
 
@@ -57,7 +57,7 @@ MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
 //
 //       Invariant failure !condition some/file.cpp 528
 //
-#define MONGO_invariant_1(Expression) \
+#define MERIZO_invariant_1(Expression) \
     ::merizo::invariantWithLocation((Expression), #Expression, __FILE__, __LINE__)
 
 template <typename T>
@@ -65,12 +65,12 @@ inline void invariantWithLocation(const T& testOK,
                                   const char* expr,
                                   const char* file,
                                   unsigned line) {
-    if (MONGO_unlikely(!testOK)) {
+    if (MERIZO_unlikely(!testOK)) {
         ::merizo::invariantFailed(expr, file, line);
     }
 }
 
-MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
+MERIZO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
                                                     const std::string& msg,
                                                     const char* file,
                                                     unsigned line) noexcept;
@@ -82,7 +82,7 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
 //
 //       Invariant failure !condition "hello!" some/file.cpp 528
 //
-#define MONGO_invariant_2(Expression, contextExpr)                                           \
+#define MERIZO_invariant_2(Expression, contextExpr)                                           \
     ::merizo::invariantWithContextAndLocation((Expression),                                   \
                                              #Expression,                                    \
                                              [&]() -> std::string { return (contextExpr); }, \
@@ -92,23 +92,23 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
 template <typename T, typename ContextExpr>
 inline void invariantWithContextAndLocation(
     const T& testOK, const char* expr, ContextExpr&& contextExpr, const char* file, unsigned line) {
-    if (MONGO_unlikely(!testOK)) {
+    if (MERIZO_unlikely(!testOK)) {
         ::merizo::invariantFailedWithMsg(expr, contextExpr(), file, line);
     }
 }
 
 // This helper macro is necessary to make the __VAR_ARGS__ expansion work properly on MSVC.
-#define MONGO_expand(x) x
+#define MERIZO_expand(x) x
 
 #define invariant(...) \
-    MONGO_expand(MONGO_expand(BOOST_PP_OVERLOAD(MONGO_invariant_, __VA_ARGS__))(__VA_ARGS__))
+    MERIZO_expand(MERIZO_expand(BOOST_PP_OVERLOAD(MERIZO_invariant_, __VA_ARGS__))(__VA_ARGS__))
 
 // Behaves like invariant in debug builds and is compiled out in release. Use for checks, which can
 // potentially be slow or on a critical path.
-#define MONGO_dassert(...) \
+#define MERIZO_dassert(...) \
     if (kDebugBuild)       \
     invariant(__VA_ARGS__)
 
-#define dassert MONGO_dassert
+#define dassert MERIZO_dassert
 
 }  // namespace merizo

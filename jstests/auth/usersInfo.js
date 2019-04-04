@@ -35,9 +35,9 @@
         assert.eq(userCount + 1, allInfo.users.length);
     }
 
-    const m = MongoRunner.runMongod();
+    const m = MerizoRunner.runMerizod();
     runTest(m);
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     const st =

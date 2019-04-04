@@ -5,7 +5,7 @@
     'use strict';
 
     const runURIAuthTest = function(userMech, uriMech, authMechanism, regexMechanism) {
-        const conn = MongoRunner.runMongod({auth: ""});
+        const conn = MerizoRunner.runMerizod({auth: ""});
         const adminDB = conn.getDB("admin");
 
         adminDB.createUser({
@@ -41,7 +41,7 @@
             uri = "merizodb://user:password@localhost:" + conn.port;
         }
 
-        var shell = runMongoProgram('./merizo', uri, "--eval", "db.getName()");
+        var shell = runMerizoProgram('./merizo', uri, "--eval", "db.getName()");
         assert.eq(shell, 0, "Should be able to connect with specified params.");
 
         const log = adminDB.runCommand({getLog: "global"});
@@ -50,7 +50,7 @@
         assert(matches);
         assert.eq(2, matches.length);
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     };
 
     const SCRAM_SHA_256 = "SCRAM-SHA-256";

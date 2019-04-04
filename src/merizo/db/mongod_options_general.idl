@@ -33,7 +33,7 @@ global:
     configs:
         section: 'General options'
         initializer:
-            register: addMongodGeneralOptions
+            register: addMerizodGeneralOptions
 
 configs:
     auth:

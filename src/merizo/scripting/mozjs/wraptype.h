@@ -52,9 +52,9 @@
 // top level and converted back to merizo exceptions by an error handler on
 // ImplScope.
 
-// MONGO_*_JS_FUNCTION_* macros are public and allow wrapped types to install
+// MERIZO_*_JS_FUNCTION_* macros are public and allow wrapped types to install
 // their own functions on types and into the global scope
-#define MONGO_DECLARE_JS_FUNCTION(function)                 \
+#define MERIZO_DECLARE_JS_FUNCTION(function)                 \
     struct function {                                       \
         static const char* name() {                         \
             return #function;                               \
@@ -62,12 +62,12 @@
         static void call(JSContext* cx, JS::CallArgs args); \
     };
 
-#define MONGO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, flags) \
+#define MERIZO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, flags) \
     JS_FN(#name, smUtils::wrapFunction<Functions::name>, 0, flags)
 
-#define MONGO_ATTACH_JS_FUNCTION(name) MONGO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, 0)
+#define MERIZO_ATTACH_JS_FUNCTION(name) MERIZO_ATTACH_JS_FUNCTION_WITH_FLAGS(name, 0)
 
-#define MONGO_ATTACH_JS_CONSTRAINED_METHOD(name, ...)                                              \
+#define MERIZO_ATTACH_JS_CONSTRAINED_METHOD(name, ...)                                              \
     {                                                                                              \
         #name, {smUtils::wrapConstrainedMethod < Functions::name, false, __VA_ARGS__ >, nullptr }, \
                 0,                                                                                 \
@@ -75,7 +75,7 @@
                 nullptr                                                                            \
     }
 
-#define MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(name, ...)                                    \
+#define MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(name, ...)                                    \
     {                                                                                             \
         #name, {smUtils::wrapConstrainedMethod < Functions::name, true, __VA_ARGS__ >, nullptr }, \
                 0,                                                                                \

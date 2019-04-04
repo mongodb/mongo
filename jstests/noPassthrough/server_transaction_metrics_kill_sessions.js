@@ -23,7 +23,7 @@
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
     const sessionOptions = {causalConsistency: false};
-    let session = testDB.getMongo().startSession(sessionOptions);
+    let session = testDB.getMerizo().startSession(sessionOptions);
     let sessionDb = session.getDatabase(dbName);
 
     let initialMetrics = assert.commandWorked(testDB.adminCommand({serverStatus: 1})).transactions;
@@ -50,7 +50,7 @@
 
     session.endSession();
 
-    session = testDB.getMongo().startSession(sessionOptions);
+    session = testDB.getMerizo().startSession(sessionOptions);
     sessionDb = session.getDatabase(dbName);
 
     jsTest.log("Start a snapshot transaction at a time that is too old.");

@@ -44,9 +44,9 @@
 #include "merizo/platform/endian.h"
 
 #if defined(_WIN32)
-#define MONGO_API_CALL __cdecl
+#define MERIZO_API_CALL __cdecl
 #else
-#define MONGO_API_CALL
+#define MERIZO_API_CALL
 #endif
 
 // Macro to trick the linter into accepting assert.
@@ -206,7 +206,7 @@ extern "C" ssize_t merizoc_stream_embedded_writev(merizoc_stream_t* s,
                                                          &output_buffer,
                                                          &output_buffer_size,
                                                          nullptr);
-            if (retVal != MONGO_EMBEDDED_V1_SUCCESS) {
+            if (retVal != MERIZO_EMBEDDED_V1_SUCCESS) {
                 return -1;
             }
 
@@ -308,7 +308,7 @@ struct ClientDeleter {
 
 }  // namespace
 
-extern "C" merizoc_client_t* MONGO_API_CALL
+extern "C" merizoc_client_t* MERIZO_API_CALL
 merizoc_embedded_v1_client_create(merizo_embedded_v1_instance* db) try {
     if (!db) {
         errno = EINVAL;

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -168,7 +168,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(DoTxnCmd);
+MERIZO_REGISTER_TEST_COMMAND(DoTxnCmd);
 
 }  // namespace
 }  // namespace merizo

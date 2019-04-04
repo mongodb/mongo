@@ -37,7 +37,7 @@
 namespace merizo {
 
 /**
- * Hashes the password so that it can be stored in a user object or used for MONGODB-CR
+ * Hashes the password so that it can be stored in a user object or used for MERIZODB-CR
  * authentication.
  */
 std::string createPasswordDigest(StringData username, StringData clearTextPassword);

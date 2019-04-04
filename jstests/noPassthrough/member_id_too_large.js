@@ -24,7 +24,7 @@
 
     jsTestLog("replSetReconfig with member _id greater than number of members");
 
-    let secondary2 = MongoRunner.runMongod({replSet: rst.name});
+    let secondary2 = MerizoRunner.runMerizod({replSet: rst.name});
     conf = rst.getReplSetConfigFromNode();
     conf.version++;
     conf.members.push({_id: 5, host: secondary2.host});
@@ -32,6 +32,6 @@
     assert.commandWorked(testColl.insert(doc, {writeConcern: {w: 2}}));
     assert.commandWorked(testColl.insert(doc, {writeConcern: {w: 3}}));
 
-    MongoRunner.stopMongod(secondary2);
+    MerizoRunner.stopMerizod(secondary2);
     rst.stopSet();
 })();

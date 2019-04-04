@@ -1,6 +1,6 @@
 // SERVER-8802: Test that you can't build indexes on system.users and use that to drop users with
 // dropDups.
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = MerizoRunner.runMerizod({auth: ""});
 
 var adminDB = conn.getDB("admin");
 var testDB = conn.getDB("test");
@@ -32,4 +32,4 @@ adminDB.logout();
 adminDB.auth('admin', 'x');
 // Make sure that no users were actually dropped
 assert.eq(3, adminDB.system.users.count());
-MongoRunner.stopMongod(conn, null, {user: 'admin', pwd: 'x'});
+MerizoRunner.stopMerizod(conn, null, {user: 'admin', pwd: 'x'});

@@ -68,7 +68,7 @@ func main() {
 	progressManager.Start()
 	defer progressManager.Stop()
 
-	dump := merizodump.MongoDump{
+	dump := merizodump.MerizoDump{
 		ToolOptions:     opts,
 		OutputOptions:   outputOpts,
 		InputOptions:    inputOpts,

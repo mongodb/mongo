@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -97,7 +97,7 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
 
         uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(value),
                                    "Plan executor error during findAndModify");
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     invariant(state == PlanExecutor::IS_EOF);

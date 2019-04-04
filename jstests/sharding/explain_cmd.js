@@ -142,7 +142,7 @@
     assert.commandFailed(explain, tojson(explain));
 
     // Explain a changeStream, ensure an error is thrown under snapshot read concern.
-    const session = db.getMongo().startSession();
+    const session = db.getMerizo().startSession();
     const sessionDB = session.getDatabase(db.getName());
     explain = sessionDB.runCommand({
         aggregate: "coll",

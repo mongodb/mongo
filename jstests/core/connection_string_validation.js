@@ -6,9 +6,9 @@
 
 port = "27017";
 
-if (db.getMongo().host.indexOf(":") >= 0) {
-    var idx = db.getMongo().host.indexOf(":");
-    port = db.getMongo().host.substring(idx + 1);
+if (db.getMerizo().host.indexOf(":") >= 0) {
+    var idx = db.getMerizo().host.indexOf(":");
+    port = db.getMerizo().host.substring(idx + 1);
 }
 
 var goodStrings = [
@@ -56,7 +56,7 @@ function testGoodAsURI(i, uri) {
     var gotException = false;
     var exception;
     try {
-        var m_uri = MongoURI(uri);
+        var m_uri = MerizoURI(uri);
         var connectDB = connect(uri);
         connectDB = null;
     } catch (e) {

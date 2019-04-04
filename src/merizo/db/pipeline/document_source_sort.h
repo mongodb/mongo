@@ -177,7 +177,7 @@ private:
     explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        MONGO_UNREACHABLE;  // Should call serializeToArray instead.
+        MERIZO_UNREACHABLE;  // Should call serializeToArray instead.
     }
 
     /**

@@ -13,8 +13,8 @@
     const testDB = st.s.getDB(dbName);
 
     // Only testing the command read and write modes.
-    assert(testDB.getMongo().readMode() === "commands");
-    assert(testDB.getMongo().writeMode() === "commands");
+    assert(testDB.getMerizo().readMode() === "commands");
+    assert(testDB.getMerizo().writeMode() === "commands");
 
     // Shard a collection with the only chunk on shard0.
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));

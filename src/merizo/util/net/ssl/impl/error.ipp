@@ -35,19 +35,19 @@ public:
         return "asio.ssl";
     }
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_WINDOWS
     std::string message(int value) const {
         if (value == asio::ssl::error::no_renegotiation) {
             return "peer requested renegotiation, which is not supported";
         }
         return merizo::errnoWithDescription(value);
     }
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
     std::string message(int value) const {
         const char* s = ::ERR_reason_error_string(value);
         return s ? s : "asio.ssl error";
     }
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_APPLE
     std::string message(int value) const {
         // engine_apple produces osstatus_errorcategory messages except for stream_truncated
         if (value == asio::ssl::error::stream_truncated) {

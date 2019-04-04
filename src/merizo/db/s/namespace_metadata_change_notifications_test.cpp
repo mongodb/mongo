@@ -43,7 +43,7 @@ namespace {
 
 const NamespaceString kNss("foo.bar");
 
-class NamespaceMetadataChangeNotificationsTest : public ServiceContextMongoDTest {
+class NamespaceMetadataChangeNotificationsTest : public ServiceContextMerizoDTest {
 protected:
     NamespaceMetadataChangeNotificationsTest() {
         getServiceContext()->setTickSource(stdx::make_unique<TickSourceMock<>>());

@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
 
     let session = conn.startSession();
     assert(session.getOptions().isCausalConsistency(),
@@ -41,19 +41,19 @@
            "Retryable writes should be able to be explicitly enabled");
     session.endSession();
 
-    function runMongoShellWithRetryWritesEnabled(func) {
-        const args = [MongoRunner.merizoShellPath];
+    function runMerizoShellWithRetryWritesEnabled(func) {
+        const args = [MerizoRunner.merizoShellPath];
         args.push("--port", conn.port);
         args.push("--retryWrites");
 
         const jsCode = "(" + func.toString() + ")()";
         args.push("--eval", jsCode);
 
-        const exitCode = runMongoProgram.apply(null, args);
+        const exitCode = runMerizoProgram.apply(null, args);
         assert.eq(0, exitCode, "Encountered an error in the other merizo shell");
     }
 
-    runMongoShellWithRetryWritesEnabled(function() {
+    runMerizoShellWithRetryWritesEnabled(function() {
         let session = db.getSession();
         assert(session.getOptions().isCausalConsistency(),
                "Causal consistency should be implicitly enabled for an explicit session");
@@ -61,14 +61,14 @@
                "Retryable writes should be implicitly enabled on default session when using" +
                    " --retryWrites");
 
-        session = db.getMongo().startSession({retryWrites: false});
+        session = db.getMerizo().startSession({retryWrites: false});
         assert(session.getOptions().isCausalConsistency(),
                "Causal consistency should be implicitly enabled for an explicit session");
         assert(!session.getOptions().shouldRetryWrites(),
                "Retryable writes should be able to be explicitly disabled");
         session.endSession();
 
-        session = db.getMongo().startSession();
+        session = db.getMerizo().startSession();
         assert(session.getOptions().isCausalConsistency(),
                "Causal consistency should be implicitly enabled for an explicit session");
         assert(session.getOptions().shouldRetryWrites(),
@@ -77,5 +77,5 @@
         session.endSession();
     });
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

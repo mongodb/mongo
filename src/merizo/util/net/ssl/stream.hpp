@@ -64,11 +64,11 @@ template <typename Stream>
 class stream : public stream_base, private noncopyable {
 public:
 /// The native handle type of the SSL stream.
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_WINDOWS
     typedef PCtxtHandle native_handle_type;
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
     typedef SSL* native_handle_type;
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_APPLE
     typedef ::SSLContextRef native_handle_type;
 #else
 #error "Unknown SSL Provider"

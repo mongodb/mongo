@@ -147,7 +147,7 @@ public:
      * This should never be used.
      */
     BSONObj toBSON_do_not_use() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     ResumeTokenData getData() const;

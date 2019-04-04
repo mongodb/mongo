@@ -66,7 +66,7 @@ class DBClientCursorBatchIterator;
 
 /**
  *  A basic connection to the database.
- *  This is the main entry point for talking to a simple Mongo setup
+ *  This is the main entry point for talking to a simple Merizo setup
  *
  *  In general, this type is only allowed to be used from one thread at a time. As a special
  *  exception, it is legal to call shutdownAndDisallowReconnect() from any thread as a way to
@@ -92,7 +92,7 @@ public:
      */
     DBClientConnection(bool _autoReconnect = false,
                        double so_timeout = 0,
-                       MongoURI uri = {},
+                       MerizoURI uri = {},
                        const HandshakeValidationHook& hook = HandshakeValidationHook());
 
     virtual ~DBClientConnection() {
@@ -100,7 +100,7 @@ public:
     }
 
     /**
-     * Connect to a Mongo database server.
+     * Connect to a Merizo database server.
      *
      * If autoReconnect is true, you can try to use the DBClientConnection even when
      * false was returned -- it will try to connect again.
@@ -131,7 +131,7 @@ public:
      */
     Status connectSocketOnly(const HostAndPort& server);
 
-    /** Connect to a Mongo database server.  Exception throwing version.
+    /** Connect to a Merizo database server.  Exception throwing version.
         Throws a AssertionException if cannot connect.
 
        If autoReconnect is true, you can try to use the DBClientConnection even when
@@ -275,8 +275,8 @@ public:
         return _isReplicaSetMember;
     }
 
-    bool isMongos() const override {
-        return _isMongos;
+    bool isMerizos() const override {
+        return _isMerizos;
     }
 
     Status authenticateInternalUser() override;
@@ -285,7 +285,7 @@ protected:
     int _minWireVersion{0};
     int _maxWireVersion{0};
     bool _isReplicaSetMember = false;
-    bool _isMongos = false;
+    bool _isMerizos = false;
 
     void _auth(const BSONObj& params) override;
 
@@ -335,7 +335,7 @@ private:
 
     MessageCompressorManager _compressorManager;
 
-    MongoURI _uri;
+    MerizoURI _uri;
 };
 
 BSONElement getErrField(const BSONObj& result);

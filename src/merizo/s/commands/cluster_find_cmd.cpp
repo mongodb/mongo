@@ -159,7 +159,7 @@ public:
                     millisElapsed,
                     &bodyBuilder));
 
-            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>& ex) {
                 auto bodyBuilder = result->getBodyBuilder();
                 bodyBuilder.resetToEmpty();
 
@@ -211,7 +211,7 @@ public:
                     firstBatch.append(obj);
                 }
                 firstBatch.done(cursorId, cq->ns());
-            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>& ex) {
                 result->reset();
 
                 auto aggCmdOnView = uassertStatusOK(cq->getQueryRequest().asAggregationCommand());

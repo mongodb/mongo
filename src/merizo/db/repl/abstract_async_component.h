@@ -239,7 +239,7 @@ std::ostream& operator<<(std::ostream& os, const AbstractAsyncComponent::State& 
 
 template <typename T>
 Status AbstractAsyncComponent::_startupComponent_inlock(std::unique_ptr<T>& component) {
-    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
+    MERIZO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
 
     if (_isShuttingDown_inlock()) {
         // Save name of 'component' before resetting unique_ptr.
@@ -266,7 +266,7 @@ Status AbstractAsyncComponent::_startupComponent(std::unique_ptr<T>& component) 
 
 template <typename T>
 void AbstractAsyncComponent::_shutdownComponent_inlock(const std::unique_ptr<T>& component) {
-    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
+    MERIZO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
 
     if (!component) {
         return;

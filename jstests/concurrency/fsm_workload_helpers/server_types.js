@@ -4,7 +4,7 @@
  * Returns true if the process is a merizos, and false otherwise.
  *
  */
-function isMongos(db) {
+function isMerizos(db) {
     var res = db.runCommand('ismaster');
     assert.commandWorked(res);
 
@@ -15,16 +15,16 @@ function isMongos(db) {
  * Returns true if the process is a merizod, and false otherwise.
  *
  */
-function isMongod(db) {
-    return !isMongos(db);
+function isMerizod(db) {
+    return !isMerizos(db);
 }
 
 /**
  * Returns true if the process is a merizod configsvr, and false otherwise.
  *
  */
-function isMongodConfigsvr(db) {
-    if (!isMongod(db)) {
+function isMerizodConfigsvr(db) {
+    if (!isMerizod(db)) {
         return false;
     }
     var res = db.adminCommand('getCmdLineOpts');
@@ -42,7 +42,7 @@ function getStorageEngineName(db) {
     var status = db.serverStatus();
     assert.commandWorked(status);
 
-    assert(isMongod(db), 'no storage engine is reported when connected to merizos');
+    assert(isMerizod(db), 'no storage engine is reported when connected to merizos');
     assert.neq(
         'undefined', typeof status.storageEngine, 'missing storage engine info in server status');
 
@@ -89,7 +89,7 @@ function supportsCommittedReads(db) {
     var status = db.serverStatus();
     assert.commandWorked(status);
 
-    assert(isMongod(db), 'no storage engine is reported when connected to merizos');
+    assert(isMerizod(db), 'no storage engine is reported when connected to merizos');
     assert.neq(
         'undefined', typeof status.storageEngine, 'missing storage engine info in server status');
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -55,10 +55,10 @@ using std::string;
 using std::stringstream;
 
 // Failpoint which causes to hang "count" cmd after acquiring the DB lock.
-MONGO_FAIL_POINT_DEFINE(hangBeforeCollectionCount);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeCollectionCount);
 
 /**
- * Implements the MongoD side of the count command.
+ * Implements the MerizoD side of the count command.
  */
 class CmdCount : public BasicCommand {
 public:

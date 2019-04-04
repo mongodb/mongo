@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -97,10 +97,10 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
-MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
-MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
-MONGO_FAIL_POINT_DEFINE(waitAfterReadCommandFinishesExecution);
+MERIZO_FAIL_POINT_DEFINE(rsStopGetMore);
+MERIZO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
+MERIZO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
+MERIZO_FAIL_POINT_DEFINE(waitAfterReadCommandFinishesExecution);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not master error resulted in network disconnection.
@@ -379,7 +379,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     // This constructor will check out the session. It handles the appropriate state management
     // for both multi-statement transactions and retryable writes. Currently, only requests with
     // a transaction number will check out the session.
-    MongoDOperationContextSession sessionTxnState(opCtx);
+    MerizoDOperationContextSession sessionTxnState(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
     if (!opCtx->getClient()->isInDirectClient()) {
@@ -410,7 +410,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
 
     try {
         invocation->run(opCtx, replyBuilder);
-    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
+    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>&) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
         // specially to avoid unnecessary aborts.
 
@@ -484,7 +484,7 @@ bool runCommandImpl(OperationContext* opCtx,
             invokeWithSessionCheckedOut(opCtx, invocation, sessionOptions, replyBuilder);
         } else {
             invocation->run(opCtx, replyBuilder);
-            MONGO_FAIL_POINT_BLOCK(waitAfterReadCommandFinishesExecution, options) {
+            MERIZO_FAIL_POINT_BLOCK(waitAfterReadCommandFinishesExecution, options) {
                 const BSONObj& data = options.getData();
                 auto db = data["db"].str();
                 if (db.empty() || request.getDatabase() == db) {
@@ -509,7 +509,7 @@ bool runCommandImpl(OperationContext* opCtx,
         opCtx->setWriteConcern(wcResult);
 
         auto waitForWriteConcern = [&](auto&& bb) {
-            MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
+            MERIZO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
                 return CommandHelpers::shouldActivateFailCommandFailPoint(
                            data, request.getCommandName(), opCtx->getClient()) &&
                     data.hasField("writeConcernError");
@@ -667,7 +667,7 @@ void execCommandDatabase(OperationContext* opCtx,
         const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
 
         if (!opCtx->getClient()->isInDirectClient() &&
-            !MONGO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
+            !MERIZO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
             const bool inMultiDocumentTransaction = (sessionOptions.getAutocommit() == false);
             auto allowed = command->secondaryAllowed(opCtx->getServiceContext());
             bool alwaysAllowed = allowed == Command::AllowedOnSecondary::kAlways;
@@ -680,7 +680,7 @@ void execCommandDatabase(OperationContext* opCtx,
                 uasserted(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
             }
 
-            if (MONGO_FAIL_POINT(respondWithNotPrimaryInCommandDispatch)) {
+            if (MERIZO_FAIL_POINT(respondWithNotPrimaryInCommandDispatch)) {
                 uassert(ErrorCodes::NotMaster, "not primary", canRunHere);
             } else {
                 uassert(ErrorCodes::NotMaster, "not master", canRunHere);
@@ -803,7 +803,7 @@ void execCommandDatabase(OperationContext* opCtx,
         if (logger::globalLogDomain()->shouldLog(logger::LogComponent::kTracking,
                                                  logger::LogSeverity::Debug(1)) &&
             rpc::TrackingMetadata::get(opCtx).getParentOperId()) {
-            MONGO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
+            MERIZO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
                 << rpc::TrackingMetadata::get(opCtx).toString();
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
@@ -1131,7 +1131,7 @@ DbResponse receivedGetMore(OperationContext* opCtx,
         audit::logGetMoreAuthzCheck(opCtx->getClient(), nsString, cursorid, status.code());
         uassertStatusOK(status);
 
-        while (MONGO_FAIL_POINT(rsStopGetMore)) {
+        while (MERIZO_FAIL_POINT(rsStopGetMore)) {
             sleepmillis(0);
         }
 
@@ -1281,7 +1281,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
                 } else if (op == dbDelete) {
                     receivedDelete(opCtx, nsString, m);
                 } else {
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
                 }
             }
         } catch (const AssertionException& ue) {
@@ -1308,7 +1308,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
     // this op should be sampled for profiling.
     const bool shouldSample = currentOp.completeAndLogOperation(
-        opCtx, MONGO_LOG_DEFAULT_COMPONENT, dbresponse.response.size(), slowMsOverride, forceLog);
+        opCtx, MERIZO_LOG_DEFAULT_COMPONENT, dbresponse.response.size(), slowMsOverride, forceLog);
 
     Top::get(opCtx->getServiceContext())
         .incrementGlobalLatencyStats(

@@ -81,7 +81,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CPULoadCommand);
+MERIZO_REGISTER_TEST_COMMAND(CPULoadCommand);
 
 
 }  // namespace merizo

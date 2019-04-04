@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 #define LOG_FOR_ELECTION(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationElection)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationElection)
 #define LOG_FOR_HEARTBEATS(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationHeartbeats)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationHeartbeats)
 
 #include "merizo/platform/basic.h"
 
@@ -68,8 +68,8 @@ namespace repl {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(blockHeartbeatStepdown);
-MONGO_FAIL_POINT_DEFINE(blockHeartbeatReconfigFinish);
+MERIZO_FAIL_POINT_DEFINE(blockHeartbeatStepdown);
+MERIZO_FAIL_POINT_DEFINE(blockHeartbeatReconfigFinish);
 
 }  // namespace
 
@@ -377,7 +377,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
         return;
     }
 
-    if (MONGO_FAIL_POINT(blockHeartbeatStepdown)) {
+    if (MERIZO_FAIL_POINT(blockHeartbeatStepdown)) {
         // This log output is used in js tests so please leave it.
         log() << "stepDown - blockHeartbeatStepdown fail point enabled. "
                  "Blocking until fail point is disabled.";
@@ -387,7 +387,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
             return _inShutdown;
         };
 
-        while (MONGO_FAIL_POINT(blockHeartbeatStepdown) && !inShutdown()) {
+        while (MERIZO_FAIL_POINT(blockHeartbeatStepdown) && !inShutdown()) {
             merizo::sleepsecs(1);
         }
     }
@@ -570,7 +570,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         return;
     }
 
-    if (MONGO_FAIL_POINT(blockHeartbeatReconfigFinish)) {
+    if (MERIZO_FAIL_POINT(blockHeartbeatReconfigFinish)) {
         LOG_FOR_HEARTBEATS(0) << "blockHeartbeatReconfigFinish fail point enabled. Rescheduling "
                                  "_heartbeatReconfigFinish until fail point is disabled.";
         _replExecutor

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -52,7 +52,7 @@ int main(int argc, char** argv, char** envp) {
     if (::benchmark::ReportUnrecognizedArguments(argc, argv))
         return 1;
 
-#ifndef MONGO_CONFIG_OPTIMIZED_BUILD
+#ifndef MERIZO_CONFIG_OPTIMIZED_BUILD
     ::merizo::log() << "***WARNING*** MerizoDB was built with --opt=off. Function timings may be "
                       "affected. Always verify any code change against the production environment "
                       "(e.g. --opt=on).";

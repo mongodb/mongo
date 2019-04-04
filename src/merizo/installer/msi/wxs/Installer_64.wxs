@@ -32,8 +32,8 @@
                 <Directory Id="Server" Name="Server">
                     <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
                       <Directory Id="BIN" Name="bin" />
-                        <Directory Id="MONGO_DATA_PATH" Name="data" />
-                        <Directory Id="MONGO_LOG_PATH" Name="log" />
+                        <Directory Id="MERIZO_DATA_PATH" Name="data" />
+                        <Directory Id="MERIZO_LOG_PATH" Name="log" />
                       <Directory Id="SNMP" Name="snmp" />
                     </Directory>
                 </Directory>
@@ -50,18 +50,18 @@
 
     <Binary Id="CAIntro" SourceFile="$(var.CustomActionDll)"/>
 
-    <CustomAction Id="UpdateMongoYAML"
+    <CustomAction Id="UpdateMerizoYAML"
         BinaryKey="CAIntro"
-        DllEntry="UpdateMongoYAML"
+        DllEntry="UpdateMerizoYAML"
         Execute="deferred"
         Return="check"
         Impersonate="no"
         HideTarget="no" />
 
-    <CustomAction Id="UpdateMongoYAML.SetProperty" 
+    <CustomAction Id="UpdateMerizoYAML.SetProperty" 
         Return="check"
-        Property="UpdateMongoYAML"
-        Value="BIN=[BIN];MONGO_DATA_PATH=[MONGO_DATA_PATH];MONGO_LOG_PATH=[MONGO_LOG_PATH]"/>
+        Property="UpdateMerizoYAML"
+        Value="BIN=[BIN];MERIZO_DATA_PATH=[MERIZO_DATA_PATH];MERIZO_LOG_PATH=[MERIZO_LOG_PATH]"/>
 
     <CustomAction Id="ValidateServiceLogon"
         BinaryKey="CAIntro"
@@ -69,8 +69,8 @@
         Execute="immediate" />
 
     <InstallExecuteSequence>
-      <Custom Action="UpdateMongoYAML.SetProperty" Before="InstallFiles" />
-      <Custom Action="UpdateMongoYAML" After="InstallFiles">MONGO_SERVICE_INSTALL AND NOT REMOVE</Custom>
+      <Custom Action="UpdateMerizoYAML.SetProperty" Before="InstallFiles" />
+      <Custom Action="UpdateMerizoYAML" After="InstallFiles">MERIZO_SERVICE_INSTALL AND NOT REMOVE</Custom>
     </InstallExecuteSequence>
   
     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
@@ -88,20 +88,20 @@
 
     <FeatureGroupRef Id="fg_MerizoDBAll" />
 
-    <UIRef Id="MongoWixUI" />
+    <UIRef Id="MerizoWixUI" />
     <UIRef Id="WixUI_ErrorProgressText" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" />
 
     <!-- Settings for Install MerizoDB as a service -->
-    <Property Id="MONGO_SERVICE_INSTALL" Value="0" Secure="yes" />
-    <Property Id="MONGO_SERVICE_ACCOUNT_TYPE" Secure="yes" Value="ServiceLocalNetwork" />
-    <Property Id="MONGO_SERVICE_NAME" Secure="yes" Value="MerizoDB" />
-    <Property Id="MONGO_SERVICE_ACCOUNT_DOMAIN" Value="." />
-    <Property Id="MONGO_SERVICE_ACCOUNT_NAME" Secure="yes" Value="MerizoDB" />
-    <Property Id="MONGO_SERVICE_ACCOUNT_PASSWORD" Secure="yes" Hidden="yes"/>
+    <Property Id="MERIZO_SERVICE_INSTALL" Value="0" Secure="yes" />
+    <Property Id="MERIZO_SERVICE_ACCOUNT_TYPE" Secure="yes" Value="ServiceLocalNetwork" />
+    <Property Id="MERIZO_SERVICE_NAME" Secure="yes" Value="MerizoDB" />
+    <Property Id="MERIZO_SERVICE_ACCOUNT_DOMAIN" Value="." />
+    <Property Id="MERIZO_SERVICE_ACCOUNT_NAME" Secure="yes" Value="MerizoDB" />
+    <Property Id="MERIZO_SERVICE_ACCOUNT_PASSWORD" Secure="yes" Hidden="yes"/>
 
-    <Property Id="MONGO_DATA_PATH" Secure="yes" />
-    <Property Id="MONGO_LOG_PATH" Secure="yes" />
+    <Property Id="MERIZO_DATA_PATH" Secure="yes" />
+    <Property Id="MERIZO_LOG_PATH" Secure="yes" />
 
     <util:Group Id="PerfmonGroup" Name="Performance Monitor Users" />
 
@@ -112,52 +112,52 @@
     -->
     <!-- Default the domain to grant to the user request -->
     <CustomAction Id="MerizoDB.SetGrantAccountDefault"
-        Property="MONGO_SERVICE_ACCOUNT_DOMAIN_GRANT" Value="[MONGO_SERVICE_ACCOUNT_DOMAIN]" />
+        Property="MERIZO_SERVICE_ACCOUNT_DOMAIN_GRANT" Value="[MERIZO_SERVICE_ACCOUNT_DOMAIN]" />
 
     <!-- Change the domain to blank if the user specified '.' i.e. local machine -->
     <CustomAction Id="MerizoDB.SetGrantAccountToBlank"
-        Property="MONGO_SERVICE_ACCOUNT_DOMAIN_GRANT" Value="" />
+        Property="MERIZO_SERVICE_ACCOUNT_DOMAIN_GRANT" Value="" />
 
     <!-- Change the domain to blank if the user specified '.' i.e. local machine -->
     <CustomAction Id="MerizoDB.SetGrantAccountToNetworkAccount"
-        Property="MONGO_SERVICE_ACCOUNT_DOMAIN_GRANT" Value="NT AUTHORITY" />
+        Property="MERIZO_SERVICE_ACCOUNT_DOMAIN_GRANT" Value="NT AUTHORITY" />
 
     <!-- Default to the fully qualified domain\account for the service account -->
     <CustomAction Id="MerizoDB.SetServiceAccountDefault"
-        Property="MONGO_SERVICE_FULL_ACCOUNT_NAME"
-        Value="[MONGO_SERVICE_ACCOUNT_DOMAIN]\[MONGO_SERVICE_ACCOUNT_NAME]" />
+        Property="MERIZO_SERVICE_FULL_ACCOUNT_NAME"
+        Value="[MERIZO_SERVICE_ACCOUNT_DOMAIN]\[MERIZO_SERVICE_ACCOUNT_NAME]" />
 
     <!-- Default to .\account if the user left domain blank -->
     <CustomAction Id="MerizoDB.SetServiceAccountToDot"
-        Property="MONGO_SERVICE_FULL_ACCOUNT_NAME" Value=".\[MONGO_SERVICE_ACCOUNT_NAME]" />
+        Property="MERIZO_SERVICE_FULL_ACCOUNT_NAME" Value=".\[MERIZO_SERVICE_ACCOUNT_NAME]" />
 
     <!-- If the user chose network service, then just set the user account to Network Service -->
     <CustomAction Id="MerizoDB.SetServiceNetworkAccount"
-        Property="MONGO_SERVICE_FULL_ACCOUNT_NAME" Value="NT AUTHORITY\NetworkService" />
+        Property="MERIZO_SERVICE_FULL_ACCOUNT_NAME" Value="NT AUTHORITY\NetworkService" />
     <CustomAction Id="MerizoDB.SetServiceNetworkAccount2"
-        Property="MONGO_SERVICE_ACCOUNT_NAME" Value="NetworkService" />
+        Property="MERIZO_SERVICE_ACCOUNT_NAME" Value="NetworkService" />
 
     <InstallExecuteSequence>
         <Custom Action="MerizoDB.SetGrantAccountDefault" After="CostFinalize" />
-        <Custom Action="MerizoDB.SetGrantAccountToBlank" After="CostFinalize">MONGO_SERVICE_ACCOUNT_DOMAIN = "."</Custom>
-        <Custom Action="MerizoDB.SetGrantAccountToNetworkAccount" After="CostFinalize">MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Custom>
+        <Custom Action="MerizoDB.SetGrantAccountToBlank" After="CostFinalize">MERIZO_SERVICE_ACCOUNT_DOMAIN = "."</Custom>
+        <Custom Action="MerizoDB.SetGrantAccountToNetworkAccount" After="CostFinalize">MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Custom>
 
         <Custom Action="MerizoDB.SetServiceAccountDefault" After="CostFinalize" />
-        <Custom Action="MerizoDB.SetServiceAccountToDot" After="CostFinalize">MONGO_SERVICE_ACCOUNT_DOMAIN = ""</Custom>
-        <Custom Action="MerizoDB.SetServiceNetworkAccount" After="CostFinalize">MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Custom>
-        <Custom Action="MerizoDB.SetServiceNetworkAccount2" After="CostFinalize">MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Custom>
+        <Custom Action="MerizoDB.SetServiceAccountToDot" After="CostFinalize">MERIZO_SERVICE_ACCOUNT_DOMAIN = ""</Custom>
+        <Custom Action="MerizoDB.SetServiceNetworkAccount" After="CostFinalize">MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Custom>
+        <Custom Action="MerizoDB.SetServiceNetworkAccount2" After="CostFinalize">MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Custom>
     </InstallExecuteSequence>
 
-    <Property Id="MONGO_MULTIPLE_SKU" >
-        <RegistrySearch Id="Mongo_Multiple_Sku"
+    <Property Id="MERIZO_MULTIPLE_SKU" >
+        <RegistrySearch Id="Merizo_Multiple_Sku"
             Root="HKLM"
             Key="Software\MerizoDB\Server\$(var.MerizoDBMajorVersion)"
             Name="Edition"
             Type="raw" />
     </Property>
 
-    <Condition Message="You cannot install multiple editions for the same version of MerizoDB. Already installed product '[MONGO_MULTIPLE_SKU]' conflicts with this product.">
-        Installed OR (NOT MONGO_MULTIPLE_SKU OR MONGO_MULTIPLE_SKU = "!(wix.ProductMajorName)")
+    <Condition Message="You cannot install multiple editions for the same version of MerizoDB. Already installed product '[MERIZO_MULTIPLE_SKU]' conflicts with this product.">
+        Installed OR (NOT MERIZO_MULTIPLE_SKU OR MERIZO_MULTIPLE_SKU = "!(wix.ProductMajorName)")
     </Condition>
 
     <Property Id="SHOULD_INSTALL_COMPASS" Secure="yes" Value="1" />

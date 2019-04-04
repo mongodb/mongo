@@ -39,7 +39,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Mongo cluster encapsulation.
+// Merizo cluster encapsulation.
 //
 // A cluster enables the communication with one or more servers participating
 // in a merizo cluster.  This works with individual servers, a replica set,
@@ -228,7 +228,7 @@ func (cluster *merizoCluster) syncServer(server *merizoServer) (info *merizoServ
 
 	info = &merizoServerInfo{
 		Master:         result.IsMaster,
-		Mongos:         result.Msg == "isdbgrid",
+		Merizos:         result.Msg == "isdbgrid",
 		Tags:           result.Tags,
 		SetName:        result.SetName,
 		MaxWireVersion: result.MaxWireVersion,
@@ -591,7 +591,7 @@ func (cluster *merizoCluster) AcquireSocket(mode Mode, slaveOk bool, syncTimeout
 			if mastersLen > 0 && !(slaveOk && mode == Secondary) || slavesLen > 0 && slaveOk {
 				break
 			}
-			if mastersLen > 0 && mode == Secondary && cluster.masters.HasMongos() {
+			if mastersLen > 0 && mode == Secondary && cluster.masters.HasMerizos() {
 				break
 			}
 			if started.IsZero() {

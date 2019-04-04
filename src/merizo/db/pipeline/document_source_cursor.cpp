@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -45,7 +45,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeDocumentSourceCursorLoadBatch);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeDocumentSourceCursorLoadBatch);
 
 using boost::intrusive_ptr;
 using std::shared_ptr;
@@ -84,7 +84,7 @@ void DocumentSourceCursor::loadBatch() {
         return;
     }
 
-    while (MONGO_FAIL_POINT(hangBeforeDocumentSourceCursorLoadBatch)) {
+    while (MERIZO_FAIL_POINT(hangBeforeDocumentSourceCursorLoadBatch)) {
         log() << "Hanging aggregation due to 'hangBeforeDocumentSourceCursorLoadBatch' failpoint";
         sleepmillis(10);
     }
@@ -154,7 +154,7 @@ void DocumentSourceCursor::loadBatch() {
             uassertStatusOK(_execStatus);
         }
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

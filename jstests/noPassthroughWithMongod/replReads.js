@@ -51,7 +51,7 @@ function testReadLoadBalancing(numReplicas) {
     var connections = [];
 
     for (var i = 0; i < secondaries.length * 10; i++) {
-        conn = new Mongo(s._merizos[0].host);
+        conn = new Merizo(s._merizos[0].host);
         conn.setSlaveOk();
         conn.getDB('test').foo.findOne();
         connections.push(conn);
@@ -102,7 +102,7 @@ function testReadLoadBalancing(numReplicas) {
     secondaries = s.rs0._slaves;
 
     for (var i = 0; i < secondaries.length * 10; i++) {
-        conn = new Mongo(s._merizos[0].host);
+        conn = new Merizo(s._merizos[0].host);
         conn.setSlaveOk();
         conn.getDB('test').foo.findOne();
         connections.push(conn);

@@ -1,5 +1,5 @@
 /**
- * Test runner responsible for parsing and executing a MQL MongoD model test json file.
+ * Test runner responsible for parsing and executing a MQL MerizoD model test json file.
  */
 (function() {
     "use strict";

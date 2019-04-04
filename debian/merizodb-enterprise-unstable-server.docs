@@ -1,8 +1,8 @@
 snmp/merizod.conf.master
 snmp/merizod.conf.subagent
 snmp/README-snmp.txt
-snmp/MONGOD-MIB.txt
-snmp/MONGODBINC-MIB.txt
+snmp/MERIZOD-MIB.txt
+snmp/MERIZODBINC-MIB.txt
 LICENSE-Enterprise.txt
 README
 THIRD-PARTY-NOTICES

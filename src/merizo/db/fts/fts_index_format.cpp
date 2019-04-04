@@ -127,7 +127,7 @@ BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
 }
 }  // namespace
 
-MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
+MERIZO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
     BSONObjBuilder b;
     b.appendNull("");
     nullObj = b.obj();

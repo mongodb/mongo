@@ -143,8 +143,8 @@ class ClangFormat(object):
                 print("WARNING: Could not find clang-format %s" % (path))
 
         # Check the environment variable
-        if "MONGO_CLANG_FORMAT" in os.environ:
-            self.path = os.environ["MONGO_CLANG_FORMAT"]
+        if "MERIZO_CLANG_FORMAT" in os.environ:
+            self.path = os.environ["MERIZO_CLANG_FORMAT"]
 
             if self.path and not self._validate_version():
                 self.path = None

@@ -574,7 +574,7 @@ TEST(CollatorFactoryICULocalesTest, FactoryInitializationSucceedsWithMalayalamLo
                   .getStatus());
 }
 
-TEST(CollatorFactoryICULocalesTest, FactoryInitializationSucceedsWithMongolianLocale) {
+TEST(CollatorFactoryICULocalesTest, FactoryInitializationSucceedsWithMerizolianLocale) {
     CollatorFactoryICU factory;
     ASSERT_OK(factory
                   .makeFromBSON(BSON("locale"

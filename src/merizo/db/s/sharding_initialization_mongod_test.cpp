@@ -57,14 +57,14 @@ const std::string kShardName("TestShard");
  * This test suite directly invokes the sharding initialization code and validates its behaviour and
  * proper state transitions.
  */
-class ShardingInitializationMongoDTest : public ShardingMongodTestFixture {
+class ShardingInitializationMerizoDTest : public ShardingMerizodTestFixture {
 protected:
     // Used to write to set up local collections before exercising server logic.
     std::unique_ptr<DBDirectClient> _dbDirectClient;
 
     void setUp() override {
         serverGlobalParams.clusterRole = ClusterRole::None;
-        ShardingMongodTestFixture::setUp();
+        ShardingMerizodTestFixture::setUp();
 
         // When sharding initialization is triggered, initialize sharding state as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
@@ -73,13 +73,13 @@ protected:
                                 stdx::make_unique<ShardServerCatalogCacheLoader>(
                                     stdx::make_unique<ConfigServerCatalogCacheLoader>()));
 
-        ShardingInitializationMongoD::get(getServiceContext())
+        ShardingInitializationMerizoD::get(getServiceContext())
             ->setGlobalInitMethodForTest([&](OperationContext* opCtx,
                                              const ShardIdentity& shardIdentity,
                                              StringData distLockProcessId) {
                 const auto& configConnStr = shardIdentity.getConfigsvrConnectionString();
 
-                uassertStatusOK(initializeGlobalShardingStateForMongodForTest(configConnStr));
+                uassertStatusOK(initializeGlobalShardingStateForMerizodForTest(configConnStr));
 
                 // Set the ConnectionString return value on the mock targeter so that later calls to
                 // the
@@ -105,7 +105,7 @@ protected:
         CatalogCacheLoader::clearForTests(getServiceContext());
         ShardingState::get(getServiceContext())->clearForTests();
 
-        ShardingMongodTestFixture::tearDown();
+        ShardingMerizodTestFixture::tearDown();
     }
 
     std::unique_ptr<DistLockManager> makeDistLockManager(
@@ -120,7 +120,7 @@ protected:
     }
 
     auto* shardingInitialization() {
-        return ShardingInitializationMongoD::get(getServiceContext());
+        return ShardingInitializationMerizoD::get(getServiceContext());
     }
 
     auto* shardingState() {
@@ -156,7 +156,7 @@ private:
     ServiceContext* const _serviceContext;
 };
 
-TEST_F(ShardingInitializationMongoDTest, ValidShardIdentitySucceeds) {
+TEST_F(ShardingInitializationMerizoDTest, ValidShardIdentitySucceeds) {
     // Must hold a lock to call initializeFromShardIdentity.
     Lock::GlobalWrite lk(operationContext());
 
@@ -173,7 +173,7 @@ TEST_F(ShardingInitializationMongoDTest, ValidShardIdentitySucceeds) {
     ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
-TEST_F(ShardingInitializationMongoDTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
+TEST_F(ShardingInitializationMerizoDTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
     // Must hold a lock to call initializeFromShardIdentity.
     Lock::GlobalWrite lk(operationContext());
 
@@ -204,7 +204,7 @@ TEST_F(ShardingInitializationMongoDTest, InitWhilePreviouslyInErrorStateWillStay
     ASSERT(!shardingState()->enabled());
 }
 
-TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
+TEST_F(ShardingInitializationMerizoDTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     // Must hold a lock to call initializeFromShardIdentity.
     Lock::GlobalWrite lk(operationContext());
 
@@ -237,7 +237,7 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentit
     ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
-TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingReplSetNameSucceeds) {
+TEST_F(ShardingInitializationMerizoDTest, InitializeAgainWithMatchingReplSetNameSucceeds) {
     // Must hold a lock to call initializeFromShardIdentity.
     Lock::GlobalWrite lk(operationContext());
 
@@ -276,7 +276,7 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingReplSetNameS
 /**
  * readOnly and --shardsvr
  */
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededReadOnlyAndShardServerAndNoOverrideShardIdentity) {
     storageGlobalParams.readOnly = true;
 
@@ -286,7 +286,7 @@ TEST_F(ShardingInitializationMongoDTest,
         ErrorCodes::InvalidOptions);
 }
 
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededReadOnlyAndShardServerAndInvalidOverrideShardIdentity) {
     storageGlobalParams.readOnly = true;
     serverGlobalParams.overrideShardIdentity =
@@ -305,7 +305,7 @@ TEST_F(ShardingInitializationMongoDTest,
         ErrorCodes::UnsupportedFormat);
 }
 
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededReadOnlyAndShardServerAndValidOverrideShardIdentity) {
     storageGlobalParams.readOnly = true;
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
@@ -325,7 +325,7 @@ TEST_F(ShardingInitializationMongoDTest,
 /**
  * readOnly and not --shardsvr
  */
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededReadOnlyAndNotShardServerAndNoOverrideShardIdentity) {
     storageGlobalParams.readOnly = true;
     serverGlobalParams.clusterRole = ClusterRole::None;
@@ -334,7 +334,7 @@ TEST_F(ShardingInitializationMongoDTest,
 }
 
 TEST_F(
-    ShardingInitializationMongoDTest,
+    ShardingInitializationMerizoDTest,
     InitializeShardingAwarenessIfNeededReadOnlyAndNotShardServerAndInvalidOverrideShardIdentity) {
     storageGlobalParams.readOnly = true;
     serverGlobalParams.clusterRole = ClusterRole::None;
@@ -349,7 +349,7 @@ TEST_F(
         ErrorCodes::InvalidOptions);
 }
 
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededReadOnlyAndNotShardServerAndValidOverrideShardIdentity) {
     storageGlobalParams.readOnly = true;
     serverGlobalParams.clusterRole = ClusterRole::None;
@@ -372,7 +372,7 @@ TEST_F(ShardingInitializationMongoDTest,
 /**
  * not readOnly and --overrideShardIdentity
  */
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndInvalidOverrideShardIdentity) {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     serverGlobalParams.overrideShardIdentity = BSON("_id"
@@ -393,7 +393,7 @@ TEST_F(ShardingInitializationMongoDTest,
         ErrorCodes::InvalidOptions);
 }
 
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndValidOverrideShardIdentity) {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     serverGlobalParams.overrideShardIdentity = [] {
@@ -422,12 +422,12 @@ TEST_F(ShardingInitializationMongoDTest,
 /**
  * not readOnly and --shardsvr
  */
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndShardServerAndNoShardIdentity) {
     ASSERT(!shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
 }
 
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndShardServerAndInvalidShardIdentity) {
     // Insert the shardIdentity doc to disk while pretending that we are in "standalone" mode,
     // otherwise OpObserver for inserts will prevent the insert from occurring because the
@@ -454,7 +454,7 @@ TEST_F(ShardingInitializationMongoDTest,
         ErrorCodes::UnsupportedFormat);
 }
 
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndShardServerAndValidShardIdentity) {
     // Insert the shardIdentity doc to disk while pretending that we are in "standalone" mode,
     // otherwise OpObserver for inserts will prevent the insert from occurring because the
@@ -482,14 +482,14 @@ TEST_F(ShardingInitializationMongoDTest,
 /**
  * not readOnly and not --shardsvr
  */
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndNotShardServerAndNoShardIdentity) {
     ScopedSetStandaloneMode standalone(getServiceContext());
 
     ASSERT(!shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
 }
 
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndNotShardServerAndInvalidShardIdentity) {
     ScopedSetStandaloneMode standalone(getServiceContext());
 
@@ -504,7 +504,7 @@ TEST_F(ShardingInitializationMongoDTest,
     ASSERT(!shardingInitialization()->initializeShardingAwarenessIfNeeded(operationContext()));
 }
 
-TEST_F(ShardingInitializationMongoDTest,
+TEST_F(ShardingInitializationMerizoDTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndNotShardServerAndValidShardIdentity) {
     ScopedSetStandaloneMode standalone(getServiceContext());
 

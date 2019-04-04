@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -244,7 +244,7 @@ private:
             } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
                 return targeter.targetDelete(opCtx, targetingBatchItem.getDelete());
             } else {
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
             }
         }();
 

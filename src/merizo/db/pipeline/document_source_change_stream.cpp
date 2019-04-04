@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/db/pipeline/document_source_change_stream.h"
 
@@ -200,7 +200,7 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const Namespac
             // followed by ".", then NOT followed by '$' or 'system.'.
             return kRegexAllDBs + "\\." + kRegexAllCollections;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -341,10 +341,10 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
     uassert(40573,
             "The $changeStream stage is only supported on replica sets",
-            expCtx->inMongos || (replCoord &&
+            expCtx->inMerizos || (replCoord &&
                                  replCoord->getReplicationMode() ==
                                      repl::ReplicationCoordinator::Mode::modeReplSet));
-    if (!startFrom && !expCtx->inMongos) {
+    if (!startFrom && !expCtx->inMerizos) {
         startFrom = replCoord->getMyLastAppliedOpTime().getTimestamp();
     }
 

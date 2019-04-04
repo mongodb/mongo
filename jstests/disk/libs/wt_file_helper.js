@@ -25,15 +25,15 @@ let corruptFile = function(file) {
 
 /**
  * Starts a merizod on the provided data path without clearing data. Accepts 'options' as parameters
- * to runMongod.
+ * to runMerizod.
  */
-let startMongodOnExistingPath = function(dbpath, options) {
+let startMerizodOnExistingPath = function(dbpath, options) {
     let args = {dbpath: dbpath, noCleanData: true};
     for (let attr in options) {
         if (options.hasOwnProperty(attr))
             args[attr] = options[attr];
     }
-    return MongoRunner.runMongod(args);
+    return MerizoRunner.runMerizod(args);
 };
 
 let assertQueryUsesIndex = function(coll, query, indexName) {
@@ -59,7 +59,7 @@ let assertRepairSucceeds = function(dbpath, port, opts) {
         }
     }
     jsTestLog("Repairing the node");
-    assert.eq(0, runMongoProgram.apply(this, args));
+    assert.eq(0, runMerizoProgram.apply(this, args));
 };
 
 let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
@@ -67,8 +67,8 @@ let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
     jsTestLog("The node should fail to complete repair with --setParameter " + param);
 
     assert.eq(
-        MongoRunner.EXIT_ABRUPT,
-        runMongoProgram(
+        MerizoRunner.EXIT_ABRUPT,
+        runMerizoProgram(
             "merizod", "--repair", "--port", port, "--dbpath", dbpath, "--setParameter", param));
 };
 
@@ -79,13 +79,13 @@ let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
 let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
     jsTestLog("The repaired node should fail to start up with the --replSet option");
 
-    clearRawMongoProgramOutput();
-    let node = MongoRunner.runMongod(
+    clearRawMerizoProgramOutput();
+    let node = MerizoRunner.runMerizod(
         {dbpath: dbpath, port: port, replSet: rsName, noCleanData: true, waitForConnect: false});
     assert.soon(function() {
-        return rawMongoProgramOutput().indexOf("Fatal Assertion 50923") >= 0;
+        return rawMerizoProgramOutput().indexOf("Fatal Assertion 50923") >= 0;
     });
-    MongoRunner.stopMongod(node, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    MerizoRunner.stopMerizod(node, null, {allowedExitCode: MerizoRunner.EXIT_ABRUPT});
 };
 
 /**
@@ -95,13 +95,13 @@ let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
 let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
     jsTestLog("The node should fail to start up because a previous repair did not complete");
 
-    clearRawMongoProgramOutput();
-    let node = MongoRunner.runMongod(
+    clearRawMerizoProgramOutput();
+    let node = MerizoRunner.runMerizod(
         {dbpath: dbpath, port: port, noCleanData: true, waitForConnect: false});
     assert.soon(function() {
-        return rawMongoProgramOutput().indexOf("Fatal Assertion 50922") >= 0;
+        return rawMerizoProgramOutput().indexOf("Fatal Assertion 50922") >= 0;
     });
-    MongoRunner.stopMongod(node, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    MerizoRunner.stopMerizod(node, null, {allowedExitCode: MerizoRunner.EXIT_ABRUPT});
 };
 
 /**
@@ -110,10 +110,10 @@ let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
  */
 let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port, testFunc) {
     jsTestLog("The repaired node should start up and serve reads as a standalone");
-    let node = MongoRunner.runMongod({dbpath: dbpath, port: port, noCleanData: true});
+    let node = MerizoRunner.runMerizod({dbpath: dbpath, port: port, noCleanData: true});
     assert(node);
     testFunc(node);
-    MongoRunner.stopMongod(node);
+    MerizoRunner.stopMerizod(node);
 };
 
 /**
@@ -149,7 +149,7 @@ let assertStartInReplSet = function(replSet, originalNode, cleanData, expectResy
 let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
     dbpath, dbName, collName, deleteOrCorruptFunc, errmsg) {
     // Start a MerizoDB instance, create the collection file.
-    const merizod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
+    const merizod = MerizoRunner.runMerizod({dbpath: dbpath, cleanData: true});
     const testColl = merizod.getDB(dbName)[collName];
     const doc = {a: 1};
     assert.commandWorked(testColl.insert(doc));
@@ -158,10 +158,10 @@ let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
     deleteOrCorruptFunc(merizod, testColl);
 
     // Restart the MerizoDB instance and get an expected error message.
-    clearRawMongoProgramOutput();
-    assert.eq(MongoRunner.EXIT_ABRUPT,
-              runMongoProgram("merizod", "--port", merizod.port, "--dbpath", dbpath));
-    assert.gte(rawMongoProgramOutput().indexOf(errmsg), 0);
+    clearRawMerizoProgramOutput();
+    assert.eq(MerizoRunner.EXIT_ABRUPT,
+              runMerizoProgram("merizod", "--port", merizod.port, "--dbpath", dbpath));
+    assert.gte(rawMerizoProgramOutput().indexOf(errmsg), 0);
 };
 
 /**
@@ -170,7 +170,7 @@ let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
 let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
     dbpath, dbName, collName, deleteOrCorruptFunc, requestFunc, errmsg) {
     // Start a MerizoDB instance, create the collection file.
-    merizod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
+    merizod = MerizoRunner.runMerizod({dbpath: dbpath, cleanData: true});
     testColl = merizod.getDB(dbName)[collName];
     const doc = {a: 1};
     assert.commandWorked(testColl.insert(doc));
@@ -179,14 +179,14 @@ let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
     deleteOrCorruptFunc(merizod, testColl);
 
     // Restart the MerizoDB instance.
-    clearRawMongoProgramOutput();
-    merizod = MongoRunner.runMongod({dbpath: dbpath, port: merizod.port, noCleanData: true});
+    clearRawMerizoProgramOutput();
+    merizod = MerizoRunner.runMerizod({dbpath: dbpath, port: merizod.port, noCleanData: true});
 
     // This request crashes the server.
     testColl = merizod.getDB(dbName)[collName];
     requestFunc(testColl);
 
     // Get an expected error message.
-    assert.gte(rawMongoProgramOutput().indexOf(errmsg), 0);
-    MongoRunner.stopMongod(merizod, 9, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    assert.gte(rawMerizoProgramOutput().indexOf(errmsg), 0);
+    MerizoRunner.stopMerizod(merizod, 9, {allowedExitCode: MerizoRunner.EXIT_ABRUPT});
 };

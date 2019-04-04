@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -41,7 +41,7 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec CursorHandleInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(zeroCursorId, CursorHandleInfo), JS_FS_END,
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(zeroCursorId, CursorHandleInfo), JS_FS_END,
 };
 
 const char* const CursorHandleInfo::className = "CursorHandle";

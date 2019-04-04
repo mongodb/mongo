@@ -59,8 +59,8 @@ public:
         // TODO SERVER-27533 Until we remove the restriction of only performing lookups from merizos,
         // this stage must run on merizos if the output collection is sharded.
         HostTypeRequirement hostRequirement =
-            (pExpCtx->inMongos && pExpCtx->merizoProcessInterface->isSharded(pExpCtx->opCtx, _from))
-            ? HostTypeRequirement::kMongoS
+            (pExpCtx->inMerizos && pExpCtx->merizoProcessInterface->isSharded(pExpCtx->opCtx, _from))
+            ? HostTypeRequirement::kMerizoS
             : HostTypeRequirement::kPrimaryShard;
 
         StageConstraints constraints(StreamType::kStreaming,
@@ -129,7 +129,7 @@ private:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         // Should not be called; use serializeToArray instead.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**

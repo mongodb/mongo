@@ -60,7 +60,7 @@ namespace merizo {
  * attempting to optimize the pipeline or the pipeline stages. Neither DocumentSource::optimizeAt()
  * nor DocumentSource::optimize() will be attempted.
  */
-MONGO_FAIL_POINT_DEFINE(disablePipelineOptimization);
+MERIZO_FAIL_POINT_DEFINE(disablePipelineOptimization);
 
 using boost::intrusive_ptr;
 using std::endl;
@@ -254,7 +254,7 @@ void Pipeline::validateCommon() const {
         // Verify that we are not attempting to run a merizoS-only stage on merizoD.
         uassert(40644,
                 str::stream() << stage->getSourceName() << " can only be run on merizoS",
-                !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inMongos));
+                !(constraints.hostRequirement == HostTypeRequirement::kMerizoS && !pCtx->inMerizos));
 
         if (pCtx->inMultiDocumentTransaction) {
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
@@ -267,7 +267,7 @@ void Pipeline::validateCommon() const {
 
 void Pipeline::optimizePipeline() {
     // If the disablePipelineOptimization failpoint is enabled, the pipeline won't be optimized.
-    if (MONGO_FAIL_POINT(disablePipelineOptimization)) {
+    if (MERIZO_FAIL_POINT(disablePipelineOptimization)) {
         return;
     }
 
@@ -382,10 +382,10 @@ bool Pipeline::needsPrimaryShardMerger() const {
     });
 }
 
-bool Pipeline::needsMongosMerger() const {
+bool Pipeline::needsMerizosMerger() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
         return stage->constraints(SplitState::kSplitForMerge).resolvedHostTypeRequirement(pCtx) ==
-            HostTypeRequirement::kMongoS;
+            HostTypeRequirement::kMerizoS;
     });
 }
 
@@ -397,11 +397,11 @@ bool Pipeline::needsShard() const {
     });
 }
 
-bool Pipeline::canRunOnMongos() const {
-    return _pipelineCanRunOnMongoS().isOK();
+bool Pipeline::canRunOnMerizos() const {
+    return _pipelineCanRunOnMerizoS().isOK();
 }
 
-bool Pipeline::requiredToRunOnMongos() const {
+bool Pipeline::requiredToRunOnMerizos() const {
     invariant(_splitState != SplitState::kSplitForShards);
 
     for (auto&& stage : _sources) {
@@ -415,9 +415,9 @@ bool Pipeline::requiredToRunOnMongos() const {
 
         // If a merizoS-only stage occurs before a splittable stage, or if the pipeline is already
         // split, this entire pipeline must run on merizoS.
-        if (hostRequirement == HostTypeRequirement::kMongoS) {
+        if (hostRequirement == HostTypeRequirement::kMerizoS) {
             // Verify that the remainder of this pipeline can run on merizoS.
-            auto merizosRunStatus = _pipelineCanRunOnMongoS();
+            auto merizosRunStatus = _pipelineCanRunOnMerizoS();
 
             uassertStatusOKWithContext(merizosRunStatus,
                                        str::stream() << stage->getSourceName()
@@ -604,7 +604,7 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
     return deps;
 }
 
-Status Pipeline::_pipelineCanRunOnMongoS() const {
+Status Pipeline::_pipelineCanRunOnMerizoS() const {
     for (auto&& stage : _sources) {
         auto constraints = stage->constraints(_splitState);
         auto hostRequirement = constraints.resolvedHostTypeRequirement(pCtx);
@@ -620,7 +620,7 @@ Status Pipeline::_pipelineCanRunOnMongoS() const {
         const bool needsDisk = (mustWriteToDisk || mayWriteTmpDataAndDiskUseIsAllowed);
 
         const bool needsToBlock = (constraints.streamType == StreamType::kBlocking);
-        const bool blockingIsPermitted = !internalQueryProhibitBlockingMergeOnMongoS.load();
+        const bool blockingIsPermitted = !internalQueryProhibitBlockingMergeOnMerizoS.load();
 
         // If nothing prevents this stage from running on merizoS, continue to the next stage.
         if (!needsShard && !needsDisk && (!needsToBlock || blockingIsPermitted)) {
@@ -640,7 +640,7 @@ Status Pipeline::_pipelineCanRunOnMongoS() const {
         } else if (mayWriteTmpDataAndDiskUseIsAllowed) {
             ss << " may write to disk when 'allowDiskUse' is enabled";
         } else {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
 
         return {ErrorCodes::IllegalOperation, ss.str()};

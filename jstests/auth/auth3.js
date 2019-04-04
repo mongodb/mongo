@@ -2,7 +2,7 @@
 
     'use strict';
 
-    var conn = MongoRunner.runMongod({auth: ""});
+    var conn = MerizoRunner.runMerizod({auth: ""});
 
     var admin = conn.getDB("admin");
     var errorCodeUnauthorized = 13;
@@ -29,5 +29,5 @@
     assert("info" in admin.killOp(123));
     assert.eq(admin.fsyncUnlock().errmsg, "fsyncUnlock called when not locked");
 
-    MongoRunner.stopMongod(conn, null, {user: "foo", pwd: "bar"});
+    MerizoRunner.stopMerizod(conn, null, {user: "foo", pwd: "bar"});
 })();

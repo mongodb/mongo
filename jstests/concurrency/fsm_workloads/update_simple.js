@@ -9,7 +9,7 @@
  *  - what value to $set the field to
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMerizod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -54,7 +54,7 @@ var $config = (function() {
             assertResult: function assertResult(db, res) {
                 assertAlways.eq(0, res.nUpserted, tojson(res));
 
-                if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+                if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
                     // Storage engines which support document-level concurrency will automatically
                     // retry any operations when there are conflicts, so we should always see a
                     // matching document.
@@ -69,7 +69,7 @@ var $config = (function() {
 
                 // We can't be sure nModified will be non-zero because we may have just set a key to
                 // its existing value
-                if (db.getMongo().writeMode() === 'commands') {
+                if (db.getMerizo().writeMode() === 'commands') {
                     assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
                 }
             },

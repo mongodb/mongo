@@ -81,7 +81,7 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
             decimalTotal = decimalTotal.add(input.coerceToDecimal());
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -131,7 +131,7 @@ Value AccumulatorSum::getValue(bool toBeMerged) {
             return Value(total);
         }
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

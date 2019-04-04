@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -171,7 +171,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         }
 
         if (!args.response.isOK()) {
-            if (isMongos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
+            if (isMerizos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
                 severe()
                     << "This merizos server must be upgraded. It is attempting to communicate with "
                        "an upgraded cluster with which it is incompatible. Error: '"

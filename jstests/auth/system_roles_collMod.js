@@ -4,7 +4,7 @@
     'use strict';
     print("START auth-system-roles-collMod.js");
     TestData.roleGraphInvalidationIsFatal = false;
-    var conn = MongoRunner.runMongod({});
+    var conn = MerizoRunner.runMerizod({});
     var db = conn.getDB("test");
 
     assert.commandWorked(db.runCommand(
@@ -20,5 +20,5 @@
     assert(db.runCommand({rolesInfo: "role1"}).roles.length === 0);
 
     print("SUCCESS auth-system-roles-collMod.js");
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

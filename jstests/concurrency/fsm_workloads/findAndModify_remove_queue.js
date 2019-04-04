@@ -11,7 +11,7 @@
  * This workload was designed to reproduce SERVER-18304.
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMerizod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -43,12 +43,12 @@ var $config = (function() {
 
             assertAlways.contains(res.nMatched, [0, 1], tojson(res));
             if (res.nMatched === 0) {
-                if (ownedDB.getMongo().writeMode() === 'commands') {
+                if (ownedDB.getMerizo().writeMode() === 'commands') {
                     assertAlways.eq(0, res.nModified, tojson(res));
                 }
                 assertAlways.eq(1, res.nUpserted, tojson(res));
             } else {
-                if (ownedDB.getMongo().writeMode() === 'commands') {
+                if (ownedDB.getMerizo().writeMode() === 'commands') {
                     assertAlways.eq(1, res.nModified, tojson(res));
                 }
                 assertAlways.eq(0, res.nUpserted, tojson(res));
@@ -64,7 +64,7 @@ var $config = (function() {
             assertAlways.commandWorked(res);
 
             var doc = res.value;
-            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+            if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
                 // Storage engines which do not support document-level concurrency will not
                 // automatically retry if there was a conflict, so it is expected that it may return
                 // null in the case of a conflict. All other storage engines should automatically
@@ -111,7 +111,7 @@ var $config = (function() {
         var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
         if (this.opName === 'removed') {
-            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+            if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
                 // On storage engines which support document-level concurrency, each findAndModify
                 // should be internally retried until it removes exactly one document. Since
                 // this.numDocs == this.iterations * this.threadCount, there should not be any

@@ -18,7 +18,7 @@ requireSSLProvider('windows', function() {
             "certutil.exe", "-importpfx", "-f", "-p", "foo", "jstests\\libs\\trusted-client.pfx");
     }
 
-    const conn = MongoRunner.runMongod(
+    const conn = MerizoRunner.runMerizod(
         {sslMode: 'requireSSL', sslPEMKeyFile: "jstests\\libs\\trusted-server.pem"});
 
     const testWithCert = function(certSelector) {
@@ -34,7 +34,7 @@ requireSSLProvider('windows', function() {
             'db.runCommand({buildInfo: 1})'
         ];
 
-        const exitStatus = runMongoProgram.apply(null, argv);
+        const exitStatus = runMerizoProgram.apply(null, argv);
         assert.eq(exitStatus, 0, "successfully connected with SSL");
     };
 
@@ -46,5 +46,5 @@ requireSSLProvider('windows', function() {
         testWithCert("subject=Trusted Kernel Test Client");
     });
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 });

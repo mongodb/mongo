@@ -27,7 +27,7 @@ assert(mydb.auth("eliot", pass2), "what?");
 mydb.dropUser("eliot");
 assert(!mydb.auth("eliot", pass2), "didn't drop user");
 
-var a = mydb.getMongo().getDB("admin");
+var a = mydb.getMerizo().getDB("admin");
 a.dropAllUsers();
 pass = "c" + Math.random();
 a.createUser({user: "super", pwd: pass, roles: jsTest.adminUserRoles});

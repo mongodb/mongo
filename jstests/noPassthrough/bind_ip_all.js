@@ -8,11 +8,11 @@
     const BINDIPALL = 'jstests/noPassthrough/libs/net.bindIpAll.yaml';
 
     function runTest(config, opt, expectStar, expectLocalhost) {
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
         const merizod =
-            runMongoProgram('./merizod', '--port', port, '--config', config, opt, '--outputConfig');
+            runMerizoProgram('./merizod', '--port', port, '--config', config, opt, '--outputConfig');
         assert.eq(merizod, 0);
-        const output = rawMongoProgramOutput();
+        const output = rawMerizoProgramOutput();
         assert.eq(output.search(/bindIp: "\*"/) >= 0, expectStar, output);
         assert.eq(output.search(/bindIp: localhost/) >= 0, expectLocalhost, output);
         assert.eq(output.search(/bindIpAll:/) >= 0, false, output);

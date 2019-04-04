@@ -11,7 +11,7 @@
 
     const baseName = "wt_repair_missing_files";
     const collName = "test";
-    const dbpath = MongoRunner.dataPath + baseName + "/";
+    const dbpath = MerizoRunner.dataPath + baseName + "/";
 
     resetDbpath(dbpath);
 
@@ -20,7 +20,7 @@
      * re-creating it. The collection should be visible on normal startup.
      */
 
-    let merizod = startMongodOnExistingPath(dbpath);
+    let merizod = startMerizodOnExistingPath(dbpath);
     let testColl = merizod.getDB(baseName)[collName];
 
     const doc = {a: 1};
@@ -29,14 +29,14 @@
     let testCollUri = getUriForColl(testColl);
     let testCollFile = dbpath + testCollUri + ".wt";
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     jsTestLog("deleting collection file: " + testCollFile);
     removeFile(testCollFile);
 
     assertRepairSucceeds(dbpath, merizod.port);
 
-    merizod = startMongodOnExistingPath(dbpath);
+    merizod = startMerizodOnExistingPath(dbpath);
     testColl = merizod.getDB(baseName)[collName];
 
     assert.eq(testCollUri, getUriForColl(testColl));
@@ -56,14 +56,14 @@
 
     let indexUri = getUriForIndex(testColl, indexName);
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     let indexFile = dbpath + indexUri + ".wt";
     jsTestLog("deleting index file: " + indexFile);
     removeFile(indexFile);
 
     assertRepairSucceeds(dbpath, merizod.port);
-    merizod = startMongodOnExistingPath(dbpath);
+    merizod = startMerizodOnExistingPath(dbpath);
     testColl = merizod.getDB(baseName)[collName];
 
     // Repair creates new idents.
@@ -73,7 +73,7 @@
     assert.eq(testColl.find(doc).itcount(), 1);
     assert.eq(testColl.count(), 1);
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     /**
      * Test 3. Delete the sizeStorer. Verify that repair suceeds in recreating it.
@@ -85,12 +85,12 @@
 
     assertRepairSucceeds(dbpath, merizod.port);
 
-    merizod = startMongodOnExistingPath(dbpath);
+    merizod = startMerizodOnExistingPath(dbpath);
     testColl = merizod.getDB(baseName)[collName];
 
     assert.eq(testColl.find(doc).itcount(), 1);
     assert.eq(testColl.count(), 1);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     /**
      * Test 4. Delete the _mdb_catalog. Verify that repair suceeds in creating an empty catalog and
@@ -103,7 +103,7 @@
 
     assertRepairSucceeds(dbpath, merizod.port);
 
-    merizod = startMongodOnExistingPath(dbpath);
+    merizod = startMerizodOnExistingPath(dbpath);
     testColl = merizod.getDB(baseName)[collName];
     assert.isnull(testColl.exists());
 
@@ -115,17 +115,17 @@
      * files, allowing MerizoDB to start up normally.
      */
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
     resetDbpath(dbpath);
 
-    merizod = startMongodOnExistingPath(dbpath, {directoryperdb: ""});
+    merizod = startMerizodOnExistingPath(dbpath, {directoryperdb: ""});
     testColl = merizod.getDB(baseName)[collName];
 
     assert.commandWorked(testColl.insert(doc));
 
     testCollUri = getUriForColl(testColl);
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     let dataDir = dbpath + baseName;
     jsTestLog("deleting data directory: " + dataDir);
@@ -133,12 +133,12 @@
 
     assertRepairSucceeds(dbpath, merizod.port, {directoryperdb: ""});
 
-    merizod = startMongodOnExistingPath(dbpath, {directoryperdb: ""});
+    merizod = startMerizodOnExistingPath(dbpath, {directoryperdb: ""});
     testColl = merizod.getDB(baseName)[collName];
 
     assert.eq(testCollUri, getUriForColl(testColl));
     assert.eq(testColl.find({}).itcount(), 0);
     assert.eq(testColl.count(), 0);
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

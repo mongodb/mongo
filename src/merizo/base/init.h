@@ -54,46 +54,46 @@
 /**
  * Convenience parameter representing an empty set of prerequisites for an initializer function.
  */
-#define MONGO_NO_PREREQUISITES (NULL)
+#define MERIZO_NO_PREREQUISITES (NULL)
 
 /**
  * Convenience parameter representing an empty set of dependents of an initializer function.
  */
-#define MONGO_NO_DEPENDENTS (NULL)
+#define MERIZO_NO_DEPENDENTS (NULL)
 
 /**
  * Convenience parameter representing the default set of dependents for initializer functions.
  */
-#define MONGO_DEFAULT_PREREQUISITES (MONGO_DEFAULT_PREREQUISITES_STR)
+#define MERIZO_DEFAULT_PREREQUISITES (MERIZO_DEFAULT_PREREQUISITES_STR)
 
 /**
  * Macro to define an initializer function named "NAME" with the default prerequisites, and
  * no explicit dependents.
  *
- * See MONGO_INITIALIZER_GENERAL.
+ * See MERIZO_INITIALIZER_GENERAL.
  *
  * Usage:
- *     MONGO_INITIALIZER(myModule)(::merizo::InitializerContext* context) {
+ *     MERIZO_INITIALIZER(myModule)(::merizo::InitializerContext* context) {
  *         ...
  *     }
  */
-#define MONGO_INITIALIZER(NAME) \
-    MONGO_INITIALIZER_WITH_PREREQUISITES(NAME, MONGO_DEFAULT_PREREQUISITES)
+#define MERIZO_INITIALIZER(NAME) \
+    MERIZO_INITIALIZER_WITH_PREREQUISITES(NAME, MERIZO_DEFAULT_PREREQUISITES)
 
 /**
  * Macro to define an initializer function named "NAME" that depends on the initializers
  * specified in PREREQUISITES to have been completed, but names no explicit dependents.
  *
- * See MONGO_INITIALIZER_GENERAL.
+ * See MERIZO_INITIALIZER_GENERAL.
  *
  * Usage:
- *     MONGO_INITIALIZER_WITH_PREREQUISITES(myGlobalStateChecker,
+ *     MERIZO_INITIALIZER_WITH_PREREQUISITES(myGlobalStateChecker,
  *                                         ("globalStateInitialized", "stacktraces"))(
  *            ::merizo::InitializerContext* context) {
  *    }
  */
-#define MONGO_INITIALIZER_WITH_PREREQUISITES(NAME, PREREQUISITES) \
-    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, MONGO_NO_DEPENDENTS)
+#define MERIZO_INITIALIZER_WITH_PREREQUISITES(NAME, PREREQUISITES) \
+    MERIZO_INITIALIZER_GENERAL(NAME, PREREQUISITES, MERIZO_NO_DEPENDENTS)
 
 /**
  * Macro to define an initializer that depends on PREREQUISITES and has DEPENDENTS as explicit
@@ -108,7 +108,7 @@
  * list of dependents.
  *
  * Usage:
- *    MONGO_INITIALIZER_GENERAL(myInitializer,
+ *    MERIZO_INITIALIZER_GENERAL(myInitializer,
  *                             ("myPrereq1", "myPrereq2", ...),
  *                             ("myDependent1", "myDependent2", ...))(
  *            ::merizo::InitializerContext* context) {
@@ -118,16 +118,16 @@
  * A form that takes an existing function or that lets the programmer supply the name
  * of the function to declare would be options.
  */
-#define MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)                        \
-    ::merizo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)(::merizo::InitializerContext*); \
+#define MERIZO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)                        \
+    ::merizo::Status MERIZO_INITIALIZER_FUNCTION_NAME_(NAME)(::merizo::InitializerContext*); \
     namespace {                                                                           \
     ::merizo::GlobalInitializerRegisterer _merizoInitializerRegisterer_##NAME(              \
         std::string(#NAME),                                                               \
-        MONGO_MAKE_STRING_VECTOR PREREQUISITES,                                           \
-        MONGO_MAKE_STRING_VECTOR DEPENDENTS,                                              \
-        merizo::InitializerFunction(MONGO_INITIALIZER_FUNCTION_NAME_(NAME)));              \
+        MERIZO_MAKE_STRING_VECTOR PREREQUISITES,                                           \
+        MERIZO_MAKE_STRING_VECTOR DEPENDENTS,                                              \
+        merizo::InitializerFunction(MERIZO_INITIALIZER_FUNCTION_NAME_(NAME)));              \
     }                                                                                     \
-    ::merizo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)
+    ::merizo::Status MERIZO_INITIALIZER_FUNCTION_NAME_(NAME)
 
 /**
  * Macro to define an initializer group.
@@ -136,8 +136,8 @@
  * initialization steps into phases, such as "all global parameter declarations completed", "all
  * global parameters initialized".
  */
-#define MONGO_INITIALIZER_GROUP(NAME, PREREQUISITES, DEPENDENTS)                               \
-    MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(::merizo::InitializerContext*) { \
+#define MERIZO_INITIALIZER_GROUP(NAME, PREREQUISITES, DEPENDENTS)                               \
+    MERIZO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(::merizo::InitializerContext*) { \
         return ::merizo::Status::OK();                                                          \
     }
 
@@ -145,4 +145,4 @@
  * Macro to produce a name for a merizo initializer function for an initializer operation
  * named "NAME".
  */
-#define MONGO_INITIALIZER_FUNCTION_NAME_(NAME) _merizoInitializerFunction_##NAME
+#define MERIZO_INITIALIZER_FUNCTION_NAME_(NAME) _merizoInitializerFunction_##NAME

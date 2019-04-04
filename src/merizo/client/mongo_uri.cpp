@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -112,10 +112,10 @@ namespace {
 
 constexpr StringData kURIPrefix = "merizodb://"_sd;
 constexpr StringData kURISRVPrefix = "merizodb+srv://"_sd;
-constexpr StringData kDefaultMongoHost = "127.0.0.1:27017"_sd;
+constexpr StringData kDefaultMerizoHost = "127.0.0.1:27017"_sd;
 
 /**
- * Helper Method for MongoURI::parse() to split a string into exactly 2 pieces by a char
+ * Helper Method for MerizoURI::parse() to split a string into exactly 2 pieces by a char
  * delimiter.
  */
 std::pair<StringData, StringData> partitionForward(StringData str, const char c) {
@@ -127,7 +127,7 @@ std::pair<StringData, StringData> partitionForward(StringData str, const char c)
 }
 
 /**
- * Helper method for MongoURI::parse() to split a string into exactly 2 pieces by a char
+ * Helper method for MerizoURI::parse() to split a string into exactly 2 pieces by a char
  * delimiter searching backward from the end of the string.
  */
 std::pair<StringData, StringData> partitionBackward(StringData str, const char c) {
@@ -147,8 +147,8 @@ std::pair<StringData, StringData> partitionBackward(StringData str, const char c
  * on multiple parsed option sources.  STL setwise operations require sorted lists.  A map is used
  * instead of a vector of pairs to permit insertion-is-not-overwrite behavior.
  */
-MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
-    MongoURI::OptionsMap ret;
+MerizoURI::OptionsMap parseOptions(StringData options, StringData url) {
+    MerizoURI::OptionsMap ret;
     if (options.empty()) {
         return ret;
     }
@@ -205,7 +205,7 @@ MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
     return ret;
 }
 
-MongoURI::OptionsMap addTXTOptions(MongoURI::OptionsMap options,
+MerizoURI::OptionsMap addTXTOptions(MerizoURI::OptionsMap options,
                                    const std::string& host,
                                    const StringData url,
                                    const bool isSeedlist) {
@@ -240,9 +240,9 @@ MongoURI::OptionsMap addTXTOptions(MongoURI::OptionsMap options,
     return {std::make_move_iterator(begin(options)), std::make_move_iterator(end(options))};
 }
 
-// Contains the parts of a MongoURI as unowned StringData's. Any code that needs to break up
+// Contains the parts of a MerizoURI as unowned StringData's. Any code that needs to break up
 // URIs into their basic components without fully parsing them can use this struct.
-// Internally, MongoURI uses this to do basic parsing of the input URI string.
+// Internally, MerizoURI uses this to do basic parsing of the input URI string.
 struct URIParts {
     explicit URIParts(StringData uri);
     StringData scheme;
@@ -298,12 +298,12 @@ URIParts::URIParts(StringData uri) {
 }
 }  // namespace
 
-bool MongoURI::isMongoURI(StringData uri) {
+bool MerizoURI::isMerizoURI(StringData uri) {
     return (uri.startsWith(kURIPrefix) || uri.startsWith(kURISRVPrefix));
 }
 
-std::string MongoURI::redact(StringData url) {
-    uassert(50892, "String passed to MongoURI::redact wasn't a MongoURI", isMongoURI(url));
+std::string MerizoURI::redact(StringData url) {
+    uassert(50892, "String passed to MerizoURI::redact wasn't a MerizoURI", isMerizoURI(url));
     URIParts parts(url);
     std::ostringstream out;
 
@@ -319,13 +319,13 @@ std::string MongoURI::redact(StringData url) {
     return out.str();
 }
 
-MongoURI MongoURI::parseImpl(const std::string& url) {
+MerizoURI MerizoURI::parseImpl(const std::string& url) {
     const StringData urlSD(url);
 
     // 1. Validate and remove the scheme prefix `merizodb://` or `merizodb+srv://`
     const bool isSeedlist = urlSD.startsWith(kURISRVPrefix);
     if (!(urlSD.startsWith(kURIPrefix) || isSeedlist)) {
-        return MongoURI(uassertStatusOK(ConnectionString::parse(url)));
+        return MerizoURI(uassertStatusOK(ConnectionString::parse(url)));
     }
 
     // 2. Split up the URI into its components for further parsing and validation
@@ -503,7 +503,7 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
 
     ConnectionString cs(
         setName.empty() ? ConnectionString::MASTER : ConnectionString::SET, servers, setName);
-    return MongoURI(std::move(cs),
+    return MerizoURI(std::move(cs),
                     username,
                     password,
                     database,
@@ -512,13 +512,13 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
                     std::move(options));
 }
 
-StatusWith<MongoURI> MongoURI::parse(const std::string& url) try {
+StatusWith<MerizoURI> MerizoURI::parse(const std::string& url) try {
     return parseImpl(url);
 } catch (const std::exception&) {
     return exceptionToStatus();
 }
 
-const boost::optional<std::string> MongoURI::getAppName() const {
+const boost::optional<std::string> MerizoURI::getAppName() const {
     const auto optIter = _options.find("appName");
     if (optIter != end(_options)) {
         return optIter->second;
@@ -526,7 +526,7 @@ const boost::optional<std::string> MongoURI::getAppName() const {
     return boost::none;
 }
 
-std::string MongoURI::canonicalizeURIAsString() const {
+std::string MerizoURI::canonicalizeURIAsString() const {
     StringBuilder uri;
     uri << kURIPrefix;
     if (!_user.empty()) {
@@ -553,7 +553,7 @@ std::string MongoURI::canonicalizeURIAsString() const {
             delimeter = ",";
         }
     } else {
-        uri << kDefaultMongoHost;
+        uri << kDefaultMerizoHost;
     }
 
     uri << "/";

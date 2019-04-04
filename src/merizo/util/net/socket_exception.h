@@ -55,7 +55,7 @@ Status makeSocketError(SocketErrorKind kind,
 #define throwSocketError(...)                          \
     do {                                               \
         uassertStatusOK(makeSocketError(__VA_ARGS__)); \
-        MONGO_UNREACHABLE;                             \
+        MERIZO_UNREACHABLE;                             \
     } while (false)
 
 using NetworkException = ExceptionForCat<ErrorCategory::NetworkError>;

@@ -72,7 +72,7 @@ public:
      */
     ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds);
 
-    ReplicaSetMonitor(const MongoURI& uri);
+    ReplicaSetMonitor(const MerizoURI& uri);
 
     /**
      * Schedules the initial refresh task into task executor.
@@ -153,7 +153,7 @@ public:
      * Returns the URI that was used to construct this monitor.
      * It IS NOT updated to reflect the current members of the set.
      */
-    const MongoURI& getOriginalUri() const;
+    const MerizoURI& getOriginalUri() const;
 
     /**
      * Is server part of this set? Uses only cached information.
@@ -181,7 +181,7 @@ public:
     static std::shared_ptr<ReplicaSetMonitor> createIfNeeded(const std::string& name,
                                                              const std::set<HostAndPort>& servers);
 
-    static std::shared_ptr<ReplicaSetMonitor> createIfNeeded(const MongoURI& uri);
+    static std::shared_ptr<ReplicaSetMonitor> createIfNeeded(const MerizoURI& uri);
 
     /**
      * gets a cached Monitor per name. If the monitor is not found and createFromSeed is false,

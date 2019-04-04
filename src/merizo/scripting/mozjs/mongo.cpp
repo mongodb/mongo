@@ -60,38 +60,38 @@
 namespace merizo {
 namespace mozjs {
 
-const JSFunctionSpec MongoBase::methods[] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(copyDatabaseWithSCRAM, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorFromId, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorHandleFromId, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getClientRPCProtocols, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getServerRPCProtocols, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(insert, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetConnection, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_markNodeAsFailed, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(logout, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(remove, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommand, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommandWithMetadata, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClientRPCProtocols, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(update, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMinWireVersion, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMaxWireVersion, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetMember, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isMongos, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoExternalInfo),
+const JSFunctionSpec MerizoBase::methods[] = {
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(copyDatabaseWithSCRAM, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorFromId, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorHandleFromId, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getClientRPCProtocols, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getServerRPCProtocols, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(insert, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetConnection, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_markNodeAsFailed, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(logout, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(remove, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommand, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommandWithMetadata, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClientRPCProtocols, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(update, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMinWireVersion, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMaxWireVersion, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetMember, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isMerizos, MerizoExternalInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MerizoExternalInfo),
     JS_FS_END,
 };
 
-const char* const MongoBase::className = "Mongo";
+const char* const MerizoBase::className = "Merizo";
 
-const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
-    MONGO_ATTACH_JS_FUNCTION(_forgetReplSet),
-    MONGO_ATTACH_JS_FUNCTION(load),
-    MONGO_ATTACH_JS_FUNCTION(quit),
+const JSFunctionSpec MerizoExternalInfo::freeFunctions[4] = {
+    MERIZO_ATTACH_JS_FUNCTION(_forgetReplSet),
+    MERIZO_ATTACH_JS_FUNCTION(load),
+    MERIZO_ATTACH_JS_FUNCTION(quit),
     JS_FS_END,
 };
 
@@ -101,7 +101,7 @@ const std::shared_ptr<DBClientBase>& getConnectionRef(JS::CallArgs& args) {
     auto ret =
         static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
     uassert(
-        ErrorCodes::BadValue, "Trying to get connection for closed Mongo object", *ret != nullptr);
+        ErrorCodes::BadValue, "Trying to get connection for closed Merizo object", *ret != nullptr);
     return *ret;
 }
 
@@ -151,56 +151,56 @@ void setCursorHandle(MozJSImplScope* scope,
         scope->trackedNew<CursorHandleInfo::CursorTracker>(std::move(ns), cursorId, *client));
 }
 
-void setHiddenMongo(JSContext* cx, JS::HandleValue value, JS::CallArgs& args) {
+void setHiddenMerizo(JSContext* cx, JS::HandleValue value, JS::CallArgs& args) {
     ObjectWrapper o(cx, args.rval());
     if (!o.hasField(InternedString::_merizo)) {
         o.defineProperty(InternedString::_merizo, value, JSPROP_READONLY | JSPROP_PERMANENT);
     }
 }
 
-void setHiddenMongo(JSContext* cx, JS::CallArgs& args) {
-    setHiddenMongo(cx, args.thisv(), args);
+void setHiddenMerizo(JSContext* cx, JS::CallArgs& args) {
+    setHiddenMerizo(cx, args.thisv(), args);
 }
 
-void setHiddenMongo(JSContext* cx,
+void setHiddenMerizo(JSContext* cx,
                     std::shared_ptr<DBClientBase> resPtr,
                     DBClientBase* origConn,
                     JS::CallArgs& args) {
     ObjectWrapper o(cx, args.rval());
     // If the connection that ran the command is the same as conn, then we set a hidden "_merizo"
-    // property on the returned object that is just "this" Mongo object.
+    // property on the returned object that is just "this" Merizo object.
     if (resPtr.get() == origConn) {
-        setHiddenMongo(cx, args.thisv(), args);
+        setHiddenMerizo(cx, args.thisv(), args);
     } else {
-        JS::RootedObject newMongo(cx);
+        JS::RootedObject newMerizo(cx);
 
         auto scope = getScope(cx);
-        scope->getProto<MongoExternalInfo>().newObject(&newMongo);
+        scope->getProto<MerizoExternalInfo>().newObject(&newMerizo);
 
         auto host = resPtr->getServerAddress();
-        JS_SetPrivate(newMongo,
+        JS_SetPrivate(newMerizo,
                       scope->trackedNew<std::shared_ptr<DBClientBase>>(std::move(resPtr)));
 
         ObjectWrapper from(cx, args.thisv());
-        ObjectWrapper to(cx, newMongo);
+        ObjectWrapper to(cx, newMerizo);
         for (const auto& k : {InternedString::slaveOk, InternedString::defaultDB}) {
             JS::RootedValue tmpValue(cx);
             from.getValue(k, &tmpValue);
             to.setValue(k, tmpValue);
         }
 
-        // 'newMongo' is a direct connection to an individual server. Its "host" property therefore
+        // 'newMerizo' is a direct connection to an individual server. Its "host" property therefore
         // reports the stringified HostAndPort of the underlying DBClientConnection.
         to.setString(InternedString::host, host);
 
         JS::RootedValue value(cx);
-        value.setObjectOrNull(newMongo);
-        setHiddenMongo(cx, value, args);
+        value.setObjectOrNull(newMerizo);
+        setHiddenMerizo(cx, value, args);
     }
 }
 }  // namespace
 
-void MongoBase::finalize(js::FreeOp* fop, JSObject* obj) {
+void MerizoBase::finalize(js::FreeOp* fop, JSObject* obj) {
     auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(obj));
 
     if (conn) {
@@ -208,7 +208,7 @@ void MongoBase::finalize(js::FreeOp* fop, JSObject* obj) {
     }
 }
 
-void MongoBase::Functions::close::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::close::call(JSContext* cx, JS::CallArgs args) {
     getConnection(args);
 
     auto thisv = args.thisv().toObjectOrNull();
@@ -219,7 +219,7 @@ void MongoBase::Functions::close::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 3)
         uasserted(ErrorCodes::BadValue, "runCommand needs 3 args");
 
@@ -240,7 +240,7 @@ void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
 
     if (isUnacknowledged(cmdObj)) {
         runFireAndForgetCommand(conn, database, cmdObj);
-        setHiddenMongo(cx, args);
+        setHiddenMerizo(cx, args);
         returnOk(cx, args);
         return;
     }
@@ -253,10 +253,10 @@ void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
     //
     // Also, we make a copy here because we want a copy after we dump cmdRes
     ValueReader(cx, args.rval()).fromBSON(cmdRes.getOwned(), nullptr, false /* read only */);
-    setHiddenMongo(cx, std::get<1>(resTuple), conn.get(), args);
+    setHiddenMerizo(cx, std::get<1>(resTuple), conn.get(), args);
 }
 
-void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 3)
         uasserted(ErrorCodes::BadValue, "runCommandWithMetadata needs 3 args");
 
@@ -280,7 +280,7 @@ void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallA
 
     if (isUnacknowledged(commandArgs)) {
         runFireAndForgetCommand(conn, database, commandArgs, metadata);
-        setHiddenMongo(cx, args);
+        setHiddenMerizo(cx, args);
         returnOk(cx, args);
         return;
     }
@@ -293,10 +293,10 @@ void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallA
     mergedResultBob.append("commandReply", res->getCommandReply());
 
     ValueReader(cx, args.rval()).fromBSON(mergedResultBob.obj(), nullptr, false);
-    setHiddenMongo(cx, std::get<1>(resTuple), conn.get(), args);
+    setHiddenMerizo(cx, std::get<1>(resTuple), conn.get(), args);
 }
 
-void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 7)
@@ -353,7 +353,7 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 3)
@@ -434,7 +434,7 @@ void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::remove::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::remove::call(JSContext* cx, JS::CallArgs args) {
     if (!(args.length() == 2 || args.length() == 3))
         uasserted(ErrorCodes::BadValue, "remove needs 2 or 3 args");
 
@@ -461,7 +461,7 @@ void MongoBase::Functions::remove::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() < 3)
         uasserted(ErrorCodes::BadValue, "update needs at least 3 args");
 
@@ -491,7 +491,7 @@ void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
     uassert(ErrorCodes::BadValue, "no connection", conn);
     uassert(ErrorCodes::BadValue, "merizoAuth takes exactly 1 object argument", args.length() == 1);
@@ -500,7 +500,7 @@ void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(true);
 }
 
-void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "logout needs 1 arg");
 
@@ -518,7 +518,7 @@ void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromBSON(ret.getOwned(), nullptr, false);
 }
 
-void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (!(args.length() == 2 || args.length() == 3))
@@ -551,7 +551,7 @@ void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) 
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 2) {
@@ -576,7 +576,7 @@ void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs 
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (!conn)
@@ -654,7 +654,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
     ValueReader(cx, args.rval()).fromBSON(inputObj, nullptr, true);
 }
 
-void MongoBase::Functions::getClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::getClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 0)
@@ -668,7 +668,7 @@ void MongoBase::Functions::getClientRPCProtocols::call(JSContext* cx, JS::CallAr
     ValueReader(cx, args.rval()).fromStringData(protoStr);
 }
 
-void MongoBase::Functions::setClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::setClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 1)
@@ -686,7 +686,7 @@ void MongoBase::Functions::setClientRPCProtocols::call(JSContext* cx, JS::CallAr
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::getServerRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::getServerRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 0)
@@ -700,7 +700,7 @@ void MongoBase::Functions::getServerRPCProtocols::call(JSContext* cx, JS::CallAr
     ValueReader(cx, args.rval()).fromStringData(protoStr);
 }
 
-void MongoBase::Functions::isReplicaSetConnection::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::isReplicaSetConnection::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 0) {
@@ -710,7 +710,7 @@ void MongoBase::Functions::isReplicaSetConnection::call(JSContext* cx, JS::CallA
     args.rval().setBoolean(conn->type() == ConnectionString::ConnectionType::SET);
 }
 
-void MongoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 3) {
         uasserted(ErrorCodes::BadValue, "_markNodeAsFailed needs 3 args");
     }
@@ -747,7 +747,7 @@ void MongoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs a
     args.rval().setUndefined();
 }
 
-void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
+void MerizoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     std::string host("127.0.0.1");
@@ -756,7 +756,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         host = ValueWriter(cx, args.get(0)).toString();
     }
 
-    auto cs = uassertStatusOK(MongoURI::parse(host));
+    auto cs = uassertStatusOK(MerizoURI::parse(host));
 
     boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
@@ -769,7 +769,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     ScriptEngine::runConnectCallback(*conn);
 
     JS::RootedObject thisv(cx);
-    scope->getProto<MongoExternalInfo>().newObject(&thisv);
+    scope->getProto<MerizoExternalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     JS_SetPrivate(thisv, scope->trackedNew<std::shared_ptr<DBClientBase>>(conn.release()));
@@ -779,7 +779,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto defaultDB = cs.getDatabase() == "" ? "test" : cs.getDatabase();
     o.setString(InternedString::defaultDB, defaultDB);
 
-    // Adds a property to the Mongo connection object.
+    // Adds a property to the Merizo connection object.
     boost::optional<bool> retryWrites = cs.getRetryWrites();
     // If retryWrites is not explicitly set in uri, sessions created on this connection default to
     // the global retryWrites value. This is checked in sessions.js by using the injected
@@ -791,31 +791,31 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     args.rval().setObjectOrNull(thisv);
 }
 
-void MongoBase::Functions::getMinWireVersion::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::getMinWireVersion::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     args.rval().setInt32(conn->getMinWireVersion());
 }
 
-void MongoBase::Functions::getMaxWireVersion::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::getMaxWireVersion::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     args.rval().setInt32(conn->getMaxWireVersion());
 }
 
-void MongoBase::Functions::isReplicaSetMember::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::isReplicaSetMember::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     args.rval().setBoolean(conn->isReplicaSetMember());
 }
 
-void MongoBase::Functions::isMongos::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::isMerizos::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
-    args.rval().setBoolean(conn->isMongos());
+    args.rval().setBoolean(conn->isMerizos());
 }
 
-void MongoBase::Functions::_startSession::call(JSContext* cx, JS::CallArgs args) {
+void MerizoBase::Functions::_startSession::call(JSContext* cx, JS::CallArgs args) {
     auto client =
         static_cast<std::shared_ptr<DBClientBase>*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
 
@@ -828,7 +828,7 @@ void MongoBase::Functions::_startSession::call(JSContext* cx, JS::CallArgs args)
     args.rval().setObjectOrNull(obj.get());
 }
 
-void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) {
+void MerizoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     for (unsigned i = 0; i < args.length(); ++i) {
@@ -842,11 +842,11 @@ void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) 
     args.rval().setBoolean(true);
 }
 
-void MongoExternalInfo::Functions::quit::call(JSContext* cx, JS::CallArgs args) {
+void MerizoExternalInfo::Functions::quit::call(JSContext* cx, JS::CallArgs args) {
     quickExit(args.get(0).isNumber() ? args.get(0).toNumber() : 0);
 }
 
-void MongoExternalInfo::Functions::_forgetReplSet::call(JSContext* cx, JS::CallArgs args) {
+void MerizoExternalInfo::Functions::_forgetReplSet::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "_forgetReplSet takes exactly 1 argument, but was given "

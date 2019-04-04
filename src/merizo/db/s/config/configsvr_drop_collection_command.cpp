@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/db/auth/authorization_session.h"
 #include "merizo/db/client.h"
@@ -51,7 +51,7 @@
 namespace merizo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(setDropCollDistLockWait);
+MERIZO_FAIL_POINT_DEFINE(setDropCollDistLockWait);
 
 template <typename F>
 auto staleExceptionRetry(OperationContext* opCtx, StringData opStr, F&& f) {
@@ -76,7 +76,7 @@ auto staleExceptionRetry(OperationContext* opCtx, StringData opStr, F&& f) {
             }
             throw;
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 }
 
@@ -138,7 +138,7 @@ public:
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
         Seconds waitFor(DistLockManager::kDefaultLockTimeout);
-        MONGO_FAIL_POINT_BLOCK(setDropCollDistLockWait, customWait) {
+        MERIZO_FAIL_POINT_BLOCK(setDropCollDistLockWait, customWait) {
             const BSONObj& data = customWait.getData();
             waitFor = Seconds(data["waitForSecs"].numberInt());
         }

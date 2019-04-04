@@ -6,10 +6,10 @@ var configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
 configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
 var replConfig = configRS.getReplSetConfig();
 replConfig.configsvr = true;
-var merizos = MongoRunner.runMongos({configdb: configRS.getURL(), waitForConnect: false});
+var merizos = MerizoRunner.runMerizos({configdb: configRS.getURL(), waitForConnect: false});
 
 assert.throws(function() {
-    new Mongo(merizos.host);
+    new Merizo(merizos.host);
 });
 
 jsTestLog("Initiating CSRS");
@@ -25,7 +25,7 @@ var e;
 assert.soon(
     function() {
         try {
-            merizos2 = new Mongo(merizos.host);
+            merizos2 = new Merizo(merizos.host);
             return true;
         } catch (ex) {
             e = ex;
@@ -40,4 +40,4 @@ assert.soon(
 jsTestLog("got merizos");
 assert.commandWorked(merizos2.getDB('admin').runCommand('serverStatus'));
 configRS.stopSet();
-MongoRunner.stopMongos(merizos);
+MerizoRunner.stopMerizos(merizos);

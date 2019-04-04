@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -126,7 +126,7 @@ namespace {
 
 #if defined(_WIN32)
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
-    L"MongoS", L"MerizoDB Router", L"MerizoDB Sharding Router"};
+    L"MerizoS", L"MerizoDB Router", L"MerizoDB Sharding Router"};
 #endif
 
 constexpr auto kSignKeysRetryInterval = Seconds{1};
@@ -261,7 +261,7 @@ void cleanupTask(ServiceContext* serviceContext) {
 #endif
 
         // Shutdown Full-Time Data Capture
-        stopMongoSFTDC();
+        stopMerizoSFTDC();
     }
 
     audit::logShutdown(Client::getCurrent());
@@ -306,7 +306,7 @@ Status initializeSharding(OperationContext* opCtx) {
                 stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(
                 stdx::make_unique<rpc::CommittedOpTimeMetadataHook>(opCtx->getServiceContext()));
-            hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(
+            hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMerizos>(
                 opCtx->getServiceContext()));
             return hookList;
         },
@@ -342,14 +342,14 @@ void initWireSpec() {
     spec.isInternalClient = true;
 }
 
-ExitCode runMongosServer(ServiceContext* serviceContext) {
+ExitCode runMerizosServer(ServiceContext* serviceContext) {
     Client::initThread("merizosMain");
     printShardingVersionInfo(false);
 
     initWireSpec();
 
     serviceContext->setServiceEntryPoint(
-        stdx::make_unique<ServiceEntryPointMongos>(serviceContext));
+        stdx::make_unique<ServiceEntryPointMerizos>(serviceContext));
 
     auto tl =
         transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
@@ -363,7 +363,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
     unshardedHookList->addHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
+        stdx::make_unique<rpc::ShardingEgressMetadataHookForMerizos>(serviceContext));
     // TODO SERVER-33053: readReplyMetadata is not called on hooks added through
     // ShardingConnectionHook with _shardedConnections=false, so this hook will not run for
     // connections using globalConnPool.
@@ -375,7 +375,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     auto shardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
     shardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
     shardedHookList->addHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext));
+        stdx::make_unique<rpc::ShardingEgressMetadataHookForMerizos>(serviceContext));
     shardedHookList->addHook(stdx::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
 
     shardConnectionPool.addHook(new ShardingConnectionHook(true, std::move(shardedHookList)));
@@ -385,7 +385,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ReplicaSetMonitor::setSynchronousConfigChangeHook(
         &ShardRegistry::replicaSetChangeShardRegistryUpdateHook);
 
-    // Mongos connection pools already takes care of authenticating new connections so the
+    // Merizos connection pools already takes care of authenticating new connections so the
     // replica set connection shouldn't need to.
     DBClientReplicaSet::setAuthPooledSecondaryConn(false);
 
@@ -416,7 +416,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
             .transitional_ignore();
     }
 
-    startMongoSFTDC();
+    startMerizoSFTDC();
 
     Status status = AuthorizationManager::get(serviceContext)->initialize(opCtx.get());
     if (!status.isOK()) {
@@ -480,13 +480,13 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 #endif
 
     // Block until shutdown.
-    MONGO_IDLE_THREAD_BLOCK;
+    MERIZO_IDLE_THREAD_BLOCK;
     return waitForShutdown();
 }
 
 #if defined(_WIN32)
 ExitCode initService() {
-    return runMongosServer(getGlobalServiceContext());
+    return runMerizosServer(getGlobalServiceContext());
 }
 #endif
 
@@ -503,8 +503,8 @@ void startupConfigActions(const std::vector<std::string>& argv) {
 #endif
 }
 
-std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongos() {
-    return stdx::make_unique<AuthzManagerExternalStateMongos>();
+std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMerizos() {
+    return stdx::make_unique<AuthzManagerExternalStateMerizos>();
 }
 
 ExitCode main(ServiceContext* serviceContext) {
@@ -537,11 +537,11 @@ ExitCode main(ServiceContext* serviceContext) {
     }
 #endif
 
-    return runMongosServer(serviceContext);
+    return runMerizosServer(serviceContext);
 }
 
 namespace {
-MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
+MERIZO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     forkServerOrDie();
     return Status::OK();
@@ -552,15 +552,15 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 // to the latest version because there is no feature gating that currently occurs at the merizos
 // level. The shards are responsible for rejecting usages of new features if their
 // featureCompatibilityVersion is lower.
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion42, ("EndStartupOptionStorage"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion42, ("EndStartupOptionStorage"))
 (InitializerContext* context) {
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
     return Status::OK();
 }
 
-#ifdef MONGO_CONFIG_SSL
-MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))
+#ifdef MERIZO_CONFIG_SSL
+MERIZO_INITIALIZER_GENERAL(setSSLManagerType, MERIZO_NO_PREREQUISITES, ("SSLManager"))
 (InitializerContext* context) {
     isSSLServer = true;
     return Status::OK();
@@ -570,7 +570,7 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManage
 }  // namespace
 
 ExitCode merizoSMain(int argc, char* argv[], char** envp) {
-    setMongos();
+    setMerizos();
 
     if (argc < 1)
         return EXIT_BADOPTIONS;

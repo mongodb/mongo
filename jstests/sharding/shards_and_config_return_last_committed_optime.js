@@ -82,7 +82,7 @@
     }
 
     //
-    // Mongos should not return lastCommittedOpTime.
+    // Merizos should not return lastCommittedOpTime.
     //
 
     const st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2});
@@ -182,9 +182,9 @@
     // A standalone merizod does not return lastCommittedOpTime.
     //
 
-    const standalone = MongoRunner.runMongod();
+    const standalone = MerizoRunner.runMerizod();
 
     assertDoesNotReturnLastCommittedOpTime(standalone.getDB("test"), "foo", "standalone merizod");
 
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 })();

@@ -39,8 +39,8 @@
 namespace merizo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(setYieldAllLocksHang);
-MONGO_FAIL_POINT_DEFINE(setYieldAllLocksWait);
+MERIZO_FAIL_POINT_DEFINE(setYieldAllLocksHang);
+MERIZO_FAIL_POINT_DEFINE(setYieldAllLocksWait);
 }  // namespace
 
 // static
@@ -69,14 +69,14 @@ void QueryYield::yieldAllLocks(OperationContext* opCtx,
     // Track the number of yields in CurOp.
     CurOp::get(opCtx)->yielded();
 
-    MONGO_FAIL_POINT_BLOCK(setYieldAllLocksHang, config) {
+    MERIZO_FAIL_POINT_BLOCK(setYieldAllLocksHang, config) {
         StringData ns{config.getData().getStringField("namespace")};
         if (ns.empty() || ns == planExecNS.ns()) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(setYieldAllLocksHang);
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET(setYieldAllLocksHang);
         }
     }
 
-    MONGO_FAIL_POINT_BLOCK(setYieldAllLocksWait, customWait) {
+    MERIZO_FAIL_POINT_BLOCK(setYieldAllLocksWait, customWait) {
         const BSONObj& data = customWait.getData();
         BSONElement customWaitNS = data["namespace"];
         if (!customWaitNS || planExecNS.ns() == customWaitNS.str()) {

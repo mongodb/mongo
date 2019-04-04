@@ -64,7 +64,7 @@ function multiVersionDumpRestoreTest(configObj) {
         var shardingTest = new ShardingTest(shardingTestConfig);
         var serverSource = shardingTest.s;
     } else {
-        var serverSource = MongoRunner.runMongod({
+        var serverSource = MerizoRunner.runMerizod({
             binVersion: configObj.serverSourceVersion,
             dbpath: configObj.testDbpath,
             storageEngine: configObj.storageEngine
@@ -89,15 +89,15 @@ function multiVersionDumpRestoreTest(configObj) {
 
     // Dump using the specified version of merizodump from the running merizod or merizos instance.
     if (configObj.dumpType === "merizod") {
-        MongoRunner.runMongoTool("merizodump", {
+        MerizoRunner.runMerizoTool("merizodump", {
             out: configObj.dumpDir,
             binVersion: configObj.merizoDumpVersion,
             host: serverSource.host,
             db: testBaseName
         });
-        MongoRunner.stopMongod(serverSource);
+        MerizoRunner.stopMerizod(serverSource);
     } else { /* "merizos" */
-        MongoRunner.runMongoTool("merizodump", {
+        MerizoRunner.runMerizoTool("merizodump", {
             out: configObj.dumpDir,
             binVersion: configObj.merizoDumpVersion,
             host: serverSource.host,
@@ -108,10 +108,10 @@ function multiVersionDumpRestoreTest(configObj) {
 
     // Restore using the specified version of merizorestore
     if (configObj.restoreType === "merizod") {
-        var serverDest = MongoRunner.runMongod(
+        var serverDest = MerizoRunner.runMerizod(
             {binVersion: configObj.serverDestVersion, storageEngine: configObj.storageEngine});
 
-        MongoRunner.runMongoTool("merizorestore", {
+        MerizoRunner.runMerizoTool("merizorestore", {
             dir: configObj.dumpDir + "/" + testBaseName,
             binVersion: configObj.merizoRestoreVersion,
             host: serverDest.host,
@@ -127,7 +127,7 @@ function multiVersionDumpRestoreTest(configObj) {
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         serverDest = shardingTest.s;
-        MongoRunner.runMongoTool("merizorestore", {
+        MerizoRunner.runMerizoTool("merizorestore", {
             dir: configObj.dumpDir + "/" + testBaseName,
             binVersion: configObj.merizoRestoreVersion,
             host: serverDest.host,
@@ -161,7 +161,7 @@ function multiVersionDumpRestoreTest(configObj) {
     if (configObj.restoreType === "merizos") {
         shardingTest.stop();
     } else {
-        MongoRunner.stopMongod(serverDest);
+        MerizoRunner.stopMerizod(serverDest);
     }
 }
 

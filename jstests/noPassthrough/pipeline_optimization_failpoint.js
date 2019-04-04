@@ -6,8 +6,8 @@
     load("jstests/libs/analyze_plan.js");  // For aggPlan functions.
     Random.setRandomSeed();
 
-    const conn = MongoRunner.runMongod({});
-    assert.neq(conn, null, "Mongod failed to start up.");
+    const conn = MerizoRunner.runMerizod({});
+    assert.neq(conn, null, "Merizod failed to start up.");
     const testDb = conn.getDB("test");
     const coll = testDb.agg_opt;
 
@@ -47,5 +47,5 @@
     // Test that the result is the same with and without optimizations enabled.
     assert.eq(enabledResult, disabledResult);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

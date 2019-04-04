@@ -49,7 +49,7 @@ std::shared_ptr<const ErrorExtraInfo> ErrorExtraInfoExample::parse(const BSONObj
     return std::make_shared<ErrorExtraInfoExample>(obj["data"].Int());
 }
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ErrorExtraInfoExample);
+MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(ErrorExtraInfoExample);
 
 namespace nested::twice {
 
@@ -67,7 +67,7 @@ std::shared_ptr<const ErrorExtraInfo> NestedErrorExtraInfoExample::parse(const B
     return std::make_shared<NestedErrorExtraInfoExample>(obj["data"].Int());
 }
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(NestedErrorExtraInfoExample);
+MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(NestedErrorExtraInfoExample);
 
 }  // namespace nested::twice
 

@@ -36,23 +36,23 @@
  * Utility macro to construct a std::vector<std::string> from a sequence of C-style
  * strings.
  *
- * Usage:  MONGO_MAKE_STRING_VECTOR("a", "b", "c") returns a vector containing
+ * Usage:  MERIZO_MAKE_STRING_VECTOR("a", "b", "c") returns a vector containing
  * std::strings "a", "b", "c", in that order.
  */
-#define MONGO_MAKE_STRING_VECTOR(...) ::merizo::_makeStringVector(0, __VA_ARGS__, NULL)
+#define MERIZO_MAKE_STRING_VECTOR(...) ::merizo::_makeStringVector(0, __VA_ARGS__, NULL)
 
 namespace merizo {
 
 /**
  * Create a vector of strings from varargs of C-style strings.
  *
- * WARNING: Only intended for use by MONGO_MAKE_STRING_VECTOR macro, defined above.  Aborts
+ * WARNING: Only intended for use by MERIZO_MAKE_STRING_VECTOR macro, defined above.  Aborts
  * ungracefully if you misuse it, so stick to the macro.
  *
  * The first parameter is ignored in all circumstances. The subsequent parameters must be
  * const char* C-style strings, or NULL. Of these parameters, at least one must be
  * NULL. Parameters at and beyond the NULL are not inserted. Typically, the NULL will be
- * the last parameter. The MONGO_MAKE_STRING_VECTOR macro enforces this.
+ * the last parameter. The MERIZO_MAKE_STRING_VECTOR macro enforces this.
  *
  * Returns a vector of std::strings.
  */

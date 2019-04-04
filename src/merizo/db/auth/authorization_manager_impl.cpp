@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -79,7 +79,7 @@ using std::endl;
 using std::string;
 using std::vector;
 
-MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
+MERIZO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
                           ("EndStartupOptionStorage"),
                           ("CreateAuthorizationManager"))
 (InitializerContext* const context) try {
@@ -230,7 +230,7 @@ Status AuthorizationManagerPinnedUsersServerParameter::setFromString(const std::
     return authorizationManagerPinnedUsers.setFromString(str);
 }
 
-MONGO_REGISTER_SHIM(AuthorizationManager::create)()->std::unique_ptr<AuthorizationManager> {
+MERIZO_REGISTER_SHIM(AuthorizationManager::create)()->std::unique_ptr<AuthorizationManager> {
     return std::make_unique<AuthorizationManagerImpl>();
 }
 

@@ -65,7 +65,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterIsSelfCommand, ("GenerateInstanceId"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(RegisterIsSelfCommand, ("GenerateInstanceId"))
 (InitializerContext* context) {
     // Leaked intentionally: a Command registers itself when constructed
     new IsSelfCommand();

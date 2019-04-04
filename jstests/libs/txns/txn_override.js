@@ -13,7 +13,7 @@
     load("jstests/libs/retryable_writes_util.js");
     load("jstests/libs/transactions_util.js");
 
-    const runCommandOriginal = Mongo.prototype.runCommand;
+    const runCommandOriginal = Merizo.prototype.runCommand;
 
     const kCmdsThatInsert = new Set([
         'insert',

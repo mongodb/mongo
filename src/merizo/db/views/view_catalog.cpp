@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -266,10 +266,10 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
         new ExpressionContext(opCtx,
                               request,
                               CollatorInterface::cloneCollator(viewDef.defaultCollator()),
-                              // We can use a stub MongoProcessInterface because we are only parsing
+                              // We can use a stub MerizoProcessInterface because we are only parsing
                               // the Pipeline for validation here. We won't do anything with the
                               // pipeline that will require a real implementation.
-                              std::make_shared<StubMongoProcessInterface>(),
+                              std::make_shared<StubMerizoProcessInterface>(),
                               std::move(resolvedNamespaces),
                               boost::none);
 
@@ -437,7 +437,7 @@ std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(WithLock lk,
                                                      OperationContext* opCtx,
                                                      StringData ns) {
     // We expect the catalog to be valid, so short-circuit other checks for best performance.
-    if (MONGO_unlikely(!_valid.load())) {
+    if (MERIZO_unlikely(!_valid.load())) {
         // If the catalog is invalid, we want to avoid references to virtualized or other invalid
         // collection names to trigger a reload. This makes the system more robust in presence of
         // invalid view definitions.
@@ -531,6 +531,6 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                                   << ViewGraph::kMaxViewDepth};
         }
     };
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 }  // namespace merizo

@@ -37,7 +37,7 @@
     const coll = testDB.getCollection(testName);
     coll.drop();
 
-    const isMongos = (testDB.runCommand("ismaster").msg === "isdbgrid");
+    const isMerizos = (testDB.runCommand("ismaster").msg === "isdbgrid");
 
     // Test that $jsonSchema is rejected in an $elemMatch projection.
     assert.throws(function() {
@@ -132,7 +132,7 @@
     assert.writeOK(coll.insert({a: "str"}));
     assert.writeOK(coll.insert({a: ["STR", "sTr"]}));
 
-    if (testDB.getMongo().useReadCommands()) {
+    if (testDB.getMerizo().useReadCommands()) {
         assert.eq(0,
                   coll.find({$jsonSchema: schema}).collation(caseInsensitiveCollation).itcount());
         assert.eq(2,
@@ -216,7 +216,7 @@
     assert.eq(0, coll.find({$jsonSchema: schema}).itcount());
 
     // Test that $jsonSchema does not respect the collation specified in a delete command.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         res = coll.deleteMany({$jsonSchema: {properties: {a: {enum: ["STR"]}}}},
                               {collation: caseInsensitiveCollation});
         assert.eq(0, res.deletedCount);
@@ -309,7 +309,7 @@
         coll.find({$or: [{$jsonSchema: {required: ["a"]}}, {$text: {$search: "TEST"}}]}).itcount());
     assert.eq(1, coll.find({$and: [{$jsonSchema: {}}, {$text: {$search: "TEST"}}]}).itcount());
 
-    if (!isMongos) {
+    if (!isMerizos) {
         coll.drop();
         assert.writeOK(coll.insert({_id: 0, a: true}));
 
@@ -332,9 +332,9 @@
         coll.drop({writeConcern: {w: "majority"}});
         assert.writeOK(coll.insert({_id: 1, a: true}));
 
-        if (FixtureHelpers.isReplSet(db) && !isMongos && isWiredTiger(db)) {
+        if (FixtureHelpers.isReplSet(db) && !isMerizos && isWiredTiger(db)) {
             // Test $jsonSchema in the precondition checking for doTxn.
-            const session = db.getMongo().startSession();
+            const session = db.getMerizo().startSession();
             const sessionDb = session.getDatabase(testDB.getName());
             res = sessionDb.adminCommand({
                 doTxn: [

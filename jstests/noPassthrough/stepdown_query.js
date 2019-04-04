@@ -26,7 +26,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // We create a new connection to 'host' here instead of passing in the original connection.
         // This to work around the fact that connections created by ReplSetTest already have slaveOk
         // set on them, but we need a connection with slaveOk not set for this test.
-        var conn = new Mongo(host);
+        var conn = new Merizo(host);
         var coll = conn.getDB(dbName).getCollection(collName);
         assert(!coll.exists());
         assert.writeOK(coll.insert([{}, {}, {}, {}, {}]));

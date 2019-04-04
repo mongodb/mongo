@@ -36,11 +36,11 @@
     }
 
     function runTest(options) {
-        var dbpath = MongoRunner.dataPath + 'wt_nojournal_toggle';
+        var dbpath = MerizoRunner.dataPath + 'wt_nojournal_toggle';
         resetDbpath(dbpath);
 
         // Start a merizod with journaling enabled.
-        var conn = MongoRunner.runMongod({
+        var conn = MerizoRunner.runMerizod({
             dbpath: dbpath,
             noCleanData: true,
             journal: '',
@@ -60,7 +60,7 @@
                 // do an extra journaled write to make all visible commits durable, before killing
                 // the merizod.
                 assert.writeOK(testDB.nojournal.insert({final: true}, {writeConcern: {j: true}}));
-                MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+                MerizoRunner.stopMerizod(conn, 9, {allowedExitCode: MerizoRunner.EXIT_SIGKILL});
                 return true;
             }
             return false;
@@ -70,7 +70,7 @@
         assert.neq(0, exitCode, 'expected shell to exit abnormally due to merizod being terminated');
 
         // Restart the merizod with journaling disabled.
-        conn = MongoRunner.runMongod({
+        conn = MerizoRunner.runMerizod({
             dbpath: dbpath,
             noCleanData: true,
             nojournal: '',
@@ -89,10 +89,10 @@
                   testDB.serverStatus().wiredTiger.log['log write operations'],
                   'journaling is still enabled even though --nojournal was specified');
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
 
         // Restart the merizod with journaling enabled.
-        conn = MongoRunner.runMongod({
+        conn = MerizoRunner.runMerizod({
             dbpath: dbpath,
             noCleanData: true,
             journal: '',
@@ -108,7 +108,7 @@
                   testDB.serverStatus().wiredTiger.log['log write operations'],
                   'journaling is still disabled even though --journal was specified');
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     }
 
     // Operations from the journal should be replayed even when the merizod is terminated before

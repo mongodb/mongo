@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -152,7 +152,7 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
             return NEED_TIME;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void TrialStage::_assessTrialAndBuildFinalPlan() {

@@ -32,7 +32,7 @@
     // Issue a 'dropDatabase' command.
     let dropDatabaseFn = function() {
         const rollbackDb = "oldDatabase";
-        var primary = db.getMongo();
+        var primary = db.getMerizo();
         jsTestLog("Dropping database " + rollbackDb + " on primary node " + primary.host);
         var dbToDrop = db.getSiblingDB(rollbackDb);
         assert.commandWorked(dbToDrop.dropDatabase());

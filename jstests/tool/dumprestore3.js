@@ -28,24 +28,24 @@
     replTest.awaitReplication();
 
     jsTestLog("merizodump from primary");
-    var data = MongoRunner.dataDir + "/dumprestore3-other1/";
+    var data = MerizoRunner.dataDir + "/dumprestore3-other1/";
     resetDbpath(data);
-    var ret = MongoRunner.runMongoTool("merizodump", {
+    var ret = MerizoRunner.runMerizoTool("merizodump", {
         host: primary.host,
         out: data,
     });
     assert.eq(ret, 0, "merizodump should exit w/ 0 on primary");
 
     jsTestLog("try merizorestore to secondary");
-    ret = MongoRunner.runMongoTool("merizorestore", {
+    ret = MerizoRunner.runMerizoTool("merizorestore", {
         host: secondary.host,
         dir: data,
     });
     assert.neq(ret, 0, "merizorestore should exit w/ 1 on secondary");
 
     jsTestLog("merizoexport from primary");
-    dataFile = MongoRunner.dataDir + "/dumprestore3-other2.json";
-    ret = MongoRunner.runMongoTool("merizoexport", {
+    dataFile = MerizoRunner.dataDir + "/dumprestore3-other2.json";
+    ret = MerizoRunner.runMerizoTool("merizoexport", {
         host: primary.host,
         out: dataFile,
         db: "foo",
@@ -54,7 +54,7 @@
     assert.eq(ret, 0, "merizoexport should exit w/ 0 on primary");
 
     jsTestLog("merizoimport from secondary");
-    ret = MongoRunner.runMongoTool("merizoimport", {
+    ret = MerizoRunner.runMerizoTool("merizoimport", {
         host: secondary.host,
         file: dataFile,
     });

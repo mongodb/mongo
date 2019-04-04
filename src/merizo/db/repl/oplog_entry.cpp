@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -86,7 +86,7 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
                                 << " Object field: "
                                 << redact(objectField));
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 /**
@@ -204,7 +204,7 @@ StatusWith<OplogEntry> OplogEntry::parse(const BSONObj& object) {
     } catch (...) {
         return exceptionToStatus();
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 OplogEntry::OplogEntry(BSONObj rawInput) : raw(std::move(rawInput)) {
@@ -266,7 +266,7 @@ bool OplogEntry::isCrudOpType(OpTypeEnum opType) {
         case OpTypeEnum::kNoop:
             return false;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool OplogEntry::isCrudOpType() const {

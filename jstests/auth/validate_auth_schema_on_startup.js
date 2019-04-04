@@ -6,12 +6,12 @@
  */
 (function() {
 
-    const dbpath = MongoRunner.dataPath + "validateAuthSchemaOnStartup/";
+    const dbpath = MerizoRunner.dataPath + "validateAuthSchemaOnStartup/";
     resetDbpath(dbpath);
     const dbName = "validateAuthSchemaOnStartup";
     const authSchemaColl = "system.version";
 
-    let merizod = MongoRunner.runMongod({dbpath: dbpath, auth: ""});
+    let merizod = MerizoRunner.runMerizod({dbpath: dbpath, auth: ""});
     let adminDB = merizod.getDB('admin');
 
     // Create a user.
@@ -19,10 +19,10 @@
         {user: "root", pwd: "root", roles: [{role: 'userAdminAnyDatabase', db: 'admin'}]});
     assert(adminDB.auth("root", "root"));
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     // Start without auth to corrupt the authSchema document.
-    merizod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
+    merizod = MerizoRunner.runMerizod({dbpath: dbpath, noCleanData: true});
     adminDB = merizod.getDB('admin');
 
     let currentVersion = adminDB[authSchemaColl].findOne({_id: 'authSchema'}).currentVersion;
@@ -30,23 +30,23 @@
     // Invalidate the authSchema document.
     assert.commandWorked(
         adminDB[authSchemaColl].update({_id: 'authSchema'}, {currentVersion: 'asdf'}));
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     // Confirm start up fails, even without --auth.
-    assert.eq(null, MongoRunner.runMongod({dbpath: dbpath, noCleanData: true}));
+    assert.eq(null, MerizoRunner.runMerizod({dbpath: dbpath, noCleanData: true}));
 
     // Confirm startup works with the flag to disable validation so the document can be repaired.
-    merizod = MongoRunner.runMongod(
+    merizod = MerizoRunner.runMerizod(
         {dbpath: dbpath, noCleanData: true, setParameter: "startupAuthSchemaValidation=false"});
     adminDB = merizod.getDB('admin');
     assert.commandWorked(
         adminDB[authSchemaColl].update({_id: 'authSchema'}, {currentVersion: currentVersion}));
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     // Confirm everything is normal again.
-    merizod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true, auth: ""});
+    merizod = MerizoRunner.runMerizod({dbpath: dbpath, noCleanData: true, auth: ""});
     adminDB = merizod.getDB('admin');
     assert(adminDB.auth("root", "root"));
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

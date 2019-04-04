@@ -442,7 +442,7 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 	case bson.RegEx: // RegExp
 		return json.RegExp{v.Pattern, v.Options}, nil
 
-	case bson.MongoTimestamp: // Timestamp
+	case bson.MerizoTimestamp: // Timestamp
 		timestamp := int64(v)
 		return json.Timestamp{
 			Seconds:   uint32(timestamp >> 32),

@@ -18,7 +18,7 @@
 
     load('jstests/libs/get_index_helpers.js');
 
-    const dbpath = MongoRunner.dataPath + 'skip_level_upgrade';
+    const dbpath = MerizoRunner.dataPath + 'skip_level_upgrade';
     resetDbpath(dbpath);
 
     // We set noCleanData to true in order to preserve the data files within an iteration.
@@ -43,7 +43,7 @@
         let merizodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
 
         // Start up an old binary version merizod.
-        let conn = MongoRunner.runMongod(merizodOptions);
+        let conn = MerizoRunner.runMerizod(merizodOptions);
         let port = conn.port;
 
         assert.neq(null,
@@ -56,22 +56,22 @@
         assert.commandWorked(testDB.createCollection(version.testCollection));
         assert.writeOK(testDB[version.testCollection].insert({a: 1}));
         assert.commandWorked(testDB[version.testCollection].createIndex({a: 1}));
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
 
         // Restart the merizod with the latest binary version on the old version's data files.
         // Should fail due to being a skip level upgrade.
         merizodOptions = Object.extend({binVersion: 'latest'}, defaultOptions);
-        conn = MongoRunner.runMongod(merizodOptions);
+        conn = MerizoRunner.runMerizod(merizodOptions);
         assert.eq(null, conn);
 
         // Restart the merizod with the latest version with --repair. Should fail due to being a
         // skip level upgrade.
-        let returnCode = runMongoProgram("merizod", "--port", port, "--repair", "--dbpath", dbpath);
+        let returnCode = runMerizoProgram("merizod", "--port", port, "--repair", "--dbpath", dbpath);
         assert.neq(returnCode, 0, "expected merizod --repair to fail with a skip level upgrade");
 
         // Restart the merizod in the originally specified version. Should succeed.
         merizodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
-        conn = MongoRunner.runMongod(merizodOptions);
+        conn = MerizoRunner.runMerizod(merizodOptions);
 
         // Verify that the data and indices from previous iterations are still accessible.
         testDB = conn.getDB('test');
@@ -85,7 +85,7 @@
             `index from ${version.testCollection} should be available; options: ` +
                 tojson(merizodOptions));
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
 
         resetDbpath(dbpath);
     }

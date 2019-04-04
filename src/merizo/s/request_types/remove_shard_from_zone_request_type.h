@@ -47,7 +47,7 @@ public:
      *   zone: <string zoneName>
      * }
      */
-    static StatusWith<RemoveShardFromZoneRequest> parseFromMongosCommand(const BSONObj& cmdObj);
+    static StatusWith<RemoveShardFromZoneRequest> parseFromMerizosCommand(const BSONObj& cmdObj);
 
     /**
      * Parses the provided BSON content as the internal _configsvrRemoveShardFromZone command, and
@@ -72,7 +72,7 @@ public:
 private:
     RemoveShardFromZoneRequest(std::string shardName, std::string zoneName);
     static StatusWith<RemoveShardFromZoneRequest> _parseFromCommand(const BSONObj& cmdObj,
-                                                                    bool forMongos);
+                                                                    bool forMerizos);
 
     std::string _shardName;
     std::string _zoneName;

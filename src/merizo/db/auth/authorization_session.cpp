@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -66,5 +66,5 @@ void AuthorizationSession::ScopedImpersonate::swap() {
     swap(*std::get<1>(impersonations), _roles);
 }
 
-MONGO_DEFINE_SHIM(AuthorizationSession::create);
+MERIZO_DEFINE_SHIM(AuthorizationSession::create);
 }  // namespace merizo

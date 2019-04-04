@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/db/merizod_options.h"
 
@@ -77,21 +77,21 @@ std::string storageDBPathDescription() {
     return sb.str();
 }
 
-Status addMongodOptions(moe::OptionSection* options) try {
+Status addMerizodOptions(moe::OptionSection* options) try {
     uassertStatusOK(addGeneralServerOptions(options));
     uassertStatusOK(addNonGeneralServerOptions(options));
-    uassertStatusOK(addMongodGeneralOptions(options));
-    uassertStatusOK(addMongodReplicationOptions(options));
-    uassertStatusOK(addMongodShardingOptions(options));
-    uassertStatusOK(addMongodStorageOptions(options));
-    uassertStatusOK(addMongodLegacyOptions(options));
+    uassertStatusOK(addMerizodGeneralOptions(options));
+    uassertStatusOK(addMerizodReplicationOptions(options));
+    uassertStatusOK(addMerizodShardingOptions(options));
+    uassertStatusOK(addMerizodStorageOptions(options));
+    uassertStatusOK(addMerizodLegacyOptions(options));
 
     return Status::OK();
 } catch (const AssertionException& ex) {
     return ex.toStatus();
 }
 
-void printMongodHelp(const moe::OptionSection& options) {
+void printMerizodHelp(const moe::OptionSection& options) {
     std::cout << options.helpString() << std::endl;
 };
 
@@ -109,10 +109,10 @@ void sysRuntimeInfo() {
 }
 }  // namespace
 
-bool handlePreValidationMongodOptions(const moe::Environment& params,
+bool handlePreValidationMerizodOptions(const moe::Environment& params,
                                       const std::vector<std::string>& args) {
     if (params.count("help") && params["help"].as<bool>() == true) {
-        printMongodHelp(moe::startupOptions);
+        printMerizodHelp(moe::startupOptions);
         return false;
     }
     if (params.count("version") && params["version"].as<bool>() == true) {
@@ -136,7 +136,7 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
     return true;
 }
 
-Status validateMongodOptions(const moe::Environment& params) {
+Status validateMerizodOptions(const moe::Environment& params) {
     Status ret = validateServerOptions(params);
     if (!ret.isOK()) {
         return ret;
@@ -184,7 +184,7 @@ Status validateMongodOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-Status canonicalizeMongodOptions(moe::Environment* params) {
+Status canonicalizeMerizodOptions(moe::Environment* params) {
 
     Status ret = canonicalizeServerOptions(params);
     if (!ret.isOK()) {
@@ -336,7 +336,7 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
     return Status::OK();
 }
 
-Status storeMongodOptions(const moe::Environment& params) {
+Status storeMerizodOptions(const moe::Environment& params) {
     Status ret = storeServerOptions(params);
     if (!ret.isOK()) {
         return ret;

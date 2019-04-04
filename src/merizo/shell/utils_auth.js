@@ -106,7 +106,7 @@ var authutil;
             });
         } else if (authMode === 'x509') {
             authutil.assertAuthenticate(conn, '$external', {
-                mechanism: 'MONGODB-X509',
+                mechanism: 'MERIZODB-X509',
             });
         } else {
             throw new Error('clusterAuthMode ' + authMode + ' is currently unsupported');

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -45,7 +45,7 @@
 namespace merizo {
 
 // This failpoint is used for performance testing.
-MONGO_FAIL_POINT_DEFINE(preventDynamicSnapshotHistoryWindowTargetAdjustments);
+MERIZO_FAIL_POINT_DEFINE(preventDynamicSnapshotHistoryWindowTargetAdjustments);
 
 namespace SnapshotWindowUtil {
 
@@ -87,7 +87,7 @@ void _decreaseTargetSnapshotWindowSize(WithLock lock, OperationContext* opCtx) {
 }  // namespace
 
 void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
-    if (MONGO_FAIL_POINT(preventDynamicSnapshotHistoryWindowTargetAdjustments)) {
+    if (MERIZO_FAIL_POINT(preventDynamicSnapshotHistoryWindowTargetAdjustments)) {
         return;
     }
 
@@ -144,7 +144,7 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
 }
 
 void decreaseTargetSnapshotWindowSize(OperationContext* opCtx) {
-    if (MONGO_FAIL_POINT(preventDynamicSnapshotHistoryWindowTargetAdjustments)) {
+    if (MERIZO_FAIL_POINT(preventDynamicSnapshotHistoryWindowTargetAdjustments)) {
         return;
     }
 

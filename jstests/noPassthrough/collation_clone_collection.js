@@ -5,10 +5,10 @@
 (function() {
     "use strict";
 
-    var source = MongoRunner.runMongod({});
+    var source = MerizoRunner.runMerizod({});
     assert.neq(null, source, "merizod was unable to start up");
 
-    var dest = MongoRunner.runMongod({});
+    var dest = MerizoRunner.runMerizod({});
     assert.neq(null, dest, "merizod was unable to start up");
 
     var sourceColl = source.getDB("test").collation;
@@ -45,7 +45,7 @@
     destColl.drop();
     assert.commandWorked(destColl.getDB().runCommand({
         cloneCollection: sourceColl.getFullName(),
-        from: sourceColl.getMongo().host,
+        from: sourceColl.getMerizo().host,
         query: {_id: "foo"}
     }));
 
@@ -71,6 +71,6 @@
     for (var i = 0; i < sourceIndexInfos.length; ++i) {
         assert.contains(sourceIndexInfos[i], destIndexInfos);
     }
-    MongoRunner.stopMongod(source);
-    MongoRunner.stopMongod(dest);
+    MerizoRunner.stopMerizod(source);
+    MerizoRunner.stopMerizod(dest);
 })();

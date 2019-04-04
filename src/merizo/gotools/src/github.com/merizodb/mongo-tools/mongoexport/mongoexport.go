@@ -32,9 +32,9 @@ const (
 	watchProgressorUpdateFrequency = 8000
 )
 
-// MongoExport is a container for the user-specified options and
+// MerizoExport is a container for the user-specified options and
 // internal state used for running merizoexport.
-type MongoExport struct {
+type MerizoExport struct {
 	// generic merizo tool options
 	ToolOptions options.ToolOptions
 
@@ -71,7 +71,7 @@ type ExportOutput interface {
 
 // ValidateSettings returns an error if any settings specified on the command line
 // were invalid, or nil if they are valid.
-func (exp *MongoExport) ValidateSettings() error {
+func (exp *MerizoExport) ValidateSettings() error {
 	// Namespace must have a valid database if none is specified,
 	// use 'test'
 	if exp.ToolOptions.Namespace.DB == "" {
@@ -134,7 +134,7 @@ func (exp *MongoExport) ValidateSettings() error {
 
 // GetOutputWriter opens and returns an io.WriteCloser for the output
 // options or nil if none is set. The caller is responsible for closing it.
-func (exp *MongoExport) GetOutputWriter() (io.WriteCloser, error) {
+func (exp *MerizoExport) GetOutputWriter() (io.WriteCloser, error) {
 	if exp.OutputOpts.OutputFile != "" {
 		// If the directory in which the output file is to be
 		// written does not exist, create it
@@ -182,7 +182,7 @@ func makeFieldSelector(fields string) bson.M {
 // If there is a query and no limit then it returns 0, because it's too expensive to count the query.
 // If the collection is a view then it returns 0, because it is too expensive to count the view.
 // Otherwise it returns the count minus the skip
-func (exp *MongoExport) getCount() (c int, err error) {
+func (exp *MerizoExport) getCount() (c int, err error) {
 	session, err := exp.SessionProvider.GetSession()
 	if err != nil {
 		return 0, err
@@ -224,7 +224,7 @@ func (exp *MongoExport) getCount() (c int, err error) {
 // getCursor returns a cursor that can be iterated over to get all the documents
 // to export, based on the options given to merizoexport. Also returns the
 // associated session, so that it can be closed once the cursor is used up.
-func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
+func (exp *MerizoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 	sortFields := []string{}
 	if exp.InputOpts != nil && exp.InputOpts.Sort != "" {
 		sortD, err := getSortFromArg(exp.InputOpts.Sort)
@@ -304,7 +304,7 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 
 // Internal function that handles exporting to the given writer. Used primarily
 // for testing, because it bypasses writing to the file system.
-func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
+func (exp *MerizoExport) exportInternal(out io.Writer) (int64, error) {
 
 	max, err := exp.getCount()
 	if err != nil {
@@ -377,7 +377,7 @@ func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
 // Export executes the entire export operation. It returns an integer of the count
 // of documents successfully exported, and a non-nil error if something went wrong
 // during the export operation.
-func (exp *MongoExport) Export(out io.Writer) (int64, error) {
+func (exp *MerizoExport) Export(out io.Writer) (int64, error) {
 	count, err := exp.exportInternal(out)
 	return count, err
 }
@@ -385,7 +385,7 @@ func (exp *MongoExport) Export(out io.Writer) (int64, error) {
 // getExportOutput returns an implementation of ExportOutput which can handle
 // transforming BSON documents into the appropriate output format and writing
 // them to an output stream.
-func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
+func (exp *MerizoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
 	if exp.OutputOpts.Type == CSV {
 		// TODO what if user specifies *both* --fields and --fieldFile?
 		var fields []string

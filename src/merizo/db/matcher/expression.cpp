@@ -38,7 +38,7 @@ namespace merizo {
  * Enabling the disableMatchExpressionOptimization fail point will stop match expressions from
  * being optimized.
  */
-MONGO_FAIL_POINT_DEFINE(disableMatchExpressionOptimization);
+MERIZO_FAIL_POINT_DEFINE(disableMatchExpressionOptimization);
 
 MatchExpression::MatchExpression(MatchType type) : _matchType(type) {}
 

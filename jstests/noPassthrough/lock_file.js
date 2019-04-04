@@ -3,7 +3,7 @@
 
 (function() {
     // Ensures that merizod.lock exists and returns size of file.
-    function getMongodLockFileSize(dir) {
+    function getMerizodLockFileSize(dir) {
         var files = listFiles(dir);
         for (var i in files) {
             var file = files[i];
@@ -15,17 +15,17 @@
     }
 
     var baseName = "jstests_lock_file";
-    var dbpath = MongoRunner.dataPath + baseName + '/';
+    var dbpath = MerizoRunner.dataPath + baseName + '/';
 
     // Test framework will append --storageEngine command line option.
-    var merizod = MongoRunner.runMongod({dbpath: dbpath});
+    var merizod = MerizoRunner.runMerizod({dbpath: dbpath});
     assert.neq(0,
-               getMongodLockFileSize(dbpath),
+               getMerizodLockFileSize(dbpath),
                'merizod.lock should not be empty while server is running');
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     // merizod.lock must be empty after shutting server down.
     assert.eq(
-        0, getMongodLockFileSize(dbpath), 'merizod.lock not truncated after shutting server down');
+        0, getMerizodLockFileSize(dbpath), 'merizod.lock not truncated after shutting server down');
 }());

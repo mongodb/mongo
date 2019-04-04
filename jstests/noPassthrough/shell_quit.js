@@ -8,7 +8,7 @@
             "quit(" + retCode + ");",
         ];
 
-        var actualRetCode = _runMongoProgram.apply(null, args);
+        var actualRetCode = _runMerizoProgram.apply(null, args);
         assert.eq(retCode, actualRetCode);
     };
 

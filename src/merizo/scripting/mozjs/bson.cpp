@@ -47,7 +47,7 @@ namespace mozjs {
 const char* const BSONInfo::className = "BSON";
 
 const JSFunctionSpec BSONInfo::freeFunctions[3] = {
-    MONGO_ATTACH_JS_FUNCTION(bsonWoCompare), MONGO_ATTACH_JS_FUNCTION(bsonBinaryEqual), JS_FS_END,
+    MERIZO_ATTACH_JS_FUNCTION(bsonWoCompare), MERIZO_ATTACH_JS_FUNCTION(bsonBinaryEqual), JS_FS_END,
 };
 
 

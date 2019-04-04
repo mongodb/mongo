@@ -53,12 +53,12 @@ ChangeStreamPassthroughHelpers.passthroughType = function() {
 
 // Redirect the DB's 'watch' function to use the cluster-wide version. The Collection.watch helper
 // has already been overridden to use DB.watch when we loaded 'implicit_whole_db_changestreams.js',
-// so this ensures that both the Collection and DB helpers will actually call the Mongo function.
+// so this ensures that both the Collection and DB helpers will actually call the Merizo function.
 // Although calls to the shell helpers will ultimately resolve to the overridden runCommand anyway,
-// we need to override the helper to ensure that the Mongo.watch function itself is exercised by the
+// we need to override the helper to ensure that the Merizo.watch function itself is exercised by the
 // passthrough wherever Collection.watch or DB.watch is called.
 DB.prototype.watch = function(pipeline, options) {
     pipeline = Object.assign([], pipeline);
     pipeline.unshift(ChangeStreamPassthroughHelpers.nsMatchFilter(this, 1));
-    return this.getMongo().watch(pipeline, options);
+    return this.getMerizo().watch(pipeline, options);
 };

@@ -45,9 +45,9 @@ const (
 	progressBarLength = 24
 )
 
-// MongoImport is a container for the user-specified options and
+// MerizoImport is a container for the user-specified options and
 // internal state used for running merizoimport.
-type MongoImport struct {
+type MerizoImport struct {
 	// insertionCount keeps track of how many documents have successfully
 	// been inserted into the database
 	// updated atomically, aligned at the beginning of the struct
@@ -97,8 +97,8 @@ type InputReader interface {
 }
 
 // ValidateSettings ensures that the tool specific options supplied for
-// MongoImport are valid.
-func (imp *MongoImport) ValidateSettings(args []string) error {
+// MerizoImport are valid.
+func (imp *MerizoImport) ValidateSettings(args []string) error {
 	// namespace must have a valid database; if none is specified, use 'test'
 	if imp.ToolOptions.DB == "" {
 		imp.ToolOptions.DB = "test"
@@ -266,7 +266,7 @@ func (imp *MongoImport) ValidateSettings(args []string) error {
 // getSourceReader returns an io.Reader to read from the input source. Also
 // returns a progress.Progressor which can be used to track progress if the
 // reader supports it.
-func (imp *MongoImport) getSourceReader() (io.ReadCloser, int64, error) {
+func (imp *MerizoImport) getSourceReader() (io.ReadCloser, int64, error) {
 	if imp.InputOptions.File != "" {
 		file, err := os.Open(util.ToUniversalPath(imp.InputOptions.File))
 		if err != nil {
@@ -300,7 +300,7 @@ func (fsp *fileSizeProgressor) Progress() (int64, int64) {
 // ImportDocuments is used to write input data to the database. It returns the
 // number of documents successfully imported to the appropriate namespace and
 // any error encountered in doing this
-func (imp *MongoImport) ImportDocuments() (uint64, error) {
+func (imp *MerizoImport) ImportDocuments() (uint64, error) {
 	source, fileSize, err := imp.getSourceReader()
 	if err != nil {
 		return 0, err
@@ -338,7 +338,7 @@ func (imp *MongoImport) ImportDocuments() (uint64, error) {
 // importDocuments is a helper to ImportDocuments and does all the ingestion
 // work by taking data from the inputReader source and writing it to the
 // appropriate namespace
-func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported uint64, retErr error) {
+func (imp *MerizoImport) importDocuments(inputReader InputReader) (numImported uint64, retErr error) {
 	session, err := imp.SessionProvider.GetSession()
 	if err != nil {
 		return 0, err
@@ -405,7 +405,7 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 // ingestDocuments accepts a channel from which it reads documents to be inserted
 // into the target collection. It spreads the insert/upsert workload across one
 // or more workers.
-func (imp *MongoImport) ingestDocuments(readDocs chan bson.D) (retErr error) {
+func (imp *MerizoImport) ingestDocuments(readDocs chan bson.D) (retErr error) {
 	numInsertionWorkers := imp.IngestOptions.NumInsertionWorkers
 	if numInsertionWorkers <= 0 {
 		numInsertionWorkers = 1
@@ -444,7 +444,7 @@ func (imp *MongoImport) ingestDocuments(readDocs chan bson.D) (retErr error) {
 // 3. Sets the session safety
 //
 // returns an error if it's unable to set the write concern
-func (imp *MongoImport) configureSession(session *mgo.Session) error {
+func (imp *MerizoImport) configureSession(session *mgo.Session) error {
 	// sockets to the database will never be forcibly closed
 	session.SetSocketTimeout(0)
 	sessionSafety, err := db.BuildWriteConcern(imp.IngestOptions.WriteConcern, imp.nodeType,
@@ -464,7 +464,7 @@ type flushInserter interface {
 
 // runInsertionWorker is a helper to InsertDocuments - it reads document off
 // the read channel and prepares then in batches for insertion into the database
-func (imp *MongoImport) runInsertionWorker(readDocs chan bson.D) (err error) {
+func (imp *MerizoImport) runInsertionWorker(readDocs chan bson.D) (err error) {
 	session, err := imp.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error connecting to merizod: %v", err)
@@ -519,11 +519,11 @@ readLoop:
 }
 
 type upserter struct {
-	imp        *MongoImport
+	imp        *MerizoImport
 	collection *mgo.Collection
 }
 
-func (imp *MongoImport) newUpserter(collection *mgo.Collection) *upserter {
+func (imp *MerizoImport) newUpserter(collection *mgo.Collection) *upserter {
 	return &upserter{
 		imp:        imp,
 		collection: collection,
@@ -574,7 +574,7 @@ func splitInlineHeader(header string) (headers []string) {
 }
 
 // getInputReader returns an implementation of InputReader based on the input type
-func (imp *MongoImport) getInputReader(in io.Reader) (InputReader, error) {
+func (imp *MerizoImport) getInputReader(in io.Reader) (InputReader, error) {
 	var colSpecs []ColumnSpec
 	var headers []string
 	var err error

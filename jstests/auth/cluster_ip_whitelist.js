@@ -7,16 +7,16 @@
 
     print("When whitelist is empty, the server does not start.");
     assert.eq(null,
-              MongoRunner.runMongod(
+              MerizoRunner.runMerizod(
                   {auth: null, keyFile: "jstests/libs/key1", clusterIpSourceWhitelist: ""}));
 
     function testIpWhitelist(description, whitelistString, authResult) {
         print(description);
 
-        var conn = MongoRunner.runMongod(
+        var conn = MerizoRunner.runMerizod(
             {auth: null, keyFile: "jstests/libs/key1", clusterIpSourceWhitelist: whitelistString});
         assert.eq(authResult, conn.getDB("local").auth("__system", "foopdedoop"));
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     }
 
     testIpWhitelist(

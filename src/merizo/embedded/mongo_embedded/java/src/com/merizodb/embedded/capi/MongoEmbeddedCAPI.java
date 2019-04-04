@@ -38,61 +38,61 @@ import static java.lang.String.format;
 /**
  * The embedded merizodb CAPI.
  */
-public final class MongoEmbeddedCAPI {
+public final class MerizoEmbeddedCAPI {
     private static final String NATIVE_LIBRARY_NAME = "merizo_embedded";
 
     /**
      * Initializes the embedded merizodb library, required before any other call.
      *
-     * <p>Cannot be called multiple times without first calling {@link MongoEmbeddedLibrary#close()}.</p>
+     * <p>Cannot be called multiple times without first calling {@link MerizoEmbeddedLibrary#close()}.</p>
      *
      * @param yamlConfig the yaml configuration for the embedded merizodb capi library
-     * @return the initialized MongoEmbedded.
+     * @return the initialized MerizoEmbedded.
      */
-    public static MongoEmbeddedLibrary create(final String yamlConfig) {
+    public static MerizoEmbeddedLibrary create(final String yamlConfig) {
         return create(yamlConfig, LogLevel.LOGGER);
     }
 
     /**
      * Initializes the embedded merizodb library, required before any other call.
      *
-     * <p>Cannot be called multiple times without first calling {@link MongoEmbeddedLibrary#close()}.</p>
+     * <p>Cannot be called multiple times without first calling {@link MerizoEmbeddedLibrary#close()}.</p>
      *
      * @param yamlConfig the yaml configuration for the embedded merizodb capi library
      * @param logLevel   the logging level
-     * @return the initialized MongoEmbedded.
+     * @return the initialized MerizoEmbedded.
      */
-    public static MongoEmbeddedLibrary create(final String yamlConfig, final LogLevel logLevel) {
+    public static MerizoEmbeddedLibrary create(final String yamlConfig, final LogLevel logLevel) {
         return create(yamlConfig, logLevel, null);
     }
 
     /**
      * Initializes the embedded merizodb library, required before any other call.
      *
-     * <p>Cannot be called multiple times without first calling {@link MongoEmbeddedLibrary#close()}.</p>
+     * <p>Cannot be called multiple times without first calling {@link MerizoEmbeddedLibrary#close()}.</p>
      *
      * @param yamlConfig the yaml configuration for the embedded merizodb capi library
      * @param libraryPath the path to the embedded merizodb capi library.
      * @param logLevel   the logging level
-     * @return the initialized MongoEmbedded.
+     * @return the initialized MerizoEmbedded.
      */
-    public static  MongoEmbeddedLibrary create(final String yamlConfig, final LogLevel logLevel, final String libraryPath) {
+    public static  MerizoEmbeddedLibrary create(final String yamlConfig, final LogLevel logLevel, final String libraryPath) {
         if (libraryPath != null) {
             NativeLibrary.addSearchPath(NATIVE_LIBRARY_NAME, libraryPath);
         }
         try {
             new CAPI();
         } catch (Throwable t) {
-            throw new MongoEmbeddedCAPIException(
-                    format("Unable to load the Mongo Embedded Library.%n"
-                         + "Please either: Set the libraryPath when calling MongoEmbeddedCAPI.create or %n"
+            throw new MerizoEmbeddedCAPIException(
+                    format("Unable to load the Merizo Embedded Library.%n"
+                         + "Please either: Set the libraryPath when calling MerizoEmbeddedCAPI.create or %n"
                          + "Ensure the library is set on the jna.library.path or the java.library.path system property."
                     ), t
             );
         }
-        return new MongoEmbeddedLibraryImpl(yamlConfig != null ? yamlConfig : "", logLevel != null ? logLevel : LogLevel.LOGGER);
+        return new MerizoEmbeddedLibraryImpl(yamlConfig != null ? yamlConfig : "", logLevel != null ? logLevel : LogLevel.LOGGER);
     }
 
-    private MongoEmbeddedCAPI() {
+    private MerizoEmbeddedCAPI() {
     }
 }

@@ -58,7 +58,7 @@ using executor::NetworkInterfaceMock;
 /**
  * Fixture for testing ReplicationCoordinatorImpl behaviors.
  */
-class ReplCoordTest : public ServiceContextMongoDTest {
+class ReplCoordTest : public ServiceContextMerizoDTest {
 public:
     /**
      * Makes a command response with the given "doc" response and optional elapsed time "millis".

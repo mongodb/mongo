@@ -33,6 +33,6 @@
 
 namespace merizo {
 
-MONGO_DEFINE_SHIM(MongoProcessInterface::create);
+MERIZO_DEFINE_SHIM(MerizoProcessInterface::create);
 
 }  // namespace merizo

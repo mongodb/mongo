@@ -54,7 +54,7 @@ assert.eq(3, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
 jsTest.log("One shard down!");
 
-MongoRunner.stopMongod(st.shard2);
+MerizoRunner.stopMerizod(st.shard2);
 
 jsTest.log("done.");
 
@@ -63,7 +63,7 @@ assert.eq(2, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
 jsTest.log("Two shards down!");
 
-MongoRunner.stopMongod(st.shard1);
+MerizoRunner.stopMerizod(st.shard1);
 
 jsTest.log("done.");
 
@@ -72,7 +72,7 @@ assert.eq(1, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
 jsTest.log("All shards down!");
 
-MongoRunner.stopMongod(st.shard0);
+MerizoRunner.stopMerizod(st.shard0);
 
 jsTest.log("done.");
 

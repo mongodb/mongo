@@ -10,7 +10,7 @@
 
     const baseName = "wt_repair_corrupt_metadata";
     const collName = "test";
-    const dbpath = MongoRunner.dataPath + baseName + "/";
+    const dbpath = MerizoRunner.dataPath + baseName + "/";
 
     /**
      * This test runs repair using a version of the WiredTiger.turtle file that has checkpoint
@@ -39,7 +39,7 @@
         const turtleFile = dbpath + "WiredTiger.turtle";
         const turtleFileWithoutCollection = dbpath + "WiredTiger.turtle.1";
 
-        let merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        let merizod = startMerizodOnExistingPath(dbpath, merizodOptions);
 
         // Force a checkpoint and make a copy of the turtle file.
         assert.commandWorked(merizod.getDB(baseName).adminCommand({fsync: 1}));
@@ -52,7 +52,7 @@
 
         // Force another checkpoint before a clean shutdown.
         assert.commandWorked(merizod.getDB(baseName).adminCommand({fsync: 1}));
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
 
         // Guarantee the turtle files changed between checkpoints.
         assert.neq(md5sumFile(turtleFileWithoutCollection), md5sumFile(turtleFile));
@@ -63,7 +63,7 @@
 
         assertRepairSucceeds(dbpath, merizod.port, merizodOptions);
 
-        merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        merizod = startMerizodOnExistingPath(dbpath, merizodOptions);
         testColl = merizod.getDB(baseName)[collName];
 
         // The collection exists despite using an older turtle file because salvage is able to find
@@ -72,7 +72,7 @@
         // We can assert that the data exists because the salvage only took place on the metadata,
         // not the data.
         assert.eq(testColl.find({}).itcount(), 1);
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
 
         // Corrupt the .turtle file in a very specific way such that the log sequence numbers are
         // invalid.
@@ -95,7 +95,7 @@
 
             assertRepairSucceeds(dbpath, merizod.port, merizodOptions);
 
-            merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+            merizod = startMerizodOnExistingPath(dbpath, merizodOptions);
             testColl = merizod.getDB(baseName)[collName];
 
             // The collection exists despite using a salvaged turtle file because salvage is able to
@@ -105,7 +105,7 @@
             // We can assert that the data exists because the salvage only took place on the
             // metadata, not the data.
             assert.eq(testColl.find({}).itcount(), 1);
-            MongoRunner.stopMongod(merizod);
+            MerizoRunner.stopMerizod(merizod);
         }
     };
 

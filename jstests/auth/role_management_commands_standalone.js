@@ -3,7 +3,7 @@
 
     load('jstests/auth/role_management_commands_lib.js');
 
-    var conn = MongoRunner.runMongod({auth: '', useHostname: false});
+    var conn = MerizoRunner.runMerizod({auth: '', useHostname: false});
     runAllRoleManagementCommandsTests(conn);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

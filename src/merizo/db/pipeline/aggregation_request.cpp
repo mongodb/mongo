@@ -51,7 +51,7 @@ namespace merizo {
 constexpr StringData AggregationRequest::kCommandName;
 constexpr StringData AggregationRequest::kCursorName;
 constexpr StringData AggregationRequest::kBatchSizeName;
-constexpr StringData AggregationRequest::kFromMongosName;
+constexpr StringData AggregationRequest::kFromMerizosName;
 constexpr StringData AggregationRequest::kNeedsMergeName;
 constexpr StringData AggregationRequest::kMergeByPBRTName;
 constexpr StringData AggregationRequest::kPipelineName;
@@ -107,7 +107,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
     bool hasCursorElem = false;
     bool hasExplainElem = false;
 
-    bool hasFromMongosElem = false;
+    bool hasFromMerizosElem = false;
     bool hasNeedsMergeElem = false;
 
     // Parse optional parameters.
@@ -183,15 +183,15 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             if (elem.Bool()) {
                 request.setExplain(ExplainOptions::Verbosity::kQueryPlanner);
             }
-        } else if (kFromMongosName == fieldName) {
+        } else if (kFromMerizosName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << kFromMongosName << " must be a boolean, not a "
+                        str::stream() << kFromMerizosName << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
 
-            hasFromMongosElem = true;
-            request.setFromMongos(elem.Bool());
+            hasFromMerizosElem = true;
+            request.setFromMerizos(elem.Bool());
         } else if (kNeedsMergeName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
@@ -280,10 +280,10 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                               << "' option"};
     }
 
-    if (hasNeedsMergeElem && !hasFromMongosElem) {
+    if (hasNeedsMergeElem && !hasFromMerizosElem) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "Cannot specify '" << kNeedsMergeName << "' without '"
-                              << kFromMongosName
+                              << kFromMerizosName
                               << "'"};
     }
 
@@ -323,7 +323,7 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kPipelineName, _pipeline},
         // Only serialize booleans if different than their default.
         {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},
-        {kFromMongosName, _fromMongos ? Value(true) : Value()},
+        {kFromMerizosName, _fromMerizos ? Value(true) : Value()},
         {kNeedsMergeName, _needsMerge ? Value(true) : Value()},
         {kMergeByPBRTName, _mergeByPBRT ? Value(true) : Value()},
         {bypassDocumentValidationCommandOption(),

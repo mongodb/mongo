@@ -36,7 +36,7 @@
 #include "merizo/config.h"
 #include "merizo/util/assert_util.h"
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 #error This file should not be included if compiling with SSL support
 #endif
 

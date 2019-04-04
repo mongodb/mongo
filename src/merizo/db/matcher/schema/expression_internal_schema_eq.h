@@ -63,7 +63,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::vector<MatchExpression*>* getChildVector() final {

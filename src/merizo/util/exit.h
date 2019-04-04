@@ -84,7 +84,7 @@ inline void registerShutdownTask(unique_function<void()> task) {
  * shutdown tasks. It is illegal to reenter this function from a
  * registered shutdown task. The function does not return.
  */
-MONGO_COMPILER_NORETURN void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs = {});
+MERIZO_COMPILER_NORETURN void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs = {});
 
 /**
  * Toggles the shutdown flag to 'true' and runs the registered
@@ -96,7 +96,7 @@ MONGO_COMPILER_NORETURN void shutdown(ExitCode code, const ShutdownTaskArgs& shu
 void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs = {});
 
 /** An alias for 'shutdown'. */
-MONGO_COMPILER_NORETURN inline void exitCleanly(ExitCode code) {
+MERIZO_COMPILER_NORETURN inline void exitCleanly(ExitCode code) {
     shutdown(code);
 }
 

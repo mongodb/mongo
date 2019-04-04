@@ -43,7 +43,7 @@ const char* getNameForOp(ArithmeticNode::ArithmeticOp op) {
         case ArithmeticNode::ArithmeticOp::kMultiply:
             return "multiply";
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 }  // namespace

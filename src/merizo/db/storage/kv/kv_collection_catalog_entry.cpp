@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -64,7 +64,7 @@ public:
     virtual void rollback() {
         // Intentionally ignoring failure.
         auto kvEngine = _cce->_engine->getEngine();
-        MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
+        MERIZO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
     }
 
     OperationContext* const _opCtx;
@@ -100,7 +100,7 @@ public:
             engine->addDropPendingIdent(*commitTimestamp, _indexNss, _ident);
         } else {
             auto kvEngine = engine->getEngine();
-            MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
+            MERIZO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_opCtx, _ident);
         }
     }
 

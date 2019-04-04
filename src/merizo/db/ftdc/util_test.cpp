@@ -47,8 +47,8 @@ TEST(FTDCUtilTest, TestRoundTime) {
     checkTime(14, 13, 7);
 }
 
-// Validate the MongoS FTDC path is computed correctly from a log file path.
-TEST(FTDCUtilTest, TestMongoSPath) {
+// Validate the MerizoS FTDC path is computed correctly from a log file path.
+TEST(FTDCUtilTest, TestMerizoSPath) {
 
     std::vector<std::pair<std::string, std::string>> testCases = {
         {"/var/log/merizos.log", "/var/log/merizos.diagnostic.data"},
@@ -66,7 +66,7 @@ TEST(FTDCUtilTest, TestMongoSPath) {
     };
 
     for (const auto& p : testCases) {
-        ASSERT_EQUALS(FTDCUtil::getMongoSPath(p.first), p.second);
+        ASSERT_EQUALS(FTDCUtil::getMerizoSPath(p.first), p.second);
     }
 }
 

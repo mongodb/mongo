@@ -77,10 +77,10 @@
 
     // Establish change stream cursor on the second merizos, which is not aware that the
     // collection is sharded.
-    let cstMongos1 = new ChangeStreamTest(merizos1DB);
-    let cursorMongos1 = cstMongos1.startWatchingChanges(
+    let cstMerizos1 = new ChangeStreamTest(merizos1DB);
+    let cursorMerizos1 = cstMerizos1.startWatchingChanges(
         {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: merizos1Coll});
-    assert.eq(0, cursorMongos1.firstBatch.length, "Cursor had changes: " + tojson(cursorMongos1));
+    assert.eq(0, cursorMerizos1.firstBatch.length, "Cursor had changes: " + tojson(cursorMerizos1));
 
     // Establish a change stream cursor on the now sharded collection through the first merizos.
     let cst = new ChangeStreamTest(merizosDB);
@@ -105,7 +105,7 @@
             operationType: "insert",
         }]
     });
-    let merizos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);
+    let merizos1ChangeDoc = cstMerizos1.getOneChange(cursorMerizos1);
     assert.docEq({_id: 1, a: 1}, merizos1ChangeDoc.documentKey);
     assert.docEq({_id: 1, a: 1}, merizos1ChangeDoc.fullDocument);
     assert.eq({db: merizos1DB.getName(), coll: merizos1Coll.getName()}, merizos1ChangeDoc.ns);
@@ -140,7 +140,7 @@
             updateDescription: {removedFields: [], updatedFields: {b: 1}}
         }]
     });
-    merizos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);
+    merizos1ChangeDoc = cstMerizos1.getOneChange(cursorMerizos1);
     assert.docEq({_id: 1, a: 1}, merizos1ChangeDoc.documentKey);
     assert.docEq({_id: 1, a: 1, b: 1}, merizos1ChangeDoc.fullDocument);
     assert.eq({db: merizos1DB.getName(), coll: merizos1Coll.getName()}, merizos1ChangeDoc.ns);
@@ -152,18 +152,18 @@
     assert.eq(false, isShardAware(st.rs0.getPrimary(), merizosColl.getFullName()));
 
     // Establish change stream cursor on merizos2 using the resume token from the change steam on
-    // merizos1. Mongos2 is aware that the collection exists and thinks that it's unsharded, so it
+    // merizos1. Merizos2 is aware that the collection exists and thinks that it's unsharded, so it
     // won't trigger a routing table refresh. This must be done using a resume token from an update
     // otherwise the shard will generate the documentKey based on the assumption that the shard key
     // is _id which will cause the cursor establishment to fail due to SERVER-32085.
-    let cstMongos2 = new ChangeStreamTest(merizos2DB);
-    let cursorMongos2 = cstMongos2.startWatchingChanges({
+    let cstMerizos2 = new ChangeStreamTest(merizos2DB);
+    let cursorMerizos2 = cstMerizos2.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: merizos1ChangeDoc._id}}],
         collection: merizos2Coll
     });
 
-    cstMongos2.assertNextChangesEqual({
-        cursor: cursorMongos2,
+    cstMerizos2.assertNextChangesEqual({
+        cursor: cursorMerizos2,
         expectedChanges: [{
             documentKey: {_id: -2, a: -2},
             fullDocument: {_id: -2, a: -2},
@@ -172,8 +172,8 @@
         }]
     });
 
-    cstMongos2.assertNextChangesEqual({
-        cursor: cursorMongos2,
+    cstMerizos2.assertNextChangesEqual({
+        cursor: cursorMerizos2,
         expectedChanges: [{
             documentKey: {_id: 2, a: 2},
             fullDocument: {_id: 2, a: 2},

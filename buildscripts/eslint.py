@@ -116,8 +116,8 @@ class ESLint(object):
                 print("WARNING: Could not find ESLint at %s" % (path))
 
         # Check the environment variable
-        if "MONGO_ESLINT" in os.environ:
-            self.path = os.environ["MONGO_ESLINT"]
+        if "MERIZO_ESLINT" in os.environ:
+            self.path = os.environ["MERIZO_ESLINT"]
 
             if self.path and not self._validate_version(warn=True):
                 self.path = None

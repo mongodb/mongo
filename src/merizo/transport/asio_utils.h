@@ -176,7 +176,7 @@ StatusWith<EventsMask> pollASIOSocket(Socket& socket, EventsMask mask, Milliseco
     }
 }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 /**
  * Peeks at a fragment of a client issued TLS handshake packet. Returns a TLS alert
  * packet if the client has selected a protocol which has been disabled by the server.

@@ -202,7 +202,7 @@
 
     // Test find.
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand({find: "coll", filter: {x: 1}}));
@@ -212,7 +212,7 @@
 
     // Test getMore on a find established cursor.
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandWorked(db.adminCommand(
@@ -233,7 +233,7 @@
 
     // Test aggregate.
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(
@@ -245,7 +245,7 @@
     // Test getMore with an initial find batchSize of 0. Interrupt behavior of a getMore is not
     // expected to change with a change of batchSize in the originating command.
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandWorked(db.adminCommand(
@@ -266,7 +266,7 @@
 
     // Test distinct.
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand({distinct: "coll", key: "_id"}));
@@ -277,7 +277,7 @@
 
     // Test update.
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand({
@@ -293,7 +293,7 @@
 
     // Test delete.
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand(
@@ -305,7 +305,7 @@
 
     // Test findAndModify.
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand(
@@ -317,7 +317,7 @@
     }, {"command.findAndModify": "coll"}, true);
 
     testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase("test");
         session.startTransaction({readConcern: {level: "snapshot"}});
         const res = assert.commandWorked(sessionDb.runCommand(

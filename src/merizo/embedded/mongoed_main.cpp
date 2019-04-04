@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -55,9 +55,9 @@
 namespace merizo {
 namespace {
 
-class ServiceEntryPointMongoe : public ServiceEntryPointImpl {
+class ServiceEntryPointMerizoe : public ServiceEntryPointImpl {
 public:
-    explicit ServiceEntryPointMongoe(ServiceContext* svcCtx)
+    explicit ServiceEntryPointMerizoe(ServiceContext* svcCtx)
         : ServiceEntryPointImpl(svcCtx),
           _sepEmbedded(std::make_unique<ServiceEntryPointEmbedded>()) {}
 
@@ -69,7 +69,7 @@ private:
     std::unique_ptr<ServiceEntryPointEmbedded> _sepEmbedded;
 };
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SignalProcessingStartup, ("ThreadNameInitializer"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SignalProcessingStartup, ("ThreadNameInitializer"))
 (InitializerContext*) {
     // Make sure we call this as soon as possible but before any other threads are started. Before
     // embedded::initialize is too early and after is too late. So instead we hook in during the
@@ -110,20 +110,20 @@ int merizoedMain(int argc, char* argv[], char** envp) {
         // Adding all options merizod we don't have to maintain a separate set for this executable,
         // some will be unused but that's fine as this is just an executable for testing purposes
         // anyway.
-        uassertStatusOK(addMongodGeneralOptions(&startupOptions));
-        uassertStatusOK(addMongodReplicationOptions(&startupOptions));
+        uassertStatusOK(addMerizodGeneralOptions(&startupOptions));
+        uassertStatusOK(addMerizodReplicationOptions(&startupOptions));
         uassertStatusOK(embedded::addOptions(&startupOptions));
         uassertStatusOK(
             embedded_integration_helpers::parseCommandLineOptions(argc, argv, startupOptions));
 
         serviceContext = embedded::initialize("");
 
-        // storeMongodOptions() triggers cmdline censoring, which must happen after initializers.
-        uassertStatusOK(storeMongodOptions(optionenvironment::startupOptionsParsed));
+        // storeMerizodOptions() triggers cmdline censoring, which must happen after initializers.
+        uassertStatusOK(storeMerizodOptions(optionenvironment::startupOptionsParsed));
 
         // Override the ServiceEntryPoint with one that can support transport layers.
         serviceContext->setServiceEntryPoint(
-            std::make_unique<ServiceEntryPointMongoe>(serviceContext));
+            std::make_unique<ServiceEntryPointMerizoe>(serviceContext));
 
         auto tl =
             transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);

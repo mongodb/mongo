@@ -11,8 +11,8 @@
 
     // Use separate merizoses for admin, inserting data, and validating results, so no single-merizos
     // tricks will work
-    var staleMongos = st.s1;
-    var insertMongos = st.s2;
+    var staleMerizos = st.s1;
+    var insertMerizos = st.s2;
 
     var shards = [st.shard0, st.shard1, st.shard2];
 
@@ -30,12 +30,12 @@
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
     st.configRS.awaitLastOpCommitted();  // TODO: Remove after collection lifecyle project (PM-85)
 
-    var bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
+    var bulk = insertMerizos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({_id: i, test: "a"});
     }
     assert.writeOK(bulk.execute());
-    assert.eq(100, staleMongos.getCollection(coll + "").find({test: "a"}).itcount());
+    assert.eq(100, staleMerizos.getCollection(coll + "").find({test: "a"}).itcount());
 
     assert(coll.drop());
     st.configRS.awaitLastOpCommitted();
@@ -52,13 +52,13 @@
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {notId: 1}}));
     st.configRS.awaitLastOpCommitted();
 
-    bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
+    bulk = insertMerizos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({notId: i, test: "b"});
     }
     assert.writeOK(bulk.execute());
-    assert.eq(100, staleMongos.getCollection(coll + "").find({test: "b"}).itcount());
-    assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a"]}}).itcount());
+    assert.eq(100, staleMerizos.getCollection(coll + "").find({test: "b"}).itcount());
+    assert.eq(0, staleMerizos.getCollection(coll + "").find({test: {$in: ["a"]}}).itcount());
 
     assert(coll.drop());
     st.configRS.awaitLastOpCommitted();
@@ -70,14 +70,14 @@
 
     jsTest.log("Re-creating unsharded collection from a sharded collection...");
 
-    bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
+    bulk = insertMerizos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({test: "c"});
     }
     assert.writeOK(bulk.execute());
 
-    assert.eq(100, staleMongos.getCollection(coll + "").find({test: "c"}).itcount());
-    assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());
+    assert.eq(100, staleMerizos.getCollection(coll + "").find({test: "c"}).itcount());
+    assert.eq(0, staleMerizos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());
 
     st.stop();
 })();

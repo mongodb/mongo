@@ -5,15 +5,15 @@
     "use strict";
     var dbName = 'list_collections_not_blocked';
     var mydb = db.getSiblingDB(dbName);
-    var session = db.getMongo().startSession({causalConsistency: false});
+    var session = db.getMerizo().startSession({causalConsistency: false});
     var sessionDb = session.getDatabase(dbName);
 
     mydb.foo.drop({writeConcern: {w: "majority"}});
 
     assert.commandWorked(mydb.createCollection("foo", {writeConcern: {w: "majority"}}));
 
-    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
-    if (isMongos) {
+    const isMerizos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    if (isMerizos) {
         // Before starting the transaction below, access the collection so it can be implicitly
         // sharded and force all shards to refresh their database versions because the refresh
         // requires an exclusive lock and would block behind the transaction.

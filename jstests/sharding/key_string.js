@@ -29,7 +29,7 @@
     s.adminCommand({
         movechunk: "test.foo",
         find: {name: "eliot"},
-        to: seconday.getMongo().name,
+        to: seconday.getMerizo().name,
         _waitForDelete: true
     });
 

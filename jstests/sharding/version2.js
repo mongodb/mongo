@@ -45,7 +45,7 @@
               "a2 mine 1");
 
     function simpleFindOne() {
-        return a2.getMongo().getDB("alleyinsider").foo.findOne();
+        return a2.getMerizo().getDB("alleyinsider").foo.findOne();
     }
 
     var barEpoch = s.getDB('config').chunks.findOne({ns: 'alleyinsider.bar'}).lastmodEpoch;

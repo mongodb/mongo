@@ -54,7 +54,7 @@ namespace moe = merizo::optionenvironment;
 namespace merizo {
 namespace {
 
-MONGO_INITIALIZER(ServerLogRedirection)(InitializerContext*) {
+MERIZO_INITIALIZER(ServerLogRedirection)(InitializerContext*) {
     // ssl_options_server.cpp has an initializer which depends on logging.
     // We can stub that dependency out for unit testing purposes.
     return Status::OK();
@@ -330,7 +330,7 @@ TEST(SetupOptions, sslModeRequired) {
               static_cast<int>(::merizo::SSLParams::Protocols::TLS1_0));
 }
 
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+#ifdef MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS
 TEST(SetupOptions, tlsModeRequiredCertificateSelector) {
     moe::startupOptions = moe::OptionSection();
     moe::startupOptionsParsed = moe::Environment();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -345,7 +345,7 @@ void ActiveClientConnections::appendInfo(BSONObjBuilder* b) const {
 thread_local std::unique_ptr<ClientConnections> ClientConnections::_perThread;
 
 // This must run after CLI/config --setParameter has been parsed to be useful.
-MONGO_INITIALIZER_WITH_PREREQUISITES(InitializeShardedConnectionPool,
+MERIZO_INITIALIZER_WITH_PREREQUISITES(InitializeShardedConnectionPool,
                                      ("EndPostStartupOptionStorage"))
 (InitializerContext* context) {
     shardConnectionPool.setName("sharded connection pool");
@@ -378,7 +378,7 @@ ShardConnection::ShardConnection(OperationContext* opCtx,
     auto csString = _cs.toString();
 
     _conn = ClientConnections::threadInstance()->get(csString, _ns);
-    if (isMongos()) {
+    if (isMerizos()) {
         // In merizos, we record this connection as having been used for useful work to provide
         // useful information in getLastError.
         ClusterLastErrorInfo::get(opCtx->getClient())->addShardHost(csString);

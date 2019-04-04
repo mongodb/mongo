@@ -22,11 +22,11 @@ for (var i = 0; i < configRS.ports.length; i++) {
 }
 var configSeedList = configRS.name + "/" + configHosts.join(",");
 
-var merizos = MongoRunner.runMongos({configdb: configSeedList});
+var merizos = MerizoRunner.runMerizos({configdb: configSeedList});
 
 // Do some basic operations to ensure that merizos started up successfully despite the discrepancy
 // in the config server replset configuration.
 assert.commandWorked(merizos.getDB('admin').runCommand('serverStatus'));
 
-MongoRunner.stopMongos(merizos);
+MerizoRunner.stopMerizos(merizos);
 configRS.stopSet();

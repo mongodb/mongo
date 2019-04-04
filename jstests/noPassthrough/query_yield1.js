@@ -1,7 +1,7 @@
 (function() {
     "use strict";
     if (0) {  // Test disabled until SERVER-8579 is finished. Reminder ticket: SERVER-8342
-        const conn = MongoRunner.runMongod({nojournal: ""});
+        const conn = MerizoRunner.runMerizod({nojournal: ""});
         assert.neq(null, conn, "merizod failed to start.");
         db = conn.getDB("test");
 
@@ -88,6 +88,6 @@
         var x = db.currentOp();
         assert.eq(0, x.inprog.length, "weird 2");
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     }
 })();

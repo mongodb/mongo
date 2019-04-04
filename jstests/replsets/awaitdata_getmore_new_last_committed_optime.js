@@ -46,7 +46,7 @@
     let waitForGetMoreToFinish = startParallelShell(() => {
         load('jstests/replsets/rslib.js');
 
-        const secondary = db.getMongo();
+        const secondary = db.getMerizo();
         secondary.setSlaveOk();
 
         const dbName = 'test';

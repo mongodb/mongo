@@ -33,7 +33,7 @@ replTest.awaitSecondaryNodes();
 
 var testDB = primary.getDB('test');
 
-var newConn = new Mongo(primary.host);
+var newConn = new Merizo(primary.host);
 var isMaster = newConn.adminCommand({isMaster: 1});
 assert(isMaster.tags != null, 'isMaster: ' + tojson(isMaster));
 

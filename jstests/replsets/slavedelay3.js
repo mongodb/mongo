@@ -17,7 +17,7 @@ var slaveConns = replTest._slaves;
 var slave = [];
 for (var i in slaveConns) {
     var d = slaveConns[i].getDB(name);
-    d.getMongo().setSlaveOk();
+    d.getMerizo().setSlaveOk();
     slave.push(d);
 }
 

@@ -225,8 +225,8 @@ fi
 %attr(0755,merizod,merizod) %dir /var/log/merizodb
 %attr(0755,merizod,merizod) %dir /var/run/merizodb
 %attr(0640,merizod,merizod) %config(noreplace) %verify(not md5 size mtime) /var/log/merizodb/merizod.log
-%doc snmp/MONGOD-MIB.txt
-%doc snmp/MONGODBINC-MIB.txt
+%doc snmp/MERIZOD-MIB.txt
+%doc snmp/MERIZODBINC-MIB.txt
 %doc snmp/merizod.conf.master
 %doc snmp/merizod.conf.subagent
 %doc snmp/README-snmp.txt

@@ -93,7 +93,7 @@ std::unique_ptr<merizo::HarnessHelper> makeHarnessHelper() {
     return std::make_unique<RecordStoreHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
+MERIZO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
     merizo::registerHarnessHelperFactory(makeHarnessHelper);
     return Status::OK();
 }

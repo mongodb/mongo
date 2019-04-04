@@ -95,7 +95,7 @@ type queryWrapper struct {
 }
 
 func (op *queryOp) finalQuery(socket *merizoSocket) interface{} {
-	if op.flags&flagSlaveOk != 0 && socket.ServerInfo().Mongos {
+	if op.flags&flagSlaveOk != 0 && socket.ServerInfo().Merizos {
 		var modeName string
 		switch op.mode {
 		case Strong:

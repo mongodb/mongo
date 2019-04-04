@@ -30,7 +30,7 @@
         var explain = coll.find(query).explain();
         assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
         var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
-        var conn = new Mongo(serverInfo.host + ":" + serverInfo.port.toString());
+        var conn = new Merizo(serverInfo.host + ":" + serverInfo.port.toString());
         var cmdRes = conn.getDB('admin').runCommand({isMaster: 1});
 
         jsTest.log('isMaster: ' + tojson(cmdRes));

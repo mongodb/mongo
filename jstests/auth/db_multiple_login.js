@@ -3,7 +3,7 @@
 // authentication.
 //
 // Regression test for SERVER-8144.
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = MerizoRunner.runMerizod({auth: ""});
 var admin = conn.getDB("admin");
 var test = conn.getDB("test");
 
@@ -28,4 +28,4 @@ test.foo.findOne();
 test.auth('reader', 'a');
 assert.writeError(test.docs.insert({value: 2}));
 test.foo.findOne();
-MongoRunner.stopMongod(conn, null, {user: 'admin', pwd: 'a'});
+MerizoRunner.stopMerizod(conn, null, {user: 'admin', pwd: 'a'});

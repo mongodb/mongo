@@ -9,12 +9,12 @@
     const lineContents = "lots of super fun text\n".repeat(numLines).trim();
 
     var echoTest = function() {
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
 
         // This will produce `numLines` + 1 lines of output because echo isn't being called with
         // `-n`. This will block until the program exits.
         var exitCode = runProgram("echo", lineContents);
-        var output = rawMongoProgramOutput();
+        var output = rawMerizoProgramOutput();
 
         assert.eq(0, exitCode);
 

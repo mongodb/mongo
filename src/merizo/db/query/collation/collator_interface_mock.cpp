@@ -52,7 +52,7 @@ std::string mockTypeToString(CollatorInterfaceMock::MockType type) {
             return "mock_to_lower_string";
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace
@@ -90,7 +90,7 @@ int CollatorInterfaceMock::compare(StringData left, StringData right) const {
             return 0;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(
@@ -111,7 +111,7 @@ CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(
             return makeComparisonKey("always_equal");
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

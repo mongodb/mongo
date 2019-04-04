@@ -359,7 +359,7 @@ public:
             cv.emplace();
 
             auto oldState = SSBState::kInit;
-            if (MONGO_unlikely(!state.compare_exchange_strong(
+            if (MERIZO_unlikely(!state.compare_exchange_strong(
                     oldState, SSBState::kWaiting, std::memory_order_acq_rel))) {
                 // transitionToFinished() transitioned after we did our initial check.
                 dassert(oldState == SSBState::kFinished);
@@ -467,7 +467,7 @@ protected:
 
 template <typename T>
 struct SharedStateImpl final : SharedStateBase {
-    MONGO_STATIC_ASSERT(!std::is_void<T>::value);
+    MERIZO_STATIC_ASSERT(!std::is_void<T>::value);
 
     // Remaining methods only called by promise side.
     void fillFrom(SharedState<T>&& other) {
@@ -661,7 +661,7 @@ private:
 };
 
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS FutureImpl {
+class MERIZO_WARN_UNUSED_RESULT_CLASS FutureImpl {
 public:
     using value_type = T;
 
@@ -1099,7 +1099,7 @@ private:
         ON_BLOCK_EXIT([&] {
             // oldState could be either kInit or kWaiting, depending on whether we've failed a call
             // to wait().
-            if (MONGO_unlikely(!_shared->state.compare_exchange_strong(
+            if (MERIZO_unlikely(!_shared->state.compare_exchange_strong(
                     oldState, SSBState::kHaveContinuation, std::memory_order_acq_rel))) {
                 dassert(oldState == SSBState::kFinished);
                 _shared->callback(_shared.getPtr());
@@ -1115,8 +1115,8 @@ private:
                                           SuccessFunc&& success,
                                           FailFunc&& fail) noexcept {
         // Make sure they don't capture anything.
-        MONGO_STATIC_ASSERT(std::is_empty<SuccessFunc>::value);
-        MONGO_STATIC_ASSERT(std::is_empty<FailFunc>::value);
+        MERIZO_STATIC_ASSERT(std::is_empty<SuccessFunc>::value);
+        MERIZO_STATIC_ASSERT(std::is_empty<FailFunc>::value);
 
         return generalImpl(
             [&](T&& val) {
@@ -1163,7 +1163,7 @@ private:
 };
 
 template <>
-class MONGO_WARN_UNUSED_RESULT_CLASS FutureImpl<void> : public FutureImpl<FakeVoid> {
+class MERIZO_WARN_UNUSED_RESULT_CLASS FutureImpl<void> : public FutureImpl<FakeVoid> {
     using Base = FutureImpl<FakeVoid>;
 
 public:

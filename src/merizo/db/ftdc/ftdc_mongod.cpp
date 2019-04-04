@@ -42,7 +42,7 @@
 namespace merizo {
 
 namespace {
-void registerMongoDCollectors(FTDCController* controller) {
+void registerMerizoDCollectors(FTDCController* controller) {
     // These metrics are only collected if replication is enabled
     if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
         repl::ReplicationCoordinator::modeNone) {
@@ -62,7 +62,7 @@ void registerMongoDCollectors(FTDCController* controller) {
 
 }  // namespace
 
-void startMongoDFTDC() {
+void startMerizoDFTDC() {
     auto dir = getFTDCDirectoryPathParameter();
 
     if (dir.empty()) {
@@ -70,10 +70,10 @@ void startMongoDFTDC() {
         dir /= kFTDCDefaultDirectory.toString();
     }
 
-    startFTDC(dir, FTDCStartMode::kStart, registerMongoDCollectors);
+    startFTDC(dir, FTDCStartMode::kStart, registerMerizoDCollectors);
 }
 
-void stopMongoDFTDC() {
+void stopMerizoDFTDC() {
     stopFTDC();
 }
 

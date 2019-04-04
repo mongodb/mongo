@@ -13,7 +13,7 @@
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
-    const conn = new Mongo(rst.getPrimary().host);
+    const conn = new Merizo(rst.getPrimary().host);
 
     // Create the collection so the override doesn't try to when it is not expected.
     assert.commandWorked(conn.getDB(dbName).createCollection(collName));
@@ -22,8 +22,8 @@
     // this test and to allow mocking certain responses.
     let cmdObjsSeen = [];
     let mockNetworkError, mockFirstResponse, mockFirstCommitResponse;
-    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
-    Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
+    const merizoRunCommandOriginal = Merizo.prototype.runCommand;
+    Merizo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
         cmdObjsSeen.push(cmdObj);
 
         if (mockNetworkError) {

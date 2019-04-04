@@ -315,7 +315,7 @@ public:
                 << "Throwing DBException on DBClientCursorForTest::query(). Failures left: "
                 << _initFailuresLeft;
             uasserted(50852, "Simulated network error");
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
 
         unittest::log() << "Returning success on DBClientCursorForTest::query()";

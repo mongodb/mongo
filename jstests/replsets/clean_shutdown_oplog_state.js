@@ -64,7 +64,7 @@
         options.setParameter.recoverFromOplogAsStandalone = true;
     }
 
-    var conn = MongoRunner.runMongod(options);
+    var conn = MerizoRunner.runMerizod(options);
     assert.neq(null, conn, "secondary failed to start");
 
     // Following clean shutdown of a node, the oplog must exactly match the applied operations.

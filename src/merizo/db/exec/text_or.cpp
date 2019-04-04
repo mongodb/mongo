@@ -144,7 +144,7 @@ PlanStage::StageState TextOrStage::doWork(WorkingSetID* out) {
             break;
         case State::kDone:
             // Should have been handled above.
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
             break;
     }
 

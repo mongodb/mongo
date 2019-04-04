@@ -128,7 +128,7 @@ public:
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
-class ReplicationRecoveryTest : public ServiceContextMongoDTest {
+class ReplicationRecoveryTest : public ServiceContextMerizoDTest {
 protected:
     OperationContext* getOperationContext() {
         return _opCtx.get();
@@ -164,7 +164,7 @@ protected:
 
 private:
     void setUp() override {
-        ServiceContextMongoDTest::setUp();
+        ServiceContextMerizoDTest::setUp();
 
         auto service = getServiceContext();
         StorageInterface::set(service, stdx::make_unique<StorageInterfaceRecovery>());
@@ -183,7 +183,7 @@ private:
         ASSERT_OK(_storageInterface->createCollection(
             getOperationContext(), testNs, generateOptionsWithUuid()));
 
-        MongoDSessionCatalog::onStepUp(_opCtx.get());
+        MerizoDSessionCatalog::onStepUp(_opCtx.get());
 
         auto observerRegistry = checked_cast<OpObserverRegistry*>(service->getOpObserver());
         observerRegistry->addObserver(std::make_unique<ReplicationRecoveryTestObObserver>());
@@ -196,7 +196,7 @@ private:
         _opCtx.reset(nullptr);
         _consistencyMarkers.reset();
 
-        ServiceContextMongoDTest::tearDown();
+        ServiceContextMerizoDTest::tearDown();
     }
 
     void _createOpCtx() {

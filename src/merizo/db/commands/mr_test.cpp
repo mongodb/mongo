@@ -95,7 +95,7 @@ std::string _getOutTypeString(mr::Config::OutputType outType) {
         case mr::Config::INMEMORY:
             return "INMEMORY";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 /**
@@ -351,7 +351,7 @@ repl::OpTime MapReduceOpObserver::onDropCollection(OperationContext* opCtx,
 /**
  * Test fixture for MapReduceCommand.
  */
-class MapReduceCommandTest : public ServiceContextMongoDTest {
+class MapReduceCommandTest : public ServiceContextMerizoDTest {
 public:
     static const NamespaceString inputNss;
     static const NamespaceString outputNss;
@@ -395,7 +395,7 @@ const NamespaceString MapReduceCommandTest::inputNss("myDB.myCollection");
 const NamespaceString MapReduceCommandTest::outputNss(inputNss.getSisterNS("outCollection"));
 
 void MapReduceCommandTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
     ScriptEngine::setup();
     auto service = getServiceContext();
     DBDirectClientFactory::get(service).registerImplementation(
@@ -428,7 +428,7 @@ void MapReduceCommandTest::tearDown() {
     _opCtx = {};
     _opObserver = nullptr;
     ScriptEngine::dropScopeCache();
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 repl::ReplicationCoordinatorMock* MapReduceCommandTest::_getReplCoord() const {

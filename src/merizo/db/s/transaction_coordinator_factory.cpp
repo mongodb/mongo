@@ -33,6 +33,6 @@
 
 namespace merizo {
 
-MONGO_DEFINE_SHIM(createTransactionCoordinator);
+MERIZO_DEFINE_SHIM(createTransactionCoordinator);
 
 }  // namespace merizo

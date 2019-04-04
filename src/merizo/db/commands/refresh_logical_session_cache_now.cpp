@@ -92,7 +92,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(RefreshLogicalSessionCacheNowCommand);
+MERIZO_REGISTER_TEST_COMMAND(RefreshLogicalSessionCacheNowCommand);
 
 }  // namespace
 

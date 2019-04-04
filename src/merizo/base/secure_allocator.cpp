@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -215,14 +215,14 @@ void systemDeallocate(void* ptr, std::size_t bytes) {
 // macro definitions, but that seems plausible on all platforms we care about.
 
 #if defined(MAP_ANONYMOUS)
-#define MONGO_MAP_ANONYMOUS MAP_ANONYMOUS
+#define MERIZO_MAP_ANONYMOUS MAP_ANONYMOUS
 #else
 #if defined(MAP_ANON)
-#define MONGO_MAP_ANONYMOUS MAP_ANON
+#define MERIZO_MAP_ANONYMOUS MAP_ANON
 #endif
 #endif
 
-#if !defined(MONGO_MAP_ANONYMOUS)
+#if !defined(MERIZO_MAP_ANONYMOUS)
 #error "Could not determine a way to map anonymous memory, required for secure allocation"
 #endif
 
@@ -239,7 +239,7 @@ void* systemAllocate(std::size_t bytes) {
     //
     // skipping flags like MAP_LOCKED and MAP_POPULATE as linux-isms
     auto ptr =
-        mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MONGO_MAP_ANONYMOUS, -1, 0);
+        mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MERIZO_MAP_ANONYMOUS, -1, 0);
 
     if (!ptr) {
         auto str = errnoWithPrefix("Failed to mmap");
@@ -338,7 +338,7 @@ std::shared_ptr<Allocation> lastAllocation = nullptr;
 
 }  // namespace
 
-MONGO_INITIALIZER_GENERAL(SecureAllocator, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
+MERIZO_INITIALIZER_GENERAL(SecureAllocator, MERIZO_NO_PREREQUISITES, MERIZO_NO_DEPENDENTS)
 (InitializerContext* context) {
 #if _WIN32
     // Enable the increase working set size privilege in our access token.

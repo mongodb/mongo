@@ -35,19 +35,19 @@ server_parameters:
             If set to true on merizos, all aggregations delivered to the merizos which require a merging shard
             will select the primary shard as the merger. False by default, which means that the merging shard
             will be selected randomly amongst the shards participating in the query. Pipelines capable of
-            merging on merizoS are unaffected by this setting, unless internalQueryProhibitMergingOnMongoS is true.
+            merging on merizoS are unaffected by this setting, unless internalQueryProhibitMergingOnMerizoS is true.
         cpp_vartype: AtomicWord<bool>
         cpp_varname: internalQueryAlwaysMergeOnPrimaryShard
         set_at: [ startup, runtime ]
         default: false
-    internalQueryProhibitMergingOnMongoS:
+    internalQueryProhibitMergingOnMerizoS:
         description: >-
             If set to true on merizos, all aggregations which could otherwise merge on the merizos will be
             obliged to merge on a shard instead. Pipelines which are redirected to the shards will obey the
             value of internalQueryAlwaysMergeOnPrimaryShard. False by default, meaning that pipelines capable
             of merging on merizoS will always do so.
         cpp_vartype: AtomicWord<bool>
-        cpp_varname: internalQueryProhibitMergingOnMongoS
+        cpp_varname: internalQueryProhibitMergingOnMerizoS
         set_at: [ startup, runtime ]
         default: false
     internalQueryDisableExchange:

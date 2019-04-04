@@ -959,7 +959,7 @@ Status GeometryContainer::parseFromGeoJSON(const BSONObj& obj, bool skipValidati
         }
     } else {
         // Should not reach here.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     // Check parsing result.
@@ -1090,7 +1090,7 @@ string GeometryContainer::getDebugType() const {
     } else if (NULL != _geometryCollection) {
         return "gc";
     } else {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
         return "";
     }
 }
@@ -1117,7 +1117,7 @@ CRS GeometryContainer::getNativeCRS() const {
     } else if (NULL != _geometryCollection) {
         return SPHERE;
     } else {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
         return FLAT;
     }
 }

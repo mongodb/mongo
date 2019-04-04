@@ -12,7 +12,7 @@
 
     load('jstests/libs/analyze_plan.js');              // For getPlanStage().
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-    load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
+    load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMerizos.
 
     const coll = db.wildcard_cached_plans;
     coll.drop();
@@ -45,7 +45,7 @@
     }
 
     function getPlanCacheKeyFromExplain(explainRes) {
-        const hash = FixtureHelpers.isMongos(db)
+        const hash = FixtureHelpers.isMerizos(db)
             ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
             : explainRes.queryPlanner.planCacheKey;
         assert.eq(typeof(hash), "string");

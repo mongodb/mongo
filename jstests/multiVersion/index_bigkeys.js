@@ -16,7 +16,7 @@
 
 const dbName = "test";
 const collName = "index_bigkeys";
-const dbpath = MongoRunner.dataPath + "index_bigkeys";
+const dbpath = MerizoRunner.dataPath + "index_bigkeys";
 
 const largeKey = 's'.repeat(12345);
 const documentWithLargeKey = {
@@ -73,7 +73,7 @@ function downgradeAndVerifyBehavior(testDowngradeBehaviorFunc) {
     let uniqueIndex = false;
 
     // 1. Downgrade to FCV 4.0 and verify behaviors.
-    let conn = MongoRunner.runMongod({binVersion: "latest", cleanData: true, dbpath: dbpath});
+    let conn = MerizoRunner.runMerizod({binVersion: "latest", cleanData: true, dbpath: dbpath});
     let testColl = conn.getDB(dbName)[collName];
     assert.commandWorked(testColl.createIndex({x: 1}, {name: "x_1", unique: uniqueIndex}));
     assert.commandWorked(testColl.insert(documentWithLargeKey));
@@ -82,23 +82,23 @@ function downgradeAndVerifyBehavior(testDowngradeBehaviorFunc) {
     testDowngradeBehaviorFunc(testColl);
     // We skip the validation because FCV 4.0 cannot validate a big index key
     // inserted by FCV 4.2.
-    MongoRunner.stopMongod(conn, null, {skipValidation: true});
+    MerizoRunner.stopMerizod(conn, null, {skipValidation: true});
 
     // 2. Start fresh on a 4.2 binary and insert long index keys. Then downgrade to FCV 4.0 followed
     // by restarting with a 4.0 binary and verify behaviors.
-    conn = MongoRunner.runMongod({binVersion: "latest", cleanData: true, dbpath: dbpath});
+    conn = MerizoRunner.runMerizod({binVersion: "latest", cleanData: true, dbpath: dbpath});
     testColl = conn.getDB(dbName)[collName];
     assert.commandWorked(testColl.createIndex({x: 1}, {name: "x_1", unique: uniqueIndex}));
     assert.commandWorked(testColl.insert(documentWithLargeKey));
     assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
     // We skip the validation because FCV 4.0 cannot validate a big index key
     // inserted by FCV 4.2.
-    MongoRunner.stopMongod(conn, null, {skipValidation: true});
-    conn = MongoRunner.runMongod({binVersion: "4.0", noCleanData: true, dbpath: dbpath});
+    MerizoRunner.stopMerizod(conn, null, {skipValidation: true});
+    conn = MerizoRunner.runMerizod({binVersion: "4.0", noCleanData: true, dbpath: dbpath});
     testColl = conn.getDB(dbName)[collName];
     assertAllThingsAreIndexed(testColl);
     testDowngradeBehaviorFunc(testColl);
-    MongoRunner.stopMongod(conn, null, {skipValidation: true});
+    MerizoRunner.stopMerizod(conn, null, {skipValidation: true});
 }
 
 (function() {
@@ -106,18 +106,18 @@ function downgradeAndVerifyBehavior(testDowngradeBehaviorFunc) {
 
     // Test the behavior of inserting big index keys of each version.
     // 4.2 binary (with FCV 4.2)
-    let conn = MongoRunner.runMongod({binVersion: "latest", cleanData: true});
+    let conn = MerizoRunner.runMerizod({binVersion: "latest", cleanData: true});
     testInsertDocumentWithLargeKey(conn, false);
 
     // 4.2 binary (with FCV 4.0)
     assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
     testInsertDocumentWithLargeKey(conn, true);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // 4.0 binary
-    conn = MongoRunner.runMongod({binVersion: "4.0", cleanData: true});
+    conn = MerizoRunner.runMerizod({binVersion: "4.0", cleanData: true});
     testInsertDocumentWithLargeKey(conn, true);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // Downgrade path
     // 1. Test that 4.0 binary could read and delete big index keys which got
@@ -147,17 +147,17 @@ function downgradeAndVerifyBehavior(testDowngradeBehaviorFunc) {
     // 1. Test the normal upgrade path.
     [true, false].forEach(function(uniqueIndex) {
         // Upgrade all the way to 4.2 binary with FCV 4.2.
-        let conn = MongoRunner.runMongod({binVersion: "4.0", cleanData: true, dbpath: dbpath});
+        let conn = MerizoRunner.runMerizod({binVersion: "4.0", cleanData: true, dbpath: dbpath});
         assert.commandWorked(
             conn.getDB(dbName)[collName].createIndex({x: 1}, {name: "x_1", unique: uniqueIndex}));
         assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({binVersion: "latest", noCleanData: true, dbpath: dbpath});
+        MerizoRunner.stopMerizod(conn);
+        conn = MerizoRunner.runMerizod({binVersion: "latest", noCleanData: true, dbpath: dbpath});
         // Setting the FCV to 4.2
         assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
         assert.commandWorked(
             conn.getDB(dbName).runCommand({insert: collName, documents: [documentWithLargeKey]}));
-        MongoRunner.stopMongod(conn, null, {skipValidation: false});
+        MerizoRunner.stopMerizod(conn, null, {skipValidation: false});
     });
 
     // 2. If 4.0 binary has already inserted documents with large keys by setting
@@ -165,7 +165,7 @@ function downgradeAndVerifyBehavior(testDowngradeBehaviorFunc) {
     // successfully validate the index consistency because some index keys are missing. But reindex
     // should solve this problem.
     [true, false].forEach(function(uniqueIndex) {
-        let conn = MongoRunner.runMongod({
+        let conn = MerizoRunner.runMerizod({
             binVersion: "4.0",
             cleanData: true,
             setParameter: "failIndexKeyTooLong=false",
@@ -175,8 +175,8 @@ function downgradeAndVerifyBehavior(testDowngradeBehaviorFunc) {
             conn.getDB(dbName)[collName].createIndex({x: 1}, {name: "x_1", unique: uniqueIndex}));
         assert.commandWorked(conn.getDB(dbName)[collName].insert(documentWithLargeKey));
         assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({binVersion: "latest", noCleanData: true, dbpath: dbpath});
+        MerizoRunner.stopMerizod(conn);
+        conn = MerizoRunner.runMerizod({binVersion: "latest", noCleanData: true, dbpath: dbpath});
         assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
         let testColl = conn.getDB(dbName)[collName];
@@ -184,7 +184,7 @@ function downgradeAndVerifyBehavior(testDowngradeBehaviorFunc) {
         testColl.reIndex();
         assert(testColl.validate().valid);
 
-        MongoRunner.stopMongod(conn, null, {skipValidation: false});
+        MerizoRunner.stopMerizod(conn, null, {skipValidation: false});
     });
 
 }());

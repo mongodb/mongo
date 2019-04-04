@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
 
 #include "merizo/platform/basic.h"
 
@@ -616,12 +616,12 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
     replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 
-    if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
+    if (MERIZO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
 
         // This log output is used in jstests so please leave it.
         log() << "rollback - rollbackHangThenFailAfterWritingMinValid fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
+        while (MERIZO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
             invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
             merizo::sleepsecs(1);
         }
@@ -893,7 +893,7 @@ Status _syncRollback(OperationContext* opCtx,
 
     // Find the UUID of the transactions collection. An OperationContext is required because the
     // UUID is not known at compile time, so the SessionCatalog needs to load the collection.
-    how.transactionTableUUID = MongoDSessionCatalog::getTransactionTableUUID(opCtx);
+    how.transactionTableUUID = MerizoDSessionCatalog::getTransactionTableUUID(opCtx);
 
     log() << "Finding the Common Point";
     try {
@@ -952,11 +952,11 @@ Status _syncRollback(OperationContext* opCtx,
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
     }
 
-    if (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {
+    if (MERIZO_FAIL_POINT(rollbackHangBeforeFinish)) {
         // This log output is used in js tests so please leave it.
         log() << "rollback - rollbackHangBeforeFinish fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {
+        while (MERIZO_FAIL_POINT(rollbackHangBeforeFinish)) {
             invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
             merizo::sleepsecs(1);
         }
@@ -1499,7 +1499,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     // If necessary, clear the memory of existing sessions.
     if (fixUpInfo.refetchTransactionDocs) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
+        MerizoDSessionCatalog::invalidateSessions(opCtx, boost::none);
     }
 
     if (auto validator = LogicalTimeValidator::get(opCtx)) {
@@ -1579,10 +1579,10 @@ void rollback(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_FAIL_POINT(rollbackHangAfterTransitionToRollback)) {
+    if (MERIZO_FAIL_POINT(rollbackHangAfterTransitionToRollback)) {
         log() << "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
                  "point is disabled (rs_rollback).";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                         rollbackHangAfterTransitionToRollback);
     }
 

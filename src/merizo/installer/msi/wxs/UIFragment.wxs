@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"  xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
     <Fragment>
-        <UI Id="MongoWixUI">
+        <UI Id="MerizoWixUI">
             <!-- Base our MSI on the FeatureTree based Wix set, and add our custom dialog boxes -->
             <UIRef Id="WixUI_FeatureTree" />
 
-            <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="LicenseAgreementDlg" Control="Next">LicenseAccepted = "1"</Publish>
-            <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="CustomizeDlg" Control="Back">WixUI_InstallMode = "InstallCustom"</Publish>
+            <Publish Event="NewDialog" Value="MerizoSetupTypeDlg" Dialog="LicenseAgreementDlg" Control="Next">LicenseAccepted = "1"</Publish>
+            <Publish Event="NewDialog" Value="MerizoSetupTypeDlg" Dialog="CustomizeDlg" Control="Back">WixUI_InstallMode = "InstallCustom"</Publish>
             <Publish Event="NewDialog" Value="ServiceDlg" Dialog="CustomizeDlg" Control="Next"></Publish>
 	        <Publish Event="NewDialog" Value="CompassDlg" Dialog="VerifyReadyDlg" Control="Back"></Publish>
 
             <!-- A custom setup type dialog box with only Complete and Custom buttons -->
-            <Dialog Id="MongoSetupTypeDlg" X="50" Y="50" Width="370" Height="270" Title="[ProductName] Setup">
+            <Dialog Id="MerizoSetupTypeDlg" X="50" Y="50" Width="370" Height="270" Title="[ProductName] Setup">
                 <Control Id="CompleteButton" Type="PushButton" X="40" Y="65" Width="80" Height="17" Text="C&amp;omplete" ToolTip="Complete Installation" TabSkip="no" Default="yes">
                     <Publish Property="WixUI_InstallMode" Value="InstallComplete">1</Publish>
                     <Publish Event="NewDialog" Value="ServiceDlg">1</Publish>
@@ -60,90 +60,90 @@
                 <Control Id="lineBottomDivider" Type="Line" X="0" Y="234" Width="370" Height="2" />
                 <Control Id="Back" Type="PushButton" X="189" Y="244" Width="56" Height="17" TabSkip="no">
                     <Text>&lt; &amp;Back</Text>
-                    <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Order="1">WixUI_InstallMode = "InstallTypical" OR WixUI_InstallMode = "InstallComplete"</Publish>
+                    <Publish Event="NewDialog" Value="MerizoSetupTypeDlg" Order="1">WixUI_InstallMode = "InstallTypical" OR WixUI_InstallMode = "InstallComplete"</Publish>
                     <Publish Event="NewDialog" Value="CustomizeDlg" Order="2">WixUI_InstallMode = "InstallCustom"</Publish>
                 </Control>
                 <Control Id="Next" Type="PushButton" X="244" Y="244" Width="56" Height="17" TabSkip="no">
                     <Text>&amp;Next &gt;</Text>
-                    <Publish Event="AddLocal" Value="ServerNoService">NOT MONGO_SERVICE_INSTALL</Publish>
-                    <Publish Event="AddLocal" Value="ServerService">MONGO_SERVICE_INSTALL</Publish>
-                    <Publish Event="DoAction" Value="ValidateServiceLogon" Order="1"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Publish>
-                    <Publish Event="SpawnDialog" Value="InvalidServiceAccount" Order="2">MONGO_SERVICE_ACCOUNT_VALID = "0"</Publish>
-                    <Publish Event="NewDialog" Value="CompassDlg" Order="2">NOT MONGO_SERVICE_INSTALL OR (MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork" OR MONGO_SERVICE_ACCOUNT_VALID)</Publish>
+                    <Publish Event="AddLocal" Value="ServerNoService">NOT MERIZO_SERVICE_INSTALL</Publish>
+                    <Publish Event="AddLocal" Value="ServerService">MERIZO_SERVICE_INSTALL</Publish>
+                    <Publish Event="DoAction" Value="ValidateServiceLogon" Order="1"><![CDATA[MERIZO_SERVICE_INSTALL AND MERIZO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Publish>
+                    <Publish Event="SpawnDialog" Value="InvalidServiceAccount" Order="2">MERIZO_SERVICE_ACCOUNT_VALID = "0"</Publish>
+                    <Publish Event="NewDialog" Value="CompassDlg" Order="2">NOT MERIZO_SERVICE_INSTALL OR (MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork" OR MERIZO_SERVICE_ACCOUNT_VALID)</Publish>
                 </Control>
                 <Control Id="Cancel" Type="PushButton" X="309" Y="244" Width="56" Height="17" TabSkip="no">
                     <Text>Cancel</Text>
                     <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
                 </Control>
-                <Control Id="CheckBox1" Type="CheckBox" X="8" Y="48" Width="132" Height="18"  Property="MONGO_SERVICE_INSTALL" CheckBoxValue="TRUE" TabSkip="no">
-                    <Text>Install MongoD as a Service</Text>
+                <Control Id="CheckBox1" Type="CheckBox" X="8" Y="48" Width="132" Height="18"  Property="MERIZO_SERVICE_INSTALL" CheckBoxValue="TRUE" TabSkip="no">
+                    <Text>Install MerizoD as a Service</Text>
                 </Control>
-                <Control Id="RadioButtonGroup1" Type="RadioButtonGroup" Property="MONGO_SERVICE_ACCOUNT_TYPE" X="20" Y="62" Width="190" Height="44">
-                    <RadioButtonGroup Property="MONGO_SERVICE_ACCOUNT_TYPE">
+                <Control Id="RadioButtonGroup1" Type="RadioButtonGroup" Property="MERIZO_SERVICE_ACCOUNT_TYPE" X="20" Y="62" Width="190" Height="44">
+                    <RadioButtonGroup Property="MERIZO_SERVICE_ACCOUNT_TYPE">
                         <RadioButton X="0" Y="2" Width="184" Height="18" Value="ServiceLocalNetwork" Text="Run service as Network Service user" />
                         <RadioButton X="0" Y="18" Width="184" Height="18" Value="ServiceCustomAccount" Text="Run service as a local or domain user:" />
                     </RadioButtonGroup>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL</Condition>
-                    <Condition Action="enable">MONGO_SERVICE_INSTALL</Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL</Condition>
+                    <Condition Action="enable">MERIZO_SERVICE_INSTALL</Condition>
                 </Control>
                 <Control Id="textAccountName" Type="Text" X="38" Y="116" Width="76" Height="15" TabSkip="yes">
                     <Text>Account Name:</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL OR MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
-                    <Condition Action="enable"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL OR MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
+                    <Condition Action="enable"><![CDATA[MERIZO_SERVICE_INSTALL AND MERIZO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
                 </Control>
                 <Control Id="textAccountDomain" Type="Text" X="38" Y="98" Width="76" Height="15" TabSkip="yes">
                     <Text>Account Domain:</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL OR MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
-                    <Condition Action="enable"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL OR MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
+                    <Condition Action="enable"><![CDATA[MERIZO_SERVICE_INSTALL AND MERIZO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
                 </Control>
                 <Control Id="textAccountPassword" Type="Text" X="38" Y="134" Width="76" Height="15" TabSkip="yes">
                     <Text>Account Password:</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL OR MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
-                    <Condition Action="enable"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL OR MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
+                    <Condition Action="enable"><![CDATA[MERIZO_SERVICE_INSTALL AND MERIZO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
                 </Control>
-                <Control Id="editAccountDomain" Type="Edit" X="124" Y="98" Width="101" Height="15" TabSkip="no" Property="MONGO_SERVICE_ACCOUNT_DOMAIN">
+                <Control Id="editAccountDomain" Type="Edit" X="124" Y="98" Width="101" Height="15" TabSkip="no" Property="MERIZO_SERVICE_ACCOUNT_DOMAIN">
                     <Text>{32767}</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL OR MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
-                    <Condition Action="enable"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL OR MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
+                    <Condition Action="enable"><![CDATA[MERIZO_SERVICE_INSTALL AND MERIZO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
                 </Control>
-                <Control Id="editAccountName" Type="Edit" X="124" Y="116" Width="101" Height="15" TabSkip="no" Property="MONGO_SERVICE_ACCOUNT_NAME">
+                <Control Id="editAccountName" Type="Edit" X="124" Y="116" Width="101" Height="15" TabSkip="no" Property="MERIZO_SERVICE_ACCOUNT_NAME">
                     <Text>{32767}</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL OR MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
-                    <Condition Action="enable"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL OR MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
+                    <Condition Action="enable"><![CDATA[MERIZO_SERVICE_INSTALL AND MERIZO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
                 </Control>
-                <Control Id="editAccountPassword" Type="Edit" X="124" Y="134" Width="101" Height="15" TabSkip="no" Password="yes" Property="MONGO_SERVICE_ACCOUNT_PASSWORD">
+                <Control Id="editAccountPassword" Type="Edit" X="124" Y="134" Width="101" Height="15" TabSkip="no" Password="yes" Property="MERIZO_SERVICE_ACCOUNT_PASSWORD">
                     <Text>{32767}</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL OR MONGO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
-                    <Condition Action="enable"><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL OR MERIZO_SERVICE_ACCOUNT_TYPE = "ServiceLocalNetwork"</Condition>
+                    <Condition Action="enable"><![CDATA[MERIZO_SERVICE_INSTALL AND MERIZO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
                 </Control>
                 <Control Id="textServiceName" Type="Text" X="23" Y="161" Width="62" Height="15" TabSkip="yes">
                     <Text>Service Name:</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL</Condition>
-                    <Condition Action="enable">MONGO_SERVICE_INSTALL</Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL</Condition>
+                    <Condition Action="enable">MERIZO_SERVICE_INSTALL</Condition>
                 </Control>
-                <Control Id="editServiceName" Type="Edit" X="98" Y="161" Width="105" Height="15" TabSkip="no" Property="MONGO_SERVICE_NAME">
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL</Condition>
-                    <Condition Action="enable">MONGO_SERVICE_INSTALL</Condition>
+                <Control Id="editServiceName" Type="Edit" X="98" Y="161" Width="105" Height="15" TabSkip="no" Property="MERIZO_SERVICE_NAME">
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL</Condition>
+                    <Condition Action="enable">MERIZO_SERVICE_INSTALL</Condition>
                 </Control>
                 <Control Id="textDataDirectory" Type="Text" X="23" Y="188" Width="64" Height="15" TabSkip="yes">
                     <Text>Data Directory:</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL</Condition>
-                    <Condition Action="enable">MONGO_SERVICE_INSTALL</Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL</Condition>
+                    <Condition Action="enable">MERIZO_SERVICE_INSTALL</Condition>
                 </Control>
                 <Control Id="textLogDirectory" Type="Text" X="23" Y="210" Width="62" Height="15" TabSkip="yes">
                     <Text>Log Directory:</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL</Condition>
-                    <Condition Action="enable">MONGO_SERVICE_INSTALL</Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL</Condition>
+                    <Condition Action="enable">MERIZO_SERVICE_INSTALL</Condition>
                 </Control>
-                <Control Id="editDataDirectory" Type="Edit" X="98" Y="188" Width="237" Height="15" TabSkip="no" Property="MONGO_DATA_PATH">
+                <Control Id="editDataDirectory" Type="Edit" X="98" Y="188" Width="237" Height="15" TabSkip="no" Property="MERIZO_DATA_PATH">
                     <Text>{32767}</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL</Condition>
-                    <Condition Action="enable">MONGO_SERVICE_INSTALL</Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL</Condition>
+                    <Condition Action="enable">MERIZO_SERVICE_INSTALL</Condition>
                 </Control>
-                <Control Id="editLogDirectory" Type="Edit" X="98" Y="210" Width="238" Height="15" TabSkip="no" Property="MONGO_LOG_PATH">
+                <Control Id="editLogDirectory" Type="Edit" X="98" Y="210" Width="238" Height="15" TabSkip="no" Property="MERIZO_LOG_PATH">
                     <Text>{32767}</Text>
-                    <Condition Action="disable">NOT MONGO_SERVICE_INSTALL</Condition>
-                    <Condition Action="enable">MONGO_SERVICE_INSTALL</Condition>
+                    <Condition Action="disable">NOT MERIZO_SERVICE_INSTALL</Condition>
+                    <Condition Action="enable">MERIZO_SERVICE_INSTALL</Condition>
                 </Control>
         </Dialog>
 

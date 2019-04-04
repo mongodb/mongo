@@ -312,7 +312,7 @@ std::unique_ptr<KVHarnessHelper> makeHelper() {
     return stdx::make_unique<WiredTigerKVHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
+MERIZO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
     KVHarnessHelper::registerFactory(makeHelper);
     return Status::OK();
 }

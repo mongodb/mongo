@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include <boost/none_t.hpp>
 
@@ -63,7 +63,7 @@ const ConnectionString ShardLocal::getConnString() const {
 }
 
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 };
 
 const ConnectionString ShardLocal::originalConnString() const {
@@ -75,15 +75,15 @@ const ConnectionString ShardLocal::originalConnString() const {
 
 void ShardLocal::updateReplSetMonitor(const HostAndPort& remoteHost,
                                       const Status& remoteCommandStatus) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ShardLocal::updateLastCommittedOpTime(LogicalTime lastCommittedOpTime) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 LogicalTime ShardLocal::getLastCommittedOpTime() const {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::string ShardLocal::toString() const {
@@ -117,7 +117,7 @@ StatusWith<Shard::QueryResponse> ShardLocal::_runExhaustiveCursorCommand(
     StringData dbName,
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
@@ -154,7 +154,7 @@ void ShardLocal::runFireAndForgetCommand(OperationContext* opCtx,
                                          const ReadPreferenceSetting& readPref,
                                          const std::string& dbName,
                                          const BSONObj& cmdObj) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

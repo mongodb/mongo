@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -88,7 +88,7 @@ NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned lin
     temp << "assertion " << file << ":" << line;
 
     breakpoint();
-#if defined(MONGO_CONFIG_DEBUG_BUILD)
+#if defined(MERIZO_CONFIG_DEBUG_BUILD)
     // this is so we notice in buildbot
     severe() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n"
              << std::endl;
@@ -154,7 +154,7 @@ NOINLINE_DECL void fassertFailedNoTraceWithLocation(int msgid,
     quickExit(EXIT_ABRUPT);
 }
 
-MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
+MERIZO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
                                                                  const Status& status,
                                                                  const char* file,
                                                                  unsigned line) noexcept {
@@ -165,7 +165,7 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
     std::abort();
 }
 
-MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgid,
+MERIZO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgid,
                                                                         const Status& status,
                                                                         const char* file,
                                                                         unsigned line) noexcept {

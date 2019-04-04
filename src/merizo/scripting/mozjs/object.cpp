@@ -40,7 +40,7 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec ObjectInfo::methods[2] = {
-    MONGO_ATTACH_JS_FUNCTION(bsonsize), JS_FS_END,
+    MERIZO_ATTACH_JS_FUNCTION(bsonsize), JS_FS_END,
 };
 
 const char* const ObjectInfo::className = "Object";

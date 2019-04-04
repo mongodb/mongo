@@ -42,11 +42,11 @@ function testBackupSystemCollStats(adminDB) {
 
 // ************************************************************
 
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = MerizoRunner.runMerizod({auth: ""});
 var adminDB = conn.getDB("admin");
 adminDB.createUser({user: "root", pwd: "pwd", roles: ["root"]});
 
 testUserAdminAnyDatabaseSystemCollIndexing(adminDB);
 testBackupSystemCollStats(adminDB);
 
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);

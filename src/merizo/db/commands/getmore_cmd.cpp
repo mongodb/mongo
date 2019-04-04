@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -68,8 +68,8 @@ namespace merizo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
-MONGO_FAIL_POINT_DEFINE(GetMoreHangBeforeReadLock);
+MERIZO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
+MERIZO_FAIL_POINT_DEFINE(GetMoreHangBeforeReadLock);
 
 // The timeout when waiting for linearizable read concern on a getMore command.
 static constexpr int kLinearizableReadConcernTimeout = 15000;
@@ -285,7 +285,7 @@ public:
                     return Status::OK();
             }
 
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
 
         void acquireLocksAndIterateCursor(OperationContext* opCtx,
@@ -348,10 +348,10 @@ public:
                 invariant(cursorPin->lockPolicy() ==
                           ClientCursorParams::LockPolicy::kLockExternally);
 
-                if (MONGO_FAIL_POINT(GetMoreHangBeforeReadLock)) {
+                if (MERIZO_FAIL_POINT(GetMoreHangBeforeReadLock)) {
                     log() << "GetMoreHangBeforeReadLock fail point enabled. Blocking until fail "
                              "point is disabled.";
-                    MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+                    MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                                     GetMoreHangBeforeReadLock);
                 }
 
@@ -417,7 +417,7 @@ public:
             validateLSID(opCtx, _request, cursorPin.getCursor());
             validateTxnNumber(opCtx, _request, cursorPin.getCursor());
 
-            if (_request.nss.isOplog() && MONGO_FAIL_POINT(rsStopGetMoreCmd)) {
+            if (_request.nss.isOplog() && MERIZO_FAIL_POINT(rsStopGetMoreCmd)) {
                 uasserted(ErrorCodes::CommandFailed,
                           str::stream() << "getMore on " << _request.nss.ns()
                                         << " rejected due to active fail point rsStopGetMoreCmd");
@@ -441,7 +441,7 @@ public:
             // repeatedly release and re-acquire the collection readLock at regular intervals until
             // the failpoint is released. This is done in order to avoid deadlocks caused by the
             // pinned-cursor failpoints in this file (see SERVER-21997).
-            if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+            if (MERIZO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterPinningCursorBeforeGetMoreBatch,
                     opCtx,
@@ -455,7 +455,7 @@ public:
             applyCursorReadConcern(opCtx, cursorPin->getReadConcernArgs());
 
             const bool disableAwaitDataFailpointActive =
-                MONGO_FAIL_POINT(disableAwaitDataForGetMoreCmd);
+                MERIZO_FAIL_POINT(disableAwaitDataForGetMoreCmd);
 
             // We assume that cursors created through a DBDirectClient are always used from their
             // original OperationContext, so we do not need to move time to and from the cursor.
@@ -528,7 +528,7 @@ public:
             // the 'waitWithPinnedCursorDuringGetMoreBatch' failpoint is active, set the 'msg' field
             // of this operation's CurOp to signal that we've hit this point and then spin until the
             // failpoint is released.
-            MONGO_FAIL_POINT_BLOCK(waitWithPinnedCursorDuringGetMoreBatch, options) {
+            MERIZO_FAIL_POINT_BLOCK(waitWithPinnedCursorDuringGetMoreBatch, options) {
                 const BSONObj& data = options.getData();
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitWithPinnedCursorDuringGetMoreBatch,
@@ -621,7 +621,7 @@ public:
             // If the 'waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch' failpoint is active, we
             // set the 'msg' field of this operation's CurOp to signal that we've hit this point and
             // then spin until the failpoint is released.
-            if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
+            if (MERIZO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
                     opCtx,

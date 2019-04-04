@@ -10,7 +10,7 @@
     assert.commandWorked(db.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
     // Override the global "db".
-    const session = db.getMongo().startSession();
+    const session = db.getMerizo().startSession();
     db = session.getDatabase(db.getName());
     const coll = db.getCollection(collName);
 

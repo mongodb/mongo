@@ -43,7 +43,7 @@
     coll = rst.getPrimary().getDB("indexRebuild")["coll"];
     assert.commandWorked(coll.dropIndexes());
     rst.awaitReplication();
-    rst.stopSet(9, true, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+    rst.stopSet(9, true, {allowedExitCode: MerizoRunner.EXIT_SIGKILL});
 
     // Restarting the replica set should rebuild both indexes on both nodes. Just to be dropped
     // again by replication recovery. Starting up successfully is a passing test run.

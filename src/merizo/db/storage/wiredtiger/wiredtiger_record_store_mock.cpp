@@ -43,7 +43,7 @@ bool initRsOplogBackgroundThread(StringData ns) {
     return NamespaceString::oplog(ns);
 }
 
-MONGO_INITIALIZER(SetInitRsOplogBackgroundThreadCallback)(InitializerContext* context) {
+MERIZO_INITIALIZER(SetInitRsOplogBackgroundThreadCallback)(InitializerContext* context) {
     WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(initRsOplogBackgroundThread);
     return Status::OK();
 }

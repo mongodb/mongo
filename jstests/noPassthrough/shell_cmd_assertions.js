@@ -5,7 +5,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     const db = conn.getDB("commandAssertions");
     const kFakeErrCode = 1234567890;
     const tests = [];
@@ -358,5 +358,5 @@
     });
 
     /* cleanup */
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

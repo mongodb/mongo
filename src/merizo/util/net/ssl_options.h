@@ -38,9 +38,9 @@
 
 namespace merizo {
 
-#if (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS) || \
-    (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE)
-#define MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS 1
+#if (MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_WINDOWS) || \
+    (MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_APPLE)
+#define MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS 1
 #endif
 
 namespace optionenvironment {
@@ -69,7 +69,7 @@ struct SSLParams {
             return subject.empty() && thumbprint.empty();
         }
     };
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+#ifdef MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS
     CertificateSelector sslCertificateSelector;         // --sslCertificateSelector
     CertificateSelector sslClusterCertificateSelector;  // --sslClusterCertificateSelector
 #endif

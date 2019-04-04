@@ -92,12 +92,12 @@ using repl::ReplicationCoordinatorMock;
 using repl::ReplSettings;
 using unittest::assertGet;
 
-ShardingMongodTestFixture::ShardingMongodTestFixture() = default;
+ShardingMerizodTestFixture::ShardingMerizodTestFixture() = default;
 
-ShardingMongodTestFixture::~ShardingMongodTestFixture() = default;
+ShardingMerizodTestFixture::~ShardingMerizodTestFixture() = default;
 
-void ShardingMongodTestFixture::setUp() {
-    ServiceContextMongoDTest::setUp();
+void ShardingMerizodTestFixture::setUp() {
+    ServiceContextMerizoDTest::setUp();
 
     const auto service = getServiceContext();
     _opCtx = makeOperationContext();
@@ -151,7 +151,7 @@ void ShardingMongodTestFixture::setUp() {
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42);
 }
 
-std::unique_ptr<ReplicationCoordinatorMock> ShardingMongodTestFixture::makeReplicationCoordinator(
+std::unique_ptr<ReplicationCoordinatorMock> ShardingMerizodTestFixture::makeReplicationCoordinator(
     ReplSettings replSettings) {
     auto coordinator =
         stdx::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(), replSettings);
@@ -159,7 +159,7 @@ std::unique_ptr<ReplicationCoordinatorMock> ShardingMongodTestFixture::makeRepli
     return coordinator;
 }
 
-std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskExecutorPool() {
+std::unique_ptr<executor::TaskExecutorPool> ShardingMerizodTestFixture::makeTaskExecutorPool() {
     // Set up a NetworkInterfaceMock. Note, unlike NetworkInterfaceASIO, which has its own pool of
     // threads, tasks in the NetworkInterfaceMock must be carried out synchronously by the (single)
     // thread the unit test is running on.
@@ -187,7 +187,7 @@ std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskE
     return executorPool;
 }
 
-std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
+std::unique_ptr<ShardRegistry> ShardingMerizodTestFixture::makeShardRegistry(
     ConnectionString configConnStr) {
     auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
     auto targeterFactoryPtr = targeterFactory.get();
@@ -225,29 +225,29 @@ std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
     return stdx::make_unique<ShardRegistry>(std::move(shardFactory), configConnStr);
 }
 
-std::unique_ptr<DistLockCatalog> ShardingMongodTestFixture::makeDistLockCatalog() {
+std::unique_ptr<DistLockCatalog> ShardingMerizodTestFixture::makeDistLockCatalog() {
     return nullptr;
 }
 
-std::unique_ptr<DistLockManager> ShardingMongodTestFixture::makeDistLockManager(
+std::unique_ptr<DistLockManager> ShardingMerizodTestFixture::makeDistLockManager(
     std::unique_ptr<DistLockCatalog> distLockCatalog) {
     return nullptr;
 }
 
-std::unique_ptr<ShardingCatalogClient> ShardingMongodTestFixture::makeShardingCatalogClient(
+std::unique_ptr<ShardingCatalogClient> ShardingMerizodTestFixture::makeShardingCatalogClient(
     std::unique_ptr<DistLockManager> distLockManager) {
     return nullptr;
 }
 
-std::unique_ptr<ClusterCursorManager> ShardingMongodTestFixture::makeClusterCursorManager() {
+std::unique_ptr<ClusterCursorManager> ShardingMerizodTestFixture::makeClusterCursorManager() {
     return nullptr;
 }
 
-std::unique_ptr<BalancerConfiguration> ShardingMongodTestFixture::makeBalancerConfiguration() {
+std::unique_ptr<BalancerConfiguration> ShardingMerizodTestFixture::makeBalancerConfiguration() {
     return nullptr;
 }
 
-Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
+Status ShardingMerizodTestFixture::initializeGlobalShardingStateForMerizodForTest(
     const ConnectionString& configConnStr) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
               serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
@@ -286,7 +286,7 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
     return Status::OK();
 }
 
-void ShardingMongodTestFixture::tearDown() {
+void ShardingMerizodTestFixture::tearDown() {
     ReplicaSetMonitor::cleanup();
 
     if (Grid::get(operationContext())->getExecutorPool() && !_executorPoolShutDown) {
@@ -304,61 +304,61 @@ void ShardingMongodTestFixture::tearDown() {
     Grid::get(operationContext())->clearForUnitTests();
 
     _opCtx.reset();
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
-ShardingCatalogClient* ShardingMongodTestFixture::catalogClient() const {
+ShardingCatalogClient* ShardingMerizodTestFixture::catalogClient() const {
     invariant(Grid::get(operationContext())->catalogClient());
     return Grid::get(operationContext())->catalogClient();
 }
 
-CatalogCache* ShardingMongodTestFixture::catalogCache() const {
+CatalogCache* ShardingMerizodTestFixture::catalogCache() const {
     invariant(Grid::get(operationContext())->catalogCache());
     return Grid::get(operationContext())->catalogCache();
 }
 
-ShardRegistry* ShardingMongodTestFixture::shardRegistry() const {
+ShardRegistry* ShardingMerizodTestFixture::shardRegistry() const {
     invariant(Grid::get(operationContext())->shardRegistry());
     return Grid::get(operationContext())->shardRegistry();
 }
 
-ClusterCursorManager* ShardingMongodTestFixture::clusterCursorManager() const {
+ClusterCursorManager* ShardingMerizodTestFixture::clusterCursorManager() const {
     invariant(Grid::get(operationContext())->getCursorManager());
     return Grid::get(operationContext())->getCursorManager();
 }
 
-executor::TaskExecutorPool* ShardingMongodTestFixture::executorPool() const {
+executor::TaskExecutorPool* ShardingMerizodTestFixture::executorPool() const {
     invariant(Grid::get(operationContext())->getExecutorPool());
     return Grid::get(operationContext())->getExecutorPool();
 }
 
-void ShardingMongodTestFixture::shutdownExecutorPool() {
+void ShardingMerizodTestFixture::shutdownExecutorPool() {
     invariant(!_executorPoolShutDown);
     executorPool()->shutdownAndJoin();
     _executorPoolShutDown = true;
 }
 
-executor::TaskExecutor* ShardingMongodTestFixture::executor() const {
+executor::TaskExecutor* ShardingMerizodTestFixture::executor() const {
     invariant(Grid::get(operationContext())->getExecutorPool());
     return Grid::get(operationContext())->getExecutorPool()->getFixedExecutor();
 }
 
-repl::ReplicationCoordinatorMock* ShardingMongodTestFixture::replicationCoordinator() const {
+repl::ReplicationCoordinatorMock* ShardingMerizodTestFixture::replicationCoordinator() const {
     invariant(_replCoord);
     return _replCoord;
 }
 
-DistLockCatalog* ShardingMongodTestFixture::distLockCatalog() const {
+DistLockCatalog* ShardingMerizodTestFixture::distLockCatalog() const {
     invariant(_distLockCatalog);
     return _distLockCatalog;
 }
 
-DistLockManager* ShardingMongodTestFixture::distLock() const {
+DistLockManager* ShardingMerizodTestFixture::distLock() const {
     invariant(_distLockManager);
     return _distLockManager;
 }
 
-RemoteCommandTargeterFactoryMock* ShardingMongodTestFixture::targeterFactory() const {
+RemoteCommandTargeterFactoryMock* ShardingMerizodTestFixture::targeterFactory() const {
     invariant(_targeterFactory);
     return _targeterFactory;
 }

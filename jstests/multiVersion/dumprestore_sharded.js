@@ -4,8 +4,8 @@ load('./jstests/multiVersion/libs/dumprestore_helpers.js');
 var testBaseName = "jstests_tool_dumprestore_sharded";
 
 // Paths to external directories to be used to store dump files
-var dumpDir = MongoRunner.dataPath + testBaseName + "_dump_external/";
-var testDbpath = MongoRunner.dataPath + testBaseName + "_dbpath_external/";
+var dumpDir = MerizoRunner.dataPath + testBaseName + "_dump_external/";
+var testDbpath = MerizoRunner.dataPath + testBaseName + "_dbpath_external/";
 
 // Test dumping from a sharded cluster across versions
 var shardedDumpTests = {

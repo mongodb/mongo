@@ -88,9 +88,9 @@ enum UpgradeHistory {
      * Also:
      * + Version document in config.version now of the form:
      *   { minVersion : X, currentVersion : Y, clusterId : OID(...) }
-     * + Mongos pings include a "merizoVersion" field indicating the merizos version
-     * + Mongos pings include a "configVersion" field indicating the current config version
-     * + Mongos explicitly ignores any collection with a "primary" field
+     * + Merizos pings include a "merizoVersion" field indicating the merizos version
+     * + Merizos pings include a "configVersion" field indicating the current config version
+     * + Merizos explicitly ignores any collection with a "primary" field
      */
     UpgradeHistory_MandatoryEpochVersion = 4,
 

@@ -52,7 +52,7 @@ const std::size_t kIncrementOffset = kInstanceUniqueOffset + OID::kInstanceUniqu
 OID::InstanceUnique _instanceUnique;
 }  // namespace
 
-MONGO_INITIALIZER_GENERAL(OIDGeneration, MONGO_NO_PREREQUISITES, ("default"))
+MERIZO_INITIALIZER_GENERAL(OIDGeneration, MERIZO_NO_PREREQUISITES, ("default"))
 (InitializerContext* context) {
     std::unique_ptr<SecureRandom> entropy(SecureRandom::create());
     counter = std::make_unique<AtomicWord<int64_t>>(entropy->nextInt64());

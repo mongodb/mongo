@@ -13,18 +13,18 @@ var db;
 
     const url = replSet.getURL();
     print("* Connecting to " + url);
-    const merizo = new Mongo(url);
+    const merizo = new Merizo(url);
     db = merizo.getDB('admin');
     assert.eq(url, merizo.host, "replSet.getURL() should match active connection string");
 
-    print("* Starting parallel shell on --host " + db.getMongo().host);
+    print("* Starting parallel shell on --host " + db.getMerizo().host);
     var awaitShell = startParallelShell('db.coll0.insert({test: "connString only"});');
     assert.soon(function() {
         return db.coll0.find({test: "connString only"}).count() === 1;
     });
     awaitShell();
 
-    const uri = new MongoURI(url);
+    const uri = new MerizoURI(url);
     const port0 = uri.servers[0].port;
     print("* Starting parallel shell w/ --port " + port0);
     awaitShell = startParallelShell('db.coll0.insert({test: "explicit port"});', port0);

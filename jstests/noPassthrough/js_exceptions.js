@@ -83,10 +83,10 @@
     tests.forEach(function(t) {
         let code = tojson(recurser);
         [1, 2, 10].forEach(function(depth) {
-            clearRawMongoProgramOutput();
+            clearRawMerizoProgramOutput();
             assert.throws(startParallelShell(
                 code + ";\nrecurser(0," + depth + "," + tojson(t.callback) + ");", false, true));
-            let output = rawMongoProgramOutput();
+            let output = rawMerizoProgramOutput();
             let lines = output.split(/\s*\n/);
             assertMatch(/MerizoDB shell version/, lines.shift());
             assertMatch(/^\s*$/, lines.pop());

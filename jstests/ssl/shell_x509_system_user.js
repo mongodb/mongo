@@ -44,13 +44,13 @@
 
         };
         // Explicitly check asCluster can succeed.
-        authutil.asCluster(db.getMongo(), 'dummyKeyFile', function() {
+        authutil.asCluster(db.getMerizo(), 'dummyKeyFile', function() {
             // No need to do anything here. We just need to check we don't error out in the
             // previous auth step.
         });
 
         // Indirectly check that ReplSetTest can successfully call asCluster.
-        const rst = new ReplSetTest(db.getMongo().host);
+        const rst = new ReplSetTest(db.getMerizo().host);
 
         // Directly check that the use case for our auth perf tests can succeed.
         load("jstests/hooks/run_check_repl_dbhash.js");
@@ -63,13 +63,13 @@
         '--sslPEMKeyFile=jstests/libs/server.pem',
         '--sslAllowInvalidHostnames',
         '--authenticationDatabase=$external',
-        '--authenticationMechanism=MONGODB-X509',
+        '--authenticationMechanism=MERIZODB-X509',
         primaryConnString,
         '--eval',
         `(${subShellCommands.toString()})();`
     ];
 
-    const retVal = _runMongoProgram(...subShellArgs);
+    const retVal = _runMerizoProgram(...subShellArgs);
     assert.eq(retVal, 0, 'merizo shell did not succeed with exit code 0');
 
     rst.stopSet();

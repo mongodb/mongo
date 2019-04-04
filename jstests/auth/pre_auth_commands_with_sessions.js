@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    var conn = MongoRunner.runMongod({auth: ""});
+    var conn = MerizoRunner.runMerizod({auth: ""});
     var admin = conn.getDB("admin");
     var db = conn.getDB("otherdb");
 
@@ -48,5 +48,5 @@
     for (var i = 0; i < commands.length; i++) {
         testCommand(commands[i]);
     }
-    MongoRunner.stopMongod(conn, null, {user: "admin", pwd: "pwd"});
+    MerizoRunner.stopMerizod(conn, null, {user: "admin", pwd: "pwd"});
 })();

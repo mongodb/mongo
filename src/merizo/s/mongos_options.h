@@ -45,21 +45,21 @@ class Environment;
 
 namespace moe = merizo::optionenvironment;
 
-struct MongosGlobalParams {
+struct MerizosGlobalParams {
     // The config server connection string
     ConnectionString configdbs;
 };
 
-extern MongosGlobalParams merizosGlobalParams;
+extern MerizosGlobalParams merizosGlobalParams;
 
-void printMongosHelp(const moe::OptionSection& options);
+void printMerizosHelp(const moe::OptionSection& options);
 
 /**
  * Handle options that should come before validation, such as "help".
  *
  * Returns false if an option was found that implies we should prematurely exit with success.
  */
-bool handlePreValidationMongosOptions(const moe::Environment& params,
+bool handlePreValidationMerizosOptions(const moe::Environment& params,
                                       const std::vector<std::string>& args);
 
 /**
@@ -67,7 +67,7 @@ bool handlePreValidationMongosOptions(const moe::Environment& params,
  * Constraints in the Environment.  See the "validate" function in the Environment class for
  * more details.
  */
-Status validateMongosOptions(const moe::Environment& params);
+Status validateMerizosOptions(const moe::Environment& params);
 
 /**
  * Canonicalize merizos options for the given environment.
@@ -75,7 +75,7 @@ Status validateMongosOptions(const moe::Environment& params);
  * For example, the options "dur", "nodur", "journal", "nojournal", and
  * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".
  */
-Status canonicalizeMongosOptions(moe::Environment* params);
+Status canonicalizeMerizosOptions(moe::Environment* params);
 
-Status storeMongosOptions(const moe::Environment& params);
+Status storeMerizosOptions(const moe::Environment& params);
 }

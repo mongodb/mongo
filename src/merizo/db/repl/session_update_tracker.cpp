@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -192,7 +192,7 @@ std::vector<OplogEntry> SessionUpdateTracker::_flush(const OplogEntry& entry) {
             return flushAll();
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::vector<OplogEntry> SessionUpdateTracker::flushAll() {

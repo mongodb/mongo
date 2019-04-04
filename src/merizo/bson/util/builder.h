@@ -204,7 +204,7 @@ public:
     }
 
     void appendUChar(unsigned char j) {
-        MONGO_STATIC_ASSERT(CHAR_BIT == 8);
+        MERIZO_STATIC_ASSERT(CHAR_BIT == 8);
         appendNumImpl(j);
     }
     void appendChar(char j) {
@@ -214,11 +214,11 @@ public:
         appendNumImpl(j);
     }
     void appendNum(short j) {
-        MONGO_STATIC_ASSERT(sizeof(short) == 2);
+        MERIZO_STATIC_ASSERT(sizeof(short) == 2);
         appendNumImpl(j);
     }
     void appendNum(int j) {
-        MONGO_STATIC_ASSERT(sizeof(int) == 4);
+        MERIZO_STATIC_ASSERT(sizeof(int) == 4);
         appendNumImpl(j);
     }
     void appendNum(unsigned j) {
@@ -229,11 +229,11 @@ public:
     void appendNum(bool j) = delete;
 
     void appendNum(double j) {
-        MONGO_STATIC_ASSERT(sizeof(double) == 8);
+        MERIZO_STATIC_ASSERT(sizeof(double) == 8);
         appendNumImpl(j);
     }
     void appendNum(long long j) {
-        MONGO_STATIC_ASSERT(sizeof(long long) == 8);
+        MERIZO_STATIC_ASSERT(sizeof(long long) == 8);
         appendNumImpl(j);
     }
 
@@ -323,7 +323,7 @@ public:
      * Only legal to call when this builder is empty and when the SharedBuffer isn't shared.
      */
     void useSharedBuffer(SharedBuffer buf) {
-        MONGO_STATIC_ASSERT(std::is_same<BufferAllocator, SharedBufferAllocator>());
+        MERIZO_STATIC_ASSERT(std::is_same<BufferAllocator, SharedBufferAllocator>());
         invariant(l == 0);  // Can only do this while empty.
         invariant(reservedBytes == 0);
         size = buf.capacity();
@@ -364,7 +364,7 @@ private:
 };
 
 typedef _BufBuilder<SharedBufferAllocator> BufBuilder;
-MONGO_STATIC_ASSERT(std::is_move_constructible<BufBuilder>::value);
+MERIZO_STATIC_ASSERT(std::is_move_constructible<BufBuilder>::value);
 
 /** The StackBufBuilder builds smaller datasets on the stack instead of using malloc.
       this can be significantly faster for small bufs.  However, you can not release() the
@@ -378,52 +378,52 @@ public:
     StackBufBuilder() : _BufBuilder<StackAllocator>(StackAllocator::SZ) {}
     void release() = delete;  // not allowed. not implemented.
 };
-MONGO_STATIC_ASSERT(!std::is_move_constructible<StackBufBuilder>::value);
+MERIZO_STATIC_ASSERT(!std::is_move_constructible<StackBufBuilder>::value);
 
 /** std::stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
 template <typename Allocator>
 class StringBuilderImpl {
 public:
     // Sizes are determined based on the number of characters in 64-bit + the trailing '\0'
-    static const size_t MONGO_DBL_SIZE = 3 + DBL_MANT_DIG - DBL_MIN_EXP + 1;
-    static const size_t MONGO_S32_SIZE = 12;
-    static const size_t MONGO_U32_SIZE = 11;
-    static const size_t MONGO_S64_SIZE = 23;
-    static const size_t MONGO_U64_SIZE = 22;
-    static const size_t MONGO_S16_SIZE = 7;
-    static const size_t MONGO_PTR_SIZE = 19;  // Accounts for the 0x prefix
+    static const size_t MERIZO_DBL_SIZE = 3 + DBL_MANT_DIG - DBL_MIN_EXP + 1;
+    static const size_t MERIZO_S32_SIZE = 12;
+    static const size_t MERIZO_U32_SIZE = 11;
+    static const size_t MERIZO_S64_SIZE = 23;
+    static const size_t MERIZO_U64_SIZE = 22;
+    static const size_t MERIZO_S16_SIZE = 7;
+    static const size_t MERIZO_PTR_SIZE = 19;  // Accounts for the 0x prefix
 
     StringBuilderImpl() {}
 
     StringBuilderImpl& operator<<(double x) {
-        return SBNUM(x, MONGO_DBL_SIZE, "%g");
+        return SBNUM(x, MERIZO_DBL_SIZE, "%g");
     }
     StringBuilderImpl& operator<<(int x) {
-        return appendIntegral(x, MONGO_S32_SIZE);
+        return appendIntegral(x, MERIZO_S32_SIZE);
     }
     StringBuilderImpl& operator<<(unsigned x) {
-        return appendIntegral(x, MONGO_U32_SIZE);
+        return appendIntegral(x, MERIZO_U32_SIZE);
     }
     StringBuilderImpl& operator<<(long x) {
-        return appendIntegral(x, MONGO_S64_SIZE);
+        return appendIntegral(x, MERIZO_S64_SIZE);
     }
     StringBuilderImpl& operator<<(unsigned long x) {
-        return appendIntegral(x, MONGO_U64_SIZE);
+        return appendIntegral(x, MERIZO_U64_SIZE);
     }
     StringBuilderImpl& operator<<(long long x) {
-        return appendIntegral(x, MONGO_S64_SIZE);
+        return appendIntegral(x, MERIZO_S64_SIZE);
     }
     StringBuilderImpl& operator<<(unsigned long long x) {
-        return appendIntegral(x, MONGO_U64_SIZE);
+        return appendIntegral(x, MERIZO_U64_SIZE);
     }
     StringBuilderImpl& operator<<(short x) {
-        return appendIntegral(x, MONGO_S16_SIZE);
+        return appendIntegral(x, MERIZO_S16_SIZE);
     }
     StringBuilderImpl& operator<<(const void* x) {
         if (sizeof(x) == 8) {
-            return SBNUM(x, MONGO_PTR_SIZE, "0x%llX");
+            return SBNUM(x, MERIZO_PTR_SIZE, "0x%llX");
         } else {
-            return SBNUM(x, MONGO_PTR_SIZE, "0x%lX");
+            return SBNUM(x, MERIZO_PTR_SIZE, "0x%lX");
         }
     }
     StringBuilderImpl& operator<<(bool val) {
@@ -510,8 +510,8 @@ private:
     _BufBuilder<Allocator> _buf;
     template <typename T>
     StringBuilderImpl& appendIntegral(T val, int maxSize) {
-        MONGO_STATIC_ASSERT(!std::is_same<T, char>());  // char shouldn't append as number.
-        MONGO_STATIC_ASSERT(std::is_integral<T>());
+        MERIZO_STATIC_ASSERT(!std::is_same<T, char>());  // char shouldn't append as number.
+        MERIZO_STATIC_ASSERT(std::is_integral<T>());
 
         if (val < 0) {
             *this << '-';

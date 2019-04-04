@@ -1,5 +1,5 @@
 /**
- * Overrides Mongo.prototype.runCommand and Mongo.prototype.runCommandWithMetadata to retry all
+ * Overrides Merizo.prototype.runCommand and Merizo.prototype.runCommandWithMetadata to retry all
  * retryable writes at least once, randomly more than that, regardless of the outcome of the
  * command. Returns the result of the latest attempt.
  */
@@ -16,10 +16,10 @@
     // Store a session to access ServerSession#canRetryWrites.
     let _serverSession;
 
-    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
-    const merizoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
+    const merizoRunCommandOriginal = Merizo.prototype.runCommand;
+    const merizoRunCommandWithMetadataOriginal = Merizo.prototype.runCommandWithMetadata;
 
-    Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
+    Merizo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
         if (typeof _serverSession === "undefined") {
             _serverSession = this.startSession()._serverSession;
         }
@@ -27,7 +27,7 @@
         return runWithRetries(this, cmdObj, merizoRunCommandOriginal, arguments);
     };
 
-    Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
+    Merizo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
         dbName, metadata, cmdObj) {
         if (typeof _serverSession === "undefined") {
             _serverSession = this.startSession()._serverSession;

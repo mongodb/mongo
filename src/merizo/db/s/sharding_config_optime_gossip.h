@@ -34,7 +34,7 @@
 namespace merizo {
 namespace rpc {
 
-class ShardingEgressMetadataHookForMongod final : public ShardingEgressMetadataHook {
+class ShardingEgressMetadataHookForMerizod final : public ShardingEgressMetadataHook {
 public:
     using ShardingEgressMetadataHook::ShardingEgressMetadataHook;
 

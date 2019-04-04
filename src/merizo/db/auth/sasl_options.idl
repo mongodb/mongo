@@ -75,7 +75,7 @@ server_parameters:
 
 configs:
   "security.authenticationMechanisms":
-    description: "List of supported authentication mechanisms. Default is SCRAM-SHA-1 and MONGODB-X509."
+    description: "List of supported authentication mechanisms. Default is SCRAM-SHA-1 and MERIZODB-X509."
     arg_vartype: StringVector
   "security.sasl.hostName":
     description: "Fully qualified server domain name"

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -99,7 +99,7 @@ public:
 
     void commit(boost::optional<Timestamp>) override {
         try {
-            ShardingInitializationMongoD::get(_opCtx)->initializeFromShardIdentity(_opCtx,
+            ShardingInitializationMerizoD::get(_opCtx)->initializeFromShardIdentity(_opCtx,
                                                                                    _shardIdentity);
         } catch (const AssertionException& ex) {
             fassertFailedWithStatus(40071, ex.toStatus());

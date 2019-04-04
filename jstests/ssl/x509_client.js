@@ -1,5 +1,5 @@
 // Check if this build supports the authenticationMechanisms startup parameter.
-var conn = MongoRunner.runMongod({
+var conn = MerizoRunner.runMerizod({
     auth: "",
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
@@ -9,11 +9,11 @@ conn.getDB('admin').createUser({user: "root", pwd: "pass", roles: ["root"]});
 conn.getDB('admin').auth("root", "pass");
 var cmdOut = conn.getDB('admin').runCommand({getParameter: 1, authenticationMechanisms: 1});
 if (cmdOut.ok) {
-    TestData.authMechanism = "MONGODB-X509,SCRAM-SHA-1";  // SERVER-10353
+    TestData.authMechanism = "MERIZODB-X509,SCRAM-SHA-1";  // SERVER-10353
 }
 conn.getDB('admin').dropAllUsers();
 conn.getDB('admin').logout();
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 var SERVER_CERT = "jstests/libs/server.pem";
 var CA_CERT = "jstests/libs/ca.pem";
@@ -60,15 +60,15 @@ function authAndTest(merizo) {
         test.foo.findOne();
     }, [], "read without login");
 
-    assert(!external.auth({user: INVALID_CLIENT_USER, mechanism: 'MONGODB-X509'}),
+    assert(!external.auth({user: INVALID_CLIENT_USER, mechanism: 'MERIZODB-X509'}),
            "authentication with invalid user should fail");
-    assert(external.auth({user: CLIENT_USER, mechanism: 'MONGODB-X509'}),
+    assert(external.auth({user: CLIENT_USER, mechanism: 'MERIZODB-X509'}),
            "authentication with valid user failed");
-    assert(external.auth({mechanism: 'MONGODB-X509'}),
+    assert(external.auth({mechanism: 'MERIZODB-X509'}),
            "authentication with valid client cert and no user field failed");
-    assert(external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509', user: CLIENT_USER}).ok,
+    assert(external.runCommand({authenticate: 1, mechanism: 'MERIZODB-X509', user: CLIENT_USER}).ok,
            "runCommand authentication with valid client cert and user field failed");
-    assert(external.runCommand({authenticate: 1, mechanism: 'MONGODB-X509'}).ok,
+    assert(external.runCommand({authenticate: 1, mechanism: 'MERIZODB-X509'}).ok,
            "runCommand authentication with valid client cert and no user field failed");
 
     // Check that there's a "Successfully authenticated" message that includes the client IP
@@ -93,10 +93,10 @@ function authAndTest(merizo) {
 print("1. Testing x.509 auth to merizod");
 var x509_options = {sslMode: "requireSSL", sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT};
 
-var merizo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
+var merizo = MerizoRunner.runMerizod(Object.merge(x509_options, {auth: ""}));
 
 authAndTest(merizo);
-MongoRunner.stopMongod(merizo);
+MerizoRunner.stopMerizod(merizo);
 
 print("2. Testing x.509 auth to merizos");
 
@@ -114,5 +114,5 @@ var st = new ShardingTest({
     }
 });
 
-authAndTest(new Mongo("localhost:" + st.s0.port));
+authAndTest(new Merizo("localhost:" + st.s0.port));
 st.stop();

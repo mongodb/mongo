@@ -31,7 +31,7 @@
 
 namespace merizo {
 
-MongodGlobalParams merizodGlobalParams;
+MerizodGlobalParams merizodGlobalParams;
 
 namespace {
 repl::ReplSettings globalReplSettings;

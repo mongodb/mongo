@@ -48,7 +48,7 @@
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     assert.soon(() => {
-        return rawMongoProgramOutput().indexOf("Fatal Assertion 51121") !== -1;
+        return rawMerizoProgramOutput().indexOf("Fatal Assertion 51121") !== -1;
     });
 
     jsTest.log(

@@ -10,13 +10,13 @@
 
     function runTestWithoutSubset(subset) {
         const disabledProtocols = subset.join(",");
-        const conn = MongoRunner.runMongod({
+        const conn = MerizoRunner.runMerizod({
             sslMode: 'allowSSL',
             sslPEMKeyFile: SERVER_CERT,
             sslDisabledProtocols: disabledProtocols
         });
 
-        const exitStatus = runMongoProgram('merizo',
+        const exitStatus = runMerizoProgram('merizo',
                                            '--ssl',
                                            '--sslAllowInvalidHostnames',
                                            '--sslPEMKeyFile',
@@ -30,7 +30,7 @@
 
         assert.eq(0, exitStatus, "");
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     }
 
     runTestWithoutSubset(["TLS1_0"]);

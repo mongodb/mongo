@@ -34,7 +34,7 @@
         const name = 'hang_before_releasing_transaction_oplog_hole';
         const dbName = 'test';
         const collName = name;
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDB = session.getDatabase(dbName);
 
         session.startTransaction({readConcern: {level: 'snapshot'}});

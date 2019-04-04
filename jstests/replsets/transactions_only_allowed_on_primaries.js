@@ -71,7 +71,7 @@
 
     // Initiate a session on the secondary.
     const sessionOptions = {causalConsistency: false};
-    const secondarySession = secondary.getDB(dbName).getMongo().startSession(sessionOptions);
+    const secondarySession = secondary.getDB(dbName).getMerizo().startSession(sessionOptions);
 
     // Test read commands that are supported in transactions.
     let readCommands = [
@@ -101,7 +101,7 @@
     // Make sure transactions are allowed on primaries with any valid read preference.
     //
 
-    const primarySession = primary.getDB(dbName).getMongo().startSession(sessionOptions);
+    const primarySession = primary.getDB(dbName).getMerizo().startSession(sessionOptions);
     const primarySessionDb = primarySession.getDatabase(dbName);
 
     primarySession.startTransaction();

@@ -158,7 +158,7 @@ func (op *QueryOp) FromReader(r io.Reader) error {
 
 // Execute performs the QueryOp on a given socket, yielding the reply when
 // successful (and an error otherwise).
-func (op *QueryOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+func (op *QueryOp) Execute(socket *mgo.MerizoSocket) (Replyable, error) {
 	before := time.Now()
 	_, _, replyData, resultReply, err := mgo.ExecOpWithReply(socket, &op.QueryOp)
 	after := time.Now()

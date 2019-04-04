@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -48,12 +48,12 @@ namespace merizo {
 namespace txn {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
-MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForDecisionWriteConcern);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeWaitingForParticipantListWriteConcern);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeWaitingForDecisionWriteConcern);
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeWritingParticipantList);
-MONGO_FAIL_POINT_DEFINE(hangBeforeWritingDecision);
-MONGO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeWritingParticipantList);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeWritingDecision);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeDeletingCoordinatorDoc);
 
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
 
@@ -109,9 +109,9 @@ void persistParticipantListBlocking(OperationContext* opCtx,
                                     const std::vector<ShardId>& participantList) {
     LOG(3) << "Going to write participant list for " << lsid.getId() << ':' << txnNumber;
 
-    if (MONGO_FAIL_POINT(hangBeforeWritingParticipantList)) {
+    if (MERIZO_FAIL_POINT(hangBeforeWritingParticipantList)) {
         LOG(0) << "Hit hangBeforeWritingParticipantList failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingParticipantList);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingParticipantList);
     }
 
     OperationSessionInfo sessionInfo;
@@ -176,9 +176,9 @@ void persistParticipantListBlocking(OperationContext* opCtx,
 
     LOG(3) << "Wrote participant list for " << lsid.getId() << ':' << txnNumber;
 
-    if (MONGO_FAIL_POINT(hangBeforeWaitingForParticipantListWriteConcern)) {
+    if (MERIZO_FAIL_POINT(hangBeforeWaitingForParticipantListWriteConcern)) {
         LOG(0) << "Hit hangBeforeWaitingForParticipantListWriteConcern failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
             opCtx, hangBeforeWaitingForParticipantListWriteConcern);
     }
 
@@ -284,9 +284,9 @@ void persistDecisionBlocking(OperationContext* opCtx,
     LOG(3) << "Going to write decision " << (commitTimestamp ? "commit" : "abort") << " for "
            << lsid.getId() << ':' << txnNumber;
 
-    if (MONGO_FAIL_POINT(hangBeforeWritingDecision)) {
+    if (MERIZO_FAIL_POINT(hangBeforeWritingDecision)) {
         LOG(0) << "Hit hangBeforeWritingDecision failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingDecision);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeWritingDecision);
     }
 
     OperationSessionInfo sessionInfo;
@@ -372,9 +372,9 @@ void persistDecisionBlocking(OperationContext* opCtx,
     LOG(3) << "Wrote decision " << (commitTimestamp ? "commit" : "abort") << " for " << lsid.getId()
            << ':' << txnNumber;
 
-    if (MONGO_FAIL_POINT(hangBeforeWaitingForDecisionWriteConcern)) {
+    if (MERIZO_FAIL_POINT(hangBeforeWaitingForDecisionWriteConcern)) {
         LOG(0) << "Hit hangBeforeWaitingForDecisionWriteConcern failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                         hangBeforeWaitingForDecisionWriteConcern);
     }
 
@@ -450,9 +450,9 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
                                   TxnNumber txnNumber) {
     LOG(3) << "Going to delete coordinator doc for " << lsid.getId() << ':' << txnNumber;
 
-    if (MONGO_FAIL_POINT(hangBeforeDeletingCoordinatorDoc)) {
+    if (MERIZO_FAIL_POINT(hangBeforeDeletingCoordinatorDoc)) {
         LOG(0) << "Hit hangBeforeDeletingCoordinatorDoc failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDeletingCoordinatorDoc);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDeletingCoordinatorDoc);
     }
 
     OperationSessionInfo sessionInfo;
@@ -598,7 +598,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                     }
 
                     uassertStatusOK(status);
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
                 })
                 .onError<ErrorCodes::ShardNotFound>([shardId, isLocalShard](const Status&) {
                     invariant(!isLocalShard);

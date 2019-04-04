@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -136,7 +136,7 @@ string optionString(size_t options) {
                 ss << "STRICT_DISTINCT_ONLY ";
                 break;
             case QueryPlannerParams::DEFAULT:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
                 break;
         }
     }

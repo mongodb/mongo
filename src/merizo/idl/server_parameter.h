@@ -43,8 +43,8 @@
 #include "merizo/bson/bsonelement.h"
 #include "merizo/bson/bsonobjbuilder.h"
 
-#define MONGO_SERVER_PARAMETER_REGISTER(name) \
-    MONGO_INITIALIZER_GENERAL(                \
+#define MERIZO_SERVER_PARAMETER_REGISTER(name) \
+    MERIZO_INITIALIZER_GENERAL(                \
         name, ("BeginServerParameterRegistration"), ("EndServerParameterRegistration"))
 
 namespace merizo {

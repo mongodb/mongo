@@ -11,7 +11,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
     // Some test machines lack ipv6 so test for by starting a merizod that needs to bind to an ipv6
     // address.
     var hasIpv6 = true;
-    const merizodHasIpv6 = MongoRunner.runMongod({
+    const merizodHasIpv6 = MerizoRunner.runMerizod({
         sslMode: "requireSSL",
         sslPEMKeyFile: SERVER1_CERT,
         sslCAFile: CA_CERT,
@@ -22,7 +22,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
         jsTest.log("Unable to run all tests because ipv6 is not on machine, see BF-10990");
         hasIpv6 = false;
     } else {
-        MongoRunner.stopMongod(merizodHasIpv6);
+        MerizoRunner.stopMerizod(merizodHasIpv6);
     }
 
     function authAndTest(cert_option) {
@@ -46,7 +46,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
                 args.push("--ipv6");
             }
 
-            const merizo = runMongoProgram.apply(null, args);
+            const merizo = runMerizoProgram.apply(null, args);
 
             assert.eq(0, merizo, "Connection succeeded");
         }
@@ -57,7 +57,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
             Object.extend(x509_options, {ipv6: ""});
         }
 
-        let merizod = MongoRunner.runMongod(Object.merge(x509_options, cert_option));
+        let merizod = MerizoRunner.runMerizod(Object.merge(x509_options, cert_option));
 
         test_host("localhost", merizod.port);
         test_host("127.0.0.1", merizod.port);
@@ -65,7 +65,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
             test_host("::1", merizod.port);
         }
 
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
     }
 
     print("1. Test parsing different values in SAN DNS and IP fields. ");

@@ -13,7 +13,7 @@ executor:
   - class: CleanEveryN
     n: 20
   fixture:
-    class: MongoDFixture
+    class: MerizoDFixture
     merizod_options:
       auditDestination: console
       set_parameters:

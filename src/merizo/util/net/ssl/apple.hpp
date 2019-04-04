@@ -30,7 +30,7 @@
 
 #pragma once
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_APPLE
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <Security/Security.h>

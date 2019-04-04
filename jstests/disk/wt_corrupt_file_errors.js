@@ -10,7 +10,7 @@
 
     const baseName = "wt_corrupt_file_errors";
     const collName = "test";
-    const dbpath = MongoRunner.dataPath + baseName + "/";
+    const dbpath = MerizoRunner.dataPath + baseName + "/";
 
     /**
      * Test 1. Corrupt a collection's .wt file.
@@ -20,7 +20,7 @@
         dbpath, baseName, collName, (merizod, testColl) => {
             const testCollUri = getUriForColl(testColl);
             const testCollFile = dbpath + testCollUri + ".wt";
-            MongoRunner.stopMongod(merizod);
+            MerizoRunner.stopMerizod(merizod);
             jsTestLog("corrupting collection file: " + testCollFile);
             corruptFile(testCollFile);
         }, "Fatal Assertion 50882");
@@ -31,7 +31,7 @@
 
     assertErrorOnStartupWhenFilesAreCorruptOrMissing(
         dbpath, baseName, collName, (merizod, testColl) => {
-            MongoRunner.stopMongod(merizod);
+            MerizoRunner.stopMerizod(merizod);
             const mdbCatalogFile = dbpath + "_mdb_catalog.wt";
             jsTestLog("corrupting catalog file: " + mdbCatalogFile);
             corruptFile(mdbCatalogFile);
@@ -43,7 +43,7 @@
 
     assertErrorOnStartupWhenFilesAreCorruptOrMissing(
         dbpath, baseName, collName, (merizod, testColl) => {
-            MongoRunner.stopMongod(merizod);
+            MerizoRunner.stopMerizod(merizod);
             const WiredTigerWTFile = dbpath + "WiredTiger.wt";
             jsTestLog("corrupting WiredTiger.wt");
             corruptFile(WiredTigerWTFile);
@@ -61,7 +61,7 @@
             const indexName = "a_1";
             assert.commandWorked(testColl.createIndex({a: 1}, {name: indexName}));
             const indexUri = getUriForIndex(testColl, indexName);
-            MongoRunner.stopMongod(merizod);
+            MerizoRunner.stopMerizod(merizod);
             const indexFile = dbpath + indexUri + ".wt";
             jsTestLog("corrupting index file: " + indexFile);
             corruptFile(indexFile);

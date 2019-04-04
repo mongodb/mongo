@@ -148,7 +148,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
 
-        this.session = db.getMongo().startSession({causalConsistency: false});
+        this.session = db.getMerizo().startSession({causalConsistency: false});
 
         // Assign each document owned by this thread to a different "group" so they can be multi
         // deleted by group later.

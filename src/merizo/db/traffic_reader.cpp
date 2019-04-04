@@ -228,7 +228,7 @@ BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile) {
     return builder.arr();
 }
 
-void trafficRecordingFileToMongoReplayFile(int inputFd, std::ostream& outputStream) {
+void trafficRecordingFileToMerizoReplayFile(int inputFd, std::ostream& outputStream) {
     // Document expected by merizoreplay
     BSONObjBuilder opts{};
     opts.append("playbackfileversion", 1);

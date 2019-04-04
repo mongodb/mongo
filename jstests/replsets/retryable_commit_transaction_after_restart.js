@@ -22,7 +22,7 @@
     let stmtId = 0;
 
     const sessionOptions = {causalConsistency: false};
-    const session = testDB.getMongo().startSession(sessionOptions);
+    const session = testDB.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
 
     jsTest.log("commitTransaction command is retryable before restart");

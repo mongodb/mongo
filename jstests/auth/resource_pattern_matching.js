@@ -228,9 +228,9 @@ function run_tests(granter, verifier) {
 var keyfile = "jstests/libs/key1";
 
 print('--- standalone node test ---');
-var conn = MongoRunner.runMongod({auth: null, keyFile: keyfile});
+var conn = MerizoRunner.runMerizod({auth: null, keyFile: keyfile});
 run_tests(conn.getDB('test'), conn.getDB('test'));
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 print('--- done standalone node test ---');
 
 print('--- replica set test ---');

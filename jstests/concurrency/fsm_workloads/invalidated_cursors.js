@@ -10,7 +10,7 @@
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMerizos
 
 var $config = (function() {
 
@@ -178,7 +178,7 @@ var $config = (function() {
          * 'this.involvedCollections' by repopulating them with data and indexes.
          */
         dropDatabase: function dropDatabase(unusedDB, unusedCollName) {
-            if (isMongos(unusedDB)) {
+            if (isMerizos(unusedDB)) {
                 // This workload can sometimes triggers an 'unable to target write op for
                 // collection ... caused by ... database not found' error. Further investigation
                 // still needs to be done, but these failures may be due to SERVER-17397 'drops in
@@ -201,7 +201,7 @@ var $config = (function() {
          * collection is then re-created with data and indexes.
          */
         dropCollection: function dropCollection(unusedDB, unusedCollName) {
-            if (isMongos(unusedDB)) {
+            if (isMerizos(unusedDB)) {
                 // This workload can sometimes triggers an 'unable to target write op for
                 // collection ... caused by ... database not found' error. Further investigation
                 // still needs to be done, but these failures may be due to SERVER-17397 'drops in

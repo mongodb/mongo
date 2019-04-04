@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 #define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
 
 #include "merizo/platform/basic.h"
 
@@ -76,8 +76,8 @@ namespace {
 static const int kMinimumRecordStoreVersion = 1;
 static const int kCurrentRecordStoreVersion = 1;  // New record stores use this by default.
 static const int kMaximumRecordStoreVersion = 1;
-MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
-MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
+MERIZO_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
+MERIZO_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
 
 void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
     StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(opCtx, uri);
@@ -87,8 +87,8 @@ void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
 }
 }  // namespace
 
-MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
-MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
+MERIZO_FAIL_POINT_DEFINE(WTWriteConflictException);
+MERIZO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 
@@ -191,7 +191,7 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
     stdx::unique_lock<stdx::mutex> lock(_oplogReclaimMutex);
     while (!_isDead) {
         {
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (hasExcessStones_inlock()) {
                 // There are now excess oplog stones. However, there it may be necessary to keep

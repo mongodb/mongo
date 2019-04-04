@@ -5,7 +5,7 @@
     var st = new ShardingTest({name: "add_shard_idempotent", shards: 0});
 
     jsTestLog("Testing adding a standalone shard multiple times");
-    var shard1 = MongoRunner.runMongod({'shardsvr': ""});
+    var shard1 = MerizoRunner.runMerizod({'shardsvr': ""});
     assert.commandWorked(
         st.admin.runCommand({addshard: shard1.host, name: "newShard1", maxSize: 1024}));
 
@@ -50,7 +50,7 @@
             assert.eq(shard2.getURL(), shard.host);
         }
     }
-    MongoRunner.stopMongod(shard1);
+    MerizoRunner.stopMerizod(shard1);
     shard2.stopSet();
     st.stop();
 

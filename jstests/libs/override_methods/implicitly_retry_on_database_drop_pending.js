@@ -1,5 +1,5 @@
 /**
- * Loading this file overrides functions on Mongo.prototype so that operations which return a
+ * Loading this file overrides functions on Merizo.prototype so that operations which return a
  * "DatabaseDropPending" error response are automatically retried until they succeed.
  */
 (function() {
@@ -7,8 +7,8 @@
 
     const defaultTimeout = 10 * 60 * 1000;
 
-    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
-    const merizoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
+    const merizoRunCommandOriginal = Merizo.prototype.runCommand;
+    const merizoRunCommandWithMetadataOriginal = Merizo.prototype.runCommandWithMetadata;
 
     function awaitLatestOperationMajorityConfirmed(primary) {
         // Get the latest optime from the primary.
@@ -38,8 +38,8 @@
         // We create a copy of 'commandObj' to avoid mutating the parameter the caller specified.
         // Instead, we use the makeFuncArgs() function to build the array of arguments to 'func' by
         // giving it the 'commandObj' that should be used. This is done to work around the
-        // difference in the order of parameters for the Mongo.prototype.runCommand() and
-        // Mongo.prototype.runCommandWithMetadata() functions.
+        // difference in the order of parameters for the Merizo.prototype.runCommand() and
+        // Merizo.prototype.runCommandWithMetadata() functions.
         commandObj = Object.assign({}, commandObj);
         const commandName = Object.keys(commandObj)[0];
         let resPrevious;
@@ -162,7 +162,7 @@
         return res;
     }
 
-    Mongo.prototype.runCommand = function(dbName, commandObj, options) {
+    Merizo.prototype.runCommand = function(dbName, commandObj, options) {
         return runCommandWithRetries(this,
                                      dbName,
                                      commandObj,
@@ -170,7 +170,7 @@
                                      (commandObj) => [dbName, commandObj, options]);
     };
 
-    Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs) {
+    Merizo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs) {
         return runCommandWithRetries(this,
                                      dbName,
                                      commandArgs,

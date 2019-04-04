@@ -100,7 +100,7 @@
                 assert.throws(tryList, [{listDatabases: 1, authorizedDatabases: false}, test.dbs]);
             }
 
-            // Test using shell helper Mongo.getDBs().
+            // Test using shell helper Merizo.getDBs().
             assert.eq(merizod.getDBs(undefined, {}, true).filter(filterSpecial),
                       test.dbs,
                       "Shell helper speaking to same version");
@@ -108,8 +108,8 @@
                 // Admin and user7 don't have an explicit list of DBs to parse.
                 assert.eq(merizod._getDatabaseNamesFromPrivileges(), test.authDbs || test.dbs);
 
-                // Test (non-admin) call to Mongo.getDBs() on a < 4.0 MongoD
-                // by injecting a command failure into Mongo.adminCommand().
+                // Test (non-admin) call to Merizo.getDBs() on a < 4.0 MerizoD
+                // by injecting a command failure into Merizo.adminCommand().
                 // This will allow us to resemble a < 4.0 server.
                 const adminCommandFunction = merizod.adminCommand;
                 const adminCommandMethod = adminCommandFunction.bind(merizod);
@@ -149,9 +149,9 @@
         });
     }
 
-    const merizod = MongoRunner.runMongod({auth: ""});
+    const merizod = MerizoRunner.runMerizod({auth: ""});
     runTest(merizod);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     if (jsTest.options().storageEngine !== "mobile") {
         // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

@@ -3,14 +3,14 @@
 (function() {
     'use strict';
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     const admin = conn.getDB('admin');
 
     admin.createUser({user: 'andy', pwd: 'a', roles: jsTest.adminUserRoles});
     assert(admin.auth({user: 'andy', pwd: 'a'}));
     assert(admin.logout());
 
-    // Try all the ways to call db.auth that uses SCRAM-SHA-1 or MONGODB-CR.
+    // Try all the ways to call db.auth that uses SCRAM-SHA-1 or MERIZODB-CR.
     assert(admin.auth('andy', 'a'));
     assert(admin.logout());
     assert(admin.auth({user: 'andy', pwd: 'a'}));
@@ -20,5 +20,5 @@
 
     // Invalid mechanisms shouldn't lead to authentication, but also shouldn't crash.
     assert(!admin.auth({mechanism: 'this-mechanism-is-fake', user: 'andy', pwd: 'a'}));
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

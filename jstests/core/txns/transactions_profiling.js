@@ -12,7 +12,7 @@
     testDB.setProfilingLevel(2);
 
     const sessionOptions = {causalConsistency: false};
-    let session = testDB.getMongo().startSession(sessionOptions);
+    let session = testDB.getMerizo().startSession(sessionOptions);
     let sessionDB = session.getDatabase(dbName);
     let sessionColl = sessionDB[collName];
 

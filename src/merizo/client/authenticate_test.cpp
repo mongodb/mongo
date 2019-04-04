@@ -107,7 +107,7 @@ public:
         _requests.emplace(OpMsgRequest::fromDBAndBody(dbname, cmd));
     }
 
-    BSONObj loadMongoCRConversation() {
+    BSONObj loadMerizoCRConversation() {
         // 1. Client sends 'getnonce' command
         pushRequest("admin", BSON("getnonce" << 1));
 
@@ -124,7 +124,7 @@ public:
 
         // Call clientAuthenticate()
         return BSON("mechanism"
-                    << "MONGODB-CR"
+                    << "MERIZODB-CR"
                     << "db"
                     << "admin"
                     << "user"
@@ -140,7 +140,7 @@ public:
         // 1. Client sends 'authenticate' command
         pushRequest("$external",
                     BSON("authenticate" << 1 << "mechanism"
-                                        << "MONGODB-X509"
+                                        << "MERIZODB-X509"
                                         << "user"
                                         << _username));
 
@@ -149,7 +149,7 @@ public:
 
         // Call clientAuthenticate()
         return BSON("mechanism"
-                    << "MONGODB-X509"
+                    << "MERIZODB-X509"
                     << "db"
                     << "$external"
                     << "user"
@@ -174,26 +174,26 @@ public:
     std::queue<BSONObj> _responses;
 };
 
-TEST_F(AuthClientTest, MongoCR) {
-    // This test excludes the MONGODB-CR support found in merizo/shell/merizodbcr.cpp
+TEST_F(AuthClientTest, MerizoCR) {
+    // This test excludes the MERIZODB-CR support found in merizo/shell/merizodbcr.cpp
     // so it should fail to auth.
-    // jstests exist to ensure MONGODB-CR continues to work from the client.
-    auto params = loadMongoCRConversation();
+    // jstests exist to ensure MERIZODB-CR continues to work from the client.
+    auto params = loadMerizoCRConversation();
     ASSERT_THROWS(
         auth::authenticateClient(std::move(params), HostAndPort(), "", _runCommandCallback).get(),
         DBException);
 }
 
-TEST_F(AuthClientTest, asyncMongoCR) {
+TEST_F(AuthClientTest, asyncMerizoCR) {
     // As with the sync version above, we expect authentication to fail
-    // since this test was built without MONGODB-CR support.
-    auto params = loadMongoCRConversation();
+    // since this test was built without MERIZODB-CR support.
+    auto params = loadMerizoCRConversation();
     ASSERT_NOT_OK(
         auth::authenticateClient(std::move(params), HostAndPort(), "", _runCommandCallback)
             .getNoThrow());
 }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 TEST_F(AuthClientTest, X509) {
     auto params = loadX509Conversation();
     auth::authenticateClient(std::move(params), HostAndPort(), _username, _runCommandCallback)

@@ -30,7 +30,7 @@
 #include "merizo/db/auth/authz_session_external_state_mock.h"
 
 namespace merizo {
-MONGO_REGISTER_SHIM(AuthzSessionExternalState::create)
+MERIZO_REGISTER_SHIM(AuthzSessionExternalState::create)
 (AuthorizationManager* const authzManager)->std::unique_ptr<AuthzSessionExternalState> {
     return std::make_unique<AuthzSessionExternalStateMock>(authzManager);
 }

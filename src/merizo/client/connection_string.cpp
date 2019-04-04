@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -180,7 +180,7 @@ bool ConnectionString::operator==(const ConnectionString& other) const {
             return true;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool ConnectionString::operator!=(const ConnectionString& other) const {
@@ -236,7 +236,7 @@ std::string ConnectionString::typeToString(ConnectionType type) {
             return "local";
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

@@ -227,7 +227,7 @@ func main() {
 	}
 
 	opts.Direct = true
-	stat := &merizostat.MongoStat{
+	stat := &merizostat.MerizoStat{
 		Options:       opts,
 		StatOptions:   statOpts,
 		Nodes:         map[string]*merizostat.NodeMonitor{},

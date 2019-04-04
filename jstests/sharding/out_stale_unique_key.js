@@ -13,35 +13,35 @@
 
     // Test that an $out through a stale merizos can still use the correct uniqueKey and succeed.
     (function testDefaultUniqueKeyIsRecent() {
-        const freshMongos = st.s0;
-        const staleMongos = st.s1;
+        const freshMerizos = st.s0;
+        const staleMerizos = st.s1;
 
         // Set up two collections for an aggregate with an $out: The source collection will be
         // unsharded and the target collection will be sharded amongst the two shards.
-        const staleMongosDB = staleMongos.getDB(dbName);
+        const staleMerizosDB = staleMerizos.getDB(dbName);
         st.shardColl(source, {_id: 1}, {_id: 0}, {_id: 1});
 
-        (function setupStaleMongos() {
-            // Shard the collection through 'staleMongos', setting up 'staleMongos' to believe the
+        (function setupStaleMerizos() {
+            // Shard the collection through 'staleMerizos', setting up 'staleMerizos' to believe the
             // collection is sharded by {sk: 1, _id: 1}.
-            assert.commandWorked(staleMongosDB.adminCommand(
+            assert.commandWorked(staleMerizosDB.adminCommand(
                 {shardCollection: target.getFullName(), key: {sk: 1, _id: 1}}));
             // Perform a query through that merizos to ensure the cache is populated.
-            assert.eq(0, staleMongosDB[target.getName()].find().itcount());
+            assert.eq(0, staleMerizosDB[target.getName()].find().itcount());
 
             // Drop the collection from the other merizos - it is no longer sharded but the stale
             // merizos doesn't know that yet.
             target.drop();
         }());
 
-        // At this point 'staleMongos' will believe that the target collection is sharded. This
+        // At this point 'staleMerizos' will believe that the target collection is sharded. This
         // should not prevent it from running an $out without a uniqueKey specified. Specifically,
         // the merizos should force a refresh of its cache before defaulting the uniqueKey.
         assert.commandWorked(source.insert({_id: 'seed'}));
 
         // If we had used the stale uniqueKey, this aggregation would fail since the documents do
         // not have an 'sk' field.
-        assert.doesNotThrow(() => staleMongosDB[source.getName()].aggregate(
+        assert.doesNotThrow(() => staleMerizosDB[source.getName()].aggregate(
                                 [{$out: {to: target.getName(), mode: 'insertDocuments'}}]));
         assert.eq(target.find().toArray(), [{_id: 'seed'}]);
         target.drop();

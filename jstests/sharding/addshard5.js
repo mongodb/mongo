@@ -29,7 +29,7 @@
     assert.commandWorked(merizos.adminCommand({removeShard: st.shard1.shardName}));
     assert.commandWorked(merizos.adminCommand({removeShard: st.shard1.shardName}));
 
-    var shard2 = MongoRunner.runMongod({'shardsvr': ''});
+    var shard2 = MerizoRunner.runMerizod({'shardsvr': ''});
     assert.commandWorked(merizos.adminCommand({addShard: shard2.host, name: st.shard1.shardName}));
 
     jsTest.log('Shard was dropped and re-added with same name...');
@@ -42,5 +42,5 @@
     assert.eq('world', shard2.getCollection(coll + '').findOne().hello);
 
     st.stop();
-    MongoRunner.stopMongod(shard2);
+    MerizoRunner.stopMerizod(shard2);
 })();

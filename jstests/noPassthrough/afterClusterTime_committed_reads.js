@@ -14,7 +14,7 @@
     rst.initiate();
 
     const session =
-        rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+        rst.getPrimary().getDB(dbName).getMerizo().startSession({causalConsistency: false});
     const primaryDB = session.getDatabase(dbName);
 
     let txnNumber = 0;

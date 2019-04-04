@@ -197,7 +197,7 @@ private:
 class Value : public EncodedValueStorage<Layout, ConstView, View> {
 public:
     Value() {
-        MONGO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
+        MERIZO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
     }
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
@@ -212,7 +212,7 @@ public:
 */
 class DbMessage {
     // Assume sizeof(int) == 4 bytes
-    MONGO_STATIC_ASSERT(sizeof(int) == 4);
+    MERIZO_STATIC_ASSERT(sizeof(int) == 4);
 
 public:
     // Note: DbMessage constructor reads the first 4 bytes and stores it in reserved

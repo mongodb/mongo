@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -50,7 +50,7 @@
 #include "merizo/util/net/ssl_manager.h"
 #include "merizo/util/net/ssl_options.h"
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 #include "merizo/util/net/ssl.hpp"
 #endif
 
@@ -65,7 +65,7 @@
 namespace merizo {
 namespace transport {
 
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
+MERIZO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
 
 class ASIOReactorTimer final : public ReactorTimer {
 public:
@@ -233,7 +233,7 @@ TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
     : _ingressReactor(std::make_shared<ASIOReactor>()),
       _egressReactor(std::make_shared<ASIOReactor>()),
       _acceptorReactor(std::make_shared<ASIOReactor>()),
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
       _ingressSSLContext(nullptr),
       _egressSSLContext(nullptr),
 #endif
@@ -450,7 +450,7 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(HostAndPort peer,
     }
 #endif
 
-#ifndef MONGO_CONFIG_SSL
+#ifndef MERIZO_CONFIG_SSL
     if (sslMode == kEnableSSL) {
         return {ErrorCodes::InvalidSSLConfiguration, "SSL requested but not supported"};
     }
@@ -591,7 +591,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
                 std::make_shared<ASIOSession>(this, std::move(connector->socket), false);
             connector->session->ensureAsync();
 
-#ifndef MONGO_CONFIG_SSL
+#ifndef MERIZO_CONFIG_SSL
             if (sslMode == kEnableSSL) {
                 uasserted(ErrorCodes::InvalidSSLConfiguration, "SSL requested but not supported");
             }
@@ -611,7 +611,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
             return makeConnectError(status, connector->peer, connector->resolvedEndpoint);
         })
         .getAsync([connector](Status connectResult) {
-            if (MONGO_FAIL_POINT(transportLayerASIOasyncConnectTimesOut)) {
+            if (MERIZO_FAIL_POINT(transportLayerASIOasyncConnectTimesOut)) {
                 log() << "asyncConnectTimesOut fail point is active. simulating timeout.";
                 return;
             }
@@ -739,7 +739,7 @@ Status TransportLayerASIO::setup() {
         return Status(ErrorCodes::SocketException, "No available addresses/ports to bind to");
     }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     const auto& sslParams = getSSLGlobalParams();
 
     if (_sslMode() != SSLParams::SSLMode_disabled && _listenerOptions.isIngress()) {
@@ -788,7 +788,7 @@ Status TransportLayerASIO::start() {
         });
 
         const char* ssl = "";
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
         if (_sslMode() != SSLParams::SSLMode_disabled) {
             ssl = " ssl";
         }
@@ -842,7 +842,7 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
             return std::make_shared<ASIOReactor>();
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
@@ -871,7 +871,7 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
 }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
     return static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
 }

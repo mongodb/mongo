@@ -38,7 +38,7 @@
 namespace merizo {
 
 /**
- * The MongoVersionRange represents a min/max of MerizoDB versions, useful for
+ * The MerizoVersionRange represents a min/max of MerizoDB versions, useful for
  * excluding/including particular versions.
  *
  * The ranges may be single-version, in which case maxVersion == "", where only exact prefix
@@ -46,8 +46,8 @@ namespace merizo {
  * and include any version with a prefix of the min and max version as well as all versions
  * between the two.
  */
-struct MongoVersionRange {
-    static BSONArray toBSONArray(const std::vector<MongoVersionRange>& ranges);
+struct MerizoVersionRange {
+    static BSONArray toBSONArray(const std::vector<MerizoVersionRange>& ranges);
 
     bool parseBSONElement(const BSONElement& el, std::string* errMsg);
 
@@ -59,5 +59,5 @@ struct MongoVersionRange {
     std::string maxVersion;
 };
 
-bool isInMongoVersionRanges(StringData version, const std::vector<MongoVersionRange>& ranges);
+bool isInMerizoVersionRanges(StringData version, const std::vector<MerizoVersionRange>& ranges);
 }

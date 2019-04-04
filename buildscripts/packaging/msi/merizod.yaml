@@ -5,7 +5,7 @@
 
 # Where and how to store data.
 storage:
-  dbPath: %MONGO_DATA_PATH%
+  dbPath: %MERIZO_DATA_PATH%
   journal:
     enabled: true
 #  engine:
@@ -16,7 +16,7 @@ storage:
 systemLog:
   destination: file
   logAppend: true
-  path:  %MONGO_LOG_PATH%\merizod.log
+  path:  %MERIZO_LOG_PATH%\merizod.log
 
 # network interfaces
 net:

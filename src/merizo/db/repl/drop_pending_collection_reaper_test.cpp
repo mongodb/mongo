@@ -52,7 +52,7 @@ namespace {
 using namespace merizo;
 using namespace merizo::repl;
 
-class DropPendingCollectionReaperTest : public ServiceContextMongoDTest {
+class DropPendingCollectionReaperTest : public ServiceContextMerizoDTest {
 private:
     void setUp() override;
     void tearDown() override;
@@ -74,7 +74,7 @@ protected:
 };
 
 void DropPendingCollectionReaperTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
     _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
     auto service = getServiceContext();
     ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
@@ -82,7 +82,7 @@ void DropPendingCollectionReaperTest::setUp() {
 
 void DropPendingCollectionReaperTest::tearDown() {
     _storageInterface = {};
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 bool DropPendingCollectionReaperTest::collectionExists(OperationContext* opCtx,

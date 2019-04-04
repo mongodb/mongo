@@ -3,7 +3,7 @@
 
     // SERVER-8623: Test that renameCollection can't be used to bypass auth checks on system
     // namespaces
-    const conn = MongoRunner.runMongod({auth: ""});
+    const conn = MerizoRunner.runMerizod({auth: ""});
 
     const adminDB = conn.getDB("admin");
     const configDB = conn.getDB("config");
@@ -104,6 +104,6 @@
 
     // At this point, all the user documents are gone, so further activity may be unauthorized,
     // depending on cluster configuration.  So, this is the end of the test.
-    MongoRunner.stopMongod(conn, {user: 'userAdmin', pwd: 'password'});
+    MerizoRunner.stopMerizod(conn, {user: 'userAdmin', pwd: 'password'});
 
 })();

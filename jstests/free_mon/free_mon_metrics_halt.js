@@ -15,7 +15,7 @@ load("jstests/free_mon/libs/free_mon.js");
         verbose: 1,
     };
 
-    const conn = MongoRunner.runMongod(options);
+    const conn = MerizoRunner.runMerizod(options);
     assert.neq(null, conn, 'merizod was unable to start up');
 
     mock_web.waitMetrics(6);
@@ -25,7 +25,7 @@ load("jstests/free_mon/libs/free_mon.js");
     print(tojson(reg));
     assert.eq(reg.state, "disabled");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     mock_web.stop();
 })();

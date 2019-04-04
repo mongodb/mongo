@@ -20,7 +20,7 @@
 
     });
 
-    assert(rawMongoProgramOutput().match("Bad value for parameter \"rollbackTimeLimitSecs\""),
+    assert(rawMerizoProgramOutput().match("Bad value for parameter \"rollbackTimeLimitSecs\""),
            "failed to reject bad value for parameter");
 
     // Now initialize the same parameter correctly on startup.

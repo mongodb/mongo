@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -74,7 +74,7 @@
 namespace merizo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
+MERIZO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 
 using std::string;
 using std::vector;
@@ -1077,7 +1077,7 @@ protected:
                 std::memcmp(_key.getBuffer(), item.data, std::min(_key.getSize(), item.size));
             bool nextNotIncreasing = cmp > 0 || (cmp == 0 && _key.getSize() > item.size);
 
-            if (MONGO_FAIL_POINT(WTEmulateOutOfOrderNextIndexKey)) {
+            if (MERIZO_FAIL_POINT(WTEmulateOutOfOrderNextIndexKey)) {
                 log() << "WTIndex::updatePosition simulating next key not increasing.";
                 nextNotIncreasing = true;
             }
@@ -1339,7 +1339,7 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx, WT_CURSOR* c, const B
     }
 
     fassertFailedWithStatus(40685, wtRCToStatus(ret));
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insert(OperationContext* opCtx,

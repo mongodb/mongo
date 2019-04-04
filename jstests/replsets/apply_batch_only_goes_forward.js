@@ -69,7 +69,7 @@ TestData.skipCheckDBHashes = true;
     jsTest.log('Restarting primary ' + master.host +
                ' with updated minValid. This node will go into RECOVERING upon restart. ' +
                'Secondary ' + slave.host + ' will become new primary.');
-    clearRawMongoProgramOutput();
+    clearRawMerizoProgramOutput();
     replTest.restart(master);
     printjson(sLocal.adminCommand("isMaster"));
     replTest.waitForState(master, ReplSetTest.State.RECOVERING);
@@ -84,7 +84,7 @@ TestData.skipCheckDBHashes = true;
     // Sync source selection will log this message if it does not detect min valid in the sync
     // source candidate's oplog.
     assert.soon(function() {
-        return rawMongoProgramOutput().match(
+        return rawMerizoProgramOutput().match(
             'it does not contain the necessary operations for us to reach a consistent state');
     });
 

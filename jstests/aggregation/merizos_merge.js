@@ -134,7 +134,7 @@
      * Throws an assertion if the aggregation specified by 'pipeline' does not produce
      * 'expectedCount' results, or if the merge phase is not performed on the merizoS.
      */
-    function assertMergeOnMongoS({testName, pipeline, batchSize, allowDiskUse, expectedCount}) {
+    function assertMergeOnMerizoS({testName, pipeline, batchSize, allowDiskUse, expectedCount}) {
         assertMergeBehaviour({
             testName: testName,
             pipeline: pipeline,
@@ -149,7 +149,7 @@
      * Throws an assertion if the aggregation specified by 'pipeline' does not produce
      * 'expectedCount' results, or if the merge phase was not performed on a shard.
      */
-    function assertMergeOnMongoD(
+    function assertMergeOnMerizoD(
         {testName, pipeline, mergeType, batchSize, allowDiskUse, expectedCount}) {
         assertMergeBehaviour({
             testName: testName,
@@ -167,7 +167,7 @@
      */
     function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allowDiskUse) {
         // Test that a $match pipeline with an empty merge stage is merged on merizoS.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_match_only",
             pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}],
             allowDiskUse: allowDiskUse,
@@ -175,7 +175,7 @@
         });
 
         // Test that a $sort stage which merges pre-sorted streams is run on merizoS.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_sort_presorted",
             pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}],
             allowDiskUse: allowDiskUse,
@@ -183,7 +183,7 @@
         });
 
         // Test that $skip is merged on merizoS.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_skip",
             pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}, {$skip: 300}],
             allowDiskUse: allowDiskUse,
@@ -191,7 +191,7 @@
         });
 
         // Test that $limit is merged on merizoS.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_limit",
             pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$limit: 300}],
             allowDiskUse: allowDiskUse,
@@ -200,7 +200,7 @@
 
         // Test that $sample is merged on merizoS if it is the splitpoint, since this will result in
         // a merging $sort of presorted streams in the merge pipeline.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_sample_splitpoint",
             pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sample: {size: 300}}],
             allowDiskUse: allowDiskUse,
@@ -208,7 +208,7 @@
         });
 
         // Test that $geoNear is merged on merizoS.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_geo_near",
             pipeline: [
                 {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}},
@@ -220,7 +220,7 @@
 
         // Test that $facet is merged on merizoS if all pipelines are merizoS-mergeable regardless of
         // 'allowDiskUse'.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_facet_all_pipes_eligible_for_merizos",
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -237,7 +237,7 @@
 
         // Test that $facet is merged on merizoD if any pipeline requires a primary shard merge,
         // regardless of 'allowDiskUse'.
-        assertMergeOnMongoD({
+        assertMergeOnMerizoD({
             testName: "agg_merizos_merge_facet_pipe_needs_primary_shard_disk_use_" + allowDiskUse,
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -266,7 +266,7 @@
         // Test that a pipeline whose merging half can be run on merizos using only the merizos
         // execution machinery returns the correct results.
         // TODO SERVER-30882 Find a way to assert that all stages get absorbed by merizos.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_all_merizos_runnable_skip_and_limit_stages",
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -282,7 +282,7 @@
 
         // Test that a merge pipeline which needs to run on a shard is NOT merged on merizoS
         // regardless of 'allowDiskUse'.
-        assertMergeOnMongoD({
+        assertMergeOnMerizoD({
             testName: "agg_merizos_merge_primary_shard_disk_use_" + allowDiskUse,
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -299,7 +299,7 @@
 
         // Test that $lookup is merged on the primary shard when the foreign collection is
         // unsharded.
-        assertMergeOnMongoD({
+        assertMergeOnMerizoD({
             testName: "agg_merizos_merge_lookup_unsharded_disk_use_" + allowDiskUse,
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -318,7 +318,7 @@
         });
 
         // Test that $lookup is merged on merizoS when the foreign collection is sharded.
-        assertMergeOnMongoS({
+        assertMergeOnMerizoS({
             testName: "agg_merizos_merge_lookup_sharded_disk_use_" + allowDiskUse,
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -347,10 +347,10 @@
      */
     function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
         // All test cases should merge on merizoD if allowDiskUse is true, merizoS otherwise.
-        const assertMergeOnMongoX = (allowDiskUse ? assertMergeOnMongoD : assertMergeOnMongoS);
+        const assertMergeOnMerizoX = (allowDiskUse ? assertMergeOnMerizoD : assertMergeOnMerizoS);
 
         // Test that a blocking $sort is only merged on merizoS if 'allowDiskUse' is not set.
-        assertMergeOnMongoX({
+        assertMergeOnMerizoX({
             testName: "agg_merizos_merge_blocking_sort_no_disk_use",
             pipeline:
                 [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}, {$sort: {a: 1}}],
@@ -359,7 +359,7 @@
         });
 
         // Test that $group is only merged on merizoS if 'allowDiskUse' is not set.
-        assertMergeOnMongoX({
+        assertMergeOnMerizoX({
             testName: "agg_merizos_merge_group_allow_disk_use",
             pipeline:
                 [{$match: {_id: {$gte: -200, $lte: 200}}}, {$group: {_id: {$mod: ["$_id", 150]}}}],
@@ -368,7 +368,7 @@
         });
 
         // Test that a blocking $sample is only merged on merizoS if 'allowDiskUse' is not set.
-        assertMergeOnMongoX({
+        assertMergeOnMerizoX({
             testName: "agg_merizos_merge_blocking_sample_allow_disk_use",
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -381,7 +381,7 @@
 
         // Test that $facet is only merged on merizoS if all pipelines are merizoS-mergeable when
         // 'allowDiskUse' is not set.
-        assertMergeOnMongoX({
+        assertMergeOnMerizoX({
             testName: "agg_merizos_merge_facet_allow_disk_use",
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -397,7 +397,7 @@
         });
 
         // Test that $bucketAuto is only merged on merizoS if 'allowDiskUse' is not set.
-        assertMergeOnMongoX({
+        assertMergeOnMerizoX({
             testName: "agg_merizos_merge_bucket_auto_allow_disk_use",
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -412,7 +412,7 @@
         //
 
         // Test that $bucket ($group->$sort) is merged on merizoS iff 'allowDiskUse' is not set.
-        assertMergeOnMongoX({
+        assertMergeOnMerizoX({
             testName: "agg_merizos_merge_bucket_allow_disk_use",
             pipeline: [
                 {$match: {_id: {$gte: -200, $lte: 200}}},
@@ -428,7 +428,7 @@
         });
 
         // Test that $sortByCount ($group->$sort) is merged on merizoS iff 'allowDiskUse' isn't set.
-        assertMergeOnMongoX({
+        assertMergeOnMerizoX({
             testName: "agg_merizos_merge_sort_by_count_allow_disk_use",
             pipeline:
                 [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sortByCount: {$mod: ["$_id", 150]}}],
@@ -437,7 +437,7 @@
         });
 
         // Test that $count ($group->$project) is merged on merizoS iff 'allowDiskUse' is not set.
-        assertMergeOnMongoX({
+        assertMergeOnMerizoX({
             testName: "agg_merizos_merge_count_allow_disk_use",
             pipeline: [{$match: {_id: {$gte: -150, $lte: 1500}}}, {$count: "doc_count"}],
             allowDiskUse: allowDiskUse,
@@ -460,7 +460,7 @@
     startProfiling();
 
     // Test that merge pipelines containing all merizos-runnable stages produce the expected output.
-    assertMergeOnMongoS({
+    assertMergeOnMerizoS({
         testName: "agg_merizos_merge_all_merizos_runnable_stages",
         pipeline: [
             {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}},

@@ -5,10 +5,10 @@
 (function() {
     'use strict';
 
-    var dbpath = MongoRunner.dataPath + 'noncapped_oplog_creation';
+    var dbpath = MerizoRunner.dataPath + 'noncapped_oplog_creation';
     resetDbpath(dbpath);
 
-    var conn = MongoRunner.runMongod({
+    var conn = MerizoRunner.runMerizod({
         dbpath: dbpath,
         noCleanData: true,
     });
@@ -34,5 +34,5 @@
         pipeline: [{$out: 'oplog.aggregation'}],
     }));
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

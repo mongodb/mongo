@@ -40,7 +40,7 @@ std::string getFirstARecord(const std::string& service) {
     return res.front();
 }
 
-TEST(MongoDnsQuery, basic) {
+TEST(MerizoDnsQuery, basic) {
     // We only require 50% of the records to pass, because it is possible that some large scale
     // outages could cause some of these records to fail.
     const double kPassingPercentage = 0.50;
@@ -102,7 +102,7 @@ TEST(MongoDnsQuery, basic) {
     ASSERT_GTE(resolution_count, kPassingRate);
 }
 
-TEST(MongoDnsQuery, srvRecords) {
+TEST(MerizoDnsQuery, srvRecords) {
     const auto kMerizodbSRVPrefix = "_merizodb._tcp."s;
     const struct {
         std::string query;
@@ -160,7 +160,7 @@ TEST(MongoDnsQuery, srvRecords) {
     }
 }
 
-TEST(MongoDnsQuery, txtRecords) {
+TEST(MerizoDnsQuery, txtRecords) {
     const struct {
         std::string query;
         std::vector<std::string> result;

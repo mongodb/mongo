@@ -24,7 +24,7 @@ executor:
           skipValidationOnNamespaceNotFound: false
           forceValidationWithFeatureCompatibilityVersion: "4.2"
   fixture:
-    class: MongoDFixture
+    class: MerizoDFixture
     merizod_options:
       set_parameters:
         disableLogicalSessionCacheRefresh: false

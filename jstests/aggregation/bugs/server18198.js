@@ -5,12 +5,12 @@
     var t = db.server18198;
     t.drop();
 
-    var merizo = db.getMongo();
+    var merizo = db.getMerizo();
 
     try {
         var commandsRan = [];
         // hook in our patched merizo
-        var mockMongo = {
+        var mockMerizo = {
             getSlaveOk: function() {
                 return true;
             },
@@ -33,8 +33,8 @@
             isReplicaSetMember: function() {
                 return merizo.isReplicaSetMember();
             },
-            isMongos: function() {
-                return merizo.isMongos();
+            isMerizos: function() {
+                return merizo.isMerizos();
             },
             isCausalConsistency: function() {
                 return false;
@@ -44,8 +44,8 @@
             },
         };
 
-        db._merizo = mockMongo;
-        db._session = new _DummyDriverSession(mockMongo);
+        db._merizo = mockMerizo;
+        db._session = new _DummyDriverSession(mockMerizo);
 
         // this query should not get a read pref
         t.aggregate([{$sort: {"x": 1}}, {$out: "foo"}]);

@@ -65,7 +65,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
             } else if ("primaryShard"_sd == mergeTypeString) {
                 mergeType = HostTypeRequirement::kPrimaryShard;
             } else if ("merizos"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kMongoS;
+                mergeType = HostTypeRequirement::kMerizoS;
             } else {
                 uasserted(ErrorCodes::BadValue,
                           str::stream() << "unrecognized field while parsing mergeType: '"
@@ -105,7 +105,7 @@ Value DocumentSourceInternalSplitPipeline::serialize(
             mergeTypeString = "localOnly";
             break;
 
-        case HostTypeRequirement::kMongoS:
+        case HostTypeRequirement::kMerizoS:
             mergeTypeString = "merizos";
             break;
 

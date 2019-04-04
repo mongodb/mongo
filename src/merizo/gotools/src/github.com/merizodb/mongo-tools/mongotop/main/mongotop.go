@@ -93,18 +93,18 @@ func main() {
 	}
 
 	// fail fast if connecting to a merizos
-	isMongos, err := sessionProvider.IsMongos()
+	isMerizos, err := sessionProvider.IsMerizos()
 	if err != nil {
 		log.Logvf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
-	if isMongos {
+	if isMerizos {
 		log.Logvf(log.Always, "cannot run merizotop against a merizos")
 		os.Exit(util.ExitError)
 	}
 
 	// instantiate a merizotop instance
-	top := &merizotop.MongoTop{
+	top := &merizotop.MerizoTop{
 		Options:         opts,
 		OutputOptions:   outputOpts,
 		SessionProvider: sessionProvider,

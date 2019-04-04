@@ -9,7 +9,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
     const CLIENT_CERT = "jstests/libs/client_privatekey.pem";
 
     function authAndTest(port) {
-        const merizo = runMongoProgram("merizo",
+        const merizo = runMerizoProgram("merizo",
                                       "--host",
                                       "localhost",
                                       "--port",
@@ -22,15 +22,15 @@ load('jstests/ssl/libs/ssl_helpers.js');
                                       "--eval",
                                       "1");
 
-        // runMongoProgram returns 0 on success
+        // runMerizoProgram returns 0 on success
         assert.eq(0, merizo, "Connection attempt failed");
     }
 
     const x509_options = {sslMode: "requireSSL", sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT};
 
-    let merizo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
+    let merizo = MerizoRunner.runMerizod(Object.merge(x509_options, {auth: ""}));
 
     authAndTest(merizo.port);
 
-    MongoRunner.stopMongod(merizo);
+    MerizoRunner.stopMerizod(merizo);
 }());

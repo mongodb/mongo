@@ -69,7 +69,7 @@ private:
 
 #else
 
-#if MONGO_CONFIG_DEBUG_BUILD
+#if MERIZO_CONFIG_DEBUG_BUILD
 class SpinLock {
     SpinLock(const SpinLock&) = delete;
     SpinLock& operator=(const SpinLock&) = delete;
@@ -103,7 +103,7 @@ public:
     }
 
     void lock() {
-        if (MONGO_likely(_tryLock()))
+        if (MERIZO_likely(_tryLock()))
             return;
         _lockSlowPath();
     }

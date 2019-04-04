@@ -1,4 +1,4 @@
-MONGOC_EMBEDDED_ABI_1.0 {
+MERIZOC_EMBEDDED_ABI_1.0 {
     global: merizoc_embedded_v1_*;
     local: *;
 };

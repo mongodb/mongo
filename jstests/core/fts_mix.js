@@ -123,7 +123,7 @@ assert(resultsEq(getIDS(res), getIDS(res2)));
 
 assert.throws(function() {
     const cursor = tc.find({"$text": {"$search": "member", $language: "spanglish"}});
-    if (db.getMongo().readMode() === "legacy") {
+    if (db.getMerizo().readMode() === "legacy") {
         // In legacy read mode, calling next() will check if the response to the OP_QUERY message
         // has an error.
         cursor.next();
@@ -136,7 +136,7 @@ assert.throws(function() {
 });
 assert.doesNotThrow(function() {
     const cursor = tc.find({"$text": {"$search": "member", $language: "english"}});
-    if (db.getMongo().readMode() === "legacy") {
+    if (db.getMerizo().readMode() === "legacy") {
         // In legacy read mode, calling next() will check if the response to the OP_QUERY message
         // has an error.
         cursor.next();

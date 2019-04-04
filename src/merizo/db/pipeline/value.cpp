@@ -188,7 +188,7 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
         }
 
         case jstOID:
-            MONGO_STATIC_ASSERT(sizeof(_storage.oid) == OID::kOIDSize);
+            MERIZO_STATIC_ASSERT(sizeof(_storage.oid) == OID::kOIDSize);
             memcpy(_storage.oid, elem.OID().view().view(), OID::kOIDSize);
             break;
 
@@ -694,7 +694,7 @@ int Value::compare(const Value& rL,
                     return compareDecimalToDouble(rL._storage.getDecimal(),
                                                   rR._storage.doubleValue);
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 
@@ -711,7 +711,7 @@ int Value::compare(const Value& rL,
                 case NumberDecimal:
                     return compareIntToDecimal(rL._storage.intValue, rR._storage.getDecimal());
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 
@@ -726,7 +726,7 @@ int Value::compare(const Value& rL,
                 case NumberDecimal:
                     return compareLongToDecimal(rL._storage.longValue, rR._storage.getDecimal());
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 
@@ -742,7 +742,7 @@ int Value::compare(const Value& rL,
                     return compareDoubleToDecimal(rL._storage.doubleValue,
                                                   rR._storage.getDecimal());
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 
@@ -845,7 +845,7 @@ void Value::hash_combine(size_t& seed,
 
         case bsonTimestamp:
         case Date:
-            MONGO_STATIC_ASSERT(sizeof(_storage.dateValue) == sizeof(_storage.timestampValue));
+            MERIZO_STATIC_ASSERT(sizeof(_storage.dateValue) == sizeof(_storage.timestampValue));
             boost::hash_combine(seed, _storage.dateValue);
             break;
 

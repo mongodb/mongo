@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/db/commands/fsync.h"
 
@@ -404,7 +404,7 @@ void FSyncLockThread::run() {
     }
 }
 
-MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
+MERIZO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
     setLockedForWritingImpl([]() { return fsyncCmd.fsyncLocked(); });
     return Status::OK();
 }

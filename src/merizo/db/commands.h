@@ -54,8 +54,8 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DECLARE(failCommand);
-MONGO_FAIL_POINT_DECLARE(waitInCommandMarkKillOnClientDisconnect);
+MERIZO_FAIL_POINT_DECLARE(failCommand);
+MERIZO_FAIL_POINT_DECLARE(waitInCommandMarkKillOnClientDisconnect);
 
 class Command;
 class CommandInvocation;
@@ -864,11 +864,11 @@ CommandRegistry* globalCommandRegistry();
 
 /**
  * Creates a test command object of type CmdType if test commands are enabled for this process.
- * Prefer this syntax to using MONGO_INITIALIZER directly.
+ * Prefer this syntax to using MERIZO_INITIALIZER directly.
  * The created Command object is "leaked" intentionally, since it will register itself.
  */
-#define MONGO_REGISTER_TEST_COMMAND(CmdType)                                \
-    MONGO_INITIALIZER(RegisterTestCommand_##CmdType)(InitializerContext*) { \
+#define MERIZO_REGISTER_TEST_COMMAND(CmdType)                                \
+    MERIZO_INITIALIZER(RegisterTestCommand_##CmdType)(InitializerContext*) { \
         if (getTestCommandsEnabled()) {                                     \
             new CmdType();                                                  \
         }                                                                   \

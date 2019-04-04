@@ -44,7 +44,7 @@ class ServiceContext;
  * current time, schedule periodic refresh jobs, and get a list of sessions
  * that are being used for long-running queries on the service context.
  *
- * Mongod and merizos implement their own classes to fulfill this interface.
+ * Merizod and merizos implement their own classes to fulfill this interface.
  */
 class ServiceLiaison {
 public:

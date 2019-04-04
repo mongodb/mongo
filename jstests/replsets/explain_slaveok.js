@@ -24,13 +24,13 @@ assert.eq(1, primary.getDB("test").explain_slaveok.findOne({a: 1})["a"]);
 
 // We shouldn't be able to read from the secondary with slaveOk off.
 var secondary = replTest.getSecondary();
-secondary.getDB("test").getMongo().setSlaveOk(false);
+secondary.getDB("test").getMerizo().setSlaveOk(false);
 assert.throws(function() {
     secondary.getDB("test").explain_slaveok.findOne({a: 1});
 });
 
 // With slaveOk on, we should be able to read from the secondary.
-secondary.getDB("test").getMongo().setSlaveOk(true);
+secondary.getDB("test").getMerizo().setSlaveOk(true);
 assert.eq(1, secondary.getDB("test").explain_slaveok.findOne({a: 1})["a"]);
 
 //
@@ -58,7 +58,7 @@ assert.eq(1, stages.nWouldModify);
 // Confirm that the document did not actually get modified on the primary
 // or on the secondary.
 assert.eq(1, primary.getDB("test").explain_slaveok.findOne({a: 1})["a"]);
-secondary.getDB("test").getMongo().setSlaveOk(true);
+secondary.getDB("test").getMerizo().setSlaveOk(true);
 assert.eq(1, secondary.getDB("test").explain_slaveok.findOne({a: 1})["a"]);
 
 //
@@ -67,24 +67,24 @@ assert.eq(1, secondary.getDB("test").explain_slaveok.findOne({a: 1})["a"]);
 
 // Explain a count on the secondary with slaveOk off. Should fail because
 // slaveOk is required for explains on a secondary.
-secondary.getDB("test").getMongo().setSlaveOk(false);
+secondary.getDB("test").getMerizo().setSlaveOk(false);
 explainOut = secondary.getDB("test").runCommand(
     {explain: {count: "explain_slaveok", query: {a: 1}}, verbosity: "executionStats"});
 assert.commandFailed(explainOut, "explain read op on secondary, slaveOk false");
 
 // Explain of count should succeed once slaveOk is true.
-secondary.getDB("test").getMongo().setSlaveOk(true);
+secondary.getDB("test").getMerizo().setSlaveOk(true);
 explainOut = secondary.getDB("test").runCommand(
     {explain: {count: "explain_slaveok", query: {a: 1}}, verbosity: "executionStats"});
 assert.commandWorked(explainOut, "explain read op on secondary, slaveOk true");
 
 // Explain .find() on a secondary, setting slaveOk directly on the query.
-secondary.getDB("test").getMongo().setSlaveOk(false);
+secondary.getDB("test").getMerizo().setSlaveOk(false);
 assert.throws(function() {
     secondary.getDB("test").explain_slaveok.explain("executionStats").find({a: 1}).finish();
 });
 
-secondary.getDB("test").getMongo().setSlaveOk(false);
+secondary.getDB("test").getMerizo().setSlaveOk(false);
 explainOut = secondary.getDB("test")
                  .explain_slaveok.explain("executionStats")
                  .find({a: 1})
@@ -92,7 +92,7 @@ explainOut = secondary.getDB("test")
                  .finish();
 assert.commandWorked(explainOut, "explain read op on secondary, slaveOk set to true on query");
 
-secondary.getDB("test").getMongo().setSlaveOk(true);
+secondary.getDB("test").getMerizo().setSlaveOk(true);
 explainOut =
     secondary.getDB("test").explain_slaveok.explain("executionStats").find({a: 1}).finish();
 assert.commandWorked(explainOut, "explain .find() on secondary, slaveOk set to true");
@@ -100,7 +100,7 @@ assert.commandWorked(explainOut, "explain .find() on secondary, slaveOk set to t
 // Explain .find() on a secondary, setting slaveOk to false with various read preferences.
 var readPrefModes = ["secondary", "secondaryPreferred", "primaryPreferred", "nearest"];
 readPrefModes.forEach(function(prefString) {
-    secondary.getDB("test").getMongo().setSlaveOk(false);
+    secondary.getDB("test").getMerizo().setSlaveOk(false);
     explainOut = secondary.getDB("test")
                      .explain_slaveok.explain("executionStats")
                      .find({a: 1})
@@ -122,7 +122,7 @@ readPrefModes.forEach(function(prefString) {
 
 // Fail explain find() on a secondary, setting slaveOk to false with read preference set to primary.
 var prefStringPrimary = "primary";
-secondary.getDB("test").getMongo().setSlaveOk(false);
+secondary.getDB("test").getMerizo().setSlaveOk(false);
 explainOut = secondary.getDB("test").runCommand(
     {explain: {find: "explain_slaveok", query: {a: 1}}, verbosity: "executionStats"});
 assert.commandFailed(explainOut, "not master and slaveOk=false");
@@ -137,7 +137,7 @@ secondary.setReadPref();
 
 // Explain an update on the secondary with slaveOk off. Should fail because
 // slaveOk is required for explains on a secondary.
-secondary.getDB("test").getMongo().setSlaveOk(false);
+secondary.getDB("test").getMerizo().setSlaveOk(false);
 explainOut = secondary.getDB("test").runCommand({
     explain: {update: "explain_slaveok", updates: [{q: {a: 1}, u: {$set: {a: 5}}}]},
     verbosity: "executionStats"
@@ -145,7 +145,7 @@ explainOut = secondary.getDB("test").runCommand({
 assert.commandFailed(explainOut, "explain write op on secondary, slaveOk false");
 
 // Explain of the update should also fail with slaveOk on.
-secondary.getDB("test").getMongo().setSlaveOk(true);
+secondary.getDB("test").getMerizo().setSlaveOk(true);
 explainOut = secondary.getDB("test").runCommand({
     explain: {update: "explain_slaveok", updates: [{q: {a: 1}, u: {$set: {a: 5}}}]},
     verbosity: "executionStats"

@@ -15,7 +15,7 @@
 
     let checkLogStats = function() {
         // Check if the log output contains the expected statistics.
-        let merizodLogs = rawMongoProgramOutput();
+        let merizodLogs = rawMerizoProgramOutput();
         let lines = merizodLogs.split('\n');
         let match;
         let logLineCount = 0;
@@ -42,7 +42,7 @@
         let name = "wt_op_stat";
 
         jsTestLog("run merizod");
-        let conn = MongoRunner.runMongod();
+        let conn = MerizoRunner.runMerizod();
         assert.neq(null, conn, "merizod was unable to start up");
         let testDB = conn.getDB(name);
 
@@ -55,16 +55,16 @@
         }
 
         let connport = conn.port;
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
 
         // Restart the server
-        conn = MongoRunner.runMongod({
+        conn = MerizoRunner.runMerizod({
             restart: true,
             port: connport,
             slowms: "0",
         });
 
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
 
         // Scan the collection and check the bytes read statistic in the slowop log and
         // system.profile.
@@ -81,7 +81,7 @@
         checkSystemProfileStats(profileObj, "bytesRead");
 
         // Stopping the merizod waits until all of its logs have been read by the merizo shell.
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
         checkLogStats();
 
         jsTestLog("Success!");

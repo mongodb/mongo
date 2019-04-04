@@ -2,7 +2,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod was unable to start up");
 
     const testDB = conn.getDB("test");
@@ -24,5 +24,5 @@
         ErrorCodes.InvalidDBRef);
     assert.docEq(testDB.coll.findOne({_id: 1}), {_id: 1, a: [0]});
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

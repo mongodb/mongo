@@ -56,7 +56,7 @@
     });
 
     // Add one shard since the last shard cannot be removed.
-    var normalShard = MongoRunner.runMongod({shardsvr: ''});
+    var normalShard = MerizoRunner.runMerizod({shardsvr: ''});
     st.s.adminCommand({addShard: normalShard.name, name: 'normalShard'});
 
     // Allocate a port that can be used to test adding invalid hosts.
@@ -67,18 +67,18 @@
     // 1.a. with or without specifying the shardName.
 
     jsTest.log("Adding a standalone *without* a specified shardName should succeed.");
-    let standalone1 = MongoRunner.runMongod({shardsvr: ''});
+    let standalone1 = MerizoRunner.runMerizod({shardsvr: ''});
     addShardRes = st.s.adminCommand({addshard: standalone1.name});
     assertAddShardSucceeded(addShardRes);
     removeShardWithName(addShardRes.shardAdded);
-    MongoRunner.stopMongod(standalone1);
+    MerizoRunner.stopMerizod(standalone1);
 
     jsTest.log("Adding a standalone *with* a specified shardName should succeed.");
-    let standalone2 = MongoRunner.runMongod({shardsvr: ''});
+    let standalone2 = MerizoRunner.runMerizod({shardsvr: ''});
     addShardRes = st.s.adminCommand({addshard: standalone2.name, name: "shardName"});
     assertAddShardSucceeded(addShardRes, "shardName");
     removeShardWithName(addShardRes.shardAdded);
-    MongoRunner.stopMongod(standalone2);
+    MerizoRunner.stopMerizod(standalone2);
 
     // 1.b. with an invalid hostname.
 
@@ -194,6 +194,6 @@
     rst5.stopSet();
 
     st.stop();
-    MongoRunner.stopMongod(normalShard);
+    MerizoRunner.stopMerizod(normalShard);
 
 })();

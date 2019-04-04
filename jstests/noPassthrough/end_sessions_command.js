@@ -10,7 +10,7 @@
     var startSession = {startSession: 1};
 
     // Start up a standalone server.
-    var conn = MongoRunner.runMongod();
+    var conn = MerizoRunner.runMerizod();
     var admin = conn.getDB("admin");
     var config = conn.getDB("config");
 
@@ -89,5 +89,5 @@
                   "endSessions and refresh should result in 0 remaining sessions");
     }
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

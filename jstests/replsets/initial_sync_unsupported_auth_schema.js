@@ -22,7 +22,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     var initSyncNode = rst.add();
     var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
-    clearRawMongoProgramOutput();
+    clearRawMerizoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(rst);
 
     assert.soon(function() {
@@ -34,7 +34,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
         return false;
     }, "Node did not terminate due to unsupported auth schema during initial sync", 60 * 1000);
 
-    rst.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    rst.stop(initSyncNode, undefined, {allowedExitCode: MerizoRunner.EXIT_ABRUPT});
 
     var msg;
     if (schema.hasOwnProperty('currentVersion')) {
@@ -43,7 +43,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
         msg = /During initial sync, found malformed auth schema version/;
     }
 
-    assert(rawMongoProgramOutput().match(msg),
+    assert(rawMerizoProgramOutput().match(msg),
            'Initial sync should have aborted due to an invalid or unsupported' +
                ' authSchema version: ' + tojson(schema));
 
@@ -69,7 +69,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     var initSyncNode = rst.add();
     var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
-    clearRawMongoProgramOutput();
+    clearRawMerizoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(rst);
 
     assert.soon(function() {
@@ -81,11 +81,11 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
         return false;
     }, "Node did not terminate due to unsupported auth schema during initial sync", 60 * 1000);
 
-    rst.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    rst.stop(initSyncNode, undefined, {allowedExitCode: MerizoRunner.EXIT_ABRUPT});
 
     var msg = /During initial sync, found documents in admin\.system\.users/;
 
-    assert(rawMongoProgramOutput().match(msg),
+    assert(rawMerizoProgramOutput().match(msg),
            'Initial sync should have aborted due to an existing user document and' +
                ' a missing auth schema');
 

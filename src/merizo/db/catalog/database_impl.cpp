@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -82,7 +82,7 @@
 namespace merizo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 
 std::unique_ptr<Collection> _createCollectionInstance(OperationContext* opCtx,
                                                       DatabaseCatalogEntry* dbEntry,
@@ -761,7 +761,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         }
     }
 
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLoggingCreateCollection);
+    MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLoggingCreateCollection);
 
     opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
         opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec, createOplogSlot);

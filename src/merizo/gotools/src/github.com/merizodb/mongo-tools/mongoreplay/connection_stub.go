@@ -15,14 +15,14 @@ import (
 	mgo "github.com/10gen/llmgo"
 )
 
-// SessionStub mocks an MongoSession by implementing the AcquireSocketPrivate
+// SessionStub mocks an MerizoSession by implementing the AcquireSocketPrivate
 // method.  It allows for tests to pass around a struct with stubbed fields that
 // can then be read later for testing.
 type SessionStub struct {
 	startup sync.Once
-	mgo.MongoSession
+	mgo.MerizoSession
 	connection ConnStub
-	socket     *mgo.MongoSocket
+	socket     *mgo.MerizoSocket
 }
 
 // ConnStub mocks the connection used by an mgo session. It implements the
@@ -86,10 +86,10 @@ func newTwoSidedConn() (conn1 ConnStub, conn2 ConnStub) {
 	return conn1, conn2
 }
 
-// AcquireSocketPrivate is an implementation of MongoSession's function that
+// AcquireSocketPrivate is an implementation of MerizoSession's function that
 // allows for the a stubbed connection to the passed to the other operations of
 // llmgo for testing
-func (session *SessionStub) AcquireSocketPrivate(slaveOk bool) (*mgo.MongoSocket, error) {
+func (session *SessionStub) AcquireSocketPrivate(slaveOk bool) (*mgo.MerizoSocket, error) {
 	session.startup.Do(func() {
 		session.socket = mgo.NewDumbSocket(&session.connection)
 	})

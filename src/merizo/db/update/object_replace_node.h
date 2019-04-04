@@ -77,7 +77,7 @@ public:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates) const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void acceptVisitor(UpdateNodeVisitor* visitor) final {

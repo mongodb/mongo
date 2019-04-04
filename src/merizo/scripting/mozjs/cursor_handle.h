@@ -39,13 +39,13 @@ namespace mozjs {
  * Wraps a DBClientCursor in javascript.
  *
  * Note that the install is private, so this class should only be constructible from C++. Current
- * callers are all via the Mongo object.
+ * callers are all via the Merizo object.
  */
 struct CursorHandleInfo : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(zeroCursorId);
+        MERIZO_DECLARE_JS_FUNCTION(zeroCursorId);
     };
 
     static const JSFunctionSpec methods[2];

@@ -5,8 +5,8 @@
 (function() {
     "use strict";
 
-    // Start a single merizoD using MongoRunner.
-    const conn = MongoRunner.runMongod({});
+    // Start a single merizoD using MerizoRunner.
+    const conn = MerizoRunner.runMerizod({});
     assert.neq(null, conn, "merizod was unable to start up");
 
     // Create the test DB and collection.
@@ -46,7 +46,7 @@
             }
             bulkRemove.execute();
         }`,
-                                              testDB.getMongo().port);
+                                              testDB.getMerizo().port);
 
         let childOpId = null;
         let childYields = 0;
@@ -116,5 +116,5 @@
     assert.commandWorked(testDB.test.insert(docsToTest));
     runYieldTest(docsToTest);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

@@ -1,5 +1,5 @@
 // @tags: [requires_profiling]
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = MerizoRunner.runMerizod({auth: ""});
 
 var adminDb = conn.getDB("admin");
 var testDb = conn.getDB("testdb");
@@ -39,4 +39,4 @@ testDb.auth('dbAdminAnyDBUser', 'password');
 testDb.setProfilingLevel(0);
 testDb.system.profile.drop();
 assert.commandWorked(testDb.createCollection("system.profile", {capped: true, size: 1024}));
-MongoRunner.stopMongod(conn, null, {user: 'admin', pwd: 'password'});
+MerizoRunner.stopMerizod(conn, null, {user: 'admin', pwd: 'password'});

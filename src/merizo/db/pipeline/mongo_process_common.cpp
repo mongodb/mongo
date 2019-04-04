@@ -45,7 +45,7 @@
 
 namespace merizo {
 
-std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
+std::vector<BSONObj> MerizoProcessCommon::getCurrentOps(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     CurrentOpConnectionsMode connMode,
     CurrentOpSessionsMode sessionMode,
@@ -113,7 +113,7 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(
     return ops;
 }
 
-std::vector<FieldPath> MongoProcessCommon::collectDocumentKeyFieldsActingAsRouter(
+std::vector<FieldPath> MerizoProcessCommon::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
     if (auto chunkManager =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
@@ -125,7 +125,7 @@ std::vector<FieldPath> MongoProcessCommon::collectDocumentKeyFieldsActingAsRoute
     return {"_id"};
 }
 
-bool MongoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
+bool MerizoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
                                                    const std::set<FieldPath>& uniqueKeyPaths) {
     size_t nFieldsMatched = 0;
     for (auto&& elem : keyPattern) {
@@ -140,7 +140,7 @@ bool MongoProcessCommon::keyPatternNamesExactPaths(const BSONObj& keyPattern,
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
-boost::optional<ChunkVersion> MongoProcessCommon::refreshAndGetCollectionVersion(
+boost::optional<ChunkVersion> MerizoProcessCommon::refreshAndGetCollectionVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) const {
     const bool forceRefreshFromThisThread = false;
     auto routingInfo = uassertStatusOK(
@@ -153,7 +153,7 @@ boost::optional<ChunkVersion> MongoProcessCommon::refreshAndGetCollectionVersion
     return boost::none;
 }
 
-std::vector<FieldPath> MongoProcessCommon::_shardKeyToDocumentKeyFields(
+std::vector<FieldPath> MerizoProcessCommon::_shardKeyToDocumentKeyFields(
     const std::vector<std::unique_ptr<FieldRef>>& keyPatternFields) const {
     std::vector<FieldPath> result;
     bool gotId = false;

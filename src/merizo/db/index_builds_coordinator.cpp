@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -59,9 +59,9 @@ namespace merizo {
 
 using namespace indexbuildentryhelpers;
 
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
+MERIZO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
+MERIZO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
+MERIZO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
 
 namespace {
 
@@ -796,7 +796,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             if (!removeStatus.isOK()) {
                 logFailure(removeStatus, nss, replState);
                 uassertStatusOK(removeStatus);
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
             }
         }
     }
@@ -815,7 +815,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
         }
 
         uassertStatusOK(status);
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     log() << "Index build completed successfully: " << replState->buildUUID << ": " << nss << " ( "
@@ -855,9 +855,9 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
             _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
+    if (MERIZO_FAIL_POINT(hangAfterIndexBuildDumpsInsertsFromBulk)) {
         log() << "Hanging after dumping inserts from bulk builder";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildDumpsInsertsFromBulk);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildDumpsInsertsFromBulk);
     }
 
     // Perform the first drain while holding an intent lock.
@@ -871,9 +871,9 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
             opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kNoOverlap));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
+    if (MERIZO_FAIL_POINT(hangAfterIndexBuildFirstDrain)) {
         log() << "Hanging after index build first drain";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildFirstDrain);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildFirstDrain);
     }
 
     // Perform the second drain while stopping writes on the collection.
@@ -885,9 +885,9 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
             opCtx, replState->buildUUID, RecoveryUnit::ReadSource::kUnset));
     }
 
-    if (MONGO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
+    if (MERIZO_FAIL_POINT(hangAfterIndexBuildSecondDrain)) {
         log() << "Hanging after index build second drain";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterIndexBuildSecondDrain);
     }
 
     relockOnErrorGuard.dismiss();

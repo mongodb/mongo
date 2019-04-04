@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -147,29 +147,29 @@ ConfigServerCatalogCacheLoader::~ConfigServerCatalogCacheLoader() {
 }
 
 void ConfigServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ConfigServerCatalogCacheLoader::onStepDown() {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ConfigServerCatalogCacheLoader::onStepUp() {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
                                                             const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ConfigServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
                                                           StringData dbName) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSince(

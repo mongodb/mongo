@@ -214,7 +214,7 @@ while ((t = *data++) != XCL_END)
       to be what Perl does. The exceptional characters are:
 
       U+061C           Arabic Letter Mark
-      U+180E           Mongolian Vowel Separator
+      U+180E           Merizolian Vowel Separator
       U+2066 - U+2069  Various "isolate"s
       */
 

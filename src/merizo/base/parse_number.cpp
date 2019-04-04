@@ -152,7 +152,7 @@ inline StatusWith<uint64_t> parseMagnitudeFromStringWithBase(uint64_t base,
 
 template <typename NumberType>
 Status parseNumberFromStringWithBase(StringData wholeString, int base, NumberType* result) {
-    MONGO_STATIC_ASSERT(sizeof(NumberType) <= sizeof(uint64_t));
+    MERIZO_STATIC_ASSERT(sizeof(NumberType) <= sizeof(uint64_t));
     typedef ::std::numeric_limits<NumberType> limits;
 
     if (base == 1 || base < 0 || base > 36)

@@ -52,8 +52,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBso
             spec.embeddedObject().isEmpty());
 
     uassert(50932,
-            str::stream() << kStageName << " cannot be executed against a MongoS.",
-            !pExpCtx->inMongos && !pExpCtx->fromMongos && !pExpCtx->needsMerge);
+            str::stream() << kStageName << " cannot be executed against a MerizoS.",
+            !pExpCtx->inMerizos && !pExpCtx->fromMerizos && !pExpCtx->needsMerge);
 
     return new DocumentSourcePlanCacheStats(pExpCtx);
 }

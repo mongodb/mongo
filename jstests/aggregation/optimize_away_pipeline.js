@@ -14,7 +14,7 @@
     load("jstests/aggregation/extras/utils.js");  // For 'orderedArrayEq' and 'arrayEq'.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isWiredTiger.
     load("jstests/libs/analyze_plan.js");     // For 'aggPlanHasStage' and other explain helpers.
-    load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
+    load("jstests/libs/fixture_helpers.js");  // For 'isMerizos' and 'isSharded'.
 
     const coll = db.optimize_away_pipeline;
     coll.drop();
@@ -293,7 +293,7 @@
     // Test getMore puts a correct namespace into profile data for a colletion with optimized away
     // pipeline. Cannot be run on merizos as profiling can be enabled only on merizod. Also profiling
     // is supported on WiredTiger only.
-    if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
+    if (!FixtureHelpers.isMerizos(db) && isWiredTiger(db)) {
         db.system.profile.drop();
         db.setProfilingLevel(2);
         testGetMore({

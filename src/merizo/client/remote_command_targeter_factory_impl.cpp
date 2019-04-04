@@ -57,9 +57,9 @@ std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryImpl::create(
         // These connections should never be seen
         case ConnectionString::INVALID:
         case ConnectionString::LOCAL:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

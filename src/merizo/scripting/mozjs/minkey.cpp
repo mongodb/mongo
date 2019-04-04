@@ -41,8 +41,8 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec MinKeyInfo::methods[3] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MinKeyInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, MinKeyInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MinKeyInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, MinKeyInfo),
     JS_FS_END,
 };
 

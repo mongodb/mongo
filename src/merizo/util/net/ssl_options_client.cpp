@@ -35,7 +35,7 @@
 #include "merizo/util/options_parser/startup_option_init.h"
 #include "merizo/util/options_parser/startup_options.h"
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/ssl.h>
 #endif
 
@@ -43,7 +43,7 @@ using namespace merizo;
 
 namespace {
 
-MONGO_STARTUP_OPTIONS_STORE(SSLClientOptions)(InitializerContext*) {
+MERIZO_STARTUP_OPTIONS_STORE(SSLClientOptions)(InitializerContext*) {
     const auto& params = merizo::optionenvironment::startupOptionsParsed;
 
     if (params.count("tls") && params["tls"].as<bool>() == true) {
@@ -56,7 +56,7 @@ MONGO_STARTUP_OPTIONS_STORE(SSLClientOptions)(InitializerContext*) {
         if (!status.isOK()) {
             return status;
         }
-#if ((MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL) || \
+#if ((MERIZO_CONFIG_SSL_PROVIDER != MERIZO_CONFIG_SSL_PROVIDER_OPENSSL) || \
      (OPENSSL_VERSION_NUMBER >= 0x100000cf)) /* 1.0.0l */
     } else {
         /* Similar to the server setting above, we auto-disable TLS 1.0
@@ -70,7 +70,7 @@ MONGO_STARTUP_OPTIONS_STORE(SSLClientOptions)(InitializerContext*) {
 #endif
     }
 
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+#ifdef MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS
     if (params.count("tls.certificateSelector")) {
         const auto status =
             parseCertificateSelector(&sslGlobalParams.sslCertificateSelector,

@@ -1,6 +1,6 @@
 // Test auth of the explain command.
 
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = MerizoRunner.runMerizod({auth: ""});
 var authzErrorCode = 13;
 
 var admin = conn.getDB("admin");
@@ -98,4 +98,4 @@ db.auth("removeOnly", "pwd");
 testExplainAuth({find: false, count: false, remove: true, update: false});
 db.logout();
 
-MongoRunner.stopMongod(conn, null, {user: "adminUser", pwd: "pwd"});
+MerizoRunner.stopMerizod(conn, null, {user: "adminUser", pwd: "pwd"});

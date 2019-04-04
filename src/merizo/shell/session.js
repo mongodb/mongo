@@ -247,7 +247,7 @@ var {
             }
 
             if (serverSupports(kWireVersionSupportingCausalConsistency) &&
-                (client.isReplicaSetMember() || client.isMongos()) &&
+                (client.isReplicaSetMember() || client.isMerizos()) &&
                 !jsTest.options().skipGossipingClusterTime) {
                 // The `clientClusterTime` is the highest clusterTime observed by any connection
                 // within this merizo shell.
@@ -284,11 +284,11 @@ var {
 
             // TODO SERVER-31868: A user should get back an error if they attempt to advance the
             // DriverSession's operationTime manually when talking to a stand-alone merizod. Removing
-            // the `(client.isReplicaSetMember() || client.isMongos())` condition will also involve
+            // the `(client.isReplicaSetMember() || client.isMerizos())` condition will also involve
             // calling resetOperationTime_forTesting() in JavaScript tests that start different
             // cluster types.
             if (serverSupports(kWireVersionSupportingCausalConsistency) &&
-                (client.isReplicaSetMember() || client.isMongos()) &&
+                (client.isReplicaSetMember() || client.isMerizos()) &&
                 (driverSession.getOptions().isCausalConsistency() ||
                  client.isCausalConsistency()) &&
                 canUseReadConcern(driverSession, cmdObj)) {
@@ -1030,11 +1030,11 @@ var {
         });
     }
 
-    // The default session on the Mongo connection object should report that causal consistency
-    // isn't enabled when interrogating the SessionOptions since it must be enabled on the Mongo
+    // The default session on the Merizo connection object should report that causal consistency
+    // isn't enabled when interrogating the SessionOptions since it must be enabled on the Merizo
     // connection object.
     //
-    // The default session on the Mongo connection object should also report that retryable
+    // The default session on the Merizo connection object should also report that retryable
     // writes isn't enabled when interrogating the SessionOptions since `DummyDriverSession` won't
     // ever assign a transaction number.
     const DummyDriverSession =
@@ -1071,17 +1071,17 @@ var {
                       },
 
                       startTransaction: function startTransaction() {
-                          throw new Error("Must call startSession() on the Mongo connection " +
+                          throw new Error("Must call startSession() on the Merizo connection " +
                                           "object before starting a transaction.");
                       },
 
                       commitTransaction: function commitTransaction() {
-                          throw new Error("Must call startSession() on the Mongo connection " +
+                          throw new Error("Must call startSession() on the Merizo connection " +
                                           "object before committing a transaction.");
                       },
 
                       abortTransaction: function abortTransaction() {
-                          throw new Error("Must call startSession() on the Mongo connection " +
+                          throw new Error("Must call startSession() on the Merizo connection " +
                                           "object before aborting a transaction.");
                       },
                   };

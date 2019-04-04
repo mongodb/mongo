@@ -39,11 +39,11 @@ import com.sun.jna.ptr.PointerByReference;
 
 import java.nio.ByteBuffer;
 
-class MongoEmbeddedClientImpl implements MongoEmbeddedClient {
+class MerizoEmbeddedClientImpl implements MerizoEmbeddedClient {
     private final CAPI.merizo_embedded_v1_status status;
     private final CAPI.merizo_embedded_v1_client client;
 
-    MongoEmbeddedClientImpl(final CAPI.merizo_embedded_v1_instance instance) {
+    MerizoEmbeddedClientImpl(final CAPI.merizo_embedded_v1_instance instance) {
         status = CAPIHelper.createStatusPointer();
 
         try {

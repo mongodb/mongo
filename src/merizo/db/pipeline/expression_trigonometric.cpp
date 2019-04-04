@@ -156,7 +156,7 @@ public:
                     std::atan2(numericArg1.coerceToDouble(), numericArg2.coerceToDouble()));
             }
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 

@@ -6,11 +6,11 @@
 
     const dbName = "test";
     const collName = "hybrid_indexes";
-    const dbpath = MongoRunner.dataPath + "hybrid_indexes";
+    const dbpath = MerizoRunner.dataPath + "hybrid_indexes";
 
     load("jstests/libs/feature_compatibility_version.js");
 
-    let conn = MongoRunner.runMongod({binVersion: "latest", cleanData: true, dbpath: dbpath});
+    let conn = MerizoRunner.runMerizod({binVersion: "latest", cleanData: true, dbpath: dbpath});
     let testDB = conn.getDB(dbName);
     let testColl = testDB[collName];
     testColl.insert({i: 0});
@@ -24,7 +24,7 @@
         assert.commandWorked(res);
         let fcv = res.version;
 
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
         assert.commandWorked(testDB.adminCommand(
             {configureFailPoint: 'hangBeforeIndexBuildOf', mode: "alwaysOn", data: {"i": 0}}));
 
@@ -44,8 +44,8 @@
             ", ns: \"test.hybrid_indexes\", background: " + background + " } using method: " +
             expected;
         print(msg);
-        assert.soon(() => rawMongoProgramOutput().indexOf(msg) >= 0, "Index build not started");
-        assert.soon(() => rawMongoProgramOutput().indexOf("Hanging before index build of i=0") >= 0,
+        assert.soon(() => rawMerizoProgramOutput().indexOf(msg) >= 0, "Index build not started");
+        assert.soon(() => rawMerizoProgramOutput().indexOf("Hanging before index build of i=0") >= 0,
                     "Index build not hanging");
 
         if (expected === "Background" || expected === "Hybrid") {
@@ -73,7 +73,7 @@
     // Test: Upgrade to FCV 4.2 while a background index build is in progress fails. This is subject
     // to change, but characterizes the current behavior.
 
-    clearRawMongoProgramOutput();
+    clearRawMerizoProgramOutput();
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: 'hangAfterStartingIndexBuildUnlocked', mode: "alwaysOn"}));
 
@@ -83,7 +83,7 @@
                                      ErrorCodes.OperationFailed);
     }, conn.port);
 
-    assert.soon(() => rawMongoProgramOutput().indexOf("Hanging index build with no locks") >= 0,
+    assert.soon(() => rawMerizoProgramOutput().indexOf("Hanging index build with no locks") >= 0,
                 "Index build not hanging");
 
     assert.commandFailedWithCode(testDB.adminCommand({setFeatureCompatibilityVersion: "4.2"}),
@@ -103,5 +103,5 @@
 
     buildIndex({background: false, expected: "Hybrid"});
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

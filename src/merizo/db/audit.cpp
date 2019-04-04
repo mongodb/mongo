@@ -29,7 +29,7 @@
 
 #include "merizo/db/audit.h"
 
-#if !MONGO_ENTERPRISE_AUDIT
+#if !MERIZO_ENTERPRISE_AUDIT
 
 void merizo::audit::logAuthentication(Client* client,
                                      StringData mechanism,

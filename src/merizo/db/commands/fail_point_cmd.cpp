@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include <vector>
 
@@ -102,5 +102,5 @@ public:
         return true;
     }
 };
-MONGO_REGISTER_TEST_COMMAND(FaultInjectCmd);
+MERIZO_REGISTER_TEST_COMMAND(FaultInjectCmd);
 }

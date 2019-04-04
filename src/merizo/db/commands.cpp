@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -457,8 +457,8 @@ Status CommandHelpers::canUseTransactions(StringData dbName, StringData cmdName)
 
 constexpr StringData CommandHelpers::kHelpFieldName;
 
-MONGO_FAIL_POINT_DEFINE(failCommand);
-MONGO_FAIL_POINT_DEFINE(waitInCommandMarkKillOnClientDisconnect);
+MERIZO_FAIL_POINT_DEFINE(failCommand);
+MERIZO_FAIL_POINT_DEFINE(waitInCommandMarkKillOnClientDisconnect);
 
 bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
                                                         StringData cmdName,
@@ -492,7 +492,7 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx, Strin
     bool closeConnection, hasErrorCode;
     long long errorCode;
 
-    MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
+    MERIZO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
         closeConnection = data.hasField("closeConnection") &&
             bsonExtractBooleanField(data, "closeConnection", &closeConnection).isOK() &&
             closeConnection;
@@ -529,14 +529,14 @@ void CommandHelpers::handleMarkKillOnClientDisconnect(OperationContext* opCtx,
         opCtx->markKillOnClientDisconnect();
     }
 
-    MONGO_FAIL_POINT_BLOCK_IF(
+    MERIZO_FAIL_POINT_BLOCK_IF(
         waitInCommandMarkKillOnClientDisconnect, options, [&](const BSONObj& obj) {
             const auto& clientMetadata =
                 ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
 
             return clientMetadata && (clientMetadata->getApplicationName() == obj["appName"].str());
         }) {
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                         waitInCommandMarkKillOnClientDisconnect);
     }
 }

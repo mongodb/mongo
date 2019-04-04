@@ -40,7 +40,7 @@
 
 namespace merizo {
 
-LogicalSessionIdSet ServiceLiaisonMongod::getActiveOpSessions() const {
+LogicalSessionIdSet ServiceLiaisonMerizod::getActiveOpSessions() const {
     LogicalSessionIdSet activeSessions;
 
     invariant(hasGlobalServiceContext());
@@ -65,20 +65,20 @@ LogicalSessionIdSet ServiceLiaisonMongod::getActiveOpSessions() const {
     return activeSessions;
 }
 
-LogicalSessionIdSet ServiceLiaisonMongod::getOpenCursorSessions(OperationContext* opCtx) const {
+LogicalSessionIdSet ServiceLiaisonMerizod::getOpenCursorSessions(OperationContext* opCtx) const {
     LogicalSessionIdSet cursorSessions;
     CursorManager::get(opCtx)->appendActiveSessions(&cursorSessions);
     return cursorSessions;
 }
 
-void ServiceLiaisonMongod::scheduleJob(PeriodicRunner::PeriodicJob job) {
+void ServiceLiaisonMerizod::scheduleJob(PeriodicRunner::PeriodicJob job) {
     invariant(hasGlobalServiceContext());
     auto jobHandle = getGlobalServiceContext()->getPeriodicRunner()->makeJob(std::move(job));
     jobHandle->start();
     _jobs.push_back(std::move(jobHandle));
 }
 
-void ServiceLiaisonMongod::join() {
+void ServiceLiaisonMerizod::join() {
     invariant(hasGlobalServiceContext());
     for (auto&& jobHandle : _jobs) {
         jobHandle->stop();
@@ -86,16 +86,16 @@ void ServiceLiaisonMongod::join() {
     _jobs.clear();
 }
 
-Date_t ServiceLiaisonMongod::now() const {
+Date_t ServiceLiaisonMerizod::now() const {
     invariant(hasGlobalServiceContext());
     return getGlobalServiceContext()->getFastClockSource()->now();
 }
 
-ServiceContext* ServiceLiaisonMongod::_context() {
+ServiceContext* ServiceLiaisonMerizod::_context() {
     return getGlobalServiceContext();
 }
 
-std::pair<Status, int> ServiceLiaisonMongod::killCursorsWithMatchingSessions(
+std::pair<Status, int> ServiceLiaisonMerizod::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
     return CursorManager::get(opCtx)->killCursorsWithMatchingSessions(opCtx, matcher);
 }

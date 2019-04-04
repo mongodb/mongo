@@ -3,7 +3,7 @@
 (function() {
     "use strict";
     var standalone =
-        MongoRunner.runMongod({enableMajorityReadConcern: "", storageEngine: "wiredTiger"});
+        MerizoRunner.runMerizod({enableMajorityReadConcern: "", storageEngine: "wiredTiger"});
 
     var testDB = standalone.getDB("test");
 
@@ -37,7 +37,7 @@
     }),
                                  ErrorCodes.IllegalOperation,
                                  "expected afterClusterTime read to fail on standalone merizod");
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 
     var rst = new ReplSetTest({nodes: 1});
     rst.startSet();

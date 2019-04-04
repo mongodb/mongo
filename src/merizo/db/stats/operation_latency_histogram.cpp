@@ -171,7 +171,7 @@ void OperationLatencyHistogram::increment(uint64_t latency, Command::ReadWriteTy
             _incrementData(latency, bucket, &_transactions);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

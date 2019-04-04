@@ -430,7 +430,7 @@ functions:
       working_dir: src/github.com/merizodb/merizo-tools
       script: |
         # export sensitive info before `set -x`
-        export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+        export MERIZODB_KERBEROS_PASSWORD=${kerberos_password}
         set -x
         set -v
         if [ "Windows_NT" = "$OS" ]; then
@@ -506,7 +506,7 @@ functions:
         # export sensitive info before `set -x`
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
-            export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+            export MERIZODB_KERBEROS_PASSWORD=${kerberos_password}
         fi;
         set -x
         set -v
@@ -768,7 +768,7 @@ functions:
           set -x
           set -v
           set -e
-          ./bin/merizo --nodb --eval 'var d; assert.soon(function(x){try{d = new Mongo("localhost:${merizod_port}"); return true} catch(e){return false}}, "timed out connection");d.setLogLevel(5, "write");'
+          ./bin/merizo --nodb --eval 'var d; assert.soon(function(x){try{d = new Merizo("localhost:${merizod_port}"); return true} catch(e){return false}}, "timed out connection");d.setLogLevel(5, "write");'
 
   "create repl_set" :
     - command: shell.exec
@@ -789,7 +789,7 @@ functions:
           set -x
           set -v
           set -e
-          ./bin/merizo --nodb --eval 'assert.soon(function(x){try{var d = new Mongo("localhost:${merizod_port}"); return true} catch(e){return false}}, "timed out connection")'
+          ./bin/merizo --nodb --eval 'assert.soon(function(x){try{var d = new Merizo("localhost:${merizod_port}"); return true} catch(e){return false}}, "timed out connection")'
 
   "run replay go_test" :
   - command: shell.exec

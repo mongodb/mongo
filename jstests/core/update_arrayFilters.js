@@ -16,7 +16,7 @@
     // Tests for update.
     //
 
-    if (db.getMongo().writeMode() !== "commands") {
+    if (db.getMerizo().writeMode() !== "commands") {
         assert.throws(function() {
             coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]});
         });
@@ -147,7 +147,7 @@
     // Tests for the bulk API.
     //
 
-    if (db.getMongo().writeMode() !== "commands") {
+    if (db.getMerizo().writeMode() !== "commands") {
         let bulk = coll.initializeUnorderedBulkOp();
         bulk.find({});
         assert.throws(function() {
@@ -187,7 +187,7 @@
               coll.findOneAndUpdate({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]}));
 
     // updateOne().
-    if (db.getMongo().writeMode() !== "commands") {
+    if (db.getMerizo().writeMode() !== "commands") {
         assert.throws(function() {
             coll.updateOne({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]});
         });
@@ -200,7 +200,7 @@
     }
 
     // updateMany().
-    if (db.getMongo().writeMode() !== "commands") {
+    if (db.getMerizo().writeMode() !== "commands") {
         assert.throws(function() {
             coll.updateMany({}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]});
         });
@@ -213,7 +213,7 @@
     }
 
     // updateOne with bulkWrite().
-    if (db.getMongo().writeMode() !== "commands") {
+    if (db.getMerizo().writeMode() !== "commands") {
         assert.throws(function() {
             coll.bulkWrite([{
                 updateOne:
@@ -234,7 +234,7 @@
     }
 
     // updateMany with bulkWrite().
-    if (db.getMongo().writeMode() !== "commands") {
+    if (db.getMerizo().writeMode() !== "commands") {
         assert.throws(function() {
             coll.bulkWrite([
                 {updateMany: {filter: {}, update: {$set: {"a.$[i]": 5}}, arrayFilters: [{i: 0}]}}
@@ -255,7 +255,7 @@
     //
 
     // update().
-    if (db.getMongo().writeMode() !== "commands") {
+    if (db.getMerizo().writeMode() !== "commands") {
         assert.throws(function() {
             coll.explain().update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0}]});
         });
@@ -282,7 +282,7 @@
     // $set.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [0, 1, 0, 1]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update({_id: 0}, {$set: {"a.$[i]": 2}}, {arrayFilters: [{i: 0}]}));
         assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [2, 1, 2, 1]});
     }
@@ -292,7 +292,7 @@
     // $unset.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [0, 1, 0, 1]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update({_id: 0}, {$unset: {"a.$[i]": true}}, {arrayFilters: [{i: 0}]}));
         assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [null, 1, null, 1]});
     }
@@ -302,7 +302,7 @@
     // $inc.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [0, 1, 0, 1]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update({_id: 0}, {$inc: {"a.$[i]": 1}}, {arrayFilters: [{i: 1}]}));
         assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [0, 2, 0, 2]});
     }
@@ -314,7 +314,7 @@
     // $mul.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [0, 2, 0, 2]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update({_id: 0}, {$mul: {"a.$[i]": 3}}, {arrayFilters: [{i: 2}]}));
         assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [0, 6, 0, 6]});
     }
@@ -326,7 +326,7 @@
     // $rename.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [1, 2, 3, 4]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         res = coll.update({_id: 0}, {$rename: {"a.$[i]": "b"}}, {arrayFilters: [{i: 0}]});
         assert.writeErrorWithCode(res, ErrorCodes.BadValue);
         assert.neq(-1,
@@ -360,7 +360,7 @@
 
     // $setOnInsert.
     coll.drop();
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update({_id: 0, a: [0]},
                                    {$setOnInsert: {"a.$[i]": 1}},
                                    {arrayFilters: [{i: 0}], upsert: true}));
@@ -373,7 +373,7 @@
     // $min.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [{b: 0, c: 1}, {b: 0, c: -1}, {b: 1, c: 1}]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(
             coll.update({_id: 0}, {$min: {"a.$[i].c": 0}}, {arrayFilters: [{"i.b": 0}]}));
         assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [{b: 0, c: 0}, {b: 0, c: -1}, {b: 1, c: 1}]});
@@ -384,7 +384,7 @@
     // $max.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [{b: 0, c: 1}, {b: 0, c: -1}, {b: 1, c: -1}]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(
             coll.update({_id: 0}, {$max: {"a.$[i].c": 0}}, {arrayFilters: [{"i.b": 0}]}));
         assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [{b: 0, c: 1}, {b: 0, c: 0}, {b: 1, c: -1}]});
@@ -395,7 +395,7 @@
     // $currentDate.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [0, 1]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(
             coll.update({_id: 0}, {$currentDate: {"a.$[i]": true}}, {arrayFilters: [{i: 0}]}));
         let doc = coll.findOne({_id: 0});
@@ -409,7 +409,7 @@
 
     // $addToSet.
     coll.drop();
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.insert({_id: 0, a: [[0], [1]]}));
         assert.writeOK(coll.update({_id: 0}, {$addToSet: {"a.$[i]": 2}}, {arrayFilters: [{i: 0}]}));
         assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [[0, 2], [1]]});
@@ -422,7 +422,7 @@
     // $pop.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [[0, 1], [1, 2]]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update({_id: 0}, {$pop: {"a.$[i]": 1}}, {arrayFilters: [{i: 0}]}));
         assert.eq({_id: 0, a: [[0], [1, 2]]}, coll.findOne());
     }
@@ -434,7 +434,7 @@
     // $pullAll.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [[0, 1, 2, 3], [1, 2, 3, 4]]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(
             coll.update({_id: 0}, {$pullAll: {"a.$[i]": [0, 2]}}, {arrayFilters: [{i: 0}]}));
         assert.eq({_id: 0, a: [[1, 3], [1, 2, 3, 4]]}, coll.findOne());
@@ -447,7 +447,7 @@
     // $pull.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [[0, 1], [1, 2]]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update({_id: 0}, {$pull: {"a.$[i]": 1}}, {arrayFilters: [{i: 2}]}));
         assert.eq({_id: 0, a: [[0, 1], [2]]}, coll.findOne());
     }
@@ -459,7 +459,7 @@
     // $push.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [[0, 1], [2, 3]]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update({_id: 0}, {$push: {"a.$[i]": 4}}, {arrayFilters: [{i: 0}]}));
         assert.eq({_id: 0, a: [[0, 1, 4], [2, 3]]}, coll.findOne());
     }
@@ -471,7 +471,7 @@
     // $bit.
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [NumberInt(0), NumberInt(2)]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(coll.update(
             {_id: 0}, {$bit: {"a.$[i]": {or: NumberInt(10)}}}, {arrayFilters: [{i: 0}]}));
         assert.eq({_id: 0, a: [NumberInt(10), NumberInt(2)]}, coll.findOne());
@@ -488,7 +488,7 @@
     coll.drop();
     assert.writeOK(coll.insert({_id: 0, a: [0, 1, 0, 1]}));
     assert.writeOK(coll.insert({_id: 1, a: [0, 2, 0, 2]}));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.writeOK(
             coll.update({}, {$set: {"a.$[i]": 3}}, {multi: true, arrayFilters: [{i: 0}]}));
         assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [3, 1, 3, 1]});
@@ -502,7 +502,7 @@
     // Collation tests.
     //
 
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         // arrayFilters respect operation collation.
         coll.drop();
         assert.writeOK(coll.insert({_id: 0, a: ["foo", "FOO"]}));
@@ -534,7 +534,7 @@
     assert.eq(coll.findOne({_id: 0}), {_id: 0, a: [{b: 2}, {b: 2}]});
 
     // Update all matching documents in array.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         coll.drop();
         assert.writeOK(coll.insert({_id: 0, a: [{b: 0}, {b: 1}]}));
         assert.writeOK(
@@ -543,7 +543,7 @@
     }
 
     // Update all matching scalars in array.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         coll.drop();
         assert.writeOK(coll.insert({_id: 0, a: [0, 1]}));
         assert.writeOK(coll.update({_id: 0}, {$set: {"a.$[i]": 2}}, {arrayFilters: [{i: 0}]}));
@@ -551,7 +551,7 @@
     }
 
     // Update all matching scalars in array of arrays.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         coll.drop();
         assert.writeOK(coll.insert({_id: 0, a: [[0, 1], [0, 1]]}));
         assert.writeOK(coll.update({_id: 0}, {$set: {"a.$[].$[j]": 2}}, {arrayFilters: [{j: 0}]}));
@@ -559,7 +559,7 @@
     }
 
     // Update all matching documents in nested array.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         coll.drop();
         assert.writeOK(
             coll.insert({_id: 0, a: [{b: 0, c: [{d: 0}, {d: 1}]}, {b: 1, c: [{d: 0}, {d: 1}]}]}));
@@ -570,7 +570,7 @@
     }
 
     // Update all scalars in array matching a logical predicate.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         coll.drop();
         assert.writeOK(coll.insert({_id: 0, a: [0, 1, 3]}));
         assert.writeOK(coll.update(
@@ -592,7 +592,7 @@
                "update failed for a reason other than missing array filter");
 
     // Use an <id> at the same position as a $, integer, or field name.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         coll.drop();
 
         res = coll.update({_id: 0}, {$set: {"a.$[i]": 0, "a.$": 0}}, {arrayFilters: [{i: 0}]});
@@ -630,7 +630,7 @@
                "update failed for a reason other than implicit array traversal");
 
     // <id> contains special characters or does not begin with a lowercase letter.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         coll.drop();
 
         res = coll.update({_id: 0}, {$set: {"a.$[$i]": 1}}, {arrayFilters: [{"$i": 0}]});
@@ -662,7 +662,7 @@
     // Nested array update conflict detection.
     //
 
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         // "a.$[i].b.$[k].c" and "a.$[j].b.$[k].d" are not a conflict, even if i and j are not
         // disjoint.
         coll.drop();

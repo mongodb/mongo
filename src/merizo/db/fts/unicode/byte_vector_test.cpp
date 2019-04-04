@@ -34,7 +34,7 @@
 #include "merizo/db/fts/unicode/byte_vector.h"
 #include "merizo/unittest/unittest.h"
 
-#ifdef MONGO_HAVE_FAST_BYTE_VECTOR
+#ifdef MERIZO_HAVE_FAST_BYTE_VECTOR
 namespace merizo {
 namespace unicode {
 

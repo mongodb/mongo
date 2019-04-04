@@ -57,7 +57,7 @@
         st.configRS.awaitReplication();
         st.rs0.awaitReplication();
         st.rs1.awaitReplication();
-        st.restartMongoses();
+        st.restartMerizoses();
 
         // Having upgraded the cluster, reacquire references to each component.
         merizosDB = st.s.getDB(jsTestName());
@@ -122,7 +122,7 @@
         // Upgrade the remaining shard to 4.2 but leave the merizoS on 'oldVersion'.
         jsTestLog(`Upgrading to binary ${oldVersion} merizoS and binary 4.2 shards with FCV 4.0`);
         refreshCluster(latest42Version,
-                       {upgradeMongos: false, upgradeShards: true, upgradeConfigs: true});
+                       {upgradeMerizos: false, upgradeShards: true, upgradeConfigs: true});
 
         // The shards have been upgraded to 4.2 but the merizoS is running 4.0. The merizoS should be
         // able to merge the output from the shards, but the merizoS streams will only generate a
@@ -141,7 +141,7 @@
         // Upgrade the merizoS to 4.2 but leave the cluster in FCV 4.0
         jsTestLog("Upgrading to binary 4.2 merizoS and shards with FCV 4.0");
         refreshCluster(latest42Version,
-                       {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
+                       {upgradeMerizos: true, upgradeShards: false, upgradeConfigs: false});
 
         // All streams should now return PBRTs, and we should obtain a valid HWM from the test.
         jsTestLog("Testing binary 4.2 merizoS and shards with FCV 4.0");
@@ -191,7 +191,7 @@
         // running a post-backport version of 4.0.
         jsTestLog(`Downgrading to binary ${oldVersion} merizoS with FCV 4.0 shards`);
         refreshCluster(oldVersion,
-                       {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
+                       {upgradeMerizos: true, upgradeShards: false, upgradeConfigs: false});
 
         // Should only receive PBRTs and be able to resume via merizoS if running post-backport 4.0.
         jsTestLog(`Testing downgraded binary ${oldVersion} merizoS with binary 4.2 FCV 4.0 shards`);
@@ -225,9 +225,9 @@
         // Downgrade the remainder of the cluster to 'oldVersion'.
         jsTestLog(`Downgrading to binary ${oldVersion} shards`);
         refreshCluster(oldVersion,
-                       {upgradeShards: true, upgradeConfigs: false, upgradeMongos: false});
+                       {upgradeShards: true, upgradeConfigs: false, upgradeMerizos: false});
         refreshCluster(oldVersion,
-                       {upgradeConfigs: true, upgradeShards: false, upgradeMongos: false});
+                       {upgradeConfigs: true, upgradeShards: false, upgradeMerizos: false});
 
         // We should only receive PBRTs and be able to resume if running a post-backport 4.0.
         jsTestLog(`Testing downgraded binary ${oldVersion} merizoS and shards`);

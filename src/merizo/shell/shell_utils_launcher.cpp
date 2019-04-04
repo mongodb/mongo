@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -261,7 +261,7 @@ void ProgramOutputMultiplexer::clear() {
     _buffer.str("");
 }
 
-ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMongo) {
+ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMerizo) {
     uassert(ErrorCodes::FailedToParse,
             "cannot pass an empty argument to ProgramRunner",
             !args.isEmpty());
@@ -277,17 +277,17 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     _port = -1;
 
     string prefix("merizod-");
-    bool isMongodProgram = isMongo && (string("merizod") == programName ||
+    bool isMerizodProgram = isMerizo && (string("merizod") == programName ||
                                        programName.string().compare(0, prefix.size(), prefix) == 0);
     prefix = "merizos-";
-    bool isMongosProgram = isMongo && (string("merizos") == programName ||
+    bool isMerizosProgram = isMerizo && (string("merizos") == programName ||
                                        programName.string().compare(0, prefix.size(), prefix) == 0);
 
-    if (!isMongo) {
+    if (!isMerizo) {
         _name = "sh";
-    } else if (isMongodProgram) {
+    } else if (isMerizodProgram) {
         _name = "d";
-    } else if (isMongosProgram) {
+    } else if (isMerizosProgram) {
         _name = "s";
     } else if (programName == "merizobridge") {
         _name = "b";
@@ -312,12 +312,12 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
             verify(e.type() == merizo::String);
             str = e.valuestr();
         }
-        if (isMongo) {
+        if (isMerizo) {
             if (str == "--port") {
                 _port = -2;
             } else if (_port == -2) {
                 _port = strtol(str.c_str(), 0, 10);
-            } else if (isMongodProgram && str == "--configsvr") {
+            } else if (isMerizodProgram && str == "--configsvr") {
                 _name = "c";
             }
         }
@@ -368,7 +368,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     }
 #endif
     bool needsPort =
-        isMongo && (isMongodProgram || isMongosProgram || (programName == "merizobridge"));
+        isMerizo && (isMerizodProgram || isMerizosProgram || (programName == "merizobridge"));
     if (!needsPort) {
         _port = -1;
     }
@@ -742,7 +742,7 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
         } else if (WIFSIGNALED(tmp)) {
             *exit_code = -WTERMSIG(tmp);
         } else {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
     }
     if (ret) {
@@ -754,11 +754,11 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
 #endif
 }
 
-BSONObj RawMongoProgramOutput(const BSONObj& args, void* data) {
+BSONObj RawMerizoProgramOutput(const BSONObj& args, void* data) {
     return BSON("" << programOutputLogger.str());
 }
 
-BSONObj ClearRawMongoProgramOutput(const BSONObj& args, void* data) {
+BSONObj ClearRawMerizoProgramOutput(const BSONObj& args, void* data) {
     programOutputLogger.clear();
     return undefinedReturn;
 }
@@ -784,7 +784,7 @@ BSONObj WaitProgram(const BSONObj& a, void* data) {
 // which will be executed, or a single Object which must have a field named "args" which contains
 // an array with all commandline tokens. The Object may have a field named "env" which contains an
 // object of Key Value pairs which will be loaded into the environment of the spawned process.
-BSONObj StartMongoProgram(const BSONObj& a, void* data) {
+BSONObj StartMerizoProgram(const BSONObj& a, void* data) {
     shellGlobalParams.nokillop = true;
     BSONObj args = a;
     BSONObj env{};
@@ -795,7 +795,7 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
         BSONElement argsElem = subobj["args"];
         BSONElement envElem = subobj["env"];
         uassert(40098,
-                "If StartMongoProgram is called with a BSONObj, "
+                "If StartMerizoProgram is called with a BSONObj, "
                 "it must contain an 'args' subobject." +
                     args.toString(),
                 argsElem.ok() && argsElem.isABSONObj());
@@ -814,9 +814,9 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
     return BSON(string("") << r.pid().asLongLong());
 }
 
-BSONObj RunProgram(const BSONObj& a, void* data, bool isMongo) {
+BSONObj RunProgram(const BSONObj& a, void* data, bool isMerizo) {
     BSONObj env{};
-    ProgramRunner r(a, env, isMongo);
+    ProgramRunner r(a, env, isMerizo);
     r.start();
     invariant(registry.isPidRegistered(r.pid()));
     stdx::thread t(r);
@@ -826,11 +826,11 @@ BSONObj RunProgram(const BSONObj& a, void* data, bool isMongo) {
     return BSON(string("") << exit_code);
 }
 
-BSONObj RunMongoProgram(const BSONObj& a, void* data) {
+BSONObj RunMerizoProgram(const BSONObj& a, void* data) {
     return RunProgram(a, data, true);
 }
 
-BSONObj RunNonMongoProgram(const BSONObj& a, void* data) {
+BSONObj RunNonMerizoProgram(const BSONObj& a, void* data) {
     return RunProgram(a, data, false);
 }
 
@@ -1024,7 +1024,7 @@ int getSignal(const BSONObj& a) {
     return ret;
 }
 
-BSONObj getStopMongodOpts(const BSONObj& a) {
+BSONObj getStopMerizodOpts(const BSONObj& a) {
     if (a.nFields() == 3) {
         BSONObjIterator i(a);
         i.next();
@@ -1039,24 +1039,24 @@ BSONObj getStopMongodOpts(const BSONObj& a) {
     return BSONObj();
 }
 
-/** stopMongoProgram(port[, signal]) */
-BSONObj StopMongoProgram(const BSONObj& a, void* data) {
+/** stopMerizoProgram(port[, signal]) */
+BSONObj StopMerizoProgram(const BSONObj& a, void* data) {
     int nFields = a.nFields();
     uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 3);
-    uassert(ErrorCodes::BadValue, "stopMongoProgram needs a number", a.firstElement().isNumber());
+    uassert(ErrorCodes::BadValue, "stopMerizoProgram needs a number", a.firstElement().isNumber());
     int port = int(a.firstElement().number());
-    int code = killDb(port, ProcessId::fromNative(0), getSignal(a), getStopMongodOpts(a));
+    int code = killDb(port, ProcessId::fromNative(0), getSignal(a), getStopMerizodOpts(a));
     log() << "shell: stopped merizo program on port " << port;
     return BSON("" << (double)code);
 }
 
-BSONObj StopMongoProgramByPid(const BSONObj& a, void* data) {
+BSONObj StopMerizoProgramByPid(const BSONObj& a, void* data) {
     int nFields = a.nFields();
     uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields >= 1 && nFields <= 3);
     uassert(
-        ErrorCodes::BadValue, "stopMongoProgramByPid needs a number", a.firstElement().isNumber());
+        ErrorCodes::BadValue, "stopMerizoProgramByPid needs a number", a.firstElement().isNumber());
     ProcessId pid = ProcessId::fromNative(int(a.firstElement().number()));
-    int code = killDb(0, pid, getSignal(a), getStopMongodOpts(a));
+    int code = killDb(0, pid, getSignal(a), getStopMerizodOpts(a));
     log() << "shell: stopped merizo program with pid " << pid;
     return BSON("" << (double)code);
 }
@@ -1069,7 +1069,7 @@ BSONObj ConvertTrafficRecordingToBSON(const BSONObj& a, void* data) {
     return BSON("" << arr);
 }
 
-int KillMongoProgramInstances() {
+int KillMerizoProgramInstances() {
     vector<ProcessId> pids;
     registry.getRegisteredPids(pids);
     int returnCode = EXIT_SUCCESS;
@@ -1084,11 +1084,11 @@ int KillMongoProgramInstances() {
     return returnCode;
 }
 
-std::vector<ProcessId> getRunningMongoChildProcessIds() {
+std::vector<ProcessId> getRunningMerizoChildProcessIds() {
     std::vector<ProcessId> registeredPids, outPids;
     registry.getRegisteredPids(registeredPids);
     // Only return processes that are still alive. A client may have started a program using a merizo
-    // helper but terminated another way. E.g. if a merizod is started with MongoRunner.startMongod
+    // helper but terminated another way. E.g. if a merizod is started with MerizoRunner.startMerizod
     // but exited with db.shutdownServer.
     std::copy_if(registeredPids.begin(),
                  registeredPids.end(),
@@ -1101,20 +1101,20 @@ std::vector<ProcessId> getRunningMongoChildProcessIds() {
     return outPids;
 }
 
-MongoProgramScope::~MongoProgramScope() {
-    DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), 0);)
+MerizoProgramScope::~MerizoProgramScope() {
+    DESTRUCTOR_GUARD(KillMerizoProgramInstances(); ClearRawMerizoProgramOutput(BSONObj(), 0);)
 }
 
 void installShellUtilsLauncher(Scope& scope) {
-    scope.injectNative("_startMongoProgram", StartMongoProgram);
-    scope.injectNative("runProgram", RunMongoProgram);
-    scope.injectNative("run", RunMongoProgram);
-    scope.injectNative("_runMongoProgram", RunMongoProgram);
-    scope.injectNative("runNonMongoProgram", RunNonMongoProgram);
-    scope.injectNative("_stopMongoProgram", StopMongoProgram);
-    scope.injectNative("stopMongoProgramByPid", StopMongoProgramByPid);
-    scope.injectNative("rawMongoProgramOutput", RawMongoProgramOutput);
-    scope.injectNative("clearRawMongoProgramOutput", ClearRawMongoProgramOutput);
+    scope.injectNative("_startMerizoProgram", StartMerizoProgram);
+    scope.injectNative("runProgram", RunMerizoProgram);
+    scope.injectNative("run", RunMerizoProgram);
+    scope.injectNative("_runMerizoProgram", RunMerizoProgram);
+    scope.injectNative("runNonMerizoProgram", RunNonMerizoProgram);
+    scope.injectNative("_stopMerizoProgram", StopMerizoProgram);
+    scope.injectNative("stopMerizoProgramByPid", StopMerizoProgramByPid);
+    scope.injectNative("rawMerizoProgramOutput", RawMerizoProgramOutput);
+    scope.injectNative("clearRawMerizoProgramOutput", ClearRawMerizoProgramOutput);
     scope.injectNative("waitProgram", WaitProgram);
     scope.injectNative("checkProgram", CheckProgram);
     scope.injectNative("resetDbpath", ResetDbpath);

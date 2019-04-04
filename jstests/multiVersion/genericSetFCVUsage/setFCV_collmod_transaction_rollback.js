@@ -7,12 +7,12 @@
 
     load("jstests/libs/feature_compatibility_version.js");
 
-    let dbpath = MongoRunner.dataPath + "setFCV_collmod_transaction_rollback";
+    let dbpath = MerizoRunner.dataPath + "setFCV_collmod_transaction_rollback";
     resetDbpath(dbpath);
 
     const latest = "latest";
 
-    let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
+    let conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: latest});
     assert.neq(
         null, conn, "merizod was unable to start up with version=" + latest + " and no data files");
     let adminDB = conn.getDB("admin");
@@ -48,5 +48,5 @@
     assert.commandFailedWithCode(adminDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}),
                                  50971);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

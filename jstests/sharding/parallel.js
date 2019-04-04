@@ -33,7 +33,7 @@
     var doCommand = function(dbname, cmd) {
         x = benchRun({
             ops: [{op: "findOne", ns: dbname + ".$cmd", query: cmd}],
-            host: db.getMongo().host,
+            host: db.getMerizo().host,
             parallel: 2,
             seconds: 2
         });

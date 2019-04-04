@@ -43,7 +43,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     jsTest.log("Inserting initial data...");
 
-    var merizosConnActive = new Mongo(st.s0.host);
+    var merizosConnActive = new Merizo(st.s0.host);
     var merizosConnIdle = null;
     var merizosConnNew = null;
 
@@ -53,7 +53,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     jsTest.log("Stopping third shard...");
 
-    merizosConnIdle = new Mongo(st.s0.host);
+    merizosConnIdle = new Merizo(st.s0.host);
 
     st.rs2.stopSet();
 
@@ -79,25 +79,25 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     jsTest.log("Testing new connections...");
 
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -4}));
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 4}));
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.writeOK(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 4}));
 
     gc();  // Clean up new connections
 
     jsTest.log("Stopping second shard...");
 
-    merizosConnIdle = new Mongo(st.s0.host);
+    merizosConnIdle = new Merizo(st.s0.host);
 
     st.rs1.stopSet();
     jsTest.log("Testing active connection...");
@@ -121,19 +121,19 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     jsTest.log("Testing new connections...");
 
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.neq(null, merizosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
 
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.neq(null, merizosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.writeOK(merizosConnNew.getCollection(collSharded.toString()).insert({_id: -7}));
 
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.writeError(merizosConnNew.getCollection(collSharded.toString()).insert({_id: 7}));
 
-    merizosConnNew = new Mongo(st.s0.host);
+    merizosConnNew = new Merizo(st.s0.host);
     assert.writeOK(merizosConnNew.getCollection(collUnsharded.toString()).insert({_id: 7}));
 
     st.stop();

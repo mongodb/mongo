@@ -34,7 +34,7 @@ var (
 	urlAuth, urlNonAuth string
 	currentTestURL      string
 	authTestServerMode  bool
-	isMongosTestServer  bool
+	isMerizosTestServer  bool
 	testCollectorOpts   = StatOptions{
 		Buffered: true,
 	}
@@ -89,8 +89,8 @@ func getPrimaryPort(session *mgo.Session) (string, error) {
 		Msg string
 	}{}
 	session.Run("ismaster", res)
-	isMongosTestServer = (res.Msg == "isdbgrid")
-	if isMongosTestServer {
+	isMerizosTestServer = (res.Msg == "isdbgrid")
+	if isMerizosTestServer {
 		return "", nil
 	}
 
@@ -113,7 +113,7 @@ func getPrimaryPort(session *mgo.Session) (string, error) {
 }
 
 func TestMain(m *testing.M) {
-	if !testtype.HasTestType(testtype.MongoReplayTestType) {
+	if !testtype.HasTestType(testtype.MerizoReplayTestType) {
 		os.Exit(0)
 	}
 	err := setConnectionURL()
@@ -135,7 +135,7 @@ func TestMain(m *testing.M) {
 // completed. It then checks its BufferedStatCollector to ensure the inserts
 // match what we expected
 func TestOpInsertLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -234,7 +234,7 @@ func TestOpInsertLiveDB(t *testing.T) {
 // verify they were completed. It then checks its BufferedStatCollector to
 // ensure the update matches what we expected.
 func TestUpdateOpLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -351,7 +351,7 @@ func TestUpdateOpLiveDB(t *testing.T) {
 // It generates inserts and queries and sends them to the main execution of merizoreplay.
 // TestQueryOp then examines a BufferedStatCollector to ensure the queries executed as expected
 func TestQueryOpLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -436,7 +436,7 @@ func TestQueryOpLiveDB(t *testing.T) {
 // based on the original query. It then Uses a BufferedStatCollector to ensure
 // the getmores executed as expected
 func TestOpGetMoreLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -465,7 +465,7 @@ func TestOpGetMoreLiveDB(t *testing.T) {
 // BufferedStatCollector to ensure that each getmore played against the database
 // is executed and receives the response expected
 func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -585,7 +585,7 @@ func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
 // ensure that each killcursors played against the database is executed and
 // receives the response expected
 func TestOpKillCursorsLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -706,11 +706,11 @@ func TestOpKillCursorsLiveDB(t *testing.T) {
 	}
 }
 func TestCommandOpInsertLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
-	if isMongosTestServer {
+	if isMerizosTestServer {
 		t.Skipf("Skipping OpCommand test against merizos")
 	}
 
@@ -793,11 +793,11 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 }
 
 func TestCommandOpFindLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
-	if isMongosTestServer {
+	if isMerizosTestServer {
 		t.Skipf("Skipping OpCommand test against merizos")
 	}
 
@@ -882,8 +882,8 @@ func TestCommandOpFindLiveDB(t *testing.T) {
 }
 
 func TestCommandOpGetMoreLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
-	if isMongosTestServer {
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
+	if isMerizosTestServer {
 		t.Skipf("Skipping OpCommand test against merizos")
 	}
 	if err := teardownDB(); err != nil {
@@ -915,7 +915,7 @@ func TestCommandOpGetMoreLiveDB(t *testing.T) {
 // completed. It then checks its BufferedStatCollector to ensure the inserts
 // match what we expected
 func TestMsgOpInsertLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -997,7 +997,7 @@ func TestMsgOpInsertLiveDB(t *testing.T) {
 }
 
 func TestMsgOpGetMoreLiveDB(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	if err := teardownDB(); err != nil {
 		t.Error(err)
 	}
@@ -1043,7 +1043,7 @@ func getmoreTestHelper(t *testing.T,
 	getmoreFunc getmoreGeneratorFunc,
 	replyFunc replyGeneratorFunc,
 	findFunc findGeneratorFunc) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 
 	var requestID int32 = 2
 	numInserts := 20

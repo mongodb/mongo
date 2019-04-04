@@ -138,7 +138,7 @@
             upsert: true
         }));
 
-    s.restartMongos(0);
+    s.restartMerizos(0);
     s.restartShardRS(0);
 
     // Original problematic case, scaled down to smaller chunksize.

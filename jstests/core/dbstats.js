@@ -5,7 +5,7 @@
 (function() {
     "use strict";
 
-    function serverIsMongos() {
+    function serverIsMerizos() {
         const res = db.runCommand("ismaster");
         assert.commandWorked(res);
         return res.msg === "isdbgrid";
@@ -17,8 +17,8 @@
         return res.storageEngine.persistent === true;
     }
 
-    const isMongoS = serverIsMongos();
-    const isUsingPersistentStorage = !isMongoS && serverUsingPersistentStorage();
+    const isMerizoS = serverIsMerizos();
+    const isUsingPersistentStorage = !isMerizoS && serverUsingPersistentStorage();
 
     let testDB = db.getSiblingDB("dbstats_js");
     assert.commandWorked(testDB.dropDatabase());
@@ -37,7 +37,7 @@
     assert.eq(dataSize, dbStats.dataSize, tojson(dbStats));
 
     // Index count will vary on merizoS if an additional index is needed to support sharding.
-    if (isMongoS) {
+    if (isMerizoS) {
         assert(dbStats.hasOwnProperty("indexes"), tojson(dbStats));
     } else {
         assert.eq(2, dbStats.indexes, tojson(dbStats));
@@ -53,7 +53,7 @@
     }
 
     // Confirm collection and view counts on merizoD
-    if (!isMongoS) {
+    if (!isMerizoS) {
         assert.eq(testDB.getName(), dbStats.db, tojson(dbStats));
 
         // We wait to add a view until this point as it allows more exact testing of avgObjSize for

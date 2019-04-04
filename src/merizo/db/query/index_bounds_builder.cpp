@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/db/query/index_bounds_builder.h"
 
@@ -804,7 +804,7 @@ void IndexBoundsBuilder::intersectize(const OrderedIntervalList& oilA, OrderedIn
             } else if (Interval::INTERVAL_OVERLAPS_AFTER == cmp) {
                 ++oilBIdx;
             } else {
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
             }
         }
     }
@@ -1047,7 +1047,7 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
         log() << "INVALID BOUNDS: " << redact(bounds->toString()) << endl
               << "kp = " << redact(kp) << endl
               << "scanDir = " << scanDir;
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 }
 

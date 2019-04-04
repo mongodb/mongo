@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationInitialSync
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationInitialSync
 
 #include "merizo/platform/basic.h"
 
@@ -76,29 +76,29 @@ namespace merizo {
 namespace repl {
 
 // Failpoint for initial sync
-MONGO_FAIL_POINT_DEFINE(failInitialSyncWithBadHost);
+MERIZO_FAIL_POINT_DEFINE(failInitialSyncWithBadHost);
 
 // Failpoint which fails initial sync and leaves an oplog entry in the buffer.
-MONGO_FAIL_POINT_DEFINE(failInitSyncWithBufferedEntriesLeft);
+MERIZO_FAIL_POINT_DEFINE(failInitSyncWithBufferedEntriesLeft);
 
 // Failpoint which causes the initial sync function to hang before copying databases.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCopyingDatabases);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangBeforeCopyingDatabases);
 
 // Failpoint which causes the initial sync function to hang before finishing.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeFinish);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangBeforeFinish);
 
 // Failpoint which causes the initial sync function to hang before calling shouldRetry on a failed
 // operation.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeGettingMissingDocument);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangBeforeGettingMissingDocument);
 
 // Failpoint which causes the initial sync function to hang before creating the oplog.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCreatingOplog);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangBeforeCreatingOplog);
 
 // Failpoint which stops the applier.
-MONGO_FAIL_POINT_DEFINE(rsSyncApplyStop);
+MERIZO_FAIL_POINT_DEFINE(rsSyncApplyStop);
 
 // Failpoint which causes the initial sync function to hang afte cloning all databases.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterDataCloning);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangAfterDataCloning);
 
 namespace {
 using namespace executor;
@@ -542,7 +542,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
         return;
     }
 
-    if (MONGO_FAIL_POINT(failInitialSyncWithBadHost)) {
+    if (MERIZO_FAIL_POINT(failInitialSyncWithBadHost)) {
         status = Status(ErrorCodes::InvalidSyncSource,
                         "no sync source avail(failInitialSyncWithBadHost failpoint is set).");
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
@@ -580,12 +580,12 @@ void InitialSyncer::_chooseSyncSourceCallback(
         return;
     }
 
-    if (MONGO_FAIL_POINT(initialSyncHangBeforeCreatingOplog)) {
+    if (MERIZO_FAIL_POINT(initialSyncHangBeforeCreatingOplog)) {
         // This log output is used in js tests so please leave it.
         log() << "initial sync - initialSyncHangBeforeCreatingOplog fail point "
                  "enabled. Blocking until fail point is disabled.";
         lock.unlock();
-        while (MONGO_FAIL_POINT(initialSyncHangBeforeCreatingOplog) && !_isShuttingDown()) {
+        while (MERIZO_FAIL_POINT(initialSyncHangBeforeCreatingOplog) && !_isShuttingDown()) {
             merizo::sleepsecs(1);
         }
         lock.lock();
@@ -961,14 +961,14 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         return;
     }
 
-    if (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases)) {
+    if (MERIZO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases)) {
         lock.unlock();
         // This could have been done with a scheduleWorkAt but this is used only by JS tests where
         // we run with multiple threads so it's fine to spin on this thread.
         // This log output is used in js tests so please leave it.
         log() << "initial sync - initialSyncHangBeforeCopyingDatabases fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases) && !_isShuttingDown()) {
+        while (MERIZO_FAIL_POINT(initialSyncHangBeforeCopyingDatabases) && !_isShuttingDown()) {
             merizo::sleepsecs(1);
         }
         lock.lock();
@@ -1034,13 +1034,13 @@ void InitialSyncer::_databasesClonerCallback(const Status& databaseClonerFinishS
     log() << "Finished cloning data: " << redact(databaseClonerFinishStatus)
           << ". Beginning oplog replay.";
 
-    if (MONGO_FAIL_POINT(initialSyncHangAfterDataCloning)) {
+    if (MERIZO_FAIL_POINT(initialSyncHangAfterDataCloning)) {
         // This could have been done with a scheduleWorkAt but this is used only by JS tests where
         // we run with multiple threads so it's fine to spin on this thread.
         // This log output is used in js tests so please leave it.
         log() << "initial sync - initialSyncHangAfterDataCloning fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(initialSyncHangAfterDataCloning) && !_isShuttingDown()) {
+        while (MERIZO_FAIL_POINT(initialSyncHangAfterDataCloning) && !_isShuttingDown()) {
             merizo::sleepsecs(1);
         }
     }
@@ -1155,16 +1155,16 @@ void InitialSyncer::_getNextApplierBatchCallback(
 
     // Set and unset by the InitialSyncTest fixture to cause initial sync to pause so that the
     // Initial Sync Fuzzer can run commands on the sync source.
-    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
+    if (MERIZO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint1)) {
         log() << "Initial Syncer is about to apply the next oplog batch of size: "
               << batchResult.getValue().size();
         log() << "initialSyncFuzzerSynchronizationPoint1 fail point enabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint1);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint1);
     }
 
-    if (MONGO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
+    if (MERIZO_FAIL_POINT(initialSyncFuzzerSynchronizationPoint2)) {
         log() << "initialSyncFuzzerSynchronizationPoint2 fail point enabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncFuzzerSynchronizationPoint2);
     }
 
     // Schedule MultiApplier if we have operations to apply.
@@ -1448,11 +1448,11 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
         std::swap(_onCompletion, onCompletion);
     }
 
-    if (MONGO_FAIL_POINT(initialSyncHangBeforeFinish)) {
+    if (MERIZO_FAIL_POINT(initialSyncHangBeforeFinish)) {
         // This log output is used in js tests so please leave it.
         log() << "initial sync - initialSyncHangBeforeFinish fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(initialSyncHangBeforeFinish) && !_isShuttingDown()) {
+        while (MERIZO_FAIL_POINT(initialSyncHangBeforeFinish) && !_isShuttingDown()) {
             merizo::sleepsecs(1);
         }
     }
@@ -1674,7 +1674,7 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
     // If the fail-point is active, delay the apply batch by returning an empty batch so that
     // _getNextApplierBatchCallback() will reschedule itself at a later time.
     // See InitialSyncerOptions::getApplierBatchCallbackRetryWait.
-    if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+    if (MERIZO_FAIL_POINT(rsSyncApplyStop)) {
         return Operations();
     }
 

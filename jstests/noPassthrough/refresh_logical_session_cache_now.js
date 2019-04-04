@@ -10,7 +10,7 @@
     var startSession = {startSession: 1};
 
     // Start up a standalone server.
-    var conn = MongoRunner.runMongod();
+    var conn = MerizoRunner.runMerizod();
     var admin = conn.getDB("admin");
     var config = conn.getDB("config");
 
@@ -45,5 +45,5 @@
 
     assert.eq(
         config.system.sessions.count(), numSessions + 1, "should have written session records");
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

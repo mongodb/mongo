@@ -2,7 +2,7 @@
 
 (function() {
     'use strict';
-    var m = MongoRunner.runMongod({setParameter: "diagnosticDataCollectionPeriodMillis=101"});
+    var m = MerizoRunner.runMerizod({setParameter: "diagnosticDataCollectionPeriodMillis=101"});
 
     // Check the defaults are correct
     //
@@ -15,5 +15,5 @@
     }
 
     assert.eq(getparam("diagnosticDataCollectionPeriodMillis"), 101);
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 })();

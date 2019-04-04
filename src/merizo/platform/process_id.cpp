@@ -39,7 +39,7 @@
 
 namespace merizo {
 
-MONGO_STATIC_ASSERT(sizeof(NativeProcessId) == sizeof(uint32_t));
+MERIZO_STATIC_ASSERT(sizeof(NativeProcessId) == sizeof(uint32_t));
 
 namespace {
 #ifdef _WIN32

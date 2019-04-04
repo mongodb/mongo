@@ -35,10 +35,10 @@
 
 namespace merizo {
 
-MONGO_REGISTER_SHIM(MongoProcessInterface::create)
-(OperationContext* opCtx)->std::shared_ptr<MongoProcessInterface> {
-    return ShardingState::get(opCtx)->enabled() ? std::make_shared<MongoInterfaceShardServer>(opCtx)
-                                                : std::make_shared<MongoInterfaceStandalone>(opCtx);
+MERIZO_REGISTER_SHIM(MerizoProcessInterface::create)
+(OperationContext* opCtx)->std::shared_ptr<MerizoProcessInterface> {
+    return ShardingState::get(opCtx)->enabled() ? std::make_shared<MerizoInterfaceShardServer>(opCtx)
+                                                : std::make_shared<MerizoInterfaceStandalone>(opCtx);
 }
 
 }  // namespace merizo

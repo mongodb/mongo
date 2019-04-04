@@ -13,7 +13,7 @@
     // check would be lost.
     TestData.skipGossipingClusterTime = true;
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod was unable to start up");
     const testDB = conn.getDB("jstests_query_shape_hash");
     const coll = testDB.test;
@@ -152,5 +152,5 @@
              logLine.indexOf("queryHash " + String(onCreationHashes.queryHash)) != -1));
     assert.eq(1, creationLogList.length);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

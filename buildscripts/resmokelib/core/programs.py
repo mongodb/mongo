@@ -23,22 +23,22 @@ from .. import utils
 
 # The default verbosity setting for any tests that are not started with an Evergreen task id. This
 # will apply to any tests run locally.
-DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"rollback": 2}, "transaction": 4}
+DEFAULT_MERIZOD_LOG_COMPONENT_VERBOSITY = {"replication": {"rollback": 2}, "transaction": 4}
 
 # The default verbosity setting for any tests running in Evergreen i.e. started with an Evergreen
 # task id.
-DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
+DEFAULT_EVERGREEN_MERIZOD_LOG_COMPONENT_VERBOSITY = {
     "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
     "storage": {"recovery": 2}, "transaction": 4
 }
 
 # The default verbosity setting for any tests that are not started with an Evergreen task id. This
 # will apply to any tests run locally.
-DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY = {"transaction": 3}
+DEFAULT_MERIZOS_LOG_COMPONENT_VERBOSITY = {"transaction": 3}
 
 # The default verbosity setting for any tests running in Evergreen i.e. started with an Evergreen
 # task id.
-DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY = {"transaction": 3}
+DEFAULT_EVERGREEN_MERIZOS_LOG_COMPONENT_VERBOSITY = {"transaction": 3}
 
 
 def make_process(*args, **kwargs):
@@ -52,30 +52,30 @@ def make_process(*args, **kwargs):
 def default_merizod_log_component_verbosity():
     """Return the default 'logComponentVerbosity' value to use for merizod processes."""
     if config.EVERGREEN_TASK_ID:
-        return DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY
-    return DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY
+        return DEFAULT_EVERGREEN_MERIZOD_LOG_COMPONENT_VERBOSITY
+    return DEFAULT_MERIZOD_LOG_COMPONENT_VERBOSITY
 
 
 def default_merizos_log_component_verbosity():
     """Return the default 'logComponentVerbosity' value to use for merizos processes."""
     if config.EVERGREEN_TASK_ID:
-        return DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY
-    return DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY
+        return DEFAULT_EVERGREEN_MERIZOS_LOG_COMPONENT_VERBOSITY
+    return DEFAULT_MERIZOS_LOG_COMPONENT_VERBOSITY
 
 
 def merizod_program(  # pylint: disable=too-many-branches
         logger, executable=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts merizod arguments constructed from 'kwargs'."""
 
-    executable = utils.default_if_none(executable, config.DEFAULT_MONGOD_EXECUTABLE)
+    executable = utils.default_if_none(executable, config.DEFAULT_MERIZOD_EXECUTABLE)
     args = [executable]
 
     # Apply the --setParameter command line argument. Command line options to resmoke.py override
     # the YAML configuration.
     suite_set_parameters = kwargs.pop("set_parameters", {})
 
-    if config.MONGOD_SET_PARAMETERS is not None:
-        suite_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+    if config.MERIZOD_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.MERIZOD_SET_PARAMETERS))
 
     # Set default log verbosity levels if none were specified.
     if "logComponentVerbosity" not in suite_set_parameters:
@@ -172,15 +172,15 @@ def merizod_program(  # pylint: disable=too-many-branches
 def merizos_program(logger, executable=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts a merizos with arguments constructed from 'kwargs'."""
 
-    executable = utils.default_if_none(executable, config.DEFAULT_MONGOS_EXECUTABLE)
+    executable = utils.default_if_none(executable, config.DEFAULT_MERIZOS_EXECUTABLE)
     args = [executable]
 
     # Apply the --setParameter command line argument. Command line options to resmoke.py override
     # the YAML configuration.
     suite_set_parameters = kwargs.pop("set_parameters", {})
 
-    if config.MONGOS_SET_PARAMETERS is not None:
-        suite_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+    if config.MERIZOS_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.MERIZOS_SET_PARAMETERS))
 
     # Set default log verbosity levels if none were specified.
     if "logComponentVerbosity" not in suite_set_parameters:
@@ -206,7 +206,7 @@ def merizo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,t
     """
 
     executable = utils.default_if_none(
-        utils.default_if_none(executable, config.MONGO_EXECUTABLE), config.DEFAULT_MONGO_EXECUTABLE)
+        utils.default_if_none(executable, config.MERIZO_EXECUTABLE), config.DEFAULT_MERIZO_EXECUTABLE)
     args = [executable]
 
     eval_sb = []  # String builder.
@@ -244,17 +244,17 @@ def merizo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,t
     # they are dictionaries, they will be converted to JavaScript objects when passed to the shell
     # by the _format_shell_vars() function.
     merizod_set_parameters = test_data.get("setParameters", {}).copy()
-    merizos_set_parameters = test_data.get("setParametersMongos", {}).copy()
+    merizos_set_parameters = test_data.get("setParametersMerizos", {}).copy()
 
     # Propagate additional setParameters to merizod processes spawned by the merizo shell. Command
     # line options to resmoke.py override the YAML configuration.
-    if config.MONGOD_SET_PARAMETERS is not None:
-        merizod_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+    if config.MERIZOD_SET_PARAMETERS is not None:
+        merizod_set_parameters.update(utils.load_yaml(config.MERIZOD_SET_PARAMETERS))
 
     # Propagate additional setParameters to merizos processes spawned by the merizo shell. Command
     # line options to resmoke.py override the YAML configuration.
-    if config.MONGOS_SET_PARAMETERS is not None:
-        merizos_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+    if config.MERIZOS_SET_PARAMETERS is not None:
+        merizos_set_parameters.update(utils.load_yaml(config.MERIZOS_SET_PARAMETERS))
 
     # If the 'logComponentVerbosity' setParameter for merizod was not already specified, we set its
     # value to a default.
@@ -267,7 +267,7 @@ def merizo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,t
                                      default_merizos_log_component_verbosity())
 
     test_data["setParameters"] = merizod_set_parameters
-    test_data["setParametersMongos"] = merizos_set_parameters
+    test_data["setParametersMerizos"] = merizos_set_parameters
 
     # There's a periodic background thread that checks for and aborts expired transactions.
     # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring

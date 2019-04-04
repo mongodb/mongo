@@ -25,7 +25,7 @@
         // into "sentinel", to signal that the parallel shell has started and is waiting for the
         // getMore to appear in currentOp.
         const port =
-            (collection.stats().sharded ? collection.getMongo().port
+            (collection.stats().sharded ? collection.getMerizo().port
                                         : FixtureHelpers.getPrimaryForNodeHostingDatabase(db).port);
 
         const sentinelCountBefore = shellSentinelCollection.find().itcount();

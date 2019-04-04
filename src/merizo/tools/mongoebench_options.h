@@ -51,26 +51,26 @@ class Environment;
 
 namespace moe = merizo::optionenvironment;
 
-struct MongoeBenchGlobalParams {
+struct MerizoeBenchGlobalParams {
     std::unique_ptr<BenchRunConfig> preConfig;
     std::unique_ptr<BenchRunConfig> opsConfig;
     boost::filesystem::path outputFile;
 };
 
-extern MongoeBenchGlobalParams merizoeBenchGlobalParams;
+extern MerizoeBenchGlobalParams merizoeBenchGlobalParams;
 
-Status addMongoeBenchOptions(moe::OptionSection* options);
+Status addMerizoeBenchOptions(moe::OptionSection* options);
 
-void printMongoeBenchHelp(std::ostream* out);
+void printMerizoeBenchHelp(std::ostream* out);
 
 /**
  * Handle options that should come before validation, such as "help".
  *
  * Returns false if an option was found that implies we should prematurely exit with success.
  */
-bool handlePreValidationMongoeBenchOptions(const moe::Environment& params);
+bool handlePreValidationMerizoeBenchOptions(const moe::Environment& params);
 
-Status storeMongoeBenchOptions(const moe::Environment& params,
+Status storeMerizoeBenchOptions(const moe::Environment& params,
                                const std::vector<std::string>& args);
 
 }  // namespace merizo

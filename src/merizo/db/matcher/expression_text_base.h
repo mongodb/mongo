@@ -61,7 +61,7 @@ public:
     virtual const fts::FTSQuery& getFTSQuery() const = 0;
 
     BSONObj getSerializedRightHandSide() const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     //

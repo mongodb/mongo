@@ -50,7 +50,7 @@
 
     // The override requires the connection to be run under a session. Use the replica set URL to
     // allow automatic re-targeting of the primary on NotMaster errors.
-    const db = new Mongo(rst.getURL()).startSession({retryWrites: true}).getDatabase(dbName);
+    const db = new Merizo(rst.getURL()).startSession({retryWrites: true}).getDatabase(dbName);
 
     // Commands with no disconnections should work as normal.
     assert.commandWorked(db.runCommand({ping: 1}));

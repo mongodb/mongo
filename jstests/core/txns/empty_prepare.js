@@ -17,7 +17,7 @@
     const doc = {_id: 1, a: 1, b: 1};
     assert.commandWorked(testColl.insert(doc));
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
 

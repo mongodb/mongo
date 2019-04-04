@@ -57,12 +57,12 @@
  * options that are always in the executable
  *
  * Usage:
- *     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
+ *     MERIZO_GENERAL_STARTUP_OPTIONS_REGISTER(MerizodOptions)(InitializerContext* context) {
  *         return Status::OK();
  *     }
  */
-#define MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(fname)                    \
-    MONGO_INITIALIZER_GENERAL(fname##_Register,                          \
+#define MERIZO_GENERAL_STARTUP_OPTIONS_REGISTER(fname)                    \
+    MERIZO_INITIALIZER_GENERAL(fname##_Register,                          \
                               ("BeginGeneralStartupOptionRegistration"), \
                               ("EndGeneralStartupOptionRegistration"))
 
@@ -72,12 +72,12 @@
  * startup options, and thus options registered in these will appear after those in help output.
  *
  * Usage:
- *     MONGO_MODULE_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
+ *     MERIZO_MODULE_STARTUP_OPTIONS_REGISTER(MerizodOptions)(InitializerContext* context) {
  *         return Status::OK();
  *     }
  */
-#define MONGO_MODULE_STARTUP_OPTIONS_REGISTER(fname)                   \
-    MONGO_INITIALIZER_GENERAL(fname##_Register,                        \
+#define MERIZO_MODULE_STARTUP_OPTIONS_REGISTER(fname)                   \
+    MERIZO_INITIALIZER_GENERAL(fname##_Register,                        \
                               ("EndGeneralStartupOptionRegistration"), \
                               ("EndStartupOptionRegistration"))
 
@@ -87,12 +87,12 @@
  * This should only be defined once per binary.
  *
  * Usage:
- *     MONGO_STARTUP_OPTIONS_PARSE(MongodOptions)(InitializerContext* context) {
+ *     MERIZO_STARTUP_OPTIONS_PARSE(MerizodOptions)(InitializerContext* context) {
  *         return Status::OK();
  *     }
  */
-#define MONGO_STARTUP_OPTIONS_PARSE(fname) \
-    MONGO_INITIALIZER_GENERAL(             \
+#define MERIZO_STARTUP_OPTIONS_PARSE(fname) \
+    MERIZO_INITIALIZER_GENERAL(             \
         fname##_Parse, ("BeginStartupOptionParsing"), ("EndStartupOptionParsing"))
 
 /**
@@ -103,12 +103,12 @@
  * that depends on them being separate.
  *
  * Usage:
- *     MONGO_STARTUP_OPTIONS_PARSE(MongodOptions)(InitializerContext* context) {
+ *     MERIZO_STARTUP_OPTIONS_PARSE(MerizodOptions)(InitializerContext* context) {
  *         return Status::OK();
  *     }
  */
-#define MONGO_STARTUP_OPTIONS_VALIDATE(fname) \
-    MONGO_INITIALIZER_GENERAL(                \
+#define MERIZO_STARTUP_OPTIONS_VALIDATE(fname) \
+    MERIZO_INITIALIZER_GENERAL(                \
         fname##_Validate, ("BeginStartupOptionValidation"), ("EndStartupOptionValidation"))
 
 /**
@@ -120,12 +120,12 @@
  * that depends on them being separate.
  *
  * Usage:
- *     MONGO_STARTUP_OPTIONS_STORE(MongodOptions)(InitializerContext* context) {
+ *     MERIZO_STARTUP_OPTIONS_STORE(MerizodOptions)(InitializerContext* context) {
  *         return Status::OK();
  *     }
  */
-#define MONGO_STARTUP_OPTIONS_STORE(fname) \
-    MONGO_INITIALIZER_GENERAL(             \
+#define MERIZO_STARTUP_OPTIONS_STORE(fname) \
+    MERIZO_INITIALIZER_GENERAL(             \
         fname##_Store, ("BeginStartupOptionStorage"), ("EndStartupOptionStorage"))
 
 /**
@@ -134,10 +134,10 @@
  * and configuring global state.
  *
  * Usage:
- *     MONGO_STARTUP_OPTIONS_POST(MongodOptions)(InitializerContext* context) {
+ *     MERIZO_STARTUP_OPTIONS_POST(MerizodOptions)(InitializerContext* context) {
  *         return Status::OK();
  *     }
  */
-#define MONGO_STARTUP_OPTIONS_POST(fname) \
-    MONGO_INITIALIZER_GENERAL(            \
+#define MERIZO_STARTUP_OPTIONS_POST(fname) \
+    MERIZO_INITIALIZER_GENERAL(            \
         fname##_Store, ("BeginPostStartupOptionStorage"), ("EndPostStartupOptionStorage"))

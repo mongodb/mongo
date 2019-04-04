@@ -31,7 +31,7 @@
 
     replSet.awaitSecondaryNodes(200 * 1000);
 
-    // Skip collection validation during stopMongod if invalid views exists.
+    // Skip collection validation during stopMerizod if invalid views exists.
     TestData.skipValidationOnInvalidViewDefinitions = true;
 
     replSet.stopSet();

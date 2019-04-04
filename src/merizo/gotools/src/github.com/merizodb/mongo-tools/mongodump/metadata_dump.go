@@ -33,7 +33,7 @@ type IndexDocumentFromDB struct {
 
 // dumpMetadata gets the metadata for a collection and writes it
 // in readable JSON format.
-func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOutputBuffer) (err error) {
+func (dump *MerizoDump) dumpMetadata(intent *intents.Intent, buffer resettableOutputBuffer) (err error) {
 
 	meta := Metadata{
 		// We have to initialize Indexes to an empty slice, not nil, so that an empty

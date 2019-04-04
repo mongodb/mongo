@@ -74,8 +74,8 @@
             assert.writeOK(coll.insert({_id: i, a: i}));
         }
 
-        const isLocalMongosCurOp = (FixtureHelpers.isMongos(testDB) && localOps);
-        const isRemoteShardCurOp = (FixtureHelpers.isMongos(testDB) && !localOps);
+        const isLocalMerizosCurOp = (FixtureHelpers.isMerizos(testDB) && localOps);
+        const isRemoteShardCurOp = (FixtureHelpers.isMerizos(testDB) && !localOps);
 
         // If 'truncatedOps' is true, run only the subset of tests designed to validate the
         // truncation behaviour. Otherwise, run the standard set of tests which assume that
@@ -120,18 +120,18 @@
             // found at TestData.currentOpTest.
             function doTest() {
                 const testDB = db.getSiblingDB(TestData.currentOpCollName);
-                testDB.getMongo().forceReadMode(TestData.shellReadMode);
+                testDB.getMerizo().forceReadMode(TestData.shellReadMode);
                 TestData.currentOpTest(testDB);
             }
 
             // Run the operation in the background.
-            var awaitShell = startParallelShell(doTest, testDB.getMongo().port);
+            var awaitShell = startParallelShell(doTest, testDB.getMerizo().port);
 
             // Augment the currentOpFilter with additional known predicates.
             if (!testObj.currentOpFilter.ns) {
                 testObj.currentOpFilter.ns = coll.getFullName();
             }
-            if (!isLocalMongosCurOp) {
+            if (!isLocalMerizosCurOp) {
                 testObj.currentOpFilter.planSummary = testObj.planSummary;
             }
             if (testObj.hasOwnProperty("command")) {
@@ -164,7 +164,7 @@
                     return "Failed to find operation from " + tojson(testObj.currentOpFilter) +
                         " in currentOp() output: " +
                         tojson(currentOp(testDB, {}, truncatedOps, localOps)) +
-                        (isLocalMongosCurOp
+                        (isLocalMerizosCurOp
                              ? ", with localOps=false: " +
                                  tojson(currentOp(testDB, {}, truncatedOps, false))
                              : "");
@@ -291,7 +291,7 @@
                   operation: "remove",
                   planSummary: "COLLSCAN",
                   currentOpFilter:
-                      (isLocalMongosCurOp
+                      (isLocalMerizosCurOp
                            ? {"command.delete": coll.getName(), "command.ordered": true}
                            : {
                                "command.q.$comment": "currentop_query",
@@ -308,7 +308,7 @@
                   operation: "update",
                   planSummary: "COLLSCAN",
                   currentOpFilter:
-                      (isLocalMongosCurOp
+                      (isLocalMerizosCurOp
                            ? {"command.update": coll.getName(), "command.ordered": true}
                            : {
                                "command.q.$comment": "currentop_query",

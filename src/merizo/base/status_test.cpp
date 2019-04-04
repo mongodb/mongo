@@ -284,7 +284,7 @@ DEATH_TEST(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure parsers::"
     ErrorExtraInfo::invariantHaveAllParsers();
 }
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
 DEATH_TEST(ErrorExtraInfo, DassertShouldHaveExtraInfo, "Fatal Assertion 40680") {
     Status(ErrorCodes::ForTestingErrorExtraInfo, "");
 }

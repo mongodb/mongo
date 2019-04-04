@@ -2,5 +2,5 @@ LIBRARY "merizoca"
 
 EXPORTS
 
-UpdateMongoYAML
+UpdateMerizoYAML
 ValidateServiceLogon

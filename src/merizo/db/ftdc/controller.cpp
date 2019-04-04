@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
 
 #include "merizo/platform/basic.h"
 
@@ -206,7 +206,7 @@ void FTDCController::doLoop() {
             // Wait for the next run or signal to shutdown
             {
                 stdx::unique_lock<stdx::mutex> lock(_mutex);
-                MONGO_IDLE_THREAD_BLOCK;
+                MERIZO_IDLE_THREAD_BLOCK;
 
                 // We ignore spurious wakeups by just doing an iteration of the loop
                 auto status = _condvar.wait_until(lock, next_time.toSystemTimePoint());

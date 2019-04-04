@@ -5,18 +5,18 @@
     "use strict";
 
     if (!_isWindows()) {
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
         var rc = runProgram("./merizo", "--nodb", "--quiet", "--eval", "print(isInteractive())");
         assert.eq(rc, 0);
-        var output = rawMongoProgramOutput();
+        var output = rawMerizoProgramOutput();
         var response = (output.split('\n').slice(-2)[0]).split(' ')[1];
         assert.eq(response, "false", "Expected 'false' in script mode");
         // now try interactive
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
         rc = runProgram(
             "./merizo", "--nodb", "--quiet", "--shell", "--eval", "print(isInteractive()); quit()");
         assert.eq(rc, 0);
-        output = rawMongoProgramOutput();
+        output = rawMerizoProgramOutput();
         response = (output.split('\n').slice(-2)[0]).split(' ')[1];
         assert.eq(response, "true", "Expected 'true' in interactive mode");
     }

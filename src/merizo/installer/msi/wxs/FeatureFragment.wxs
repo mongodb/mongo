@@ -44,8 +44,8 @@
                  Level ="32767">
              <ComponentRef Id="c_merizodWithService"/>
              <ComponentRef Id="c_merizodWithServiceUser" />
-             <ComponentRef Id="c_MONGO_DATA_PATH"/>
-             <ComponentRef Id="c_MONGO_LOG_PATH"/>
+             <ComponentRef Id="c_MERIZO_DATA_PATH"/>
+             <ComponentRef Id="c_MERIZO_LOG_PATH"/>
         </Feature>
         <Feature Id="Client"
                  Title ="Client"
@@ -116,8 +116,8 @@
           <?endif ?>
         </Feature>
         <?if $(var.Edition) = Enterprise ?>
-        <Feature Id="MongoCryptD"
-                Title ="MongoCryptD"
+        <Feature Id="MerizoCryptD"
+                Title ="MerizoCryptD"
                 Description="MerizoDB Field Level Encryption Daemon"
                 Level ="1">
           <ComponentRef Id="c_merizocryptd"/>

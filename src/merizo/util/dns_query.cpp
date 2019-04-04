@@ -48,7 +48,7 @@
 
 // It is safe to include the implementation "headers" in an anonymous namespace, as the code is
 // meant to live in a single TU -- this one.  Include one of these headers last.
-#define MONGO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
+#define MERIZO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
 #ifdef WIN32
 #include "merizo/util/dns_query_windows-impl.h"
 #elif defined(__ANDROID__) || defined(__EMSCRIPTEN__)
@@ -56,7 +56,7 @@
 #else
 #include "merizo/util/dns_query_posix-impl.h"
 #endif
-#undef MONGO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
+#undef MERIZO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
 
 using namespace std::literals::string_literals;
 

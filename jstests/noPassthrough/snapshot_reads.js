@@ -39,7 +39,7 @@
         primaryDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 
         const session =
-            primaryDB.getMongo().startSession({causalConsistency: useCausalConsistency});
+            primaryDB.getMerizo().startSession({causalConsistency: useCausalConsistency});
         const sessionDb = session.getDatabase(dbName);
 
         const bulk = primaryDB.coll.initializeUnorderedBulkOp();

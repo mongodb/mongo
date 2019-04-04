@@ -51,12 +51,12 @@ namespace merizo {
  * FailPoint makeBadThingsHappen;
  *
  * // Somewhere in the code
- * return false || MONGO_FAIL_POINT(makeBadThingsHappen);
+ * return false || MERIZO_FAIL_POINT(makeBadThingsHappen);
  *
  * or
  *
  * // Somewhere in the code
- * MONGO_FAIL_POINT_BLOCK(makeBadThingsHappen, blockMakeBadThingsHappen) {
+ * MERIZO_FAIL_POINT_BLOCK(makeBadThingsHappen, blockMakeBadThingsHappen) {
  *     const BSONObj& data = blockMakeBadThingsHappen.getData();
  *     // Do something
  * }
@@ -91,7 +91,7 @@ public:
 
     /**
      * Note: This is not side-effect free - it can change the state to OFF after calling.
-     * Note: see MONGO_FAIL_POINT_BLOCK_IF for information on the passed callable
+     * Note: see MERIZO_FAIL_POINT_BLOCK_IF for information on the passed callable
      *
      * @return true if fail point is active.
      */
@@ -99,7 +99,7 @@ public:
     inline bool shouldFail(Callable&& cb = nullptr) {
         RetCode ret = shouldFailOpenBlock(std::forward<Callable>(cb));
 
-        if (MONGO_likely(ret == fastOff)) {
+        if (MERIZO_likely(ret == fastOff)) {
             return false;
         }
 
@@ -112,7 +112,7 @@ public:
      * decrementing it. Must call shouldFailCloseBlock afterwards when the return value
      * is not fastOff. Otherwise, this will remain read-only forever.
      *
-     * Note: see MONGO_FAIL_POINT_BLOCK_IF for information on the passed callable
+     * Note: see MERIZO_FAIL_POINT_BLOCK_IF for information on the passed callable
      *
      * @return slowOn if its active and needs to be closed
      *         userIgnored if its active and needs to be closed, but shouldn't be acted on
@@ -121,7 +121,7 @@ public:
      */
     template <typename Callable = std::nullptr_t>
     inline RetCode shouldFailOpenBlock(Callable&& cb = nullptr) {
-        if (MONGO_likely((_fpInfo.loadRelaxed() & ACTIVE_BIT) == 0)) {
+        if (MERIZO_likely((_fpInfo.loadRelaxed() & ACTIVE_BIT) == 0)) {
             return fastOff;
         }
 
@@ -210,7 +210,7 @@ private:
 /**
  * Helper class for making sure that FailPoint#shouldFailCloseBlock is called when
  * FailPoint#shouldFailOpenBlock was called. This should only be used within the
- * MONGO_FAIL_POINT_BLOCK macro.
+ * MERIZO_FAIL_POINT_BLOCK macro.
  */
 class ScopedFailPoint {
     ScopedFailPoint(const ScopedFailPoint&) = delete;
@@ -260,17 +260,17 @@ private:
     bool _shouldClose;
 };
 
-#define MONGO_FAIL_POINT(symbol) MONGO_unlikely(symbol.shouldFail())
+#define MERIZO_FAIL_POINT(symbol) MERIZO_unlikely(symbol.shouldFail())
 
-inline void MONGO_FAIL_POINT_PAUSE_WHILE_SET(FailPoint& failPoint) {
-    while (MONGO_FAIL_POINT(failPoint)) {
+inline void MERIZO_FAIL_POINT_PAUSE_WHILE_SET(FailPoint& failPoint) {
+    while (MERIZO_FAIL_POINT(failPoint)) {
         sleepmillis(100);
     }
 }
 
-inline void MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(OperationContext* opCtx,
+inline void MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(OperationContext* opCtx,
                                                             FailPoint& failPoint) {
-    while (MONGO_FAIL_POINT(failPoint)) {
+    while (MERIZO_FAIL_POINT(failPoint)) {
         opCtx->sleepFor(Milliseconds(100));
     }
 }
@@ -279,8 +279,8 @@ inline void MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(OperationContext* op
  * Macro for creating a fail point with block context. Also use this when
  * you want to access the data stored in the fail point.
  */
-#define MONGO_FAIL_POINT_BLOCK(symbol, blockSymbol) \
-    for (merizo::ScopedFailPoint blockSymbol(&symbol); MONGO_unlikely(blockSymbol.isActive());)
+#define MERIZO_FAIL_POINT_BLOCK(symbol, blockSymbol) \
+    for (merizo::ScopedFailPoint blockSymbol(&symbol); MERIZO_unlikely(blockSymbol.isActive());)
 
 /**
  * Macro for creating a fail point with block context and a pre-flight condition. Also use this when
@@ -291,8 +291,8 @@ inline void MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(OperationContext* op
  * block without evaluating it and avoid altering the mode in any way (you won't consume nTimes for
  * instance).
  */
-#define MONGO_FAIL_POINT_BLOCK_IF(symbol, blockSymbol, ...)        \
+#define MERIZO_FAIL_POINT_BLOCK_IF(symbol, blockSymbol, ...)        \
     for (merizo::ScopedFailPoint blockSymbol(&symbol, __VA_ARGS__); \
-         MONGO_unlikely(blockSymbol.isActive());)
+         MERIZO_unlikely(blockSymbol.isActive());)
 
 }  // namespace merizo

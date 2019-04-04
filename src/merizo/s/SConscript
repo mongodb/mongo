@@ -95,8 +95,8 @@ env.Library(
     ],
 )
 
-# Functionality for initializing all the services used by sharding, which are common between MongoS
-# and MongoD
+# Functionality for initializing all the services used by sharding, which are common between MerizoS
+# and MerizoD
 env.Library(
     target='sharding_initialization',
     source=[

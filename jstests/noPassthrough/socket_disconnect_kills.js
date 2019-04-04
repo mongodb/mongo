@@ -32,7 +32,7 @@
 
         // Make a socket which will timeout
         id++;
-        let conn = new Mongo(
+        let conn = new Merizo(
             `merizodb://${host}/?socketTimeoutMS=${socketTimeout}&appName=${testName}${id}`);
 
         // Make sure it works at all
@@ -213,10 +213,10 @@
     }
 
     {
-        let proc = MongoRunner.runMongod();
+        let proc = MerizoRunner.runMerizod();
         assert.neq(proc, null);
         runTests(proc);
-        MongoRunner.stopMongod(proc);
+        MerizoRunner.stopMerizod(proc);
     }
 
     {

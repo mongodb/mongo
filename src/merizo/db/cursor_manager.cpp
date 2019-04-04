@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -236,7 +236,7 @@ void CursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
 }
 
 std::vector<GenericCursor> CursorManager::getIdleCursors(
-    OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) const {
+    OperationContext* opCtx, MerizoProcessInterface::CurrentOpUserMode userMode) const {
     std::vector<GenericCursor> cursors;
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
 
@@ -247,7 +247,7 @@ std::vector<GenericCursor> CursorManager::getIdleCursors(
 
             // Exclude cursors that this user does not own if auth is enabled.
             if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
-                userMode == MongoProcessInterface::CurrentOpUserMode::kExcludeOthers &&
+                userMode == MerizoProcessInterface::CurrentOpUserMode::kExcludeOthers &&
                 !ctxAuth->isCoauthorizedWith(cursor->getAuthenticatedUsers())) {
                 continue;
             }

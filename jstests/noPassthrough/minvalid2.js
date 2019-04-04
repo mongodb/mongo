@@ -83,7 +83,7 @@ mdb1 = master.getDB("foo");
 mdb1.foo.save({a: 1002});
 
 print("8: start up former master");
-clearRawMongoProgramOutput();
+clearRawMerizoProgramOutput();
 replTest.restart(masterId);
 
 print("9: check former master " + replTest.nodes[masterId].host + " does not select former slave " +
@@ -93,7 +93,7 @@ replTest.waitForState(replTest.nodes[masterId], ReplSetTest.State.RECOVERING, 90
 // Sync source selection will log this message if it does not detect min valid in the sync
 // source candidate's oplog.
 assert.soon(function() {
-    return rawMongoProgramOutput().match(
+    return rawMerizoProgramOutput().match(
         'it does not contain the necessary operations for us to reach a consistent state');
 });
 

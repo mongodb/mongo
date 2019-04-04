@@ -6,7 +6,7 @@
 
     load("jstests/libs/analyze_plan.js");
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod failed to start up");
 
     const testDb = conn.getDB("test");
@@ -172,5 +172,5 @@
     assert.commandWorked(testDb.runCommand({planCacheClear: coll.getName()}));
     assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).itcount());
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

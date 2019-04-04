@@ -60,7 +60,7 @@ public:
      */
     bool matchesSingleElement(const BSONElement& elem,
                               MatchDetails* details = nullptr) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
@@ -76,7 +76,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::vector<MatchExpression*>* getChildVector() final {

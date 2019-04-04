@@ -71,6 +71,6 @@ std::shared_ptr<const ErrorExtraInfo> JSExceptionInfo::parse(const BSONObj& obj)
     return std::make_shared<JSExceptionInfo>(std::move(stack), std::move(status));
 }
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(JSExceptionInfo);
+MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(JSExceptionInfo);
 
 }  // namespace merizo

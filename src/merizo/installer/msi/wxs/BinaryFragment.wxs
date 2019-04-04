@@ -28,16 +28,16 @@
               ErrorControl='normal'
               Start='auto'
               Type='ownProcess'
-              Account='[MONGO_SERVICE_FULL_ACCOUNT_NAME]'
-              Password='[MONGO_SERVICE_ACCOUNT_PASSWORD]'
+              Account='[MERIZO_SERVICE_FULL_ACCOUNT_NAME]'
+              Password='[MERIZO_SERVICE_ACCOUNT_PASSWORD]'
               Vital='yes' />
         <ServiceControl Id="StartStopService" Name="MerizoDB" Start="install" Stop="both" Remove="uninstall" Wait="no" />
       </Component>
       <Component Id="c_merizodWithServiceUser" Guid="961B0579-4074-4437-B168-9B6C5E3C9E6A" KeyPath="yes">
-        <Condition><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
+        <Condition><![CDATA[MERIZO_SERVICE_INSTALL AND MERIZO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
         <util:User Id="GrantLogonAsService"
-          Name="[MONGO_SERVICE_ACCOUNT_NAME]"
-          Domain="[MONGO_SERVICE_ACCOUNT_DOMAIN_GRANT]"
+          Name="[MERIZO_SERVICE_ACCOUNT_NAME]"
+          Domain="[MERIZO_SERVICE_ACCOUNT_DOMAIN_GRANT]"
            CreateUser="no" LogonAsService="yes" UpdateIfExists="yes" FailIfExists="no" >
           <!-- Grant membership to performance counter group so FTDC is happy -->
           <util:GroupRef Id="PerfmonGroup" />
@@ -146,27 +146,27 @@
           <File Id="f_snmpConfSubagent" Name="merizod.conf.subagent" Source="$(var.EnterpriseBase)\docs\merizod.conf.subagent"
                 DiskId="1" KeyPath="yes" />
         </Component>
-        <Component Id="c_snmpMongodMib" Guid="F3E98C6B-FE42-44E7-8A1F-E47BDDD0A3D7">
-          <File Id="f_snmpMongodMib" Name="MONGOD-MIB.txt" Source="$(var.EnterpriseBase)\docs\MONGOD-MIB.txt"
+        <Component Id="c_snmpMerizodMib" Guid="F3E98C6B-FE42-44E7-8A1F-E47BDDD0A3D7">
+          <File Id="f_snmpMerizodMib" Name="MERIZOD-MIB.txt" Source="$(var.EnterpriseBase)\docs\MERIZOD-MIB.txt"
                 DiskId="1" KeyPath="yes" />
         </Component>
         <Component Id="c_snmpMerizodbincMib" Guid="58c6bd8e-a785-48a0-af48-42f6bf9f68b4">
-          <File Id="f_snmpMerizodbincMib" Name="MONGODBINC-MIB.txt" Source="$(var.EnterpriseBase)\docs\MONGODBINC-MIB.txt"
+          <File Id="f_snmpMerizodbincMib" Name="MERIZODBINC-MIB.txt" Source="$(var.EnterpriseBase)\docs\MERIZODBINC-MIB.txt"
                 DiskId="1" KeyPath="yes" />
         </Component>
       </DirectoryRef>
     <?endif ?>
-    <DirectoryRef Id="MONGO_DATA_PATH" >
-      <Component Id="c_MONGO_DATA_PATH" Guid="F695F048-E262-4871-A31B-0E2361BB4BCB">
-          <CreateFolder Directory="MONGO_DATA_PATH" >
-            <util:PermissionEx User="[MONGO_SERVICE_ACCOUNT_NAME]" GenericAll="yes"/>
+    <DirectoryRef Id="MERIZO_DATA_PATH" >
+      <Component Id="c_MERIZO_DATA_PATH" Guid="F695F048-E262-4871-A31B-0E2361BB4BCB">
+          <CreateFolder Directory="MERIZO_DATA_PATH" >
+            <util:PermissionEx User="[MERIZO_SERVICE_ACCOUNT_NAME]" GenericAll="yes"/>
           </CreateFolder>
       </Component>
     </DirectoryRef>
-    <DirectoryRef Id="MONGO_LOG_PATH" >
-      <Component Id="c_MONGO_LOG_PATH" Guid="D7DBC821-5BD2-4EB7-AEFB-7AC92945146D">
-        <CreateFolder Directory="MONGO_LOG_PATH" >
-            <util:PermissionEx User="[MONGO_SERVICE_ACCOUNT_NAME]" GenericAll="yes"/>
+    <DirectoryRef Id="MERIZO_LOG_PATH" >
+      <Component Id="c_MERIZO_LOG_PATH" Guid="D7DBC821-5BD2-4EB7-AEFB-7AC92945146D">
+        <CreateFolder Directory="MERIZO_LOG_PATH" >
+            <util:PermissionEx User="[MERIZO_SERVICE_ACCOUNT_NAME]" GenericAll="yes"/>
           </CreateFolder>
       </Component>
     </DirectoryRef>
@@ -192,7 +192,7 @@
         <ComponentRef Id="c_snmpReadme" />
         <ComponentRef Id="c_snmpConfMaster" />
         <ComponentRef Id="c_snmpConfSubagent" />
-        <ComponentRef Id="c_snmpMongodMib" />
+        <ComponentRef Id="c_snmpMerizodMib" />
         <ComponentRef Id="c_snmpMerizodbincMib" />
       </ComponentGroup>
     <?endif ?>

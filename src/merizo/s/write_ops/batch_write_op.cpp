@@ -222,7 +222,7 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
         return estSize;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 /**
@@ -470,7 +470,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                     _clientRequest.getDeleteRequest().getDeletes().at(writeOpRef.first));
                 break;
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
 
         if (stmtIdsForOp) {
@@ -500,7 +500,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                     return deleteOp;
                 }());
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }());
 
     request.setWriteCommandBase([&] {
@@ -523,7 +523,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
         if (_clientRequest.isVerboseWC()) {
             request.setWriteConcern(_clientRequest.getWriteConcern());
         } else {
-            // Mongos needs to send to the shard with w > 0 so it will be able to see the
+            // Merizos needs to send to the shard with w > 0 so it will be able to see the
             // writeErrors
             request.setWriteConcern(upgradeWriteConcern(_clientRequest.getWriteConcern()));
         }

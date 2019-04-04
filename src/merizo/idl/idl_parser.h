@@ -81,7 +81,7 @@ public:
      * Throws an exception if the BSON element's type is wrong.
      */
     bool checkAndAssertType(const BSONElement& element, BSONType type) const {
-        if (MONGO_likely(element.type() == type)) {
+        if (MERIZO_likely(element.type() == type)) {
             return true;
         }
 
@@ -98,7 +98,7 @@ public:
      * Throws an exception if the BSON element's type is wrong.
      */
     bool checkAndAssertBinDataType(const BSONElement& element, BinDataType type) const {
-        if (MONGO_likely(element.type() == BinData && element.binDataType() == type)) {
+        if (MERIZO_likely(element.type() == BinData && element.binDataType() == type)) {
             return true;
         }
 
@@ -118,39 +118,39 @@ public:
     /**
      * Throw an error message about the BSONElement being a duplicate field.
      */
-    MONGO_COMPILER_NORETURN void throwDuplicateField(const BSONElement& element) const;
+    MERIZO_COMPILER_NORETURN void throwDuplicateField(const BSONElement& element) const;
 
     /**
      * Throw an error message about the BSONElement being a duplicate field.
      */
-    MONGO_COMPILER_NORETURN void throwDuplicateField(StringData fieldName) const;
+    MERIZO_COMPILER_NORETURN void throwDuplicateField(StringData fieldName) const;
 
     /**
      * Throw an error message about the required field missing from the document.
      */
-    MONGO_COMPILER_NORETURN void throwMissingField(StringData fieldName) const;
+    MERIZO_COMPILER_NORETURN void throwMissingField(StringData fieldName) const;
 
     /**
      * Throw an error message about an unknown field in a document.
      */
-    MONGO_COMPILER_NORETURN void throwUnknownField(StringData fieldName) const;
+    MERIZO_COMPILER_NORETURN void throwUnknownField(StringData fieldName) const;
 
     /**
      * Throw an error message about an array field name not being a valid unsigned integer.
      */
-    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberValue(StringData value) const;
+    MERIZO_COMPILER_NORETURN void throwBadArrayFieldNumberValue(StringData value) const;
 
     /**
      * Throw an error message about the array field name not being the next number in the sequence.
      */
-    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberSequence(
+    MERIZO_COMPILER_NORETURN void throwBadArrayFieldNumberSequence(
         std::uint32_t actualValue, std::uint32_t expectedValue) const;
 
     /**
      * Throw an error message about an unrecognized enum value.
      */
-    MONGO_COMPILER_NORETURN void throwBadEnumValue(StringData enumValue) const;
-    MONGO_COMPILER_NORETURN void throwBadEnumValue(int enumValue) const;
+    MERIZO_COMPILER_NORETURN void throwBadEnumValue(StringData enumValue) const;
+    MERIZO_COMPILER_NORETURN void throwBadEnumValue(int enumValue) const;
 
     /**
      * Equivalent to CommandHelpers::parseNsCollectionRequired

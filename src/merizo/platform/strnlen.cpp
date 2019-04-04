@@ -30,7 +30,7 @@
 #include "merizo/platform/strnlen.h"
 #include "merizo/config.h"
 
-#ifndef MONGO_CONFIG_HAVE_STRNLEN
+#ifndef MERIZO_CONFIG_HAVE_STRNLEN
 
 namespace merizo {
 

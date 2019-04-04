@@ -8,8 +8,8 @@
     if (_isWindows()) {
         const filename = 'jstests/noPassthrough/libs/testWindowsExtension.bat';
 
-        clearRawMongoProgramOutput();
-        const result = runMongoProgram(filename);
+        clearRawMerizoProgramOutput();
+        const result = runMerizoProgram(filename);
         assert.eq(result, 42);
     } else {
         jsTestLog("This test is only relevant for Windows environments.");

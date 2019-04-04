@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -570,7 +570,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
         } else if (name == "writeCmd") {
             myOp.useWriteCmd = arg.trueValue();
         } else if (name == "writeConcern") {
-            // Mongo-perf wants to pass the write concern into all calls. It is only used for
+            // Merizo-perf wants to pass the write concern into all calls. It is only used for
             // update, insert, delete
             myOp.writeConcern = arg.Obj();
         } else if (name == "value") {
@@ -743,7 +743,7 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
     }
 }
 
-MONGO_DEFINE_SHIM(BenchRunConfig::createConnectionImpl);
+MERIZO_DEFINE_SHIM(BenchRunConfig::createConnectionImpl);
 
 std::unique_ptr<DBClientBase> BenchRunConfig::createConnection() const {
     return BenchRunConfig::createConnectionImpl(*this);

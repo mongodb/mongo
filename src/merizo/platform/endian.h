@@ -38,9 +38,9 @@
 #include "merizo/config.h"
 #include "merizo/platform/decimal128.h"
 
-#pragma push_macro("MONGO_UINT16_SWAB")
-#pragma push_macro("MONGO_UINT32_SWAB")
-#pragma push_macro("MONGO_UINT64_SWAB")
+#pragma push_macro("MERIZO_UINT16_SWAB")
+#pragma push_macro("MERIZO_UINT32_SWAB")
+#pragma push_macro("MERIZO_UINT64_SWAB")
 #pragma push_macro("htobe16")
 #pragma push_macro("htobe32")
 #pragma push_macro("htobe64")
@@ -54,9 +54,9 @@
 #pragma push_macro("le32toh")
 #pragma push_macro("le64toh")
 
-#undef MONGO_UINT16_SWAB
-#undef MONGO_UINT32_SWAB
-#undef MONGO_UINT64_SWAB
+#undef MERIZO_UINT16_SWAB
+#undef MERIZO_UINT32_SWAB
+#undef MERIZO_UINT64_SWAB
 #undef htobe16
 #undef htobe32
 #undef htobe64
@@ -70,82 +70,82 @@
 #undef le32toh
 #undef le64toh
 
-#define MONGO_LITTLE_ENDIAN 1234
-#define MONGO_BIG_ENDIAN 4321
+#define MERIZO_LITTLE_ENDIAN 1234
+#define MERIZO_BIG_ENDIAN 4321
 
 #if defined(_MSC_VER)
 #include <cstdlib>
-#define MONGO_UINT16_SWAB(v) _byteswap_ushort(v)
-#define MONGO_UINT32_SWAB(v) _byteswap_ulong(v)
-#define MONGO_UINT64_SWAB(v) _byteswap_uint64(v)
+#define MERIZO_UINT16_SWAB(v) _byteswap_ushort(v)
+#define MERIZO_UINT32_SWAB(v) _byteswap_ulong(v)
+#define MERIZO_UINT64_SWAB(v) _byteswap_uint64(v)
 #elif defined(__clang__) && defined(__clang_major__) && defined(__clang_minor__) && \
     (__clang_major__ >= 3) && (__clang_minor__ >= 1)
 #if __has_builtin(__builtin_bswap16)
-#define MONGO_UINT16_SWAB(v) __builtin_bswap16(v)
+#define MERIZO_UINT16_SWAB(v) __builtin_bswap16(v)
 #endif
 #if __has_builtin(__builtin_bswap32)
-#define MONGO_UINT32_SWAB(v) __builtin_bswap32(v)
+#define MERIZO_UINT32_SWAB(v) __builtin_bswap32(v)
 #endif
 #if __has_builtin(__builtin_bswap64)
-#define MONGO_UINT64_SWAB(v) __builtin_bswap64(v)
+#define MERIZO_UINT64_SWAB(v) __builtin_bswap64(v)
 #endif
 #elif defined(__GNUC__) && (__GNUC__ >= 4)
 #if __GNUC__ >= 4 && defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 3
-#define MONGO_UINT32_SWAB(v) __builtin_bswap32(v)
-#define MONGO_UINT64_SWAB(v) __builtin_bswap64(v)
+#define MERIZO_UINT32_SWAB(v) __builtin_bswap32(v)
+#define MERIZO_UINT64_SWAB(v) __builtin_bswap64(v)
 #endif
 #if __GNUC__ >= 4 && defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 8
-#define MONGO_UINT16_SWAB(v) __builtin_bswap16(v)
+#define MERIZO_UINT16_SWAB(v) __builtin_bswap16(v)
 #endif
 #elif defined(__sun)
 #include <sys/byteorder.h>
-#define MONGO_UINT16_SWAB(v) BSWAP_16(v)
-#define MONGO_UINT32_SWAB(v) BSWAP_32(v)
-#define MONGO_UINT64_SWAB(v) BSWAP_64(v)
+#define MERIZO_UINT16_SWAB(v) BSWAP_16(v)
+#define MERIZO_UINT32_SWAB(v) BSWAP_32(v)
+#define MERIZO_UINT64_SWAB(v) BSWAP_64(v)
 #endif
 
-#ifndef MONGO_UINT16_SWAB
-#define MONGO_UINT16_SWAB(v) endian::bswap_slow16(v)
+#ifndef MERIZO_UINT16_SWAB
+#define MERIZO_UINT16_SWAB(v) endian::bswap_slow16(v)
 #endif
 
-#ifndef MONGO_UINT32_SWAB
-#define MONGO_UINT32_SWAB(v) endian::bswap_slow32(v)
+#ifndef MERIZO_UINT32_SWAB
+#define MERIZO_UINT32_SWAB(v) endian::bswap_slow32(v)
 #endif
 
-#ifndef MONGO_UINT64_SWAB
-#define MONGO_UINT64_SWAB(v) endian::bswap_slow64(v)
+#ifndef MERIZO_UINT64_SWAB
+#define MERIZO_UINT64_SWAB(v) endian::bswap_slow64(v)
 #endif
 
-#if MONGO_CONFIG_BYTE_ORDER == MONGO_LITTLE_ENDIAN
-#define htobe16(v) MONGO_UINT16_SWAB(v)
-#define htobe32(v) MONGO_UINT32_SWAB(v)
-#define htobe64(v) MONGO_UINT64_SWAB(v)
+#if MERIZO_CONFIG_BYTE_ORDER == MERIZO_LITTLE_ENDIAN
+#define htobe16(v) MERIZO_UINT16_SWAB(v)
+#define htobe32(v) MERIZO_UINT32_SWAB(v)
+#define htobe64(v) MERIZO_UINT64_SWAB(v)
 #define htole16(v) (v)
 #define htole32(v) (v)
 #define htole64(v) (v)
-#define be16toh(v) MONGO_UINT16_SWAB(v)
-#define be32toh(v) MONGO_UINT32_SWAB(v)
-#define be64toh(v) MONGO_UINT64_SWAB(v)
+#define be16toh(v) MERIZO_UINT16_SWAB(v)
+#define be32toh(v) MERIZO_UINT32_SWAB(v)
+#define be64toh(v) MERIZO_UINT64_SWAB(v)
 #define le16toh(v) (v)
 #define le32toh(v) (v)
 #define le64toh(v) (v)
-#elif MONGO_CONFIG_BYTE_ORDER == MONGO_BIG_ENDIAN
+#elif MERIZO_CONFIG_BYTE_ORDER == MERIZO_BIG_ENDIAN
 #define htobe16(v) (v)
 #define htobe32(v) (v)
 #define htobe64(v) (v)
-#define htole16(v) MONGO_UINT16_SWAB(v)
-#define htole32(v) MONGO_UINT32_SWAB(v)
-#define htole64(v) MONGO_UINT64_SWAB(v)
+#define htole16(v) MERIZO_UINT16_SWAB(v)
+#define htole32(v) MERIZO_UINT32_SWAB(v)
+#define htole64(v) MERIZO_UINT64_SWAB(v)
 #define be16toh(v) (v)
 #define be32toh(v) (v)
 #define be64toh(v) (v)
-#define le16toh(v) MONGO_UINT16_SWAB(v)
-#define le32toh(v) MONGO_UINT32_SWAB(v)
-#define le64toh(v) MONGO_UINT64_SWAB(v)
+#define le16toh(v) MERIZO_UINT16_SWAB(v)
+#define le32toh(v) MERIZO_UINT32_SWAB(v)
+#define le64toh(v) MERIZO_UINT64_SWAB(v)
 #else
 #error \
     "The endianness of target architecture is unknown. " \
-        "Please define MONGO_CONFIG_BYTE_ORDER"
+        "Please define MERIZO_CONFIG_BYTE_ORDER"
 #endif
 
 namespace merizo {
@@ -343,7 +343,7 @@ struct ByteOrderConverter<float> {
     typedef float T;
 
     inline static T nativeToBig(T t) {
-        MONGO_STATIC_ASSERT(sizeof(T) == sizeof(uint32_t));
+        MERIZO_STATIC_ASSERT(sizeof(T) == sizeof(uint32_t));
 
         uint32_t temp;
         std::memcpy(&temp, &t, sizeof(t));
@@ -382,7 +382,7 @@ struct ByteOrderConverter<double> {
     typedef double T;
 
     inline static T nativeToBig(T t) {
-        MONGO_STATIC_ASSERT(sizeof(T) == sizeof(uint64_t));
+        MERIZO_STATIC_ASSERT(sizeof(T) == sizeof(uint64_t));
 
         uint64_t temp;
         std::memcpy(&temp, &t, sizeof(t));
@@ -455,31 +455,31 @@ struct IntegralTypeMap {
 
 template <>
 struct IntegralTypeMap<signed char> {
-    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
+    MERIZO_STATIC_ASSERT(CHAR_BIT == 8);
     typedef int8_t type;
 };
 
 template <>
 struct IntegralTypeMap<unsigned char> {
-    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
+    MERIZO_STATIC_ASSERT(CHAR_BIT == 8);
     typedef uint8_t type;
 };
 
 template <>
 struct IntegralTypeMap<char> {
-    MONGO_STATIC_ASSERT(CHAR_BIT == 8);
+    MERIZO_STATIC_ASSERT(CHAR_BIT == 8);
     typedef std::conditional<std::is_signed<char>::value, int8_t, uint8_t>::type type;
 };
 
 template <>
 struct IntegralTypeMap<long long> {
-    MONGO_STATIC_ASSERT(sizeof(long long) == sizeof(int64_t));
+    MERIZO_STATIC_ASSERT(sizeof(long long) == sizeof(int64_t));
     typedef int64_t type;
 };
 
 template <>
 struct IntegralTypeMap<unsigned long long> {
-    MONGO_STATIC_ASSERT(sizeof(unsigned long long) == sizeof(uint64_t));
+    MERIZO_STATIC_ASSERT(sizeof(unsigned long long) == sizeof(uint64_t));
     typedef uint64_t type;
 };
 
@@ -506,9 +506,9 @@ inline T littleToNative(T t) {
 }  // namespace endian
 }  // namespace merizo
 
-#undef MONGO_UINT16_SWAB
-#undef MONGO_UINT32_SWAB
-#undef MONGO_UINT64_SWAB
+#undef MERIZO_UINT16_SWAB
+#undef MERIZO_UINT32_SWAB
+#undef MERIZO_UINT64_SWAB
 #undef htobe16
 #undef htobe32
 #undef htobe64
@@ -522,9 +522,9 @@ inline T littleToNative(T t) {
 #undef le32toh
 #undef le64toh
 
-#pragma pop_macro("MONGO_UINT16_SWAB")
-#pragma pop_macro("MONGO_UINT32_SWAB")
-#pragma pop_macro("MONGO_UINT64_SWAB")
+#pragma pop_macro("MERIZO_UINT16_SWAB")
+#pragma pop_macro("MERIZO_UINT32_SWAB")
+#pragma pop_macro("MERIZO_UINT64_SWAB")
 #pragma pop_macro("htobe16")
 #pragma pop_macro("htobe32")
 #pragma pop_macro("htobe64")

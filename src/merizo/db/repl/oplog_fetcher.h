@@ -44,7 +44,7 @@
 namespace merizo {
 namespace repl {
 
-MONGO_FAIL_POINT_DECLARE(stopReplProducer);
+MERIZO_FAIL_POINT_DECLARE(stopReplProducer);
 
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable cursor.

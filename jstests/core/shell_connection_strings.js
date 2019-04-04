@@ -5,12 +5,12 @@
 (function() {
     'use strict';
 
-    const merizod = new MongoURI(db.getMongo().host).servers[0];
+    const merizod = new MerizoURI(db.getMerizo().host).servers[0];
     const host = merizod.host;
     const port = merizod.port;
 
     function testConnect(ok, ...args) {
-        const exitCode = runMongoProgram('merizo', '--eval', ';', ...args);
+        const exitCode = runMerizoProgram('merizo', '--eval', ';', ...args);
         if (ok) {
             assert.eq(exitCode, 0, "failed to connect with `" + args.join(' ') + "`");
         } else {

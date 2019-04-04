@@ -38,9 +38,9 @@ namespace merizo {
 
 namespace {
 
-TEST(RemoveShardFromZoneRequest, BasicValidMongosCommand) {
+TEST(RemoveShardFromZoneRequest, BasicValidMerizosCommand) {
     auto requestStatus =
-        RemoveShardFromZoneRequest::parseFromMongosCommand(BSON("removeShardFromZone"
+        RemoveShardFromZoneRequest::parseFromMerizosCommand(BSON("removeShardFromZone"
                                                                 << "a"
                                                                 << "zone"
                                                                 << "z"));
@@ -53,7 +53,7 @@ TEST(RemoveShardFromZoneRequest, BasicValidMongosCommand) {
 
 TEST(RemoveShardFromZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommand) {
     auto requestStatus =
-        RemoveShardFromZoneRequest::parseFromMongosCommand(BSON("removeShardFromZone"
+        RemoveShardFromZoneRequest::parseFromMerizosCommand(BSON("removeShardFromZone"
                                                                 << "a"
                                                                 << "zone"
                                                                 << "z"));
@@ -73,35 +73,35 @@ TEST(RemoveShardFromZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommand) 
 }
 
 TEST(RemoveShardFromZoneRequest, MissingZoneErrors) {
-    auto request = RemoveShardFromZoneRequest::parseFromMongosCommand(BSON("removeShardFromZone"
+    auto request = RemoveShardFromZoneRequest::parseFromMerizosCommand(BSON("removeShardFromZone"
                                                                            << "a"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
 TEST(RemoveShardFromZoneRequest, MissingShardNameErrors) {
-    auto request = RemoveShardFromZoneRequest::parseFromMongosCommand(BSON("zone"
+    auto request = RemoveShardFromZoneRequest::parseFromMerizosCommand(BSON("zone"
                                                                            << "z"));
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
 TEST(RemoveShardFromZoneRequest, WrongShardNameTypeErrors) {
-    auto request = RemoveShardFromZoneRequest::parseFromMongosCommand(
+    auto request = RemoveShardFromZoneRequest::parseFromMerizosCommand(
         BSON("removeShardFromZone" << 1234 << "zone"
                                    << "z"));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
 TEST(RemoveShardFromZoneRequest, WrongZoneNameTypeErrors) {
-    auto request = RemoveShardFromZoneRequest::parseFromMongosCommand(BSON("removeShardFromZone"
+    auto request = RemoveShardFromZoneRequest::parseFromMerizosCommand(BSON("removeShardFromZone"
                                                                            << "a"
                                                                            << "zone"
                                                                            << 1234));
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
-TEST(RemoveShardFromZoneRequest, CannotUseMongosToParseConfigCommand) {
+TEST(RemoveShardFromZoneRequest, CannotUseMerizosToParseConfigCommand) {
     auto request =
-        RemoveShardFromZoneRequest::parseFromMongosCommand(BSON("_configsvrRemoveShardFromZone"
+        RemoveShardFromZoneRequest::parseFromMerizosCommand(BSON("_configsvrRemoveShardFromZone"
                                                                 << "a"
                                                                 << "zone"
                                                                 << "z"));
@@ -160,7 +160,7 @@ TEST(CfgRemoveShardFromZoneRequest, WrongZoneNameTypeErrors) {
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
-TEST(CfgRemoveShardFromZoneRequest, CannotUseConfigToParseMongosCommand) {
+TEST(CfgRemoveShardFromZoneRequest, CannotUseConfigToParseMerizosCommand) {
     auto request = RemoveShardFromZoneRequest::parseFromConfigCommand(BSON("removeShardFromZone"
                                                                            << "a"
                                                                            << "zone"

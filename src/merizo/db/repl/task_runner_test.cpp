@@ -216,7 +216,7 @@ TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
         uassert(ErrorCodes::OperationFailed, "task failure", false);
 
         // not reached.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
         return TaskRunner::NextAction::kKeepOperationContext;
     };
     getTaskRunner().schedule(task);

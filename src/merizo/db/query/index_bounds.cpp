@@ -176,7 +176,7 @@ BoundInclusion IndexBounds::reverseBoundInclusion(BoundInclusion b) {
             // These are both symmetric.
             return b;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

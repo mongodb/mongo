@@ -2,7 +2,7 @@
 // merizod with the --notablescan flag set, so that they fail if the index is not used.
 (function() {
     "use strict";
-    var runner = MongoRunner.runMongod({setParameter: "notablescan=1"});
+    var runner = MerizoRunner.runMerizod({setParameter: "notablescan=1"});
     var coll = runner.getDB("test").index_partial_no_explain_cmds;
     var ret;
 
@@ -53,5 +53,5 @@
     // operations to fail if they have no query predicate.
     ret = coll.distinct("x");
     assert.eq(2, ret.length);
-    MongoRunner.stopMongod(runner);
+    MerizoRunner.stopMerizod(runner);
 })();

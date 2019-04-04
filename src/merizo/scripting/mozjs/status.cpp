@@ -41,18 +41,18 @@
 namespace merizo {
 namespace mozjs {
 
-const char* const MongoStatusInfo::className = "MongoStatus";
-const char* const MongoStatusInfo::inheritFrom = "Error";
+const char* const MerizoStatusInfo::className = "MerizoStatus";
+const char* const MerizoStatusInfo::inheritFrom = "Error";
 
-Status MongoStatusInfo::toStatus(JSContext* cx, JS::HandleObject object) {
+Status MerizoStatusInfo::toStatus(JSContext* cx, JS::HandleObject object) {
     return *static_cast<Status*>(JS_GetPrivate(object));
 }
 
-Status MongoStatusInfo::toStatus(JSContext* cx, JS::HandleValue value) {
+Status MerizoStatusInfo::toStatus(JSContext* cx, JS::HandleValue value) {
     return *static_cast<Status*>(JS_GetPrivate(value.toObjectOrNull()));
 }
 
-void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandleValue value) {
+void MerizoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandleValue value) {
     invariant(status != Status::OK());
     auto scope = getScope(cx);
 
@@ -65,17 +65,17 @@ void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandle
     scope->getProto<ErrorInfo>().newInstance(args, &error);
 
     JS::RootedObject thisv(cx);
-    scope->getProto<MongoStatusInfo>().newObjectWithProto(&thisv, error);
+    scope->getProto<MerizoStatusInfo>().newObjectWithProto(&thisv, error);
     ObjectWrapper thisvObj(cx, thisv);
     thisvObj.defineProperty(InternedString::code,
                             JSPROP_ENUMERATE,
-                            smUtils::wrapConstrainedMethod<Functions::code, false, MongoStatusInfo>,
+                            smUtils::wrapConstrainedMethod<Functions::code, false, MerizoStatusInfo>,
                             nullptr);
 
     thisvObj.defineProperty(
         InternedString::reason,
         JSPROP_ENUMERATE,
-        smUtils::wrapConstrainedMethod<Functions::reason, false, MongoStatusInfo>,
+        smUtils::wrapConstrainedMethod<Functions::reason, false, MerizoStatusInfo>,
         nullptr);
 
     // We intentionally omit JSPROP_ENUMERATE to match how Error.prototype.stack is a non-enumerable
@@ -83,7 +83,7 @@ void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandle
     thisvObj.defineProperty(
         InternedString::stack,
         0,
-        smUtils::wrapConstrainedMethod<Functions::stack, false, MongoStatusInfo>,
+        smUtils::wrapConstrainedMethod<Functions::stack, false, MerizoStatusInfo>,
         nullptr);
 
     JS_SetPrivate(thisv, scope->trackedNew<Status>(std::move(status)));
@@ -91,22 +91,22 @@ void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandle
     value.setObjectOrNull(thisv);
 }
 
-void MongoStatusInfo::finalize(js::FreeOp* fop, JSObject* obj) {
+void MerizoStatusInfo::finalize(js::FreeOp* fop, JSObject* obj) {
     auto status = static_cast<Status*>(JS_GetPrivate(obj));
 
     if (status)
         getScope(fop)->trackedDelete(status);
 }
 
-void MongoStatusInfo::Functions::code::call(JSContext* cx, JS::CallArgs args) {
+void MerizoStatusInfo::Functions::code::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setInt32(toStatus(cx, args.thisv()).code());
 }
 
-void MongoStatusInfo::Functions::reason::call(JSContext* cx, JS::CallArgs args) {
+void MerizoStatusInfo::Functions::reason::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData(toStatus(cx, args.thisv()).reason());
 }
 
-void MongoStatusInfo::Functions::stack::call(JSContext* cx, JS::CallArgs args) {
+void MerizoStatusInfo::Functions::stack::call(JSContext* cx, JS::CallArgs args) {
     JS::RootedObject thisv(cx, args.thisv().toObjectOrNull());
     JS::RootedObject parent(cx);
 
@@ -142,12 +142,12 @@ void MongoStatusInfo::Functions::stack::call(JSContext* cx, JS::CallArgs args) {
     }
 }
 
-void MongoStatusInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
+void MerizoStatusInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
     auto scope = getScope(cx);
 
     JS_SetPrivate(
         proto,
-        scope->trackedNew<Status>(Status(ErrorCodes::UnknownError, "Mongo Status Prototype")));
+        scope->trackedNew<Status>(Status(ErrorCodes::UnknownError, "Merizo Status Prototype")));
 }
 
 }  // namespace mozjs

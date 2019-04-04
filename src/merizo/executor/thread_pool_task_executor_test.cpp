@@ -48,7 +48,7 @@ namespace merizo {
 namespace executor {
 namespace {
 
-MONGO_INITIALIZER(ThreadPoolExecutorCommonTests)(InitializerContext*) {
+MERIZO_INITIALIZER(ThreadPoolExecutorCommonTests)(InitializerContext*) {
     addTestsForExecutor("ThreadPoolExecutorCommon", [](std::unique_ptr<NetworkInterfaceMock> net) {
         return makeThreadPoolTestExecutor(std::move(net));
     });
@@ -154,7 +154,7 @@ TEST_F(ThreadPoolExecutorTest, ShutdownAndScheduleRaceDoesNotCrash) {
         getGlobalFailPointRegistry()->getFailPoint("scheduleIntoPoolSpinsUntilThreadPoolShutsDown");
     fpTPTE1->setMode(FailPoint::alwaysOn);
     barrier.countDownAndWait();
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fpTPTE1));
+    MERIZO_FAIL_POINT_PAUSE_WHILE_SET((*fpTPTE1));
     executor.shutdown();
     executor.join();
     ASSERT_OK(status1);

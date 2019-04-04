@@ -55,14 +55,14 @@ struct NumberLongInfo : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(toNumber);
-        MONGO_DECLARE_JS_FUNCTION(toString);
-        MONGO_DECLARE_JS_FUNCTION(toJSON);
-        MONGO_DECLARE_JS_FUNCTION(valueOf);
-        MONGO_DECLARE_JS_FUNCTION(compare);
-        MONGO_DECLARE_JS_FUNCTION(floatApprox);
-        MONGO_DECLARE_JS_FUNCTION(top);
-        MONGO_DECLARE_JS_FUNCTION(bottom);
+        MERIZO_DECLARE_JS_FUNCTION(toNumber);
+        MERIZO_DECLARE_JS_FUNCTION(toString);
+        MERIZO_DECLARE_JS_FUNCTION(toJSON);
+        MERIZO_DECLARE_JS_FUNCTION(valueOf);
+        MERIZO_DECLARE_JS_FUNCTION(compare);
+        MERIZO_DECLARE_JS_FUNCTION(floatApprox);
+        MERIZO_DECLARE_JS_FUNCTION(top);
+        MERIZO_DECLARE_JS_FUNCTION(bottom);
     };
 
     static const JSFunctionSpec methods[6];

@@ -54,7 +54,7 @@ bool ValueComparator::evaluate(Value::DeferredComparison deferredComparison) con
             return cmp != 0;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

@@ -1,8 +1,8 @@
 /**
  * Sets up a test for the backup/restore process:
  * - 3 node replica set
- * - Mongo CRUD client
- * - Mongo FSM client
+ * - Merizo CRUD client
+ * - Merizo FSM client
  * - fsyncLock, stop or open a backupCursor on a Secondary
  * - cp (or rsync) DB files
  * - fsyncUnlock, start or close a backupCursor on the Secondary
@@ -109,7 +109,7 @@ var BackupRestoreTest = function(options) {
 
         // Returns the pid of the started merizo shell so the CRUD test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect(MongoRunner.merizoShellPath,
+        return startMerizoProgramNoConnect(MerizoRunner.merizoShellPath,
                                           '--eval',
                                           '(' + crudClientCmds + ')("' + dbName + '", "' +
                                               collectionName + '", ' + numNodes + ')',
@@ -123,12 +123,12 @@ var BackupRestoreTest = function(options) {
         // Launch FSM client
         const suite = 'concurrency_replication_for_backup_restore';
         const resmokeCmd = 'python buildscripts/resmoke.py --shuffle --continueOnFailure' +
-            ' --repeat=99999 --merizo=' + MongoRunner.merizoShellPath +
+            ' --repeat=99999 --merizo=' + MerizoRunner.merizoShellPath +
             ' --shellConnString=merizodb://' + host + ' --suites=' + suite;
 
         // Returns the pid of the FSM test client so it can be terminated without waiting for its
         // execution to finish.
-        return _startMongoProgram({args: resmokeCmd.split(' ')});
+        return _startMerizoProgram({args: resmokeCmd.split(' ')});
     }
 
     /**
@@ -162,7 +162,7 @@ var BackupRestoreTest = function(options) {
         var clientTime = options.clientTime || 10000;
 
         // Set the dbpath for the replica set
-        var dbpathPrefix = MongoRunner.dataPath + 'backupRestore';
+        var dbpathPrefix = MerizoRunner.dataPath + 'backupRestore';
         resetDbpath(dbpathPrefix);
         var dbpathFormat = dbpathPrefix + '/merizod-$port';
 
@@ -339,13 +339,13 @@ var BackupRestoreTest = function(options) {
         assert(crudStatus.alive,
                testName + ' CRUD client was not running at end of test and exited with code: ' +
                    crudStatus.exitCode);
-        stopMongoProgramByPid(crudPid);
+        stopMerizoProgramByPid(crudPid);
 
         var fsmStatus = checkProgram(fsmPid);
         assert(fsmStatus.alive,
                testName + ' FSM client was not running at end of test and exited with code: ' +
                    fsmStatus.exitCode);
-        stopMongoProgramByPid(fsmPid);
+        stopMerizoProgramByPid(fsmPid);
 
         // Make sure the databases are not in a drop-pending state. This can happen if we
         // killed the FSM client while it was in the middle of dropping them.

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -46,7 +46,7 @@
 
 namespace merizo {
 
-MONGO_INITIALIZER(Behaviors_Win32)(InitializerContext*) {
+MERIZO_INITIALIZER(Behaviors_Win32)(InitializerContext*) {
     // do not display dialog on abort()
     _set_abort_behavior(0, _CALL_REPORTFAULT | _WRITE_ABORT_MSG);
 

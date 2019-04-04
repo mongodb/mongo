@@ -58,7 +58,7 @@ enum class PrepareConflictBehavior {
  * set on the readConcernArgs. Both cmdName and readConcernArgs are used to determine whether or not
  * prepare conflicts can be ignored.
  */
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
+extern MERIZO_DECLARE_SHIM((OperationContext * opCtx,
                            const repl::ReadConcernArgs& readConcernArgs,
                            bool allowAfterClusterTime,
                            PrepareConflictBehavior prepareConflictBehavior)
@@ -71,7 +71,7 @@ extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
  * A readConcernTimeout of 0 indicates that the operation will block indefinitely waiting for read
  * concern.
  */
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx, const int readConcernTimeout)->Status)
+extern MERIZO_DECLARE_SHIM((OperationContext * opCtx, const int readConcernTimeout)->Status)
     waitForLinearizableReadConcern;
 
 /**
@@ -79,7 +79,7 @@ extern MONGO_DECLARE_SHIM((OperationContext * opCtx, const int readConcernTimeou
  *
  * This method must only be called if the operation is a speculative majority read.
  */
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx,
+extern MERIZO_DECLARE_SHIM((OperationContext * opCtx,
                            repl::SpeculativeMajorityReadInfo speculativeReadInfo)
                               ->Status) waitForSpeculativeMajorityReadConcern;
 

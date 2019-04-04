@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod({binVersion: "latest"});
+    const conn = MerizoRunner.runMerizod({binVersion: "latest"});
     const db = conn.getDB(jsTest.name());
 
     const coll = db[jsTest.name()];
@@ -37,5 +37,5 @@
     assert.commandWorked(db.runCommand({aggregate: view42, pipeline: [], cursor: {}}),
                          'Expected an aggregate with view to work');
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

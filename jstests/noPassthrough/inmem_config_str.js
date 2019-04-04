@@ -7,11 +7,11 @@
         return;
     }
 
-    var merizod = MongoRunner.runMongod({
+    var merizod = MerizoRunner.runMerizod({
         storageEngine: 'inMemory',
         inMemoryEngineConfigString: 'eviction=(threads_min=1)',
     });
     assert.neq(null, merizod, "merizod failed to started up with --inMemoryEngineConfigString");
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 }());

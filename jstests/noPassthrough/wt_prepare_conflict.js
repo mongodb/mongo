@@ -6,7 +6,7 @@
 (function() {
     "strict";
 
-    let conn = MongoRunner.runMongod();
+    let conn = MerizoRunner.runMerizod();
     let testDB = conn.getDB("test");
 
     let t = testDB.prepare_conflict;
@@ -41,7 +41,7 @@
 
     let seconds = 5;
     let parallel = 5;
-    let host = testDB.getMongo().host;
+    let host = testDB.getMerizo().host;
 
     let benchArgs = {ops, seconds, parallel, host};
 
@@ -60,5 +60,5 @@
         {configureFailPoint: 'WTAlwaysNotifyPrepareConflictWaiters', mode: 'off'}));
     res = t.validate();
     assert(res.valid, tojson(res));
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

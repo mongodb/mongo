@@ -165,7 +165,7 @@ def distsrc_action_generator(source, target, env, for_signature):
         print "Invalid file format for distsrc. Must be tar or zip file"
         env.Exit(1)
 
-    git_cmd = "\"%s\" archive --format %s --output %s --prefix ${MONGO_DIST_SRC_PREFIX} HEAD" % (
+    git_cmd = "\"%s\" archive --format %s --output %s --prefix ${MERIZO_DIST_SRC_PREFIX} HEAD" % (
         git_path, target_ext, target[0])
 
     return [

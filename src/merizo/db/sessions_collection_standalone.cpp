@@ -122,7 +122,7 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionStandalone::findRemovedSession
 
 Status SessionsCollectionStandalone::removeTransactionRecords(OperationContext* opCtx,
                                                               const LogicalSessionIdSet& sessions) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

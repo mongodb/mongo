@@ -99,7 +99,7 @@ func getBasicToolOptions() *options.ToolOptions {
 	}
 }
 
-func NewMongoImport() (*MongoImport, error) {
+func NewMerizoImport() (*MerizoImport, error) {
 	toolOptions := getBasicToolOptions()
 	inputOptions := &InputOptions{
 		ParseGrace: "stop",
@@ -109,7 +109,7 @@ func NewMongoImport() (*MongoImport, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &MongoImport{
+	return &MerizoImport{
 		ToolOptions:     toolOptions,
 		InputOptions:    inputOptions,
 		IngestOptions:   ingestOptions,
@@ -142,12 +142,12 @@ func TestSplitInlineHeader(t *testing.T) {
 	})
 }
 
-func TestMongoImportValidateSettings(t *testing.T) {
+func TestMerizoImportValidateSettings(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	Convey("Given a merizoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no collection is given", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.ToolOptions.Namespace.DB = ""
 			imp.ToolOptions.Namespace.Collection = ""
@@ -155,7 +155,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("an error should be thrown if an invalid type is given", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = "invalid"
 			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
@@ -163,7 +163,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("an error should be thrown if neither --headerline is supplied "+
 			"nor --fields/--fieldFile", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
@@ -171,7 +171,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("no error should be thrown if --headerline is not supplied "+
 			"but --fields is supplied", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fields := "a,b,c"
 			imp.InputOptions.Fields = &fields
@@ -180,39 +180,39 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("no error should be thrown if no input type is supplied", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			So(imp.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("no error should be thrown if there's just one positional argument", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			So(imp.ValidateSettings([]string{"a"}), ShouldBeNil)
 		})
 
 		Convey("an error should be thrown if --file is used with one positional argument", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			imp.InputOptions.File = "abc"
 			So(err, ShouldBeNil)
 			So(imp.ValidateSettings([]string{"a"}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if there's more than one positional argument", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			So(imp.ValidateSettings([]string{"a", "b"}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if --headerline is used with JSON input", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if --fields is used with JSON input", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fields := ""
 			imp.InputOptions.Fields = &fields
@@ -223,7 +223,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("an error should be thrown if --fieldFile is used with JSON input", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fieldFile := ""
 			imp.InputOptions.FieldFile = &fieldFile
@@ -234,7 +234,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("an error should be thrown if --ignoreBlanks is used with JSON input", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.IngestOptions.IgnoreBlanks = true
 			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
@@ -242,7 +242,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("no error should be thrown if --headerline is not supplied "+
 			"but --fieldFile is supplied", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fieldFile := "test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
@@ -251,7 +251,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("an error should be thrown if --mode is incorrect", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.IngestOptions.Mode = "wrong"
 			So(imp.ValidateSettings([]string{}), ShouldNotBeNil)
@@ -259,7 +259,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("an error should be thrown if a field in the --upsertFields "+
 			"argument starts with a dollar sign", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
@@ -272,7 +272,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("no error should be thrown if --upsertFields is supplied without "+
 			"--mode=xxx", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
@@ -283,7 +283,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("an error should be thrown if --upsertFields is used with "+
 			"--mode=insert", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
@@ -294,7 +294,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("if --mode=upsert is used without --upsertFields, _id should be set as "+
 			"the upsert field", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
@@ -306,7 +306,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("no error should be thrown if all fields in the --upsertFields "+
 			"argument are valid", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.HeaderLine = true
 			imp.InputOptions.Type = CSV
@@ -316,7 +316,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("no error should be thrown if --fields is supplied with CSV import", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fields := "a,b,c"
 			imp.InputOptions.Fields = &fields
@@ -325,7 +325,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("an error should be thrown if an empty --fields is supplied with CSV import", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fields := ""
 			imp.InputOptions.Fields = &fields
@@ -334,7 +334,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("no error should be thrown if --fieldFile is supplied with CSV import", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fieldFile := "test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
@@ -343,7 +343,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		})
 
 		Convey("an error should be thrown if no collection and no file is supplied", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fieldFile := "test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
@@ -354,7 +354,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("no error should be thrown if --file is used (without -c) supplied "+
 			"- the file name should be used as the collection name", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.File = "input"
 			imp.InputOptions.HeaderLine = true
@@ -367,7 +367,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("with no collection name and a file name the base name of the "+
 			"file (without the extension) should be used as the collection name", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
 			imp.InputOptions.HeaderLine = true
@@ -385,7 +385,7 @@ func TestGetSourceReader(t *testing.T) {
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
 				"the reader does not exist", func() {
-				imp, err := NewMongoImport()
+				imp, err := NewMerizoImport()
 				So(err, ShouldBeNil)
 				imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
 				imp.InputOptions.Type = CSV
@@ -395,7 +395,7 @@ func TestGetSourceReader(t *testing.T) {
 			})
 
 			Convey("no error should be thrown if the file exists", func() {
-				imp, err := NewMongoImport()
+				imp, err := NewMerizoImport()
 				So(err, ShouldBeNil)
 				imp.InputOptions.File = "testdata/test_array.json"
 				imp.InputOptions.Type = JSON
@@ -404,7 +404,7 @@ func TestGetSourceReader(t *testing.T) {
 			})
 
 			Convey("no error should be thrown if stdin is used", func() {
-				imp, err := NewMongoImport()
+				imp, err := NewMerizoImport()
 				So(err, ShouldBeNil)
 				imp.InputOptions.File = ""
 				_, _, err = imp.getSourceReader()
@@ -417,7 +417,7 @@ func TestGetInputReader(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("Given a io.Reader on calling getInputReader", t, func() {
 		Convey("should parse --fields using valid csv escaping", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Fields = new(string)
 			*imp.InputOptions.Fields = "foo.auto(),bar.date(January 2, 2006)"
@@ -427,7 +427,7 @@ func TestGetInputReader(t *testing.T) {
 			So(err, ShouldBeNil)
 		})
 		Convey("should complain about non-escaped new lines in --fields", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Fields = new(string)
 			*imp.InputOptions.Fields = "foo.auto(),\nblah.binary(hex),bar.date(January 2, 2006)"
@@ -438,14 +438,14 @@ func TestGetInputReader(t *testing.T) {
 		})
 		Convey("no error should be thrown if neither --fields nor --fieldFile "+
 			"is used", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.File = "/path/to/input/file/dot/input.txt"
 			_, err = imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown if --fields is used", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fields := "a,b,c"
 			imp.InputOptions.Fields = &fields
@@ -455,7 +455,7 @@ func TestGetInputReader(t *testing.T) {
 		})
 		Convey("no error should be thrown if --fieldFile is used and it "+
 			"references a valid file", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fieldFile := "testdata/test.csv"
 			imp.InputOptions.FieldFile = &fieldFile
@@ -464,7 +464,7 @@ func TestGetInputReader(t *testing.T) {
 		})
 		Convey("an error should be thrown if --fieldFile is used and it "+
 			"references an invalid file", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fieldFile := "/path/to/input/file/dot/input.txt"
 			imp.InputOptions.FieldFile = &fieldFile
@@ -472,28 +472,28 @@ func TestGetInputReader(t *testing.T) {
 			So(err, ShouldNotBeNil)
 		})
 		Convey("no error should be thrown for CSV import inputs", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			_, err = imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown for TSV import inputs", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = TSV
 			_, err = imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown for JSON import inputs", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = JSON
 			_, err = imp.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("an error should be thrown if --fieldFile fields are invalid", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fieldFile := "testdata/test_fields_invalid.txt"
 			imp.InputOptions.FieldFile = &fieldFile
@@ -503,7 +503,7 @@ func TestGetInputReader(t *testing.T) {
 			So(err, ShouldNotBeNil)
 		})
 		Convey("no error should be thrown if --fieldFile fields are valid", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			fieldFile := "testdata/test_fields_valid.txt"
 			imp.InputOptions.FieldFile = &fieldFile
@@ -532,7 +532,7 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("no error should be thrown for CSV import on test data and all "+
 			"CSV data lines should be imported correctly", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test.csv"
@@ -545,7 +545,7 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("an error should be thrown for JSON import on test data that is "+
 			"JSON array", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.File = "testdata/test_array.json"
 			imp.IngestOptions.WriteConcern = "majority"
@@ -555,7 +555,7 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("TOOLS-247: no error should be thrown for JSON import on test "+
 			"data and all documents should be imported correctly", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.File = "testdata/test_plain2.json"
 			imp.IngestOptions.WriteConcern = "majority"
@@ -564,7 +564,7 @@ func TestImportDocuments(t *testing.T) {
 			So(numImported, ShouldEqual, 10)
 		})
 		Convey("CSV import with --ignoreBlanks should import only non-blank fields", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test_blanks.csv"
@@ -583,7 +583,7 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("CSV import without --ignoreBlanks should include blanks", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test_blanks.csv"
@@ -600,7 +600,7 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("no error should be thrown for CSV import on test data with --upsertFields", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test.csv"
@@ -620,7 +620,7 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("no error should be thrown for CSV import on test data with "+
 			"--stopOnError. Only documents before error should be imported", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test.csv"
@@ -640,7 +640,7 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("CSV import with duplicate _id's should not error if --stopOnError is not set", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 
 			imp.InputOptions.Type = CSV
@@ -662,7 +662,7 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("no error should be thrown for CSV import on test data with --drop", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test.csv"
@@ -682,7 +682,7 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*imp.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("CSV import on test data with --headerLine should succeed", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test.csv"
@@ -698,7 +698,7 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			csvFile.Close()
 
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = csvFile.Name()
@@ -710,7 +710,7 @@ func TestImportDocuments(t *testing.T) {
 			So(numImported, ShouldEqual, 0)
 		})
 		Convey("CSV import with --mode=upsert and --upsertFields should succeed", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 
 			imp.InputOptions.Type = CSV
@@ -731,7 +731,7 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("CSV import with --mode=upsert/--upsertFields with duplicate id should succeed "+
 			"if stopOnError is not set", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test_duplicate.csv"
@@ -752,7 +752,7 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("an error should be thrown for CSV import on test data with "+
 			"duplicate _id if --stopOnError is set", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test_duplicate.csv"
@@ -772,7 +772,7 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("an error should be thrown for JSON import on test data that "+
 			"is a JSON array without passing --jsonArray", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.File = "testdata/test_array.json"
 			imp.IngestOptions.WriteConcern = "1"
@@ -787,7 +787,7 @@ func TestImportDocuments(t *testing.T) {
 			So(jsonInputReader.StreamDocument(true, docChan), ShouldNotBeNil)
 		})
 		Convey("an error should be thrown for invalid CSV import on test data", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test_bad.csv"
@@ -800,7 +800,7 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldNotBeNil)
 		})
 		Convey("CSV import with --mode=upsert/--upsertFields with a nested upsert field should succeed when repeated", func() {
-			imp, err := NewMongoImport()
+			imp, err := NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test_nested_upsert.csv"
@@ -815,7 +815,7 @@ func TestImportDocuments(t *testing.T) {
 			So(n, ShouldEqual, 1)
 
 			// Repeat must succeed
-			imp, err = NewMongoImport()
+			imp, err = NewMerizoImport()
 			So(err, ShouldBeNil)
 			imp.InputOptions.Type = CSV
 			imp.InputOptions.File = "testdata/test_nested_upsert.csv"
@@ -836,7 +836,7 @@ func TestImportDocuments(t *testing.T) {
 func TestHiddenOptionsDefaults(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 	Convey("With a new merizoimport with empty options", t, func() {
-		imp, err := NewMongoImport()
+		imp, err := NewMerizoImport()
 		imp.ToolOptions = options.New("", "", options.EnabledOptions{})
 		So(err, ShouldBeNil)
 		Convey("Then parsing should fill args with expected defaults", func() {

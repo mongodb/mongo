@@ -26,9 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 #define LOG_FOR_RECOVERY(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kStorageRecovery)
 
 #include "merizo/platform/basic.h"
 
@@ -155,34 +155,34 @@ public:
     }
 
     void pushEvenIfFull(OperationContext*, const Value&) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     void push(OperationContext*, const Value&) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     void pushAllNonBlocking(OperationContext*, Batch::const_iterator, Batch::const_iterator) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     void waitForSpace(OperationContext*, std::size_t) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     std::size_t getMaxSize() const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     std::size_t getSize() const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     std::size_t getCount() const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     void clear(OperationContext*) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     bool waitForData(Seconds) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     boost::optional<Value> lastObjectPushed(OperationContext*) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
 private:

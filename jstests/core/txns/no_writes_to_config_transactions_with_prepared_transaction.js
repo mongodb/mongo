@@ -26,7 +26,7 @@
     testDB.runCommand({drop: collName2, writeConcern: {w: "majority"}});
     assert.commandWorked(testDB.runCommand({create: collName2, writeConcern: {w: "majority"}}));
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
 
@@ -81,7 +81,7 @@
                                  40528);
 
     jsTestLog("Test that we can prepare a transaction on a different session");
-    const session2 = db.getMongo().startSession({causalConsistency: false});
+    const session2 = db.getMerizo().startSession({causalConsistency: false});
     const sessionDB2 = session2.getDatabase(dbName);
     const sessionColl2 = sessionDB2.getCollection(collName2);
 

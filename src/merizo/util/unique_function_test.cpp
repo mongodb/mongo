@@ -179,145 +179,145 @@ TEST(UniqueFunctionTest, convertability_tests) {
     // No arguments, return variants
 
     // Same return type
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void()>, sf<void()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<void()>, uf<void()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<void()>, uf<void()>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void()>, sf<void()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<void()>, uf<void()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<void()>, uf<void()>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<int()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int()>, uf<int()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int()>, uf<int()>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<int()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int()>, uf<int()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int()>, uf<int()>>::value);
 
     // Convertible return type
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<void()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int()>, uf<void()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int()>, uf<void()>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<void()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int()>, uf<void()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int()>, uf<void()>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<long()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int()>, uf<long()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int()>, uf<long()>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<long()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int()>, uf<long()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int()>, uf<long()>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<const char*()>, sf<std::string()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<const char*()>, uf<std::string()>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<const char*()>, uf<std::string()>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<const char*()>, sf<std::string()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<const char*()>, uf<std::string()>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<const char*()>, uf<std::string()>>::value);
 
     // Incompatible return type
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void()>, sf<int()>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void()>, uf<int()>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<void()>, uf<int()>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void()>, sf<int()>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void()>, uf<int()>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<void()>, uf<int()>>::value);
 
 
     // Argument consistency, with return variants
 
     // Same return type, same arguments
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(int)>, sf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<void(int)>, uf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<void(int)>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(int)>, sf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<void(int)>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<void(int)>, uf<void(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(int)>, sf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(int)>, uf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(int)>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(int)>, sf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(int)>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(int)>, uf<int(int)>>::value);
 
     // Convertible return type, same arguments
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(int)>, sf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(int)>, uf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(int)>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(int)>, sf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(int)>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(int)>, uf<void(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(int)>, sf<long(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(int)>, uf<long(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(int)>, uf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(int)>, sf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(int)>, uf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(int)>, uf<long(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<const char*(int)>, sf<std::string(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<const char*(int)>, uf<std::string(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<const char*(int)>, uf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<const char*(int)>, sf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<const char*(int)>, uf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<const char*(int)>, uf<std::string(int)>>::value);
 
     // Incompatible return type, same arguments
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(int)>, sf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(int)>, uf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<void(int)>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(int)>, sf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(int)>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<void(int)>, uf<int(int)>>::value);
 
 
     // Extra arguments, with return variants
 
     // Same return type, with extra arguments (Not permitted)
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void()>, sf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<void()>, uf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void()>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void()>, sf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<void()>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void()>, uf<void(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, uf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<int()>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<int()>, uf<int(int)>>::value);
 
     // Convertible return type, with extra arguments (Not permitted)
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, uf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<int()>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<int()>, uf<void(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<long(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int()>, uf<long(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<int()>, uf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, sf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int()>, uf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<int()>, uf<long(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<const char*()>, sf<std::string(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<const char*()>, uf<std::string(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<const char*()>, uf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<const char*()>, sf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<const char*()>, uf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<const char*()>, uf<std::string(int)>>::value);
 
     // Incompatible return type, with extra arguments (Not permitted)
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void()>, sf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void()>, uf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<void()>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void()>, sf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void()>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<void()>, uf<int(int)>>::value);
 
 
     // Argument conversions, with return variants
 
     // Same return type, Convertible argument
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(long)>, sf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<void(long)>, uf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<void(long)>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(long)>, sf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<void(long)>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<void(long)>, uf<void(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(long)>, sf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(long)>, uf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(long)>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(long)>, sf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(long)>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(long)>, uf<int(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(std::string)>, sf<void(const char*)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<void(const char*)>, uf<void(const char*)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<void(std::string)>, uf<void(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(std::string)>, sf<void(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<void(const char*)>, uf<void(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<void(std::string)>, uf<void(const char*)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(std::string)>, sf<int(const char*)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(std::string)>, uf<int(const char*)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(std::string)>, uf<int(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(std::string)>, sf<int(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(std::string)>, uf<int(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(std::string)>, uf<int(const char*)>>::value);
 
     // Convertible return type, with convertible arguments
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(long)>, sf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(long)>, uf<void(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(long)>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(long)>, sf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(long)>, uf<void(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(long)>, uf<void(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(long)>, sf<long(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(long)>, uf<long(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(long)>, uf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(long)>, sf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(long)>, uf<long(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(long)>, uf<long(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<const char*(long)>, sf<std::string(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<const char*(long)>, uf<std::string(int)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<const char*(long)>, uf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<const char*(long)>, sf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<const char*(long)>, uf<std::string(int)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<const char*(long)>, uf<std::string(int)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(std::string)>, sf<void(const char*)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(std::string)>, uf<void(const char*)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(std::string)>, uf<void(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(std::string)>, sf<void(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(std::string)>, uf<void(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(std::string)>, uf<void(const char*)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(std::string)>, sf<long(const char*)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<uf<int(std::string)>, uf<long(const char*)>>::value);
-    MONGO_STATIC_ASSERT(std::is_convertible<sf<int(std::string)>, uf<long(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(std::string)>, sf<long(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<uf<int(std::string)>, uf<long(const char*)>>::value);
+    MERIZO_STATIC_ASSERT(std::is_convertible<sf<int(std::string)>, uf<long(const char*)>>::value);
 
-    MONGO_STATIC_ASSERT(
+    MERIZO_STATIC_ASSERT(
         !std::is_convertible<uf<const char*(std::string)>, sf<std::string(const char*)>>::value);
-    MONGO_STATIC_ASSERT(
+    MERIZO_STATIC_ASSERT(
         std::is_convertible<uf<const char*(std::string)>, uf<std::string(const char*)>>::value);
-    MONGO_STATIC_ASSERT(
+    MERIZO_STATIC_ASSERT(
         std::is_convertible<sf<const char*(std::string)>, uf<std::string(const char*)>>::value);
 
     // Incompatible return type, with convertible arguments (Not permitted)
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(long)>, sf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(long)>, uf<int(int)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<void(long)>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(long)>, sf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(long)>, uf<int(int)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<void(long)>, uf<int(int)>>::value);
 
 
     struct X {};
@@ -326,31 +326,31 @@ TEST(UniqueFunctionTest, convertability_tests) {
     // Incompatible argument conversions, with return variants
 
     // Same return type
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(X)>, sf<void(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<void(X)>, uf<void(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(X)>, uf<void(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(X)>, sf<void(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<void(X)>, uf<void(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(X)>, uf<void(Y)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, sf<int(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, uf<int(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<int(X)>, uf<int(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, sf<int(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, uf<int(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<int(X)>, uf<int(Y)>>::value);
 
     // Convertible return type
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, sf<void(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, uf<void(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<int(X)>, uf<void(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, sf<void(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, uf<void(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<int(X)>, uf<void(Y)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, sf<long(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, uf<long(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<int(X)>, uf<long(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, sf<long(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<int(X)>, uf<long(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<int(X)>, uf<long(Y)>>::value);
 
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<const char*(X)>, sf<std::string(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<const char*(X)>, uf<std::string(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<const char*(X)>, uf<std::string(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<const char*(X)>, sf<std::string(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<const char*(X)>, uf<std::string(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<const char*(X)>, uf<std::string(Y)>>::value);
 
     // Incompatible return type
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(X)>, sf<int(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<uf<void(X)>, uf<int(Y)>>::value);
-    MONGO_STATIC_ASSERT(!std::is_convertible<sf<void(X)>, uf<int(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(X)>, sf<int(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<uf<void(X)>, uf<int(Y)>>::value);
+    MERIZO_STATIC_ASSERT(!std::is_convertible<sf<void(X)>, uf<int(Y)>>::value);
 #endif
 }
 }  // namespace conversion_checking

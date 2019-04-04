@@ -46,15 +46,15 @@ class ServiceContext;
  * The IndexBuildsCoordinator is instantiated on the ServiceContext as a decoration, and is
  * accessible via the ServiceContext.
  */
-class IndexBuildsCoordinatorMongod : public IndexBuildsCoordinator {
-    IndexBuildsCoordinatorMongod(const IndexBuildsCoordinatorMongod&) = delete;
-    IndexBuildsCoordinatorMongod& operator=(const IndexBuildsCoordinatorMongod&) = delete;
+class IndexBuildsCoordinatorMerizod : public IndexBuildsCoordinator {
+    IndexBuildsCoordinatorMerizod(const IndexBuildsCoordinatorMerizod&) = delete;
+    IndexBuildsCoordinatorMerizod& operator=(const IndexBuildsCoordinatorMerizod&) = delete;
 
 public:
     /**
      * Sets up the thread pool.
      */
-    IndexBuildsCoordinatorMongod();
+    IndexBuildsCoordinatorMerizod();
 
     /**
      * Shuts down the thread pool, signals interrupt to all index builds, then waits for all of the

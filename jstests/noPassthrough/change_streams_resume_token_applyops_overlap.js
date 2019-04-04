@@ -39,7 +39,7 @@
         merizosColl.insert([{shard: 0, _id: "initial_doc"}, {shard: 1, _id: "initial doc"}]));
 
     // Start a transaction which will be used to write documents across both shards.
-    const session = merizosDB.getMongo().startSession();
+    const session = merizosDB.getMerizo().startSession();
     const sessionDB = session.getDatabase(merizosDB.getName());
     const sessionColl = sessionDB[merizosColl.getName()];
     session.startTransaction({readConcern: {level: "majority"}});

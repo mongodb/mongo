@@ -87,7 +87,7 @@ std::ostream& operator<<(std::ostream& os, const InitialSyncer::State& state) {
         case InitialSyncer::State::kComplete:
             return os << "Complete";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace repl

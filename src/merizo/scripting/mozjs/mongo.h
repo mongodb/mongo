@@ -35,38 +35,38 @@ namespace merizo {
 namespace mozjs {
 
 /**
- * Shared code for the "Mongo" javascript object.
+ * Shared code for the "Merizo" javascript object.
  *
  * The idea here is that there is a lot of shared functionality between the
- * "Mongo" we see in the shell and the "Mongo" in dbeval.  So we provide one
+ * "Merizo" we see in the shell and the "Merizo" in dbeval.  So we provide one
  * info type with common code and differentiate with varying constructors.
  */
-struct MongoBase : public BaseInfo {
+struct MerizoBase : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(auth);
-        MONGO_DECLARE_JS_FUNCTION(copyDatabaseWithSCRAM);
-        MONGO_DECLARE_JS_FUNCTION(close);
-        MONGO_DECLARE_JS_FUNCTION(cursorFromId);
-        MONGO_DECLARE_JS_FUNCTION(cursorHandleFromId);
-        MONGO_DECLARE_JS_FUNCTION(find);
-        MONGO_DECLARE_JS_FUNCTION(getClientRPCProtocols);
-        MONGO_DECLARE_JS_FUNCTION(getServerRPCProtocols);
-        MONGO_DECLARE_JS_FUNCTION(insert);
-        MONGO_DECLARE_JS_FUNCTION(isReplicaSetConnection);
-        MONGO_DECLARE_JS_FUNCTION(_markNodeAsFailed);
-        MONGO_DECLARE_JS_FUNCTION(logout);
-        MONGO_DECLARE_JS_FUNCTION(remove);
-        MONGO_DECLARE_JS_FUNCTION(runCommand);
-        MONGO_DECLARE_JS_FUNCTION(runCommandWithMetadata);
-        MONGO_DECLARE_JS_FUNCTION(setClientRPCProtocols);
-        MONGO_DECLARE_JS_FUNCTION(update);
-        MONGO_DECLARE_JS_FUNCTION(getMinWireVersion);
-        MONGO_DECLARE_JS_FUNCTION(getMaxWireVersion);
-        MONGO_DECLARE_JS_FUNCTION(isReplicaSetMember);
-        MONGO_DECLARE_JS_FUNCTION(isMongos);
-        MONGO_DECLARE_JS_FUNCTION(_startSession);
+        MERIZO_DECLARE_JS_FUNCTION(auth);
+        MERIZO_DECLARE_JS_FUNCTION(copyDatabaseWithSCRAM);
+        MERIZO_DECLARE_JS_FUNCTION(close);
+        MERIZO_DECLARE_JS_FUNCTION(cursorFromId);
+        MERIZO_DECLARE_JS_FUNCTION(cursorHandleFromId);
+        MERIZO_DECLARE_JS_FUNCTION(find);
+        MERIZO_DECLARE_JS_FUNCTION(getClientRPCProtocols);
+        MERIZO_DECLARE_JS_FUNCTION(getServerRPCProtocols);
+        MERIZO_DECLARE_JS_FUNCTION(insert);
+        MERIZO_DECLARE_JS_FUNCTION(isReplicaSetConnection);
+        MERIZO_DECLARE_JS_FUNCTION(_markNodeAsFailed);
+        MERIZO_DECLARE_JS_FUNCTION(logout);
+        MERIZO_DECLARE_JS_FUNCTION(remove);
+        MERIZO_DECLARE_JS_FUNCTION(runCommand);
+        MERIZO_DECLARE_JS_FUNCTION(runCommandWithMetadata);
+        MERIZO_DECLARE_JS_FUNCTION(setClientRPCProtocols);
+        MERIZO_DECLARE_JS_FUNCTION(update);
+        MERIZO_DECLARE_JS_FUNCTION(getMinWireVersion);
+        MERIZO_DECLARE_JS_FUNCTION(getMaxWireVersion);
+        MERIZO_DECLARE_JS_FUNCTION(isReplicaSetMember);
+        MERIZO_DECLARE_JS_FUNCTION(isMerizos);
+        MERIZO_DECLARE_JS_FUNCTION(_startSession);
     };
 
     static const JSFunctionSpec methods[23];
@@ -76,15 +76,15 @@ struct MongoBase : public BaseInfo {
 };
 
 /**
- * The shell variant of "Mongo"
+ * The shell variant of "Merizo"
  */
-struct MongoExternalInfo : public MongoBase {
+struct MerizoExternalInfo : public MerizoBase {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(_forgetReplSet);
-        MONGO_DECLARE_JS_FUNCTION(load);
-        MONGO_DECLARE_JS_FUNCTION(quit);
+        MERIZO_DECLARE_JS_FUNCTION(_forgetReplSet);
+        MERIZO_DECLARE_JS_FUNCTION(load);
+        MERIZO_DECLARE_JS_FUNCTION(quit);
     };
 
     static const JSFunctionSpec freeFunctions[4];

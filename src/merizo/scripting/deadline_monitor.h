@@ -152,7 +152,7 @@ private:
 
             // wait for a task to be added or a deadline to expire
             if (_nearestDeadlineWallclock > now) {
-                MONGO_IDLE_THREAD_BLOCK;
+                MERIZO_IDLE_THREAD_BLOCK;
                 if (_nearestDeadlineWallclock == Date_t::max()) {
                     if ((interruptInterval.count() > 0) &&
                         (_nearestDeadlineWallclock - now > interruptInterval)) {

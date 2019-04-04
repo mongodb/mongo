@@ -10,7 +10,7 @@
  * update and the find, because thread ids are unique.
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMerizod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -23,12 +23,12 @@ var $config = (function() {
         function assertUpdateSuccess(db, res, nModifiedPossibilities) {
             assertAlways.eq(0, res.nUpserted, tojson(res));
 
-            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+            if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
                 // Storage engines which support document-level concurrency will automatically retry
                 // any operations when there are conflicts, so the update should have succeeded if
                 // a matching document existed.
                 assertWhenOwnColl.contains(1, nModifiedPossibilities, tojson(res));
-                if (db.getMongo().writeMode() === 'commands') {
+                if (db.getMerizo().writeMode() === 'commands') {
                     assertWhenOwnColl.contains(res.nModified, nModifiedPossibilities, tojson(res));
                 }
             } else {
@@ -37,7 +37,7 @@ var $config = (function() {
                 // another thread updated a target document during a yield, triggering an
                 // invalidation.
                 assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-                if (db.getMongo().writeMode() === 'commands') {
+                if (db.getMerizo().writeMode() === 'commands') {
                     assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
                 }
             }

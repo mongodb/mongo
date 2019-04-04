@@ -18,7 +18,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     // Note: Adding new replica set member by hand because of SERVER-24011.
 
-    var newNode = MongoRunner.runMongod(
+    var newNode = MerizoRunner.runMerizod(
         {configsvr: '', replSet: st.configRS.name, storageEngine: 'wiredTiger'});
 
     var replConfig = st.configRS.getReplSetConfigFromNode();
@@ -77,7 +77,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     st.rs0.stop(0);
     st.rs0.stop(1);
 
-    MongoRunner.stopMongod(newNode);
+    MerizoRunner.stopMerizod(newNode);
 
     replConfig = st.configRS.getReplSetConfigFromNode();
     replConfig.version += 1;

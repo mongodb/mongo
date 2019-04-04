@@ -82,7 +82,7 @@ rstConn3.getDB("test").a.insert({a: 3, str: "TESTTESTTEST"});
 assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
 rst.awaitReplication();
 // Test that a non-ssl connection can still be made
-var canConnectNoSSL = runMongoProgram("merizo", "--port", rst.ports[0], "--eval", ";");
+var canConnectNoSSL = runMerizoProgram("merizo", "--port", rst.ports[0], "--eval", ";");
 assert.eq(0, canConnectNoSSL, "SSL Connection attempt failed when it should succeed");
 
 print("===== UPGRADE preferSSL,sendX509 -> requireSSL,x509 =====");

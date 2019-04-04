@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -43,7 +43,7 @@
 #include "merizo/util/options_parser/startup_options.h"
 #include "merizo/util/text.h"
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/ssl.h>
 #endif
 
@@ -86,7 +86,7 @@ bool gImplicitDisableTLS10 = false;
 
 // storeSSLServerOptions depends on serverGlobalParams.clusterAuthMode
 // and IDL based storage actions, and therefore must run later.
-MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
+MERIZO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
     auto& params = moe::startupOptionsParsed;
 
     if (params.count("net.tls.mode")) {
@@ -155,7 +155,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
         if (!status.isOK()) {
             return status;
         }
-#if (MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL) || \
+#if (MERIZO_CONFIG_SSL_PROVIDER != MERIZO_CONFIG_SSL_PROVIDER_OPENSSL) || \
     (OPENSSL_VERSION_NUMBER >= 0x100000cf) /* 1.0.0l */
     } else {
         /* Disable TLS 1.0 by default on all platforms
@@ -175,7 +175,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
         }
     }
 
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+#ifdef MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS
     if (params.count("net.tls.certificateSelector")) {
         const auto status =
             parseCertificateSelector(&sslGlobalParams.sslCertificateSelector,
@@ -224,7 +224,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
                sslGlobalParams.sslCAFile.size() || sslGlobalParams.sslCRLFile.size() ||
                sslGlobalParams.sslCipherConfig.size() ||
                params.count("net.tls.disabledProtocols") ||
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+#ifdef MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS
                params.count("net.tls.certificateSelector") ||
                params.count("net.tls.clusterCertificateSelector") ||
 #endif
@@ -291,7 +291,7 @@ Status canonicalizeSSLServerOptions(moe::Environment* params) {
     return Status::OK();
 }
 
-MONGO_STARTUP_OPTIONS_VALIDATE(SSLServerOptions)(InitializerContext*) {
+MERIZO_STARTUP_OPTIONS_VALIDATE(SSLServerOptions)(InitializerContext*) {
     auto status = canonicalizeSSLServerOptions(&moe::startupOptionsParsed);
     if (!status.isOK()) {
         return status;
@@ -334,7 +334,7 @@ MONGO_STARTUP_OPTIONS_VALIDATE(SSLServerOptions)(InitializerContext*) {
 // This warning must be deferred until after
 // ServerLogRedirection has started up so that
 // it goes to the right place.
-MONGO_INITIALIZER_WITH_PREREQUISITES(ImplicitDisableTLS10Warning, ("ServerLogRedirection"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(ImplicitDisableTLS10Warning, ("ServerLogRedirection"))
 (InitializerContext*) {
     if (gImplicitDisableTLS10) {
         log() << "Automatically disabling TLS 1.0, to force-enable TLS 1.0 "

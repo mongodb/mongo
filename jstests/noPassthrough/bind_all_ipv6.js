@@ -3,8 +3,8 @@
 (function() {
     'use strict';
 
-    const merizo = MongoRunner.runMongod({ipv6: "", bind_ip_all: ""});
+    const merizo = MerizoRunner.runMerizod({ipv6: "", bind_ip_all: ""});
     assert(merizo !== null, "Database is not running");
     assert.commandWorked(merizo.getDB("test").isMaster(), "isMaster failed");
-    MongoRunner.stopMongod(merizo);
+    MerizoRunner.stopMerizod(merizo);
 }());

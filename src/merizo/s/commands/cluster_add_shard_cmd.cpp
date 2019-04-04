@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -76,7 +76,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto parsedRequest = uassertStatusOK(AddShardRequest::parseFromMongosCommand(cmdObj));
+        auto parsedRequest = uassertStatusOK(AddShardRequest::parseFromMerizosCommand(cmdObj));
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

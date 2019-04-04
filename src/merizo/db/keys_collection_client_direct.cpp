@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -127,7 +127,7 @@ StatusWith<Shard::QueryResponse> KeysCollectionClientDirect::_query(
 
         return result;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
@@ -159,7 +159,7 @@ Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
 
         return batchResponse.toStatus();
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Status KeysCollectionClientDirect::insertNewKey(OperationContext* opCtx, const BSONObj& doc) {

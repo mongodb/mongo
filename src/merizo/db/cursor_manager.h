@@ -153,7 +153,7 @@ public:
      * return cursors owned by the caller. If auth is off, this argument does not matter.
      */
     std::vector<GenericCursor> getIdleCursors(
-        OperationContext* opCtx, MongoProcessInterface::CurrentOpUserMode userMode) const;
+        OperationContext* opCtx, MerizoProcessInterface::CurrentOpUserMode userMode) const;
 
     /*
      * Returns a list of all open cursors for the given session.

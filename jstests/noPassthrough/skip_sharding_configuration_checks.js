@@ -17,12 +17,12 @@
         });
     }
 
-    let configSvr = MongoRunner.runMongod(
+    let configSvr = MerizoRunner.runMerizod(
         {configsvr: "", setParameter: 'skipShardingConfigurationChecks=true'});
     assert.eq(configSvr, null);
 
     let shardSvr =
-        MongoRunner.runMongod({shardsvr: "", setParameter: 'skipShardingConfigurationChecks=true'});
+        MerizoRunner.runMerizod({shardsvr: "", setParameter: 'skipShardingConfigurationChecks=true'});
     assert.eq(shardSvr, null);
 
     var st = new ShardingTest({name: "skipConfig", shards: {rs0: {nodes: 1}}});
@@ -50,5 +50,5 @@
     shardRS.startSet({}, true);
     expectState(shardRS, ReplSetTest.State.PRIMARY);
     shardRS.stopSet();
-    MongoRunner.stopMongos(st.s);
+    MerizoRunner.stopMerizos(st.s);
 })();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kExecutor
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kExecutor
 
 #include "merizo/platform/basic.h"
 
@@ -126,7 +126,7 @@ void ThreadPool::_shutdown_inlock() {
         case shutdownComplete:
             return;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ThreadPool::join() {
@@ -148,7 +148,7 @@ void ThreadPool::_join_inlock(stdx::unique_lock<stdx::mutex>* lk) {
                 severe() << "Attempted to join pool " << _options.poolName << " more than once";
                 fassertFailed(28700);
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     });
     _setState_inlock(joining);
     ++_numIdleThreads;
@@ -198,7 +198,7 @@ Status ThreadPool::schedule(Task task) {
         case running:
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
     _pendingTasks.emplace_back(std::move(task));
     if (_state == preStart) {
@@ -270,7 +270,7 @@ void ThreadPool::_consumeTasks() {
 
                 LOG(3) << "Not reaping because the earliest retirement date is "
                        << nextThreadRetirementDate;
-                MONGO_IDLE_THREAD_BLOCK;
+                MERIZO_IDLE_THREAD_BLOCK;
                 _workAvailable.wait_until(lk, nextThreadRetirementDate.toSystemTimePoint());
             } else {
                 // Since the number of threads is not more than minThreads, this thread is not
@@ -279,7 +279,7 @@ void ThreadPool::_consumeTasks() {
                 // would be eligible for retirement once they had no work left to do.
                 LOG(3) << "waiting for work; I am one of " << _threads.size() << " thread(s);"
                        << " the minimum number of threads is " << _options.minThreads;
-                MONGO_IDLE_THREAD_BLOCK;
+                MERIZO_IDLE_THREAD_BLOCK;
                 _workAvailable.wait(lk);
             }
             continue;
@@ -355,7 +355,7 @@ void ThreadPool::_startWorkerThread_inlock() {
         case running:
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
     if (_threads.size() == _options.maxThreads) {
         LOG(2) << "Not starting new thread in pool " << _options.poolName

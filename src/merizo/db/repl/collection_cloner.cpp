@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationInitialSync
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationInitialSync
 
 #include "merizo/platform/basic.h"
 
@@ -70,19 +70,19 @@ const int kProgressMeterCheckInterval = 128;
 
 // Failpoint which causes initial sync to hang before establishing its cursor to clone the
 // 'namespace' collection.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCollectionClone);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangBeforeCollectionClone);
 
 // Failpoint which causes initial sync to hang when it has cloned 'numDocsToClone' documents to
 // collection 'namespace'.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangDuringCollectionClone);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangDuringCollectionClone);
 
 // Failpoint which causes initial sync to hang after handling the next batch of results from the
 // DBClientConnection, optionally limited to a specific collection.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangCollectionClonerAfterHandlingBatchResponse);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangCollectionClonerAfterHandlingBatchResponse);
 
 // Failpoint which causes initial sync to hang before establishing the cursors (but after
 // listIndexes), optionally limited to a specific collection.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangCollectionClonerBeforeEstablishingCursor);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangCollectionClonerBeforeEstablishingCursor);
 
 BSONObj makeCommandWithUUIDorCollectionName(StringData command,
                                             OptionalCollectionUUID uuid,
@@ -440,12 +440,12 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
         _finishCallback(cbd.status);
         return;
     }
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerBeforeEstablishingCursor, nssData) {
+    MERIZO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerBeforeEstablishingCursor, nssData) {
         const BSONObj& data = nssData.getData();
         auto nss = data["nss"].str();
         // Only hang when cloning the specified collection, or if no collection was specified.
         if (nss.empty() || _destNss.toString() == nss) {
-            while (MONGO_FAIL_POINT(initialSyncHangCollectionClonerBeforeEstablishingCursor) &&
+            while (MERIZO_FAIL_POINT(initialSyncHangCollectionClonerBeforeEstablishingCursor) &&
                    !_isShuttingDown()) {
                 log() << "initialSyncHangCollectionClonerBeforeEstablishingCursor fail point "
                          "enabled for "
@@ -516,12 +516,12 @@ void CollectionCloner::_runQuery(const executor::TaskExecutor::CallbackArgs& cal
         return;
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangBeforeCollectionClone, options) {
+    MERIZO_FAIL_POINT_BLOCK(initialSyncHangBeforeCollectionClone, options) {
         const BSONObj& data = options.getData();
         if (data["namespace"].String() == _destNss.ns()) {
             log() << "initial sync - initialSyncHangBeforeCollectionClone fail point "
                      "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(initialSyncHangBeforeCollectionClone) && !_isShuttingDown()) {
+            while (MERIZO_FAIL_POINT(initialSyncHangBeforeCollectionClone) && !_isShuttingDown()) {
                 merizo::sleepsecs(1);
             }
         }
@@ -613,12 +613,12 @@ void CollectionCloner::_handleNextBatch(std::shared_ptr<OnCompletionGuard> onCom
         uassertStatusOK(newStatus);
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerAfterHandlingBatchResponse, nssData) {
+    MERIZO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerAfterHandlingBatchResponse, nssData) {
         const BSONObj& data = nssData.getData();
         auto nss = data["nss"].str();
         // Only hang when cloning the specified collection, or if no collection was specified.
         if (nss.empty() || _destNss.toString() == nss) {
-            while (MONGO_FAIL_POINT(initialSyncHangCollectionClonerAfterHandlingBatchResponse) &&
+            while (MERIZO_FAIL_POINT(initialSyncHangCollectionClonerAfterHandlingBatchResponse) &&
                    !_isShuttingDown()) {
                 log() << "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
                          "enabled for "
@@ -715,14 +715,14 @@ void CollectionCloner::_insertDocumentsCallback(
         return;
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangDuringCollectionClone, options) {
+    MERIZO_FAIL_POINT_BLOCK(initialSyncHangDuringCollectionClone, options) {
         const BSONObj& data = options.getData();
         if (data["namespace"].String() == _destNss.ns() &&
             static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt()) {
             lk.unlock();
             log() << "initial sync - initialSyncHangDuringCollectionClone fail point "
                      "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(initialSyncHangDuringCollectionClone) && !_isShuttingDown()) {
+            while (MERIZO_FAIL_POINT(initialSyncHangDuringCollectionClone) && !_isShuttingDown()) {
                 merizo::sleepsecs(1);
             }
             lk.lock();

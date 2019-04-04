@@ -53,7 +53,7 @@ public:
             return stdx::unordered_set<NamespaceString>();
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const final {
             return {Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::indexStats)};
         }
 

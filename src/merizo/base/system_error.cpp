@@ -40,9 +40,9 @@ namespace {
 /**
  * A std::error_category for the codes in the named ErrorCodes space.
  */
-class MongoErrorCategoryImpl final : public std::error_category {
+class MerizoErrorCategoryImpl final : public std::error_category {
 public:
-    MongoErrorCategoryImpl() = default;
+    MerizoErrorCategoryImpl() = default;
 
     const char* name() const noexcept override {
         return "merizo";
@@ -73,7 +73,7 @@ public:
 
 const std::error_category& merizoErrorCategory() {
     // TODO: Remove this static, and make a constexpr instance when we move to C++14.
-    static const MongoErrorCategoryImpl instance{};
+    static const MerizoErrorCategoryImpl instance{};
     return instance;
 }
 

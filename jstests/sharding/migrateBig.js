@@ -30,7 +30,7 @@
     s.printShardingStatus();
 
     print("YO : " + s.getPrimaryShard("test").host);
-    var direct = new Mongo(s.getPrimaryShard("test").host);
+    var direct = new Merizo(s.getPrimaryShard("test").host);
     print("direct : " + direct);
 
     var directDB = direct.getDB("test");

@@ -82,7 +82,7 @@
 
     jsTestLog("Testing transactions against the node that just rolled back.");
     const sessionOptions = {causalConsistency: false};
-    let session = rollbackNode.getDB(dbName).getMongo().startSession(sessionOptions);
+    let session = rollbackNode.getDB(dbName).getMerizo().startSession(sessionOptions);
     let sessionDb = session.getDatabase(dbName);
     let sessionColl = sessionDb[crudCollName];
 

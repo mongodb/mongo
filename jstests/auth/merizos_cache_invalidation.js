@@ -114,7 +114,7 @@ db3.auth('spencer', 'pwd');
             return false;
         }
         return db2.foo.findOne().a == 3;
-    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
+    }, "Merizos did not update its user cache after 10 seconds", 10 * 1000);
 
     // We manually invalidate the cache on s2/db3.
     db3.adminCommand("invalidateUserCache");
@@ -137,7 +137,7 @@ db3.auth('spencer', 'pwd');
     assert.soon(function() {
         var res = db2.foo.update({}, {$inc: {a: 1}});
         return res instanceof WriteCommandError && res.code == authzErrorCode;
-    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
+    }, "Merizos did not update its user cache after 10 seconds", 10 * 1000);
 
     // We manually invalidate the cache on s1/db3.
     db3.adminCommand("invalidateUserCache");
@@ -159,7 +159,7 @@ db3.auth('spencer', 'pwd');
     // s1/db2 should update its cache in 10 seconds.
     assert.soon(function() {
         return !(db2.foo.update({}, {$inc: {a: 1}}) instanceof WriteCommandError);
-    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
+    }, "Merizos did not update its user cache after 10 seconds", 10 * 1000);
 
     // We manually invalidate the cache on s1/db3.
     db3.adminCommand("invalidateUserCache");
@@ -207,7 +207,7 @@ db3.auth('spencer', 'pwd');
     // s1/db2 should update its cache in 10 seconds.
     assert.soon(function() {
         return db2.foo.runCommand("collStats").code == authzErrorCode;
-    }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
+    }, "Merizos did not update its user cache after 10 seconds", 10 * 1000);
 
     // We manually invalidate the cache on s2/db3.
     db3.adminCommand("invalidateUserCache");

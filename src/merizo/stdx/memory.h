@@ -31,7 +31,7 @@
 
 #include "merizo/config.h"
 
-#if defined(MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE)
+#if defined(MERIZO_CONFIG_HAVE_STD_MAKE_UNIQUE)
 
 #include <memory>
 

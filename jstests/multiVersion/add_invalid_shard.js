@@ -15,10 +15,10 @@
                                  ErrorCodes.IllegalOperation);
 
     // Can't add a merizod with a lower binary version than our featureCompatibilityVersion.
-    var lastStableMongod = MongoRunner.runMongod({binVersion: "last-stable", shardsvr: ""});
-    assert.commandFailedWithCode(st.admin.runCommand({addshard: lastStableMongod.host}),
+    var lastStableMerizod = MerizoRunner.runMerizod({binVersion: "last-stable", shardsvr: ""});
+    assert.commandFailedWithCode(st.admin.runCommand({addshard: lastStableMerizod.host}),
                                  ErrorCodes.IncompatibleServerVersion);
-    MongoRunner.stopMongod(lastStableMongod);
+    MerizoRunner.stopMerizod(lastStableMerizod);
 
     // Can't add config servers as shard.
     assert.commandFailed(st.admin.runCommand({addshard: st._configDB}));

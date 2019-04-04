@@ -316,7 +316,7 @@ boost::optional<StringMap<std::string>> DocumentSource::renamedPaths(
             return boost::none;
         }
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void DocumentSource::serializeToArray(vector<Value>& array,

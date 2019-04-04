@@ -169,7 +169,7 @@ StringData String::caseFoldAndStripDiacritics(StackBufBuilder* buffer,
     auto outputIt = buffer->skip(utf8.size() * 2);
 
     for (auto inputIt = utf8.begin(), endIt = utf8.end(); inputIt != endIt;) {
-#ifdef MONGO_HAVE_FAST_BYTE_VECTOR
+#ifdef MERIZO_HAVE_FAST_BYTE_VECTOR
         if (size_t(endIt - inputIt) >= ByteVector::size) {
             // Try the fast path for 16 contiguous bytes of ASCII.
             auto word = ByteVector::load(&*inputIt);

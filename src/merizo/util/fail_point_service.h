@@ -51,9 +51,9 @@ void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
  * Note: that means never at local scope (inside functions) or class scope.
  * NOTE: Never use in header files, only sources.
  */
-#define MONGO_FAIL_POINT_DEFINE(fp)                                                   \
+#define MERIZO_FAIL_POINT_DEFINE(fp)                                                   \
     ::merizo::FailPoint fp;                                                            \
-    MONGO_INITIALIZER_GENERAL(fp, ("FailPointRegistry"), ("AllFailPointsRegistered")) \
+    MERIZO_INITIALIZER_GENERAL(fp, ("FailPointRegistry"), ("AllFailPointsRegistered")) \
     (::merizo::InitializerContext * context) {                                         \
         return ::merizo::getGlobalFailPointRegistry()->addFailPoint(#fp, &fp);         \
     }
@@ -61,7 +61,7 @@ void setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
 /**
  * Convenience macro for declaring a fail point in a header.
  */
-#define MONGO_FAIL_POINT_DECLARE(fp) extern ::merizo::FailPoint fp;
+#define MERIZO_FAIL_POINT_DECLARE(fp) extern ::merizo::FailPoint fp;
 
 /**
  * Convenience class for enabling a failpoint and disabling it as this goes out of scope.

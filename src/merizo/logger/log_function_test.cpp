@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -53,12 +53,12 @@ typedef LogTest<MessageEventDetailsEncoder> LogTestDetailsEncoder;
 
 // Constants for log component test cases.
 const LogComponent componentA = LogComponent::kCommand;
-const LogComponent componentB = MONGO_LOG_DEFAULT_COMPONENT;
+const LogComponent componentB = MERIZO_LOG_DEFAULT_COMPONENT;
 
 // Tests pass through of log component:
 //     unconditional log functions -> LogStreamBuilder -> MessageEventEphemeral
 //                                 -> MessageEventDetailsEncoder
-// MONGO_DEFAULT_LOG_COMPONENT is set to kReplication before including util/log.h
+// MERIZO_DEFAULT_LOG_COMPONENT is set to kReplication before including util/log.h
 // so non-debug logging without explicit component will log with kReplication instead
 // of kDefault.
 TEST_F(LogTestDetailsEncoder, LogFunctionsOverrideGlobalComponent) {

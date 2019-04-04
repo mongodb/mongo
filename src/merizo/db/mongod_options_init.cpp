@@ -37,15 +37,15 @@
 #include "merizo/util/quick_exit.h"
 
 namespace merizo {
-MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
-    return addMongodOptions(&moe::startupOptions);
+MERIZO_GENERAL_STARTUP_OPTIONS_REGISTER(MerizodOptions)(InitializerContext* context) {
+    return addMerizodOptions(&moe::startupOptions);
 }
 
-MONGO_INITIALIZER_GENERAL(MongodOptions,
+MERIZO_INITIALIZER_GENERAL(MerizodOptions,
                           ("BeginStartupOptionValidation", "AllFailPointsRegistered"),
                           ("EndStartupOptionValidation"))
 (InitializerContext* context) {
-    if (!handlePreValidationMongodOptions(moe::startupOptionsParsed, context->args())) {
+    if (!handlePreValidationMerizodOptions(moe::startupOptionsParsed, context->args())) {
         quickExit(EXIT_SUCCESS);
     }
     // Run validation, but tell the Environment that we don't want it to be set as "valid",
@@ -54,11 +54,11 @@ MONGO_INITIALIZER_GENERAL(MongodOptions,
     if (!ret.isOK()) {
         return ret;
     }
-    ret = validateMongodOptions(moe::startupOptionsParsed);
+    ret = validateMerizodOptions(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         return ret;
     }
-    ret = canonicalizeMongodOptions(&moe::startupOptionsParsed);
+    ret = canonicalizeMerizodOptions(&moe::startupOptionsParsed);
     if (!ret.isOK()) {
         return ret;
     }
@@ -69,11 +69,11 @@ MONGO_INITIALIZER_GENERAL(MongodOptions,
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
+MERIZO_INITIALIZER_GENERAL(CoreOptions_Store,
                           ("BeginStartupOptionStorage"),
                           ("EndStartupOptionStorage"))
 (InitializerContext* context) {
-    Status ret = storeMongodOptions(moe::startupOptionsParsed);
+    Status ret = storeMerizodOptions(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;

@@ -5,11 +5,11 @@
 (function() {
     'use strict';
 
-    const MONGOS_COUNT = 2;
+    const MERIZOS_COUNT = 2;
 
-    var st = new ShardingTest({shards: 1, merizos: MONGOS_COUNT, config: 1});
+    var st = new ShardingTest({shards: 1, merizos: MERIZOS_COUNT, config: 1});
 
-    var standalone = MongoRunner.runMongod();
+    var standalone = MerizoRunner.runMerizod();
 
     var merizos = st.s0;
     var admin = merizos.getDB("admin");
@@ -17,7 +17,7 @@
     // Wait for the background thread from the merizos to insert their entries before beginning
     // the tests.
     assert.soon(function() {
-        return MONGOS_COUNT == merizos.getDB('config').merizos.count();
+        return MERIZOS_COUNT == merizos.getDB('config').merizos.count();
     });
 
     function grabStatusOutput(configdb, verbose) {
@@ -247,7 +247,7 @@
 
     assert(merizos.getDB("test").dropDatabase());
 
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 
     st.stop();
 })();

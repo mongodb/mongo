@@ -11,7 +11,7 @@
     const testDB = db.getSiblingDB(dbName);
     const otherDB = db.getSiblingDB(otherDBName);
 
-    const session = testDB.getMongo().startSession({causalConsistency: false});
+    const session = testDB.getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB[collName];
 

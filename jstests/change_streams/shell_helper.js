@@ -1,6 +1,6 @@
 // Test change streams related shell helpers and options passed to them. Note that, while we only
 // call the DBCollection.watch helper in this file, it will be redirected to the DB.watch or
-// Mongo.watch equivalents in the whole_db and whole_cluster passthroughs.
+// Merizo.watch equivalents in the whole_db and whole_cluster passthroughs.
 (function() {
     "use strict";
 
@@ -18,12 +18,12 @@
     }
 
     function testCommandIsCalled(testFunc, checkFunc) {
-        const merizoRunCommandOriginal = Mongo.prototype.runCommand;
+        const merizoRunCommandOriginal = Merizo.prototype.runCommand;
 
         const sentinel = {};
         let cmdObjSeen = sentinel;
 
-        Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
+        Merizo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
             cmdObjSeen = cmdObj;
             return merizoRunCommandOriginal.apply(this, arguments);
         };
@@ -31,11 +31,11 @@
         try {
             assert.doesNotThrow(testFunc);
         } finally {
-            Mongo.prototype.runCommand = merizoRunCommandOriginal;
+            Merizo.prototype.runCommand = merizoRunCommandOriginal;
         }
 
         if (cmdObjSeen === sentinel) {
-            throw new Error("Mongo.prototype.runCommand() was never called: " +
+            throw new Error("Merizo.prototype.runCommand() was never called: " +
                             testFunc.toString());
         }
 
@@ -117,8 +117,8 @@
     jsTestLog("Testing watch() with batchSize");
     // Only test merizod because merizos uses batch size 0 for aggregate commands internally to
     // establish cursors quickly. GetMore on merizos doesn't respect batch size due to SERVER-31992.
-    const isMongos = FixtureHelpers.isMongos(db);
-    if (!isMongos) {
+    const isMerizos = FixtureHelpers.isMerizos(db);
+    if (!isMerizos) {
         // Increase a field by 5 times and verify the batch size is respected.
         for (let i = 0; i < 5; i++) {
             assert.writeOK(coll.update({_id: 1}, {$inc: {x: 1}}));

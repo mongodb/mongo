@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#ifndef MONGO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
+#ifndef MERIZO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
 #error Do not include the DNS Query platform implementation headers.  Please use "merizo/util/dns_query.h" instead.
 #endif
 

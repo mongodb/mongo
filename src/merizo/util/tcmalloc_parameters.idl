@@ -54,7 +54,7 @@ server_parameters:
     cpp_varname: HeapProfilingEnabled
     default: false
     condition:
-      preprocessor: defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+      preprocessor: defined(_POSIX_VERSION) && defined(MERIZO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 
   heapProfilingSampleIntervalBytes:
     description: "Configure heap profiling sample interval bytes"
@@ -64,7 +64,7 @@ server_parameters:
     # 256kb
     default: 262144
     condition:
-      preprocessor: defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+      preprocessor: defined(_POSIX_VERSION) && defined(MERIZO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 
   tcmallocEnableMarkThreadTemporarilyIdle:
     description: 'REMOVED: Setting this parameter has no effect and it will be removed in a future version of MerizoDB.'

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -94,7 +94,7 @@ BSONObj generateBson(BsonValueType bsonValueType) {
                                          Decimal128::kRoundTiesToAway)
                                   .quantize(Decimal128("0.01", Decimal128::kRoundTiesToAway)));
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 static BsonsAndKeyStrings generateBsonsAndKeyStrings(BsonValueType bsonValueType,

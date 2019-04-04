@@ -8,7 +8,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     const testDB = conn.getDB("admin");
     const expectedParamDefaults = {
         internalQueryPlanEvaluationWorks: 10000,
@@ -41,7 +41,7 @@
         internalInsertMaxBatchSize: 64,
         internalQueryPlannerGenerateCoveredWholeIndexScans: false,
         internalQueryIgnoreUnknownJSONSchemaKeywords: false,
-        internalQueryProhibitBlockingMergeOnMongoS: false,
+        internalQueryProhibitBlockingMergeOnMerizoS: false,
     };
 
     function assertDefaultParameterValues() {
@@ -166,6 +166,6 @@
     assertSetParameterSucceeds("internalDocumentSourceLookupCacheSizeBytes", 0);
     assertSetParameterFails("internalDocumentSourceLookupCacheSizeBytes", -1);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
 })();

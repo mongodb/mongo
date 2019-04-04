@@ -39,8 +39,8 @@ namespace optionenvironment {
  * file.  See the OptionSection and OptionDescription classes for more details.
  *
  * Example:
- * MONGO_MODULE_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
- *          return addMongodOptions(&moe::startupOptions);
+ * MERIZO_MODULE_STARTUP_OPTIONS_REGISTER(MerizodOptions)(InitializerContext* context) {
+ *          return addMerizodOptions(&moe::startupOptions);
  *     startupOptions.addOptionChaining("option", "option", moe::String, "description");
  *     return Status::OK();
  * }
@@ -49,7 +49,7 @@ extern OptionSection startupOptions;
 
 /*
  * This structure stores the parsed command line options.  After the "defult" group of the
- * MONGO_INITIALIZERS, this structure should be fully validated from an option perspective.  See
+ * MERIZO_INITIALIZERS, this structure should be fully validated from an option perspective.  See
  * the Environment, Constraint, and Value classes for more details.
  *
  * Example:

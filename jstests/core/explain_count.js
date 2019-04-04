@@ -3,7 +3,7 @@
 // @tags: [requires_fastcount]
 
 load("jstests/libs/analyze_plan.js");     // For assertExplainCount.
-load("jstests/libs/fixture_helpers.js");  // For isMongos and isSharded.
+load("jstests/libs/fixture_helpers.js");  // For isMerizos and isSharded.
 
 var collName = "jstests_explain_count";
 var t = db[collName];
@@ -48,7 +48,7 @@ function checkShardingFilterIndexScanExplain(explain, keyName, bounds) {
  */
 function checkIndexedCountWithPred(db, explain, keyName, bounds) {
     assert.eq(bounds.length, 2);
-    if (isMongos(db) && FixtureHelpers.isSharded(db[collName])) {
+    if (isMerizos(db) && FixtureHelpers.isSharded(db[collName])) {
         // On sharded collections we have a SHARDING_FILTER with a child that's an IXSCAN.
         checkShardingFilterIndexScanExplain(explain, keyName, bounds);
     } else {

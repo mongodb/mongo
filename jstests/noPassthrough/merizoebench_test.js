@@ -4,18 +4,18 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/merizoebench.js");  // for runMongoeBench
+    load("jstests/libs/merizoebench.js");  // for runMerizoeBench
 
     if (jsTest.options().storageEngine !== "mobile") {
         print("Skipping test because storage engine isn't mobile");
         return;
     }
 
-    const dbpath = MongoRunner.dataPath + "merizoebench_test";
+    const dbpath = MerizoRunner.dataPath + "merizoebench_test";
     resetDbpath(dbpath);
 
     // Test that the operations in the "pre" section of the configuration are run exactly once.
-    runMongoeBench(  // Force clang-format to break this line.
+    runMerizoeBench(  // Force clang-format to break this line.
         {
           pre: [{
               op: "insert",
@@ -40,12 +40,12 @@
     assert(stats.hasOwnProperty("totalOps/s"),
            () => "stats file doesn't report ops per second: " + tojson(stats));
 
-    const conn = MongoRunner.runMongod({dbpath, noCleanData: true});
+    const conn = MerizoRunner.runMerizod({dbpath, noCleanData: true});
     assert.neq(null, conn, "failed to start merizod after running merizoebench");
 
     const db = conn.getDB("test");
     const count = db.merizoebench_test.find().itcount();
     assert.eq(1, count, "ops in 'pre' section ran more than once or didn't run at all");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

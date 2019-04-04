@@ -30,7 +30,7 @@ var $config = (function() {
 
             assertAlways.eq(0, res.nUpserted, tojson(res));
             assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-            if (db.getMongo().writeMode() === 'commands') {
+            if (db.getMerizo().writeMode() === 'commands') {
                 assertWhenOwnColl.eq(res.nMatched, res.nModified, tojson(res));
             }
         }

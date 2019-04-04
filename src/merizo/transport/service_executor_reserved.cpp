@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kExecutor;
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kExecutor;
 
 #include "merizo/platform/basic.h"
 

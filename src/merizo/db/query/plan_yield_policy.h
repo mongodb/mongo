@@ -106,7 +106,7 @@ public:
                 return false;
             }
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**
@@ -127,7 +127,7 @@ public:
             case PlanExecutor::INTERRUPT_ONLY:
                 return false;
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     PlanExecutor::YieldPolicy getPolicy() const {

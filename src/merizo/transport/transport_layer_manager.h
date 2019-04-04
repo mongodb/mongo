@@ -45,7 +45,7 @@ namespace transport {
 
 /**
  * This TransportLayerManager is a TransportLayer implementation that holds other
- * TransportLayers. Mongod and Mongos can treat this like the "only" TransportLayer
+ * TransportLayers. Merizod and Merizos can treat this like the "only" TransportLayer
  * and not be concerned with which other TransportLayer implementations it holds
  * underneath.
  */

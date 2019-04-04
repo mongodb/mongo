@@ -177,7 +177,7 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithinSinglePipeline) {
     auto ctx = getExpCtx();
-    ctx->inMongos = true;
+    ctx->inMerizos = true;
 
     auto spec = fromjson(
         "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
@@ -190,7 +190,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithi
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcrossPipelines) {
     auto ctx = getExpCtx();
-    ctx->inMongos = true;
+    ctx->inMerizos = true;
 
     auto spec = fromjson(
         "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], merizosPipe: "
@@ -515,10 +515,10 @@ TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
 }
 
 /**
- * An implementation of the MongoProcessInterface that is okay with changing the OperationContext,
+ * An implementation of the MerizoProcessInterface that is okay with changing the OperationContext,
  * but has no other parts of the interface implemented.
  */
-class StubMongoProcessOkWithOpCtxChanges : public StubMongoProcessInterface {
+class StubMerizoProcessOkWithOpCtxChanges : public StubMerizoProcessInterface {
 public:
     void setOperationContext(OperationContext* opCtx) final {
         return;
@@ -527,9 +527,9 @@ public:
 
 TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
-    // We're going to be changing the OperationContext, so we need to use a MongoProcessInterface
+    // We're going to be changing the OperationContext, so we need to use a MerizoProcessInterface
     // that won't throw when we do so.
-    ctx->merizoProcessInterface = stdx::make_unique<StubMongoProcessOkWithOpCtxChanges>();
+    ctx->merizoProcessInterface = stdx::make_unique<StubMerizoProcessOkWithOpCtxChanges>();
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto firstPipeline = unittest::assertGet(Pipeline::createFacetPipeline({firstDummy}, ctx));

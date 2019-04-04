@@ -278,7 +278,7 @@ private:
 }  // namespace
 }  // namespace embedded
 
-MONGO_REGISTER_SHIM(AuthorizationSession::create)
+MERIZO_REGISTER_SHIM(AuthorizationSession::create)
 (AuthorizationManager* const authzManager)->std::unique_ptr<AuthorizationSession> {
     return std::make_unique<embedded::AuthorizationSession>(authzManager);
 }

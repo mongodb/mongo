@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -263,7 +263,7 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     }
 
     // Those are all the reasons the versions can mismatch
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void CollectionShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx, CSRLock&) {

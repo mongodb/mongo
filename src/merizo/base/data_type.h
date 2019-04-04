@@ -59,8 +59,8 @@ struct DataType {
     template <typename T, typename = void>
     struct Handler {
         static void unsafeLoad(T* t, const char* ptr, size_t* advanced) {
-#if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
-            MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
+#if MERIZO_HAVE_STD_IS_TRIVIALLY_COPYABLE
+            MERIZO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
                                     "The generic DataType implementation requires values to be "
                                     "trivially copyable. You may specialize the template to use it "
                                     "with other types.");
@@ -87,8 +87,8 @@ struct DataType {
         }
 
         static void unsafeStore(const T& t, char* ptr, size_t* advanced) {
-#if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
-            MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
+#if MERIZO_HAVE_STD_IS_TRIVIALLY_COPYABLE
+            MERIZO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
                                     "The generic DataType implementation requires values to be "
                                     "trivially copyable. You may specialize the template to use it "
                                     "with other types.");
@@ -170,6 +170,6 @@ struct DataType {
 }  // namespace merizo
 
 // Force the visibility of the DataType::Handler specializations.
-#define MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
+#define MERIZO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
 #include "merizo/base/data_type_string_data.h"
-#undef MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
+#undef MERIZO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_

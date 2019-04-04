@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -75,7 +75,7 @@ static const int LockConflictsTable[] = {
 const uint64_t intentModes = (1 << MODE_IS) | (1 << MODE_IX);
 
 // Ensure we do not add new modes without updating the conflicts table
-MONGO_STATIC_ASSERT((sizeof(LockConflictsTable) / sizeof(LockConflictsTable[0])) == LockModesCount);
+MERIZO_STATIC_ASSERT((sizeof(LockConflictsTable) / sizeof(LockConflictsTable[0])) == LockModesCount);
 
 
 /**
@@ -86,8 +86,8 @@ static const char* LockModeNames[] = {"NONE", "IS", "IX", "S", "X"};
 static const char* LegacyLockModeNames[] = {"", "r", "w", "R", "W"};
 
 // Ensure we do not add new modes without updating the names array
-MONGO_STATIC_ASSERT((sizeof(LockModeNames) / sizeof(LockModeNames[0])) == LockModesCount);
-MONGO_STATIC_ASSERT((sizeof(LegacyLockModeNames) / sizeof(LegacyLockModeNames[0])) ==
+MERIZO_STATIC_ASSERT((sizeof(LockModeNames) / sizeof(LockModeNames[0])) == LockModesCount);
+MERIZO_STATIC_ASSERT((sizeof(LegacyLockModeNames) / sizeof(LegacyLockModeNames[0])) ==
                     LockModesCount);
 
 // Helper functions for the lock modes
@@ -112,7 +112,7 @@ static const char* ResourceTypeNames[] = {
     "Invalid", "Global", "Database", "Collection", "Metadata", "Mutex"};
 
 // Ensure we do not add new types without updating the names array
-MONGO_STATIC_ASSERT((sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) ==
+MERIZO_STATIC_ASSERT((sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) ==
                     ResourceTypesCount);
 
 
@@ -124,7 +124,7 @@ static const char* LockRequestStatusNames[] = {
 };
 
 // Ensure we do not add new status types without updating the names array
-MONGO_STATIC_ASSERT((sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0])) ==
+MERIZO_STATIC_ASSERT((sizeof(LockRequestStatusNames) / sizeof(LockRequestStatusNames[0])) ==
                     LockRequest::StatusCount);
 
 }  // namespace
@@ -631,7 +631,7 @@ bool LockManager::unlock(LockRequest* request) {
         _onLockModeChanged(lock, lock->grantedCounts[request->convertMode] == 0);
     } else {
         // Invalid request status
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     return (request->recursiveCount == 0);
@@ -983,14 +983,14 @@ uint64_t ResourceId::fullHash(ResourceType type, uint64_t hashId) {
 
 ResourceId::ResourceId(ResourceType type, StringData ns)
     : _fullHash(fullHash(type, hashStringData(ns))) {
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
     _nsCopy = ns.toString();
 #endif
 }
 
 ResourceId::ResourceId(ResourceType type, const std::string& ns)
     : _fullHash(fullHash(type, hashStringData(ns))) {
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
     _nsCopy = ns;
 #endif
 }
@@ -1004,7 +1004,7 @@ std::string ResourceId::toString() const {
         ss << ", " << Lock::ResourceMutex::getName(*this);
     }
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
     ss << ", " << _nsCopy;
 #endif
 

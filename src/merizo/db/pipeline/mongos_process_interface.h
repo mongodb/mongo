@@ -42,7 +42,7 @@ namespace merizo {
  * Class to provide access to merizos-specific implementations of methods required by some
  * document sources.
  */
-class MongoSInterface final : public MongoProcessCommon {
+class MerizoSInterface final : public MerizoProcessCommon {
 public:
     static BSONObj createPassthroughCommandForShard(OperationContext* opCtx,
                                                     const AggregationRequest& request,
@@ -72,9 +72,9 @@ public:
     static StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(
         OperationContext* opCtx, const NamespaceString& execNss);
 
-    MongoSInterface() = default;
+    MerizoSInterface() = default;
 
-    virtual ~MongoSInterface() = default;
+    virtual ~MerizoSInterface() = default;
 
     void setOperationContext(OperationContext* opCtx) final {}
 
@@ -91,11 +91,11 @@ public:
 
     repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
                                               repl::OpTime lookupTime) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     DBClientBase* directClient() final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
@@ -105,7 +105,7 @@ public:
                 std::vector<BSONObj>&& objs,
                 const WriteConcernOptions& wc,
                 boost::optional<OID>) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -116,36 +116,36 @@ public:
                 bool upsert,
                 bool multi,
                 boost::optional<OID>) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                           const NamespaceString& ns) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,
                             BSONObjBuilder* builder) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     Status appendStorageStats(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& param,
                               BSONObjBuilder* builder) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     Status appendRecordCount(OperationContext* opCtx,
                              const NamespaceString& nss,
                              BSONObjBuilder* builder) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     BSONObj getCollectionOptions(const NamespaceString& nss) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
@@ -153,19 +153,19 @@ public:
                                                  const NamespaceString& targetNs,
                                                  const BSONObj& originalCollectionOptions,
                                                  const std::list<BSONObj>& originalIndexes) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
 
     std::string getShardName(OperationContext* opCtx) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext* opCtx, const NamespaceString&, UUID) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
@@ -178,28 +178,28 @@ public:
      * a merizos.
      */
     BackupCursorState openBackupCursor(OperationContext* opCtx) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     BackupCursorExtendState extendBackupCursor(OperationContext* opCtx,
                                                const UUID& backupId,
                                                const Timestamp& extendTo) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**
-     * Mongos does not have a plan cache, so this method should never be called on merizos. Upstream
+     * Merizos does not have a plan cache, so this method should never be called on merizos. Upstream
      * checks are responsible for generating an error if a user attempts to introspect the plan
      * cache on merizos.
      */
     std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
                                                         const NamespaceString&,
                                                         const MatchExpression*) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>&,
@@ -209,7 +209,7 @@ public:
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>&,
                                       const NamespaceString&,
                                       ChunkVersion) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::unique_ptr<ResourceYielder> getResourceYielder() const override {

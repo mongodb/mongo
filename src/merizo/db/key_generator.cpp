@@ -42,7 +42,7 @@ namespace merizo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(disableKeyGeneration);
+MERIZO_FAIL_POINT_DEFINE(disableKeyGeneration);
 
 /**
  * Inserts a new key to the keys collection.
@@ -76,7 +76,7 @@ KeyGenerator::KeyGenerator(std::string purpose,
 
 Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
 
-    if (MONGO_FAIL_POINT(disableKeyGeneration)) {
+    if (MERIZO_FAIL_POINT(disableKeyGeneration)) {
         return {ErrorCodes::FailPointEnabled, "key generation disabled"};
     }
 

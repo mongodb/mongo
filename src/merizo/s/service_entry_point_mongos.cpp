@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -61,7 +61,7 @@ BSONObj buildErrReply(const DBException& ex) {
 }  // namespace
 
 
-DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const Message& message) {
+DbResponse ServiceEntryPointMerizos::handleRequest(OperationContext* opCtx, const Message& message) {
     // Release any cached egress connections for client back to pool before destroying
     auto guard = makeGuard(ShardConnection::releaseMyConnections);
 
@@ -143,7 +143,7 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
                 break;
 
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
 
         LOG(3) << "Request::process end ns: " << nss << " msg id: " << msgId

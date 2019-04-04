@@ -24,7 +24,7 @@
     assert.commandWorked(coll.createIndex({a: 1}));
 
     assert.writeOK(coll.remove({a: {$gte: 2}, b: {$gte: 2}},
-                               db.getMongo().writeMode() === "commands"
+                               db.getMerizo().writeMode() === "commands"
                                    ? {justOne: true, collation: {locale: "fr"}}
                                    : {justOne: true}));
 
@@ -32,7 +32,7 @@
 
     assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "remove", tojson(profileObj));
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
     }
     assert.eq(profileObj.ndeleted, 1, tojson(profileObj));

@@ -52,7 +52,7 @@ public:
             return true;
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const final {
             return {Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::collStats)};
         }
 

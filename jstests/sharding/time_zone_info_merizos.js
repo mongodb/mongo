@@ -21,16 +21,16 @@
     assert.eq(merizosCfg.parsed.processManagement.timeZoneInfo, tzGoodInfo);
 
     // Test that a bad timezone file causes merizoS startup to fail.
-    let conn = MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzBadInfo});
+    let conn = MerizoRunner.runMerizos({configdb: st.configRS.getURL(), timeZoneInfo: tzBadInfo});
     assert.eq(conn, null, "expected launching merizos with bad timezone rules to fail");
-    assert.neq(-1, rawMongoProgramOutput().indexOf("Fatal assertion 40475"));
+    assert.neq(-1, rawMerizoProgramOutput().indexOf("Fatal assertion 40475"));
 
     // Test that a non-existent timezone directory causes merizoS startup to fail.
-    conn = MongoRunner.runMongos({configdb: st.configRS.getURL(), timeZoneInfo: tzNoInfo});
+    conn = MerizoRunner.runMerizos({configdb: st.configRS.getURL(), timeZoneInfo: tzNoInfo});
     assert.eq(conn, null, "expected launching merizos with bad timezone rules to fail");
     // Look for either old or new error message
-    assert(rawMongoProgramOutput().indexOf("Failed to create service context") != -1 ||
-           rawMongoProgramOutput().indexOf("Failed global initialization") != -1);
+    assert(rawMerizoProgramOutput().indexOf("Failed to create service context") != -1 ||
+           rawMerizoProgramOutput().indexOf("Failed global initialization") != -1);
 
     // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
     assert.commandWorked(merizosDB.adminCommand({enableSharding: merizosDB.getName()}));

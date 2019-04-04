@@ -89,7 +89,7 @@ type ApplyOpsResponse struct {
 
 // Oplog represents a MerizoDB oplog document.
 type Oplog struct {
-	Timestamp bson.MongoTimestamp `bson:"ts"`
+	Timestamp bson.MerizoTimestamp `bson:"ts"`
 	HistoryID int64               `bson:"h"`
 	Version   int                 `bson:"v"`
 	Operation string              `bson:"op"`

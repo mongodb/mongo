@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -45,8 +45,8 @@ namespace merizo {
 namespace txn {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangWhileTargetingRemoteHost);
-MONGO_FAIL_POINT_DEFINE(hangWhileTargetingLocalHost);
+MERIZO_FAIL_POINT_DEFINE(hangWhileTargetingRemoteHost);
+MERIZO_FAIL_POINT_DEFINE(hangWhileTargetingLocalHost);
 
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using ResponseStatus = executor::TaskExecutor::ResponseStatus;
@@ -89,9 +89,9 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             AuthorizationSession::get(opCtx->getClient())
                 ->grantInternalAuthorization(opCtx->getClient());
 
-            if (MONGO_FAIL_POINT(hangWhileTargetingLocalHost)) {
+            if (MERIZO_FAIL_POINT(hangWhileTargetingLocalHost)) {
                 LOG(0) << "Hit hangWhileTargetingLocalHost failpoint";
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingLocalHost);
+                MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingLocalHost);
             }
 
             const auto service = opCtx->getServiceContext();
@@ -211,9 +211,9 @@ Future<HostAndPort> AsyncWorkScheduler::_targetHostAsync(const ShardId& shardId,
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
 
-        if (MONGO_FAIL_POINT(hangWhileTargetingRemoteHost)) {
+        if (MERIZO_FAIL_POINT(hangWhileTargetingRemoteHost)) {
             LOG(0) << "Hit hangWhileTargetingRemoteHost failpoint for shard " << shardId;
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingRemoteHost);
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangWhileTargetingRemoteHost);
         }
 
         // TODO (SERVER-35678): Return a SemiFuture<HostAndPort> rather than using a blocking call
@@ -239,7 +239,7 @@ ShardId getLocalShardId(ServiceContext* service) {
     }
 
     // Only sharded systems should use the two-phase commit path
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Future<void> whenAll(std::vector<Future<void>>& futures) {

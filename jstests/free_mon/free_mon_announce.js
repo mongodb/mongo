@@ -8,7 +8,7 @@ load("jstests/free_mon/libs/free_mon.js");
     const mock_web = new FreeMonWebServer();
     mock_web.start();
 
-    const merizod = MongoRunner.runMongod({
+    const merizod = MerizoRunner.runMerizod({
         setParameter: "cloudFreeMonitoringEndpointURL=" + mock_web.getURL(),
     });
     assert.neq(merizod, null, 'merizod not running');
@@ -16,11 +16,11 @@ load("jstests/free_mon/libs/free_mon.js");
 
     function getConnectAnnounce() {
         // Capture message as it'd be presented to a user.
-        clearRawMongoProgramOutput();
-        const exitCode = runMongoProgram(
+        clearRawMerizoProgramOutput();
+        const exitCode = runMerizoProgram(
             'merizo', '--port', merizod.port, '--eval', "shellHelper( 'show', 'freeMonitoring' );");
         assert.eq(exitCode, 0);
-        return rawMongoProgramOutput();
+        return rawMerizoProgramOutput();
     }
 
     // state === 'enabled'.
@@ -30,6 +30,6 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.neq(getConnectAnnounce().search(reminder), -1, 'userReminder not found');
 
     // Cleanup.
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
     mock_web.stop();
 })();

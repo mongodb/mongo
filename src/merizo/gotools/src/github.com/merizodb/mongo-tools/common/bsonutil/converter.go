@@ -106,7 +106,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 
 	case json.Timestamp: // Timestamp
 		ts := (int64(v.Seconds) << 32) | int64(v.Increment)
-		return bson.MongoTimestamp(ts), nil
+		return bson.MerizoTimestamp(ts), nil
 
 	case json.JavaScript: // Javascript
 		return bson.JavaScript{v.Code, v.Scope}, nil
@@ -233,7 +233,7 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 	case bson.RegEx: // RegExp
 		return json.RegExp{v.Pattern, v.Options}, nil
 
-	case bson.MongoTimestamp: // Timestamp
+	case bson.MerizoTimestamp: // Timestamp
 		timestamp := int64(v)
 		return json.Timestamp{
 			Seconds:   uint32(timestamp >> 32),
@@ -359,7 +359,7 @@ func GetBSONValueAsJSON(x interface{}) (interface{}, error) {
 	case bson.RegEx: // RegExp
 		return json.RegExp{v.Pattern, v.Options}, nil
 
-	case bson.MongoTimestamp: // Timestamp
+	case bson.MerizoTimestamp: // Timestamp
 		timestamp := int64(v)
 		return json.Timestamp{
 			Seconds:   uint32(timestamp >> 32),

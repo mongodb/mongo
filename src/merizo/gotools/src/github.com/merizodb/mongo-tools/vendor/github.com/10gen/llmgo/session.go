@@ -60,8 +60,8 @@ const (
 type Session struct {
 	m                sync.RWMutex
 	cluster_         *merizoCluster
-	slaveSocket      *MongoSocket
-	masterSocket     *MongoSocket
+	slaveSocket      *MerizoSocket
+	masterSocket     *MerizoSocket
 	slaveOk          bool
 	consistency      Mode
 	queryConfig      query
@@ -76,8 +76,8 @@ type Session struct {
 	bypassValidation bool
 }
 
-type MongoSession interface {
-	AcquireSocketPrivate(slaveOk bool) (*MongoSocket, error)
+type MerizoSession interface {
+	AcquireSocketPrivate(slaveOk bool) (*MerizoSocket, error)
 }
 
 type Database struct {
@@ -115,7 +115,7 @@ type Iter struct {
 	m              sync.Mutex
 	gotReply       sync.Cond
 	session        *Session
-	server         *MongoServer
+	server         *MerizoServer
 	docData        queue
 	err            error
 	op             GetMoreOp
@@ -190,7 +190,7 @@ const defaultPrefetch = 0.25
 //
 //     authMechanism=<mechanism>
 //
-//        Defines the protocol for credential negotiation. Defaults to "MONGODB-CR",
+//        Defines the protocol for credential negotiation. Defaults to "MERIZODB-CR",
 //        which is the default username/password challenge-response mechanism.
 //
 //
@@ -341,7 +341,7 @@ type DialInfo struct {
 	ServiceHost string
 
 	// Mechanism defines the protocol for credential negotiation.
-	// Defaults to "MONGODB-CR".
+	// Defaults to "MERIZODB-CR".
 	Mechanism string
 
 	// Username and Password inform the credentials for the initial authentication
@@ -407,7 +407,7 @@ func DialWithInfo(info *DialInfo) (*Session, error) {
 	if info.Username != "" {
 		source := session.sourcedb
 		if info.Source == "" &&
-			(info.Mechanism == "GSSAPI" || info.Mechanism == "PLAIN" || info.Mechanism == "MONGODB-X509") {
+			(info.Mechanism == "GSSAPI" || info.Mechanism == "PLAIN" || info.Mechanism == "MERIZODB-X509") {
 			source = "$external"
 		}
 		session.dialCred = &Credential{
@@ -627,7 +627,7 @@ func (db *Database) Run(cmd interface{}, result interface{}) error {
 }
 
 //returns metadata, bodydata, an array of reply documents, a reply, and an error
-func ExecOpWithReply(socket *MongoSocket, op OpWithReply) ([]byte, []byte, [][]byte, interface{}, error) {
+func ExecOpWithReply(socket *MerizoSocket, op OpWithReply) ([]byte, []byte, [][]byte, interface{}, error) {
 	var wait sync.Mutex
 	var reply interface{}
 	var err error
@@ -693,7 +693,7 @@ func ExecOpWithReply(socket *MongoSocket, op OpWithReply) ([]byte, []byte, [][]b
 	return metaData, bodyData, replyData, reply, replyErr
 }
 
-func ExecOpWithoutReply(socket *MongoSocket, op interface{}) error {
+func ExecOpWithoutReply(socket *MerizoSocket, op interface{}) error {
 	err := socket.Query(op)
 	if err != nil {
 		return err
@@ -723,7 +723,7 @@ type Credential struct {
 	ServiceHost string
 
 	// Mechanism defines the protocol for credential negotiation.
-	// Defaults to "MONGODB-CR".
+	// Defaults to "MERIZODB-CR".
 	Mechanism string
 }
 
@@ -765,7 +765,7 @@ func (s *Session) Login(cred *Credential) error {
 	return nil
 }
 
-func (s *Session) socketLogin(socket *MongoSocket) error {
+func (s *Session) socketLogin(socket *MerizoSocket) error {
 	for _, cred := range s.creds {
 		if err := socket.Login(cred); err != nil {
 			return err
@@ -2262,7 +2262,7 @@ func (p *Pipe) Iter() *Iter {
 // parameter may be in any mode or state, though.
 //
 func (c *Collection) NewIter(session *Session, firstBatch []bson.Raw, cursorId int64, err error) *Iter {
-	var server *MongoServer
+	var server *MerizoServer
 	csession := c.Database.Session
 	csession.m.RLock()
 	socket := csession.masterSocket
@@ -2940,7 +2940,7 @@ func (q *Query) SetMaxTime(d time.Duration) *Query {
 //
 // Relevant documentation:
 //
-//     http://www.merizodb.org/display/DOCS/How+to+do+Snapshotted+Queries+in+the+Mongo+Database
+//     http://www.merizodb.org/display/DOCS/How+to+do+Snapshotted+Queries+in+the+Merizo+Database
 //
 func (q *Query) Snapshot() *Query {
 	q.m.Lock()
@@ -3064,7 +3064,7 @@ func (q *Query) One(result interface{}) (err error) {
 // run duplicates the behavior of collection.Find(query).One(&result)
 // as performed by Database.Run, specializing the logic for running
 // database commands on a given socket.
-func (db *Database) run(socket *MongoSocket, cmd, result interface{}) (replyOp *ReplyOp, err error) {
+func (db *Database) run(socket *MerizoSocket, cmd, result interface{}) (replyOp *ReplyOp, err error) {
 	// Database.Run:
 	if name, ok := cmd.(string); ok {
 		cmd = bson.D{{name, 1}}
@@ -3655,7 +3655,7 @@ func (iter *Iter) For(result interface{}, f func() error) (err error) {
 // WARNING: This method must not be called with iter.m locked. Acquiring the
 // socket depends on the cluster sync loop, and the cluster sync loop might
 // attempt actions which cause replyFunc to be called, inducing a deadlock.
-func (iter *Iter) acquireSocket() (*MongoSocket, error) {
+func (iter *Iter) acquireSocket() (*MerizoSocket, error) {
 	socket, err := iter.session.AcquireSocketPrivate(true)
 	if err != nil {
 		return nil, err
@@ -4161,7 +4161,7 @@ func (s *Session) BuildInfo() (info BuildInfo, err error) {
 // ---------------------------------------------------------------------------
 // Internal session handling helpers.
 
-func (s *Session) AcquireSocketPrivate(slaveOk bool) (*MongoSocket, error) {
+func (s *Session) AcquireSocketPrivate(slaveOk bool) (*MerizoSocket, error) {
 
 	// Read-only lock to check for previously reserved socket.
 	s.m.RLock()
@@ -4224,7 +4224,7 @@ func (s *Session) AcquireSocketPrivate(slaveOk bool) (*MongoSocket, error) {
 	return sock, nil
 }
 
-func (s *Session) AcquireSocketDirect() (*MongoSocket, error) {
+func (s *Session) AcquireSocketDirect() (*MerizoSocket, error) {
 	sock, err := s.cluster().AcquireSocket(Strong, false, s.syncTimeout, s.sockTimeout, s.queryConfig.op.ServerTags, s.poolLimit)
 	if err != nil {
 		return nil, err
@@ -4237,7 +4237,7 @@ func (s *Session) AcquireSocketDirect() (*MongoSocket, error) {
 }
 
 // setSocket binds socket to this section.
-func (s *Session) setSocket(socket *MongoSocket) {
+func (s *Session) setSocket(socket *MerizoSocket) {
 	info := socket.Acquire()
 	if info.Master {
 		if s.masterSocket != nil {
@@ -4419,7 +4419,7 @@ func (c *Collection) writeOp(op interface{}, ordered bool) (lerr *LastError, err
 	return c.writeOpQuery(socket, safeOp, op, ordered)
 }
 
-func (c *Collection) writeOpQuery(socket *MongoSocket, safeOp *QueryOp, op interface{}, ordered bool) (lerr *LastError, err error) {
+func (c *Collection) writeOpQuery(socket *MerizoSocket, safeOp *QueryOp, op interface{}, ordered bool) (lerr *LastError, err error) {
 	if safeOp == nil {
 		return nil, socket.Query(op)
 	}
@@ -4462,7 +4462,7 @@ func (c *Collection) writeOpQuery(socket *MongoSocket, safeOp *QueryOp, op inter
 	return result, nil
 }
 
-func (c *Collection) writeOpCommand(socket *MongoSocket, safeOp *QueryOp, op interface{}, ordered, bypassValidation bool) (lerr *LastError, err error) {
+func (c *Collection) writeOpCommand(socket *MerizoSocket, safeOp *QueryOp, op interface{}, ordered, bypassValidation bool) (lerr *LastError, err error) {
 	var writeConcern interface{}
 	if safeOp == nil {
 		writeConcern = bson.D{{"w", 0}}

@@ -16,7 +16,7 @@
     // Test that a single-database change stream cannot be opened on "admin", "config", or "local".
     assertInvalidChangeStreamNss("admin", 1);
     assertInvalidChangeStreamNss("config", 1);
-    if (!FixtureHelpers.isMongos(db)) {
+    if (!FixtureHelpers.isMerizos(db)) {
         assertInvalidChangeStreamNss("local", 1);
     }
 

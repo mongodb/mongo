@@ -135,7 +135,7 @@ BSONObj appendDB(const BSONObj& obj, StringData dbName) {
 // Use a separate function to get better error messages when types do not match.
 template <typename T1, typename T2>
 void assert_same_types() {
-    MONGO_STATIC_ASSERT(std::is_same<T1, T2>::value);
+    MERIZO_STATIC_ASSERT(std::is_same<T1, T2>::value);
 }
 
 template <typename ParserT, typename TestT, BSONType Test_bson_type>

@@ -60,7 +60,7 @@
         assert.eq(indexes[0].name, "_id_");
         assert.eq(indexes[1].name, "secondIndex");
     }`,
-                                          db.getMongo().port);
+                                          db.getMerizo().port);
 
     // Wait for the $out before restarting the replication.
     assert.soon(function() {

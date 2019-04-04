@@ -180,7 +180,7 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
     // If executing on merizos and the foreign collection is sharded, then this stage can run on
     // merizos or any shard.
     HostTypeRequirement hostRequirement =
-        (pExpCtx->inMongos && pExpCtx->merizoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs))
+        (pExpCtx->inMerizos && pExpCtx->merizoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs))
         ? HostTypeRequirement::kNone
         : HostTypeRequirement::kPrimaryShard;
 
@@ -291,7 +291,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     // Tailor the pipeline construction for our needs. We want a non-optimized pipeline without a
     // cursor source.
-    MongoProcessInterface::MakePipelineOptions pipelineOpts;
+    MerizoProcessInterface::MakePipelineOptions pipelineOpts;
     pipelineOpts.optimize = false;
     pipelineOpts.attachCursorSource = false;
 

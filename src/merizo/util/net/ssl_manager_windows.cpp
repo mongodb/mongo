@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -342,7 +342,7 @@ private:
     UniqueCertificate _sslClusterCertificate;
 };
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerWindows(sslGlobalParams, isSSLServer);
@@ -507,7 +507,7 @@ int SSLManagerWindows::SSL_read(SSLConnectionInterface* connInterface, void* buf
             }
             default:
                 severe() << "Unexpected ASIO state: " << static_cast<int>(want);
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 }
@@ -551,13 +551,13 @@ int SSLManagerWindows::SSL_write(SSLConnectionInterface* connInterface, const vo
             }
             default:
                 severe() << "Unexpected ASIO state: " << static_cast<int>(want);
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 }
 
 int SSLManagerWindows::SSL_shutdown(SSLConnectionInterface* conn) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
     return 0;
 }
 
@@ -1405,7 +1405,7 @@ void SSLManagerWindows::_handshake(SSLConnectionWindows* conn, bool client) {
                 return;
             }
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 }

@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn);
     const db = conn.getDB("test_failcommand_noparallel");
 
@@ -19,6 +19,6 @@
     assert.commandWorked(db.runCommand({find: "c"}));
     assert.commandWorked(db.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
 }());

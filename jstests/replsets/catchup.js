@@ -46,7 +46,7 @@
     }
 
     function checkOpInOplog(node, op, count) {
-        node.getDB("admin").getMongo().setSlaveOk();
+        node.getDB("admin").getMerizo().setSlaveOk();
         var oplog = node.getDB("local")['oplog.rs'];
         var oplogArray = oplog.find().toArray();
         assert.eq(oplog.count(op), count, "op: " + tojson(op) + ", oplog: " + tojson(oplogArray));

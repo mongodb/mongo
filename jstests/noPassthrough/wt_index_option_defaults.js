@@ -21,7 +21,7 @@
     }
 
     // Skip this test when 'xxxIndexConfigString' is already set in TestData.
-    // TODO: This test can be enabled when MongoRunner supports combining WT config strings with
+    // TODO: This test can be enabled when MerizoRunner supports combining WT config strings with
     // commas.
     if (jsTest.options()[engine + 'IndexConfigString']) {
         jsTest.log('Skipping test because system-wide defaults for index options are already set');
@@ -50,11 +50,11 @@
     function runTest(collOptions) {
         var hasIndexOptionDefaults = collOptions.hasOwnProperty('indexOptionDefaults');
 
-        var dbpath = MongoRunner.dataPath + 'wt_index_option_defaults';
+        var dbpath = MerizoRunner.dataPath + 'wt_index_option_defaults';
         resetDbpath(dbpath);
 
         // Start a merizod with system-wide defaults for engine-specific index options.
-        var conn = MongoRunner.runMongod({
+        var conn = MerizoRunner.runMerizod({
             dbpath: dbpath,
             noCleanData: true,
             [engine + 'IndexConfigString']: systemWideConfigString,
@@ -88,7 +88,7 @@
         checkIndexWithoutOptions(collStats.indexDetails);
         checkIndexWithOptions(collStats.indexDetails);
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
 
         function checkIndexWithoutOptions(indexDetails) {
             var indexSpec = getIndexSpecByName(testDB.coll, 'without_options');

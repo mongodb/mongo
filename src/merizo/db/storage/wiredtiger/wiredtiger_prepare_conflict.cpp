@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -39,7 +39,7 @@
 namespace merizo {
 
 // When set, simulates WT_PREPARE_CONFLICT returned from WiredTiger API calls.
-MONGO_FAIL_POINT_DEFINE(WTPrepareConflictForReads);
+MERIZO_FAIL_POINT_DEFINE(WTPrepareConflictForReads);
 
 void wiredTigerPrepareConflictLog(int attempts) {
     LOG(1) << "Caught WT_PREPARE_CONFLICT, attempt " << attempts

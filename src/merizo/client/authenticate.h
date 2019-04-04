@@ -50,16 +50,16 @@ namespace auth {
 
 using RunCommandHook = stdx::function<Future<BSONObj>(OpMsgRequest request)>;
 
-/* Hook for legacy MONGODB-CR support provided by shell client only */
-using AuthMongoCRHandler = stdx::function<Future<void>(RunCommandHook, const BSONObj&)>;
-extern AuthMongoCRHandler authMongoCR;
+/* Hook for legacy MERIZODB-CR support provided by shell client only */
+using AuthMerizoCRHandler = stdx::function<Future<void>(RunCommandHook, const BSONObj&)>;
+extern AuthMerizoCRHandler authMerizoCR;
 
 /**
  * Names for supported authentication mechanisms.
  */
 
-constexpr auto kMechanismMongoCR = "MONGODB-CR"_sd;
-constexpr auto kMechanismMongoX509 = "MONGODB-X509"_sd;
+constexpr auto kMechanismMerizoCR = "MERIZODB-CR"_sd;
+constexpr auto kMechanismMerizoX509 = "MERIZODB-X509"_sd;
 constexpr auto kMechanismSaslPlain = "PLAIN"_sd;
 constexpr auto kMechanismGSSAPI = "GSSAPI"_sd;
 constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"_sd;

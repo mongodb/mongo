@@ -32,11 +32,11 @@
 
         // Do a local update in another client.
         // The transaction should see this, due to speculative behavior.
-        const otherclient = new Mongo(primary.host);
+        const otherclient = new Merizo(primary.host);
         assert.commandWorked(otherclient.getDB(dbName)[collName].update({_id: 0}, {x: 1}, {w: 1}));
 
         // Initiate a session on the primary.
-        const session = testDB.getMongo().startSession(sessionOptions);
+        const session = testDB.getMerizo().startSession(sessionOptions);
         const sessionDb = session.getDatabase(dbName);
         const sessionColl = sessionDb.getCollection(collName);
 

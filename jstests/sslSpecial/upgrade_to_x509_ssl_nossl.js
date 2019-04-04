@@ -90,7 +90,7 @@ var rstConn3 = rst.getPrimary();
 rstConn3.getDB("test").a.insert({a: 3, str: "PEASandCARROTS"});
 assert.eq(3, rstConn3.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
-var canConnectSSL = runMongoProgram("merizo",
+var canConnectSSL = runMerizoProgram("merizo",
                                     "--port",
                                     rst.ports[0],
                                     "--ssl",
@@ -121,7 +121,7 @@ rst.awaitReplication();
 assert.eq(4, rstConn4.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
 // Test that an ssl connection can still be made
-var canConnectSSL = runMongoProgram("merizo",
+var canConnectSSL = runMerizoProgram("merizo",
                                     "--port",
                                     rst.ports[0],
                                     "--ssl",

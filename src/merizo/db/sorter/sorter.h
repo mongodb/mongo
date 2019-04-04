@@ -272,7 +272,7 @@ private:
  * #include "merizo/db/sorter/sorter.cpp" and call this in a single translation
  * unit once for each unique set of template parameters.
  */
-#define MONGO_CREATE_SORTER(Key, Value, Comparator)                                      \
+#define MERIZO_CREATE_SORTER(Key, Value, Comparator)                                      \
     /* public classes */                                                                 \
     template class ::merizo::Sorter<Key, Value>;                                          \
     template class ::merizo::SortIteratorInterface<Key, Value>;                           \

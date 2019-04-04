@@ -5,7 +5,7 @@
 
     load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
 
     // Use a custom database to avoid conflict with other tests that use system.views.
     const testDB = session.getDatabase("no_reads_from_system_dot_views_in_txn");
@@ -18,7 +18,7 @@
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 
-    if (FixtureHelpers.isMongos(testDB)) {
+    if (FixtureHelpers.isMerizos(testDB)) {
         // The rest of the test is concerned with a find by UUID which is not supported against
         // merizos.
         return;

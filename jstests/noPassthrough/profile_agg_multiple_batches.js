@@ -10,7 +10,7 @@
     // Setting internalDocumentSourceCursorBatchSizeBytes=1 ensures that multiple batches pass
     // through DocumentSourceCursor.
     const options = {setParameter: "internalDocumentSourceCursorBatchSizeBytes=1"};
-    const conn = MongoRunner.runMongod(options);
+    const conn = MerizoRunner.runMerizod(options);
     assert.neq(null, conn, "merizod was unable to start up with options: " + tojson(options));
 
     const testDB = conn.getDB("test");
@@ -31,5 +31,5 @@
     assert.eq(profileObj.keysExamined, 8, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

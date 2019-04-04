@@ -98,7 +98,7 @@ func (op *DeleteOp) FromReader(r io.Reader) error {
 
 // Execute performs the DeleteOp on a given session, yielding the reply when
 // successful (and an error otherwise).
-func (op *DeleteOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+func (op *DeleteOp) Execute(socket *mgo.MerizoSocket) (Replyable, error) {
 	if err := mgo.ExecOpWithoutReply(socket, &op.DeleteOp); err != nil {
 		return nil, err
 	}

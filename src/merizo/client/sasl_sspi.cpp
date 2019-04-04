@@ -29,7 +29,7 @@
 
 #ifdef _WIN32
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -475,7 +475,7 @@ int sspiClientPluginInit(const sasl_utils_t* utils,
  * Must be run after the AllocatorsAndMutexes are registered, but before the ClientContext is
  * created.
  */
-MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
                                      ("CyrusSaslAllocatorsAndMutexes", "CyrusSaslClientContext"))
 (InitializerContext*) {
     int ret = sasl_client_add_plugin(sspiPluginName, sspiClientPluginInit);
@@ -490,7 +490,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin,
     return Status::OK();
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin,
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin,
                                      ("CyrusSaslAllocatorsAndMutexes", "CyrusSaslClientContext"))
 (InitializerContext*) {
     int ret = sasl_client_add_plugin("PLAIN", plain_client_plug_init);

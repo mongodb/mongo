@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -74,13 +74,13 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 -1);
 
 // Tests can pause and resume moveChunk's progress at each step by enabling/disabling each failpoint
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep2);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep3);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep4);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep7);
+MERIZO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
+MERIZO_FAIL_POINT_DEFINE(moveChunkHangAtStep2);
+MERIZO_FAIL_POINT_DEFINE(moveChunkHangAtStep3);
+MERIZO_FAIL_POINT_DEFINE(moveChunkHangAtStep4);
+MERIZO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
+MERIZO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
+MERIZO_FAIL_POINT_DEFINE(moveChunkHangAtStep7);
 
 class MoveChunkCommand : public BasicCommand {
 public:
@@ -213,30 +213,30 @@ private:
                                           moveChunkRequest.getFromShardId());
 
         moveTimingHelper.done(1);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep1);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep1);
 
         MigrationSourceManager migrationSourceManager(
             opCtx, moveChunkRequest, donorConnStr, recipientHost);
 
         moveTimingHelper.done(2);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
 
         uassertStatusOKWithWarning(migrationSourceManager.startClone(opCtx));
         moveTimingHelper.done(3);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
 
         uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp(opCtx));
         moveTimingHelper.done(4);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
 
         uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(opCtx));
         uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(opCtx));
         moveTimingHelper.done(5);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
 
         uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(opCtx));
         moveTimingHelper.done(6);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
     }
 
 } moveChunkCmd;

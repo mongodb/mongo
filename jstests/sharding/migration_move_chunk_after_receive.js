@@ -7,7 +7,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     'use strict';
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticMerizod = MerizoRunner.runMerizod({});  // For startParallelOps.
 
     var st = new ShardingTest({shards: 3});
 
@@ -52,12 +52,12 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // (but after the migration of the documents has been committed on the recipient)
     pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
     var joinMoveChunk0 = moveChunkParallel(
-        staticMongod, st.s0.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
+        staticMerizod, st.s0.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
     waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
     pauseMoveChunkAtStep(st.shard1, moveChunkStepNames.chunkDataCommitted);
     var joinMoveChunk1 = moveChunkParallel(
-        staticMongod, st.s0.host, {Key: 100}, null, 'TestDB.TestColl', st.shard2.shardName);
+        staticMerizod, st.s0.host, {Key: 100}, null, 'TestDB.TestColl', st.shard2.shardName);
     waitForMoveChunkStep(st.shard1, moveChunkStepNames.chunkDataCommitted);
 
     unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
@@ -70,5 +70,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(4, foundDocs.length, 'Incorrect number of documents found ' + tojson(foundDocs));
 
     st.stop();
-    MongoRunner.stopMongod(staticMongod);
+    MerizoRunner.stopMerizod(staticMerizod);
 })();

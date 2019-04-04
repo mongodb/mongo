@@ -181,7 +181,7 @@ UpdateNode::ApplyResult RenameNode::apply(ApplyParams applyParams) const {
         // so we throw an error for consistency.
         if (status == ErrorCodes::PathNotViable) {
             uassertStatusOK(status);
-            MONGO_UNREACHABLE;  // The previous uassertStatusOK should always throw.
+            MERIZO_UNREACHABLE;  // The previous uassertStatusOK should always throw.
         }
 
         // The element we want to rename does not exist. When that happens, we treat the operation

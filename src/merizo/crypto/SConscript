@@ -22,7 +22,7 @@ env.Library('sha256_block',
         '$BUILD_DIR/merizo/util/secure_compare_memory',
     ])
 
-if "tom" in env["MONGO_CRYPTO"]:
+if "tom" in env["MERIZO_CRYPTO"]:
     tomEnv = env.Clone()
     tomEnv.InjectThirdParty(libraries=['tomcrypt'])
     tomEnv.Append(
@@ -47,9 +47,9 @@ if "tom" in env["MONGO_CRYPTO"]:
     )
 
 else:
-    env.Library('sha_block_${MONGO_CRYPTO}',
+    env.Library('sha_block_${MERIZO_CRYPTO}',
         source=[
-            'sha_block_${MONGO_CRYPTO}.cpp'
+            'sha_block_${MERIZO_CRYPTO}.cpp'
         ],
         LIBDEPS=[
             '$BUILD_DIR/merizo/base',
@@ -59,20 +59,20 @@ else:
 
 env.CppUnitTest('sha1_block_test',
                 ['sha1_block_test.cpp'],
-                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
+                LIBDEPS=['sha_block_${MERIZO_CRYPTO}'])
 
 env.CppUnitTest('sha256_block_test',
                 ['sha256_block_test.cpp'],
-                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
+                LIBDEPS=['sha_block_${MERIZO_CRYPTO}'])
 
 env.CppUnitTest('sha512_block_test',
                 ['sha512_block_test.cpp'],
-                LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
+                LIBDEPS=['sha_block_${MERIZO_CRYPTO}'])
 
 env.CppUnitTest('mechanism_scram_test',
                 ['mechanism_scram_test.cpp'],
                 LIBDEPS_PRIVATE=[
                     '$BUILD_DIR/merizo/base',
                     '$BUILD_DIR/merizo/base/secure_allocator',
-                    'sha_block_${MONGO_CRYPTO}',
+                    'sha_block_${MERIZO_CRYPTO}',
                 ])

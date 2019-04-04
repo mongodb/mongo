@@ -82,7 +82,7 @@ TEST(EndianTest, NativeToBig_uint16_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(be, nativeToBig(le));
 #else
     ASSERT_EQUALS(be, nativeToBig(be));
@@ -97,7 +97,7 @@ TEST(EndianTest, NativeToBig_uint32_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(be, nativeToBig(le));
 #else
     ASSERT_EQUALS(be, nativeToBig(be));
@@ -112,7 +112,7 @@ TEST(EndianTest, NativeToBig_uint64_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(be, nativeToBig(le));
 #else
     ASSERT_EQUALS(be, nativeToBig(be));
@@ -127,7 +127,7 @@ TEST(EndianTest, NativeToBig_int16_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(be, nativeToBig(le));
 #else
     ASSERT_EQUALS(be, nativeToBig(be));
@@ -142,7 +142,7 @@ TEST(EndianTest, NativeToBig_int32_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(be, nativeToBig(le));
 #else
     ASSERT_EQUALS(be, nativeToBig(be));
@@ -157,7 +157,7 @@ TEST(EndianTest, NativeToBig_int64_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(be, nativeToBig(le));
 #else
     ASSERT_EQUALS(be, nativeToBig(be));
@@ -172,7 +172,7 @@ TEST(EndianTest, NativeToBig_float) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(be, nativeToBig(le));
 #else
     ASSERT_EQUALS(be, nativeToBig(be));
@@ -187,7 +187,7 @@ TEST(EndianTest, NativeToBig_double) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(be, nativeToBig(le));
 #else
     ASSERT_EQUALS(be, nativeToBig(be));
@@ -202,7 +202,7 @@ TEST(EndianTest, NativeToLittle_uint16_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, nativeToLittle(le));
 #else
     ASSERT_EQUALS(le, nativeToLittle(be));
@@ -217,7 +217,7 @@ TEST(EndianTest, NativeToLittle_uint32_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, nativeToLittle(le));
 #else
     ASSERT_EQUALS(le, nativeToLittle(be));
@@ -232,7 +232,7 @@ TEST(EndianTest, NativeToLittle_uint64_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, nativeToLittle(le));
 #else
     ASSERT_EQUALS(le, nativeToLittle(be));
@@ -247,7 +247,7 @@ TEST(EndianTest, NativeToLittle_int16_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, nativeToLittle(le));
 #else
     ASSERT_EQUALS(le, nativeToLittle(be));
@@ -262,7 +262,7 @@ TEST(EndianTest, NativeToLittle_int32_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, nativeToLittle(le));
 #else
     ASSERT_EQUALS(le, nativeToLittle(be));
@@ -277,7 +277,7 @@ TEST(EndianTest, NativeToLittle_int64_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, nativeToLittle(le));
 #else
     ASSERT_EQUALS(le, nativeToLittle(be));
@@ -292,7 +292,7 @@ TEST(EndianTest, NativeToLittle_float) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, nativeToLittle(le));
 #else
     ASSERT_EQUALS(le, nativeToLittle(be));
@@ -307,7 +307,7 @@ TEST(EndianTest, NativeToLittle_double) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, nativeToLittle(le));
 #else
     ASSERT_EQUALS(le, nativeToLittle(be));
@@ -322,7 +322,7 @@ TEST(EndianTest, LittleToNative_uint16_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, littleToNative(le));
 #else
     ASSERT_EQUALS(be, littleToNative(le));
@@ -337,7 +337,7 @@ TEST(EndianTest, LittleToNative_uint32_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, littleToNative(le));
 #else
     ASSERT_EQUALS(be, littleToNative(le));
@@ -352,7 +352,7 @@ TEST(EndianTest, LittleToNative_uint64_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, littleToNative(le));
 #else
     ASSERT_EQUALS(be, littleToNative(le));
@@ -367,7 +367,7 @@ TEST(EndianTest, LittleToNative_int16_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, littleToNative(le));
 #else
     ASSERT_EQUALS(be, littleToNative(le));
@@ -382,7 +382,7 @@ TEST(EndianTest, LittleToNative_int32_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, littleToNative(le));
 #else
     ASSERT_EQUALS(be, littleToNative(le));
@@ -397,7 +397,7 @@ TEST(EndianTest, LittleToNative_int64_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, littleToNative(le));
 #else
     ASSERT_EQUALS(be, littleToNative(le));
@@ -412,7 +412,7 @@ TEST(EndianTest, LittleToNative_float) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, littleToNative(le));
 #else
     ASSERT_EQUALS(be, littleToNative(le));
@@ -427,7 +427,7 @@ TEST(EndianTest, LittleToNative_double) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, littleToNative(le));
 #else
     ASSERT_EQUALS(be, littleToNative(le));
@@ -442,7 +442,7 @@ TEST(EndianTest, BigToNative_uint16_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, bigToNative(be));
 #else
     ASSERT_EQUALS(be, bigToNative(be));
@@ -457,7 +457,7 @@ TEST(EndianTest, BigToNative_uint32_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, bigToNative(be));
 #else
     ASSERT_EQUALS(be, bigToNative(be));
@@ -472,7 +472,7 @@ TEST(EndianTest, BigToNative_uint64_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, bigToNative(be));
 #else
     ASSERT_EQUALS(be, bigToNative(be));
@@ -487,7 +487,7 @@ TEST(EndianTest, BigToNative_int16_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, bigToNative(be));
 #else
     ASSERT_EQUALS(be, bigToNative(be));
@@ -502,7 +502,7 @@ TEST(EndianTest, BigToNative_int32_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, bigToNative(be));
 #else
     ASSERT_EQUALS(be, bigToNative(be));
@@ -517,7 +517,7 @@ TEST(EndianTest, BigToNative_int64_t) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, bigToNative(be));
 #else
     ASSERT_EQUALS(be, bigToNative(be));
@@ -532,7 +532,7 @@ TEST(EndianTest, BigToNative_float) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, bigToNative(be));
 #else
     ASSERT_EQUALS(be, bigToNative(be));
@@ -547,7 +547,7 @@ TEST(EndianTest, BigToNative_double) {
     std::memcpy(&le, le_buf, sizeof(le));
     std::memcpy(&be, be_buf, sizeof(be));
 
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
     ASSERT_EQUALS(le, bigToNative(be));
 #else
     ASSERT_EQUALS(be, bigToNative(be));

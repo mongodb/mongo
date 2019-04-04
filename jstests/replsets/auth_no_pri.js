@@ -12,7 +12,7 @@
     master.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"]}, {w: NODE_COUNT});
 
     // Can authenticate replset connection when whole set is up.
-    var conn = new Mongo(rs.getURL());
+    var conn = new Merizo(rs.getURL());
     assert(conn.getDB('admin').auth('admin', 'pwd'));
     assert.writeOK(conn.getDB('admin').foo.insert({a: 1}, {writeConcern: {w: NODE_COUNT}}));
 
@@ -22,7 +22,7 @@
     rs.waitForState(nodes[2], ReplSetTest.State.SECONDARY);
 
     // Make sure you can still authenticate a replset connection with no primary
-    var conn2 = new Mongo(rs.getURL());
+    var conn2 = new Merizo(rs.getURL());
     conn2.setSlaveOk(true);
     assert(conn2.getDB('admin').auth({user: 'admin', pwd: 'pwd', mechanism: "SCRAM-SHA-1"}));
     assert.eq(1, conn2.getDB('admin').foo.findOne().a);

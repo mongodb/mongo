@@ -16,7 +16,7 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_base.js');             // for $config
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMerizos
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -124,7 +124,7 @@ var $config = extendWorkload($config, function($config, $super) {
      * subsequent $out's to this collection should fail.
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
-        if (isMongos(db)) {
+        if (isMerizos(db)) {
             return;  // convertToCapped can't be run against a merizos.
         }
 
@@ -137,7 +137,7 @@ var $config = extendWorkload($config, function($config, $super) {
      * and all subsequent $out's to this collection should fail.
      */
     $config.states.shardCollection = function shardCollection(db, unusedCollName) {
-        if (isMongos(db)) {
+        if (isMerizos(db)) {
             assertWhenOwnDB.commandWorked(db.adminCommand({enableSharding: db.getName()}));
             assertWhenOwnDB.commandWorked(db.adminCommand(
                 {shardCollection: db[this.outputCollName].getFullName(), key: {_id: 'hashed'}}));

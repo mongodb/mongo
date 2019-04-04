@@ -114,7 +114,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // range are still found after the mergeChunks.
         // Choose the merizos randomly to distribute load.
         var numDocsBefore = ChunkHelper.getNumDocs(
-            ChunkHelper.getRandomMongos(connCache.merizos), ns, chunk1.min._id, chunk2.max._id);
+            ChunkHelper.getRandomMerizos(connCache.merizos), ns, chunk1.min._id, chunk2.max._id);
 
         // If the second chunk is not on the same shard as the first, move it,
         // because mergeChunks requires the chunks being merged to be on the same shard.
@@ -202,7 +202,7 @@ var $config = extendWorkload($config, function($config, $super) {
             // merizos sees as many documents in the original chunks' range after the move as there
             // were before.
             var numDocsAfter = ChunkHelper.getNumDocs(merizos, ns, chunk1.min._id, chunk2.max._id);
-            msg = 'Mongos sees a different amount of documents between chunk bounds after ' +
+            msg = 'Merizos sees a different amount of documents between chunk bounds after ' +
                 'mergeChunks.\n' + msgBase;
             assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msg);
 
@@ -211,13 +211,13 @@ var $config = extendWorkload($config, function($config, $super) {
             // chunk was on.
             var shardsForChunk =
                 ChunkHelper.getShardsForRange(merizos, ns, chunk1.min._id, chunk2.max._id);
-            msg = 'Mongos does not see exactly 1 shard for chunk after mergeChunks.\n' + msgBase +
+            msg = 'Merizos does not see exactly 1 shard for chunk after mergeChunks.\n' + msgBase +
                 '\n' +
-                'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
+                'Merizos find().explain() results for chunk: ' + tojson(shardsForChunk);
             assertWhenOwnColl.eq(shardsForChunk.shards.length, 1, msg);
-            msg = 'Mongos sees different shard for chunk than chunk does after mergeChunks.\n' +
+            msg = 'Merizos sees different shard for chunk than chunk does after mergeChunks.\n' +
                 msgBase + '\n' +
-                'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
+                'Merizos find().explain() results for chunk: ' + tojson(shardsForChunk);
             assertWhenOwnColl.eq(shardsForChunk.shards[0], chunk1.shard, msg);
 
             // If the mergeChunks operation succeeded, verify that the merizos sees one chunk between

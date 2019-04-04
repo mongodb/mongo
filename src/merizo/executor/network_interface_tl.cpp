@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kASIO
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kASIO
 
 #include "merizo/platform/basic.h"
 
@@ -143,13 +143,13 @@ bool NetworkInterfaceTL::inShutdown() const {
 
 void NetworkInterfaceTL::waitForWork() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    MONGO_IDLE_THREAD_BLOCK;
+    MERIZO_IDLE_THREAD_BLOCK;
     _workReadyCond.wait(lk, [this] { return _isExecutorRunnable; });
 }
 
 void NetworkInterfaceTL::waitForWorkUntil(Date_t when) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    MONGO_IDLE_THREAD_BLOCK;
+    MERIZO_IDLE_THREAD_BLOCK;
     _workReadyCond.wait_until(lk, when.toSystemTimePoint(), [this] { return _isExecutorRunnable; });
 }
 
@@ -162,7 +162,7 @@ void NetworkInterfaceTL::signalWorkAvailable() {
 }
 
 Date_t NetworkInterfaceTL::now() {
-    // TODO This check is because we set up NetworkInterfaces in MONGO_INITIALIZERS and then expect
+    // TODO This check is because we set up NetworkInterfaces in MERIZO_INITIALIZERS and then expect
     // this method to work before the NI is started.
     if (!_reactor) {
         return Date_t::now();
@@ -204,7 +204,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         state->deadline = state->start + state->request.timeout;
     }
 
-    if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsBeforeAcquireConn)) {
+    if (MERIZO_FAIL_POINT(networkInterfaceDiscardCommandsBeforeAcquireConn)) {
         log() << "Discarding command due to failpoint before acquireConn";
         std::move(pf.future).getAsync([onFinish = std::move(onFinish)](
             StatusWith<RemoteCommandResponse> response) mutable {
@@ -313,7 +313,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
     Future<RemoteCommandResponse> future,
     CommandState::ConnHandle conn,
     const BatonHandle& baton) {
-    if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsAfterAcquireConn)) {
+    if (MERIZO_FAIL_POINT(networkInterfaceDiscardCommandsAfterAcquireConn)) {
         conn->indicateSuccess();
         return future;
     }

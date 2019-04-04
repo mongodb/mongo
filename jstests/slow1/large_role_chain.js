@@ -33,9 +33,9 @@ function runTest(conn) {
 }
 
 // run all tests standalone
-var conn = MongoRunner.runMongod();
+var conn = MerizoRunner.runMerizod();
 runTest(conn);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 // run all tests sharded
 conn = new ShardingTest({shards: 2, merizos: 1, config: 3});

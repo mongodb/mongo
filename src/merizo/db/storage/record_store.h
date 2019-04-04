@@ -281,7 +281,7 @@ public:
     virtual bool isCapped() const = 0;
 
     virtual void setCappedCallback(CappedCallback*) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**
@@ -488,7 +488,7 @@ public:
      * Only called if compactSupported() returns true.
      */
     virtual bool compactsInPlace() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**
@@ -497,7 +497,7 @@ public:
      * Only called if compactSupported() returns true.
      */
     virtual Status compact(OperationContext* opCtx) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**

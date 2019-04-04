@@ -88,7 +88,7 @@ public:
             return _allowShardedOutNss ? true : (_foreignNssSet.find(nss) == _foreignNssSet.end());
         }
 
-        bool allowedToPassthroughFromMongos() const final {
+        bool allowedToPassthroughFromMerizos() const final {
             // Do not allow passthrough from merizos even if the source collection is unsharded. This
             // ensures that the unique index verification happens once on merizos and can be bypassed
             // on the shards.
@@ -272,7 +272,7 @@ private:
      * an optional ChunkVersion, populated with the version stored in the sharding catalog when we
      * asked for the shard key.
      */
-    static std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveUniqueKeyOnMongoS(
+    static std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveUniqueKeyOnMerizoS(
         const boost::intrusive_ptr<ExpressionContext>&,
         const DocumentSourceOutSpec& spec,
         const NamespaceString& outputNs);
@@ -284,7 +284,7 @@ private:
      * table agrees on the epoch for that version before returning. Throws a StaleConfigException if
      * not.
      */
-    static std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveUniqueKeyOnMongoD(
+    static std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>> resolveUniqueKeyOnMerizoD(
         const boost::intrusive_ptr<ExpressionContext>&,
         const DocumentSourceOutSpec& spec,
         const NamespaceString& outputNs);

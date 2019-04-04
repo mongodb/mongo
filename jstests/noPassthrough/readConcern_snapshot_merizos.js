@@ -40,7 +40,7 @@
         testDB.runCommand({find: collName, readConcern: {level: "snapshot"}}),
         ErrorCodes.InvalidOptions);
 
-    let session = testDB.getMongo().startSession({causalConsistency: false});
+    let session = testDB.getMerizo().startSession({causalConsistency: false});
     let sessionDb = session.getDatabase(dbName);
 
     // readConcern 'snapshot' is not allowed outside transaction context.

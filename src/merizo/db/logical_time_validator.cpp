@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -55,7 +55,7 @@ stdx::mutex validatorMutex;  // protects access to decoration instance of Logica
 
 std::vector<Privilege> advanceClusterTimePrivilege;
 
-MONGO_INITIALIZER(InitializeAdvanceClusterTimePrivilegeVector)(InitializerContext* const) {
+MERIZO_INITIALIZER(InitializeAdvanceClusterTimePrivilegeVector)(InitializerContext* const) {
     ActionSet actions;
     actions.addAction(ActionType::advanceClusterTime);
     advanceClusterTimePrivilege.emplace_back(ResourcePattern::forClusterResource(), actions);

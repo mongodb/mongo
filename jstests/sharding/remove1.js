@@ -39,10 +39,10 @@
     assert.commandFailed(s.s0.adminCommand({removeshard: s.shard1.shardName}));
 
     // Should create a shard0002 shard
-    var conn = MongoRunner.runMongod({shardsvr: ""});
+    var conn = MerizoRunner.runMerizod({shardsvr: ""});
     assert.commandWorked(s.s0.adminCommand({addshard: conn.host}));
     assert.eq(2, s.config.shards.count(), "new server does not appear in count");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
     s.stop();
 })();

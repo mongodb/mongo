@@ -5,7 +5,7 @@
     load("jstests/libs/feature_compatibility_version.js");
 
     // Start the node with FCV 4.0
-    let conn = MongoRunner.runMongod({binVersion: "latest"});
+    let conn = MerizoRunner.runMerizod({binVersion: "latest"});
     assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
     var db = conn.getDB('test');
     var t = db.text_index_limits;
@@ -49,5 +49,5 @@
             {insert: t.getName(), documents: [{_id: 2, comments: commentsWithWordsOfLargeSize}]}),
         16733);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

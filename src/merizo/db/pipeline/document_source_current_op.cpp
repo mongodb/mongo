@@ -45,7 +45,7 @@ const StringData kIdleCursorsFieldName = "idleCursors"_sd;
 
 const StringData kOpIdFieldName = "opid"_sd;
 const StringData kClientFieldName = "client"_sd;
-const StringData kMongosClientFieldName = "client_s"_sd;
+const StringData kMerizosClientFieldName = "client_s"_sd;
 const StringData kShardFieldName = "shard"_sd;
 }  // namespace
 
@@ -94,7 +94,7 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
                     elem.type() == BSONType::Bool);
 
             if (elem.boolean()) {
-                localOps = LocalOpsMode::kLocalMongosOps;
+                localOps = LocalOpsMode::kLocalMerizosOps;
             }
         }
     }
@@ -120,18 +120,18 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
 
         _opsIter = _ops.begin();
 
-        if (pExpCtx->fromMongos) {
+        if (pExpCtx->fromMerizos) {
             _shardName = pExpCtx->merizoProcessInterface->getShardName(pExpCtx->opCtx);
 
             uassert(40465,
-                    "Aggregation request specified 'fromMongos' but unable to retrieve shard name "
+                    "Aggregation request specified 'fromMerizos' but unable to retrieve shard name "
                     "for $currentOp pipeline stage.",
                     !_shardName.empty());
         }
     }
 
     if (_opsIter != _ops.end()) {
-        if (!pExpCtx->fromMongos) {
+        if (!pExpCtx->fromMerizos) {
             return Document(*_opsIter++);
         }
 
@@ -161,7 +161,7 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
                 std::string shardOpID = (str::stream() << _shardName << ":" << elt.numberInt());
                 doc.addField(kOpIdFieldName, Value(shardOpID));
             } else if (fieldName == kClientFieldName) {
-                doc.addField(kMongosClientFieldName, Value(elt.str()));
+                doc.addField(kMerizosClientFieldName, Value(elt.str()));
             } else {
                 doc.addField(fieldName, Value(elt));
             }
@@ -189,7 +189,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
     ConnMode includeIdleConnections = ConnMode::kExcludeIdle;
     SessionMode includeIdleSessions = SessionMode::kIncludeIdle;
     UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers;
-    LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
+    LocalOpsMode showLocalOpsOnMerizoS = LocalOpsMode::kRemoteShardOps;
     TruncationMode truncateOps = TruncationMode::kNoTruncation;
     CursorMode idleCursors = CursorMode::kExcludeCursors;
 
@@ -227,8 +227,8 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                                      "a boolean value, but found: "
                                   << typeName(elem.type()),
                     elem.type() == BSONType::Bool);
-            showLocalOpsOnMongoS =
-                (elem.boolean() ? LocalOpsMode::kLocalMongosOps : LocalOpsMode::kRemoteShardOps);
+            showLocalOpsOnMerizoS =
+                (elem.boolean() ? LocalOpsMode::kLocalMerizosOps : LocalOpsMode::kRemoteShardOps);
         } else if (fieldName == kTruncateOpsFieldName) {
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "The 'truncateOps' parameter of the $currentOp stage must be "
@@ -256,7 +256,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                                        includeIdleConnections,
                                        includeIdleSessions,
                                        includeOpsFromAllUsers,
-                                       showLocalOpsOnMongoS,
+                                       showLocalOpsOnMerizoS,
                                        truncateOps,
                                        idleCursors);
 }
@@ -266,14 +266,14 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
     ConnMode includeIdleConnections,
     SessionMode includeIdleSessions,
     UserMode includeOpsFromAllUsers,
-    LocalOpsMode showLocalOpsOnMongoS,
+    LocalOpsMode showLocalOpsOnMerizoS,
     TruncationMode truncateOps,
     CursorMode idleCursors) {
     return new DocumentSourceCurrentOp(pExpCtx,
                                        includeIdleConnections,
                                        includeIdleSessions,
                                        includeOpsFromAllUsers,
-                                       showLocalOpsOnMongoS,
+                                       showLocalOpsOnMerizoS,
                                        truncateOps,
                                        idleCursors);
 }
@@ -288,7 +288,7 @@ Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosi
                   {kAllUsersFieldName,
                    _includeOpsFromAllUsers == UserMode::kIncludeAll ? Value(true) : Value()},
                   {kLocalOpsFieldName,
-                   _showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps ? Value(true) : Value()},
+                   _showLocalOpsOnMerizoS == LocalOpsMode::kLocalMerizosOps ? Value(true) : Value()},
                   {kTruncateOpsFieldName,
                    _truncateOps == TruncationMode::kTruncateOps ? Value(true) : Value()},
                   {kIdleCursorsFieldName,

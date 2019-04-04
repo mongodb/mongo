@@ -57,7 +57,7 @@
         // Transparently handles assert.writeOK for legacy writes.
         function assertWriteOK(writeResponse) {
             if (!writeResponse) {
-                assert(db.getMongo().writeMode !== "commands");
+                assert(db.getMerizo().writeMode !== "commands");
                 assert(db.runCommand({getLastError: 1}).err == null);
             } else {
                 assert.commandWorked(writeResponse);
@@ -71,15 +71,15 @@
         }
         assertWriteOK(coll.createIndex({loc: "2dsphere"}));
 
-        const isMongos = FixtureHelpers.isMongos(db);
+        const isMerizos = FixtureHelpers.isMerizos(db);
 
         // Set the shell read/write mode.
-        db.getMongo().forceWriteMode(readWriteMode);
-        db.getMongo().forceReadMode(readWriteMode);
+        db.getMerizo().forceWriteMode(readWriteMode);
+        db.getMerizo().forceReadMode(readWriteMode);
 
         // Build a string that identifies the parameters of this test run. Individual ops will
         // use this string as their comment where applicable, and we also print it to the logs.
-        const logFormatTestComment = (isMongos ? 'merizos' : 'merizod') + "_" + readWriteMode +
+        const logFormatTestComment = (isMerizos ? 'merizos' : 'merizod') + "_" + readWriteMode +
             "_slowms:" + slowMs + "_logLevel:" + logLevel + "_sampleRate:" + sampleRate;
         jsTestLog(logFormatTestComment);
 
@@ -94,7 +94,7 @@
         // merizoS, and vice-versa. Ignore these fields when examining the logs of an instance on
         // which we do not expect them to appear.
         const ignoreFields =
-            (isMongos
+            (isMerizos
                  ? ["docsExamined", "keysExamined", "keysInserted", "keysDeleted", "planSummary", 
 					 "usedDisk", "hasSortStage"]
                  : ["nShards"]);
@@ -208,7 +208,7 @@
                             {_id: 1, a: 1, loc: {type: "Point", coordinates: [1, 1]}});
               },
               // TODO SERVER-34208: display FAM update metrics in merizoS logs.
-              logFields: Object.assign((isMongos ? {} : {nMatched: 1, nModified: 1}), {
+              logFields: Object.assign((isMerizos ? {} : {nMatched: 1, nModified: 1}), {
                   command: "findAndModify",
                   findandmodify: coll.getName(),
                   planSummary: "IXSCAN { _id: 1 }",
@@ -242,7 +242,7 @@
                   assertWriteOK(db.test.update(
                       {a: 1, $comment: logFormatTestComment}, {$inc: {b: 1}}, {multi: true}));
               },
-              logFields: (isMongos ? {
+              logFields: (isMerizos ? {
                   command: "update",
                   update: coll.getName(),
                   ordered: true,
@@ -267,7 +267,7 @@
                                                {$inc: {b: 1}},
                                                {multi: true, upsert: true}));
               },
-              logFields: (isMongos ? {
+              logFields: (isMerizos ? {
                   command: "update",
                   update: coll.getName(),
                   ordered: true,
@@ -304,7 +304,7 @@
               test: function(db) {
                   assertWriteOK(db.test.remove({z: 1, $comment: logFormatTestComment}));
               },
-              logFields: (isMongos ? {
+              logFields: (isMerizos ? {
                   command: "delete",
                   delete: coll.getName(),
                   ordered: true,

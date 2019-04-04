@@ -3,10 +3,10 @@
  */
 
 function supportsSnapshotReadConcern() {
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     const supportsSnapshotReadConcern =
         conn.getDB("test").serverStatus().storageEngine.supportsSnapshotReadConcern;
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     return supportsSnapshotReadConcern;
 }

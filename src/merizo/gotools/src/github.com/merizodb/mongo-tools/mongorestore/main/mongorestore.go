@@ -87,7 +87,7 @@ func main() {
 	progressManager.Start()
 	defer progressManager.Stop()
 
-	restore := merizorestore.MongoRestore{
+	restore := merizorestore.MerizoRestore{
 		ToolOptions:     opts,
 		OutputOptions:   outputOpts,
 		InputOptions:    inputOpts,

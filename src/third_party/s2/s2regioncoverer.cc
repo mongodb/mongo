@@ -50,7 +50,7 @@ static void Init() {
   }
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(S2RegionCovererInit, ("S2CellIdInit"))(merizo::InitializerContext *context) {
+MERIZO_INITIALIZER_WITH_PREREQUISITES(S2RegionCovererInit, ("S2CellIdInit"))(merizo::InitializerContext *context) {
     Init();
     return merizo::Status::OK();
 }

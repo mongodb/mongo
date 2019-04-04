@@ -17,7 +17,7 @@ TestData.skipCheckDBHashes = true;
     load("jstests/libs/write_concern_util.js");
     load("jstests/replsets/rslib.js");
 
-    let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
+    let dbpath = MerizoRunner.dataPath + "feature_compatibility_version";
     resetDbpath(dbpath);
     let res;
 
@@ -32,7 +32,7 @@ TestData.skipCheckDBHashes = true;
     let adminDB;
 
     // A 'latest' binary standalone should default to 'latestFCV'.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
+    conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: latest});
     assert.neq(
         null, conn, "merizod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
@@ -97,55 +97,55 @@ TestData.skipCheckDBHashes = true;
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(adminDB, latestFCV);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // featureCompatibilityVersion is durable.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
+    conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: latest});
     assert.neq(
         null, conn, "merizod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, latestFCV);
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     checkFCV(adminDB, lastStableFCV);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
+    conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: latest, noCleanData: true});
     assert.neq(null,
                conn,
                "merizod was unable to start up with binary version=" + latest +
                    " and last-stable featureCompatibilityVersion");
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // If you upgrade from 'lastStable' binary to 'latest' binary and have non-local databases, FCV
     // remains 'lastStableFCV'.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastStable});
+    conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: lastStable});
     assert.neq(null,
                conn,
                "merizod was unable to start up with version=" + lastStable + " and no data files");
     assert.writeOK(conn.getDB("test").coll.insert({a: 5}));
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
+    conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: latest, noCleanData: true});
     assert.neq(null,
                conn,
                "merizod was unable to start up with binary version=" + latest +
                    " and featureCompatibilityVersion=" + lastStableFCV);
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // A 'latest' binary merizod started with --shardsvr and clean data files defaults to
     // 'lastStableFCV'.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, shardsvr: ""});
+    conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: latest, shardsvr: ""});
     assert.neq(
         null, conn, "merizod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     //
     // Replica set tests.

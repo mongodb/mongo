@@ -93,7 +93,7 @@ msi_flavor = '2008R2Plus'
 msi_platform = 'x64'
 
 # Enterprise
-if 'enterprise' in env['MONGO_MODULES']:
+if 'enterprise' in env['MERIZO_MODULES']:
   msi_edition = 'Enterprise'
   upgrade_code = '0375833f-c12d-4faa-9a83-60730647cac3'
 # Community
@@ -110,7 +110,7 @@ sourcesList.append("Installer_64.wxs")
 sources = ["wxs/" + file for file in sourcesList]
 objects = ["$BUILD_DIR/msi/" + file.replace(".wxs", ".wixobj") for file in sourcesList]
 
-full_version = env['MONGO_VERSION'].partition('-')[0]
+full_version = env['MERIZO_VERSION'].partition('-')[0]
 
 # major version is the x.y, not the x.y.z
 major_version = full_version
@@ -209,7 +209,7 @@ env.Depends(pre_msi_cmd, '#src/merizo/installer/compass/Install-Compass.ps1')
 # Source Dependencies
 env.Depends(pre_msi_cmd, '#buildscripts/packaging/msi/merizod.yaml')
 
-if 'enterprise' in env['MONGO_MODULES']:
+if 'enterprise' in env['MERIZO_MODULES']:
     env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/merizodecrypt.exe")
     env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/merizoldap.exe")
     env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/merizocryptd.exe")

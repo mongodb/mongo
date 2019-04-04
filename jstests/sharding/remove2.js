@@ -47,7 +47,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             assert.eq(true, st.adminCommand({addshard: seed}));
         }
         awaitRSClientHosts(
-            new Mongo(st.s.host), replTest.getSecondaries(), {ok: true, secondary: true});
+            new Merizo(st.s.host), replTest.getSecondaries(), {ok: true, secondary: true});
 
         assert.soon(function() {
             var x = st.chunkDiff(coll.getName(), coll.getDB().getName());
@@ -72,7 +72,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // avoid a pending delete re-creating a database after it was dropped.
     st.s.getDB("config").settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true);
 
-    var conn = new Mongo(st.s.host);
+    var conn = new Merizo(st.s.host);
     var coll = conn.getCollection("test.remove2");
     coll.drop();
 

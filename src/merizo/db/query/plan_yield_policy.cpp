@@ -45,7 +45,7 @@
 namespace merizo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(setInterruptOnlyPlansCheckForInterruptHang);
+MERIZO_FAIL_POINT_DEFINE(setInterruptOnlyPlansCheckForInterruptHang);
 }  // namespace
 
 PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy)
@@ -95,7 +95,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(stdx::function<void()> whileYieldingFn)
         invariant(opCtx);
         // If the 'setInterruptOnlyPlansCheckForInterruptHang' fail point is enabled, set the 'msg'
         // field of this operation's CurOp to signal that we've hit this point.
-        if (MONGO_FAIL_POINT(setInterruptOnlyPlansCheckForInterruptHang)) {
+        if (MERIZO_FAIL_POINT(setInterruptOnlyPlansCheckForInterruptHang)) {
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &setInterruptOnlyPlansCheckForInterruptHang,
                 opCtx,

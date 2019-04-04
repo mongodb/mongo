@@ -41,7 +41,7 @@
 #include "merizo/util/quick_exit.h"
 
 namespace merizo {
-MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongosOptions)(InitializerContext* context) {
+MERIZO_GENERAL_STARTUP_OPTIONS_REGISTER(MerizosOptions)(InitializerContext* context) {
     auto status = addGeneralServerOptions(&moe::startupOptions);
     if (!status.isOK()) {
         return status;
@@ -50,11 +50,11 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongosOptions)(InitializerContext* contex
     return addNonGeneralServerOptions(&moe::startupOptions);
 }
 
-MONGO_INITIALIZER_GENERAL(MongosOptions,
+MERIZO_INITIALIZER_GENERAL(MerizosOptions,
                           ("BeginStartupOptionValidation", "AllFailPointsRegistered"),
                           ("EndStartupOptionValidation"))
 (InitializerContext* context) {
-    if (!handlePreValidationMongosOptions(moe::startupOptionsParsed, context->args())) {
+    if (!handlePreValidationMerizosOptions(moe::startupOptionsParsed, context->args())) {
         quickExit(EXIT_SUCCESS);
     }
     // Run validation, but tell the Environment that we don't want it to be set as "valid",
@@ -63,11 +63,11 @@ MONGO_INITIALIZER_GENERAL(MongosOptions,
     if (!ret.isOK()) {
         return ret;
     }
-    ret = validateMongosOptions(moe::startupOptionsParsed);
+    ret = validateMerizosOptions(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         return ret;
     }
-    ret = canonicalizeMongosOptions(&moe::startupOptionsParsed);
+    ret = canonicalizeMerizosOptions(&moe::startupOptionsParsed);
     if (!ret.isOK()) {
         return ret;
     }
@@ -78,11 +78,11 @@ MONGO_INITIALIZER_GENERAL(MongosOptions,
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
+MERIZO_INITIALIZER_GENERAL(CoreOptions_Store,
                           ("BeginStartupOptionStorage"),
                           ("EndStartupOptionStorage"))
 (InitializerContext* context) {
-    Status ret = storeMongosOptions(moe::startupOptionsParsed);
+    Status ret = storeMerizosOptions(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;

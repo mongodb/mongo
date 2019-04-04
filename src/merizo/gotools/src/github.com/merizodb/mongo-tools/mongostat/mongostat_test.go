@@ -102,11 +102,11 @@ func TestStatLine(t *testing.T) {
 	})
 }
 
-func TestIsMongos(t *testing.T) {
+func TestIsMerizos(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
 	runCheck := func(process string) bool {
-		return status.IsMongos(&status.ServerStatus{
+		return status.IsMerizos(&status.ServerStatus{
 			Process: process,
 		})
 	}

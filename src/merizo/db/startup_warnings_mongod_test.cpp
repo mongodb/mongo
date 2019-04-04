@@ -42,95 +42,95 @@ using merizo::unittest::TempDir;
 
 using namespace merizo;
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidDirectory) {
+TEST(StartupWarningsMerizodTest, ReadTransparentHugePagesParameterInvalidDirectory) {
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("no_such_directory", "param");
+        StartupWarningsMerizod::readTransparentHugePagesParameter("no_such_directory", "param");
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidFile) {
-    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterInvalidFile");
+TEST(StartupWarningsMerizodTest, ReadTransparentHugePagesParameterInvalidFile) {
+    TempDir tempDir("StartupWarningsMerizodTest_ReadTransparentHugePagesParameterInvalidFile");
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        StartupWarningsMerizod::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::NonExistentPath, result.getStatus().code());
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterEmptyFile) {
-    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterInvalidFile");
+TEST(StartupWarningsMerizodTest, ReadTransparentHugePagesParameterEmptyFile) {
+    TempDir tempDir("StartupWarningsMerizodTest_ReadTransparentHugePagesParameterInvalidFile");
     {
         std::string filename(tempDir.path() + "/param");
         std::ofstream(filename.c_str());
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        StartupWarningsMerizod::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::FileStreamFailed, result.getStatus().code());
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterBlankLine) {
-    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
+TEST(StartupWarningsMerizodTest, ReadTransparentHugePagesParameterBlankLine) {
+    TempDir tempDir("StartupWarningsMerizodTest_ReadTransparentHugePagesParameterBlankLine");
     {
         std::string filename(tempDir.path() + "/param");
         std::ofstream ofs(filename.c_str());
         ofs << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        StartupWarningsMerizod::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterInvalidFormat) {
-    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
+TEST(StartupWarningsMerizodTest, ReadTransparentHugePagesParameterInvalidFormat) {
+    TempDir tempDir("StartupWarningsMerizodTest_ReadTransparentHugePagesParameterBlankLine");
     {
         std::string filename(tempDir.path() + "/param");
         std::ofstream ofs(filename.c_str());
         ofs << "always madvise never" << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        StartupWarningsMerizod::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterEmptyOpMode) {
-    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterEmptyOpMode");
+TEST(StartupWarningsMerizodTest, ReadTransparentHugePagesParameterEmptyOpMode) {
+    TempDir tempDir("StartupWarningsMerizodTest_ReadTransparentHugePagesParameterEmptyOpMode");
     {
         std::string filename(tempDir.path() + "/param");
         std::ofstream ofs(filename.c_str());
         ofs << "always madvise [] never" << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        StartupWarningsMerizod::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterUnrecognizedOpMode) {
+TEST(StartupWarningsMerizodTest, ReadTransparentHugePagesParameterUnrecognizedOpMode) {
     TempDir tempDir(
-        "StartupWarningsMongodTest_ReadTransparentHugePagesParameterUnrecognizedOpMode");
+        "StartupWarningsMerizodTest_ReadTransparentHugePagesParameterUnrecognizedOpMode");
     {
         std::string filename(tempDir.path() + "/param");
         std::ofstream ofs(filename.c_str());
         ofs << "always madvise never [unknown]" << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        StartupWarningsMerizod::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterValidFormat) {
-    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
+TEST(StartupWarningsMerizodTest, ReadTransparentHugePagesParameterValidFormat) {
+    TempDir tempDir("StartupWarningsMerizodTest_ReadTransparentHugePagesParameterBlankLine");
     {
         std::string filename(tempDir.path() + "/param");
         std::ofstream ofs(filename.c_str());
         ofs << "always madvise [never]" << std::endl;
     }
     StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+        StartupWarningsMerizod::readTransparentHugePagesParameter("param", tempDir.path());
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS("never", result.getValue());
 }

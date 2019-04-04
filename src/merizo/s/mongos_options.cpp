@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -53,16 +53,16 @@
 
 namespace merizo {
 
-MongosGlobalParams merizosGlobalParams;
+MerizosGlobalParams merizosGlobalParams;
 
-void printMongosHelp(const moe::OptionSection& options) {
+void printMerizosHelp(const moe::OptionSection& options) {
     std::cout << options.helpString() << std::endl;
 };
 
-bool handlePreValidationMongosOptions(const moe::Environment& params,
+bool handlePreValidationMerizosOptions(const moe::Environment& params,
                                       const std::vector<std::string>& args) {
     if (params.count("help") && params["help"].as<bool>() == true) {
-        printMongosHelp(moe::startupOptions);
+        printMerizosHelp(moe::startupOptions);
         return false;
     }
     if (params.count("version") && params["version"].as<bool>() == true) {
@@ -79,7 +79,7 @@ bool handlePreValidationMongosOptions(const moe::Environment& params,
     return true;
 }
 
-Status validateMongosOptions(const moe::Environment& params) {
+Status validateMerizosOptions(const moe::Environment& params) {
     Status ret = validateServerOptions(params);
     if (!ret.isOK()) {
         return ret;
@@ -88,7 +88,7 @@ Status validateMongosOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-Status canonicalizeMongosOptions(moe::Environment* params) {
+Status canonicalizeMerizosOptions(moe::Environment* params) {
     Status ret = canonicalizeServerOptions(params);
     if (!ret.isOK()) {
         return ret;
@@ -97,7 +97,7 @@ Status canonicalizeMongosOptions(moe::Environment* params) {
     return Status::OK();
 }
 
-Status storeMongosOptions(const moe::Environment& params) {
+Status storeMerizosOptions(const moe::Environment& params) {
     Status ret = storeServerOptions(params);
     if (!ret.isOK()) {
         return ret;

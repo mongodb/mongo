@@ -565,7 +565,7 @@ public:
             return std::tie(collAndIdxIdents[0], collAndIdxIdents[1]);
         }
 
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**
@@ -2703,7 +2703,7 @@ public:
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
-        MongoDSessionCatalog::onStepUp(_opCtx);
+        MerizoDSessionCatalog::onStepUp(_opCtx);
 
         reset(nss);
         UUID ui = UUID::gen();
@@ -2789,7 +2789,7 @@ protected:
     Timestamp beforeTxnTs;
     Timestamp commitEntryTs;
 
-    boost::optional<MongoDOperationContextSession> ocs;
+    boost::optional<MerizoDOperationContextSession> ocs;
 };
 
 class MultiDocumentTransaction : public MultiDocumentTransactionTest {

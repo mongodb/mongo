@@ -4,7 +4,7 @@
 (function() {
     'use strict';
 
-    let merizod = MongoRunner.runMongod(
+    let merizod = MerizoRunner.runMerizod(
         {auth: "", setParameter: "authenticationMechanisms=SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"});
     assert(merizod);
     const admin = merizod.getDB('admin');
@@ -203,10 +203,10 @@
     });
     assert.eq(["sha256user", "user"], foundUsers);
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     // Ensure mechanisms can be enabled and disabled.
-    merizod = MongoRunner.runMongod({
+    merizod = MerizoRunner.runMerizod({
         auth: "",
         setParameter: "authenticationMechanisms=SCRAM-SHA-1",
         restart: merizod,
@@ -214,8 +214,8 @@
     });
     assert(merizod.getDB("test").auth("sha1user", "pass"));
     assert(!merizod.getDB("test").auth("sha256user", "pass"));
-    MongoRunner.stopMongod(merizod);
-    merizod = MongoRunner.runMongod({
+    MerizoRunner.stopMerizod(merizod);
+    merizod = MerizoRunner.runMerizod({
         auth: "",
         setParameter: "authenticationMechanisms=SCRAM-SHA-256",
         restart: merizod,
@@ -223,6 +223,6 @@
     });
     assert(!merizod.getDB("test").auth("sha1user", "pass"));
     assert(merizod.getDB("test").auth("sha256user", "pass"));
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
 })();

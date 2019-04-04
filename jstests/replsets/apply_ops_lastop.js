@@ -21,8 +21,8 @@
     var db = primary.getDB('foo');
     var coll = primary.getCollection('foo.bar');
     // Two connections
-    var m1 = new Mongo(primary.host);
-    var m2 = new Mongo(primary.host);
+    var m1 = new Merizo(primary.host);
+    var m2 = new Merizo(primary.host);
 
     var insertApplyOps = [{op: "i", ns: 'foo.bar', o: {_id: 1, a: "b"}}];
     var deleteApplyOps = [{op: "d", ns: 'foo.bar', o: {_id: 1, a: "b"}}];

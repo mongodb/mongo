@@ -39,9 +39,9 @@
         "tool_replset/127.0.0.1:" + replTest.ports[0] + ",127.0.0.1:" + replTest.ports[1];
 
     // Test with merizodump/merizorestore
-    var data = MongoRunner.dataDir + "/tool_replset-dump1/";
+    var data = MerizoRunner.dataDir + "/tool_replset-dump1/";
     print("using merizodump to dump the db to " + data);
-    var exitCode = MongoRunner.runMongoTool("merizodump", {
+    var exitCode = MerizoRunner.runMerizoTool("merizodump", {
         host: replSetConnString,
         out: data,
     });
@@ -53,7 +53,7 @@
     replTest.awaitReplication();
 
     print("using merizorestore to restore the db from " + data);
-    exitCode = MongoRunner.runMongoTool("merizorestore", {
+    exitCode = MerizoRunner.runMerizoTool("merizorestore", {
         host: replSetConnString,
         dir: data,
     });
@@ -67,8 +67,8 @@
 
     // Test with merizoexport/merizoimport
     print("export the collection");
-    var extFile = MongoRunner.dataDir + "/tool_replset/export";
-    exitCode = MongoRunner.runMongoTool("merizoexport", {
+    var extFile = MerizoRunner.dataDir + "/tool_replset/export";
+    exitCode = MerizoRunner.runMerizoTool("merizoexport", {
         host: replSetConnString,
         out: extFile,
         db: "foo",
@@ -82,7 +82,7 @@
     replTest.awaitReplication();
 
     print("import the collection");
-    exitCode = MongoRunner.runMongoTool("merizoimport", {
+    exitCode = MerizoRunner.runMerizoTool("merizoimport", {
         host: replSetConnString,
         file: extFile,
         db: "foo",

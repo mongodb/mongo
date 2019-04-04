@@ -10,7 +10,7 @@
  * update operators. Now checks that document moves don't happen and
  * that large changes in document size are handled correctly.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMerizod
 
 var $config = (function() {
 
@@ -97,7 +97,7 @@ var $config = (function() {
             // Get the DiskLoc of the document after its potential move
             var after = db[collName].find({_id: before._id}).showDiskLoc().next();
 
-            if (isMongod(db)) {
+            if (isMerizod(db)) {
                 // Even though the document has at least doubled in size, the document
                 // must never move.
                 assertWhenOwnColl.eq(

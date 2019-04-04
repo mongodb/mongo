@@ -6,7 +6,7 @@
 
     load("jstests/libs/override_methods/override_helpers.js");
 
-    const getDBOriginal = Mongo.prototype.getDB;
+    const getDBOriginal = Merizo.prototype.getDB;
 
     const sessionMap = new WeakMap();
     const sessionOptions = TestData.sessionOptions;
@@ -40,7 +40,7 @@
     // Override the getDB to return a db object with the correct driverSession. We use a WeakMap
     // to cache the session for each connection instance so we can retrieve the same session on
     // subsequent calls to getDB.
-    Mongo.prototype.getDB = function(dbName) {
+    Merizo.prototype.getDB = function(dbName) {
         if (jsTest.options().disableEnableSessions) {
             return getDBOriginal.apply(this, arguments);
         }
@@ -59,7 +59,7 @@
     };
 
     // Override the global `db` object to be part of a session.
-    db = db.getMongo().getDB(db.getName());
+    db = db.getMerizo().getDB(db.getName());
 
     OverrideHelpers.prependOverrideInParallelShell(
         "jstests/libs/override_methods/enable_sessions.js");

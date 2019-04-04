@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -98,12 +98,12 @@ StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationConte
 StatusWith<DistLockHandle> DistLockManagerMock::tryLockWithLocalWriteConcern(
     OperationContext* opCtx, StringData name, StringData whyMessage, const OID& lockSessionID) {
     // Not yet implemented
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void DistLockManagerMock::unlockAll(OperationContext* opCtx, const std::string& processID) {
     // Not yet implemented
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void DistLockManagerMock::unlock(OperationContext* opCtx, const DistLockHandle& lockHandle) {

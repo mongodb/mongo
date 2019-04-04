@@ -33,7 +33,7 @@ import sys
 import yaml
 
 # Name of map to search for in the variables map in evergreen.yml
-MONGOCRYPTD_VARIANTS = "merizocryptd_variants"
+MERIZOCRYPTD_VARIANTS = "merizocryptd_variants"
 
 
 def main():
@@ -55,11 +55,11 @@ def main():
     variables = nodes["variables"]
 
     for var in variables:
-        if MONGOCRYPTD_VARIANTS in var:
-            expected_variants = var[MONGOCRYPTD_VARIANTS]
+        if MERIZOCRYPTD_VARIANTS in var:
+            expected_variants = var[MERIZOCRYPTD_VARIANTS]
             break
     else:
-        print("ERROR: Could not find node %s in file '%s'" % (MONGOCRYPTD_VARIANTS, args.file),
+        print("ERROR: Could not find node %s in file '%s'" % (MERIZOCRYPTD_VARIANTS, args.file),
               file=sys.stderr)
         sys.exit(1)
 
@@ -67,7 +67,7 @@ def main():
         print("ERROR: Expected to find variant %s in list %s" % (args.variant, expected_variants),
               file=sys.stderr)
         print("ERROR:  Please add the build variant %s to the %s list in '%s'" %
-              (args.variant, MONGOCRYPTD_VARIANTS, args.file), file=sys.stderr)
+              (args.variant, MERIZOCRYPTD_VARIANTS, args.file), file=sys.stderr)
         sys.exit(1)
 
     sys.exit(0)

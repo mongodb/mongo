@@ -212,7 +212,7 @@ TEST(Future_Void, Success_thenError_Status) {
                         [](Future<void>&& fut) {
                             auto fut2 = std::move(fut).then(
                                 []() { return Status(ErrorCodes::BadValue, "oh no!"); });
-                            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
+                            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
                             ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
                         });
 }
@@ -223,7 +223,7 @@ TEST(Future_Void, Success_thenError_StatusWith) {
         [](Future<void>&& fut) {
             auto fut2 = std::move(fut).then(
                 []() { return StatusWith<double>(ErrorCodes::BadValue, "oh no!"); });
-            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<double>>::value);
+            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<double>>::value);
             ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
         });
 }
@@ -598,7 +598,7 @@ TEST(Future_Void, Success_onCompletionError_Status) {
                                 ASSERT_OK(status);
                                 return Status(ErrorCodes::BadValue, "oh no!");
                             });
-                            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
+                            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
                             ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
                         });
 }
@@ -610,7 +610,7 @@ TEST(Future_Void, Success_onCompletionError_StatusWith) {
                                 ASSERT_OK(status);
                                 return StatusWith<double>(ErrorCodes::BadValue, "oh no!");
                             });
-                            MONGO_STATIC_ASSERT(
+                            MERIZO_STATIC_ASSERT(
                                 std::is_same<decltype(fut2), Future<double>>::value);
                             ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
                         });

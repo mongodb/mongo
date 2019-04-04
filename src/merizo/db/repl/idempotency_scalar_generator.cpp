@@ -62,9 +62,9 @@ Value RandomizedScalarGenerator::generateScalar() const {
         case ScalarChoice::kString:
             return Value(_generateRandomString());
         case ScalarChoice::kNumChoices:
-            MONGO_UNREACHABLE
+            MERIZO_UNREACHABLE
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::string RandomizedScalarGenerator::_generateRandomString() const {

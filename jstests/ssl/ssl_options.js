@@ -15,7 +15,7 @@ requireSSLProvider('openssl', function() {
         sslClusterPassword: "qwerty",
         sslCAFile: "jstests/libs/ca.pem"
     };
-    const merizodSource = MongoRunner.runMongod(merizodConfig);
+    const merizodSource = MerizoRunner.runMerizod(merizodConfig);
 
     const getCmdLineOptsResult = merizodSource.adminCommand("getCmdLineOpts");
 
@@ -43,7 +43,7 @@ requireSSLProvider('openssl', function() {
               "<password>",
               "Password not properly censored: " + tojson(getCmdLineOptsResult));
 
-    MongoRunner.stopMongod(merizodSource);
+    MerizoRunner.stopMerizod(merizodSource);
 
     print(baseName + " succeeded.");
 });

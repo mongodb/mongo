@@ -42,10 +42,10 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec NumberIntInfo::methods[5] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toNumber, NumberIntInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberIntInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, NumberIntInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberIntInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toNumber, NumberIntInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberIntInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, NumberIntInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberIntInfo),
     JS_FS_END,
 };
 

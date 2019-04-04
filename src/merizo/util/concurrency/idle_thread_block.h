@@ -63,6 +63,6 @@ public:
 /**
  * Marks a thread idle for the rest of the current scope and passes file:line as the location.
  */
-#define MONGO_IDLE_THREAD_BLOCK IdleThreadBlock markIdle(__FILE__ ":" BOOST_PP_STRINGIZE(__LINE__))
+#define MERIZO_IDLE_THREAD_BLOCK IdleThreadBlock markIdle(__FILE__ ":" BOOST_PP_STRINGIZE(__LINE__))
 
 }  // namespace merizo

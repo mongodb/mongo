@@ -7,7 +7,7 @@
 
     // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
     load("jstests/libs/profiler.js");
-    const conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=8"});
+    const conn = MerizoRunner.runMerizod({setParameter: "maxBSONDepth=8"});
     const testDB = conn.getDB("profile_agg");
     const coll = testDB.getCollection("test");
 
@@ -148,5 +148,5 @@
         {allowDiskUse: true});
     profileObj = getLatestProfilerEntry(testDB);
     assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

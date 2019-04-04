@@ -43,7 +43,7 @@
         cursor: {},
         maxTimeMS: 5000,
         needsMerge: true,
-        fromMongos: true
+        fromMerizos: true
     });
 
     assert.commandWorked(res);

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -816,7 +816,7 @@ public:
             uasserted(ErrorCodes::BadValue, "\"createUser\" command requires a \"roles\" array");
         }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
         if (args.userName.getDB() == "$external" && getSSLManager() &&
             getSSLManager()->getSSLConfiguration().isClusterMember(args.userName.getUser())) {
             uasserted(ErrorCodes::BadValue,

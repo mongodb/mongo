@@ -4,7 +4,7 @@ var numPerTypeToCreate = 50;
 
 // We need to create a new merizod to ensure no one else is talking to us in the background, and
 // will screw up our stats.
-var merizo = MongoRunner.runMongod({});
+var merizo = MerizoRunner.runMerizod({});
 var db = merizo.getDB("test");
 
 var availableConnections = db.serverStatus().connections.available;
@@ -20,7 +20,7 @@ var signalCollection = 'keepRunning';
 function createPersistentConnection() {
     assert.soon(function() {
         try {
-            permConns.push(new Mongo(db.getMongo().host));
+            permConns.push(new Merizo(db.getMerizo().host));
             return true;
         } catch (x) {
             return false;
@@ -30,8 +30,8 @@ function createPersistentConnection() {
 
 function createTemporaryConnection() {
     // Retry connecting until you are successful
-    var pollString = "var conn = null;" + "assert.soon(function() {" + "try { conn = new Mongo(\"" +
-        db.getMongo().host + "\"); return conn" + "} catch (x) {return false;}}, " +
+    var pollString = "var conn = null;" + "assert.soon(function() {" + "try { conn = new Merizo(\"" +
+        db.getMerizo().host + "\"); return conn" + "} catch (x) {return false;}}, " +
         "\"Timed out waiting for temporary connection to connect\", 30000, 5000);";
     // Poll the signal collection until it is told to terminate.
     pollString += "assert.soon(function() {" + "return conn.getDB('" + testDB +
@@ -94,4 +94,4 @@ jsTestLog("Testing that current connections counter went down after temporary co
 waitForConnections(originalConnInfo.current + numPerTypeToCreate,
                    originalConnInfo.totalCreated + numPerTypeToCreate * 2);
 
-MongoRunner.stopMongod(merizo);
+MerizoRunner.stopMerizod(merizo);

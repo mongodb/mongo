@@ -98,7 +98,7 @@
     const filteredDBs = ["admin", "local", "config"];
     filteredDBs.forEach(dbName => {
         // Not allowed to use 'local' db through merizos.
-        if (FixtureHelpers.isMongos(db) && dbName == "local")
+        if (FixtureHelpers.isMerizos(db) && dbName == "local")
             return;
 
         assert.writeOK(db.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));

@@ -42,7 +42,7 @@ def parse_args():
 
 
 def generate_version_expansions():
-    """Generate expansions from a version.json file if given, or $MONGO_VERSION."""
+    """Generate expansions from a version.json file if given, or $MERIZO_VERSION."""
     expansions = {}
 
     if os.path.exists(VERSION_JSON):
@@ -54,9 +54,9 @@ def generate_version_expansions():
         if not version_parts:
             raise ValueError("Unable to parse version.json")
     else:
-        if not os.getenv("MONGO_VERSION"):
-            raise Exception("$MONGO_VERSION not set and no version.json provided")
-        version_line = os.getenv("MONGO_VERSION").lstrip("r")
+        if not os.getenv("MERIZO_VERSION"):
+            raise Exception("$MERIZO_VERSION not set and no version.json provided")
+        version_line = os.getenv("MERIZO_VERSION").lstrip("r")
         version_parts = match_verstr(version_line)
         if not version_parts:
             raise ValueError("Unable to parse version from stdin and no version.json provided")

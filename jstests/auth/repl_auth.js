@@ -24,8 +24,8 @@ setupConn.getDB('bar').createUser({user: 'bar', pwd: 'barpwd', roles: jsTest.bas
                                   {w: NUM_NODES});
 setupConn.getDB('bar').logout();
 
-var replConn0 = new Mongo(rsTest.getURL());
-var replConn1 = new Mongo(rsTest.getURL());
+var replConn0 = new Merizo(rsTest.getURL());
+var replConn1 = new Merizo(rsTest.getURL());
 var fooDB0 = replConn0.getDB('foo');
 var barDB0 = replConn0.getDB('bar');
 var fooDB1 = replConn1.getDB('foo');

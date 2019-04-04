@@ -41,7 +41,7 @@ namespace merizo {
 
 void CatalogTestFixture::setUp() {
     // Set up merizod.
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     auto service = getServiceContext();
 
@@ -59,7 +59,7 @@ void CatalogTestFixture::tearDown() {
     _opCtx.reset();
 
     // Tear down merizod.
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 OperationContext* CatalogTestFixture::operationContext() {

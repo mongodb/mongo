@@ -198,7 +198,7 @@
     // Test that the collation is respected. Since the collations do not match, we should not use
     // the index.
     const caseInsensitiveCollation = {locale: "en_US", strength: 2};
-    if (db.getMongo().useReadCommands()) {
+    if (db.getMerizo().useReadCommands()) {
         confirmExpectedExprExecution(
             {$eq: ["$w", "FoO"]}, {nReturned: 2}, caseInsensitiveCollation);
     }

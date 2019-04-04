@@ -14,12 +14,12 @@
     assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 
     const sessionOptions = {causalConsistency: false};
-    const session = db.getMongo().startSession(sessionOptions);
+    const session = db.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb.getCollection(collName);
 
     // Initialize second session variables.
-    const session2 = testDB.getMongo().startSession(sessionOptions);
+    const session2 = testDB.getMerizo().startSession(sessionOptions);
     const session2Db = session2.getDatabase(dbName);
     const session2Coll = session2Db.getCollection(collName);
 

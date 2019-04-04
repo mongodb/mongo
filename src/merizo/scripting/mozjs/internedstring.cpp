@@ -41,7 +41,7 @@ InternedStringTable::InternedStringTable(JSContext* cx) {
 
     int i = 0;
 
-#define MONGO_MOZJS_INTERNED_STRING(name, str)                                        \
+#define MERIZO_MOZJS_INTERNED_STRING(name, str)                                        \
     do {                                                                              \
         auto s = JS_AtomizeAndPinString(cx, str);                                     \
         if (!s) {                                                                     \
@@ -50,7 +50,7 @@ InternedStringTable::InternedStringTable(JSContext* cx) {
         _internedStrings[i++].init(cx, INTERNED_STRING_TO_JSID(cx, s));               \
     } while (0);
 #include "merizo/scripting/mozjs/internedstring.defs"
-#undef MONGO_MOZJS_INTERNED_STRING
+#undef MERIZO_MOZJS_INTERNED_STRING
 }
 
 InternedStringTable::~InternedStringTable() {

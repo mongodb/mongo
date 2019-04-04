@@ -47,7 +47,7 @@
 
         function checkResultObject(first, second) {
             // Only assert on the "modifiedCount" property when write commands are enabled
-            if (db.getMongo().writeMode() === 'commands') {
+            if (db.getMerizo().writeMode() === 'commands') {
                 assert.docEq(first, second);
             } else {
                 var overrideModifiedCount = {modifiedCount: undefined};

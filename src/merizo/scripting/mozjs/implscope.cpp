@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -356,7 +356,7 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
             // large pages, like 4MB?
             const auto available_stack_space = available.get();
 
-#if defined(__powerpc64__) && defined(MONGO_CONFIG_DEBUG_BUILD)
+#if defined(__powerpc64__) && defined(MERIZO_CONFIG_DEBUG_BUILD)
             // From experimentation, we need a larger reservation of 96k since debug ppc64le code
             // needs more stack space to process stack overflow. In debug builds, more variables are
             // stored on the stack which increases the stack pressure. It does not affects non-debug
@@ -503,7 +503,7 @@ auto MozJSImplScope::_runSafely(ImplScopeFunction&& functionToRun) -> decltype(f
         // Clear the status state
         auto status = std::move(_status);
         uassertStatusOK(status);
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 }
 
@@ -807,7 +807,7 @@ void MozJSImplScope::externalSetup() {
         // install thread-related functions (e.g. _threadInject)
         installFork();
 
-        // install the Mongo function object
+        // install the Merizo function object
         _merizoExternalProto.install(_global);
         execCoreFiles();
         _connectState = ConnectState::External;

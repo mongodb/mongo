@@ -126,7 +126,7 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
                 }
             }
         } else {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
     }
 

@@ -170,7 +170,7 @@ inline const char* logicalOpToString(LogicalOp logicalOp) {
 
     // Logical ops are always created in this process and never pulled out of network requests.
     // Therefore, this could only be reached by memory corruptions or other severe bugs.
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 namespace MSGHEADER {
@@ -259,7 +259,7 @@ private:
 class Value : public EncodedValueStorage<Layout, ConstView, View> {
 public:
     Value() {
-        MONGO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
+        MERIZO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
     }
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
@@ -376,7 +376,7 @@ private:
 class Value : public EncodedValueStorage<Layout, ConstView, View> {
 public:
     Value() {
-        MONGO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
+        MERIZO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
     }
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}

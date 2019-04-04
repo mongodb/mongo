@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -54,7 +54,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(setDistLockTimeout);
+MERIZO_FAIL_POINT_DEFINE(setDistLockTimeout);
 
 using std::string;
 using std::unique_ptr;
@@ -177,7 +177,7 @@ void ReplSetDistLockManager::doTask() {
             }
         }
 
-        MONGO_IDLE_THREAD_BLOCK;
+        MERIZO_IDLE_THREAD_BLOCK;
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _shutDownCV.wait_for(lk, _pingInterval.toSystemDuration(), [this] { return _isShutDown; });
     }
@@ -303,7 +303,7 @@ StatusWith<DistLockHandle> ReplSetDistLockManager::lockWithSessionID(OperationCo
         const string who = str::stream() << _processID << ":" << getThreadName();
 
         auto lockExpiration = _lockExpiration;
-        MONGO_FAIL_POINT_BLOCK(setDistLockTimeout, customTimeout) {
+        MERIZO_FAIL_POINT_BLOCK(setDistLockTimeout, customTimeout) {
             const BSONObj& data = customTimeout.getData();
             lockExpiration = Milliseconds(data["timeoutMs"].numberInt());
         }

@@ -34,8 +34,8 @@
 #include "merizo/logger/logstream_builder.h"
 #include "merizo/util/assert_util.h"
 
-#define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
-#define MONGO_DESTRUCTOR_GUARD(expression)                                                     \
+#define DESTRUCTOR_GUARD MERIZO_DESTRUCTOR_GUARD
+#define MERIZO_DESTRUCTOR_GUARD(expression)                                                     \
     try {                                                                                      \
         expression;                                                                            \
     } catch (const std::exception& e) {                                                        \

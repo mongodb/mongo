@@ -7,7 +7,7 @@
 
     load("jstests/libs/get_index_helpers.js");
 
-    var conn = MongoRunner.runMongod({});
+    var conn = MerizoRunner.runMerizod({});
     assert.neq(null, conn, "merizod was unable to start up");
 
     var testDB = conn.getDB("test");
@@ -124,7 +124,7 @@
 
     // Test that the "cloneCollection" command doesn't upgrade existing indexes to the latest
     // version.
-    var cloneConn = MongoRunner.runMongod({});
+    var cloneConn = MerizoRunner.runMerizod({});
     assert.neq(null, cloneConn, "merizod was unable to start up");
     testIndexVersionAutoUpgrades(function(coll) {
         var cloneDB = cloneConn.getDB(coll.getDB().getName());
@@ -134,7 +134,7 @@
         }));
         return cloneDB[coll.getName()];
     }, false);
-    MongoRunner.stopMongod(cloneConn);
+    MerizoRunner.stopMerizod(cloneConn);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

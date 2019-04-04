@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -43,7 +43,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
+MERIZO_FAIL_POINT_DEFINE(hangWhileBuildingDocumentSourceOutBatch);
 
 using boost::intrusive_ptr;
 using std::vector;
@@ -255,7 +255,7 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
 
     switch (nextInput.getStatus()) {
         case GetNextResult::ReturnStatus::kAdvanced: {
-            MONGO_UNREACHABLE;  // We consumed all advances above.
+            MERIZO_UNREACHABLE;  // We consumed all advances above.
         }
         case GetNextResult::ReturnStatus::kPauseExecution: {
             return nextInput;  // Propagate the pause.
@@ -269,7 +269,7 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
             return nextInput;
         }
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
@@ -323,7 +323,7 @@ intrusive_ptr<DocumentSourceOut> DocumentSourceOut::create(
             return new DocumentSourceOutInPlaceReplace(
                 std::move(outputNs), expCtx, mode, std::move(uniqueKey), targetCollectionVersion);
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -361,9 +361,9 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
         auto dbName = spec.getTargetDb() ? *spec.getTargetDb() : expCtx->ns.db();
         outputNs = NamespaceString(dbName, spec.getTargetCollection());
 
-        std::tie(uniqueKey, targetCollectionVersion) = expCtx->inMongos
-            ? resolveUniqueKeyOnMongoS(expCtx, spec, outputNs)
-            : resolveUniqueKeyOnMongoD(expCtx, spec, outputNs);
+        std::tie(uniqueKey, targetCollectionVersion) = expCtx->inMerizos
+            ? resolveUniqueKeyOnMerizoS(expCtx, spec, outputNs)
+            : resolveUniqueKeyOnMerizoD(expCtx, spec, outputNs);
     } else {
         uasserted(16990,
                   str::stream() << "$out only supports a string or object argument, not "
@@ -374,13 +374,13 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 }
 
 std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-DocumentSourceOut::resolveUniqueKeyOnMongoD(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+DocumentSourceOut::resolveUniqueKeyOnMerizoD(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                             const DocumentSourceOutSpec& spec,
                                             const NamespaceString& outputNs) {
-    invariant(!expCtx->inMongos);
+    invariant(!expCtx->inMerizos);
     auto targetCollectionVersion = spec.getTargetCollectionVersion();
     if (targetCollectionVersion) {
-        uassert(51018, "Unexpected target chunk version specified", expCtx->fromMongos);
+        uassert(51018, "Unexpected target chunk version specified", expCtx->fromMerizos);
         // If merizos has sent us a target shard version, we need to be sure we are prepared to
         // act as a router which is at least as recent as that merizos.
         expCtx->merizoProcessInterface->checkRoutingInfoEpochOrThrow(
@@ -389,24 +389,24 @@ DocumentSourceOut::resolveUniqueKeyOnMongoD(const boost::intrusive_ptr<Expressio
 
     auto userSpecifiedUniqueKey = spec.getUniqueKey();
     if (!userSpecifiedUniqueKey) {
-        uassert(51017, "Expected uniqueKey to be provided from merizos", !expCtx->fromMongos);
+        uassert(51017, "Expected uniqueKey to be provided from merizos", !expCtx->fromMerizos);
         return {std::set<FieldPath>{"_id"}, targetCollectionVersion};
     }
 
     // Make sure the uniqueKey has a supporting index. Skip this check if the command is sent
     // from merizos since the uniqueKey check would've happened already.
     auto uniqueKey = parseUniqueKeyFromSpec(userSpecifiedUniqueKey.get());
-    if (!expCtx->fromMongos) {
+    if (!expCtx->fromMerizos) {
         ensureUniqueKeyHasSupportingIndex(expCtx, outputNs, uniqueKey, *userSpecifiedUniqueKey);
     }
     return {uniqueKey, targetCollectionVersion};
 }
 
 std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-DocumentSourceOut::resolveUniqueKeyOnMongoS(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+DocumentSourceOut::resolveUniqueKeyOnMerizoS(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                             const DocumentSourceOutSpec& spec,
                                             const NamespaceString& outputNs) {
-    invariant(expCtx->inMongos);
+    invariant(expCtx->inMerizos);
     uassert(50984,
             "$out received unexpected 'targetCollectionVersion' on merizos",
             !spec.getTargetCollectionVersion());

@@ -219,7 +219,7 @@ function requireSSLProvider(required, fn) {
 }
 
 function detectDefaultTLSProtocol() {
-    const conn = MongoRunner.runMongod({
+    const conn = MerizoRunner.runMerizod({
         sslMode: 'allowSSL',
         sslPEMKeyFile: SERVER_CERT,
         sslDisabledProtocols: 'none',
@@ -229,7 +229,7 @@ function detectDefaultTLSProtocol() {
 
     const res = conn.getDB("admin").serverStatus().transportSecurity;
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // Verify that the default protocol is either TLS1.2 or TLS1.3.
     // No supported platform should default to an older protocol version.

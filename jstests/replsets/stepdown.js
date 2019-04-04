@@ -9,7 +9,7 @@
 load("jstests/replsets/rslib.js");
 
 // We are bypassing collection validation because this test runs "shutdown" command so the server is
-// expected to be down when MongoRunner.stopMongod is called.
+// expected to be down when MerizoRunner.stopMerizod is called.
 TestData.skipCollectionAndIndexValidation = true;
 
 var replTest = new ReplSetTest({

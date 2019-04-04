@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -46,10 +46,10 @@
 namespace merizo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic);
-MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic);
-MONGO_FAIL_POINT_DEFINE(hangBeforeCommitingTxn);
-MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingTxn);
+MERIZO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic);
+MERIZO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeCommitingTxn);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeAbortingTxn);
 
 class CmdCommitTxn : public BasicCommand {
 public:
@@ -99,7 +99,7 @@ public:
             // commit oplog entry.
             auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
             replClient.setLastOpToSystemLastOpTime(opCtx);
-            if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
+            if (MERIZO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
                 uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");
             }
@@ -122,7 +122,7 @@ public:
             // commitUnpreparedTransaction will throw if the transaction is prepared.
             txnParticipant.commitUnpreparedTransaction(opCtx);
         }
-        if (MONGO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
+        if (MERIZO_FAIL_POINT(participantReturnNetworkErrorForCommitAfterExecutingCommitLogic)) {
             uasserted(ErrorCodes::HostUnreachable,
                       "returning network error because failpoint is on");
         }
@@ -179,7 +179,7 @@ public:
 
         txnParticipant.abortActiveTransaction(opCtx);
 
-        if (MONGO_FAIL_POINT(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic)) {
+        if (MERIZO_FAIL_POINT(participantReturnNetworkErrorForAbortAfterExecutingAbortLogic)) {
             uasserted(ErrorCodes::HostUnreachable,
                       "returning network error because failpoint is on");
         }

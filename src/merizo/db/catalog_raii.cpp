@@ -40,7 +40,7 @@
 namespace merizo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
+MERIZO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 
 void uassertLockTimeout(std::string resourceName, LockMode lockMode, bool isLocked) {
     uassert(ErrorCodes::LockTimeout,
@@ -77,7 +77,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
       _resolvedNss(resolveNamespaceStringOrUUID(opCtx, nsOrUUID)) {
     _collLock.emplace(opCtx->lockState(), _resolvedNss.ns(), modeColl, deadline);
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
-    MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
+    MERIZO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
         const BSONObj& data = customWait.getData();
         sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
     }

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -43,7 +43,7 @@
 #include <third_party/murmurhash3/MurmurHash3.h>
 
 // for dlfcn.h and backtrace
-#if defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+#if defined(_POSIX_VERSION) && defined(MERIZO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 
 #include <dlfcn.h>
 #include <execinfo.h>
@@ -314,7 +314,7 @@ private:
 
         Hash hash() {
             Hash hash;
-            MONGO_STATIC_ASSERT_MSG(sizeof(frames) == sizeof(FrameInfo) * kMaxFramesPerStack,
+            MERIZO_STATIC_ASSERT_MSG(sizeof(frames) == sizeof(FrameInfo) * kMaxFramesPerStack,
                                     "frames array is not dense");
             MurmurHash3_x86_32(frames.data(), numFrames * sizeof(FrameInfo), 0, &hash);
             return hash;
@@ -662,7 +662,7 @@ public:
 
 HeapProfiler* HeapProfiler::heapProfiler;
 
-MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
+MERIZO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     if (HeapProfilingEnabled)
         HeapProfiler::heapProfiler = new HeapProfiler();
@@ -672,4 +672,4 @@ MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("de
 }  // namespace
 }  // namespace merizo
 
-#endif  // MONGO_HAVE_HEAP_PROFILER
+#endif  // MERIZO_HAVE_HEAP_PROFILER

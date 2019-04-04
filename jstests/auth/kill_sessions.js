@@ -7,11 +7,11 @@ load("jstests/libs/kill_sessions.js");
     // if the kill command is sent with an implicit session.
     TestData.disableImplicitSessions = true;
 
-    var forExec = MongoRunner.runMongod({auth: ""});
-    var forKill = new Mongo(forExec.host);
-    var forVerify = new Mongo(forExec.host);
+    var forExec = MerizoRunner.runMerizod({auth: ""});
+    var forKill = new Merizo(forExec.host);
+    var forVerify = new Merizo(forExec.host);
     KillSessionsTestHelper.initializeAuth(forExec);
     forVerify.getDB("admin").auth("super", "password");
     KillSessionsTestHelper.runAuth(forExec, forKill, [forVerify]);
-    MongoRunner.stopMongod(forExec);
+    MerizoRunner.stopMerizod(forExec);
 })();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -69,13 +69,13 @@
 namespace merizo {
 namespace {
 
-const auto getInstance = ServiceContext::declareDecoration<ShardingInitializationMongoD>();
+const auto getInstance = ServiceContext::declareDecoration<ShardingInitializationMerizoD>();
 
 auto makeEgressHooksList(ServiceContext* service) {
     auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
     unshardedHookList->addHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(service));
+        stdx::make_unique<rpc::ShardingEgressMetadataHookForMerizod>(service));
 
     return unshardedHookList;
 }
@@ -101,7 +101,7 @@ void updateShardIdentityConfigStringCB(const std::string& setName,
     Client::initThread("updateShardIdentityConfigConnString");
     auto uniqOpCtx = Client::getCurrent()->makeOperationContext();
 
-    auto status = ShardingInitializationMongoD::updateShardIdentityConfigString(
+    auto status = ShardingInitializationMerizoD::updateShardIdentityConfigString(
         uniqOpCtx.get(), uassertStatusOK(ConnectionString::parse(newConnectionString)));
     if (!status.isOK() && !ErrorCodes::isNotMasterError(status.code())) {
         warning() << "Error encountered while trying to update config connection string to "
@@ -112,7 +112,7 @@ void updateShardIdentityConfigStringCB(const std::string& setName,
 void initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
                                                 const ShardIdentity& shardIdentity,
                                                 StringData distLockProcessId) {
-    initializeGlobalShardingStateForMongoD(
+    initializeGlobalShardingStateForMerizoD(
         opCtx, shardIdentity.getConfigsvrConnectionString(), distLockProcessId);
 
     ReplicaSetMonitor::setSynchronousConfigChangeHook(
@@ -143,20 +143,20 @@ void initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
 
 }  // namespace
 
-ShardingInitializationMongoD::ShardingInitializationMongoD()
+ShardingInitializationMerizoD::ShardingInitializationMerizoD()
     : _initFunc(initializeShardingEnvironmentOnShardServer) {}
 
-ShardingInitializationMongoD::~ShardingInitializationMongoD() = default;
+ShardingInitializationMerizoD::~ShardingInitializationMerizoD() = default;
 
-ShardingInitializationMongoD* ShardingInitializationMongoD::get(OperationContext* opCtx) {
+ShardingInitializationMerizoD* ShardingInitializationMerizoD::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-ShardingInitializationMongoD* ShardingInitializationMongoD::get(ServiceContext* service) {
+ShardingInitializationMerizoD* ShardingInitializationMerizoD::get(ServiceContext* service) {
     return &getInstance(service);
 }
 
-void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
+void ShardingInitializationMerizoD::shutDown(OperationContext* opCtx) {
     auto const shardingState = ShardingState::get(opCtx);
     auto const grid = Grid::get(opCtx);
 
@@ -168,7 +168,7 @@ void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
     grid->shardRegistry()->shutdown();
 }
 
-bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(OperationContext* opCtx) {
+bool ShardingInitializationMerizoD::initializeShardingAwarenessIfNeeded(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
 
     // In sharded readOnly mode, we ignore the shardIdentity document on disk and instead *require*
@@ -202,7 +202,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
             return false;
         }
 
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     // In sharded *non*-readOnly mode, error if --overrideShardIdentity is provided
@@ -261,7 +261,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
     }
 }
 
-void ShardingInitializationMongoD::initializeFromShardIdentity(
+void ShardingInitializationMerizoD::initializeFromShardIdentity(
     OperationContext* opCtx, const ShardIdentityType& shardIdentity) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
     invariant(opCtx->lockState()->isLocked());
@@ -306,7 +306,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
     }
 }
 
-Status ShardingInitializationMongoD::updateShardIdentityConfigString(
+Status ShardingInitializationMerizoD::updateShardIdentityConfigString(
     OperationContext* opCtx, const ConnectionString& newConnectionString) {
     BSONObj updateObj(
         ShardIdentityType::createConfigServerUpdateObject(newConnectionString.toString()));
@@ -334,7 +334,7 @@ Status ShardingInitializationMongoD::updateShardIdentityConfigString(
     return Status::OK();
 }
 
-void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
+void initializeGlobalShardingStateForMerizoD(OperationContext* opCtx,
                                             const ConnectionString& configCS,
                                             StringData distLockProcessId) {
     auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryImpl>();

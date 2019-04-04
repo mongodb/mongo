@@ -8,7 +8,7 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/fixture_helpers.js");            // For FixtureHelpers.isMongos().
+    load("jstests/libs/fixture_helpers.js");            // For FixtureHelpers.isMerizos().
     load("jstests/libs/analyze_plan.js");               // For getAggPlanStage().
     load("jstests/aggregation/extras/out_helpers.js");  // For withEachOutMode().
 

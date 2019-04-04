@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -92,7 +92,7 @@ void initWireSpec() {
 
 
 // Noop, to fulfull dependencies for other initializers
-MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
+MERIZO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     return Status::OK();
 }
@@ -120,7 +120,7 @@ ServiceContext::ConstructorActionRegisterer replicationManagerInitializer(
                                     std::make_unique<IndexBuildsCoordinatorEmbedded>());
     });
 
-MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
+MERIZO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
     setLockedForWritingImpl([]() { return false; });
     return Status::OK();
 }

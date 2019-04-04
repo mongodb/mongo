@@ -58,7 +58,7 @@ public:
      * Parses the provided BSON content as the external addShard command, and if it is correct,
      * constructs an AddShardRequest object from it.
      */
-    static StatusWith<AddShardRequest> parseFromMongosCommand(const BSONObj& obj);
+    static StatusWith<AddShardRequest> parseFromMerizosCommand(const BSONObj& obj);
 
     /**
      * Parses the provided BSON content as the internal _configsvrAddShard command, and if it

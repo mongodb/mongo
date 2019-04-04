@@ -154,7 +154,7 @@ bool ClusterPlanCacheCmd::run(OperationContext* opCtx,
 // Register plan cache commands at startup
 //
 
-MONGO_INITIALIZER(RegisterPlanCacheCommands)(InitializerContext* context) {
+MERIZO_INITIALIZER(RegisterPlanCacheCommands)(InitializerContext* context) {
     // Leaked intentionally: a Command registers itself when constructed.
 
     new ClusterPlanCacheCmd("planCacheListQueryShapes",

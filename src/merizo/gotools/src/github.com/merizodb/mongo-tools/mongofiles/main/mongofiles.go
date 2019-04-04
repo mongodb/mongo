@@ -61,7 +61,7 @@ func main() {
 		os.Exit(util.ExitError)
 	}
 	defer provider.Close()
-	mf := merizofiles.MongoFiles{
+	mf := merizofiles.MerizoFiles{
 		ToolOptions:     opts,
 		StorageOptions:  storageOpts,
 		SessionProvider: provider,

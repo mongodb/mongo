@@ -37,13 +37,13 @@ namespace merizo {
 /**
  * The implementation of AuthzSessionExternalState functionality for merizod.
  */
-class AuthzSessionExternalStateMongod : public AuthzSessionExternalStateServerCommon {
-    AuthzSessionExternalStateMongod(const AuthzSessionExternalStateMongod&) = delete;
-    AuthzSessionExternalStateMongod& operator=(const AuthzSessionExternalStateMongod&) = delete;
+class AuthzSessionExternalStateMerizod : public AuthzSessionExternalStateServerCommon {
+    AuthzSessionExternalStateMerizod(const AuthzSessionExternalStateMerizod&) = delete;
+    AuthzSessionExternalStateMerizod& operator=(const AuthzSessionExternalStateMerizod&) = delete;
 
 public:
-    AuthzSessionExternalStateMongod(AuthorizationManager* authzManager);
-    virtual ~AuthzSessionExternalStateMongod();
+    AuthzSessionExternalStateMerizod(AuthorizationManager* authzManager);
+    virtual ~AuthzSessionExternalStateMerizod();
 
     virtual bool shouldIgnoreAuthChecks() const;
 

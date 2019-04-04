@@ -112,7 +112,7 @@ private:
 class Value : public EncodedValueStorage<Layout, ConstView, View> {
 public:
     Value() {
-        MONGO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
+        MERIZO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
     }
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}

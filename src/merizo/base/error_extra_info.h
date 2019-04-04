@@ -47,7 +47,7 @@ class BSONObjBuilder;
  * Actual implementations must have a 'constexpr ErrorCode::Error code' to indicate which
  * error code they bind to, and a static method with the following signature:
  *      static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
- * You must call the MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(type) macro in the cpp file that contains
+ * You must call the MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(type) macro in the cpp file that contains
  * the implementation for your subtype.
  */
 class ErrorExtraInfo {
@@ -68,21 +68,21 @@ public:
     static Parser* parserFor(ErrorCodes::Error);
 
     /**
-     * Use the MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(type) macro below rather than calling this
+     * Use the MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(type) macro below rather than calling this
      * directly.
      */
     template <typename T>
     static void registerType() {
-        MONGO_STATIC_ASSERT(std::is_base_of<ErrorExtraInfo, T>());
-        MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
-        MONGO_STATIC_ASSERT(std::is_final<T>());
-        MONGO_STATIC_ASSERT(std::is_move_constructible<T>());
+        MERIZO_STATIC_ASSERT(std::is_base_of<ErrorExtraInfo, T>());
+        MERIZO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
+        MERIZO_STATIC_ASSERT(std::is_final<T>());
+        MERIZO_STATIC_ASSERT(std::is_move_constructible<T>());
         registerParser(T::code, T::parse);
     }
 
     /**
      * Fails fatally if any error codes that should have parsers registered don't. An invariant in
-     * this function indicates that there isn't a MONGO_INIT_REGISTER_ERROR_EXTRA_INFO declaration
+     * this function indicates that there isn't a MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO declaration
      * for some error code, which requires an extra info.
      *
      * Call this during startup of any shipping executable to prevent failures at runtime.
@@ -100,9 +100,9 @@ private:
  * You must separately #include "merizo/base/init.h" since including it here would create an include
  * cycle.
  */
-#define MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(type)                            \
-    MONGO_INITIALIZER_GENERAL(                                                \
-        RegisterErrorExtraInfoFor##type, MONGO_NO_PREREQUISITES, ("default")) \
+#define MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(type)                            \
+    MERIZO_INITIALIZER_GENERAL(                                                \
+        RegisterErrorExtraInfoFor##type, MERIZO_NO_PREREQUISITES, ("default")) \
     (InitializerContext * context) {                                          \
         ErrorExtraInfo::registerType<type>();                                 \
         return Status::OK();                                                  \

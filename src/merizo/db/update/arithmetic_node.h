@@ -73,7 +73,7 @@ private:
             case ArithmeticNode::ArithmeticOp::kMultiply:
                 return "$mul";
         }
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     BSONObj operatorValue() const final {

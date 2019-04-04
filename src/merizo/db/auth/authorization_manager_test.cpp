@@ -177,7 +177,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
 }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     setX509PeerInfo(
         session,

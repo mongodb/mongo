@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
 
 
 #include "merizo/platform/basic.h"
@@ -93,7 +93,7 @@ Status storeFreeMonitoringOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-MONGO_STARTUP_OPTIONS_STORE(FreeMonitoringOptions)(InitializerContext* /*unused*/) {
+MERIZO_STARTUP_OPTIONS_STORE(FreeMonitoringOptions)(InitializerContext* /*unused*/) {
     return storeFreeMonitoringOptions(moe::startupOptionsParsed);
 }
 

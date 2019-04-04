@@ -49,7 +49,7 @@ var executeTests = function() {
     assert.eq(2, result.nUpserted);
     assert.eq(5, result.nMatched);
     // only check nModified if write commands are enabled
-    if (coll.getMongo().writeMode() == "commands") {
+    if (coll.getMerizo().writeMode() == "commands") {
         assert.eq(4, result.nModified);
     }
     assert.eq(2, result.nRemoved);
@@ -157,7 +157,7 @@ var executeTests = function() {
 
 var buildVersion = parseInt(db.runCommand({buildInfo: 1}).versionArray.slice(0, 3).join(""), 10);
 // Save the existing useWriteCommands function
-var _useWriteCommands = coll.getMongo().useWriteCommands;
+var _useWriteCommands = coll.getMerizo().useWriteCommands;
 
 //
 // Only execute write command tests if we have > 2.5.5 otherwise
@@ -181,4 +181,4 @@ coll._merizo.useWriteCommands = function() {
 executeTests();
 
 // Reset the function
-coll.getMongo().useWriteCommands = _useWriteCommands;
+coll.getMerizo().useWriteCommands = _useWriteCommands;

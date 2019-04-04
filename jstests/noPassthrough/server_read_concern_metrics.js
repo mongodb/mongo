@@ -52,7 +52,7 @@
     const testDB = primary.getDB(dbName);
     const testColl = testDB[collName];
     const sessionOptions = {causalConsistency: false};
-    const session = testDB.getMongo().startSession(sessionOptions);
+    const session = testDB.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});

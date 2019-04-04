@@ -41,7 +41,7 @@ typedef int(WSAAPI* WSAPollFunction)(pollfd* fdarray, ULONG nfds, INT timeout);
 
 static WSAPollFunction wsaPollFunction = NULL;
 
-MONGO_INITIALIZER(DynamicLinkWin32Poll)(InitializerContext* context) {
+MERIZO_INITIALIZER(DynamicLinkWin32Poll)(InitializerContext* context) {
     HINSTANCE wsaPollLib = LoadLibraryW(L"Ws2_32.dll");
     if (wsaPollLib) {
         wsaPollFunction = reinterpret_cast<WSAPollFunction>(GetProcAddress(wsaPollLib, "WSAPoll"));

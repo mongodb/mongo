@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -418,7 +418,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
     const NamespaceString nss(!_cInfo.isEmpty() ? _cInfo.versionedNS : _qSpec.ns());
 
     string prefix;
-    if (MONGO_unlikely(shouldLog(logger::LogSeverity::Debug(2)))) {
+    if (MERIZO_unlikely(shouldLog(logger::LogSeverity::Debug(2)))) {
         if (_totalTries > 0) {
             prefix = str::stream() << "retrying (" << _totalTries << " tries)";
         } else {
@@ -448,7 +448,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
     string vinfo;
 
     if (manager) {
-        if (MONGO_unlikely(shouldLog(logger::LogSeverity::Debug(2)))) {
+        if (MERIZO_unlikely(shouldLog(logger::LogSeverity::Debug(2)))) {
             vinfo = str::stream() << "[" << manager->getns().ns() << " @ "
                                   << manager->getVersion().toString() << "]";
         }
@@ -458,7 +458,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
                                      !_cInfo.isEmpty() ? _cInfo.cmdCollation : BSONObj(),
                                      &shardIds);
     } else if (primary) {
-        if (MONGO_unlikely(shouldLog(logger::LogSeverity::Debug(2)))) {
+        if (MERIZO_unlikely(shouldLog(logger::LogSeverity::Debug(2)))) {
             vinfo = str::stream() << "[unsharded @ " << primary->toString() << "]";
         }
 

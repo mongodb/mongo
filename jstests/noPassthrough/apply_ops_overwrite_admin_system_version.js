@@ -1,7 +1,7 @@
 (function() {
     "use strict";
     load("jstests/libs/feature_compatibility_version.js");
-    var standalone = MongoRunner.runMongod();
+    var standalone = MerizoRunner.runMerizod();
     var adminDB = standalone.getDB("admin");
 
     // Get the uuid of the original admin.system.version.
@@ -37,5 +37,5 @@
     assert.eq(1, res.cursor.firstBatch.length);
     assert.eq(newUUID, res.cursor.firstBatch[0].info.uuid);
 
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 })();

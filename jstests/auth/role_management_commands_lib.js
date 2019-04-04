@@ -10,7 +10,7 @@ function runAllRoleManagementCommandsTests(conn, writeConcern) {
         assert.eq(ErrorCodes.Unauthorized, result.code);
     };
 
-    var userAdminConn = new Mongo(conn.host);
+    var userAdminConn = new Merizo(conn.host);
     var testUserAdmin = userAdminConn.getDB('test');
     var adminUserAdmin = userAdminConn.getDB('admin');
     adminUserAdmin.createUser({user: 'userAdmin', pwd: 'pwd', roles: ['userAdminAnyDatabase']},

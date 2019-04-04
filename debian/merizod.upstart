@@ -29,7 +29,7 @@ start on runlevel [2345]
 stop on runlevel [06]
 
 script
-  ENABLE_MONGOD="yes"
+  ENABLE_MERIZOD="yes"
   CONF=/etc/merizod.conf
   DAEMON=/usr/bin/merizod
   DAEMONUSER=${DAEMONUSER:-merizodb}
@@ -49,7 +49,7 @@ script
     DAEMON_OPTS="-- "${DAEMON_OPTS:-"--config $CONF"}
   fi
 
-  if [ "x$ENABLE_MONGOD" = "xyes" ]
+  if [ "x$ENABLE_MERIZOD" = "xyes" ]
   then
     exec start-stop-daemon --start \
         --chuid $DAEMONUSER:$DAEMONGROUP \

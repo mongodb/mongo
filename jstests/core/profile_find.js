@@ -11,7 +11,7 @@
     var testDB = db.getSiblingDB("profile_find");
     assert.commandWorked(testDB.dropDatabase());
     var coll = testDB.getCollection("test");
-    var isLegacyReadMode = (testDB.getMongo().readMode() === "legacy");
+    var isLegacyReadMode = (testDB.getMerizo().readMode() === "legacy");
 
     testDB.setProfilingLevel(2);
     const profileEntryFilter = {op: "query"};
@@ -45,7 +45,7 @@
     } else {
         assert.eq(profileObj.command.limit, 1, tojson(profileObj));
         assert.eq(profileObj.protocol,
-                  getProfilerProtocolStringForCommand(testDB.getMongo()),
+                  getProfilerProtocolStringForCommand(testDB.getMerizo()),
                   tojson(profileObj));
     }
 

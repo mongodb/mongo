@@ -43,7 +43,7 @@ namespace mozjs {
 struct RegExpInfo : public BaseInfo {
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(toJSON);
+        MERIZO_DECLARE_JS_FUNCTION(toJSON);
     };
 
     static const JSFunctionSpec methods[2];

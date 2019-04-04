@@ -31,8 +31,8 @@
             for (let slaveOk of[true, false]) {
                 const testType = {readMode: readMode, readPref: readPref, slaveOk: slaveOk};
 
-                secDB.getMongo().forceReadMode(readMode);
-                secDB.getMongo().setSlaveOk(slaveOk);
+                secDB.getMerizo().forceReadMode(readMode);
+                secDB.getMerizo().setSlaveOk(slaveOk);
 
                 const cursor =
                     (readPref ? secDB.test.find().readPref(readPref) : secDB.test.find());

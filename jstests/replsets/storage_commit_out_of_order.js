@@ -25,7 +25,7 @@
      * Waits for the provided latch to reach 0 and then does a single w:majority insert.
      */
     const majorityInsert = function(num, host, dbName, collName, latch) {
-        const m = new Mongo(host);
+        const m = new Merizo(host);
         latch.countDown();
         while (latch.getCount() > 0) {
             // do nothing
@@ -53,7 +53,7 @@
     const t = [];
     const counter = new CountDownLatch(numThreads + 1);
     for (let i = 0; i < numThreads; ++i) {
-        t[i] = new ScopedThread(majorityInsert, i, coll.getMongo().host, dbName, collName, counter);
+        t[i] = new ScopedThread(majorityInsert, i, coll.getMerizo().host, dbName, collName, counter);
         t[i].start();
     }
 

@@ -13,7 +13,7 @@
 
 (function() {
     "use strict";
-    const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+    const isMerizos = db.runCommand({isdbgrid: 1}).isdbgrid;
 
     function runTest(badViewDefinition) {
         let viewsDB = db.getSiblingDB("invalid_system_views");
@@ -40,7 +40,7 @@
                 " in system.views";
         }
 
-        if (!isMongos) {
+        if (!isMerizos) {
             // Commands that run on existing regular collections should not be impacted by the
             // presence of invalid views. However, applyOps doesn't work on merizos.
             assert.commandWorked(
@@ -93,12 +93,12 @@
         assert.commandWorked(viewsDB.collection.createIndex({x: 1}),
                              makeErrorMessage("createIndexes"));
 
-        if (!isMongos) {
+        if (!isMerizos) {
             assert.commandWorked(viewsDB.collection.reIndex(), makeErrorMessage("reIndex"));
         }
 
         const storageEngine = jsTest.options().storageEngine;
-        if (isMongos || storageEngine === "ephemeralForTest" || storageEngine === "inMemory" ||
+        if (isMerizos || storageEngine === "ephemeralForTest" || storageEngine === "inMemory" ||
             storageEngine === "biggie") {
             print("Not testing compact command on merizos or ephemeral storage engine");
         } else {

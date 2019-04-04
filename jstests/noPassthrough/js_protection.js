@@ -13,14 +13,14 @@
 (function() {
     "use strict";
 
-    var testServer = MongoRunner.runMongod({setParameter: "javascriptProtection=true"});
+    var testServer = MerizoRunner.runMerizod({setParameter: "javascriptProtection=true"});
     assert.neq(
         null, testServer, "failed to start merizod with --setParameter=javascriptProtection=true");
 
     var db = testServer.getDB("test");
     var t = db.js_protection;
 
-    function assertMongoClientCorrect() {
+    function assertMerizoClientCorrect() {
         var functionToEval = function() {
             var doc = db.js_protection.findOne({_id: 0});
             assert.neq(null, doc);
@@ -36,7 +36,7 @@
             assert.eq(5, addOne(4));
         };
 
-        var exitCode = runMongoProgram("merizo",
+        var exitCode = runMerizoProgram("merizo",
                                        "--port",
                                        testServer.port,
                                        "--enableJavaScriptProtection",
@@ -88,8 +88,8 @@
         }
     });
 
-    assertMongoClientCorrect();
+    assertMerizoClientCorrect();
     assertNoStoredWhere();
 
-    MongoRunner.stopMongod(testServer);
+    MerizoRunner.stopMerizod(testServer);
 })();

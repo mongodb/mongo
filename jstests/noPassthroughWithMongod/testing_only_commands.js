@@ -32,17 +32,17 @@ var assertCmdFound = function(db, cmdName) {
 
 jsTest.setOption('enableTestCommands', false);
 
-var conn = MongoRunner.runMongod({});
+var conn = MerizoRunner.runMerizod({});
 for (i in testOnlyCommands) {
     assertCmdNotFound(conn.getDB('test'), testOnlyCommands[i]);
 }
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 // Now enable the commands
 jsTest.setOption('enableTestCommands', true);
 
-var conn = MongoRunner.runMongod({});
+var conn = MerizoRunner.runMerizod({});
 for (i in testOnlyCommands) {
     assertCmdFound(conn.getDB('test'), testOnlyCommands[i]);
 }
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);

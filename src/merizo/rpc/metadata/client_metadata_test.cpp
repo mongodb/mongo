@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -53,7 +53,7 @@ constexpr auto kType = "type"_sd;
 constexpr auto kVersion = "version"_sd;
 constexpr auto kOperatingSystem = "os"_sd;
 constexpr auto kArchitecture = "architecture"_sd;
-constexpr auto kMongos = "merizos"_sd;
+constexpr auto kMerizos = "merizos"_sd;
 constexpr auto kClient = "client"_sd;
 constexpr auto kHost = "host"_sd;
 
@@ -255,10 +255,10 @@ TEST(ClientMetadatTest, TestNegativeWrongTypes) {
 
 // Negative: document larger than 512 bytes
 TEST(ClientMetadatTest, TestNegativeLargeDocument) {
-    bool savedMongos = isMongos();
-    auto unsetMongoS = makeGuard([&] { setMongos(savedMongos); });
+    bool savedMerizos = isMerizos();
+    auto unsetMerizoS = makeGuard([&] { setMerizos(savedMerizos); });
 
-    setMongos(true);
+    setMerizos(true);
     {
         std::string str(350, 'x');
         ASSERT_DOC_OK(kApplication << BSON(kName << "1") << kDriver
@@ -304,7 +304,7 @@ TEST(ClientMetadatTest, TestNegativeLargeAppName) {
 }
 
 // Serialize and attach merizos information
-TEST(ClientMetadatTest, TestMongoSAppend) {
+TEST(ClientMetadatTest, TestMerizoSAppend) {
     BSONObjBuilder builder;
     ASSERT_OK(ClientMetadata::serializePrivate("a", "b", "c", "d", "e", "f", "g", &builder));
 
@@ -313,12 +313,12 @@ TEST(ClientMetadatTest, TestMongoSAppend) {
     ASSERT_OK(swParseStatus.getStatus());
     ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
 
-    swParseStatus.getValue().get().setMongoSMetadata("h", "i", "j");
+    swParseStatus.getValue().get().setMerizoSMetadata("h", "i", "j");
     ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
 
     auto doc = swParseStatus.getValue().get().getDocument();
 
-    constexpr auto kMongos = "merizos"_sd;
+    constexpr auto kMerizos = "merizos"_sd;
     constexpr auto kClient = "client"_sd;
     constexpr auto kHost = "host"_sd;
 
@@ -327,7 +327,7 @@ TEST(ClientMetadatTest, TestMongoSAppend) {
                           << kOperatingSystem
                           << BSON(kType << "c" << kName << "d" << kArchitecture << "e" << kVersion
                                         << "f")
-                          << kMongos
+                          << kMerizos
                           << BSON(kHost << "h" << kClient << "i" << kVersion << "j"));
     ASSERT_BSONOBJ_EQ(doc, outDoc);
 }

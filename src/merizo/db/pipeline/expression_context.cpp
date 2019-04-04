@@ -45,13 +45,13 @@ ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregationRequest& request,
                                      std::unique_ptr<CollatorInterface> collator,
-                                     std::shared_ptr<MongoProcessInterface> processInterface,
+                                     std::shared_ptr<MerizoProcessInterface> processInterface,
                                      StringMap<ResolvedNamespace> resolvedNamespaces,
                                      boost::optional<UUID> collUUID)
     : ExpressionContext(opCtx, collator.get()) {
     explain = request.getExplain();
     comment = request.getComment();
-    fromMongos = request.isFromMongos();
+    fromMerizos = request.isFromMerizos();
     needsMerge = request.needsMerge();
     mergeByPBRT = request.mergeByPBRT();
     allowDiskUse = request.shouldAllowDiskUse();
@@ -71,7 +71,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator)
     : opCtx(opCtx),
-      merizoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
+      merizoProcessInterface(std::make_shared<StubMerizoProcessInterface>()),
       timeZoneDatabase(opCtx && opCtx->getServiceContext()
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
@@ -81,7 +81,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInte
       _valueComparator(_collator) {}
 
 ExpressionContext::ExpressionContext(NamespaceString nss,
-                                     std::shared_ptr<MongoProcessInterface> processInterface,
+                                     std::shared_ptr<MerizoProcessInterface> processInterface,
                                      const TimeZoneDatabase* tzDb)
     : ns(std::move(nss)),
       merizoProcessInterface(std::move(processInterface)),
@@ -150,8 +150,8 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->comment = comment;
     expCtx->needsMerge = needsMerge;
     expCtx->mergeByPBRT = mergeByPBRT;
-    expCtx->fromMongos = fromMongos;
-    expCtx->inMongos = inMongos;
+    expCtx->fromMerizos = fromMerizos;
+    expCtx->inMerizos = inMerizos;
     expCtx->allowDiskUse = allowDiskUse;
     expCtx->bypassDocumentValidation = bypassDocumentValidation;
     expCtx->subPipelineDepth = subPipelineDepth;

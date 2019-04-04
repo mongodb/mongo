@@ -30,12 +30,12 @@
                         notReplicaSetErrorCode);
     }
 
-    const conn = MongoRunner.runMongod({enableMajorityReadConcern: ""});
+    const conn = MerizoRunner.runMerizod({enableMajorityReadConcern: ""});
     assert.neq(null, conn, "merizod was unable to start up");
     // $changeStream cannot run on a non-existent database.
     assert.writeOK(conn.getDB("test").ensure_db_exists.insert({}));
     assertChangeStreamNotSupportedOnConnection(conn);
-    assert.eq(0, MongoRunner.stopMongod(conn));
+    assert.eq(0, MerizoRunner.stopMerizod(conn));
 
     // Test a sharded cluster with standalone shards.
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

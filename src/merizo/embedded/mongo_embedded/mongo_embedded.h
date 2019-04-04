@@ -32,35 +32,35 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#pragma push_macro("MONGO_API_CALL")
-#undef MONGO_API_CALL
+#pragma push_macro("MERIZO_API_CALL")
+#undef MERIZO_API_CALL
 
-#pragma push_macro("MONGO_API_IMPORT")
-#undef MONGO_API_IMPORT
+#pragma push_macro("MERIZO_API_IMPORT")
+#undef MERIZO_API_IMPORT
 
-#pragma push_macro("MONGO_API_EXPORT")
-#undef MONGO_API_EXPORT
+#pragma push_macro("MERIZO_API_EXPORT")
+#undef MERIZO_API_EXPORT
 
-#pragma push_macro("MONGO_EMBEDDED_API")
-#undef MONGO_EMBEDDED_API
+#pragma push_macro("MERIZO_EMBEDDED_API")
+#undef MERIZO_EMBEDDED_API
 
 #if defined(_WIN32)
-#define MONGO_API_CALL __cdecl
-#define MONGO_API_IMPORT __declspec(dllimport)
-#define MONGO_API_EXPORT __declspec(dllexport)
+#define MERIZO_API_CALL __cdecl
+#define MERIZO_API_IMPORT __declspec(dllimport)
+#define MERIZO_API_EXPORT __declspec(dllexport)
 #else
-#define MONGO_API_CALL
-#define MONGO_API_IMPORT __attribute__((visibility("default")))
-#define MONGO_API_EXPORT __attribute__((used, visibility("default")))
+#define MERIZO_API_CALL
+#define MERIZO_API_IMPORT __attribute__((visibility("default")))
+#define MERIZO_API_EXPORT __attribute__((used, visibility("default")))
 #endif
 
-#if defined(MONGO_EMBEDDED_STATIC)
-#define MONGO_EMBEDDED_API
+#if defined(MERIZO_EMBEDDED_STATIC)
+#define MERIZO_EMBEDDED_API
 #else
-#if defined(MONGO_EMBEDDED_COMPILING)
-#define MONGO_EMBEDDED_API MONGO_API_EXPORT
+#if defined(MERIZO_EMBEDDED_COMPILING)
+#define MERIZO_EMBEDDED_API MERIZO_API_EXPORT
 #else
-#define MONGO_EMBEDDED_API MONGO_API_IMPORT
+#define MERIZO_EMBEDDED_API MERIZO_API_IMPORT
 #endif
 #endif
 
@@ -154,7 +154,7 @@ typedef struct merizo_embedded_v1_status merizo_embedded_v1_status;
  *
  * @note This function may be called before `merizo_embedded_v1_lib_init`.
  */
-MONGO_EMBEDDED_API merizo_embedded_v1_status* MONGO_API_CALL merizo_embedded_v1_status_create(void);
+MERIZO_EMBEDDED_API merizo_embedded_v1_status* MERIZO_API_CALL merizo_embedded_v1_status_create(void);
 
 /**
  * Destroys a valid `merizo_embedded_v1_status` object.
@@ -182,7 +182,7 @@ MONGO_EMBEDDED_API merizo_embedded_v1_status* MONGO_API_CALL merizo_embedded_v1_
  * including the storage referenced by functions that returned observable storage buffers from this
  * status, such as strings.
  */
-MONGO_EMBEDDED_API void MONGO_API_CALL
+MERIZO_EMBEDDED_API void MERIZO_API_CALL
 merizo_embedded_v1_status_destroy(merizo_embedded_v1_status* status);
 
 /**
@@ -194,23 +194,23 @@ merizo_embedded_v1_status_destroy(merizo_embedded_v1_status* status);
  * as the type `int`; however, the values in this enum can be used to classify the failure.
  */
 typedef enum {
-    MONGO_EMBEDDED_V1_ERROR_IN_REPORTING_ERROR = -2,
-    MONGO_EMBEDDED_V1_ERROR_UNKNOWN = -1,
+    MERIZO_EMBEDDED_V1_ERROR_IN_REPORTING_ERROR = -2,
+    MERIZO_EMBEDDED_V1_ERROR_UNKNOWN = -1,
 
-    MONGO_EMBEDDED_V1_SUCCESS = 0,
+    MERIZO_EMBEDDED_V1_SUCCESS = 0,
 
-    MONGO_EMBEDDED_V1_ERROR_ENOMEM = 1,
-    MONGO_EMBEDDED_V1_ERROR_EXCEPTION = 2,
-    MONGO_EMBEDDED_V1_ERROR_LIBRARY_ALREADY_INITIALIZED = 3,
-    MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED = 4,
-    MONGO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE = 5,
-    MONGO_EMBEDDED_V1_ERROR_DB_INITIALIZATION_FAILED = 6,
-    MONGO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE = 7,
-    MONGO_EMBEDDED_V1_ERROR_HAS_DB_HANDLES_OPEN = 8,
-    MONGO_EMBEDDED_V1_ERROR_DB_MAX_OPEN = 9,
-    MONGO_EMBEDDED_V1_ERROR_DB_CLIENTS_OPEN = 10,
-    MONGO_EMBEDDED_V1_ERROR_INVALID_CLIENT_HANDLE = 11,
-    MONGO_EMBEDDED_V1_ERROR_REENTRANCY_NOT_ALLOWED = 12,
+    MERIZO_EMBEDDED_V1_ERROR_ENOMEM = 1,
+    MERIZO_EMBEDDED_V1_ERROR_EXCEPTION = 2,
+    MERIZO_EMBEDDED_V1_ERROR_LIBRARY_ALREADY_INITIALIZED = 3,
+    MERIZO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED = 4,
+    MERIZO_EMBEDDED_V1_ERROR_INVALID_LIB_HANDLE = 5,
+    MERIZO_EMBEDDED_V1_ERROR_DB_INITIALIZATION_FAILED = 6,
+    MERIZO_EMBEDDED_V1_ERROR_INVALID_DB_HANDLE = 7,
+    MERIZO_EMBEDDED_V1_ERROR_HAS_DB_HANDLES_OPEN = 8,
+    MERIZO_EMBEDDED_V1_ERROR_DB_MAX_OPEN = 9,
+    MERIZO_EMBEDDED_V1_ERROR_DB_CLIENTS_OPEN = 10,
+    MERIZO_EMBEDDED_V1_ERROR_INVALID_CLIENT_HANDLE = 11,
+    MERIZO_EMBEDDED_V1_ERROR_REENTRANCY_NOT_ALLOWED = 12,
 } merizo_embedded_v1_error;
 
 /**
@@ -229,7 +229,7 @@ typedef enum {
  *
  * @param status The `merizo_embedded_v1_status` object from which to get an associated error code.
  *
- * @returns `MONGO_EMBEDDED_V1_SUCCESS` if the last function to which `status` was passed succeeded.
+ * @returns `MERIZO_EMBEDDED_V1_SUCCESS` if the last function to which `status` was passed succeeded.
  * @returns The `merizo_embedded_v1_error` code associated with the `status` parameter.
  *
  * @invariant This function is thread-safe, if the thread safety requirements specified by
@@ -242,7 +242,7 @@ typedef enum {
  * @note This function does not report its own failures.
  * @note This behavior of this function is undefined unless its preconditions are met.
  */
-MONGO_EMBEDDED_API int MONGO_API_CALL
+MERIZO_EMBEDDED_API int MERIZO_API_CALL
 merizo_embedded_v1_status_get_error(const merizo_embedded_v1_status* status);
 
 /**
@@ -258,7 +258,7 @@ merizo_embedded_v1_status_get_error(const merizo_embedded_v1_status* status);
  * @pre The specified `status` must be a valid `merizo_embedded_v1_status` object.
  * @pre The specified `status` must have been passed to a `merizo_embedded_v1` function.
  * @pre The function to which the specified `status` was passed must not have returned
- * `MONGO_EMBEDDED_V1_SUCCESS` as its error code.
+ * `MERIZO_EMBEDDED_V1_SUCCESS` as its error code.
  *
  * @param status The `merizo_embedded_v1_status` object from which to get an associated error
  * message.
@@ -274,7 +274,7 @@ merizo_embedded_v1_status_get_error(const merizo_embedded_v1_status* status);
  * by this function.
  *
  * @note For failures where the `merizo_embedded_v1_status_cet_error( status ) ==
- * MONGO_EMBEDDED_V1_ERROR_EXCEPTION`, this returns a string representation of the internal C++
+ * MERIZO_EMBEDDED_V1_ERROR_EXCEPTION`, this returns a string representation of the internal C++
  * exception.
  *
  * @note The storage for the returned string is associated with the specified `status` object, and
@@ -284,7 +284,7 @@ merizo_embedded_v1_status_get_error(const merizo_embedded_v1_status* status);
  * @note This function does not report its own failures.
  * @note This behavior of this function is undefined unless its preconditions are met.
  */
-MONGO_EMBEDDED_API const char* MONGO_API_CALL
+MERIZO_EMBEDDED_API const char* MERIZO_API_CALL
 merizo_embedded_v1_status_get_explanation(const merizo_embedded_v1_status* status);
 
 /**
@@ -293,14 +293,14 @@ merizo_embedded_v1_status_get_explanation(const merizo_embedded_v1_status* statu
  * Any `merizo_embedded_v1` function which reports failure must, when it fails, update the specified
  * `merizo_embedded_v1_status` object, if it exists, to contain a numeric code indicating a
  * sub-category of failure. This error code is one specified by the normal MerizoDB Driver interface,
- * if `merizo_embedded_v1_error == MONGO_EMBEDDED_V1_ERROR_EXCEPTION`.
+ * if `merizo_embedded_v1_error == MERIZO_EMBEDDED_V1_ERROR_EXCEPTION`.
  *
  * @pre The specified `status` must not be `NULL`.
  * @pre The specified `status` must be a valid `merizo_embedded_v1_status` object.
  * @pre The specified `status` must have been passed to a `merizo_embedded_v1` function.
  *
  * @pre The function to which the specified `status` was passed must not have returned
- * `MONGO_EMBEDDED_V1_SUCCESS` as its error code.
+ * `MERIZO_EMBEDDED_V1_SUCCESS` as its error code.
  *
  * @param status The `merizo_embedded_v1_status` object from which to get an associated status code.
  *
@@ -310,17 +310,17 @@ merizo_embedded_v1_status_get_explanation(const merizo_embedded_v1_status* statu
  * @invariant This function is thread-safe, if the thread safety requirements specified by
  * `merizo_embedded_v1_status`'s invariants are met.
  *
- * @note For failures where the `merizo_embedded_v1_error == MONGO_EMBEDDED_V1_ERROR_EXCEPTION` and
+ * @note For failures where the `merizo_embedded_v1_error == MERIZO_EMBEDDED_V1_ERROR_EXCEPTION` and
  * the exception was of type `merizo::DBException`, this returns the numeric code indicating which
  * specific `merizo::DBException` was thrown.
  *
- * @note For failures where the `merizo_embedded_v1_error != MONGO_EMBEDDED_V1_ERROR_EXCEPTION` the
+ * @note For failures where the `merizo_embedded_v1_error != MERIZO_EMBEDDED_V1_ERROR_EXCEPTION` the
  * value of this code is unspecified.
  *
  * @note This function does not report its own failures.
  * @note This behavior of this function is undefined unless its preconditions are met.
  */
-MONGO_EMBEDDED_API int MONGO_API_CALL
+MERIZO_EMBEDDED_API int MERIZO_API_CALL
 merizo_embedded_v1_status_get_code(const merizo_embedded_v1_status* status);
 
 
@@ -362,7 +362,7 @@ typedef struct merizo_embedded_v1_init_params merizo_embedded_v1_init_params;
  * Log = 0
  * Debug = 1 to 5
  */
-typedef void(MONGO_API_CALL* merizo_embedded_v1_log_callback)(
+typedef void(MERIZO_API_CALL* merizo_embedded_v1_log_callback)(
     void* user_data, const char* message, const char* component, const char* context, int severity);
 
 /**
@@ -370,16 +370,16 @@ typedef void(MONGO_API_CALL* merizo_embedded_v1_log_callback)(
  */
 typedef enum {
     /** Placeholder for no logging */
-    MONGO_EMBEDDED_V1_LOG_NONE = 0,
+    MERIZO_EMBEDDED_V1_LOG_NONE = 0,
 
     /** Logs to stdout */
-    MONGO_EMBEDDED_V1_LOG_STDOUT = 1,
+    MERIZO_EMBEDDED_V1_LOG_STDOUT = 1,
 
     /** Logs to stderr (not supported yet) */
-    // MONGO_EMBEDDED_V1_LOG_STDERR = 2,
+    // MERIZO_EMBEDDED_V1_LOG_STDERR = 2,
 
     /** Logs via log callback that must be provided when this bit is set. */
-    MONGO_EMBEDDED_V1_LOG_CALLBACK = 4
+    MERIZO_EMBEDDED_V1_LOG_CALLBACK = 4
 } merizo_embedded_v1_log_flags;
 
 // See the documentation of this object on the comments above its forward declaration
@@ -451,7 +451,7 @@ struct merizo_embedded_v1_init_params {
  * @note This function may return diagnosic errors for violations of its preconditions, but this
  * behavior is not guaranteed.
  */
-MONGO_EMBEDDED_API merizo_embedded_v1_lib* MONGO_API_CALL merizo_embedded_v1_lib_init(
+MERIZO_EMBEDDED_API merizo_embedded_v1_lib* MERIZO_API_CALL merizo_embedded_v1_lib_init(
     const merizo_embedded_v1_init_params* params, merizo_embedded_v1_status* status);
 
 /**
@@ -479,15 +479,15 @@ MONGO_EMBEDDED_API merizo_embedded_v1_lib* MONGO_API_CALL merizo_embedded_v1_lib
  *
  * @post Either the Embedded MerizoDB Library will be deinitialized, or an error will be reported.
  *
- * @returns Returns `MONGO_EMBEDDED_V1_SUCCESS` on success.
+ * @returns Returns `MERIZO_EMBEDDED_V1_SUCCESS` on success.
  *
- * @returns Returns `MONGO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED` and modifies `status` if
+ * @returns Returns `MERIZO_EMBEDDED_V1_ERROR_LIBRARY_NOT_INITIALIZED` and modifies `status` if
  * merizo_embedded_v1_lib_init() has not been called previously.
  *
- * @returns Returns `MONGO_EMBEDDED_V1_ERROR_HAS_DB_HANDLES_OPEN` and modifies `status` if there are
+ * @returns Returns `MERIZO_EMBEDDED_V1_ERROR_HAS_DB_HANDLES_OPEN` and modifies `status` if there are
  * open databases that haven't been closed with `merizo_embedded_v1_instance_create()`.
  *
- * @returns Returns `MONGO_EMBEDDED_V1_ERROR_EXCEPTION` and modifies `status` for errors that
+ * @returns Returns `MERIZO_EMBEDDED_V1_ERROR_EXCEPTION` and modifies `status` for errors that
  * resulted in an exception. Details can be retrived via `merizo_embedded_v1_process_get_status()`.
  *
  * @invariant This function is not thread safe. It cannot be called concurrently with any other
@@ -497,7 +497,7 @@ MONGO_EMBEDDED_API merizo_embedded_v1_lib* MONGO_API_CALL merizo_embedded_v1_lib
  * function may return diagnosic errors for violations of its preconditions, but this behavior is
  * not guaranteed.
  */
-MONGO_EMBEDDED_API int MONGO_API_CALL merizo_embedded_v1_lib_fini(merizo_embedded_v1_lib* lib,
+MERIZO_EMBEDDED_API int MERIZO_API_CALL merizo_embedded_v1_lib_fini(merizo_embedded_v1_lib* lib,
                                                                  merizo_embedded_v1_status* status);
 
 /**
@@ -554,7 +554,7 @@ typedef struct merizo_embedded_v1_instance merizo_embedded_v1_instance;
  * @note This function may return diagnosic errors for violations of its preconditions, but this
  * behavior is not guaranteed.
  */
-MONGO_EMBEDDED_API merizo_embedded_v1_instance* MONGO_API_CALL merizo_embedded_v1_instance_create(
+MERIZO_EMBEDDED_API merizo_embedded_v1_instance* MERIZO_API_CALL merizo_embedded_v1_instance_create(
     merizo_embedded_v1_lib* lib, const char* yaml_config, merizo_embedded_v1_status* status);
 
 /**
@@ -581,12 +581,12 @@ MONGO_EMBEDDED_API merizo_embedded_v1_instance* MONGO_API_CALL merizo_embedded_v
  * @post Either the specified Embedded MerizoDB Server will be destroyed, or an error will be
  * reported.
  *
- * @returns `MONGO_EMBEDDED_V1_SUCCESS` on success.
+ * @returns `MERIZO_EMBEDDED_V1_SUCCESS` on success.
  *
- * @returns `MONGO_EMBEDDED_V1_ERROR_DB_CLIENTS_OPEN` and modifies `status` if there are
+ * @returns `MERIZO_EMBEDDED_V1_ERROR_DB_CLIENTS_OPEN` and modifies `status` if there are
  * `merizo_embedded_v1_client` objects still open attached to the `instance`.
  *
- * @returns `MONGO_EMBEDDED_V1_ERROR_EXCEPTION`and modifies `status` for other unspecified errors.
+ * @returns `MERIZO_EMBEDDED_V1_ERROR_EXCEPTION`and modifies `status` for other unspecified errors.
  *
  * @invariant This function is not threadsafe unless the specified `db` object is not passed
  * concurrently to any other function. It is safe to destroy distinct `merizo_embedded_v1_instance`
@@ -597,7 +597,7 @@ MONGO_EMBEDDED_API merizo_embedded_v1_instance* MONGO_API_CALL merizo_embedded_v
  * @note This function may return diagnosic errors for violations of its precondition, but this
  * behavior is not guaranteed.
  */
-MONGO_EMBEDDED_API int MONGO_API_CALL merizo_embedded_v1_instance_destroy(
+MERIZO_EMBEDDED_API int MERIZO_API_CALL merizo_embedded_v1_instance_destroy(
     merizo_embedded_v1_instance* instance, merizo_embedded_v1_status* status);
 
 /**
@@ -636,7 +636,7 @@ typedef struct merizo_embedded_v1_client merizo_embedded_v1_client;
  *
  * @invariant This function is completely threadsafe, as long as its preconditions are met.
  */
-MONGO_EMBEDDED_API merizo_embedded_v1_client* MONGO_API_CALL merizo_embedded_v1_client_create(
+MERIZO_EMBEDDED_API merizo_embedded_v1_client* MERIZO_API_CALL merizo_embedded_v1_client_create(
     merizo_embedded_v1_instance* instance, merizo_embedded_v1_status* status);
 
 /**
@@ -660,7 +660,7 @@ MONGO_EMBEDDED_API merizo_embedded_v1_client* MONGO_API_CALL merizo_embedded_v1_
  * @post Either the specified Embedded MerizoDB Client will be destroyed, or an error will be
  * reported.
  *
- * @returns `MONGO_EMBEDDED_V1_SUCCESS` on success.
+ * @returns `MERIZO_EMBEDDED_V1_SUCCESS` on success.
  * @returns An error code and modifies the specified `status` object on failure.
  *
  * @invariant This function is not threadsafe unless the specified `client` object is not passed
@@ -672,7 +672,7 @@ MONGO_EMBEDDED_API merizo_embedded_v1_client* MONGO_API_CALL merizo_embedded_v1_
  * @note This function may return diagnosic errors for violations of its precondition, but this
  * behavior is not guaranteed.
  */
-MONGO_EMBEDDED_API int MONGO_API_CALL merizo_embedded_v1_client_destroy(
+MERIZO_EMBEDDED_API int MERIZO_API_CALL merizo_embedded_v1_client_destroy(
     merizo_embedded_v1_client* client, merizo_embedded_v1_status* status);
 
 /**
@@ -711,7 +711,7 @@ MONGO_EMBEDDED_API int MONGO_API_CALL merizo_embedded_v1_client_destroy(
  * @post Either the requested database operation will have been performed, or an error will be
  * reported.
  *
- * @return Returns MONGO_EMBEDDED_V1_SUCCESS on success.
+ * @return Returns MERIZO_EMBEDDED_V1_SUCCESS on success.
  * @return An error code and modifies `status` on failure
  *
  * @invariant This function is not thread-safe unless its preconditions are met, and the specified
@@ -729,7 +729,7 @@ MONGO_EMBEDDED_API int MONGO_API_CALL merizo_embedded_v1_client_destroy(
  * to be part of the specified `client` object for the purposes of thread-safety and undefined
  * behavior.
  */
-MONGO_EMBEDDED_API int MONGO_API_CALL
+MERIZO_EMBEDDED_API int MERIZO_API_CALL
 merizo_embedded_v1_client_invoke(merizo_embedded_v1_client* client,
                                 const void* input,
                                 size_t input_size,
@@ -746,16 +746,16 @@ merizo_embedded_v1_client_invoke(merizo_embedded_v1_client* client,
 }  // namespace merizo
 #endif
 
-#undef MONGO_EMBEDDED_API
-#pragma pop_macro("MONGO_EMBEDDED_API")
+#undef MERIZO_EMBEDDED_API
+#pragma pop_macro("MERIZO_EMBEDDED_API")
 
-#undef MONGO_API_EXPORT
-#pragma push_macro("MONGO_API_EXPORT")
+#undef MERIZO_API_EXPORT
+#pragma push_macro("MERIZO_API_EXPORT")
 
-#undef MONGO_API_IMPORT
-#pragma push_macro("MONGO_API_IMPORT")
+#undef MERIZO_API_IMPORT
+#pragma push_macro("MERIZO_API_IMPORT")
 
-#undef MONGO_API_CALL
-#pragma pop_macro("MONGO_API_CALL")
+#undef MERIZO_API_CALL
+#pragma pop_macro("MERIZO_API_CALL")
 
 #endif  // HEADERUUID_5E967FCD_63BD_4374_88CC_58C091BA61C0_DEFINED

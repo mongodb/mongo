@@ -37,7 +37,7 @@
     assert.eq(7, cursor3.objsLeftInBatch());
 
     s.adminCommand({split: "test.foo", middle: {_id: 5}});
-    s.adminCommand({movechunk: "test.foo", find: {_id: 5}, to: secondary.getMongo().name});
+    s.adminCommand({movechunk: "test.foo", find: {_id: 5}, to: secondary.getMerizo().name});
     assert.eq(2, s.config.chunks.count({"ns": "test.foo"}));
 
     // the cursors should not have been affected

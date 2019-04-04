@@ -52,7 +52,7 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
                                                       boost::optional<NamespaceString> nss) {
 
     invariant(failPoint);
-    MONGO_FAIL_POINT_BLOCK((*failPoint), options) {
+    MERIZO_FAIL_POINT_BLOCK((*failPoint), options) {
         const BSONObj& data = options.getData();
         StringData fpNss = data.getStringField("nss");
         if (nss && !fpNss.empty() && fpNss != nss.get().toString()) {
@@ -64,7 +64,7 @@ void CurOpFailpointHelpers::waitWhileFailPointEnabled(FailPoint* failPoint,
         const bool shouldCheckForInterrupt =
             checkForInterrupt || data["shouldCheckForInterrupt"].booleanSafe();
         const bool shouldContinueOnInterrupt = data["shouldContinueOnInterrupt"].booleanSafe();
-        while (MONGO_FAIL_POINT((*failPoint))) {
+        while (MERIZO_FAIL_POINT((*failPoint))) {
             sleepFor(Milliseconds(10));
             if (whileWaiting) {
                 whileWaiting();

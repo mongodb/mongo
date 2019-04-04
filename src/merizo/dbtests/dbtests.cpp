@@ -178,7 +178,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     setGlobalServiceContext(ServiceContext::make());
 
     const auto service = getGlobalServiceContext();
-    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
+    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMerizod>(service));
 
     auto logicalClock = stdx::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));

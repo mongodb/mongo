@@ -50,7 +50,7 @@ namespace {
 using namespace merizo;
 using namespace merizo::repl;
 
-class ReplicationProcessTest : public ServiceContextMongoDTest {
+class ReplicationProcessTest : public ServiceContextMerizoDTest {
 private:
     void setUp() override;
     void tearDown() override;
@@ -60,7 +60,7 @@ protected:
 };
 
 void ReplicationProcessTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
     _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
     auto service = getServiceContext();
     ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
@@ -68,7 +68,7 @@ void ReplicationProcessTest::setUp() {
 
 void ReplicationProcessTest::tearDown() {
     _storageInterface = {};
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 ServiceContext::UniqueOperationContext makeOpCtx() {

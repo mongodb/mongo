@@ -42,11 +42,11 @@ namespace merizo {
 using DocumentSourcePlanCacheStatsTest = AggregationContextFixture;
 
 /**
- * A MongoProcessInterface used for testing which returns artificial plan cache stats.
+ * A MerizoProcessInterface used for testing which returns artificial plan cache stats.
  */
-class PlanCacheStatsMongoProcessInterface final : public StubMongoProcessInterface {
+class PlanCacheStatsMerizoProcessInterface final : public StubMerizoProcessInterface {
 public:
-    PlanCacheStatsMongoProcessInterface(std::vector<BSONObj> planCacheStats)
+    PlanCacheStatsMerizoProcessInterface(std::vector<BSONObj> planCacheStats)
         : _planCacheStats(std::move(planCacheStats)) {}
 
     std::vector<BSONObj> getMatchingPlanCacheEntryStats(
@@ -81,9 +81,9 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ShouldFailToParseIfSpecIsANonEmptyObjec
         ErrorCodes::FailedToParse);
 }
 
-TEST_F(DocumentSourcePlanCacheStatsTest, CannotCreateWhenInMongos) {
+TEST_F(DocumentSourcePlanCacheStatsTest, CannotCreateWhenInMerizos) {
     const auto specObj = fromjson("{$planCacheStats: {}}");
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
     ASSERT_THROWS_CODE(
         DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx()),
         AssertionException,
@@ -144,7 +144,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsImmediateEOFWithEmptyPlanCache) {
     getExpCtx()->merizoProcessInterface =
-        std::make_shared<PlanCacheStatsMongoProcessInterface>(std::vector<BSONObj>{});
+        std::make_shared<PlanCacheStatsMerizoProcessInterface>(std::vector<BSONObj>{});
     const auto specObj = fromjson("{$planCacheStats: {}}");
     auto stage = DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
     ASSERT(stage->getNext().isEOF());
@@ -162,7 +162,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingM
                                     << "match"
                                     << true)};
     getExpCtx()->merizoProcessInterface =
-        std::make_shared<PlanCacheStatsMongoProcessInterface>(stats);
+        std::make_shared<PlanCacheStatsMerizoProcessInterface>(stats);
 
     const auto specObj = fromjson("{$planCacheStats: {}}");
     auto planCacheStats =

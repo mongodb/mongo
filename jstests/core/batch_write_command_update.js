@@ -15,7 +15,7 @@
 var coll = db.getCollection("batch_write_update");
 coll.drop();
 
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
+assert(coll.getDB().getMerizo().useWriteCommands(), "test is not running with write commands");
 
 var request;
 var result;

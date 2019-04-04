@@ -37,14 +37,14 @@
 
 namespace merizo {
 
-MONGO_DEFINE_SHIM(AuthzManagerExternalState::create);
+MERIZO_DEFINE_SHIM(AuthzManagerExternalState::create);
 
 AuthzManagerExternalState::AuthzManagerExternalState() = default;
 AuthzManagerExternalState::~AuthzManagerExternalState() = default;
 
 bool AuthzManagerExternalState::shouldUseRolesFromConnection(OperationContext* opCtx,
                                                              const UserName& userName) {
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (!opCtx || !opCtx->getClient() || !opCtx->getClient()->session()) {
         return false;
     }

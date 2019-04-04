@@ -1,10 +1,10 @@
 /**
- * Test that verifies client metadata is logged as part of slow query logging in MongoD.
+ * Test that verifies client metadata is logged as part of slow query logging in MerizoD.
  */
 (function() {
     'use strict';
 
-    let conn = MongoRunner.runMongod({useLogFiles: true});
+    let conn = MerizoRunner.runMerizod({useLogFiles: true});
     assert.neq(null, conn, 'merizod was unable to start up');
 
     let coll = conn.getCollection("test.foo");
@@ -29,5 +29,5 @@
             "\n************************************************************\n" + log +
             "\n************************************************************");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

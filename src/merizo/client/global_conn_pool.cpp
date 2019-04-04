@@ -37,7 +37,7 @@
 namespace merizo {
 namespace {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(InitializeGlobalConnectionPool, ("EndStartupOptionStorage"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(InitializeGlobalConnectionPool, ("EndStartupOptionStorage"))
 (InitializerContext* context) {
     globalConnPool.setName("connection pool");
     globalConnPool.setMaxPoolSize(maxConnsPerHost);

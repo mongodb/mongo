@@ -38,18 +38,18 @@ namespace merizo {
 using std::string;
 using std::vector;
 
-BSONArray MongoVersionRange::toBSONArray(const vector<MongoVersionRange>& ranges) {
+BSONArray MerizoVersionRange::toBSONArray(const vector<MerizoVersionRange>& ranges) {
     BSONArrayBuilder barr;
 
-    for (vector<MongoVersionRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        const MongoVersionRange& range = *it;
+    for (vector<MerizoVersionRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
+        const MerizoVersionRange& range = *it;
         range.toBSONElement(&barr);
     }
 
     return barr.arr();
 }
 
-bool MongoVersionRange::parseBSONElement(const BSONElement& el, string* errMsg) {
+bool MerizoVersionRange::parseBSONElement(const BSONElement& el, string* errMsg) {
     string dummy;
     if (!errMsg)
         errMsg = &dummy;
@@ -105,7 +105,7 @@ bool MongoVersionRange::parseBSONElement(const BSONElement& el, string* errMsg) 
     }
 }
 
-void MongoVersionRange::toBSONElement(BSONArrayBuilder* barr) const {
+void MerizoVersionRange::toBSONElement(BSONArrayBuilder* barr) const {
     if (maxVersion == "") {
         barr->append(minVersion);
     } else {
@@ -118,7 +118,7 @@ void MongoVersionRange::toBSONElement(BSONArrayBuilder* barr) const {
     }
 }
 
-bool MongoVersionRange::isInRange(StringData version) const {
+bool MerizoVersionRange::isInRange(StringData version) const {
     if (maxVersion == "") {
         // If a prefix of the version specified is excluded, the specified version is
         // excluded
@@ -139,8 +139,8 @@ bool MongoVersionRange::isInRange(StringData version) const {
     return false;
 }
 
-bool isInMongoVersionRanges(StringData version, const vector<MongoVersionRange>& ranges) {
-    for (vector<MongoVersionRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
+bool isInMerizoVersionRanges(StringData version, const vector<MerizoVersionRange>& ranges) {
+    for (vector<MerizoVersionRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
         if (it->isInRange(version))
             return true;
     }

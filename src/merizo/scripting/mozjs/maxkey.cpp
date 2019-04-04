@@ -41,8 +41,8 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec MaxKeyInfo::methods[3] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MaxKeyInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, MaxKeyInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MaxKeyInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, MaxKeyInfo),
     JS_FS_END,
 };
 

@@ -265,7 +265,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             replset_config_options=replset_config_options, **shard_options)
 
     def _new_standalone_shard(self, index):
-        """Return a standalone.MongoDFixture configured as a shard in a sharded cluster."""
+        """Return a standalone.MerizoDFixture configured as a shard in a sharded cluster."""
 
         merizod_logger = self.logger.new_fixture_node_logger("shard{}".format(index))
 
@@ -279,17 +279,17 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         merizod_options["shardsvr"] = ""
         merizod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
 
-        return standalone.MongoDFixture(
+        return standalone.MerizoDFixture(
             merizod_logger, self.job_num, merizod_executable=merizod_executable,
             merizod_options=merizod_options, preserve_dbpath=preserve_dbpath, **shard_options)
 
     def _new_merizos(self, index, total):
         """
-        Return a _MongoSFixture configured to be used as the merizos for a sharded cluster.
+        Return a _MerizoSFixture configured to be used as the merizos for a sharded cluster.
 
         :param index: The index of the current merizos.
         :param total: The total number of merizos routers
-        :return: _MongoSFixture
+        :return: _MerizoSFixture
         """
 
         if total == 1:
@@ -302,7 +302,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         merizos_options = self.merizos_options.copy()
         merizos_options["configdb"] = self.configsvr.get_internal_connection_string()
 
-        return _MongoSFixture(merizos_logger, self.job_num, merizos_executable=self.merizos_executable,
+        return _MerizoSFixture(merizos_logger, self.job_num, merizos_executable=self.merizos_executable,
                               merizos_options=merizos_options)
 
     def _add_shard(self, client, shard):
@@ -317,18 +317,18 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         client.admin.command({"addShard": connection_string})
 
 
-class _MongoSFixture(interface.Fixture):
+class _MerizoSFixture(interface.Fixture):
     """Fixture which provides JSTests with a merizos to connect to."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED  # type: ignore
 
     def __init__(self, logger, job_num, merizos_executable=None, merizos_options=None):
-        """Initialize _MongoSFixture."""
+        """Initialize _MerizoSFixture."""
 
         interface.Fixture.__init__(self, logger, job_num)
 
         # Command line options override the YAML configuration.
-        self.merizos_executable = utils.default_if_none(config.MONGOS_EXECUTABLE, merizos_executable)
+        self.merizos_executable = utils.default_if_none(config.MERIZOS_EXECUTABLE, merizos_executable)
 
         self.merizos_options = utils.default_if_none(merizos_options, {}).copy()
 
@@ -356,10 +356,10 @@ class _MongoSFixture(interface.Fixture):
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
-        deadline = time.time() + standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS
+        deadline = time.time() + standalone.MerizoDFixture.AWAIT_READY_TIMEOUT_SECS
 
         # Wait until the merizos is accepting connections. The retry logic is necessary to support
-        # versions of PyMongo <3.0 that immediately raise a ConnectionFailure if a connection cannot
+        # versions of PyMerizo <3.0 that immediately raise a ConnectionFailure if a connection cannot
         # be established.
         while True:
             # Check whether the merizos exited for some reason.
@@ -379,7 +379,7 @@ class _MongoSFixture(interface.Fixture):
                 if remaining <= 0.0:
                     raise errors.ServerFailure(
                         "Failed to connect to merizos on port {} after {} seconds".format(
-                            self.port, standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
+                            self.port, standalone.MerizoDFixture.AWAIT_READY_TIMEOUT_SECS))
 
                 self.logger.info("Waiting to connect to merizos on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.

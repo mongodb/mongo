@@ -262,7 +262,7 @@ std::unique_ptr<TransactionReaper> TransactionReaper::make(
         case Type::kSharded:
             return stdx::make_unique<TransactionReaperImpl<ShardedHandler>>(std::move(collection));
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 TransactionReaper::~TransactionReaper() = default;

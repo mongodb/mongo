@@ -15,7 +15,7 @@
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
     assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
-    const session = db.getMongo().startSession();
+    const session = db.getMerizo().startSession();
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb.getCollection(collName);
 

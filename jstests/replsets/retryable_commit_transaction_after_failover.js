@@ -13,7 +13,7 @@
     rst.initiate();
 
     // Get the connection to the replica set using MerizoDB URI.
-    const conn = new Mongo(rst.getURL());
+    const conn = new Merizo(rst.getURL());
     const testDB = conn.getDB(dbName);
     const testColl = testDB[collName];
 
@@ -25,7 +25,7 @@
     let stmtId = 0;
 
     const sessionOptions = {causalConsistency: false};
-    let session = testDB.getMongo().startSession(sessionOptions);
+    let session = testDB.getMerizo().startSession(sessionOptions);
     let sessionDb = session.getDatabase(dbName);
 
     jsTest.log("commitTransaction command is retryable before failover");
@@ -64,7 +64,7 @@
     // Wait until the other node becomes primary.
     assert.eq(oldSecondary, rst.getPrimary());
     // Reconnect the connection to the new primary.
-    sessionDb.getMongo()._markNodeAsFailed(
+    sessionDb.getMerizo()._markNodeAsFailed(
         oldPrimary.host, ErrorCodes.NotMaster, "Notice that primary is not master");
     reconnect(sessionDb);
 

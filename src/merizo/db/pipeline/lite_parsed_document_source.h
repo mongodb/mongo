@@ -91,7 +91,7 @@ public:
     /**
      * Returns a list of the privileges required for this stage.
      */
-    virtual PrivilegeVector requiredPrivileges(bool isMongos) const = 0;
+    virtual PrivilegeVector requiredPrivileges(bool isMerizos) const = 0;
 
     /**
      * Returns true if this is a $collStats stage.
@@ -117,14 +117,14 @@ public:
     /**
      * Returns true if this stage may be forwarded to shards from a merizos.
      */
-    virtual bool allowedToForwardFromMongos() const {
+    virtual bool allowedToForwardFromMerizos() const {
         return true;
     }
 
     /**
-     * Returns true if this stage may be forwarded from Mongos unmodified.
+     * Returns true if this stage may be forwarded from Merizos unmodified.
      */
-    virtual bool allowedToPassthroughFromMongos() const {
+    virtual bool allowedToPassthroughFromMerizos() const {
         return true;
     }
 
@@ -162,7 +162,7 @@ public:
         return stdx::unordered_set<NamespaceString>();
     }
 
-    PrivilegeVector requiredPrivileges(bool isMongos) const final {
+    PrivilegeVector requiredPrivileges(bool isMerizos) const final {
         return {};
     }
 };
@@ -184,7 +184,7 @@ public:
         return {_foreignNssSet};
     }
 
-    PrivilegeVector requiredPrivileges(bool isMongos) const final {
+    PrivilegeVector requiredPrivileges(bool isMerizos) const final {
         return _requiredPrivileges;
     }
 

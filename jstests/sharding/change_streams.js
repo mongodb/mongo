@@ -147,13 +147,13 @@
         changeStream.close();
 
         // Test that it is legal to open a change stream, even if the
-        // 'internalQueryProhibitMergingOnMongos' parameter is set.
+        // 'internalQueryProhibitMergingOnMerizos' parameter is set.
         assert.commandWorked(
-            st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: true}));
+            st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMerizoS: true}));
         let tempCursor = assert.doesNotThrow(() => merizosColl.aggregate([{$changeStream: {}}]));
         tempCursor.close();
         assert.commandWorked(
-            st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMongoS: false}));
+            st.s0.adminCommand({setParameter: 1, internalQueryProhibitMergingOnMerizoS: false}));
 
         assert.writeOK(merizosColl.remove({}));
         // We awaited the replication of the first write, so the change stream shouldn't return it.

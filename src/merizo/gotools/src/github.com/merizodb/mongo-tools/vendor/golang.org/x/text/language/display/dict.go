@@ -55,7 +55,7 @@ var (
 	Latvian              *Dictionary = &lv        // lv
 	Macedonian           *Dictionary = &mk        // mk
 	Malayalam            *Dictionary = &ml        // ml
-	Mongolian            *Dictionary = &mn        // mn
+	Merizolian            *Dictionary = &mn        // mn
 	Marathi              *Dictionary = &mr        // mr
 	Malay                *Dictionary = &ms        // ms
 	Burmese              *Dictionary = &my        // my

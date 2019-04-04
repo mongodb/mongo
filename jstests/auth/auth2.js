@@ -1,6 +1,6 @@
 // test read/write permissions
 
-m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+m = MerizoRunner.runMerizod({auth: "", bind_ip: "127.0.0.1"});
 db = m.getDB("admin");
 
 // These statements throw because the localhost exception does not allow

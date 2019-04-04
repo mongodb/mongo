@@ -45,27 +45,27 @@ class Environment;
 
 namespace moe = merizo::optionenvironment;
 
-struct MongoBridgeGlobalParams {
+struct MerizoBridgeGlobalParams {
     int port = 0;
     std::int64_t seed = 0;
     std::string destUri;
 
-    MongoBridgeGlobalParams() = default;
+    MerizoBridgeGlobalParams() = default;
 };
 
-extern MongoBridgeGlobalParams merizoBridgeGlobalParams;
+extern MerizoBridgeGlobalParams merizoBridgeGlobalParams;
 
-Status addMongoBridgeOptions(moe::OptionSection* options);
+Status addMerizoBridgeOptions(moe::OptionSection* options);
 
-void printMongoBridgeHelp(std::ostream* out);
+void printMerizoBridgeHelp(std::ostream* out);
 
 /**
  * Handle options that should come before validation, such as "help".
  *
  * Returns false if an option was found that implies we should prematurely exit with success.
  */
-bool handlePreValidationMongoBridgeOptions(const moe::Environment& params);
+bool handlePreValidationMerizoBridgeOptions(const moe::Environment& params);
 
-Status storeMongoBridgeOptions(const moe::Environment& params,
+Status storeMerizoBridgeOptions(const moe::Environment& params,
                                const std::vector<std::string>& args);
 }

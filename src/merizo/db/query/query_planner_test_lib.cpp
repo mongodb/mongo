@@ -31,7 +31,7 @@
  * This file contains tests for merizo/db/query/query_planner.cpp
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/db/query/query_planner_test_lib.h"
 
@@ -604,7 +604,7 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                         return false;
                     break;
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 

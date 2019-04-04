@@ -771,39 +771,39 @@ env_vars.Add('MAXLINELENGTH',
 
 # Note: This is only really meaningful when configured via a variables file. See the
 # default_buildinfo_environment_data() function for examples of how to use this.
-env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
+env_vars.Add('MERIZO_BUILDINFO_ENVIRONMENT_DATA',
     help='Sets the info returned from the buildInfo command and --version command-line flag',
     default=merizo_generators.default_buildinfo_environment_data())
 
-env_vars.Add('MONGO_DIST_SRC_PREFIX',
+env_vars.Add('MERIZO_DIST_SRC_PREFIX',
     help='Sets the prefix for files in the source distribution archive',
     converter=variable_distsrc_converter,
-    default="merizodb-src-r${MONGO_VERSION}")
+    default="merizodb-src-r${MERIZO_VERSION}")
 
-env_vars.Add('MONGO_DISTARCH',
+env_vars.Add('MERIZO_DISTARCH',
     help='Adds a string representing the target processor architecture to the dist archive',
     default='$TARGET_ARCH')
 
-env_vars.Add('MONGO_DISTMOD',
+env_vars.Add('MERIZO_DISTMOD',
     help='Adds a string that will be embedded in the dist archive naming',
     default='')
 
-env_vars.Add('MONGO_DISTNAME',
+env_vars.Add('MERIZO_DISTNAME',
     help='Sets the version string to be used in dist archive naming',
-    default='$MONGO_VERSION')
+    default='$MERIZO_VERSION')
 
 def validate_merizo_version(key, val, env):
     regex = r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?'
     if not re.match(regex, val):
-        print("Invalid MONGO_VERSION '{}', or could not derive from version.json or git metadata. Please add a conforming MONGO_VERSION=x.y.z[-extra] as an argument to SCons".format(val))
+        print("Invalid MERIZO_VERSION '{}', or could not derive from version.json or git metadata. Please add a conforming MERIZO_VERSION=x.y.z[-extra] as an argument to SCons".format(val))
         Exit(1)
 
-env_vars.Add('MONGO_VERSION',
+env_vars.Add('MERIZO_VERSION',
     help='Sets the version string for MerizoDB',
     default=version_data['version'],
     validator=validate_merizo_version)
 
-env_vars.Add('MONGO_GIT_HASH',
+env_vars.Add('MERIZO_GIT_HASH',
     help='Sets the githash to store in the MerizoDB version information',
     default=version_data['githash'])
 
@@ -1087,9 +1087,9 @@ if endian == "auto":
     endian = sys.byteorder
 
 if endian == "little":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "1234")
+    env.SetConfigHeaderDefine("MERIZO_CONFIG_BYTE_ORDER", "1234")
 elif endian == "big":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "4321")
+    env.SetConfigHeaderDefine("MERIZO_CONFIG_BYTE_ORDER", "4321")
 
 # These preprocessor macros came from
 # http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
@@ -1282,11 +1282,11 @@ if get_option('allocator') == "auto":
     # gperftools on android
     if env.TargetOSIs('windows') or \
        env.TargetOSIs('linux') and not env.TargetOSIs('android'):
-        env['MONGO_ALLOCATOR'] = "tcmalloc"
+        env['MERIZO_ALLOCATOR'] = "tcmalloc"
     else:
-        env['MONGO_ALLOCATOR'] = "system"
+        env['MERIZO_ALLOCATOR'] = "system"
 else:
-    env['MONGO_ALLOCATOR'] = get_option('allocator')
+    env['MERIZO_ALLOCATOR'] = get_option('allocator')
 
 if has_option("cache"):
     if has_option("gcov"):
@@ -1436,7 +1436,7 @@ if link_model.startswith("dynamic"):
                 env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
 
 if optBuild:
-    env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
+    env.SetConfigHeaderDefine("MERIZO_CONFIG_OPTIMIZED_BUILD")
 
 # Enable the fast decider if exlicltly requested or if in 'auto' mode and not in conflict with other
 # options.
@@ -1555,7 +1555,7 @@ elif env.TargetOSIs('windows'):
 
 # ---- other build setup -----
 if debugBuild:
-    env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
+    env.SetConfigHeaderDefine("MERIZO_CONFIG_DEBUG_BUILD")
 else:
     env.AppendUnique( CPPDEFINES=[ 'NDEBUG' ] )
 
@@ -1914,7 +1914,7 @@ if get_option('wiredtiger') == 'on':
             "Re-run scons with --wiredtiger=off to build on 32-bit platforms")
     else:
         wiredtiger = True
-        env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
+        env.SetConfigHeaderDefine("MERIZO_CONFIG_WIREDTIGER_ENABLED")
 
 mobile_se = False
 if get_option('mobile-se') == 'on':
@@ -2450,10 +2450,10 @@ def doConfigure(myenv):
         'CheckMemset_s' : CheckMemset_s,
     })
     if conf.CheckMemset_s():
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_MEMSET_S")
+        conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_HAVE_MEMSET_S")
 
     if conf.CheckFunc('strnlen'):
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_STRNLEN")
+        conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_HAVE_STRNLEN")
 
     conf.Finish()
 
@@ -2602,7 +2602,7 @@ def doConfigure(myenv):
         using_tsan = 'thread' in sanitizer_list
         using_ubsan = 'undefined' in sanitizer_list
 
-        if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental'] and (using_lsan or using_asan):
+        if env['MERIZO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental'] and (using_lsan or using_asan):
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
             env.FatalError("Cannot use --sanitize=leak or --sanitize=address with tcmalloc")
@@ -2877,7 +2877,7 @@ def doConfigure(myenv):
     })
 
     if conf.CheckCXX14EnableIfT():
-        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_ENABLE_IF_T')
+        conf.env.SetConfigHeaderDefine('MERIZO_CONFIG_HAVE_STD_ENABLE_IF_T')
 
     myenv = conf.Finish()
 
@@ -2900,7 +2900,7 @@ def doConfigure(myenv):
     })
 
     if conf.CheckCXX14MakeUnique():
-        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE')
+        conf.env.SetConfigHeaderDefine('MERIZO_CONFIG_HAVE_STD_MAKE_UNIQUE')
 
     # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
     if posix_system:
@@ -2929,7 +2929,7 @@ def doConfigure(myenv):
         })
 
         if conf.CheckPThreadSetNameNP():
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
+            conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
 
     myenv = conf.Finish()
 
@@ -3063,14 +3063,14 @@ def doConfigure(myenv):
                 #include <openssl/crypto.h>
                 #include <openssl/evp.h>
             """):
-            conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_FIPS_MODE_SET')
+            conf.env.SetConfigHeaderDefine('MERIZO_CONFIG_HAVE_FIPS_MODE_SET')
 
         if conf.CheckDeclaration(
             "d2i_ASN1_SEQUENCE_ANY",
             includes="""
                 #include <openssl/asn1.h>
             """):
-            conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS')
+            conf.env.SetConfigHeaderDefine('MERIZO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS')
 
         def CheckOpenSSL_EC_DH(context):
             compile_test_body = textwrap.dedent("""
@@ -3108,11 +3108,11 @@ def doConfigure(myenv):
 
         conf.AddTest("CheckOpenSSL_EC_DH", CheckOpenSSL_EC_DH)
         if conf.CheckOpenSSL_EC_DH():
-            conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO')
+            conf.env.SetConfigHeaderDefine('MERIZO_CONFIG_HAVE_SSL_SET_ECDH_AUTO')
 
         conf.AddTest("CheckOpenSSL_EC_KEY_new", CheckOpenSSL_EC_KEY_new)
         if conf.CheckOpenSSL_EC_KEY_new():
-            conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW')
+            conf.env.SetConfigHeaderDefine('MERIZO_CONFIG_HAVE_SSL_EC_KEY_NEW')
 
     ssl_provider = get_option("ssl-provider")
     if ssl_provider == 'auto':
@@ -3124,13 +3124,13 @@ def doConfigure(myenv):
     if ssl_provider == 'native':
         if conf.env.TargetOSIs('windows'):
             ssl_provider = 'windows'
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_WINDOWS")
-            conf.env.Append( MONGO_CRYPTO=["windows"] )
+            env.SetConfigHeaderDefine("MERIZO_CONFIG_SSL_PROVIDER", "MERIZO_CONFIG_SSL_PROVIDER_WINDOWS")
+            conf.env.Append( MERIZO_CRYPTO=["windows"] )
 
         elif conf.env.TargetOSIs('darwin', 'macOS'):
             ssl_provider = 'apple'
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_APPLE")
-            conf.env.Append( MONGO_CRYPTO=["apple"] )
+            env.SetConfigHeaderDefine("MERIZO_CONFIG_SSL_PROVIDER", "MERIZO_CONFIG_SSL_PROVIDER_APPLE")
+            conf.env.Append( MERIZO_CRYPTO=["apple"] )
             conf.env.AppendUnique(FRAMEWORKS=[
                 'CoreFoundation',
                 'Security',
@@ -3143,17 +3143,17 @@ def doConfigure(myenv):
         if require_ssl:
             checkOpenSSL(conf)
             # Working OpenSSL available, use it.
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_OPENSSL")
+            env.SetConfigHeaderDefine("MERIZO_CONFIG_SSL_PROVIDER", "MERIZO_CONFIG_SSL_PROVIDER_OPENSSL")
 
-            conf.env.Append( MONGO_CRYPTO=["openssl"] )
+            conf.env.Append( MERIZO_CRYPTO=["openssl"] )
         else:
             # If we don't need an SSL build, we can get by with TomCrypt.
-            conf.env.Append( MONGO_CRYPTO=["tom"] )
+            conf.env.Append( MERIZO_CRYPTO=["tom"] )
 
     if require_ssl:
         # Either crypto engine is native,
         # or it's OpenSSL and has been checked to be working.
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
+        conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_SSL")
         print("Using SSL Provider: {0}".format(ssl_provider))
     else:
         ssl_provider = "none"
@@ -3269,27 +3269,27 @@ def doConfigure(myenv):
                     [boostlib + suffix for suffix in boostSuffixList],
                     language='C++')
     if posix_system:
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_HEADER_UNISTD_H")
+        conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_HAVE_HEADER_UNISTD_H")
         conf.CheckLib('rt')
         conf.CheckLib('dl')
 
     if posix_monotonic_clock:
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")
+        conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")
 
     if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols_fd', includes='#include <execinfo.h>')):
 
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE")
+        conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_HAVE_EXECINFO_BACKTRACE")
 
     conf.env["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
     if env.TargetOSIs('solaris'):
         conf.CheckLib( "nsl" )
 
-    conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
-    if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
+    conf.env['MERIZO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
+    if conf.env['MERIZO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
             "sasl2",
             ["stddef.h","sasl/sasl.h"],
             "C",
@@ -3304,13 +3304,13 @@ def doConfigure(myenv):
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this
     # point.
-    if myenv['MONGO_ALLOCATOR'] == 'tcmalloc':
+    if myenv['MERIZO_ALLOCATOR'] == 'tcmalloc':
         if use_system_version_of_library('tcmalloc'):
             conf.FindSysLibDep("tcmalloc", ["tcmalloc"])
-    elif myenv['MONGO_ALLOCATOR'] in ['system', 'tcmalloc-experimental']:
+    elif myenv['MERIZO_ALLOCATOR'] in ['system', 'tcmalloc-experimental']:
         pass
     else:
-        myenv.FatalError("Invalid --allocator parameter: $MONGO_ALLOCATOR")
+        myenv.FatalError("Invalid --allocator parameter: $MERIZO_ALLOCATOR")
 
     def CheckStdAtomic(context, base_type, extra_message):
         test_body = """
@@ -3410,14 +3410,14 @@ def doConfigure(myenv):
 
     for size in extended_alignment_search_sequence.get(env['TARGET_ARCH'], default_alignment_search_sequence):
         if conf.CheckExtendedAlignment(size):
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
+            conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
             break
 
-    def CheckMongoCMinVersion(context):
+    def CheckMerizoCMinVersion(context):
         compile_test_body = textwrap.dedent("""
         #include <merizoc/merizoc.h>
 
-        #if !MONGOC_CHECK_VERSION(1,13,0)
+        #if !MERIZOC_CHECK_VERSION(1,13,0)
         #error
         #endif
         """)
@@ -3427,10 +3427,10 @@ def doConfigure(myenv):
         context.Result(result)
         return result
 
-    conf.AddTest('CheckMongoCMinVersion', CheckMongoCMinVersion)
+    conf.AddTest('CheckMerizoCMinVersion', CheckMerizoCMinVersion)
 
     if env.TargetOSIs('darwin'):
-        def CheckMongoCFramework(context):
+        def CheckMerizoCFramework(context):
             context.Message("Checking for merizoc_get_major_version() in darwin framework merizoc...")
             test_body = """
             #include <merizoc/merizoc.h>
@@ -3449,10 +3449,10 @@ def doConfigure(myenv):
             context.env['FRAMEWORKS'] = lastFRAMEWORKS
             return result
 
-        conf.AddTest('CheckMongoCFramework', CheckMongoCFramework)
+        conf.AddTest('CheckMerizoCFramework', CheckMerizoCFramework)
 
     merizoc_mode = get_option('use-system-merizo-c')
-    conf.env['MONGO_HAVE_LIBMONGOC'] = False
+    conf.env['MERIZO_HAVE_LIBMERIZOC'] = False
     if merizoc_mode != 'off':
         if conf.CheckLibWithHeader(
                 ["merizoc-1.0"],
@@ -3460,12 +3460,12 @@ def doConfigure(myenv):
                 "C",
                 "merizoc_get_major_version();",
                 autoadd=False ):
-            conf.env['MONGO_HAVE_LIBMONGOC'] = "library"
-        if not conf.env['MONGO_HAVE_LIBMONGOC'] and env.TargetOSIs('darwin') and conf.CheckMongoCFramework():
-            conf.env['MONGO_HAVE_LIBMONGOC'] = "framework"
-        if not conf.env['MONGO_HAVE_LIBMONGOC'] and merizoc_mode == 'on':
+            conf.env['MERIZO_HAVE_LIBMERIZOC'] = "library"
+        if not conf.env['MERIZO_HAVE_LIBMERIZOC'] and env.TargetOSIs('darwin') and conf.CheckMerizoCFramework():
+            conf.env['MERIZO_HAVE_LIBMERIZOC'] = "framework"
+        if not conf.env['MERIZO_HAVE_LIBMERIZOC'] and merizoc_mode == 'on':
             myenv.ConfError("Failed to find the required C driver headers")
-        if conf.env['MONGO_HAVE_LIBMONGOC'] and not conf.CheckMongoCMinVersion():
+        if conf.env['MERIZO_HAVE_LIBMERIZOC'] and not conf.CheckMerizoCMinVersion():
             myenv.ConfError("Version of merizoc is too old. Version 1.13+ required")
 
     # ask each module to configure itself and the build environment.
@@ -3473,7 +3473,7 @@ def doConfigure(myenv):
 
     # Resolve --enable-free-mon
     if free_monitoring == "auto":
-        if 'enterprise' not in env['MONGO_MODULES']:
+        if 'enterprise' not in env['MERIZO_MODULES']:
             free_monitoring = "on"
         else:
             free_monitoring = "off"
@@ -3550,7 +3550,7 @@ def doConfigure(myenv):
 
         outputIndex = next((idx for idx in [0,1] if conf.CheckAltivecVbpermqOutput(idx)), None)
         if outputIndex is not None:
-	    conf.env.SetConfigHeaderDefine("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", outputIndex)
+	    conf.env.SetConfigHeaderDefine("MERIZO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", outputIndex)
         else:
             myenv.ConfError("Running on ppc64le, but can't find a correct vec_vbpermq output index.  Compiler or platform not supported")
 
@@ -3661,7 +3661,7 @@ env.AlwaysBuild( "lint" )
 #  ----  INSTALL -------
 
 def getSystemInstallName():
-    arch_name = env.subst('$MONGO_DISTARCH')
+    arch_name = env.subst('$MERIZO_DISTARCH')
 
     # We need to make sure the directory names inside dist tarballs are permanently
     # consistent, even if the target OS name used in scons is different. Any differences
@@ -3678,7 +3678,7 @@ def getSystemInstallName():
     if len(merizo_modules):
             n += "-" + "-".join(m.name for m in merizo_modules)
 
-    dn = env.subst('$MONGO_DISTMOD')
+    dn = env.subst('$MERIZO_DISTMOD')
     if len(dn) > 0:
         n = n + "-" + dn
 
@@ -3687,11 +3687,11 @@ def getSystemInstallName():
 # This function will add the version.txt file to the source tarball
 # so that versioning will work without having the git repo available.
 def add_version_to_distsrc(env, archive):
-    version_file_path = env.subst("$MONGO_DIST_SRC_PREFIX") + "version.json"
+    version_file_path = env.subst("$MERIZO_DIST_SRC_PREFIX") + "version.json"
     if version_file_path not in archive:
         version_data = {
-            'version': env['MONGO_VERSION'],
-            'githash': env['MONGO_GIT_HASH'],
+            'version': env['MERIZO_VERSION'],
+            'githash': env['MERIZO_GIT_HASH'],
         }
         archive.append_file_contents(
             version_file_path,
@@ -3705,7 +3705,7 @@ def add_version_to_distsrc(env, archive):
 
 env.AddDistSrcCallback(add_version_to_distsrc)
 
-env['SERVER_DIST_BASENAME'] = env.subst('merizodb-%s-$MONGO_DISTNAME' % (getSystemInstallName()))
+env['SERVER_DIST_BASENAME'] = env.subst('merizodb-%s-$MERIZO_DISTNAME' % (getSystemInstallName()))
 
 module_sconscripts = moduleconfig.get_module_sconscripts(merizo_modules)
 
@@ -3732,9 +3732,9 @@ Export("ssl_provider")
 Export("free_monitoring")
 Export("http_client")
 
-def injectMongoIncludePaths(thisEnv):
+def injectMerizoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
-env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
+env.AddMethod(injectMerizoIncludePaths, 'InjectMerizoIncludePaths')
 
 def injectModule(env, module, **kwargs):
     injector = env['MODULE_INJECTORS'].get(module)
@@ -3753,17 +3753,17 @@ vcxprojFile = env.Command(
     r"$PYTHON buildscripts\make_vcxproj.py merizodb")
 vcxproj = env.Alias("vcxproj", vcxprojFile)
 
-distSrc = env.DistSrc("merizodb-src-${MONGO_VERSION}.tar")
+distSrc = env.DistSrc("merizodb-src-${MERIZO_VERSION}.tar")
 env.NoCache(distSrc)
 env.Alias("distsrc-tar", distSrc)
 
 distSrcGzip = env.GZip(
-    target="merizodb-src-${MONGO_VERSION}.tgz",
+    target="merizodb-src-${MERIZO_VERSION}.tgz",
     source=[distSrc])
 env.NoCache(distSrcGzip)
 env.Alias("distsrc-tgz", distSrcGzip)
 
-distSrcZip = env.DistSrc("merizodb-src-${MONGO_VERSION}.zip")
+distSrcZip = env.DistSrc("merizodb-src-${MERIZO_VERSION}.zip")
 env.NoCache(distSrcZip)
 env.Alias("distsrc-zip", distSrcZip)
 

@@ -33,7 +33,7 @@ ops[40] = {
     key: {y: 1}
 };
 
-res = benchRun({ops: ops, parallel: 5, seconds: 20, host: db.getMongo().host});
+res = benchRun({ops: ops, parallel: 5, seconds: 20, host: db.getMerizo().host});
 printjson(res);
 
 assert.eq(10000, t.count());

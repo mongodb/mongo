@@ -43,15 +43,15 @@ var db;
     function runDataConsistencyChecks(testCase) {
         db = testCase.conn.getDB("test");
         try {
-            clearRawMongoProgramOutput();
+            clearRawMerizoProgramOutput();
 
             load("jstests/hooks/run_check_repl_dbhash.js");
             load("jstests/hooks/run_validate_collections.js");
 
-            // We terminate the processes to ensure that the next call to rawMongoProgramOutput()
+            // We terminate the processes to ensure that the next call to rawMerizoProgramOutput()
             // will return all of their output.
             testCase.teardown();
-            return rawMongoProgramOutput();
+            return rawMerizoProgramOutput();
         } finally {
             db = undefined;
         }

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/db/read_concern.h"
 #include "merizo/base/status.h"
@@ -51,7 +51,7 @@ namespace merizo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeLinearizableReadConcern);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeLinearizableReadConcern);
 
 /**
  *  Synchronize writeRequests
@@ -221,7 +221,7 @@ bool shouldIgnorePrepared(PrepareConflictBehavior prepareConflictBehavior,
 }
 }  // namespace
 
-MONGO_REGISTER_SHIM(waitForReadConcern)
+MERIZO_REGISTER_SHIM(waitForReadConcern)
 (OperationContext* opCtx,
  const repl::ReadConcernArgs& readConcernArgs,
  bool allowAfterClusterTime,
@@ -368,7 +368,7 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
     return Status::OK();
 }
 
-MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
+MERIZO_REGISTER_SHIM(waitForLinearizableReadConcern)
 (OperationContext* opCtx, const int readConcernTimeout)->Status {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeLinearizableReadConcern, opCtx, "hangBeforeLinearizableReadConcern", [opCtx]() {
@@ -410,7 +410,7 @@ MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
     return awaitReplResult.status;
 }
 
-MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
+MERIZO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
 (OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo)->Status {
     invariant(speculativeReadInfo.isSpeculativeRead());
 

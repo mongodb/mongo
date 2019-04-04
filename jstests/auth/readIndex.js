@@ -1,5 +1,5 @@
 // SERVER-8625: Test that dbAdmins can view index definitions.
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = MerizoRunner.runMerizod({auth: ""});
 
 var adminDB = conn.getDB("admin");
 var testDB = conn.getDB("testdb");
@@ -19,4 +19,4 @@ var indexList = testDB.foo.getIndexes().filter(function(idx) {
 });
 assert.eq(1, indexList.length, tojson(indexList));
 assert.docEq(indexList[0].key, {a: 1}, tojson(indexList));
-MongoRunner.stopMongod(conn, null, {user: 'root', pwd: 'password'});
+MerizoRunner.stopMerizod(conn, null, {user: 'root', pwd: 'password'});

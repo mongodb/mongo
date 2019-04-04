@@ -108,16 +108,16 @@
     checkOnDiskDatabaseVersion(st.rs0.getSecondary(), dbName, dbEntry1);
     checkOnDiskDatabaseVersion(st.rs1.getSecondary(), dbName, undefined);
 
-    // Make "staleMongos" load the stale database info into memory.
-    const freshMongos = st.s0;
-    const staleMongos = st.s1;
-    staleMongos.getDB(dbName).runCommand({listCollections: 1});
+    // Make "staleMerizos" load the stale database info into memory.
+    const freshMerizos = st.s0;
+    const staleMerizos = st.s1;
+    staleMerizos.getDB(dbName).runCommand({listCollections: 1});
 
     // Run movePrimary to ensure the movePrimary critical section clears the in-memory cache on the
     // old primary shard.
     jsTest.log("About to do movePrimary");
-    assert.commandWorked(freshMongos.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
-    const dbEntry2 = freshMongos.getDB("config").getCollection("databases").findOne({_id: dbName});
+    assert.commandWorked(freshMerizos.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+    const dbEntry2 = freshMerizos.getDB("config").getCollection("databases").findOne({_id: dbName});
     assert.eq(dbEntry2.version.uuid, dbEntry1.version.uuid);
     assert.eq(dbEntry2.version.lastMod, dbEntry1.version.lastMod + 1);
 
@@ -144,7 +144,7 @@
     // once the stale merizos refreshes, it should cause the new primary shard's secondary to provoke
     // the new primary shard's primary to refresh.
     jsTest.log("About to do listCollections with readPref=secondary after movePrimary");
-    assert.commandWorked(staleMongos.getDB(dbName).runCommand(
+    assert.commandWorked(staleMerizos.getDB(dbName).runCommand(
         {listCollections: 1, $readPreference: {mode: "secondary"}, readConcern: {level: "local"}}));
 
     // All nodes should have refreshed.
@@ -160,7 +160,7 @@
     // Ensure that dropping the database drops it from all shards, which clears their in-memory
     // caches but not their on-disk caches.
     jsTest.log("About to drop database from the cluster");
-    assert.commandWorked(freshMongos.getDB(dbName).runCommand({dropDatabase: 1}));
+    assert.commandWorked(freshMerizos.getDB(dbName).runCommand({dropDatabase: 1}));
 
     // Ensure the drop has replicated to all nodes.
     st.rs0.awaitReplication();

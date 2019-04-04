@@ -69,11 +69,11 @@ class ServiceEntryPoint;
 namespace transport {
 
 // This fail point simulates reads and writes that always return 1 byte and fail with EAGAIN
-MONGO_FAIL_POINT_DECLARE(transportLayerASIOshortOpportunisticReadWrite);
+MERIZO_FAIL_POINT_DECLARE(transportLayerASIOshortOpportunisticReadWrite);
 
 // This fail point will cause an asyncConnect to timeout after it's successfully connected
 // to the remote peer
-MONGO_FAIL_POINT_DECLARE(transportLayerASIOasyncConnectTimesOut);
+MERIZO_FAIL_POINT_DECLARE(transportLayerASIOasyncConnectTimesOut);
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
@@ -156,7 +156,7 @@ private:
                                                  const HostAndPort& peer,
                                                  const Milliseconds& timeout);
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     SSLParams::SSLModes _sslMode() const;
 #endif
 
@@ -188,7 +188,7 @@ private:
     std::shared_ptr<ASIOReactor> _egressReactor;
     std::shared_ptr<ASIOReactor> _acceptorReactor;
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     std::unique_ptr<asio::ssl::context> _ingressSSLContext;
     std::unique_ptr<asio::ssl::context> _egressSSLContext;
 #endif

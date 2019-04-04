@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -82,31 +82,31 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
 Status IndexBuildsCoordinatorEmbedded::commitIndexBuild(OperationContext* opCtx,
                                                         const std::vector<BSONObj>& specs,
                                                         const UUID& buildUUID) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void IndexBuildsCoordinatorEmbedded::signalChangeToPrimaryMode() {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void IndexBuildsCoordinatorEmbedded::signalChangeToSecondaryMode() {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void IndexBuildsCoordinatorEmbedded::signalChangeToInitialSyncMode() {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Status IndexBuildsCoordinatorEmbedded::voteCommitIndexBuild(const UUID& buildUUID,
                                                             const HostAndPort& hostAndPort) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Status IndexBuildsCoordinatorEmbedded::setCommitQuorum(OperationContext* opCtx,
                                                        const NamespaceString& nss,
                                                        const std::vector<StringData>& indexNames,
                                                        const CommitQuorumOptions& newCommitQuorum) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

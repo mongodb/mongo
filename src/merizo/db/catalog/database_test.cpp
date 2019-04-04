@@ -66,7 +66,7 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
 }
 
-class DatabaseTest : public ServiceContextMongoDTest {
+class DatabaseTest : public ServiceContextMerizoDTest {
 private:
     void setUp() override;
     void tearDown() override;
@@ -78,7 +78,7 @@ protected:
 
 void DatabaseTest::setUp() {
     // Set up merizod.
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
@@ -115,7 +115,7 @@ void DatabaseTest::tearDown() {
     repl::DropPendingCollectionReaper::set(service, {});
     repl::StorageInterface::set(service, {});
 
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPendingState) {

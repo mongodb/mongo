@@ -5,7 +5,7 @@ assert(db.getName() == "test");
 t = db.bg1;
 t.drop();
 
-var a = new Mongo(db.getMongo().host).getDB(db.getName());
+var a = new Merizo(db.getMerizo().host).getDB(db.getName());
 
 var bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < 100000; i++) {

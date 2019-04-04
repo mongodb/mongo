@@ -11,7 +11,7 @@
     'use strict';
 
     const options = {setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'};
-    const conn = MongoRunner.runMongod(options);
+    const conn = MerizoRunner.runMerizod(options);
     assert.neq(null, conn, 'merizod was unable to start up with options: ' + tojson(options));
 
     const testDB = conn.getDB('test');
@@ -99,5 +99,5 @@
         numResults: 25
     });
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

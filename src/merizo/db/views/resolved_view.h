@@ -72,7 +72,7 @@ public:
     }
 
     // ErrorExtraInfo API
-    static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
+    static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod;
     void serialize(BSONObjBuilder* bob) const final;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 

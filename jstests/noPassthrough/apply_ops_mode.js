@@ -8,7 +8,7 @@
     'use strict';
     load('jstests/libs/feature_compatibility_version.js');
 
-    var standalone = MongoRunner.runMongod();
+    var standalone = MerizoRunner.runMerizod();
     var db = standalone.getDB("test");
 
     var coll = db.getCollection("apply_ops_mode1");
@@ -90,5 +90,5 @@
         applyOps: [collModOp],
     }));
 
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 })();

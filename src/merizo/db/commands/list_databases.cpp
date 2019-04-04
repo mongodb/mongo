@@ -49,7 +49,7 @@ static const StringData kNameField{"name"};
 static const StringData kNameOnlyField{"nameOnly"};
 
 // Failpoint which causes to hang "listDatabases" cmd after acquiring global lock in IS mode.
-MONGO_FAIL_POINT_DEFINE(hangBeforeListDatabases);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeListDatabases);
 }  // namespace
 
 using std::set;

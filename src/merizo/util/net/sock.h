@@ -58,7 +58,7 @@
 
 namespace merizo {
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 class SSLManagerInterface;
 class SSLConnectionInterface;
 #endif
@@ -175,7 +175,7 @@ public:
         return _awaitingHandshake;
     }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     /** secures inline
      *  ssl - Pointer to the global SSLManager.
      *  remoteHost - The hostname of the remote server.
@@ -232,7 +232,7 @@ private:
     long long _bytesOut;
     time_t _lastValidityCheckAtSecs;
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     std::unique_ptr<SSLConnectionInterface> _sslConnection;
     SSLManagerInterface* _sslManager;
 #endif

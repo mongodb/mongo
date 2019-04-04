@@ -42,7 +42,7 @@ namespace merizo {
 namespace {
 
 /**
- * getDiagnosticData is a MongoD only command. We implement in MongoS to give users a better error
+ * getDiagnosticData is a MerizoD only command. We implement in MerizoS to give users a better error
  * message.
  */
 class GetDiagnosticDataCommand final : public ErrmsgCommandDeprecated {
@@ -109,7 +109,7 @@ public:
 
 Command* ftdcCommand;
 
-MONGO_INITIALIZER(CreateDiagnosticDataCommand)(InitializerContext* context) {
+MERIZO_INITIALIZER(CreateDiagnosticDataCommand)(InitializerContext* context) {
     ftdcCommand = new GetDiagnosticDataCommand();
 
     return Status::OK();

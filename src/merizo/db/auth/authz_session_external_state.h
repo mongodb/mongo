@@ -50,7 +50,7 @@ class AuthzSessionExternalState {
     AuthzSessionExternalState& operator=(const AuthzSessionExternalState&) = delete;
 
 public:
-    static MONGO_DECLARE_SHIM(
+    static MERIZO_DECLARE_SHIM(
         (AuthorizationManager * authzManager)->std::unique_ptr<AuthzSessionExternalState>) create;
 
     virtual ~AuthzSessionExternalState();

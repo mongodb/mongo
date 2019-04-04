@@ -154,7 +154,7 @@ load("jstests/libs/fixture_helpers.js");
     // Test on collection with no indexes.  The local database is not accessible via merizos.
     //
 
-    if (!FixtureHelpers.isMongos(db)) {
+    if (!FixtureHelpers.isMerizos(db)) {
         let localColl = db.getSiblingDB("local").getCollection("list_indexes1");
         localColl.drop();
         assert.commandWorked(

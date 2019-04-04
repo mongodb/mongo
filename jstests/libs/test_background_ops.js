@@ -88,9 +88,9 @@ function startParallelShell(jsCode, port) {
 
     var x;
     if (port) {
-        x = startMongoProgramNoConnect("merizo", "--port", port, "--eval", jsCode);
+        x = startMerizoProgramNoConnect("merizo", "--port", port, "--eval", jsCode);
     } else {
-        x = startMongoProgramNoConnect("merizo", "--eval", jsCode, db ? db.getMongo().host : null);
+        x = startMerizoProgramNoConnect("merizo", "--eval", jsCode, db ? db.getMerizo().host : null);
     }
 
     return function() {
@@ -123,16 +123,16 @@ startParallelOps = function(merizo, proc, args, context) {
         setup: function(context, stored) {
 
             waitForLock = function() {
-                return context.waitForLock(db.getMongo(), context.procName);
+                return context.waitForLock(db.getMerizo(), context.procName);
             };
             setFinished = function(finished) {
-                return context.setFinished(db.getMongo(), context.procName, finished);
+                return context.setFinished(db.getMerizo(), context.procName, finished);
             };
             isFinished = function() {
-                return context.isFinished(db.getMongo(), context.procName);
+                return context.isFinished(db.getMerizo(), context.procName);
             };
             setResult = function(result, err) {
-                return context.setResult(db.getMongo(), context.procName, result, err);
+                return context.setResult(db.getMerizo(), context.procName, result, err);
             };
         }
     };
@@ -187,7 +187,7 @@ startParallelOps = function(merizo, proc, args, context) {
     assert.eq(null, testDataColl.getDB().getLastError());
 
     var bootstrapStartup = "{ var procName = '" + procName + "'; " +
-        "var stored = db.getMongo().getCollection( '" + testDataColl + "' )" +
+        "var stored = db.getMerizo().getCollection( '" + testDataColl + "' )" +
         ".findOne({ _id : procName }); " + "var bootstrapper = stored.bootstrapper; " +
         "eval( 'bootstrapper = ' + bootstrapper ); " + "bootstrapper( stored ); " + "}";
 
@@ -293,8 +293,8 @@ var RandomFunctionContext = function(context) {
 function moveOps(collName, options) {
     options = options || {};
 
-    var admin = db.getMongo().getDB("admin");
-    var config = db.getMongo().getDB("config");
+    var admin = db.getMerizo().getDB("admin");
+    var config = db.getMerizo().getDB("config");
     var shards = config.shards.find().toArray();
     var shardKey = config.collections.findOne({_id: collName}).key;
 
@@ -317,8 +317,8 @@ function moveOps(collName, options) {
 function splitOps(collName, options) {
     options = options || {};
 
-    var admin = db.getMongo().getDB("admin");
-    var config = db.getMongo().getDB("config");
+    var admin = db.getMerizo().getDB("admin");
+    var config = db.getMerizo().getDB("config");
     var shards = config.shards.find().toArray();
     var shardKey = config.collections.findOne({_id: collName}).key;
 

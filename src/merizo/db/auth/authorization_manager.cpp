@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -101,6 +101,6 @@ const int AuthorizationManager::schemaVersion26Upgrade;
 const int AuthorizationManager::schemaVersion26Final;
 const int AuthorizationManager::schemaVersion28SCRAM;
 
-MONGO_DEFINE_SHIM(AuthorizationManager::create);
+MERIZO_DEFINE_SHIM(AuthorizationManager::create);
 
 }  // namespace merizo

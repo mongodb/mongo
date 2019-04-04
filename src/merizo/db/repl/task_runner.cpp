@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -131,7 +131,7 @@ void TaskRunner::join() {
 }
 
 void TaskRunner::_runTasks() {
-    // We initialize cc() because ServiceContextMongoD::_newOpCtx() expects cc() to be equal to the
+    // We initialize cc() because ServiceContextMerizoD::_newOpCtx() expects cc() to be equal to the
     // client used to create the operation context.
     Client* client = &cc();
     if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {

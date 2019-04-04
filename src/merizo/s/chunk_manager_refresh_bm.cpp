@@ -320,7 +320,7 @@ void BM_RangeOverlapsChunk(benchmark::State& state,
     benchmark::RegisterBenchmark(#func "/" #test_case_name,   \
                                  [](benchmark::State& state) { func(state, __VA_ARGS__); })
 
-MONGO_INITIALIZER(RegisterBenchmarks)(InitializerContext* context) {
+MERIZO_INITIALIZER(RegisterBenchmarks)(InitializerContext* context) {
     std::initializer_list<benchmark::internal::Benchmark*> bmCases{
         REGISTER_BENCHMARK_CAPTURE(BM_FullBuildOfChunkManager, Pessimal, pessimalShardSelector),
         REGISTER_BENCHMARK_CAPTURE(BM_FullBuildOfChunkManager, Optimal, optimalShardSelector),

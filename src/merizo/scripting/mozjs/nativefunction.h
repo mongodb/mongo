@@ -58,7 +58,7 @@ struct NativeFunctionInfo : public BaseInfo {
     static const InstallType installType = InstallType::Private;
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(toString);
+        MERIZO_DECLARE_JS_FUNCTION(toString);
     };
 
     static const JSFunctionSpec methods[2];

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -298,7 +298,7 @@ void execCommandClient(OperationContext* opCtx,
 
         auto body = result->getBodyBuilder();
 
-        MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
+        MERIZO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
             return CommandHelpers::shouldActivateFailCommandFailPoint(
                        data, request.getCommandName(), opCtx->getClient()) &&
                 data.hasField("writeConcernError");
@@ -320,7 +320,7 @@ void execCommandClient(OperationContext* opCtx,
     }
 }
 
-MONGO_FAIL_POINT_DEFINE(doNotRefreshShardsOnRetargettingError);
+MERIZO_FAIL_POINT_DEFINE(doNotRefreshShardsOnRetargettingError);
 
 /**
  * Executes the command for the given request, and appends the result to replyBuilder
@@ -482,7 +482,7 @@ void runCommand(OperationContext* opCtx,
                 // under a transaction (see the invariant inside ShardConnection). Because of this,
                 // the retargeting error could not have come from a ShardConnection, so we don't
                 // need to reset the connection's in-memory state.
-                if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError) &&
+                if (!MERIZO_FAIL_POINT(doNotRefreshShardsOnRetargettingError) &&
                     !TransactionRouter::get(opCtx)) {
                     ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
                 }
@@ -582,14 +582,14 @@ void runCommand(OperationContext* opCtx,
                 }
                 throw;
             }
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
     } catch (const DBException& e) {
         command->incrementCommandsFailed();
         LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
         // hasWriteConcernError is set to false because:
         // 1. TransientTransaction error label handling for commitTransaction command in merizos is
-        //    delegated to the shards. Mongos simply propagates the shard's response up to the
+        //    delegated to the shards. Merizos simply propagates the shard's response up to the
         //    client.
         // 2. For other commands in a transaction, they shouldn't get a writeConcern error so
         //    this setting doesn't apply.
@@ -686,7 +686,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     try {
         cursorId = ClusterFind::runQuery(
             opCtx, *canonicalQuery, ReadPreferenceSetting::get(opCtx), &batch);
-    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
+    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>&) {
         uasserted(40247, "OP_QUERY not supported on views");
     }
 
@@ -906,7 +906,7 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
                            return DeleteOp::parseLegacy(msg).serialize({});
                        }
                        default:
-                           MONGO_UNREACHABLE;
+                           MERIZO_UNREACHABLE;
                    }
                }(),
                msg.operation(),
@@ -964,7 +964,7 @@ void Strategy::explainFind(OperationContext* opCtx,
             // under a transaction (see the invariant inside ShardConnection). Because of this, the
             // retargeting error could not have come from a ShardConnection, so we don't need to
             // reset the connection's in-memory state.
-            if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError) &&
+            if (!MERIZO_FAIL_POINT(doNotRefreshShardsOnRetargettingError) &&
                 !TransactionRouter::get(opCtx)) {
                 ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
             }

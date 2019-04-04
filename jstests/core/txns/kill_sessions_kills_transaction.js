@@ -19,7 +19,7 @@
     assert.commandWorked(bulk.execute({w: "majority"}));
 
     jsTest.log("Test that killing a session kills an inactive transaction.");
-    let session = db.getMongo().startSession(sessionOptions);
+    let session = db.getMerizo().startSession(sessionOptions);
     let sessionDb = session.getDatabase(dbName);
     let sessionColl = sessionDb[collName];
 
@@ -32,7 +32,7 @@
     session.endSession();
 
     jsTest.log("killSessions must not block on locks held by a transaction it plans to kill.");
-    session = db.getMongo().startSession(sessionOptions);
+    session = db.getMerizo().startSession(sessionOptions);
     sessionDb = session.getDatabase(dbName);
     sessionColl = sessionDb[collName];
 

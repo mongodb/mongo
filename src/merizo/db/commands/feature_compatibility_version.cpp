@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -200,7 +200,7 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
             return;
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior:
             // getVersion() does not return this value.
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -298,7 +298,7 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
             return;
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault40Behavior:
             // getVersion() does not return this value.
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

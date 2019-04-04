@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -40,19 +40,19 @@ namespace merizo {
 
 using std::unique_ptr;
 
-MONGO_FAIL_POINT_DEFINE(dummy);  // used by tests in jstests/fail_point
+MERIZO_FAIL_POINT_DEFINE(dummy);  // used by tests in jstests/fail_point
 
 unique_ptr<FailPointRegistry> _fpRegistry(nullptr);
 
-MONGO_INITIALIZER_GENERAL(FailPointRegistry,
-                          MONGO_NO_PREREQUISITES,
+MERIZO_INITIALIZER_GENERAL(FailPointRegistry,
+                          MERIZO_NO_PREREQUISITES,
                           ("BeginGeneralStartupOptionRegistration"))
 (InitializerContext* context) {
     _fpRegistry.reset(new FailPointRegistry());
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
+MERIZO_INITIALIZER_GENERAL(AllFailPointsRegistered, MERIZO_NO_PREREQUISITES, MERIZO_NO_DEPENDENTS)
 (InitializerContext* context) {
     _fpRegistry->freeze();
     return Status::OK();

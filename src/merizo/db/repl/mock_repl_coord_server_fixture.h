@@ -45,7 +45,7 @@ class StorageInterfaceMock;
  * This is a basic fixture that is backed by an ephemeral storage engine and a mock replication
  * coordinator that is running as primary.
  */
-class MockReplCoordServerFixture : public ServiceContextMongoDTest {
+class MockReplCoordServerFixture : public ServiceContextMerizoDTest {
 public:
     void setUp() override;
 

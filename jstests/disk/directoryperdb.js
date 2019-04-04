@@ -1,6 +1,6 @@
 var baseDir = 'jstests_disk_directoryper';
 var baseName = 'directoryperdb';
-var dbpath = MongoRunner.dataPath + baseDir + '/';
+var dbpath = MerizoRunner.dataPath + baseDir + '/';
 var storageEngine = db.serverStatus().storageEngine.name;
 
 // The pattern which matches the names of database files
@@ -25,8 +25,8 @@ assertDocumentCount = function(db, count) {
  */
 checkDBFilesInDBDirectory = function(conn, dbToCheck) {
     if (storageEngine == 'wiredTiger') {
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', restart: true});
+        MerizoRunner.stopMerizod(conn);
+        conn = MerizoRunner.runMerizod({dbpath: dbpath, directoryperdb: '', restart: true});
     }
 
     var dir = dbpath + dbToCheck;
@@ -60,8 +60,8 @@ checkDBFilesInDBDirectory = function(conn, dbToCheck) {
  */
 checkDBDirectoryNonexistent = function(conn, dbToCheck) {
     if (storageEngine == 'wiredTiger') {
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', restart: true});
+        MerizoRunner.stopMerizod(conn);
+        conn = MerizoRunner.runMerizod({dbpath: dbpath, directoryperdb: '', restart: true});
     }
 
     var files = listFiles(dbpath);
@@ -93,7 +93,7 @@ checkDBDirectoryNonexistent = function(conn, dbToCheck) {
 };
 
 // Start the directoryperdb instance of merizod.
-var m = MongoRunner.runMongod({storageEngine: storageEngine, dbpath: dbpath, directoryperdb: ''});
+var m = MerizoRunner.runMerizod({storageEngine: storageEngine, dbpath: dbpath, directoryperdb: ''});
 // Check that the 'local' db has allocated data.
 m = checkDBFilesInDBDirectory(m, 'local');
 
@@ -155,4 +155,4 @@ if (!_isWindows()) {
     assertDocumentCount(dbUU, 1);
     m = checkDBFilesInDBDirectory(m, dbUU);
 }
-MongoRunner.stopMongod(m);
+MerizoRunner.stopMerizod(m);

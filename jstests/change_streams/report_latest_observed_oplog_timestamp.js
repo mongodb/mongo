@@ -47,9 +47,9 @@
     const cursorResponse = assert.commandWorked(cursorCollection.runCommand({
         aggregate: testName,
         // The latest observed optime is only reported when needsMerge is set, and needsMerge
-        // requires fromMongos be set.
+        // requires fromMerizos be set.
         needsMerge: true,
-        fromMongos: true,
+        fromMerizos: true,
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
         cursor: {batchSize: batchSize}
     }));

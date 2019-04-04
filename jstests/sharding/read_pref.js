@@ -23,7 +23,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         // The $-prefixed query syntax is only legal for compatibility mode reads, not for the
         // find/getMore commands.
-        if (useDollarQuerySyntax && st.s.getDB("test").getMongo().useReadCommands()) {
+        if (useDollarQuerySyntax && st.s.getDB("test").getMerizo().useReadCommands()) {
             st.stop();
             return;
         }
@@ -82,7 +82,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // Wait until the ReplicaSetMonitor refreshes its view and see the tags
         var replConfig = replTest.getReplSetConfigFromNode();
         replConfig.members.forEach(function(node) {
-            var nodeConn = new Mongo(node.host);
+            var nodeConn = new Merizo(node.host);
             awaitRSClientHosts(conn, nodeConn, {ok: true, tags: node.tags}, replTest);
         });
         replTest.awaitReplication();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -77,7 +77,7 @@ void attachWriteConcern(BatchedCommandRequest* request, const WriteConcernOption
 
 }  // namespace
 
-void MongoInterfaceShardServer::checkRoutingInfoEpochOrThrow(
+void MerizoInterfaceShardServer::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     ChunkVersion targetCollectionVersion) const {
@@ -86,7 +86,7 @@ void MongoInterfaceShardServer::checkRoutingInfoEpochOrThrow(
 }
 
 std::pair<std::vector<FieldPath>, bool>
-MongoInterfaceShardServer::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
+MerizoInterfaceShardServer::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
                                                                        const NamespaceString& nss,
                                                                        UUID uuid) const {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
@@ -110,7 +110,7 @@ MongoInterfaceShardServer::collectDocumentKeyFieldsForHostedCollection(Operation
     return {_shardKeyToDocumentKeyFields(metadata->getKeyPatternFields()), true};
 }
 
-void MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void MerizoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        const NamespaceString& ns,
                                        std::vector<BSONObj>&& objs,
                                        const WriteConcernOptions& wc,
@@ -130,7 +130,7 @@ void MongoInterfaceShardServer::insert(const boost::intrusive_ptr<ExpressionCont
     uassertStatusOKWithContext(response.toStatus(), "Insert failed: ");
 }
 
-void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void MerizoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        const NamespaceString& ns,
                                        std::vector<BSONObj>&& queries,
                                        std::vector<BSONObj>&& updates,
@@ -157,7 +157,7 @@ void MongoInterfaceShardServer::update(const boost::intrusive_ptr<ExpressionCont
     uassertStatusOKWithContext(response.toStatus(), "Update failed: ");
 }
 
-unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSourceToPipeline(
+unique_ptr<Pipeline, PipelineDeleter> MerizoInterfaceShardServer::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
@@ -203,7 +203,7 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceShardServer::attachCursorSou
     // this function, to be sure the collection didn't become sharded between the time we checked
     // whether it's sharded and the time we took the lock.
 
-    return MongoInterfaceStandalone::attachCursorSourceToPipeline(expCtx, pipeline.release());
+    return MerizoInterfaceStandalone::attachCursorSourceToPipeline(expCtx, pipeline.release());
 }
 
 }  // namespace merizo

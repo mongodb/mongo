@@ -5,7 +5,7 @@
 // cannot be used to transition from disabled/keyFile modes
 function testTransition(newSSLMode, newClusterAuthMode) {
     // If no parameters are given sslMode defaults to disabled
-    var conn = MongoRunner.runMongod({clusterAuthMode: "keyFile"});
+    var conn = MerizoRunner.runMerizod({clusterAuthMode: "keyFile"});
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ["root"]});
     adminDB.auth("root", "pwd");
@@ -14,7 +14,7 @@ function testTransition(newSSLMode, newClusterAuthMode) {
 
     var res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newClusterAuthMode});
     assert.commandFailedWithCode(res, ErrorCodes.BadValue);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }
 
 testTransition("allowSSL", "sendKeyFile");

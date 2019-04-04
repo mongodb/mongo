@@ -35,11 +35,11 @@ namespace merizo {
  * Start Full Time Data Capture
  * Starts 1 thread.
  */
-void startMongoDFTDC();
+void startMerizoDFTDC();
 
 /**
  * Stop Full Time Data Capture
  */
-void stopMongoDFTDC();
+void stopMerizoDFTDC();
 
 }  // namespace merizo

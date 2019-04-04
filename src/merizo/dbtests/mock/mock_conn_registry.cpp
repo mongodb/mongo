@@ -40,7 +40,7 @@ using std::string;
 
 std::unique_ptr<MockConnRegistry> MockConnRegistry::_instance;
 
-MONGO_INITIALIZER(MockConnRegistry)(InitializerContext* context) {
+MERIZO_INITIALIZER(MockConnRegistry)(InitializerContext* context) {
     return MockConnRegistry::init();
 }
 

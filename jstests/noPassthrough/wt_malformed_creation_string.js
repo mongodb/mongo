@@ -23,11 +23,11 @@
     runTest();
 
     function runTest() {
-        var dbpath = MongoRunner.dataPath + 'wt_malformed_creation_string';
+        var dbpath = MerizoRunner.dataPath + 'wt_malformed_creation_string';
         resetDbpath(dbpath);
 
         // Start a merizod
-        var conn = MongoRunner.runMongod({
+        var conn = MerizoRunner.runMerizod({
             dbpath: dbpath,
             noCleanData: true,
         });
@@ -55,6 +55,6 @@
                                          ErrorCodes.FailedToParse);
         }
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     }
 })();

@@ -55,7 +55,7 @@
     assert.commandWorked(s.s0.adminCommand({
         movechunk: "test.foo",
         find: {num: 1},
-        to: secondary.getMongo().name,
+        to: secondary.getMerizo().name,
         _waitForDelete: true
     }));
     assert.eq(2, secondary.foo.find().length(), "secondary should have 2 after move shard");
@@ -220,7 +220,7 @@
     assert.commandWorked(s.s0.adminCommand({
         movechunk: "test.foo",
         find: {num: -2},
-        to: secondary.getMongo().name,
+        to: secondary.getMerizo().name,
         _waitForDelete: true
     }));
     assert.eq(1, s.onNumShards("foo"), "on 1 shards");
@@ -228,7 +228,7 @@
     assert.commandWorked(s.s0.adminCommand({
         movechunk: "test.foo",
         find: {num: -2},
-        to: primary.getMongo().name,
+        to: primary.getMerizo().name,
         _waitForDelete: true
     }));
     assert.eq(2, s.onNumShards("foo"), "on 2 shards again");

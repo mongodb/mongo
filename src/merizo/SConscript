@@ -17,7 +17,7 @@ Import("wiredtiger")
 
 env = env.Clone()
 
-env.InjectMongoIncludePaths()
+env.InjectMerizoIncludePaths()
 
 env.SConscript(
     dirs=[
@@ -163,7 +163,7 @@ cmd_line = " ".join(sys.argv).encode('string-escape')
 if env.TargetOSIs('windows'):
     cmd_line = cmd_line.replace('\\', r'\\')
 
-module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODULES'] ])
+module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MERIZO_MODULES'] ])
 
 # This generates a numeric representation of the version string so that
 # you can easily compare versions of MerizoDB without having to parse
@@ -183,7 +183,7 @@ module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODUL
 # 3.1.1         = 3010199
 #
 version_parts = [ x for x in re.match(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?',
-    env['MONGO_VERSION']).groups() ]
+    env['MERIZO_VERSION']).groups() ]
 version_extra = version_parts[3] if version_parts[3] else ""
 if version_parts[4] == 'rc':
     version_parts[3] = int(version_parts[5]) + -50
@@ -194,10 +194,10 @@ else:
     version_parts[3] = 0
 version_parts = [ int(x) for x in version_parts[:4]]
 
-# This turns the MONGO_BUILDINFO_ENVIRONMENT_DATA tuples into a std::vector of
+# This turns the MERIZO_BUILDINFO_ENVIRONMENT_DATA tuples into a std::vector of
 # std::tuple<string, string, bool, bool>.
 buildInfoInitializer = []
-for tup in env['MONGO_BUILDINFO_ENVIRONMENT_DATA']:
+for tup in env['MERIZO_BUILDINFO_ENVIRONMENT_DATA']:
     def pyToCXXBool(val):
         return "true" if val else "false"
     def wrapInQuotes(val):
@@ -217,15 +217,15 @@ buildInfoInitializer = '{{ {0} }}'.format(', '.join(buildInfoInitializer))
 generatedVersionFile = env.Substfile(
     'util/version_constants.h.in',
     SUBST_DICT=[
-        ('@merizo_version@', env['MONGO_VERSION']),
+        ('@merizo_version@', env['MERIZO_VERSION']),
         ('@merizo_version_major@', version_parts[0]),
         ('@merizo_version_minor@', version_parts[1]),
         ('@merizo_version_patch@', version_parts[2]),
         ('@merizo_version_extra@', version_parts[3]),
         ('@merizo_version_extra_str@', version_extra),
-        ('@merizo_git_hash@', env['MONGO_GIT_HASH']),
+        ('@merizo_git_hash@', env['MERIZO_GIT_HASH']),
         ('@buildinfo_js_engine@', js_engine_ver),
-        ('@buildinfo_allocator@', env['MONGO_ALLOCATOR']),
+        ('@buildinfo_allocator@', env['MERIZO_ALLOCATOR']),
         ('@buildinfo_modules@', module_list),
         ('@buildinfo_environment_data@', buildInfoInitializer),
     ])
@@ -236,35 +236,35 @@ if env.TargetOSIs('windows'):
     generatedResourceConstantFile = enterpriseEnv.Substfile(
         'util/resource_constants.h.in',
         SUBST_DICT=[
-            ('@merizo_version@', env['MONGO_VERSION']),
+            ('@merizo_version@', env['MERIZO_VERSION']),
             ('@merizo_version_major@', version_parts[0]),
             ('@merizo_version_minor@', version_parts[1]),
             ('@merizo_version_patch@', version_parts[2]),
-            ('@merizo_git_hash@', env['MONGO_GIT_HASH']),
+            ('@merizo_git_hash@', env['MERIZO_GIT_HASH']),
         ])
     env.Alias('generated-sources', generatedResourceConstantFile)
 
 config_header_substs = (
-    ('@merizo_config_altivec_vec_vbpermq_output_index@', 'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
-    ('@merizo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
-    ('@merizo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
-    ('@merizo_config_have_ssl_set_ecdh_auto@', 'MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
-    ('@merizo_config_have_ssl_ec_key_new@', 'MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
-    ('@merizo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
-    ('@merizo_config_have_fips_mode_set@', 'MONGO_CONFIG_HAVE_FIPS_MODE_SET'),
-    ('@merizo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
-    ('@merizo_config_have_memset_s@', 'MONGO_CONFIG_HAVE_MEMSET_S'),
-    ('@merizo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
-    ('@merizo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
-    ('@merizo_config_have_std_enable_if_t@', 'MONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
-    ('@merizo_config_have_std_make_unique@', 'MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
-    ('@merizo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
-    ('@merizo_config_max_extended_alignment@', 'MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
-    ('@merizo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
-    ('@merizo_config_ssl@', 'MONGO_CONFIG_SSL'),
-    ('@merizo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
-    ('@merizo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
-    ('@merizo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
+    ('@merizo_config_altivec_vec_vbpermq_output_index@', 'MERIZO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
+    ('@merizo_config_byte_order@', 'MERIZO_CONFIG_BYTE_ORDER'),
+    ('@merizo_config_debug_build@', 'MERIZO_CONFIG_DEBUG_BUILD'),
+    ('@merizo_config_have_ssl_set_ecdh_auto@', 'MERIZO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
+    ('@merizo_config_have_ssl_ec_key_new@', 'MERIZO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
+    ('@merizo_config_have_execinfo_backtrace@', 'MERIZO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
+    ('@merizo_config_have_fips_mode_set@', 'MERIZO_CONFIG_HAVE_FIPS_MODE_SET'),
+    ('@merizo_config_have_header_unistd_h@', 'MERIZO_CONFIG_HAVE_HEADER_UNISTD_H'),
+    ('@merizo_config_have_memset_s@', 'MERIZO_CONFIG_HAVE_MEMSET_S'),
+    ('@merizo_config_have_posix_monotonic_clock@', 'MERIZO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
+    ('@merizo_config_have_pthread_setname_np@', 'MERIZO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
+    ('@merizo_config_have_std_enable_if_t@', 'MERIZO_CONFIG_HAVE_STD_ENABLE_IF_T'),
+    ('@merizo_config_have_std_make_unique@', 'MERIZO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
+    ('@merizo_config_have_strnlen@', 'MERIZO_CONFIG_HAVE_STRNLEN'),
+    ('@merizo_config_max_extended_alignment@', 'MERIZO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
+    ('@merizo_config_optimized_build@', 'MERIZO_CONFIG_OPTIMIZED_BUILD'),
+    ('@merizo_config_ssl@', 'MERIZO_CONFIG_SSL'),
+    ('@merizo_config_ssl_has_asn1_any_definitions@', 'MERIZO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
+    ('@merizo_config_ssl_provider@', 'MERIZO_CONFIG_SSL_PROVIDER'),
+    ('@merizo_config_wiredtiger_enabled@', 'MERIZO_CONFIG_WIREDTIGER_ENABLED'),
 )
 
 def makeConfigHeaderDefine(self, key):
@@ -540,7 +540,7 @@ env.Library("linenoise_utf8",
 if not has_option('noshell') and usemozjs:
     shell_core_env = env.Clone()
     if has_option("safeshell"):
-        shell_core_env.Append(CPPDEFINES=["MONGO_SAFE_SHELL"])
+        shell_core_env.Append(CPPDEFINES=["MERIZO_SAFE_SHELL"])
     shell_core_env.Library("shell_core",
                 source=[
                     "shell/linenoise.cpp",
@@ -589,7 +589,7 @@ if not has_option('noshell') and usemozjs:
     if env.TargetOSIs('windows'):
         shellEnv.Append(LIBS=["winmm.lib"])
 
-        generatedMongoManifest = shellEnv.Substfile(
+        generatedMerizoManifest = shellEnv.Substfile(
                 'shell/shell.manifest.in',
                 SUBST_DICT=[
                     ('@merizo_version_major@', version_parts[0]),
@@ -598,8 +598,8 @@ if not has_option('noshell') and usemozjs:
                     ('@merizo_version_extra@', version_parts[3]),
                     ('@merizo_version_extra_str@', version_extra),
                 ])
-        shellEnv.Alias('generated-sources', generatedMongoManifest)
-        shellEnv.Depends("shell/shell.res", generatedMongoManifest)
+        shellEnv.Alias('generated-sources', generatedMerizoManifest)
+        shellEnv.Depends("shell/shell.res", generatedMerizoManifest)
 
     merizo_shell = shellEnv.Program(
         "merizo",
@@ -778,7 +778,7 @@ for target in env["DIST_BINARIES"]:
 
 # Set the download url to the right place
 compass_type = 'compass-community'
-if 'enterprise' in env['MONGO_MODULES']:
+if 'enterprise' in env['MERIZO_MODULES']:
     compass_type = 'compass'
 
 compass_script = "install_compass"

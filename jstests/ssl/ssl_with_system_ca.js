@@ -24,7 +24,7 @@
         }`);
 
         // allowSSL to get a non-SSL control connection.
-        const conn = MongoRunner.runMongod(
+        const conn = MerizoRunner.runMerizod(
             {sslMode: 'allowSSL', sslPEMKeyFile: 'jstests/libs/' + prefix + 'server.pem'});
 
         let argv = [
@@ -44,8 +44,8 @@
             argv.unshift("env", "SSL_CERT_FILE=jstests/libs/trusted-ca.pem");
         }
 
-        const exitCode = runMongoProgram.apply(null, argv);
-        MongoRunner.stopMongod(conn);
+        const exitCode = runMerizoProgram.apply(null, argv);
+        MerizoRunner.stopMerizod(conn);
         return exitCode;
     }
 

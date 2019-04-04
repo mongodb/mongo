@@ -74,7 +74,7 @@ public:
             case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42:
                 return kVersion42;
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 };

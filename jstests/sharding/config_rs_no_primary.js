@@ -28,7 +28,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     st.configRS.awaitNoPrimary();
 
     jsTestLog("Starting a new merizos when the config servers have no primary which should work");
-    var merizos2 = MongoRunner.runMongos({configdb: st.configRS.getURL()});
+    var merizos2 = MerizoRunner.runMerizos({configdb: st.configRS.getURL()});
     assert.neq(null, merizos2);
 
     var testOps = function(merizos) {
@@ -56,5 +56,5 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     testOps(st.s);
 
     st.stop();
-    MongoRunner.stopMongos(merizos2);
+    MerizoRunner.stopMerizos(merizos2);
 }());

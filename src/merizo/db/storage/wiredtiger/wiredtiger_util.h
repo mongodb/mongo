@@ -56,7 +56,7 @@ Status wtRCToStatus_slow(int retCode, const char* prefix);
  * converts wiredtiger return codes to merizodb statuses.
  */
 inline Status wtRCToStatus(int retCode, const char* prefix = NULL) {
-    if (MONGO_likely(retCode == 0))
+    if (MERIZO_likely(retCode == 0))
         return Status::OK();
 
     return wtRCToStatus_slow(retCode, prefix);
@@ -65,7 +65,7 @@ inline Status wtRCToStatus(int retCode, const char* prefix = NULL) {
 #define invariantWTOK(expression)                                                       \
     do {                                                                                \
         int _invariantWTOK_retCode = expression;                                        \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                              \
+        if (MERIZO_unlikely(_invariantWTOK_retCode != 0)) {                              \
             invariantOKFailed(                                                          \
                 #expression, wtRCToStatus(_invariantWTOK_retCode), __FILE__, __LINE__); \
         }                                                                               \

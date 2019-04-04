@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -60,7 +60,7 @@ TEST(FailPoint, AlwaysOn) {
     failPoint.setMode(FailPoint::alwaysOn);
     ASSERT(failPoint.shouldFail());
 
-    MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
+    MERIZO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
         ASSERT(scopedFp.getData().isEmpty());
     }
 
@@ -86,7 +86,7 @@ TEST(FailPoint, BlockOff) {
     FailPoint failPoint;
     bool called = false;
 
-    MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
+    MERIZO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
         called = true;
     }
 
@@ -98,7 +98,7 @@ TEST(FailPoint, BlockAlwaysOn) {
     failPoint.setMode(FailPoint::alwaysOn);
     bool called = false;
 
-    MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
+    MERIZO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
         called = true;
     }
 
@@ -111,7 +111,7 @@ TEST(FailPoint, BlockNTimes) {
     size_t counter = 0;
 
     for (size_t x = 0; x < 10; x++) {
-        MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
+        MERIZO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
             counter++;
         }
     }
@@ -125,7 +125,7 @@ TEST(FailPoint, BlockWithException) {
     bool threw = false;
 
     try {
-        MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
+        MERIZO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
             throw std::logic_error("BlockWithException threw");
         }
     } catch (const std::logic_error&) {
@@ -142,7 +142,7 @@ TEST(FailPoint, SetGetParam) {
     FailPoint failPoint;
     failPoint.setMode(FailPoint::alwaysOn, 0, BSON("x" << 20));
 
-    MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
+    MERIZO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
         ASSERT_EQUALS(20, scopedFp.getData()["x"].numberInt());
     }
 }
@@ -181,7 +181,7 @@ public:
 private:
     void blockTask() {
         while (true) {
-            MONGO_FAIL_POINT_BLOCK(_fp, scopedFp) {
+            MERIZO_FAIL_POINT_BLOCK(_fp, scopedFp) {
                 const merizo::BSONObj& data = scopedFp.getData();
 
                 // Expanded ASSERT_EQUALS since the error is not being
@@ -202,7 +202,7 @@ private:
     void blockWithExceptionTask() {
         while (true) {
             try {
-                MONGO_FAIL_POINT_BLOCK(_fp, scopedFp) {
+                MERIZO_FAIL_POINT_BLOCK(_fp, scopedFp) {
                     const merizo::BSONObj& data = scopedFp.getData();
 
                     if (data["a"].numberInt() != 44) {
@@ -224,7 +224,7 @@ private:
 
     void simpleTask() {
         while (true) {
-            static_cast<void>(MONGO_FAIL_POINT(_fp));
+            static_cast<void>(MERIZO_FAIL_POINT(_fp));
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (_inShutdown)
                 break;
@@ -423,7 +423,7 @@ TEST(FailPoint, FailPointBlockIfBasicTest) {
     {
         bool hit = false;
 
-        MONGO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [&](const BSONObj& obj) {
+        MERIZO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [&](const BSONObj& obj) {
             hit = obj["skip"].trueValue();
             return false;
         }) {
@@ -436,7 +436,7 @@ TEST(FailPoint, FailPointBlockIfBasicTest) {
     {
         bool hit = false;
 
-        MONGO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [](auto) { return true; }) {
+        MERIZO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [](auto) { return true; }) {
             hit = true;
             ASSERT(!scopedFp.getData().isEmpty());
         }
@@ -444,7 +444,7 @@ TEST(FailPoint, FailPointBlockIfBasicTest) {
         ASSERT(hit);
     }
 
-    MONGO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [](auto) { return true; }) {
+    MERIZO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [](auto) { return true; }) {
         ASSERT(!"shouldn't get here");
     }
 }

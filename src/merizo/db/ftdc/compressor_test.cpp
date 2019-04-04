@@ -152,7 +152,7 @@ public:
             validate(std::get<0>(st.getValue().get()));
             _docs.clear();
         } else {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
 
         return st;

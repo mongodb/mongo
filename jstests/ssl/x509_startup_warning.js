@@ -4,8 +4,8 @@
     'use strict';
 
     function runTest(opts, expectWarning) {
-        clearRawMongoProgramOutput();
-        const merizod = MongoRunner.runMongod(Object.assign({
+        clearRawMerizoProgramOutput();
+        const merizod = MerizoRunner.runMerizod(Object.assign({
             auth: '',
             sslMode: 'requireSSL',
             sslPEMKeyFile: 'jstests/libs/server.pem',
@@ -13,21 +13,21 @@
         },
                                                            opts));
         assert.eq(expectWarning,
-                  rawMongoProgramOutput().includes(
+                  rawMerizoProgramOutput().includes(
                       'WARNING: While invalid X509 certificates may be used'));
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
     }
 
     // Don't expect a warning when we're not using both options together.
     runTest({}, false);
     runTest({sslAllowInvalidCertificates: '', setParameter: 'authenticationMechanisms=SCRAM-SHA-1'},
             false);
-    runTest({setParameter: 'authenticationMechanisms=MONGODB-X509'}, false);
+    runTest({setParameter: 'authenticationMechanisms=MERIZODB-X509'}, false);
     runTest({clusterAuthMode: 'x509'}, false);
 
     // Do expect a warning when we're combining options.
     runTest(
-        {sslAllowInvalidCertificates: '', setParameter: 'authenticationMechanisms=MONGODB-X509'},
+        {sslAllowInvalidCertificates: '', setParameter: 'authenticationMechanisms=MERIZODB-X509'},
         true);
     runTest({sslAllowInvalidCertificates: '', clusterAuthMode: 'x509'}, true);
 })();

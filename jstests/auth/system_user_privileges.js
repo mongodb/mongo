@@ -27,7 +27,7 @@
                   "On " + dbName + "." + collectionName);
     }
 
-    var conn = MongoRunner.runMongod({auth: ""});
+    var conn = MerizoRunner.runMerizod({auth: ""});
 
     var admin = conn.getDB('admin');
     var test = conn.getDB('test');
@@ -98,5 +98,5 @@
     assertCountUnauthorized(conn, "local", "foo");
     assertCountUnauthorized(conn, "test", "foo");
 
-    MongoRunner.stopMongod(conn, null, {user: 'admin', pwd: 'a'});
+    MerizoRunner.stopMerizod(conn, null, {user: 'admin', pwd: 'a'});
 })();

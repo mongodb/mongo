@@ -247,7 +247,7 @@ void OpObserverMock::_logOp(OperationContext* opCtx,
     oplogEntries.push_back(operationName);
 }
 
-class RenameCollectionTest : public ServiceContextMongoDTest {
+class RenameCollectionTest : public ServiceContextMerizoDTest {
 public:
     static ServiceContext::UniqueOperationContext makeOpCtx();
 
@@ -271,7 +271,7 @@ ServiceContext::UniqueOperationContext RenameCollectionTest::makeOpCtx() {
 
 void RenameCollectionTest::setUp() {
     // Set up merizod.
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
@@ -315,7 +315,7 @@ void RenameCollectionTest::tearDown() {
     repl::DropPendingCollectionReaper::set(service, {});
     repl::StorageInterface::set(service, {});
 
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 /**

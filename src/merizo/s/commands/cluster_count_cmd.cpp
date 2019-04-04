@@ -156,7 +156,7 @@ public:
                                                            Shard::RetryPolicy::kIdempotent,
                                                            filter,
                                                            collation);
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>& ex) {
             // Rewrite the count command as an aggregation.
 
             auto countRequest = uassertStatusOK(CountRequest::parseFromBSON(nss, cmdObj, false));
@@ -256,7 +256,7 @@ public:
                                                            Shard::RetryPolicy::kIdempotent,
                                                            targetingQuery,
                                                            targetingCollation);
-        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
+        } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod>& ex) {
             auto countRequest = CountRequest::parseFromBSON(nss, cmdObj, true);
             if (!countRequest.isOK()) {
                 return countRequest.getStatus();

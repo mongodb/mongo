@@ -4,7 +4,7 @@
 // merizod whether it is hosted with "localhost" or a hostname.
 
 var baseName = "auth_server-6591";
-var dbpath = MongoRunner.dataPath + baseName;
+var dbpath = MerizoRunner.dataPath + baseName;
 var username = "foo";
 var password = "bar";
 
@@ -117,16 +117,16 @@ var authenticate = function(merizo) {
 
 var shutdown = function(conn) {
     print("============ shutting down.");
-    MongoRunner.stopMongod(conn, /*signal*/ false, {auth: {user: username, pwd: password}});
+    MerizoRunner.stopMerizod(conn, /*signal*/ false, {auth: {user: username, pwd: password}});
 };
 
 var runTest = function(useHostName, useSession) {
     print("==========================");
     print("starting merizod: useHostName=" + useHostName);
     print("==========================");
-    var conn = MongoRunner.runMongod({auth: "", dbpath: dbpath, useHostName: useHostName});
+    var conn = MerizoRunner.runMerizod({auth: "", dbpath: dbpath, useHostName: useHostName});
 
-    var merizo = new Mongo("localhost:" + conn.port);
+    var merizo = new Merizo("localhost:" + conn.port);
 
     assertCannotRunCommands(merizo);
 
@@ -145,7 +145,7 @@ var runTest = function(useHostName, useSession) {
     assertCanRunCommands(merizo);
 
     print("============ reconnecting with new client.");
-    merizo = new Mongo("localhost:" + conn.port);
+    merizo = new Merizo("localhost:" + conn.port);
 
     assertCannotRunCommands(merizo);
 
@@ -160,9 +160,9 @@ var runNonlocalTest = function(host) {
     print("==========================");
     print("starting merizod: non-local host access " + host);
     print("==========================");
-    var conn = MongoRunner.runMongod({auth: "", dbpath: dbpath});
+    var conn = MerizoRunner.runMerizod({auth: "", dbpath: dbpath});
 
-    var merizo = new Mongo(host + ":" + conn.port);
+    var merizo = new Merizo(host + ":" + conn.port);
 
     assertCannotRunCommands(merizo);
     assert.throws(function() {
@@ -181,16 +181,16 @@ var runNonlocalTest = function(host) {
 // Start the server without auth. Create a role. Restart the server with auth. The exception is
 // now enabled.
 var runRoleTest = function() {
-    var conn = MongoRunner.runMongod({dbpath: dbpath});
-    var merizo = new Mongo("localhost:" + conn.port);
+    var conn = MerizoRunner.runMerizod({dbpath: dbpath});
+    var merizo = new Merizo("localhost:" + conn.port);
     assertCanRunCommands(merizo);
     createRole(merizo);
     assertCanRunCommands(merizo);
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({auth: '', dbpath: dbpath, restart: true, cleanData: false});
-    merizo = new Mongo("localhost:" + conn.port);
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod({auth: '', dbpath: dbpath, restart: true, cleanData: false});
+    merizo = new Merizo("localhost:" + conn.port);
     assertCannotRunCommands(merizo);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 };
 
 runTest(false, false);

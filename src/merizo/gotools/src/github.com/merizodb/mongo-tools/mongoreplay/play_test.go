@@ -16,7 +16,7 @@ import (
 )
 
 func TestRepeatGeneration(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	recOp := &RecordedOp{
 		Seen: &PreciseTime{time.Now()},
 	}
@@ -70,7 +70,7 @@ func TestRepeatGeneration(t *testing.T) {
 }
 
 func TestPlayOpEOF(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	ops := []RecordedOp{{
 		Seen: &PreciseTime{time.Now()},
 	}, {

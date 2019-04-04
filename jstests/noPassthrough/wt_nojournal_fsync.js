@@ -18,10 +18,10 @@ function writeDataAndRestart(doFsync) {
     }
 
     jsTestLog("kill -9");
-    MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+    MerizoRunner.stopMerizod(conn, 9, {allowedExitCode: MerizoRunner.EXIT_SIGKILL});
 
     jsTestLog("restart node");
-    conn = MongoRunner.runMongod({
+    conn = MerizoRunner.runMerizod({
         restart: true,
         port: conn.port,
         cleanData: false,
@@ -38,7 +38,7 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
     var name = "wt_nojournal_fsync";
 
     jsTestLog("run merizod without journaling");
-    conn = MongoRunner.runMongod({storageEngine: "wiredTiger", nojournal: ""});
+    conn = MerizoRunner.runMerizod({storageEngine: "wiredTiger", nojournal: ""});
 
     // restart node without fsync and --nojournal.  Data should not be there after restart
     conn = writeDataAndRestart(false);
@@ -50,6 +50,6 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
     jsTestLog("check data is in collection foo");
     assert.eq(conn.getDB(name).foo.count(), 100);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
     jsTestLog("Success!");
 }

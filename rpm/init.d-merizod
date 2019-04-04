@@ -3,7 +3,7 @@
 # merizod - Startup script for merizod
 
 # chkconfig: 35 85 15
-# description: Mongo is a scalable, document-oriented database.
+# description: Merizo is a scalable, document-oriented database.
 # processname: merizod
 # config: /etc/merizod.conf
 
@@ -14,10 +14,10 @@
 CONFIGFILE="/etc/merizod.conf"
 OPTIONS=" -f $CONFIGFILE"
 
-merizod=${MONGOD-/usr/bin/merizod}
+merizod=${MERIZOD-/usr/bin/merizod}
 
-MONGO_USER=merizod
-MONGO_GROUP=merizod
+MERIZO_USER=merizod
+MERIZO_GROUP=merizod
 
 # All variables set before this point can be overridden by users, by
 # setting them directly in the SYSCONFIG file. Use this to explicitly
@@ -45,7 +45,7 @@ start()
 {
   # Make sure the default pidfile directory exists
   if [ ! -d $PIDDIR ]; then
-    install -d -m 0755 -o $MONGO_USER -g $MONGO_GROUP $PIDDIR
+    install -d -m 0755 -o $MERIZO_USER -g $MERIZO_GROUP $PIDDIR
   fi
 
   # Make sure the pidfile does not exist
@@ -67,7 +67,7 @@ start()
   ulimit -l unlimited
 
   echo -n $"Starting merizod: "
-  daemon --user "$MONGO_USER" --check $merizod "$NUMACTL $merizod $OPTIONS >/dev/null 2>&1"
+  daemon --user "$MERIZO_USER" --check $merizod "$NUMACTL $merizod $OPTIONS >/dev/null 2>&1"
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && touch /var/lock/subsys/merizod

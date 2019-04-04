@@ -14,7 +14,7 @@ import (
 )
 
 func TestCompleteReply(t *testing.T) {
-	testtype.SkipUnlessTestType(t, testtype.MongoReplayTestType)
+	testtype.SkipUnlessTestType(t, testtype.MerizoReplayTestType)
 	context := NewExecutionContext(&StatCollector{}, nil, &ExecutionOptions{})
 
 	// AddFromWire takes a recorded request and a live reply to the re-execution

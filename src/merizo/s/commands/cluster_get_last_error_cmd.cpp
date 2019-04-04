@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -219,7 +219,7 @@ public:
                      const std::string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        // Mongos GLE - finicky.
+        // Merizos GLE - finicky.
         //
         // To emulate merizod, we first append any write errors we had, then try to append
         // write concern error if there was no write error.  We need to contact the previous

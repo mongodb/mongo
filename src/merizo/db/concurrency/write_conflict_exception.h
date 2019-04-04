@@ -38,7 +38,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DECLARE(skipWriteConflictRetries);
+MERIZO_FAIL_POINT_DECLARE(skipWriteConflictRetries);
 
 /**
  * This is thrown if during a write, two or more operations conflict with each other.
@@ -83,7 +83,7 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
     invariant(opCtx->lockState());
     invariant(opCtx->recoveryUnit());
 
-    if (opCtx->lockState()->inAWriteUnitOfWork() || MONGO_FAIL_POINT(skipWriteConflictRetries)) {
+    if (opCtx->lockState()->inAWriteUnitOfWork() || MERIZO_FAIL_POINT(skipWriteConflictRetries)) {
         return f();
     }
 

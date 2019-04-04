@@ -108,7 +108,7 @@
                       ])
                       .itcount() == 1);
 
-        const secondary = new Mongo(TestData.secondaryHost);
+        const secondary = new Merizo(TestData.secondaryHost);
         const secondaryDb = secondary.getDB(TestData.dbName);
         // Step down the old primary and wait for new primary.
         assert.commandWorked(secondaryDb.adminCommand({replSetFreeze: 0}));

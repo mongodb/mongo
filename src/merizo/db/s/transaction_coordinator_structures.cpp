@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -61,7 +61,7 @@ StringData writeCommitDecisionEnumProperty(CommitDecision decision) {
         case CommitDecision::kAbort:      return kAbortDecision;
     };
     // clang-format on
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
@@ -72,7 +72,7 @@ logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
         case txn::CommitDecision::kAbort:      return stream << "kAbort";
     };
     // clang-format on
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace txn

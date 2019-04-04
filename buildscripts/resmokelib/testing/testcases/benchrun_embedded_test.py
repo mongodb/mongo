@@ -29,8 +29,8 @@ class BenchrunEmbeddedTestCase(  # pylint: disable=too-many-instance-attributes
         self.benchrun_config_file = merizoebench_config_file
 
         # Command line options override the YAML configuration.
-        self.benchrun_executable = utils.default_if_none(_config.MONGOEBENCH_EXECUTABLE,
-                                                         _config.DEFAULT_MONGOEBENCH_EXECUTABLE)
+        self.benchrun_executable = utils.default_if_none(_config.MERIZOEBENCH_EXECUTABLE,
+                                                         _config.DEFAULT_MERIZOEBENCH_EXECUTABLE)
         self.benchrun_repetitions = utils.default_if_none(_config.BENCHMARK_REPETITIONS,
                                                           _config.DEFAULT_BENCHMARK_REPETITIONS)
         self.suite_benchrun_options = program_options

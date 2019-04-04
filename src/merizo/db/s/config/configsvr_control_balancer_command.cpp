@@ -137,7 +137,7 @@ private:
     }
 };
 
-MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
+MERIZO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
     new ConfigSvrBalancerStartCommand();
     new ConfigSvrBalancerStopCommand();
     new ConfigSvrBalancerStatusCommand();

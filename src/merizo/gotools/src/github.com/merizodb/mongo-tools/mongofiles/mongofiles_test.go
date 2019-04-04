@@ -98,23 +98,23 @@ func tearDownGridFSTestData() error {
 
 	return nil
 }
-func simpleMongoFilesInstanceWithID(command, Id string) (*MongoFiles, error) {
-	return simpleMongoFilesInstanceWithFilenameAndID(command, "", Id)
+func simpleMerizoFilesInstanceWithID(command, Id string) (*MerizoFiles, error) {
+	return simpleMerizoFilesInstanceWithFilenameAndID(command, "", Id)
 }
-func simpleMongoFilesInstanceWithFilename(command, fname string) (*MongoFiles, error) {
-	return simpleMongoFilesInstanceWithFilenameAndID(command, fname, "")
+func simpleMerizoFilesInstanceWithFilename(command, fname string) (*MerizoFiles, error) {
+	return simpleMerizoFilesInstanceWithFilenameAndID(command, fname, "")
 }
-func simpleMongoFilesInstanceCommandOnly(command string) (*MongoFiles, error) {
-	return simpleMongoFilesInstanceWithFilenameAndID(command, "", "")
+func simpleMerizoFilesInstanceCommandOnly(command string) (*MerizoFiles, error) {
+	return simpleMerizoFilesInstanceWithFilenameAndID(command, "", "")
 }
 
-func simpleMongoFilesInstanceWithFilenameAndID(command, fname, Id string) (*MongoFiles, error) {
+func simpleMerizoFilesInstanceWithFilenameAndID(command, fname, Id string) (*MerizoFiles, error) {
 	sessionProvider, err := db.NewSessionProvider(*toolOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	merizofiles := MongoFiles{
+	merizofiles := MerizoFiles{
 		ToolOptions:     toolOptions,
 		InputOptions:    &InputOptions{},
 		StorageOptions:  &StorageOptions{GridFSPrefix: "fs", DB: testDB},
@@ -161,7 +161,7 @@ func fileContentsCompare(file1, file2 *os.File, t *testing.T) (bool, error) {
 }
 
 // get an id of an existing file, for _id access
-func idOfFile(mf *MongoFiles, filename string) string {
+func idOfFile(mf *MerizoFiles, filename string) string {
 	session, _ := mf.SessionProvider.GetSession()
 	defer session.Close()
 	gfs := session.DB(mf.StorageOptions.DB).GridFS(mf.StorageOptions.GridFSPrefix)
@@ -199,7 +199,7 @@ func getFilesAndBytesFromLines(lines []string) ([]interface{}, []interface{}) {
 }
 
 func getFilesAndBytesListFromGridFS() ([]interface{}, []interface{}, error) {
-	mfAfter, err := simpleMongoFilesInstanceCommandOnly("list")
+	mfAfter, err := simpleMerizoFilesInstanceCommandOnly("list")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -235,8 +235,8 @@ func fileExists(name string) bool {
 func TestValidArguments(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("With a MongoFiles instance", t, func() {
-		mf, err := simpleMongoFilesInstanceWithFilename("search", "file")
+	Convey("With a MerizoFiles instance", t, func() {
+		mf, err := simpleMerizoFilesInstanceWithFilename("search", "file")
 		So(err, ShouldBeNil)
 		Convey("It should error out when no arguments fed", func() {
 			args := []string{}
@@ -295,11 +295,11 @@ func TestValidArguments(t *testing.T) {
 }
 
 // Test that the output from merizofiles is actually correct
-func TestMongoFilesCommands(t *testing.T) {
+func TestMerizoFilesCommands(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 
 	Convey("Testing the various commands (get|get_id|put|delete|delete_id|search|list) "+
-		"with a MongoDump instance", t, func() {
+		"with a MerizoDump instance", t, func() {
 
 		bytesExpected, err := setUpGridFSTestData()
 		So(err, ShouldBeNil)
@@ -308,7 +308,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		filesExpected := []interface{}{"testfile1", "testfile2", "testfile3"}
 
 		Convey("Testing the 'list' command with a file that isn't in GridFS should", func() {
-			mf, err := simpleMongoFilesInstanceWithFilename("list", "gibberish")
+			mf, err := simpleMerizoFilesInstanceWithFilename("list", "gibberish")
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
 
@@ -320,7 +320,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		})
 
 		Convey("Testing the 'list' command with files that are in GridFS should", func() {
-			mf, err := simpleMongoFilesInstanceWithFilename("list", "testf")
+			mf, err := simpleMerizoFilesInstanceWithFilename("list", "testf")
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
 
@@ -339,7 +339,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		})
 
 		Convey("Testing the 'search' command with files that are in GridFS should", func() {
-			mf, err := simpleMongoFilesInstanceWithFilename("search", "file")
+			mf, err := simpleMerizoFilesInstanceWithFilename("search", "file")
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
 
@@ -358,7 +358,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		})
 
 		Convey("Testing the 'get' command with a file that is in GridFS should", func() {
-			mf, err := simpleMongoFilesInstanceWithFilename("get", "testfile1")
+			mf, err := simpleMerizoFilesInstanceWithFilename("get", "testfile1")
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
 
@@ -419,10 +419,10 @@ func TestMongoFilesCommands(t *testing.T) {
 
 		Convey("Testing the 'get_id' command with a file that is in GridFS should", func() {
 			// hack to grab an _id
-			mf, _ := simpleMongoFilesInstanceWithFilename("get", "testfile1")
+			mf, _ := simpleMerizoFilesInstanceWithFilename("get", "testfile1")
 			idString := idOfFile(mf, "testfile1")
 
-			mf, err = simpleMongoFilesInstanceWithID("get_id", idString)
+			mf, err = simpleMerizoFilesInstanceWithID("get_id", idString)
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
 
@@ -460,7 +460,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		})
 
 		Convey("Testing the 'put' command by putting some lorem ipsum file with 287613 bytes should", func() {
-			mf, err := simpleMongoFilesInstanceWithFilename("put", "lorem_ipsum_287613_bytes.txt")
+			mf, err := simpleMerizoFilesInstanceWithFilename("put", "lorem_ipsum_287613_bytes.txt")
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
 			mf.StorageOptions.LocalFileName = util.ToUniversalPath("testdata/lorem_ipsum_287613_bytes.txt")
@@ -484,7 +484,7 @@ func TestMongoFilesCommands(t *testing.T) {
 
 				Convey("and should have exactly the same content as the original file", func() {
 					buff.Truncate(0)
-					mfAfter, err := simpleMongoFilesInstanceWithFilename("get", "lorem_ipsum_287613_bytes.txt")
+					mfAfter, err := simpleMerizoFilesInstanceWithFilename("get", "lorem_ipsum_287613_bytes.txt")
 					So(err, ShouldBeNil)
 					So(mf, ShouldNotBeNil)
 
@@ -527,7 +527,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		})
 
 		Convey("Testing the 'delete' command with a file that is in GridFS should", func() {
-			mf, err := simpleMongoFilesInstanceWithFilename("delete", "testfile2")
+			mf, err := simpleMerizoFilesInstanceWithFilename("delete", "testfile2")
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
 
@@ -553,10 +553,10 @@ func TestMongoFilesCommands(t *testing.T) {
 
 		Convey("Testing the 'delete_id' command with a file that is in GridFS should", func() {
 			// hack to grab an _id
-			mf, _ := simpleMongoFilesInstanceWithFilename("get", "testfile2")
+			mf, _ := simpleMerizoFilesInstanceWithFilename("get", "testfile2")
 			idString := idOfFile(mf, "testfile2")
 
-			mf, err := simpleMongoFilesInstanceWithID("delete_id", idString)
+			mf, err := simpleMerizoFilesInstanceWithID("delete_id", idString)
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
 
@@ -590,7 +590,7 @@ func TestMongoFilesCommands(t *testing.T) {
 
 func runPutIdTestCase(idToTest string, t *testing.T) {
 	remoteName := "remoteName"
-	merizoFilesInstance, err := simpleMongoFilesInstanceWithFilenameAndID("put_id", remoteName, idToTest)
+	merizoFilesInstance, err := simpleMerizoFilesInstanceWithFilenameAndID("put_id", remoteName, idToTest)
 
 	var buff bytes.Buffer
 	log.SetWriter(&buff)
@@ -612,7 +612,7 @@ func runPutIdTestCase(idToTest string, t *testing.T) {
 
 	t.Log("and get_id should have exactly the same content as the original file")
 
-	mfAfter, err := simpleMongoFilesInstanceWithID("get_id", idToTest)
+	mfAfter, err := simpleMerizoFilesInstanceWithID("get_id", idToTest)
 	So(err, ShouldBeNil)
 	So(mfAfter, ShouldNotBeNil)
 

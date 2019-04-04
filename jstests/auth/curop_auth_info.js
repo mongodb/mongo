@@ -59,9 +59,9 @@
         }
     };
 
-    const m = MongoRunner.runMongod();
+    const m = MerizoRunner.runMerizod();
     runTest(m, m);
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 
     const st = new ShardingTest({
         shards: 1,

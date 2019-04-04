@@ -41,7 +41,7 @@
     const dbName = "test";
     const testCollName = "verify_sessions_find_get_more";
 
-    let conn = MongoRunner.runMongod();
+    let conn = MerizoRunner.runMerizod();
     let db = conn.getDB(dbName);
     let config = conn.getDB("config");
 
@@ -64,7 +64,7 @@
 
     let cursors = [];
     for (let i = 0; i < 5; i++) {
-        let session = db.getMongo().startSession({});
+        let session = db.getMerizo().startSession({});
         assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}),
                              "initialize the session");
         cursors.push(session.getDatabase(dbName)[testCollName].find({b: 1}).batchSize(1));
@@ -114,7 +114,7 @@
 
     // 4. Verify that an expired session (simulated by manual deletion) that has a currently running
     // operation will be vivified during the logical session cache refresh.
-    let pinnedCursorSession = db.getMongo().startSession();
+    let pinnedCursorSession = db.getMerizo().startSession();
     withPinnedCursor({
         conn: conn,
         db: pinnedCursorSession.getDatabase(dbName),
@@ -135,5 +135,5 @@
         failPointName: failPointName,
     });
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

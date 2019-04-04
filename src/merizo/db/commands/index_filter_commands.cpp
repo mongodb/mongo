@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -95,7 +95,7 @@ static Status getQuerySettingsAndPlanCache(OperationContext* opCtx,
 // available to the client.
 //
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands, MONGO_NO_PREREQUISITES)
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands, MERIZO_NO_PREREQUISITES)
 (InitializerContext* context) {
     new ListFilters();
     new ClearFilters();

@@ -43,7 +43,7 @@ const NamespaceString VersionType::ConfigNS("config.version");
 
 const BSONField<int> VersionType::minCompatibleVersion("minCompatibleVersion");
 const BSONField<int> VersionType::currentVersion("currentVersion");
-const BSONField<BSONArray> VersionType::excludingMongoVersions("excluding");
+const BSONField<BSONArray> VersionType::excludingMerizoVersions("excluding");
 const BSONField<OID> VersionType::clusterId("clusterId");
 const BSONField<OID> VersionType::upgradeId("upgradeId");
 const BSONField<BSONObj> VersionType::upgradeState("upgradeState");
@@ -51,7 +51,7 @@ const BSONField<BSONObj> VersionType::upgradeState("upgradeState");
 void VersionType::clear() {
     _minCompatibleVersion.reset();
     _currentVersion.reset();
-    _excludingMongoVersions.reset();
+    _excludingMerizoVersions.reset();
     _clusterId.reset();
     _upgradeId.reset();
     _upgradeState.reset();
@@ -62,7 +62,7 @@ void VersionType::cloneTo(VersionType* other) const {
 
     other->_minCompatibleVersion = _minCompatibleVersion;
     other->_currentVersion = _currentVersion;
-    other->_excludingMongoVersions = _excludingMongoVersions;
+    other->_excludingMerizoVersions = _excludingMerizoVersions;
     other->_clusterId = _clusterId;
     other->_upgradeId = _upgradeId;
     other->_upgradeState = _upgradeState;
@@ -100,9 +100,9 @@ BSONObj VersionType::toBSON() const {
         builder.append(minCompatibleVersion.name(), getMinCompatibleVersion());
     if (_currentVersion)
         builder.append(currentVersion.name(), getCurrentVersion());
-    if (_excludingMongoVersions) {
-        builder.append(excludingMongoVersions.name(),
-                       MongoVersionRange::toBSONArray(getExcludingMongoVersions()));
+    if (_excludingMerizoVersions) {
+        builder.append(excludingMerizoVersions.name(),
+                       MerizoVersionRange::toBSONArray(getExcludingMerizoVersions()));
     }
     if (_clusterId)
         builder.append(clusterId.name(), getClusterId());
@@ -154,24 +154,24 @@ StatusWith<VersionType> VersionType::fromBSON(const BSONObj& source) {
     }
 
     {
-        BSONElement vExclMongoVersionsElem;
+        BSONElement vExclMerizoVersionsElem;
         Status status = bsonExtractTypedField(
-            source, excludingMongoVersions.name(), BSONType::Array, &vExclMongoVersionsElem);
+            source, excludingMerizoVersions.name(), BSONType::Array, &vExclMerizoVersionsElem);
         if (status.isOK()) {
-            version._excludingMongoVersions = std::vector<MongoVersionRange>();
-            BSONObjIterator it(vExclMongoVersionsElem.Obj());
+            version._excludingMerizoVersions = std::vector<MerizoVersionRange>();
+            BSONObjIterator it(vExclMerizoVersionsElem.Obj());
             while (it.more()) {
-                MongoVersionRange range;
+                MerizoVersionRange range;
 
                 std::string errMsg;
                 if (!range.parseBSONElement(it.next(), &errMsg)) {
                     return {ErrorCodes::FailedToParse, errMsg};
                 }
 
-                version._excludingMongoVersions->push_back(range);
+                version._excludingMerizoVersions->push_back(range);
             }
         } else if (status == ErrorCodes::NoSuchKey) {
-            // 'excludingMongoVersions' field is optional
+            // 'excludingMerizoVersions' field is optional
         } else {
             return status;
         }
@@ -218,9 +218,9 @@ void VersionType::setClusterId(const OID& clusterId) {
     _clusterId = clusterId;
 }
 
-void VersionType::setExcludingMongoVersions(
-    const std::vector<MongoVersionRange>& excludingMongoVersions) {
-    _excludingMongoVersions = excludingMongoVersions;
+void VersionType::setExcludingMerizoVersions(
+    const std::vector<MerizoVersionRange>& excludingMerizoVersions) {
+    _excludingMerizoVersions = excludingMerizoVersions;
 }
 
 std::string VersionType::toString() const {

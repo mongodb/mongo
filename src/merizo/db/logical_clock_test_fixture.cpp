@@ -49,7 +49,7 @@ LogicalClockTestFixture::LogicalClockTestFixture() = default;
 LogicalClockTestFixture::~LogicalClockTestFixture() = default;
 
 void LogicalClockTestFixture::setUp() {
-    ShardingMongodTestFixture::setUp();
+    ShardingMerizodTestFixture::setUp();
 
     auto service = getServiceContext();
 
@@ -67,7 +67,7 @@ void LogicalClockTestFixture::setUp() {
 
 void LogicalClockTestFixture::tearDown() {
     _dbDirectClient.reset();
-    ShardingMongodTestFixture::tearDown();
+    ShardingMerizodTestFixture::tearDown();
 }
 
 LogicalClock* LogicalClockTestFixture::resetClock() {

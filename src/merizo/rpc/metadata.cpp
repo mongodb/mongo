@@ -170,7 +170,7 @@ OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
 
         cmdObj = cmdObj.firstElement().Obj().shareOwnershipWith(cmdObj);
     } else if (auto queryOptions = cmdObj["$queryOptions"]) {
-        // Mongos rewrites commands with $readPreference to put it in a field nested inside of
+        // Merizos rewrites commands with $readPreference to put it in a field nested inside of
         // $queryOptions. Its command implementations often forward commands in that format to
         // shards. This function is responsible for rewriting it to a format that the shards
         // understand.

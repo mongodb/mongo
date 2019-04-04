@@ -67,7 +67,7 @@ Status WriteOp::targetWrites(OperationContext* opCtx,
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
             return targeter.targetDelete(opCtx, _itemRef.getDelete());
         } else {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
     }();
 

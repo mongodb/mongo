@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -116,10 +116,10 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
 
 }  // namespace
 
-MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
-MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
-MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
-MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
+MERIZO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
+MERIZO_FAIL_POINT_DEFINE(failMigrationCommit);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
+MERIZO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
 
 MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* csr,
                                                     CollectionShardingRuntime::CSRLock& csrLock) {
@@ -367,7 +367,7 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     // Tell the recipient shard to fetch the latest changes.
     auto commitCloneStatus = _cloneDriver->commitClone(opCtx);
 
-    if (MONGO_FAIL_POINT(failMigrationCommit) && commitCloneStatus.isOK()) {
+    if (MERIZO_FAIL_POINT(failMigrationCommit) && commitCloneStatus.isOK()) {
         commitCloneStatus = {ErrorCodes::InternalError,
                              "Failing _recvChunkCommit due to failpoint."};
     }
@@ -426,7 +426,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             builder.obj(),
             Shard::RetryPolicy::kIdempotent);
 
-    if (MONGO_FAIL_POINT(migrationCommitNetworkError)) {
+    if (MERIZO_FAIL_POINT(migrationCommitNetworkError)) {
         commitChunkMigrationResponse = Status(
             ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
     }
@@ -554,7 +554,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     LOG(0) << "Migration succeeded and updated collection version to "
            << refreshedMetadata->getCollVersion();
 
-    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
+    MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
     scopedGuard.dismiss();
 
@@ -586,7 +586,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         return CollectionShardingRuntime::get(opCtx, getNss())->cleanUpRange(range, whenToClean);
     }();
 
-    if (!MONGO_FAIL_POINT(doNotRefreshRecipientAfterCommit)) {
+    if (!MERIZO_FAIL_POINT(doNotRefreshRecipientAfterCommit)) {
         // Best-effort make the recipient refresh its routing table to the new collection version.
         refreshRecipientRoutingTable(opCtx,
                                      getNss(),

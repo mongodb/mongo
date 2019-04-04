@@ -41,8 +41,8 @@ void merizo::redactPasswordOptions(int argc, char** argv) {
 
     for (int i = 0; i < argc; ++i) {
         StringData arg(argv[i]);
-        if (MongoURI::isMongoURI(arg)) {
-            auto reformedURI = MongoURI::redact(arg);
+        if (MerizoURI::isMerizoURI(arg)) {
+            auto reformedURI = MerizoURI::redact(arg);
             ::strncpy(argv[i], reformedURI.data(), arg.size());
         }
     }

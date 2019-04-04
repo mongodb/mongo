@@ -135,7 +135,7 @@ template <>
 constexpr bool isNamedCode<ErrorCodes::$ec.name> = true;
 //#end for
 
-MONGO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
+MERIZO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
 
 //
 // ErrorCategoriesFor

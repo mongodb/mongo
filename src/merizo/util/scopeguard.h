@@ -75,8 +75,8 @@ auto makeGuard(F&& fun) {
 
 }  // namespace merizo
 
-#define MONGO_SCOPEGUARD_CAT2(s1, s2) s1##s2
-#define MONGO_SCOPEGUARD_CAT(s1, s2) MONGO_SCOPEGUARD_CAT2(s1, s2)
-#define MONGO_SCOPEGUARD_ANON(str) MONGO_SCOPEGUARD_CAT(str, __LINE__)
+#define MERIZO_SCOPEGUARD_CAT2(s1, s2) s1##s2
+#define MERIZO_SCOPEGUARD_CAT(s1, s2) MERIZO_SCOPEGUARD_CAT2(s1, s2)
+#define MERIZO_SCOPEGUARD_ANON(str) MERIZO_SCOPEGUARD_CAT(str, __LINE__)
 
-#define ON_BLOCK_EXIT(...) auto MONGO_SCOPEGUARD_ANON(onBlockExit) = makeGuard(__VA_ARGS__)
+#define ON_BLOCK_EXIT(...) auto MERIZO_SCOPEGUARD_ANON(onBlockExit) = makeGuard(__VA_ARGS__)

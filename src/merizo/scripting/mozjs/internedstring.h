@@ -41,9 +41,9 @@ namespace mozjs {
  * identifier, or directly in ObjectWrapper.
  */
 enum class InternedString {
-#define MONGO_MOZJS_INTERNED_STRING(name, str) name,
+#define MERIZO_MOZJS_INTERNED_STRING(name, str) name,
 #include "merizo/scripting/mozjs/internedstring.defs"
-#undef MONGO_MOZJS_INTERNED_STRING
+#undef MERIZO_MOZJS_INTERNED_STRING
     NUM_IDS,
 };
 

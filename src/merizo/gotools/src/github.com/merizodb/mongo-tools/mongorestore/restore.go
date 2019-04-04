@@ -23,7 +23,7 @@ import (
 const insertBufferFactor = 16
 
 // RestoreIntents iterates through all of the intents stored in the IntentManager, and restores them.
-func (restore *MongoRestore) RestoreIntents() error {
+func (restore *MerizoRestore) RestoreIntents() error {
 	log.Logvf(log.DebugLow, "restoring up to %v collections in parallel", restore.OutputOptions.NumParallelCollections)
 
 	if restore.OutputOptions.NumParallelCollections > 0 {
@@ -86,7 +86,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 }
 
 // RestoreIntent attempts to restore a given intent into MerizoDB.
-func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
+func (restore *MerizoRestore) RestoreIntent(intent *intents.Intent) error {
 
 	collectionExists, err := restore.CollectionExists(intent)
 	if err != nil {
@@ -238,7 +238,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 // RestoreCollectionToDB pipes the given BSON data into the database.
 // Returns the number of documents restored and any errors that occurred.
-func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
+func (restore *MerizoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, file PosReader, fileSize int64) (int64, error) {
 
 	var termErr error

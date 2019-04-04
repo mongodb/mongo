@@ -3,14 +3,14 @@
 
 // Remember the global 'db' var
 var lastDB = db;
-var merizo = new Mongo(db.getMongo().host);
+var merizo = new Merizo(db.getMerizo().host);
 merizo.writeMode = function() {
     return "legacy";
 };
 db = merizo.getDB(db.toString());
 
 var t = db.opcounters;
-var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+var isMerizos = ("isdbgrid" == db.runCommand("ismaster").msg);
 var opCounters;
 
 //
@@ -59,7 +59,7 @@ var continueOnErrorFlag = 1;
 opCounters = db.serverStatus().opcounters;
 t.insert([{_id: 5}, {_id: 5}, {_id: 6}], continueOnErrorFlag);
 assert(db.getLastError());
-assert.eq(opCounters.insert + (isMongos ? 2 : 3), db.serverStatus().opcounters.insert);
+assert.eq(opCounters.insert + (isMerizos ? 2 : 3), db.serverStatus().opcounters.insert);
 
 //
 // 2. Update.
@@ -123,7 +123,7 @@ opCounters = db.serverStatus().opcounters;
 assert.throws(function() {
     t.findOne({_id: {$invalidOp: 1}});
 });
-assert.eq(opCounters.query + (isMongos ? 0 : 1), db.serverStatus().opcounters.query);
+assert.eq(opCounters.query + (isMerizos ? 0 : 1), db.serverStatus().opcounters.query);
 
 //
 // 5. Getmore.

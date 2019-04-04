@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -51,9 +51,9 @@
 
 namespace merizo {
 
-MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
+MERIZO_REGISTER_SHIM(AuthzManagerExternalState::create)
 ()->std::unique_ptr<AuthzManagerExternalState> {
-    return std::make_unique<AuthzManagerExternalStateMongos>();
+    return std::make_unique<AuthzManagerExternalStateMerizos>();
 }
 
 namespace {
@@ -85,20 +85,20 @@ void addShowToBuilder(BSONObjBuilder* builder,
 
 }  // namespace
 
-AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() = default;
+AuthzManagerExternalStateMerizos::AuthzManagerExternalStateMerizos() = default;
 
-AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() = default;
+AuthzManagerExternalStateMerizos::~AuthzManagerExternalStateMerizos() = default;
 
-Status AuthzManagerExternalStateMongos::initialize(OperationContext* opCtx) {
+Status AuthzManagerExternalStateMerizos::initialize(OperationContext* opCtx) {
     return Status::OK();
 }
 
 std::unique_ptr<AuthzSessionExternalState>
-AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
-    return stdx::make_unique<AuthzSessionExternalStateMongos>(authzManager);
+AuthzManagerExternalStateMerizos::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
+    return stdx::make_unique<AuthzSessionExternalStateMerizos>(authzManager);
 }
 
-Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* opCtx,
+Status AuthzManagerExternalStateMerizos::getStoredAuthorizationVersion(OperationContext* opCtx,
                                                                       int* outVersion) {
     // NOTE: We are treating the command "{ 'getParameter' : 1, 'authSchemaVersion' : 1 }" as a user
     // management command since this is the *only* part of merizos that runs this command.
@@ -120,7 +120,7 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     return Status::OK();
 }
 
-Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opCtx,
+Status AuthzManagerExternalStateMerizos::getUserDescription(OperationContext* opCtx,
                                                            const UserName& userName,
                                                            BSONObj* result) {
     if (!shouldUseRolesFromConnection(opCtx, userName)) {
@@ -210,7 +210,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
     }
 }
 
-Status AuthzManagerExternalStateMongos::getRoleDescription(
+Status AuthzManagerExternalStateMerizos::getRoleDescription(
     OperationContext* opCtx,
     const RoleName& roleName,
     PrivilegeFormat showPrivileges,
@@ -247,7 +247,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescription(
     *result = foundRoles[0].Obj().getOwned();
     return Status::OK();
 }
-Status AuthzManagerExternalStateMongos::getRolesDescription(
+Status AuthzManagerExternalStateMerizos::getRolesDescription(
     OperationContext* opCtx,
     const std::vector<RoleName>& roles,
     PrivilegeFormat showPrivileges,
@@ -283,7 +283,7 @@ Status AuthzManagerExternalStateMongos::getRolesDescription(
 
     return Status::OK();
 }
-Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(
+Status AuthzManagerExternalStateMerizos::getRoleDescriptionsForDB(
     OperationContext* opCtx,
     StringData dbname,
     PrivilegeFormat showPrivileges,
@@ -309,7 +309,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(
     return Status::OK();
 }
 
-bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
+bool AuthzManagerExternalStateMerizos::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
     BSONObj usersInfoCmd = BSON("usersInfo" << 1);
     BSONObjBuilder userBuilder;
     bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(

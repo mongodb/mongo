@@ -25,7 +25,7 @@
 
     let skipped = false;
     try {
-        const conn = db.getMongo();
+        const conn = db.getMerizo();
         const topology = DiscoverTopology.findConnectedNodes(conn);
 
         if (topology.type === Topology.kStandalone) {

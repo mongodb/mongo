@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -73,7 +73,7 @@ using write_ops::UpdateOpEntry;
 
 namespace {
 
-class MongoDResourceYielder : public ResourceYielder {
+class MerizoDResourceYielder : public ResourceYielder {
 public:
     void yield(OperationContext* opCtx) override {
         // We're about to block. Check back in the session so that it's available to other
@@ -83,7 +83,7 @@ public:
 
         Session* const session = OperationContextSession::get(opCtx);
         if (session) {
-            MongoDOperationContextSession::checkIn(opCtx);
+            MerizoDOperationContextSession::checkIn(opCtx);
         }
         _yielded = (session != nullptr);
     }
@@ -95,7 +95,7 @@ public:
             // unblocking this thread of execution. However, we must wait until the child operation
             // on this shard finishes so we can get the session back. This may limit the throughput
             // of the operation, but it's correct.
-            MongoDOperationContextSession::checkOut(opCtx,
+            MerizoDOperationContextSession::checkOut(opCtx,
                                                     // Assumes this is only called from the
                                                     // 'aggregate' or 'getMore' commands.  The code
                                                     // which relies on this parameter does not
@@ -137,17 +137,17 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 
 }  // namespace
 
-MongoInterfaceStandalone::MongoInterfaceStandalone(OperationContext* opCtx) : _client(opCtx) {}
+MerizoInterfaceStandalone::MerizoInterfaceStandalone(OperationContext* opCtx) : _client(opCtx) {}
 
-void MongoInterfaceStandalone::setOperationContext(OperationContext* opCtx) {
+void MerizoInterfaceStandalone::setOperationContext(OperationContext* opCtx) {
     _client.setOpCtx(opCtx);
 }
 
-DBClientBase* MongoInterfaceStandalone::directClient() {
+DBClientBase* MerizoInterfaceStandalone::directClient() {
     return &_client;
 }
 
-repl::OplogEntry MongoInterfaceStandalone::lookUpOplogEntryByOpTime(OperationContext* opCtx,
+repl::OplogEntry MerizoInterfaceStandalone::lookUpOplogEntryByOpTime(OperationContext* opCtx,
                                                                     repl::OpTime lookupTime) {
     invariant(!lookupTime.isNull());
 
@@ -170,14 +170,14 @@ repl::OplogEntry MongoInterfaceStandalone::lookUpOplogEntryByOpTime(OperationCon
     }
 }
 
-bool MongoInterfaceStandalone::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+bool MerizoInterfaceStandalone::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
     const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
     return metadata->isSharded();
 }
 
-Insert MongoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
+Insert MerizoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
                                                std::vector<BSONObj>&& objs,
                                                bool bypassDocValidation) {
     Insert insertOp(nss);
@@ -191,7 +191,7 @@ Insert MongoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
     return insertOp;
 }
 
-Update MongoInterfaceStandalone::buildUpdateOp(const NamespaceString& nss,
+Update MerizoInterfaceStandalone::buildUpdateOp(const NamespaceString& nss,
                                                std::vector<BSONObj>&& queries,
                                                std::vector<BSONObj>&& updates,
                                                bool upsert,
@@ -221,7 +221,7 @@ Update MongoInterfaceStandalone::buildUpdateOp(const NamespaceString& nss,
     return updateOp;
 }
 
-void MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void MerizoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& ns,
                                       std::vector<BSONObj>&& objs,
                                       const WriteConcernOptions& wc,
@@ -242,7 +242,7 @@ void MongoInterfaceStandalone::insert(const boost::intrusive_ptr<ExpressionConte
         "Insert failed: ");
 }
 
-void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void MerizoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& ns,
                                       std::vector<BSONObj>&& queries,
                                       std::vector<BSONObj>&& updates,
@@ -271,7 +271,7 @@ void MongoInterfaceStandalone::update(const boost::intrusive_ptr<ExpressionConte
         "Update failed: ");
 }
 
-CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext* opCtx,
+CollectionIndexUsageMap MerizoInterfaceStandalone::getIndexStats(OperationContext* opCtx,
                                                                 const NamespaceString& ns) {
     AutoGetCollectionForReadCommand autoColl(opCtx, ns);
 
@@ -284,27 +284,27 @@ CollectionIndexUsageMap MongoInterfaceStandalone::getIndexStats(OperationContext
     return collection->infoCache()->getIndexUsageStats();
 }
 
-void MongoInterfaceStandalone::appendLatencyStats(OperationContext* opCtx,
+void MerizoInterfaceStandalone::appendLatencyStats(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   bool includeHistograms,
                                                   BSONObjBuilder* builder) const {
     Top::get(opCtx->getServiceContext()).appendLatencyStats(nss.ns(), includeHistograms, builder);
 }
 
-Status MongoInterfaceStandalone::appendStorageStats(OperationContext* opCtx,
+Status MerizoInterfaceStandalone::appendStorageStats(OperationContext* opCtx,
                                                     const NamespaceString& nss,
                                                     const BSONObj& param,
                                                     BSONObjBuilder* builder) const {
     return appendCollectionStorageStats(opCtx, nss, param, builder);
 }
 
-Status MongoInterfaceStandalone::appendRecordCount(OperationContext* opCtx,
+Status MerizoInterfaceStandalone::appendRecordCount(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    BSONObjBuilder* builder) const {
     return appendCollectionRecordCount(opCtx, nss, builder);
 }
 
-BSONObj MongoInterfaceStandalone::getCollectionOptions(const NamespaceString& nss) {
+BSONObj MerizoInterfaceStandalone::getCollectionOptions(const NamespaceString& nss) {
     const auto infos = _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
     if (infos.empty()) {
         return BSONObj();
@@ -316,7 +316,7 @@ BSONObj MongoInterfaceStandalone::getCollectionOptions(const NamespaceString& ns
     return infoObj.getObjectField("options").getOwned();
 }
 
-void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
+void MerizoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const BSONObj& renameCommandObj,
     const NamespaceString& targetNs,
@@ -349,7 +349,7 @@ void MongoInterfaceStandalone::renameIfOptionsAndIndexesHaveNotChanged(
             _client.runCommand("admin", renameCommandObj, info));
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::makePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> MerizoInterfaceStandalone::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions opts) {
@@ -366,7 +366,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::makePipelin
     return pipeline;
 }
 
-unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::attachCursorSourceToPipeline(
+unique_ptr<Pipeline, PipelineDeleter> MerizoInterfaceStandalone::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
@@ -394,7 +394,7 @@ unique_ptr<Pipeline, PipelineDeleter> MongoInterfaceStandalone::attachCursorSour
     return pipeline;
 }
 
-std::string MongoInterfaceStandalone::getShardName(OperationContext* opCtx) const {
+std::string MerizoInterfaceStandalone::getShardName(OperationContext* opCtx) const {
     if (ShardingState::get(opCtx)->enabled()) {
         return ShardingState::get(opCtx)->shardId().toString();
     }
@@ -403,23 +403,23 @@ std::string MongoInterfaceStandalone::getShardName(OperationContext* opCtx) cons
 }
 
 std::pair<std::vector<FieldPath>, bool>
-MongoInterfaceStandalone::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
+MerizoInterfaceStandalone::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
                                                                       const NamespaceString& nss,
                                                                       UUID uuid) const {
     return {{"_id"}, false};  // Nothing is sharded.
 }
 
-std::vector<FieldPath> MongoInterfaceStandalone::collectDocumentKeyFieldsActingAsRouter(
+std::vector<FieldPath> MerizoInterfaceStandalone::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
     return {"_id"};  // Nothing is sharded.
 }
 
-std::vector<GenericCursor> MongoInterfaceStandalone::getIdleCursors(
+std::vector<GenericCursor> MerizoInterfaceStandalone::getIdleCursors(
     const intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     return CursorManager::get(expCtx->opCtx)->getIdleCursors(expCtx->opCtx, userMode);
 }
 
-boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
+boost::optional<Document> MerizoInterfaceStandalone::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
@@ -473,7 +473,7 @@ boost::optional<Document> MongoInterfaceStandalone::lookupSingleDocument(
     return lookedUpDocument;
 }
 
-BackupCursorState MongoInterfaceStandalone::openBackupCursor(OperationContext* opCtx) {
+BackupCursorState MerizoInterfaceStandalone::openBackupCursor(OperationContext* opCtx) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
         return backupCursorHooks->openBackupCursor(opCtx);
@@ -482,7 +482,7 @@ BackupCursorState MongoInterfaceStandalone::openBackupCursor(OperationContext* o
     }
 }
 
-void MongoInterfaceStandalone::closeBackupCursor(OperationContext* opCtx, const UUID& backupId) {
+void MerizoInterfaceStandalone::closeBackupCursor(OperationContext* opCtx, const UUID& backupId) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
     if (backupCursorHooks->enabled()) {
         backupCursorHooks->closeBackupCursor(opCtx, backupId);
@@ -491,7 +491,7 @@ void MongoInterfaceStandalone::closeBackupCursor(OperationContext* opCtx, const 
     }
 }
 
-BackupCursorExtendState MongoInterfaceStandalone::extendBackupCursor(OperationContext* opCtx,
+BackupCursorExtendState MerizoInterfaceStandalone::extendBackupCursor(OperationContext* opCtx,
                                                                      const UUID& backupId,
                                                                      const Timestamp& extendTo) {
     auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
@@ -502,7 +502,7 @@ BackupCursorExtendState MongoInterfaceStandalone::extendBackupCursor(OperationCo
     }
 }
 
-std::vector<BSONObj> MongoInterfaceStandalone::getMatchingPlanCacheEntryStats(
+std::vector<BSONObj> MerizoInterfaceStandalone::getMatchingPlanCacheEntryStats(
     OperationContext* opCtx, const NamespaceString& nss, const MatchExpression* matchExp) const {
     const auto serializer = [](const PlanCacheEntry& entry) {
         BSONObjBuilder out;
@@ -527,7 +527,7 @@ std::vector<BSONObj> MongoInterfaceStandalone::getMatchingPlanCacheEntryStats(
     return planCache->getMatchingStats(serializer, predicate);
 }
 
-bool MongoInterfaceStandalone::uniqueKeyIsSupportedByIndex(
+bool MerizoInterfaceStandalone::uniqueKeyIsSupportedByIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& uniqueKeyPaths) const {
@@ -554,7 +554,7 @@ bool MongoInterfaceStandalone::uniqueKeyIsSupportedByIndex(
     return false;
 }
 
-BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
+BSONObj MerizoInterfaceStandalone::_reportCurrentOpForClient(
     OperationContext* opCtx, Client* client, CurrentOpTruncateMode truncateOps) const {
     BSONObjBuilder builder;
 
@@ -578,7 +578,7 @@ BSONObj MongoInterfaceStandalone::_reportCurrentOpForClient(
     return builder.obj();
 }
 
-void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+void MerizoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
                                                                 CurrentOpUserMode userMode,
                                                                 std::vector<BSONObj>* ops) const {
     auto sessionCatalog = SessionCatalog::get(opCtx);
@@ -604,7 +604,7 @@ void MongoInterfaceStandalone::_reportCurrentOpsForIdleSessions(OperationContext
         });
 }
 
-std::unique_ptr<CollatorInterface> MongoInterfaceStandalone::_getCollectionDefaultCollator(
+std::unique_ptr<CollatorInterface> MerizoInterfaceStandalone::_getCollectionDefaultCollator(
     OperationContext* opCtx, StringData dbName, UUID collectionUUID) {
     auto it = _collatorCache.find(collectionUUID);
     if (it == _collatorCache.end()) {
@@ -628,8 +628,8 @@ std::unique_ptr<CollatorInterface> MongoInterfaceStandalone::_getCollectionDefau
     return collator ? collator->clone() : nullptr;
 }
 
-std::unique_ptr<ResourceYielder> MongoInterfaceStandalone::getResourceYielder() const {
-    return std::make_unique<MongoDResourceYielder>();
+std::unique_ptr<ResourceYielder> MerizoInterfaceStandalone::getResourceYielder() const {
+    return std::make_unique<MerizoDResourceYielder>();
 }
 
 }  // namespace merizo

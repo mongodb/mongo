@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -37,7 +37,7 @@
 #include "merizo/unittest/unittest.h"
 #include "merizo/util/log.h"
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "merizo/util/net/dh_openssl.h"
 #endif
 
@@ -260,7 +260,7 @@ TEST(SSLManager, EscapeRFC2253) {
     ASSERT_EQ(escapeRfc2253("abc "), "abc\\ ");
 }
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 TEST(SSLManager, DHCheckRFC7919) {
     auto dhparams = makeDefaultDHParameters();
     ASSERT_EQ(verifyDHParameters(dhparams), 0);

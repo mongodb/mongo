@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -58,7 +58,7 @@ AtomicWord<long long> Scope::_lastVersion(1);
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(mr_killop_test_fp);
+MERIZO_FAIL_POINT_DEFINE(mr_killop_test_fp);
 // 2 GB is the largest support Javascript file size.
 const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
 
@@ -237,7 +237,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         uassert(10209, str::stream() << "name has to be a string: " << n, n.type() == String);
         uassert(10210, "value has to be set", v.type() != EOO);
 
-        if (MONGO_FAIL_POINT(mr_killop_test_fp)) {
+        if (MERIZO_FAIL_POINT(mr_killop_test_fp)) {
 
             /* This thread sleep makes the interrupts in the test come in at a time
             *  where the js misses the interrupt and throw an exception instead of

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault;
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault;
 
 #include "merizo/platform/basic.h"
 
@@ -93,7 +93,7 @@ public:
     ASIOReactor() : _ioContext() {}
 
     void run() noexcept final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void runFor(Milliseconds time) noexcept final {
@@ -120,11 +120,11 @@ public:
     }
 
     std::unique_ptr<ReactorTimer> makeTimer() final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     Date_t now() final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void schedule(Task task) final {

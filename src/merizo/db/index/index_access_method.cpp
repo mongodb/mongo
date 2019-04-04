@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
 #include "merizo/platform/basic.h"
 
@@ -821,4 +821,4 @@ std::string nextFileName() {
 }  // namespace merizo
 
 #include "merizo/db/sorter/sorter.cpp"
-MONGO_CREATE_SORTER(merizo::BSONObj, merizo::RecordId, merizo::BtreeExternalSortComparison);
+MERIZO_CREATE_SORTER(merizo::BSONObj, merizo::RecordId, merizo::BtreeExternalSortComparison);

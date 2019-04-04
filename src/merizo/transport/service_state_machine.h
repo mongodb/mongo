@@ -239,7 +239,7 @@ private:
     Message _inMessage;
 
     AtomicWord<Ownership> _owned{Ownership::kUnowned};
-#if MONGO_CONFIG_DEBUG_BUILD
+#if MERIZO_CONFIG_DEBUG_BUILD
     AtomicWord<stdx::thread::id> _owningThread;
 #endif
     std::string _oldThreadName;

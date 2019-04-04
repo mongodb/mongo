@@ -4,7 +4,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     'use strict';
 
-    let staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    let staticMerizod = MerizoRunner.runMerizod({});  // For startParallelOps.
 
     let st = new ShardingTest({shards: 2});
 
@@ -19,7 +19,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     pauseMigrateAtStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 
     let joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {_id: 0}, null, 'test.user', st.shard1.shardName);
+        staticMerizod, st.s0.host, {_id: 0}, null, 'test.user', st.shard1.shardName);
 
     waitForMigrateStep(st.shard1, migrateStepNames.deletedPriorDataInRange);
 
@@ -53,5 +53,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(null, recipientColl.findOne({x: 1}));
 
     st.stop();
-    MongoRunner.stopMongod(staticMongod);
+    MerizoRunner.stopMerizod(staticMerizod);
 })();

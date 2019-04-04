@@ -16,14 +16,14 @@
     assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.foo', key: {x: 1}}));
     assert.commandWorked(st.s0.adminCommand({split: 'test.foo', middle: {x: 0}}));
 
-    let freshMongos = st.s0;
-    let staleMongos = st.s1;
+    let freshMerizos = st.s0;
+    let staleMerizos = st.s1;
 
     jsTest.log("do insert from stale merizos to make it load the routing table before the move");
-    assert.writeOK(staleMongos.getDB('test').foo.insert({x: 1}));
+    assert.writeOK(staleMerizos.getDB('test').foo.insert({x: 1}));
 
     jsTest.log("do moveChunk from fresh merizos");
-    assert.commandWorked(freshMongos.adminCommand({
+    assert.commandWorked(freshMerizos.adminCommand({
         moveChunk: 'test.foo',
         find: {x: 0},
         to: st.shard1.shardName,
@@ -43,7 +43,7 @@
     // fresh version from merizos; and that the recipient shard secondary returns the results.
 
     jsTest.log("do secondary read from stale merizos");
-    let res = staleMongos.getDB('test').runCommand({
+    let res = staleMerizos.getDB('test').runCommand({
         count: 'foo',
         query: {x: 1},
         $readPreference: {mode: "secondary"},

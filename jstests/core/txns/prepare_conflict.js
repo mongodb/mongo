@@ -56,7 +56,7 @@
     // conflict is resolved.
     assert.commandWorked(testDB.runCommand({profile: 1, level: 1, slowms: 100}));
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandWorked(sessionDB.runCommand({
@@ -86,7 +86,7 @@
     const findAwait = startParallelShell(function() {
         const it = db.getSiblingDB(TestData.dbName)
                        .runCommand({find: TestData.collName, filter: {_id: TestData.txnDoc._id}});
-    }, db.getMongo().port);
+    }, db.getMerizo().port);
 
     session.abortTransaction_forTesting();
 

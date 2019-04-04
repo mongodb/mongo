@@ -39,9 +39,9 @@ namespace stdx {
 
 #if __cplusplus < 201703L || !defined(__cpp_lib_hardware_interference_size)
 
-#if defined(MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT)
-static_assert(MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT >= sizeof(uint64_t), "Bad extended alignment");
-constexpr std::size_t hardware_destructive_interference_size = MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT;
+#if defined(MERIZO_CONFIG_MAX_EXTENDED_ALIGNMENT)
+static_assert(MERIZO_CONFIG_MAX_EXTENDED_ALIGNMENT >= sizeof(uint64_t), "Bad extended alignment");
+constexpr std::size_t hardware_destructive_interference_size = MERIZO_CONFIG_MAX_EXTENDED_ALIGNMENT;
 #else
 constexpr std::size_t hardware_destructive_interference_size = alignof(std::max_align_t);
 #endif

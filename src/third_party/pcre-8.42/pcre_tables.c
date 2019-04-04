@@ -299,7 +299,7 @@ strings to make sure that UTF-8 support works on EBCDIC platforms. */
 #define STRING_Miao0 STR_M STR_i STR_a STR_o "\0"
 #define STRING_Mn0 STR_M STR_n "\0"
 #define STRING_Modi0 STR_M STR_o STR_d STR_i "\0"
-#define STRING_Mongolian0 STR_M STR_o STR_n STR_g STR_o STR_l STR_i STR_a STR_n "\0"
+#define STRING_Merizolian0 STR_M STR_o STR_n STR_g STR_o STR_l STR_i STR_a STR_n "\0"
 #define STRING_Mro0 STR_M STR_r STR_o "\0"
 #define STRING_Myanmar0 STR_M STR_y STR_a STR_n STR_m STR_a STR_r "\0"
 #define STRING_N0 STR_N "\0"
@@ -470,7 +470,7 @@ const char PRIV(utt_names)[] =
   STRING_Miao0
   STRING_Mn0
   STRING_Modi0
-  STRING_Mongolian0
+  STRING_Merizolian0
   STRING_Mro0
   STRING_Myanmar0
   STRING_N0
@@ -641,7 +641,7 @@ const ucp_type_table PRIV(utt)[] = {
   { 730, PT_SC, ucp_Miao },
   { 735, PT_PC, ucp_Mn },
   { 738, PT_SC, ucp_Modi },
-  { 743, PT_SC, ucp_Mongolian },
+  { 743, PT_SC, ucp_Merizolian },
   { 753, PT_SC, ucp_Mro },
   { 757, PT_SC, ucp_Myanmar },
   { 765, PT_GC, ucp_N },

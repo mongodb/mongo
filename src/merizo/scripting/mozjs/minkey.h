@@ -50,8 +50,8 @@ struct MinKeyInfo : public BaseInfo {
                             bool* bp);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(tojson);
-        MONGO_DECLARE_JS_FUNCTION(toJSON);
+        MERIZO_DECLARE_JS_FUNCTION(tojson);
+        MERIZO_DECLARE_JS_FUNCTION(toJSON);
     };
 
     static const JSFunctionSpec methods[3];

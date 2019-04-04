@@ -3,12 +3,12 @@
     var t = db.create_indexes_shell_helper;
     t.drop();
 
-    var merizo = db.getMongo();
+    var merizo = db.getMerizo();
 
     try {
         var commandsRan = [];
         var insertsRan = [];
-        var mockMongo = {
+        var mockMerizo = {
             writeMode: function() {
                 return "commands";
             },
@@ -37,8 +37,8 @@
             isReplicaSetMember: function() {
                 return merizo.isReplicaSetMember();
             },
-            isMongos: function() {
-                return merizo.isMongos();
+            isMerizos: function() {
+                return merizo.isMerizos();
             },
             isCausalConsistency: function() {
                 return false;
@@ -48,8 +48,8 @@
             },
         };
 
-        db._merizo = mockMongo;
-        db._session = new _DummyDriverSession(mockMongo);
+        db._merizo = mockMerizo;
+        db._session = new _DummyDriverSession(mockMerizo);
 
         t.createIndexes([{x: 1}]);
         assert.eq(commandsRan.length, 1);

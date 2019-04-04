@@ -46,7 +46,7 @@
         assert.eq(res[0], docMinus2, tojson(res));
         assert.eq(res[1], doc1, tojson(res));
 
-        if (db.getMongo().useReadCommands()) {
+        if (db.getMerizo().useReadCommands()) {
             // Test a $near/$nearSphere query sorted by {a: 1} with the case-insensitive collation.
             res = coll.find(query).collation(caseInsensitive).sort({a: 1}).toArray();
             assert.eq(res.length, 4, tojson(res));

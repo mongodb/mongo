@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/util/log_and_backoff.h"
 
@@ -40,7 +40,7 @@ void logAndBackoff(logger::LogComponent logComponent,
                    logger::LogSeverity logLevel,
                    size_t numAttempts,
                    StringData message) {
-    MONGO_LOG_COMPONENT(logLevel, logComponent) << message
+    MERIZO_LOG_COMPONENT(logLevel, logComponent) << message
                                                 << ". Retrying, attempt: " << numAttempts;
 
     if (numAttempts < 4) {

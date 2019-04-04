@@ -42,7 +42,7 @@ merizoreplay record -f $PCAPFILE -p $OUTFILE
 if [ "$STARTMONGO" = true ]; then
 	rm -rf /data/merizoreplay/
 	mkdir /data/merizoreplay/
-	echo "starting MONGOD"
+	echo "starting MERIZOD"
 	merizod --port=$PORT --dbpath=/data/merizoreplay &
 	MONGOPID=$!
 fi

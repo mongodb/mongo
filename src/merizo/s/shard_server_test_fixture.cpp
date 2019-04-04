@@ -59,7 +59,7 @@ std::shared_ptr<RemoteCommandTargeterMock> ShardServerTestFixture::configTargete
 }
 
 void ShardServerTestFixture::setUp() {
-    ShardingMongodTestFixture::setUp();
+    ShardingMerizodTestFixture::setUp();
 
 
     replicationCoordinator()->alwaysAllowWrites(true);
@@ -75,7 +75,7 @@ void ShardServerTestFixture::setUp() {
                                 stdx::make_unique<ConfigServerCatalogCacheLoader>()));
 
     uassertStatusOK(
-        initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
+        initializeGlobalShardingStateForMerizodForTest(ConnectionString(kConfigHostAndPort)));
 
     // Set the findHost() return value on the mock targeter so that later calls to the
     // config targeter's findHost() return the appropriate value.
@@ -85,7 +85,7 @@ void ShardServerTestFixture::setUp() {
 void ShardServerTestFixture::tearDown() {
     CatalogCacheLoader::clearForTests(getServiceContext());
 
-    ShardingMongodTestFixture::tearDown();
+    ShardingMerizodTestFixture::tearDown();
 }
 
 std::unique_ptr<DistLockCatalog> ShardServerTestFixture::makeDistLockCatalog() {

@@ -54,17 +54,17 @@ const std::string kShardName("TestShard");
 
 /**
  * This test suite validates that when the default OpObserver chain is set up (which happens to
- * include the ShardingMongodOpObserver), writes to the 'admin.system.version' collection (and the
+ * include the ShardingMerizodOpObserver), writes to the 'admin.system.version' collection (and the
  * shardIdentity document specifically) will invoke the sharding initialization code.
  */
-class ShardingInitializationOpObserverTest : public ShardingMongodTestFixture {
+class ShardingInitializationOpObserverTest : public ShardingMerizodTestFixture {
 public:
     void setUp() override {
-        ShardingMongodTestFixture::setUp();
+        ShardingMerizodTestFixture::setUp();
 
         // NOTE: this assumes that globalInit will always be called on the same thread as the main
         // test thread
-        ShardingInitializationMongoD::get(operationContext())
+        ShardingInitializationMerizoD::get(operationContext())
             ->setGlobalInitMethodForTest([this](OperationContext* opCtx,
                                                 const ShardIdentity& shardIdentity,
                                                 StringData distLockProcessId) {
@@ -76,7 +76,7 @@ public:
     void tearDown() override {
         ShardingState::get(getServiceContext())->clearForTests();
 
-        ShardingMongodTestFixture::tearDown();
+        ShardingMerizodTestFixture::tearDown();
     }
 
     int getInitCallCount() const {

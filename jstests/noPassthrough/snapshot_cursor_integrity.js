@@ -16,10 +16,10 @@
 
     const primaryDB = rst.getPrimary().getDB(dbName);
 
-    const session1 = primaryDB.getMongo().startSession();
+    const session1 = primaryDB.getMerizo().startSession();
     const sessionDB1 = session1.getDatabase(dbName);
 
-    const session2 = primaryDB.getMongo().startSession();
+    const session2 = primaryDB.getMerizo().startSession();
     const sessionDB2 = session2.getDatabase(dbName);
 
     const bulk = primaryDB.coll.initializeUnorderedBulkOp();

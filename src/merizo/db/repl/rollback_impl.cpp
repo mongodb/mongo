@@ -28,7 +28,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationRollback
 
 #include "merizo/platform/basic.h"
 
@@ -65,7 +65,7 @@
 namespace merizo {
 namespace repl {
 
-MONGO_FAIL_POINT_DEFINE(rollbackHangAfterTransitionToRollback);
+MERIZO_FAIL_POINT_DEFINE(rollbackHangAfterTransitionToRollback);
 
 namespace {
 
@@ -174,10 +174,10 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _listener->onTransitionToRollback();
 
-    if (MONGO_FAIL_POINT(rollbackHangAfterTransitionToRollback)) {
+    if (MERIZO_FAIL_POINT(rollbackHangAfterTransitionToRollback)) {
         log() << "rollbackHangAfterTransitionToRollback fail point enabled. Blocking until fail "
                  "point is disabled (rollback_impl).";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx,
                                                         rollbackHangAfterTransitionToRollback);
     }
 
@@ -254,7 +254,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // We invalidate sessions before we recover so that we avoid invalidating sessions that had
     // just recovered prepared transactions.
     if (_observerInfo.rollbackSessionIds.size() > 0) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
+        MerizoDSessionCatalog::invalidateSessions(opCtx, boost::none);
     }
 
     // Recover to the stable timestamp.
@@ -471,7 +471,7 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
             case OplogEntry::CommandType::kApplyOps:
             default:
                 // Every possible command type should be handled above.
-                MONGO_UNREACHABLE
+                MERIZO_UNREACHABLE
         }
     }
 
@@ -953,7 +953,7 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
         fassert(50751, document.getStatus());
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {

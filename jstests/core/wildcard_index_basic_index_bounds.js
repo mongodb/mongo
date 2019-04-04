@@ -10,7 +10,7 @@
     "use strict";
 
     load("jstests/libs/analyze_plan.js");     // For getPlanStages.
-    load("jstests/libs/fixture_helpers.js");  // For isMongos and numberOfShardsForCollection.
+    load("jstests/libs/fixture_helpers.js");  // For isMerizos and numberOfShardsForCollection.
 
     // Asserts that the given cursors produce identical result sets.
     function assertResultsEq(cursor1, cursor2) {

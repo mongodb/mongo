@@ -19,7 +19,7 @@
 #error Do not compile Asio library source with ASIO_HEADER_ONLY defined
 #endif
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_WINDOWS
 
 #include "merizo/util/net/ssl/detail/impl/engine_schannel.ipp"
 #include "merizo/util/net/ssl/detail/impl/schannel.ipp"
@@ -27,13 +27,13 @@
 #include "merizo/util/net/ssl/impl/error.ipp"
 
 
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 
 #include "merizo/util/net/ssl/detail/impl/engine_openssl.ipp"
 #include "merizo/util/net/ssl/impl/context_openssl.ipp"
 #include "merizo/util/net/ssl/impl/error.ipp"
 
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_APPLE
 
 #include "merizo/util/net/ssl/detail/impl/engine_apple.ipp"
 #include "merizo/util/net/ssl/impl/error.ipp"

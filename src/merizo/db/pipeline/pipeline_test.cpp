@@ -2332,87 +2332,87 @@ class LookUp : public needsPrimaryShardMergerBase {
 
 }  // namespace needsPrimaryShardMerger
 
-namespace mustRunOnMongoS {
+namespace mustRunOnMerizoS {
 
 // Like a DocumentSourceMock, but must run on merizoS and can be used anywhere in the pipeline.
-class DocumentSourceMustRunOnMongoS : public DocumentSourceMock {
+class DocumentSourceMustRunOnMerizoS : public DocumentSourceMock {
 public:
-    DocumentSourceMustRunOnMongoS() : DocumentSourceMock({}) {}
+    DocumentSourceMustRunOnMerizoS() : DocumentSourceMock({}) {}
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         // Overrides DocumentSourceMock's required position.
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,
-                HostTypeRequirement::kMongoS,
+                HostTypeRequirement::kMerizoS,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
                 TransactionRequirement::kAllowed};
     }
 
-    static boost::intrusive_ptr<DocumentSourceMustRunOnMongoS> create() {
-        return new DocumentSourceMustRunOnMongoS();
+    static boost::intrusive_ptr<DocumentSourceMustRunOnMerizoS> create() {
+        return new DocumentSourceMustRunOnMerizoS();
     }
 };
 
 using HostTypeRequirement = StageConstraints::HostTypeRequirement;
-using PipelineMustRunOnMongoSTest = AggregationContextFixture;
+using PipelineMustRunOnMerizoSTest = AggregationContextFixture;
 
-TEST_F(PipelineMustRunOnMongoSTest, UnsplittablePipelineMustRunOnMongoS) {
+TEST_F(PipelineMustRunOnMerizoSTest, UnsplittablePipelineMustRunOnMerizoS) {
     auto expCtx = getExpCtx();
-    expCtx->inMongos = true;
+    expCtx->inMerizos = true;
 
     auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
-    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto runOnMerizoS = DocumentSourceMustRunOnMerizoS::create();
 
-    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS}, expCtx));
-    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMerizoS}, expCtx));
+    ASSERT_TRUE(pipeline->requiredToRunOnMerizos());
 
     pipeline->optimizePipeline();
-    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    ASSERT_TRUE(pipeline->requiredToRunOnMerizos());
 }
 
-TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowedStagePresent) {
+TEST_F(PipelineMustRunOnMerizoSTest, UnsplittableMerizoSPipelineAssertsIfDisallowedStagePresent) {
     auto expCtx = getExpCtx();
 
     expCtx->allowDiskUse = true;
-    expCtx->inMongos = true;
+    expCtx->inMerizos = true;
 
     auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
-    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto runOnMerizoS = DocumentSourceMustRunOnMerizoS::create();
     auto sort = DocumentSourceSort::create(expCtx, fromjson("{x: 1}"));
 
-    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS, sort}, expCtx));
+    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMerizoS, sort}, expCtx));
     pipeline->optimizePipeline();
 
     // The entire pipeline must run on merizoS, but $sort cannot do so when 'allowDiskUse' is true.
     ASSERT_THROWS_CODE(
-        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+        pipeline->requiredToRunOnMerizos(), AssertionException, ErrorCodes::IllegalOperation);
 }
 
-DEATH_TEST_F(PipelineMustRunOnMongoSTest,
-             SplittablePipelineMustMergeOnMongoSAfterSplit,
+DEATH_TEST_F(PipelineMustRunOnMerizoSTest,
+             SplittablePipelineMustMergeOnMerizoSAfterSplit,
              "invariant") {
     auto expCtx = getExpCtx();
-    expCtx->inMongos = true;
+    expCtx->inMerizos = true;
 
     auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
     auto split = DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kNone);
-    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto runOnMerizoS = DocumentSourceMustRunOnMerizoS::create();
 
-    auto pipeline = uassertStatusOK(Pipeline::create({match, split, runOnMongoS}, expCtx));
+    auto pipeline = uassertStatusOK(Pipeline::create({match, split, runOnMerizoS}, expCtx));
 
     // We don't need to run the entire pipeline on merizoS because we can split at
     // $_internalSplitPipeline.
-    ASSERT_FALSE(pipeline->requiredToRunOnMongos());
+    ASSERT_FALSE(pipeline->requiredToRunOnMerizos());
 
     auto splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(pipeline));
     ASSERT(splitPipeline.shardsPipeline);
     ASSERT(splitPipeline.mergePipeline);
 
-    ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnMongos());
+    ASSERT_TRUE(splitPipeline.mergePipeline->requiredToRunOnMerizos());
 
-    // Calling 'requiredToRunOnMongos' on the shard pipeline will hit an invariant.
-    splitPipeline.shardsPipeline->requiredToRunOnMongos();
+    // Calling 'requiredToRunOnMerizos' on the shard pipeline will hit an invariant.
+    splitPipeline.shardsPipeline->requiredToRunOnMerizos();
 }
 
 /**
@@ -2420,78 +2420,78 @@ DEATH_TEST_F(PipelineMustRunOnMongoSTest,
  * setup. For example, to compute its constraints, the $out stage needs to know if the output
  * collection is sharded.
  */
-class FakeMongoProcessInterface : public StubMongoProcessInterface {
+class FakeMerizoProcessInterface : public StubMerizoProcessInterface {
 public:
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
         return false;
     }
 };
 
-TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStagePresent) {
+TEST_F(PipelineMustRunOnMerizoSTest, SplitMerizoSMergePipelineAssertsIfShardStagePresent) {
     auto expCtx = getExpCtx();
 
     expCtx->allowDiskUse = true;
-    expCtx->inMongos = true;
-    expCtx->merizoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
+    expCtx->inMerizos = true;
+    expCtx->merizoProcessInterface = std::make_shared<FakeMerizoProcessInterface>();
 
     auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
     auto split = DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kNone);
-    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto runOnMerizoS = DocumentSourceMustRunOnMerizoS::create();
     auto outSpec = fromjson("{$out: 'outcoll'}");
     auto out = DocumentSourceOut::createFromBson(outSpec["$out"], expCtx);
 
-    auto pipeline = uassertStatusOK(Pipeline::create({match, split, runOnMongoS, out}, expCtx));
+    auto pipeline = uassertStatusOK(Pipeline::create({match, split, runOnMerizoS, out}, expCtx));
 
     // We don't need to run the entire pipeline on merizoS because we can split at
     // $_internalSplitPipeline.
-    ASSERT_FALSE(pipeline->requiredToRunOnMongos());
+    ASSERT_FALSE(pipeline->requiredToRunOnMerizos());
 
     auto splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(pipeline));
 
     // The merge pipeline must run on merizoS, but $out needs to run on  the primary shard.
-    ASSERT_THROWS_CODE(splitPipeline.mergePipeline->requiredToRunOnMongos(),
+    ASSERT_THROWS_CODE(splitPipeline.mergePipeline->requiredToRunOnMerizos(),
                        AssertionException,
                        ErrorCodes::IllegalOperation);
 }
 
-TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShardSideOfSplit) {
+TEST_F(PipelineMustRunOnMerizoSTest, SplittablePipelineAssertsIfMerizoSStageOnShardSideOfSplit) {
     auto expCtx = getExpCtx();
-    expCtx->inMongos = true;
+    expCtx->inMerizos = true;
 
     auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
-    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto runOnMerizoS = DocumentSourceMustRunOnMerizoS::create();
     auto split =
         DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kAnyShard);
 
-    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS, split}, expCtx));
+    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMerizoS, split}, expCtx));
     pipeline->optimizePipeline();
 
-    // The 'runOnMongoS' stage comes before any splitpoint, so this entire pipeline must run on
+    // The 'runOnMerizoS' stage comes before any splitpoint, so this entire pipeline must run on
     // merizoS. However, the pipeline *cannot* run on merizoS and *must* split at
     // $_internalSplitPipeline due to the latter's 'anyShard' requirement. The merizoS stage would
     // end up on the shard side of this split, and so it asserts.
     ASSERT_THROWS_CODE(
-        pipeline->requiredToRunOnMongos(), AssertionException, ErrorCodes::IllegalOperation);
+        pipeline->requiredToRunOnMerizos(), AssertionException, ErrorCodes::IllegalOperation);
 }
 
-TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplitpointIsEligible) {
+TEST_F(PipelineMustRunOnMerizoSTest, SplittablePipelineRunsUnsplitOnMerizoSIfSplitpointIsEligible) {
     auto expCtx = getExpCtx();
-    expCtx->inMongos = true;
+    expCtx->inMerizos = true;
 
     auto match = DocumentSourceMatch::create(fromjson("{x: 5}"), expCtx);
-    auto runOnMongoS = DocumentSourceMustRunOnMongoS::create();
+    auto runOnMerizoS = DocumentSourceMustRunOnMerizoS::create();
     auto split = DocumentSourceInternalSplitPipeline::create(expCtx, HostTypeRequirement::kNone);
 
-    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMongoS, split}, expCtx));
+    auto pipeline = uassertStatusOK(Pipeline::create({match, runOnMerizoS, split}, expCtx));
     pipeline->optimizePipeline();
 
-    // The 'runOnMongoS' stage is before the splitpoint, so this entire pipeline must run on merizoS.
+    // The 'runOnMerizoS' stage is before the splitpoint, so this entire pipeline must run on merizoS.
     // In this case, the splitpoint is itself eligible to run on merizoS, and so we are able to
     // return true.
-    ASSERT_TRUE(pipeline->requiredToRunOnMongos());
+    ASSERT_TRUE(pipeline->requiredToRunOnMerizos());
 }
 
-}  // namespace mustRunOnMongoS
+}  // namespace mustRunOnMerizoS
 }  // namespace Sharded
 }  // namespace Optimizations
 

@@ -13,7 +13,7 @@
 
         db.getSiblingDB(dbName).runCommand({drop: collName, writeConcern: {w: "majority"}});
 
-        const session = db.getMongo().startSession(sessionOptions);
+        const session = db.getMerizo().startSession(sessionOptions);
         const sessionDB = session.getDatabase(dbName);
         const sessionColl = sessionDB[collName];
 

@@ -24,7 +24,7 @@
 
     // Initiate a session.
     const sessionOptions = {causalConsistency: false};
-    const session = primary.getDB(dbName).getMongo().startSession(sessionOptions);
+    const session = primary.getDB(dbName).getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
 
     // Create collection.

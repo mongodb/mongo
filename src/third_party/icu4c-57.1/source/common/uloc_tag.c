@@ -1772,7 +1772,7 @@ _appendPrivateuseToLanguageTag(const char* localeID, char* appendAt, int32_t cap
 #define PRIV 0x0080
 
 /**
- * MONGODB MODIFICATION Fix for SERVER-38840.
+ * MERIZODB MODIFICATION Fix for SERVER-38840.
  *
  * Ticket #12705 - Visual Studio 2015 Update 3 contains a new code optimizer which has problems
  * optimizing this function. (See
@@ -2149,7 +2149,7 @@ error:
 }
 
 /**
-* MONGODB MODIFICATION Fix for SERVER-38840.
+* MERIZODB MODIFICATION Fix for SERVER-38840.
 *
 * Ticket #12705 - Turn optimization back on.
 */

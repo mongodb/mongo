@@ -205,7 +205,7 @@ bool pushdownNode(MatchExpression* node,
         return pushdownNode(node, indexedOr, std::move(destinations));
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 // Populates 'out' with all descendants of 'node' that have OrPushdownTags, assuming the initial

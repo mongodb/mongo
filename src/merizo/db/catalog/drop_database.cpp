@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -54,8 +54,8 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(dropDatabaseHangBeforeLog);
-MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterAllCollectionsDrop);
+MERIZO_FAIL_POINT_DEFINE(dropDatabaseHangBeforeLog);
+MERIZO_FAIL_POINT_DEFINE(dropDatabaseHangAfterAllCollectionsDrop);
 
 namespace {
 
@@ -85,10 +85,10 @@ void _finishDropDatabase(OperationContext* opCtx,
     log() << "dropDatabase " << dbName << " - dropped " << numCollections << " collection(s)";
     log() << "dropDatabase " << dbName << " - finished";
 
-    if (MONGO_FAIL_POINT(dropDatabaseHangBeforeLog)) {
+    if (MERIZO_FAIL_POINT(dropDatabaseHangBeforeLog)) {
         log() << "dropDatabase - fail point dropDatabaseHangBeforeLog enabled. "
                  "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangBeforeLog);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangBeforeLog);
     }
 
     writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
@@ -288,10 +288,10 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
               << result.duration << ". dropping database";
     }
 
-    if (MONGO_FAIL_POINT(dropDatabaseHangAfterAllCollectionsDrop)) {
+    if (MERIZO_FAIL_POINT(dropDatabaseHangAfterAllCollectionsDrop)) {
         log() << "dropDatabase - fail point dropDatabaseHangAfterAllCollectionsDrop enabled. "
                  "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangAfterAllCollectionsDrop);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangAfterAllCollectionsDrop);
     }
 
     Lock::GlobalWrite lk(opCtx);

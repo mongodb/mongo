@@ -5,7 +5,7 @@
 
 testname = 'temp_namespace_sw';
 
-var conn = MongoRunner.runMongod();
+var conn = MerizoRunner.runMerizod();
 d = conn.getDB('test');
 d.runCommand({create: testname + 'temp1', temp: true});
 d[testname + 'temp1'].ensureIndex({x: 1});
@@ -26,9 +26,9 @@ function countCollectionNames(theDB, regex) {
 
 assert.eq(countCollectionNames(d, /temp\d$/), 2);
 assert.eq(countCollectionNames(d, /keep\d$/), 4);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
-conn = MongoRunner.runMongod({
+conn = MerizoRunner.runMerizod({
     restart: true,
     cleanData: false,
     dbpath: conn.dbpath,
@@ -36,4 +36,4 @@ conn = MongoRunner.runMongod({
 d = conn.getDB('test');
 assert.eq(countCollectionNames(d, /temp\d$/), 0);
 assert.eq(countCollectionNames(d, /keep\d$/), 4);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);

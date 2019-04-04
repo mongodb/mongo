@@ -17,7 +17,7 @@ import (
 
 // determineOplogCollectionName uses a command to infer
 // the name of the oplog collection in the connected db
-func (dump *MongoDump) determineOplogCollectionName() error {
+func (dump *MerizoDump) determineOplogCollectionName() error {
 	masterDoc := bson.M{}
 	err := dump.SessionProvider.Run("isMaster", &masterDoc, "admin")
 	if err != nil {
@@ -42,7 +42,7 @@ func (dump *MongoDump) determineOplogCollectionName() error {
 }
 
 // getOplogCurrentTime returns the most recent oplog entry
-func (dump *MongoDump) getCurrentOplogTime() (bson.MongoTimestamp, error) {
+func (dump *MerizoDump) getCurrentOplogTime() (bson.MerizoTimestamp, error) {
 	mostRecentOplogEntry := db.Oplog{}
 
 	err := dump.SessionProvider.FindOne("local", dump.oplogCollection, 0, nil, []string{"-$natural"}, &mostRecentOplogEntry, 0)
@@ -56,7 +56,7 @@ func (dump *MongoDump) getCurrentOplogTime() (bson.MongoTimestamp, error) {
 // since merizodump started. It does this by checking the oldest oplog entry
 // still in the database and making sure it happened at or before the timestamp
 // captured at the start of the dump.
-func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, error) {
+func (dump *MerizoDump) checkOplogTimestampExists(ts bson.MerizoTimestamp) (bool, error) {
 	oldestOplogEntry := db.Oplog{}
 	err := dump.SessionProvider.FindOne("local", dump.oplogCollection, 0, nil, []string{"+$natural"}, &oldestOplogEntry, 0)
 	if err != nil {
@@ -107,7 +107,7 @@ func oplogDocumentFilter(in []byte) ([]byte, error) {
 
 // DumpOplogBetweenTimestamps takes two timestamps and writer and dumps all oplog
 // entries between the given timestamp to the writer. Returns any errors that occur.
-func (dump *MongoDump) DumpOplogBetweenTimestamps(start, end bson.MongoTimestamp) error {
+func (dump *MerizoDump) DumpOplogBetweenTimestamps(start, end bson.MerizoTimestamp) error {
 	session, err := dump.SessionProvider.GetSession()
 	if err != nil {
 		return err

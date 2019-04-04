@@ -46,14 +46,14 @@ namespace merizo {
  * authorization or not.  This can be determined by invoking ->requiresAuth() on the parsed command.
  * If it does not require authorization, return boost::none.
  *
- * Both isReplSetMemberOrMongos and supportsDocLocking need to be true if the command contains a
+ * Both isReplSetMemberOrMerizos and supportsDocLocking need to be true if the command contains a
  * transaction number, otherwise this function will throw.
  */
 OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
                                                               const BSONObj& requestBody,
                                                               bool requiresAuth,
                                                               bool attachToOpCtx,
-                                                              bool isReplSetMemberOrMongos,
+                                                              bool isReplSetMemberOrMerizos,
                                                               bool supportsDocLocking);
 
 }  // namespace merizo

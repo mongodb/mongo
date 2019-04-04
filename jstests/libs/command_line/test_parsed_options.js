@@ -37,32 +37,32 @@ function mergeOptions(obj1, obj2) {
 //
 // Example:
 //
-// testGetCmdLineOptsMongod({ port : 10000 }, { "parsed" : { "net" : { "port" : 10000 } } });
+// testGetCmdLineOptsMerizod({ port : 10000 }, { "parsed" : { "net" : { "port" : 10000 } } });
 //
-var getCmdLineOptsBaseMongod;
-function testGetCmdLineOptsMongod(merizoRunnerConfig, expectedResult) {
+var getCmdLineOptsBaseMerizod;
+function testGetCmdLineOptsMerizod(merizoRunnerConfig, expectedResult) {
     // Get the options object returned by "getCmdLineOpts" when we spawn a merizod using our test
     // framework without passing any additional options.  We need this because the framework adds
     // options of its own, and we only want to compare against the options we care about.
     function getBaseOptsObject() {
         // Start merizod with no options
-        var baseMongod = MongoRunner.runMongod();
+        var baseMerizod = MerizoRunner.runMerizod();
 
         // Get base command line opts.  Needed because the framework adds its own options
-        var getCmdLineOptsBaseMongod = baseMongod.adminCommand("getCmdLineOpts");
+        var getCmdLineOptsBaseMerizod = baseMerizod.adminCommand("getCmdLineOpts");
 
         // Stop the merizod we used to get the options
-        MongoRunner.stopMongod(baseMongod);
+        MerizoRunner.stopMerizod(baseMerizod);
 
-        return getCmdLineOptsBaseMongod;
+        return getCmdLineOptsBaseMerizod;
     }
 
-    if (typeof getCmdLineOptsBaseMongod === "undefined") {
-        getCmdLineOptsBaseMongod = getBaseOptsObject();
+    if (typeof getCmdLineOptsBaseMerizod === "undefined") {
+        getCmdLineOptsBaseMerizod = getBaseOptsObject();
     }
 
     // Get base command line opts.  Needed because the framework adds its own options
-    var getCmdLineOptsExpected = getCmdLineOptsBaseMongod;
+    var getCmdLineOptsExpected = getCmdLineOptsBaseMerizod;
 
     // Delete port and dbPath if we are not explicitly setting them, since they will change on
     // multiple runs of the test framework and cause false failures.
@@ -81,7 +81,7 @@ function testGetCmdLineOptsMongod(merizoRunnerConfig, expectedResult) {
     expectedResult = mergeOptions(getCmdLineOptsExpected, expectedResult);
 
     // Start merizod with options
-    var merizod = MongoRunner.runMongod(merizoRunnerConfig);
+    var merizod = MerizoRunner.runMerizod(merizoRunnerConfig);
 
     // Create and authenticate high-privilege user in case merizod is running with authorization.
     // Try/catch is necessary in case this is being run on an uninitiated replset, by a test
@@ -114,7 +114,7 @@ function testGetCmdLineOptsMongod(merizoRunnerConfig, expectedResult) {
 
     // Cleanup
     merizod.getDB("admin").logout();
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 }
 
 // Test that the parsed result of setting certain command line options has the correct format in
@@ -128,28 +128,28 @@ function testGetCmdLineOptsMongod(merizoRunnerConfig, expectedResult) {
 //
 // Example:
 //
-// testGetCmdLineOptsMongos({ port : 10000 }, { "parsed" : { "net" : { "port" : 10000 } } });
+// testGetCmdLineOptsMerizos({ port : 10000 }, { "parsed" : { "net" : { "port" : 10000 } } });
 //
-var getCmdLineOptsBaseMongos;
-function testGetCmdLineOptsMongos(merizoRunnerConfig, expectedResult) {
+var getCmdLineOptsBaseMerizos;
+function testGetCmdLineOptsMerizos(merizoRunnerConfig, expectedResult) {
     "use strict";
 
     // Get the options object returned by "getCmdLineOpts" when we spawn a merizos using our test
     // framework without passing any additional options.  We need this because the framework adds
     // options of its own, and we only want to compare against the options we care about.
-    function getCmdLineOptsFromMongos(merizosOptions) {
+    function getCmdLineOptsFromMerizos(merizosOptions) {
         // Start merizod with no options
-        var baseMongod = MongoRunner.runMongod(
+        var baseMerizod = MerizoRunner.runMerizod(
             {configsvr: "", journal: "", replSet: "csrs", storageEngine: "wiredTiger"});
-        assert.commandWorked(baseMongod.adminCommand({
+        assert.commandWorked(baseMerizod.adminCommand({
             replSetInitiate:
-                {_id: "csrs", configsvr: true, members: [{_id: 0, host: baseMongod.host}]}
+                {_id: "csrs", configsvr: true, members: [{_id: 0, host: baseMerizod.host}]}
         }));
-        var configdbStr = "csrs/" + baseMongod.host;
+        var configdbStr = "csrs/" + baseMerizod.host;
         var ismasterResult;
         assert.soon(
             function() {
-                ismasterResult = baseMongod.adminCommand("ismaster");
+                ismasterResult = baseMerizod.adminCommand("ismaster");
                 return ismasterResult.ismaster;
             },
             function() {
@@ -157,27 +157,27 @@ function testGetCmdLineOptsMongos(merizoRunnerConfig, expectedResult) {
             });
 
         var options = Object.merge(merizosOptions, {configdb: configdbStr});
-        var baseMongos = MongoRunner.runMongos(options);
+        var baseMerizos = MerizoRunner.runMerizos(options);
 
         // Get base command line opts.  Needed because the framework adds its own options
-        var getCmdLineOptsResult = baseMongos.adminCommand("getCmdLineOpts");
+        var getCmdLineOptsResult = baseMerizos.adminCommand("getCmdLineOpts");
 
         // Remove the configdb option
         delete getCmdLineOptsResult.parsed.sharding.configDB;
 
         // Stop the merizod and merizos we used to get the options
-        MongoRunner.stopMongos(baseMongos);
-        MongoRunner.stopMongod(baseMongod);
+        MerizoRunner.stopMerizos(baseMerizos);
+        MerizoRunner.stopMerizod(baseMerizod);
 
         return getCmdLineOptsResult;
     }
 
-    if (typeof getCmdLineOptsBaseMongos === "undefined") {
-        getCmdLineOptsBaseMongos = getCmdLineOptsFromMongos({});
+    if (typeof getCmdLineOptsBaseMerizos === "undefined") {
+        getCmdLineOptsBaseMerizos = getCmdLineOptsFromMerizos({});
     }
 
     // Get base command line opts.  Needed because the framework adds its own options
-    var getCmdLineOptsExpected = getCmdLineOptsBaseMongos;
+    var getCmdLineOptsExpected = getCmdLineOptsBaseMerizos;
 
     // Delete port if we are not explicitly setting it, since it will change on multiple runs of the
     // test framework and cause false failures.
@@ -191,7 +191,7 @@ function testGetCmdLineOptsMongos(merizoRunnerConfig, expectedResult) {
     expectedResult = mergeOptions(getCmdLineOptsExpected, expectedResult);
 
     // Get the parsed options
-    var getCmdLineOptsResult = getCmdLineOptsFromMongos(merizoRunnerConfig);
+    var getCmdLineOptsResult = getCmdLineOptsFromMerizos(merizoRunnerConfig);
 
     // Delete port if we are not explicitly setting it, since it will change on multiple runs of the
     // test framework and cause false failures.

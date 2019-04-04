@@ -2,10 +2,10 @@
 // @tags: [requires_majority_read_concern]
 (function() {
     "use strict";
-    var testServer = MongoRunner.runMongod();
+    var testServer = MerizoRunner.runMerizod();
     if (!testServer.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
         jsTest.log("skipping test since storage engine doesn't support committed reads");
-        MongoRunner.stopMongod(testServer);
+        MerizoRunner.stopMerizod(testServer);
         return;
     }
     var coll = testServer.getDB("test").readMajority;
@@ -23,5 +23,5 @@
         coll.find({_id: "foo"}).readConcern("majority").count();
     });
 
-    MongoRunner.stopMongod(testServer);
+    MerizoRunner.stopMerizod(testServer);
 }());

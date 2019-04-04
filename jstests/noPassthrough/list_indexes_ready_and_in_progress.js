@@ -6,7 +6,7 @@
 
     load("jstests/noPassthrough/libs/index_build.js");
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod was unable to start up");
 
     const testDB = conn.getDB("test");
@@ -36,5 +36,5 @@
     assert.eq(0, exitCode, 'expected shell to exit cleanly');
 
     IndexBuildTest.assertIndexes(coll, 3, ["_id_", "a_1", "b_1"]);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

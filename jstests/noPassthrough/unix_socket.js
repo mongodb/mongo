@@ -17,7 +17,7 @@
     }
 
     // Do not fail if this test leaves unterminated processes because testSockOptions
-    // is expected to throw before it calls stopMongod.
+    // is expected to throw before it calls stopMerizod.
     TestData.failIfUnterminatedProcesses = false;
 
     var doesLogMatchRegex = function(logArray, regex) {
@@ -32,32 +32,32 @@
 
     var checkSocket = function(path) {
         assert.eq(fileExists(path), true);
-        var conn = new Mongo(path);
+        var conn = new Merizo(path);
         assert.commandWorked(conn.getDB("admin").runCommand("ping"),
                              `Expected ping command to succeed for ${path}`);
     };
 
-    var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',', optMongos) {
+    var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',', optMerizos) {
         var optDict = optDict || {};
         if (bindPath) {
-            optDict["bind_ip"] = `${MongoRunner.dataDir}/${bindPath}${bindSep}127.0.0.1`;
+            optDict["bind_ip"] = `${MerizoRunner.dataDir}/${bindPath}${bindSep}127.0.0.1`;
         }
 
         var conn, shards;
-        if (optMongos) {
+        if (optMerizos) {
             shards = new ShardingTest({shards: 1, merizos: 1, other: {merizosOptions: optDict}});
             assert.neq(shards, null, "Expected cluster to start okay");
             conn = shards.s0;
         } else {
-            conn = MongoRunner.runMongod(optDict);
+            conn = MerizoRunner.runMerizod(optDict);
         }
 
-        assert.neq(conn, null, `Expected ${optMongos ? "merizos" : "merizod"} to start okay`);
+        assert.neq(conn, null, `Expected ${optMerizos ? "merizos" : "merizod"} to start okay`);
 
         const defaultUNIXSocket = `/tmp/merizodb-${conn.port}.sock`;
         var checkPath = defaultUNIXSocket;
         if (expectSockPath) {
-            checkPath = `${MongoRunner.dataDir}/${expectSockPath}`;
+            checkPath = `${MerizoRunner.dataDir}/${expectSockPath}`;
         }
 
         checkSocket(checkPath);
@@ -69,10 +69,10 @@
         var re = new RegExp("anonymous unix socket");
         assert(doesLogMatchRegex(ll, re), "Log message did not contain 'anonymous unix socket'");
 
-        if (optMongos) {
+        if (optMerizos) {
             shards.stop();
         } else {
-            MongoRunner.stopMongod(conn);
+            MerizoRunner.stopMerizod(conn);
         }
 
         assert.eq(fileExists(checkPath), false);
@@ -106,7 +106,7 @@
     });
 
     // Check the unixSocketPrefix option
-    var socketPrefix = `${MongoRunner.dataDir}/socketdir`;
+    var socketPrefix = `${MerizoRunner.dataDir}/socketdir`;
     mkdir(socketPrefix);
     var port = allocatePort();
     testSockOptions(

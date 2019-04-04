@@ -124,7 +124,7 @@ if not get_option('ssl') == 'off':
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/merizo/base/secure_allocator',
-            '$BUILD_DIR/merizo/crypto/sha_block_${MONGO_CRYPTO}',
+            '$BUILD_DIR/merizo/crypto/sha_block_${MERIZO_CRYPTO}',
             '$BUILD_DIR/merizo/db/commands/server_status',
             '$BUILD_DIR/merizo/db/server_options_core',
             '$BUILD_DIR/merizo/db/service_context',

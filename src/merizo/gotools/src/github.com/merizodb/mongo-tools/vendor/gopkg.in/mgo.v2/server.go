@@ -37,7 +37,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Mongo server encapsulation.
+// Merizo server encapsulation.
 
 type merizoServer struct {
 	sync.RWMutex
@@ -69,7 +69,7 @@ func (dial dialer) isSet() bool {
 
 type merizoServerInfo struct {
 	Master         bool
-	Mongos         bool
+	Merizos         bool
 	Tags           bson.D
 	MaxWireVersion int
 	SetName        string
@@ -414,9 +414,9 @@ func (servers *merizoServers) Empty() bool {
 	return len(servers.slice) == 0
 }
 
-func (servers *merizoServers) HasMongos() bool {
+func (servers *merizoServers) HasMerizos() bool {
 	for _, s := range servers.slice {
-		if s.Info().Mongos {
+		if s.Info().Merizos {
 			return true
 		}
 	}
@@ -431,7 +431,7 @@ func (servers *merizoServers) BestFit(mode Mode, serverTags []bson.D) *merizoSer
 		if best == nil {
 			best = next
 			best.RLock()
-			if serverTags != nil && !next.info.Mongos && !best.hasTags(serverTags) {
+			if serverTags != nil && !next.info.Merizos && !best.hasTags(serverTags) {
 				best.RUnlock()
 				best = nil
 			}
@@ -440,9 +440,9 @@ func (servers *merizoServers) BestFit(mode Mode, serverTags []bson.D) *merizoSer
 		next.RLock()
 		swap := false
 		switch {
-		case serverTags != nil && !next.info.Mongos && !next.hasTags(serverTags):
+		case serverTags != nil && !next.info.Merizos && !next.hasTags(serverTags):
 			// Must have requested tags.
-		case mode == Secondary && next.info.Master && !next.info.Mongos:
+		case mode == Secondary && next.info.Master && !next.info.Merizos:
 			// Must be a secondary or merizos.
 		case next.info.Master != best.info.Master && mode != Nearest:
 			// Prefer slaves, unless the mode is PrimaryPreferred.

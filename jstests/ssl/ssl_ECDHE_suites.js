@@ -32,7 +32,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
         bind_ip_all: ""
     };
 
-    const merizod = MongoRunner.runMongod(x509_options);
+    const merizod = MerizoRunner.runMerizod(x509_options);
 
     // Use new toolchain python, if it exists
     let python_binary = '/opt/merizodbtoolchain/v3/bin/python3';
@@ -97,5 +97,5 @@ load('jstests/ssl/libs/ssl_helpers.js');
         assert(hasDHE === hasECDHE, 'Supports both ECDHE and DHE or neither');
     }
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 }());

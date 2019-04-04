@@ -99,7 +99,7 @@ struct StorageGlobalParams {
     AtomicDouble syncdelay;  // seconds between fsyncs
 
     // --queryableBackupMode
-    // Puts MongoD into "read-only" mode. MongoD will not write any data to the underlying
+    // Puts MerizoD into "read-only" mode. MerizoD will not write any data to the underlying
     // filesystem. Note that read operations may require writes. For example, a sort on a large
     // dataset may fail if it requires spilling to disk.
     bool readOnly;

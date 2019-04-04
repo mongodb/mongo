@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	WinKerberosPwdEnv = "MONGODB_KERBEROS_PASSWORD"
+	WinKerberosPwdEnv = "MERIZODB_KERBEROS_PASSWORD"
 )
 
 func GetKerberosOptions() (*options.ToolOptions, error) {

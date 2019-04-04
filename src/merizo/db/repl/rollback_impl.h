@@ -271,7 +271,7 @@ public:
      * Only exposed for testing. It is invalid to call this function on a real RollbackImpl.
      */
     virtual const std::vector<BSONObj>& docsDeletedForNamespace_forTest(UUID uuid) const& {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     void docsDeletedForNamespace_forTest(UUID)&& = delete;
 

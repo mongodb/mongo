@@ -51,7 +51,7 @@ admin_s1.runCommand({replSetFreeze: 999999});
 print("6. Bring up #3");
 var hostname = getHostName();
 
-var slave2 = MongoRunner.runMongod(Object.merge({replSet: basename, oplogSize: 2}, x509_options2));
+var slave2 = MerizoRunner.runMerizod(Object.merge({replSet: basename, oplogSize: 2}, x509_options2));
 
 var local_s2 = slave2.getDB("local");
 var admin_s2 = slave2.getDB("admin");
@@ -102,5 +102,5 @@ assert.writeOK(bulk.execute());
 print("11. Everyone happy eventually");
 replTest.awaitReplication();
 
-MongoRunner.stopMongod(slave2);
+MerizoRunner.stopMerizod(slave2);
 replTest.stopSet();

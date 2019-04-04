@@ -346,7 +346,7 @@
                 lsid: {id: lsid},
                 txnNumber: NumberLong(1)
             }));
-            // Mongos will automatically retry on retryable errors if the request has a txnNumber,
+            // Merizos will automatically retry on retryable errors if the request has a txnNumber,
             // and the retry path for already completed writes does not trigger the failpoint, so
             // the command will succeed when run through merizos.
             assert.eq(2, res.n);

@@ -14,7 +14,7 @@ load("jstests/free_mon/libs/free_mon.js");
         verbose: 1,
     };
 
-    const conn = MongoRunner.runMongod(options);
+    const conn = MerizoRunner.runMerizod(options);
     assert.neq(null, conn, 'merizod was unable to start up');
 
     // Wait an arbitrary amount of time to allow the processor loop to start.
@@ -66,7 +66,7 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.commandWorked(retStatus2);
     assert.eq(retStatus2.state, "disabled", tojson(retStatus1));
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     mock_web.stop();
 })();

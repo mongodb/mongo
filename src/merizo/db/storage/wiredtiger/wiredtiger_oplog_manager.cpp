@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -48,7 +48,7 @@ namespace {
 const uint64_t kMinimumTimestamp = 1;
 }  // namespace
 
-MONGO_FAIL_POINT_DEFINE(WTPausePrimaryOplogDurabilityLoop);
+MERIZO_FAIL_POINT_DEFINE(WTPausePrimaryOplogDurabilityLoop);
 
 void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    const std::string& uri,
@@ -164,7 +164,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
     while (true) {
         stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
         {
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             _opsWaitingForJournalCV.wait(lk,
                                          [&] { return _shuttingDown || _opsWaitingForJournal; });
 
@@ -196,7 +196,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
             }
         }
 
-        while (!_shuttingDown && MONGO_FAIL_POINT(WTPausePrimaryOplogDurabilityLoop)) {
+        while (!_shuttingDown && MERIZO_FAIL_POINT(WTPausePrimaryOplogDurabilityLoop)) {
             lk.unlock();
             sleepmillis(10);
             lk.lock();

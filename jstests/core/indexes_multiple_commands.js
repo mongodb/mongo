@@ -8,7 +8,7 @@
     'use strict';
 
     var coll = db.indexes_multiple_commands;
-    var usingWriteCommands = db.getMongo().writeMode() === "commands";
+    var usingWriteCommands = db.getMerizo().writeMode() === "commands";
 
     /**
      * Assert that the result of the index creation ('cmd') indicates that 'numIndexes' were
@@ -143,7 +143,7 @@
 
     // An ambiguous hint pattern fails.
     assert.throws(() => coll.find({a: 1}).hint({a: 1}).itcount());
-    if (db.getMongo().useReadCommands()) {
+    if (db.getMerizo().useReadCommands()) {
         assert.throws(
             () =>
                 coll.find({a: 1}).collation({locale: "en_US", strength: 2}).hint({a: 1}).itcount());
@@ -154,7 +154,7 @@
     // A hint on an incompatible index does a whole index scan, and then filters using the query
     // collation.
     assert.eq(coll.find({a: "a"}).hint("caseInsensitive").itcount(), 1);
-    if (db.getMongo().useReadCommands()) {
+    if (db.getMerizo().useReadCommands()) {
         assert.eq(
             coll.find({a: "a"}).collation({locale: "en_US", strength: 2}).hint("sbc").itcount(), 2);
 

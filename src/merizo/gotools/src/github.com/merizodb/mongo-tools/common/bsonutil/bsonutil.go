@@ -211,7 +211,7 @@ func ParseSpecialKeys(special interface{}) (interface{}, error) {
 				return nil, errors.New("expected $timestamp to have 'i' field")
 			}
 			// see BSON spec for details on the bit fiddling here
-			return bson.MongoTimestamp(int64(ts.Seconds)<<32 | int64(ts.Increment)), nil
+			return bson.MerizoTimestamp(int64(ts.Seconds)<<32 | int64(ts.Increment)), nil
 		}
 
 		if jsonValue, ok := doc["$numberDecimal"]; ok {

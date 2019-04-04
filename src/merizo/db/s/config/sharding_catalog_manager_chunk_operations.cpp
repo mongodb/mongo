@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -57,7 +57,7 @@
 namespace merizo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(migrationCommitVersionError);
+MERIZO_FAIL_POINT_DEFINE(migrationCommitVersionError);
 
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
@@ -629,7 +629,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         return findResponse.getStatus();
     }
 
-    if (MONGO_FAIL_POINT(migrationCommitVersionError)) {
+    if (MERIZO_FAIL_POINT(migrationCommitVersionError)) {
         uassert(ErrorCodes::StaleEpoch,
                 "failpoint 'migrationCommitVersionError' generated error",
                 false);

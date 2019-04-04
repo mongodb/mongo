@@ -84,7 +84,7 @@ var _kill_sessions_api_module = (function() {
         // hang).
         var thread = new Thread(
             function(connstring, credentials, tag, isdbgrid) {
-                var client = new Mongo(connstring);
+                var client = new Merizo(connstring);
                 if (credentials) {
                     client.getDB("admin").auth(credentials, "password");
                 }
@@ -119,7 +119,7 @@ var _kill_sessions_api_module = (function() {
         // hosts.  We identify particular ops by secs sleeping.
         this.visit(function(client) {
             let admin = client.getDB("admin");
-            admin.getMongo().setSlaveOk();
+            admin.getMerizo().setSlaveOk();
 
             assert.soon(function() {
                 let inProgressOps = admin.aggregate([{$currentOp: {'allUsers': true}}]);

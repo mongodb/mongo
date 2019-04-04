@@ -171,7 +171,7 @@ configs:
     arg_vartype: String
     conflicts: [ "net.tls.certificateKeyFile", "net.tls.certificateKeyFilePassword" ]
     condition:
-      preprocessor: "defined(MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
+      preprocessor: "defined(MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
   "net.tls.clusterCertificateSelector":
     description: "SSL/TLS Certificate in system store for internal TLS authentication"
     short_name: tlsClusterCertificateSelector
@@ -180,7 +180,7 @@ configs:
     arg_vartype: String
     conflicts: [ "net.tls.clusterFile", "net.tls.clusterFilePassword" ]
     condition:
-      preprocessor: "defined(MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
+      preprocessor: "defined(MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
 
   "net.tls.logVersions":
     description: "Comma separated list of TLS protocols to log on connect [TLS1_0,TLS1_1,TLS1_2]"

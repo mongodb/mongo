@@ -22,9 +22,9 @@
             "--nodb",
             "--eval",
             "inner_mode=true;port=" + primary.port + ";",
-            "jstests/noPassthroughWithMongod/replset_host_connection_validation.js"
+            "jstests/noPassthroughWithMerizod/replset_host_connection_validation.js"
         ];
-        const exitCode = _runMongoProgram(...args);
+        const exitCode = _runMerizoProgram(...args);
         jsTest.log("Inner mode test finished, exit code was " + exitCode);
 
         replTest.stopSet();
@@ -36,7 +36,7 @@
     }
 
     function testHost(host, uri, ok) {
-        const exitCode = runMongoProgram('merizo', '--eval', ';', '--host', host, uri);
+        const exitCode = runMerizoProgram('merizo', '--eval', ';', '--host', host, uri);
         if (ok) {
             assert.eq(exitCode, 0, "failed to connect with `--host " + host + "`");
         } else {

@@ -86,7 +86,7 @@ public:
 // available to the client.
 //
 
-MONGO_INITIALIZER(RegisterTopCommand)(InitializerContext* context) {
+MERIZO_INITIALIZER(RegisterTopCommand)(InitializerContext* context) {
     new TopCommand();
 
     return Status::OK();

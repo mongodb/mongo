@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    var dir = MongoRunner.dataPath + "ShellMkdirTestDirectory";
+    var dir = MerizoRunner.dataPath + "ShellMkdirTestDirectory";
     removeFile(dir);
 
     // Make a new directory

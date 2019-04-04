@@ -198,7 +198,7 @@ def register_signal_handler(handler):
 
     if _IS_WINDOWS:
         # Create unique event_name.
-        event_name = "Global\\Mongo_Python_{:d}".format(os.getpid())
+        event_name = "Global\\Merizo_Python_{:d}".format(os.getpid())
         LOGGER.debug("Registering event %s", event_name)
 
         try:
@@ -996,12 +996,12 @@ class PosixService(object):
         return self.pids
 
 
-class MongodControl(object):  # pylint: disable=too-many-instance-attributes
+class MerizodControl(object):  # pylint: disable=too-many-instance-attributes
     """Control merizod process."""
 
     def __init__(  # pylint: disable=too-many-arguments
             self, bin_dir, db_path, log_path, port, options=None):
-        """Initialize MongodControl."""
+        """Initialize MerizodControl."""
         self.process_name = "merizod{}".format(executable_extension())
 
         self.bin_dir = bin_dir
@@ -1178,7 +1178,7 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
     if options.repl_set:
         options.merizod_options = "{} --replSet {}".format(options.merizod_options, options.repl_set)
 
-    # For MongodControl, the file references should be fully specified.
+    # For MerizodControl, the file references should be fully specified.
     if options.merizodb_bin_dir:
         bin_dir = abs_path(options.merizodb_bin_dir)
     else:
@@ -1186,7 +1186,7 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
     db_path = abs_path(options.db_path)
     log_path = abs_path(options.log_path)
 
-    merizod = MongodControl(bin_dir=bin_dir, db_path=db_path, log_path=log_path, port=options.port,
+    merizod = MerizodControl(bin_dir=bin_dir, db_path=db_path, log_path=log_path, port=options.port,
                            options=options.merizod_options)
 
     merizo_client_opts = get_merizo_client_args(host=host, port=options.port, options=options)
@@ -1253,7 +1253,7 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
                 LOGGER.error("Failed to start merizod on port %d: %s", options.port, output)
                 return ret
             LOGGER.info("Started merizod running on port %d pid %s", options.port, merizod.get_pids())
-            merizo = pymerizo.MongoClient(**merizo_client_opts)
+            merizo = pymerizo.MerizoClient(**merizo_client_opts)
             LOGGER.info("Server buildinfo: %s", merizo.admin.command("buildinfo"))
             LOGGER.info("Server serverStatus: %s", merizo.admin.command("serverStatus"))
             if options.repl_set:
@@ -1265,7 +1265,7 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
             ret = wait_for_merizod_shutdown(merizod)
 
         elif operation == "shutdown_merizod":
-            merizo = pymerizo.MongoClient(**merizo_client_opts)
+            merizo = pymerizo.MerizoClient(**merizo_client_opts)
             try:
                 merizo.admin.command("shutdown", force=True)
             except pymerizo.errors.AutoReconnect:
@@ -1283,26 +1283,26 @@ def remote_handler(options, operations):  # pylint: disable=too-many-branches,to
                 os.rename(rsync_dir, new_rsync_dir)
 
         elif operation == "seed_docs":
-            merizo = pymerizo.MongoClient(**merizo_client_opts)
+            merizo = pymerizo.MerizoClient(**merizo_client_opts)
             ret = merizo_seed_docs(merizo, options.db_name, options.collection_name,
                                   options.seed_doc_num)
 
         elif operation == "validate_collections":
-            merizo = pymerizo.MongoClient(**merizo_client_opts)
+            merizo = pymerizo.MerizoClient(**merizo_client_opts)
             ret = merizo_validate_collections(merizo)
 
         elif operation == "insert_canary":
-            merizo = pymerizo.MongoClient(**merizo_client_opts)
+            merizo = pymerizo.MerizoClient(**merizo_client_opts)
             ret = merizo_insert_canary(merizo, options.db_name, options.collection_name,
                                       options.canary_doc)
 
         elif operation == "validate_canary":
-            merizo = pymerizo.MongoClient(**merizo_client_opts)
+            merizo = pymerizo.MerizoClient(**merizo_client_opts)
             ret = merizo_validate_canary(merizo, options.db_name, options.collection_name,
                                         options.canary_doc)
 
         elif operation == "set_fcv":
-            merizo = pymerizo.MongoClient(**merizo_client_opts)
+            merizo = pymerizo.MerizoClient(**merizo_client_opts)
             try:
                 ret = merizo.admin.command("setFeatureCompatibilityVersion", options.fcv_version)
                 ret = 0 if ret["ok"] == 1 else 1
@@ -1478,7 +1478,7 @@ def wait_for_merizod_shutdown(merizod_control, timeout=120):
 
 def get_merizo_client_args(host=None, port=None, options=None, server_selection_timeout_ms=600000,
                           socket_timeout_ms=600000):
-    """Return keyword arg dict used in PyMongo client."""
+    """Return keyword arg dict used in PyMerizo client."""
     # Set the default serverSelectionTimeoutMS & socketTimeoutMS to 10 minutes.
     merizo_args = {
         "serverSelectionTimeoutMS": server_selection_timeout_ms,
@@ -2368,7 +2368,7 @@ Examples:
 
         # Optionally validate canary document locally.
         if validate_canary_local:
-            merizo = pymerizo.MongoClient(**get_merizo_client_args(
+            merizo = pymerizo.MerizoClient(**get_merizo_client_args(
                 host=merizod_host, port=secret_port, server_selection_timeout_ms=one_hour_ms,
                 socket_timeout_ms=one_hour_ms))
             ret = merizo_validate_canary(merizo, options.db_name, options.collection_name, canary_doc)
@@ -2459,7 +2459,7 @@ Examples:
         if options.canary:
             canary_doc = {"x": time.time()}
             orig_canary_doc = copy.deepcopy(canary_doc)
-            merizo = pymerizo.MongoClient(**get_merizo_client_args(
+            merizo = pymerizo.MerizoClient(**get_merizo_client_args(
                 host=merizod_host, port=standard_port, server_selection_timeout_ms=one_hour_ms,
                 socket_timeout_ms=one_hour_ms))
             crash_canary["function"] = merizo_insert_canary

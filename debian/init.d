@@ -56,7 +56,7 @@ NAME=merizod
 # http://dochub.merizodb.org/core/configurationoptions
 CONF=/etc/merizod.conf
 PIDFILE=/var/run/$NAME.pid
-ENABLE_MONGOD=yes
+ENABLE_MERIZOD=yes
 
 # Include merizodb defaults if available.
 # All variables set before this point can be overridden by users, by
@@ -84,7 +84,7 @@ if test ! -x $DAEMON; then
     exit 0
 fi
 
-if test "x$ENABLE_MONGOD" != "xyes"; then
+if test "x$ENABLE_MERIZOD" != "xyes"; then
     exit 0
 fi
 

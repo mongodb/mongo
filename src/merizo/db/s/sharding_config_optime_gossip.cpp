@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -44,10 +44,10 @@
 namespace merizo {
 namespace rpc {
 
-void ShardingEgressMetadataHookForMongod::_saveGLEStats(const BSONObj& metadata,
+void ShardingEgressMetadataHookForMerizod::_saveGLEStats(const BSONObj& metadata,
                                                         StringData hostString) {}
 
-repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
+repl::OpTime ShardingEgressMetadataHookForMerizod::_getConfigServerOpTime() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return repl::ReplicationCoordinator::get(_serviceContext)
             ->getCurrentCommittedSnapshotOpTime();
@@ -57,7 +57,7 @@ repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
     return Grid::get(_serviceContext)->configOpTime();
 }
 
-Status ShardingEgressMetadataHookForMongod::_advanceConfigOptimeFromShard(
+Status ShardingEgressMetadataHookForMerizod::_advanceConfigOptimeFromShard(
     ShardId shardId, const BSONObj& metadataObj) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();

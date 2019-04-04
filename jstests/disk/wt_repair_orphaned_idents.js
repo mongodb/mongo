@@ -9,18 +9,18 @@
     load('jstests/disk/libs/wt_file_helper.js');
 
     const baseName = "wt_repair_orphaned_idents";
-    const dbpath = MongoRunner.dataPath + baseName + "/";
+    const dbpath = MerizoRunner.dataPath + baseName + "/";
 
     resetDbpath(dbpath);
 
     // Create a collection and insert a doc.
-    let merizod = MongoRunner.runMongod({dbpath: dbpath});
+    let merizod = MerizoRunner.runMerizod({dbpath: dbpath});
     const importantCollName = "importantColl";
     const importantDocId = "importantDoc";
     const importantColl = merizod.getDB("test")[importantCollName];
     assert.commandWorked(importantColl.insert({_id: importantDocId}));
     const importantCollIdent = getUriForColl(importantColl);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     // Delete the _mdb_catalog.
     let mdbCatalogFile = dbpath + "_mdb_catalog.wt";
@@ -29,10 +29,10 @@
 
     // Repair crates the _mdb_catalog and catalog entries for all the orphaned idents.
     jsTestLog("running merizod with --repair");
-    assert.eq(0, runMongoProgram("merizod", "--repair", "--port", merizod.port, "--dbpath", dbpath));
+    assert.eq(0, runMerizoProgram("merizod", "--repair", "--port", merizod.port, "--dbpath", dbpath));
 
     jsTestLog("restarting merizod");
-    merizod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
+    merizod = MerizoRunner.runMerizod({dbpath: dbpath, noCleanData: true});
 
     let localDb = merizod.getDB("local");
     let res = localDb.runCommand({listCollections: 1});
@@ -84,5 +84,5 @@
         assert(testDb[collName].drop());
     }
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

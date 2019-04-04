@@ -30,7 +30,7 @@ global:
     cpp_namespace: "merizo::embedded"
     configs:
         initializer:
-            register: addMongoEmbeddedTestOptions
+            register: addMerizoEmbeddedTestOptions
 
 configs:
     tempPath:

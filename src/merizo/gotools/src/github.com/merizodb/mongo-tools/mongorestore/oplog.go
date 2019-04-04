@@ -27,7 +27,7 @@ import (
 const oplogMaxCommandSize = 1024 * 1024 * 8
 
 // RestoreOplog attempts to restore a MerizoDB oplog.
-func (restore *MongoRestore) RestoreOplog() error {
+func (restore *MerizoRestore) RestoreOplog() error {
 	log.Logv(log.Always, "replaying oplog")
 	intent := restore.manager.Oplog()
 	if intent == nil {
@@ -113,7 +113,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 
 // ApplyOps is a wrapper for the applyOps database command, we pass in
 // a session to avoid opening a new connection for a few inserts at a time.
-func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{}) error {
+func (restore *MerizoRestore) ApplyOps(session *mgo.Session, entries []interface{}) error {
 	res := bson.M{}
 	err := session.Run(bson.D{{"applyOps", entries}}, &res)
 	if err != nil {
@@ -128,7 +128,7 @@ func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{
 
 // TimestampBeforeLimit returns true if the given timestamp is allowed to be
 // applied to merizorestore's target database.
-func (restore *MongoRestore) TimestampBeforeLimit(ts bson.MongoTimestamp) bool {
+func (restore *MerizoRestore) TimestampBeforeLimit(ts bson.MerizoTimestamp) bool {
 	if restore.oplogLimit == 0 {
 		// always valid if there is no --oplogLimit set
 		return true
@@ -139,8 +139,8 @@ func (restore *MongoRestore) TimestampBeforeLimit(ts bson.MongoTimestamp) bool {
 // ParseTimestampFlag takes in a string the form of <time_t>:<ordinal>,
 // where <time_t> is the seconds since the UNIX epoch, and <ordinal> represents
 // a counter of operations in the oplog that occurred in the specified second.
-// It parses this timestamp string and returns a bson.MongoTimestamp type.
-func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
+// It parses this timestamp string and returns a bson.MerizoTimestamp type.
+func ParseTimestampFlag(ts string) (bson.MerizoTimestamp, error) {
 	var seconds, increment int
 	timestampFields := strings.Split(ts, ":")
 	if len(timestampFields) > 2 {
@@ -166,12 +166,12 @@ func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
 	}
 
 	timestamp := (int64(seconds) << 32) | int64(increment)
-	return bson.MongoTimestamp(timestamp), nil
+	return bson.MerizoTimestamp(timestamp), nil
 }
 
 // filterUUIDs removes 'ui' entries from ops, including nested applyOps ops.
 // It also modifies ops that rely on 'ui'.
-func (restore *MongoRestore) filterUUIDs(op db.Oplog) (db.Oplog, error) {
+func (restore *MerizoRestore) filterUUIDs(op db.Oplog) (db.Oplog, error) {
 	// Remove UUIDs from oplog entries
 	if !restore.OutputOptions.PreserveUUID {
 		op.UI = nil
@@ -235,7 +235,7 @@ func isApplyOpsCmd(cmd bson.D) bool {
 
 // newFilteredApplyOps iterates over nested ops in an applyOps document and
 // returns a new applyOps document that omits the 'ui' field from nested ops.
-func (restore *MongoRestore) newFilteredApplyOps(cmd bson.D) (bson.D, error) {
+func (restore *MerizoRestore) newFilteredApplyOps(cmd bson.D) (bson.D, error) {
 	ops, err := unwrapNestedApplyOps(cmd)
 	if err != nil {
 		return nil, err

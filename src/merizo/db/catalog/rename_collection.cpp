@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -63,7 +63,7 @@
 namespace merizo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(writeConfilctInRenameCollCopyToTmp);
+MERIZO_FAIL_POINT_DEFINE(writeConfilctInRenameCollCopyToTmp);
 
 NamespaceString getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
     Collection* source = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
@@ -552,7 +552,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                         opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
                 });
                 // Used to make sure that a WCE can be handled by this logic without data loss.
-                if (MONGO_FAIL_POINT(writeConfilctInRenameCollCopyToTmp)) {
+                if (MERIZO_FAIL_POINT(writeConfilctInRenameCollCopyToTmp)) {
                     throw WriteConflictException();
                 }
                 wunit.commit();

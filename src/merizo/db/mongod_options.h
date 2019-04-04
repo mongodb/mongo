@@ -48,16 +48,16 @@ class Environment;
 namespace moe = merizo::optionenvironment;
 
 
-Status addMongodOptions(moe::OptionSection* options);
+Status addMerizodOptions(moe::OptionSection* options);
 
-void printMongodHelp(const moe::OptionSection& options);
+void printMerizodHelp(const moe::OptionSection& options);
 
 /**
  * Handle options that should come before validation, such as "help".
  *
  * Returns false if an option was found that implies we should prematurely exit with success.
  */
-bool handlePreValidationMongodOptions(const moe::Environment& params,
+bool handlePreValidationMerizodOptions(const moe::Environment& params,
                                       const std::vector<std::string>& args);
 
 /**
@@ -65,7 +65,7 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
  * Constraints in the Environment.  See the "validate" function in the Environment class for
  * more details.
  */
-Status validateMongodOptions(const moe::Environment& params);
+Status validateMerizodOptions(const moe::Environment& params);
 
 /**
  * Canonicalize merizod options for the given environment.
@@ -73,12 +73,12 @@ Status validateMongodOptions(const moe::Environment& params);
  * For example, the options "dur", "nodur", "journal", "nojournal", and
  * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".
  */
-Status canonicalizeMongodOptions(moe::Environment* params);
+Status canonicalizeMerizodOptions(moe::Environment* params);
 
-// Must be called after "storeMongodOptions"
-StatusWith<repl::ReplSettings> parseMongodReplicationOptions(const moe::Environment& params);
+// Must be called after "storeMerizodOptions"
+StatusWith<repl::ReplSettings> parseMerizodReplicationOptions(const moe::Environment& params);
 
-Status storeMongodOptions(const moe::Environment& params);
+Status storeMerizodOptions(const moe::Environment& params);
 
 /**
  * Help test user for storage.dbPath config option.

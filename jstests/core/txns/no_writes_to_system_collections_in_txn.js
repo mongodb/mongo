@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
 
     // Use a custom database, to avoid conflict with other tests that use the system.js collection.
     const testDB = session.getDatabase("no_writes_system_collections_in_txn");

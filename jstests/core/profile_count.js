@@ -10,7 +10,7 @@
 
     var testDB = db.getSiblingDB("profile_count");
     assert.commandWorked(testDB.dropDatabase());
-    var conn = testDB.getMongo();
+    var conn = testDB.getMerizo();
     var coll = testDB.getCollection("test");
 
     testDB.setProfilingLevel(2);

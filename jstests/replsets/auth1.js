@@ -23,24 +23,24 @@ load("jstests/replsets/rslib.js");
     var key1_644 = path + "key1_644";
 
     print("try starting merizod with auth");
-    var m = MongoRunner.runMongod(
-        {auth: "", port: port[4], dbpath: MongoRunner.dataDir + "/wrong-auth"});
+    var m = MerizoRunner.runMerizod(
+        {auth: "", port: port[4], dbpath: MerizoRunner.dataDir + "/wrong-auth"});
 
     assert.eq(m.getDB("local").auth("__system", ""), 0);
 
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 
     print("reset permissions");
     run("chmod", "644", key1_644);
 
     print("try starting merizod");
-    m = runMongoProgram("merizod",
+    m = runMerizoProgram("merizod",
                         "--keyFile",
                         key1_644,
                         "--port",
                         port[0],
                         "--dbpath",
-                        MongoRunner.dataPath + name);
+                        MerizoRunner.dataPath + name);
 
     print("should fail with wrong permissions");
     assert.eq(
@@ -49,11 +49,11 @@ load("jstests/replsets/rslib.js");
     // Pre-populate the data directory for the first replica set node, to be started later, with
     // a user's credentials.
     print("add a user to server0: foo");
-    m = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-0"});
+    m = MerizoRunner.runMerizod({dbpath: MerizoRunner.dataPath + name + "-0"});
     m.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
     m.getDB("test").createUser({user: "bar", pwd: "baz", roles: jsTest.basicUserRoles});
     print("make sure user is written before shutting down");
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 
     print("start up rs");
     var rs = new ReplSetTest({"name": name, "nodes": 3});
@@ -148,8 +148,8 @@ load("jstests/replsets/rslib.js");
     bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS});
 
     print("add member with wrong key");
-    var conn = MongoRunner.runMongod({
-        dbpath: MongoRunner.dataPath + name + "-3",
+    var conn = MerizoRunner.runMerizod({
+        dbpath: MerizoRunner.dataPath + name + "-3",
         port: port[3],
         replSet: "rs_auth1",
         oplogSize: 2,
@@ -178,11 +178,11 @@ load("jstests/replsets/rslib.js");
     }
 
     print("stop member");
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     print("start back up with correct key");
-    var conn = MongoRunner.runMongod({
-        dbpath: MongoRunner.dataPath + name + "-3",
+    var conn = MerizoRunner.runMerizod({
+        dbpath: MerizoRunner.dataPath + name + "-3",
         port: port[3],
         replSet: "rs_auth1",
         oplogSize: 2,
@@ -212,6 +212,6 @@ load("jstests/replsets/rslib.js");
         }
         return true;
     });
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
     rs.stopSet();
 })();

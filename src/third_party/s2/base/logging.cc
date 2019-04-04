@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kGeo
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kGeo
 
 #include "logging.h"
 

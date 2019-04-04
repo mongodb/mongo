@@ -66,7 +66,7 @@ public:
      */
     template <typename T>
     auto declareDecoration() {
-        MONGO_STATIC_ASSERT_MSG(std::is_nothrow_destructible<T>::value,
+        MERIZO_STATIC_ASSERT_MSG(std::is_nothrow_destructible<T>::value,
                                 "Decorations must be nothrow destructible");
         return
             typename DecorationContainer<DecoratedType>::template DecorationDescriptorWithType<T>(

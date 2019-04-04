@@ -21,13 +21,13 @@
     // 'duringFailpointFunc' while the failpoint is active.
     let doDuringFailpoint = function(
         failPointName, logMessage, hitFailpointFunc, duringFailpointFunc, i) {
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
         assert.commandWorked(testDB.adminCommand(
             {configureFailPoint: failPointName, mode: "alwaysOn", data: {"i": i}}));
 
         hitFailpointFunc();
 
-        assert.soon(() => rawMongoProgramOutput().indexOf(logMessage) >= 0);
+        assert.soon(() => rawMerizoProgramOutput().indexOf(logMessage) >= 0);
 
         duringFailpointFunc();
 

@@ -12,10 +12,10 @@
     let txnNumber = 0;
 
     const sessionOptions = {causalConsistency: false};
-    const session = db.getMongo().startSession(sessionOptions);
+    const session = db.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
 
-    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    const isMerizos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
 
     assert.commandWorked(
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
@@ -54,8 +54,8 @@
         })),
                                      ErrorCodes.OperationNotSupportedInTransaction);
 
-        // Mongos has special handling for commitTransaction to support commit recovery.
-        if (!isMongos) {
+        // Merizos has special handling for commitTransaction to support commit recovery.
+        if (!isMerizos) {
             assert.commandFailedWithCode(sessionDb.adminCommand({
                 commitTransaction: 1,
                 txnNumber: NumberLong(txnNumber),
@@ -103,7 +103,7 @@
     ];
 
     // There is no applyOps command on merizos.
-    if (!isMongos) {
+    if (!isMerizos) {
         sessionCommands.push(
             {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]});
     }
@@ -147,7 +147,7 @@
     //
 
     // There is no doTxn command on merizos.
-    if (!isMongos) {
+    if (!isMerizos) {
         assert.commandWorked(sessionDb.runCommand({
             find: collName,
             readConcern: {level: "snapshot"},
@@ -188,8 +188,8 @@
     }),
                                  ErrorCodes.OperationNotSupportedInTransaction);
 
-    // Mongos has special handling for commitTransaction to support commit recovery.
-    if (!isMongos) {
+    // Merizos has special handling for commitTransaction to support commit recovery.
+    if (!isMerizos) {
         // The failed find should abort the transaction so a commit should fail.
         assert.commandFailedWithCode(sessionDb.adminCommand({
             commitTransaction: 1,

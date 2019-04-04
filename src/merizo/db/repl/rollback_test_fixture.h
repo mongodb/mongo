@@ -47,10 +47,10 @@ namespace repl {
  * Test fixture for both 3.4 and 3.6 rollback unit tests.
  * The fixture makes available to tests:
  * - an "ephemeralForTest" storage engine for checking results of the rollback algorithm at the
- *   storage layer. The storage engine is initialized as part of the ServiceContextForMongoD test
+ *   storage layer. The storage engine is initialized as part of the ServiceContextForMerizoD test
  *   fixture.
  */
-class RollbackTest : public ServiceContextMongoDTest {
+class RollbackTest : public ServiceContextMerizoDTest {
 public:
     RollbackTest() = default;
 

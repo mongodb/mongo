@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -44,7 +44,7 @@
 namespace merizo {
 
 std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheEmbedded() {
-    auto liaison = std::make_unique<ServiceLiaisonMongod>();
+    auto liaison = std::make_unique<ServiceLiaisonMerizod>();
 
     // Set up the logical session cache
     auto sessionsColl = std::make_shared<SessionsCollectionStandalone>();

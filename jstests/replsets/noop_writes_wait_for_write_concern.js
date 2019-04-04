@@ -211,7 +211,7 @@
         // operation. By using a fresh connection the client last op begins as null.
         // This test explicitly tests that write concern for noop writes works when the
         // client last op has not already been set by a duplicate operation.
-        var shell2 = new Mongo(primary.host);
+        var shell2 = new Merizo(primary.host);
 
         // We check the error code of 'res' in the 'confirmFunc'.
         var res = shell2.getDB(dbName).runCommand(cmd.req);

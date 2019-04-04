@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     var db = conn.getDB('db');
 
     assert.commandWorked(db.adminCommand({setParameter: 1, jsHeapLimitMB: 1}));
@@ -14,5 +14,5 @@
 
     var returnCode = runProgram("merizo", "--jsHeapLimitMB=1", "--nodb", "--eval='exit();'");
     assert.eq(returnCode, 1);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

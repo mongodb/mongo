@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
 #include "merizo/platform/basic.h"
 
@@ -87,20 +87,20 @@ namespace merizo {
 // single type of operation are static functions defined above their caller.
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(failAllInserts);
-MONGO_FAIL_POINT_DEFINE(failAllUpdates);
-MONGO_FAIL_POINT_DEFINE(failAllRemoves);
-MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpFinishes);
-MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpIsPopped);
-MONGO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
-MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
-MONGO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
-MONGO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
+MERIZO_FAIL_POINT_DEFINE(failAllInserts);
+MERIZO_FAIL_POINT_DEFINE(failAllUpdates);
+MERIZO_FAIL_POINT_DEFINE(failAllRemoves);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpFinishes);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpIsPopped);
+MERIZO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
+MERIZO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
+MERIZO_FAIL_POINT_DEFINE(hangDuringBatchUpdate);
+MERIZO_FAIL_POINT_DEFINE(hangDuringBatchRemove);
 // The withLock fail points are for testing interruptability of these operations, so they will not
 // themselves check for interrupt.
-MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchInsert);
-MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchUpdate);
-MONGO_FAIL_POINT_DEFINE(hangWithLockDuringBatchRemove);
+MERIZO_FAIL_POINT_DEFINE(hangWithLockDuringBatchInsert);
+MERIZO_FAIL_POINT_DEFINE(hangWithLockDuringBatchUpdate);
+MERIZO_FAIL_POINT_DEFINE(hangWithLockDuringBatchRemove);
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
     if (containsRetry) {
@@ -133,7 +133,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
         // this op should be sampled for profiling.
         const bool shouldSample =
-            curOp->completeAndLogOperation(opCtx, MONGO_LOG_DEFAULT_COMPONENT);
+            curOp->completeAndLogOperation(opCtx, MERIZO_LOG_DEFAULT_COMPONENT);
 
         if (curOp->shouldDBProfile(shouldSample)) {
             // Stash the current transaction so that writes to the profile collection are not
@@ -385,7 +385,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 true,  // Check for interrupt periodically.
                 wholeOp.getNamespace());
 
-            if (MONGO_FAIL_POINT(failAllInserts)) {
+            if (MERIZO_FAIL_POINT(failAllInserts)) {
                 uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
             }
 
@@ -579,7 +579,7 @@ WriteResult performInserts(OperationContext* opCtx,
                 opCtx->getWriteConcern());
             try {
                 uassertStatusOK(fixedDoc.getStatus());
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
             } catch (const DBException& ex) {
                 canContinue = handleError(
                     opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
@@ -615,7 +615,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
             checkForInterrupt,
             ns);
 
-        if (MONGO_FAIL_POINT(failAllUpdates)) {
+        if (MERIZO_FAIL_POINT(failAllUpdates)) {
             uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
         }
 
@@ -748,7 +748,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
         }
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& wholeOp) {
@@ -855,7 +855,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         },
         true  // Check for interrupt periodically.
         );
-    if (MONGO_FAIL_POINT(failAllRemoves)) {
+    if (MERIZO_FAIL_POINT(failAllRemoves)) {
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
 
@@ -945,12 +945,12 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
             curOp.setCommand_inlock(cmd);
         }
         ON_BLOCK_EXIT([&] {
-            if (MONGO_FAIL_POINT(hangBeforeChildRemoveOpFinishes)) {
+            if (MERIZO_FAIL_POINT(hangBeforeChildRemoveOpFinishes)) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeChildRemoveOpFinishes, opCtx, "hangBeforeChildRemoveOpFinishes");
             }
             finishCurOp(opCtx, &curOp);
-            if (MONGO_FAIL_POINT(hangBeforeChildRemoveOpIsPopped)) {
+            if (MERIZO_FAIL_POINT(hangBeforeChildRemoveOpIsPopped)) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeChildRemoveOpIsPopped, opCtx, "hangBeforeChildRemoveOpIsPopped");
             }
@@ -968,7 +968,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         }
     }
 
-    if (MONGO_FAIL_POINT(hangAfterAllChildRemoveOpsArePopped)) {
+    if (MERIZO_FAIL_POINT(hangAfterAllChildRemoveOpsArePopped)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangAfterAllChildRemoveOpsArePopped, opCtx, "hangAfterAllChildRemoveOpsArePopped");
     }

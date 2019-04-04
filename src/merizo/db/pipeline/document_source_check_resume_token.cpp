@@ -97,7 +97,7 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
     if (tokenDataFromResumedStream.uuid != tokenDataFromClient.uuid) {
         // If we are running on a replica set deployment, we don't ever expect to see identical time
         // stamps and applyOpsIndex but differing UUIDs, and we reject the resume attempt at once.
-        if (!expCtx->inMongos && !expCtx->needsMerge) {
+        if (!expCtx->inMerizos && !expCtx->needsMerge) {
             return ResumeStatus::kSurpassedToken;
         }
         // Otherwise, return a ResumeStatus based on the sort-order of the client and stream UUIDs.
@@ -124,7 +124,7 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
         : ResumeStatus::kCheckNextDoc;
 
     // If we're not running in a sharded context, we don't need to proceed any further.
-    if (!expCtx->needsMerge && !expCtx->inMongos) {
+    if (!expCtx->needsMerge && !expCtx->inMerizos) {
         return defaultResumeStatus;
     }
 
@@ -280,7 +280,7 @@ DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
                 return nextInput;
         }
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void DocumentSourceShardCheckResumability::_assertOplogHasEnoughHistory(

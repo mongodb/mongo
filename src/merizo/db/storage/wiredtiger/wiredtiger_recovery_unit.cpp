@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -50,7 +50,7 @@ namespace {
 // transaction is not prepared. This should always be enabled if WTPrepareConflictForReads is
 // used, which fails randomly. If this is not enabled, no prepare conflicts will be resolved,
 // because the recovery unit may not ever actually be in a prepared state.
-MONGO_FAIL_POINT_DEFINE(WTAlwaysNotifyPrepareConflictWaiters);
+MERIZO_FAIL_POINT_DEFINE(WTAlwaysNotifyPrepareConflictWaiters);
 
 // SnapshotIds need to be globally unique, as they are used in a WorkingSetMember to
 // determine if documents changed, but a different recovery unit may be used across a getMore,
@@ -77,7 +77,7 @@ std::string toString(WiredTigerRecoveryUnit::State state) {
         case WiredTigerRecoveryUnit::State::kAborting:
             return "Aborting";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace
@@ -154,7 +154,7 @@ BSONObj WiredTigerOperationStats::toBSON() {
                     waitSection->append(statName, val);
                     break;
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
     }
@@ -207,7 +207,7 @@ void WiredTigerRecoveryUnit::_commit() {
         }
         _setState(State::kCommitting);
 
-        if (MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
+        if (MERIZO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
             notifyDone = true;
         }
 
@@ -234,7 +234,7 @@ void WiredTigerRecoveryUnit::_abort() {
         }
         _setState(State::kAborting);
 
-        if (MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
+        if (MERIZO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
             notifyDone = true;
         }
 
@@ -500,9 +500,9 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
         case ReadSource::kNoTimestamp:
         case ReadSource::kMajorityCommitted:
         case ReadSource::kProvided:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void WiredTigerRecoveryUnit::_txnOpen() {

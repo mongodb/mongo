@@ -103,7 +103,7 @@ struct SecureAllocatorDomain {
          * heap
          *
          */
-        MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
+        MERIZO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
                                 "SecureAllocator can only be used with trivially copyable types");
 
         // NOTE: The standard doesn't seem to require these, but libstdc++

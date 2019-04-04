@@ -33,7 +33,7 @@
 
 namespace merizo {
 
-constexpr StringData kX509AuthMechanism = "MONGODB-X509"_sd;
+constexpr StringData kX509AuthMechanism = "MERIZODB-X509"_sd;
 
 void disableAuthMechanism(StringData authMechanism);
 

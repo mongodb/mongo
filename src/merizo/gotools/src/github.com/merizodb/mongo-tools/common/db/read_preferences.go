@@ -20,7 +20,7 @@ type readPrefDoc struct {
 }
 
 const (
-	WarningNonPrimaryMongosConnection = "Warning: using a non-primary readPreference with a " +
+	WarningNonPrimaryMerizosConnection = "Warning: using a non-primary readPreference with a " +
 		"connection to merizos may produce inconsistent duplicates or miss some documents."
 )
 

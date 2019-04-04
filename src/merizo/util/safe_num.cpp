@@ -30,7 +30,7 @@
 #include <sstream>
 
 #include "merizo/platform/basic.h"
-#undef MONGO_PCH_WHITELISTED  // for malloc/realloc/INFINITY pulled from bson
+#undef MERIZO_PCH_WHITELISTED  // for malloc/realloc/INFINITY pulled from bson
 
 #include "merizo/bson/bsontypes.h"
 #include "merizo/util/safe_num.h"
@@ -175,7 +175,7 @@ void SafeNum::toBSON(StringData fieldName, BSONObjBuilder* bob) const {
             bob->append(fieldName, Decimal128(_value.decimalVal));
             return;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

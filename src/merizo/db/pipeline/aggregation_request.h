@@ -54,7 +54,7 @@ public:
     static constexpr StringData kCommandName = "aggregate"_sd;
     static constexpr StringData kCursorName = "cursor"_sd;
     static constexpr StringData kBatchSizeName = "batchSize"_sd;
-    static constexpr StringData kFromMongosName = "fromMongos"_sd;
+    static constexpr StringData kFromMerizosName = "fromMerizos"_sd;
     static constexpr StringData kNeedsMergeName = "needsMerge"_sd;
     static constexpr StringData kMergeByPBRTName = "mergeByPBRT"_sd;
     static constexpr StringData kPipelineName = "pipeline"_sd;
@@ -143,8 +143,8 @@ public:
     /**
      * Returns true if this request originated from a merizoS.
      */
-    bool isFromMongos() const {
-        return _fromMongos;
+    bool isFromMerizos() const {
+        return _fromMerizos;
     }
 
     /**
@@ -254,8 +254,8 @@ public:
         _allowDiskUse = allowDiskUse;
     }
 
-    void setFromMongos(bool isFromMongos) {
-        _fromMongos = isFromMongos;
+    void setFromMerizos(bool isFromMerizos) {
+        _fromMerizos = isFromMerizos;
     }
 
     void setNeedsMerge(bool needsMerge) {
@@ -328,7 +328,7 @@ private:
     boost::optional<ExplainOptions::Verbosity> _explainMode;
 
     bool _allowDiskUse = false;
-    bool _fromMongos = false;
+    bool _fromMerizos = false;
     bool _needsMerge = false;
     bool _mergeByPBRT = false;
     bool _bypassDocumentValidation = false;

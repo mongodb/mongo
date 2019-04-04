@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -449,7 +449,7 @@ void Balancer::_endRound(OperationContext* opCtx, Seconds waitTimeout) {
         _condVar.notify_all();
     }
 
-    MONGO_IDLE_THREAD_BLOCK;
+    MERIZO_IDLE_THREAD_BLOCK;
     _sleepFor(opCtx, waitTimeout);
 }
 

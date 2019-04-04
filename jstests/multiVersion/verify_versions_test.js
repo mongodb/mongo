@@ -13,30 +13,30 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     "use strict";
 
     function assertBinVersionsEqual(v1, v2) {
-        assert(MongoRunner.areBinVersionsTheSame(v1, v2),
+        assert(MerizoRunner.areBinVersionsTheSame(v1, v2),
                "Expected \"" + v1 + "\" to equal \"" + v2 + "\"");
     }
 
     function assertBinVersionsNotEqual(v1, v2) {
-        assert(!MongoRunner.areBinVersionsTheSame(v1, v2),
+        assert(!MerizoRunner.areBinVersionsTheSame(v1, v2),
                "Expected \"" + v1 + "\" not to equal \"" + v2 + "\"");
     }
 
     function assertBinVersionComparesHigher(v1, v2) {
         assert.eq(1,
-                  MongoRunner.compareBinVersions(v1, v2),
+                  MerizoRunner.compareBinVersions(v1, v2),
                   "Expected \"" + v1 + "\" to compare higher than \"" + v2 + "\"");
     }
 
     function assertBinVersionComparesLower(v1, v2) {
         assert.eq(-1,
-                  MongoRunner.compareBinVersions(v1, v2),
+                  MerizoRunner.compareBinVersions(v1, v2),
                   "Expected \"" + v1 + "\" to compare lower than \"" + v2 + "\"");
     }
 
     function assertBinVersionComparesEqual(v1, v2) {
         assert.eq(0,
-                  MongoRunner.compareBinVersions(v1, v2),
+                  MerizoRunner.compareBinVersions(v1, v2),
                   "Expected \"" + v1 + "\" to compare equal to \"" + v2 + "\"");
     }
 
@@ -82,9 +82,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assertBinVersionComparesLower("3.4.0-abc", "3.4.1-xyz");
 
     // Prohibit versions that don't have at least two components (3 is no good, 3.2 is).
-    assert.throws(MongoRunner.areBinVersionsTheSame, ["3", "3.2"]);
-    assert.throws(MongoRunner.areBinVersionsTheSame, ["3.2", "3"]);
+    assert.throws(MerizoRunner.areBinVersionsTheSame, ["3", "3.2"]);
+    assert.throws(MerizoRunner.areBinVersionsTheSame, ["3.2", "3"]);
 
     // Throw an error when versions differ only by githash.
-    assert.throws(MongoRunner.compareBinVersions, ["3.4.1-abc", "3.4.1-xyz"]);
+    assert.throws(MerizoRunner.compareBinVersions, ["3.4.1-abc", "3.4.1-xyz"]);
 }());

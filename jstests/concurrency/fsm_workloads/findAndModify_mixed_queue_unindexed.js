@@ -18,7 +18,7 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');                  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js');  // for $config
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMerizod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = extendWorkload($config, function($config, $super) {
@@ -41,7 +41,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways.commandWorked(res);
 
         var doc = res.value;
-        if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+        if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
             // Storage engines which do not support document-level concurrency will not
             // automatically retry if there was a conflict, so it is expected that it may return
             // null in the case of a conflict. All other storage engines should automatically

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -79,7 +79,7 @@ namespace repl {
 
 OID instanceId;
 
-MONGO_INITIALIZER(GenerateInstanceId)(InitializerContext*) {
+MERIZO_INITIALIZER(GenerateInstanceId)(InitializerContext*) {
     instanceId = OID::gen();
     return Status::OK();
 }

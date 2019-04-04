@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -339,7 +339,7 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
             _cleanup(opCtx);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -452,7 +452,7 @@ void MigrationChunkClonerSourceLegacy::_consumeOperationTrackRequestAndAddToTran
         } break;
 
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     if (auto sessionSource = _sessionCatalogSource.get()) {

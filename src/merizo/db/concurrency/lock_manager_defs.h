@@ -177,7 +177,7 @@ const char* resourceTypeName(ResourceType resourceType);
 class ResourceId {
     // We only use 3 bits for the resource type in the ResourceId hash
     enum { resourceTypeBits = 3 };
-    MONGO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
+    MERIZO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
 public:
     /**
@@ -234,17 +234,17 @@ private:
 
     static uint64_t fullHash(ResourceType type, uint64_t hashId);
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
     // Keep the complete namespace name for debugging purposes (TODO: this will be
     // removed once we are confident in the robustness of the lock manager).
     std::string _nsCopy;
 #endif
 };
 
-#ifndef MONGO_CONFIG_DEBUG_BUILD
+#ifndef MERIZO_CONFIG_DEBUG_BUILD
 // Treat the resource ids as 64-bit integers in release mode in order to ensure we do
 // not spend too much time doing comparisons for hashing.
-MONGO_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
+MERIZO_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 #endif
 
 

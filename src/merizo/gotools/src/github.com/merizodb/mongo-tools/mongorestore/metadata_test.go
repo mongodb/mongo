@@ -31,7 +31,7 @@ func TestCollectionExists(t *testing.T) {
 		sessionProvider, _, err := testutil.GetBareSessionProvider()
 		So(err, ShouldBeNil)
 
-		restore := &MongoRestore{
+		restore := &MerizoRestore{
 			SessionProvider: sessionProvider,
 		}
 
@@ -83,11 +83,11 @@ func TestCollectionExists(t *testing.T) {
 func TestGetDumpAuthVersion(t *testing.T) {
 
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
-	restore := &MongoRestore{}
+	restore := &MerizoRestore{}
 
 	Convey("With a test merizorestore", t, func() {
 		Convey("and no --restoreDbUsersAndRoles", func() {
-			restore = &MongoRestore{
+			restore = &MerizoRestore{
 				InputOptions: &InputOptions{},
 				ToolOptions:  &commonOpts.ToolOptions{},
 				NSOptions:    &NSOptions{},
@@ -129,7 +129,7 @@ func TestGetDumpAuthVersion(t *testing.T) {
 		})
 
 		Convey("using --restoreDbUsersAndRoles", func() {
-			restore = &MongoRestore{
+			restore = &MerizoRestore{
 				InputOptions: &InputOptions{
 					RestoreDBUsersAndRoles: true,
 				},

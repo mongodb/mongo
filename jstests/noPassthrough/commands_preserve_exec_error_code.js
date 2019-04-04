@@ -5,7 +5,7 @@
 (function() {
     "use strict";
 
-    const merizod = MongoRunner.runMongod({});
+    const merizod = MerizoRunner.runMerizod({});
     assert.neq(merizod, null, "merizod failed to start up");
     const db = merizod.getDB("test");
     const coll = db.commands_preserve_exec_error_code;
@@ -45,5 +45,5 @@
 
     assert.commandWorked(
         db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "off"}));
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 }());

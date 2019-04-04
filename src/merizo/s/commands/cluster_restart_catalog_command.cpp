@@ -90,7 +90,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(ClusterRestartCatalogCmd);
+MERIZO_REGISTER_TEST_COMMAND(ClusterRestartCatalogCmd);
 
 }  // namespace
 }  // namespace merizo

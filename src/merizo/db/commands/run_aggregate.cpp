@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -381,7 +381,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         new ExpressionContext(opCtx,
                               request,
                               std::move(collator),
-                              MongoProcessInterface::create(opCtx),
+                              MerizoProcessInterface::create(opCtx),
                               uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                               uuid);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";

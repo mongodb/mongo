@@ -41,7 +41,7 @@ namespace moe = merizo::optionenvironment;
 
 namespace merizo {
 
-MONGO_STARTUP_OPTIONS_STORE(MobileOptions)(InitializerContext* context) {
+MERIZO_STARTUP_OPTIONS_STORE(MobileOptions)(InitializerContext* context) {
     Status ret = mobileGlobalOptions.store(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;

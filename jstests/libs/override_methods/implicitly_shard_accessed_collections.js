@@ -43,7 +43,7 @@ const ImplicitlyShardAccessCollSettings = (function() {
     var originalGetCollection = DB.prototype.getCollection;
     var originalDBCollectionDrop = DBCollection.prototype.drop;
     var originalStartParallelShell = startParallelShell;
-    var originalRunCommand = Mongo.prototype.runCommand;
+    var originalRunCommand = Merizo.prototype.runCommand;
 
     var testMayRunDropInParallel = false;
 
@@ -163,7 +163,7 @@ const ImplicitlyShardAccessCollSettings = (function() {
 
     // The mapReduce command has a special requirement where the command must indicate the output
     // collection is sharded, so we must be sure to add this information in this passthrough.
-    Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
+    Merizo.prototype.runCommand = function(dbName, cmdObj, options) {
         // Skip any commands that are not mapReduce or do not have an 'out' option.
         if (typeof cmdObj !== 'object' || cmdObj === null ||
             (!cmdObj.hasOwnProperty('mapreduce') && !cmdObj.hasOwnProperty('mapReduce')) ||

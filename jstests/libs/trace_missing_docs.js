@@ -7,12 +7,12 @@ function traceMissingDoc(coll, doc, merizos) {
     if (merizos)
         coll = merizos.getCollection(coll + "");
     else
-        merizos = coll.getMongo();
+        merizos = coll.getMerizo();
 
     var config = merizos.getDB("config");
     var shards = config.shards.find().toArray();
     for (var i = 0; i < shards.length; i++) {
-        shards[i].conn = new Mongo(shards[i].host);
+        shards[i].conn = new Merizo(shards[i].host);
     }
 
     var shardKeyPatt = config.collections.findOne({_id: coll + ""}).key;

@@ -45,12 +45,12 @@ namespace merizo {
 */
 template <typename T, typename BaseWordT>
 class AtomicProxy {
-    MONGO_STATIC_ASSERT_MSG(sizeof(T) == sizeof(BaseWordT),
+    MERIZO_STATIC_ASSERT_MSG(sizeof(T) == sizeof(BaseWordT),
                             "T and BaseWordT must have the same size");
-    MONGO_STATIC_ASSERT_MSG(std::is_integral<BaseWordT>::value,
+    MERIZO_STATIC_ASSERT_MSG(std::is_integral<BaseWordT>::value,
                             "BaseWordT must be an integral type");
-#if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
-    MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+#if MERIZO_HAVE_STD_IS_TRIVIALLY_COPYABLE
+    MERIZO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
 #endif
 public:
     using value_type = T;

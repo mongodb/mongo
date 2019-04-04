@@ -66,7 +66,7 @@ class DocumentSource;
  * An expression registered this way can be used in any featureCompatibilityVersion.
  */
 #define REGISTER_EXPRESSION(key, parser)                                     \
-    MONGO_INITIALIZER(addToExpressionParserMap_##key)(InitializerContext*) { \
+    MERIZO_INITIALIZER(addToExpressionParserMap_##key)(InitializerContext*) { \
         Expression::registerExpression("$" #key, (parser), boost::none);     \
         return Status::OK();                                                 \
     }
@@ -81,7 +81,7 @@ class DocumentSource;
  * REGISTER_EXPRESSION_WITH_MIN_VERSION(foo, ExpressionFoo::parse, X);
  */
 #define REGISTER_EXPRESSION_WITH_MIN_VERSION(key, parser, minVersion)        \
-    MONGO_INITIALIZER(addToExpressionParserMap_##key)(InitializerContext*) { \
+    MERIZO_INITIALIZER(addToExpressionParserMap_##key)(InitializerContext*) { \
         Expression::registerExpression("$" #key, (parser), (minVersion));    \
         return Status::OK();                                                 \
     }

@@ -34,7 +34,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     var addShard = function(st, shouldPass) {
         var m =
-            MongoRunner.runMongod({auth: "", keyFile: keyfile, useHostname: false, 'shardsvr': ''});
+            MerizoRunner.runMerizod({auth: "", keyFile: keyfile, useHostname: false, 'shardsvr': ''});
         var res = st.getDB("admin").runCommand({addShard: m.host});
         if (shouldPass) {
             assert.commandWorked(res, "Add shard");
@@ -201,27 +201,27 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         print("============ shutting down.");
 
         // SERVER-8445
-        // Unlike MongoRunner.stopMongod and ReplSetTest.stopSet,
+        // Unlike MerizoRunner.stopMerizod and ReplSetTest.stopSet,
         // ShardingTest.stop does not have a way to provide auth
         // information.  Therefore, we'll do this manually for now.
 
         for (var i = 0; i < st._merizos.length; i++) {
             var conn = st["s" + i];
-            MongoRunner.stopMongos(conn,
+            MerizoRunner.stopMerizos(conn,
                                    /*signal*/ false,
                                    {auth: {user: username, pwd: password}});
         }
 
         for (var i = 0; i < st._connections.length; i++) {
             var conn = st["shard" + i];
-            MongoRunner.stopMongod(conn,
+            MerizoRunner.stopMerizod(conn,
                                    /*signal*/ false,
                                    {auth: {user: username, pwd: password}});
         }
 
         for (var i = 0; i < st._configServers.length; i++) {
             var conn = st["config" + i];
-            MongoRunner.stopMongod(conn,
+            MerizoRunner.stopMerizod(conn,
                                    /*signal*/ false,
                                    {auth: {user: username, pwd: password}});
         }
@@ -236,7 +236,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     var host = st.s.host;
     var extraShards = [];
 
-    var merizo = new Mongo(host);
+    var merizo = new Merizo(host);
 
     assertCannotRunCommands(merizo, st);
 
@@ -256,7 +256,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     print("reconnecting with a new client.");
     print("===============================");
 
-    merizo = new Mongo(host);
+    merizo = new Merizo(host);
 
     assertCannotRunCommands(merizo, st);
     extraShards.push(addShard(merizo, 0));
@@ -269,6 +269,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     shutdown(st);
     extraShards.forEach(function(sh) {
-        MongoRunner.stopMongod(sh);
+        MerizoRunner.stopMerizod(sh);
     });
 })();

@@ -92,7 +92,7 @@
 
         // assert.eq( coll.find().itcount(), numDocs )
 
-        coll.getMongo().getDB("admin").runCommand({setParameter: 1, traceExceptions: true});
+        coll.getMerizo().getDB("admin").runCommand({setParameter: 1, traceExceptions: true});
 
         printjson(coll.mapReduce(
             map, reduce, {out: {replace: outputColl.getName(), db: outputColl.getDB() + ""}}));

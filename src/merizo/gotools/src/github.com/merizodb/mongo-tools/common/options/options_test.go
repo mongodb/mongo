@@ -242,7 +242,7 @@ func TestParseAndSetOptions(t *testing.T) {
 			{
 				Name: "auth fields set",
 				CS: connstring.ConnString{
-					AuthMechanism: "MONGODB-X509",
+					AuthMechanism: "MERIZODB-X509",
 					AuthSource:    "authSource",
 					Username:      "user",
 					Password:      "password",
@@ -268,7 +268,7 @@ func TestParseAndSetOptions(t *testing.T) {
 						Username:  "user",
 						Password:  "password",
 						Source:    "authSource",
-						Mechanism: "MONGODB-X509",
+						Mechanism: "MERIZODB-X509",
 					},
 					Namespace:      &Namespace{},
 					Kerberos:       &Kerberos{},
@@ -279,7 +279,7 @@ func TestParseAndSetOptions(t *testing.T) {
 			{
 				Name: "should ask for password",
 				CS: connstring.ConnString{
-					AuthMechanism: "MONGODB-X509",
+					AuthMechanism: "MERIZODB-X509",
 					AuthSource:    "authSource",
 					Username:      "user",
 				},
@@ -303,7 +303,7 @@ func TestParseAndSetOptions(t *testing.T) {
 					Auth: &Auth{
 						Username:  "user",
 						Source:    "authSource",
-						Mechanism: "MONGODB-X509",
+						Mechanism: "MERIZODB-X509",
 					},
 					Namespace:      &Namespace{},
 					Kerberos:       &Kerberos{},

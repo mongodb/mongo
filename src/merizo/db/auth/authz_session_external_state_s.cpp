@@ -38,17 +38,17 @@
 
 namespace merizo {
 
-AuthzSessionExternalStateMongos::AuthzSessionExternalStateMongos(AuthorizationManager* authzManager)
+AuthzSessionExternalStateMerizos::AuthzSessionExternalStateMerizos(AuthorizationManager* authzManager)
     : AuthzSessionExternalStateServerCommon(authzManager) {}
-AuthzSessionExternalStateMongos::~AuthzSessionExternalStateMongos() {}
+AuthzSessionExternalStateMerizos::~AuthzSessionExternalStateMerizos() {}
 
-void AuthzSessionExternalStateMongos::startRequest(OperationContext* opCtx) {
+void AuthzSessionExternalStateMerizos::startRequest(OperationContext* opCtx) {
     _checkShouldAllowLocalhost(opCtx);
 }
 
-MONGO_REGISTER_SHIM(AuthzSessionExternalState::create)
+MERIZO_REGISTER_SHIM(AuthzSessionExternalState::create)
 (AuthorizationManager* const authzManager)->std::unique_ptr<AuthzSessionExternalState> {
-    return std::make_unique<AuthzSessionExternalStateMongos>(authzManager);
+    return std::make_unique<AuthzSessionExternalStateMerizos>(authzManager);
 }
 
 }  // namespace merizo

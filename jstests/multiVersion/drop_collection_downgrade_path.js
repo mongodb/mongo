@@ -41,7 +41,7 @@
     // Kill the 4.2 replica set.
     rst.stopSet(9 /* signal */,
                 true /* forRestart */,
-                {skipValidation: true, allowedExitCode: MongoRunner.EXIT_SIGKILL});
+                {skipValidation: true, allowedExitCode: MerizoRunner.EXIT_SIGKILL});
 
     // Restart the replica set with 4.0 binaries.
     rst.startSet({restart: true, binVersion: "4.0"});

@@ -96,7 +96,7 @@ protected:
      */
     virtual void setValueForNewElement(mutablebson::Element* element) const {
         // Only implementations that return true for allowCreation() will override this method.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     };
 
     /**

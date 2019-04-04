@@ -67,7 +67,7 @@ DocumentSource::GetNextResult DocumentSourceSample::getNext() {
         }
         switch (nextInput.getStatus()) {
             case GetNextResult::ReturnStatus::kAdvanced: {
-                MONGO_UNREACHABLE;  // We consumed all advances above.
+                MERIZO_UNREACHABLE;  // We consumed all advances above.
             }
             case GetNextResult::ReturnStatus::kPauseExecution: {
                 return nextInput;  // Propagate the pause.

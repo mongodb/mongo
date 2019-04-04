@@ -38,11 +38,11 @@ namespace {
 bool merizosState = false;
 }  // namespace
 
-bool isMongos() {
+bool isMerizos() {
     return merizosState;
 }
 
-void setMongos(const bool state) {
+void setMerizos(const bool state) {
     merizosState = state;
 }
 
@@ -51,7 +51,7 @@ bool isClusterNode() {
 }
 
 bool isClusterNodeOrRouter() {
-    return isClusterNode() || isMongos();
+    return isClusterNode() || isMerizos();
 }
 
 }  // namespace merizo

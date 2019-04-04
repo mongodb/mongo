@@ -78,7 +78,7 @@
             waitForDelete: true
         }));
     `,
-                                                   merizosDB.getMongo().port);
+                                                   merizosDB.getMerizo().port);
 
     // Wait until we see that all documents have been cloned to shard1.
     assert.soon(() => {

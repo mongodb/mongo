@@ -39,8 +39,8 @@ namespace merizo {
 
 namespace {
 
-TEST(UpdateZoneKeyRangeRequest, BasicValidMongosAssignCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+TEST(UpdateZoneKeyRangeRequest, BasicValidMerizosAssignCommand) {
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
@@ -56,8 +56,8 @@ TEST(UpdateZoneKeyRangeRequest, BasicValidMongosAssignCommand) {
     ASSERT_EQ("z", request.getZoneName());
 }
 
-TEST(UpdateZoneKeyRangeRequest, BasicValidMongosRemoveCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+TEST(UpdateZoneKeyRangeRequest, BasicValidMerizosRemoveCommand) {
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
@@ -72,8 +72,8 @@ TEST(UpdateZoneKeyRangeRequest, BasicValidMongosRemoveCommand) {
     ASSERT_TRUE(request.isRemove());
 }
 
-TEST(UpdateZoneKeyRangeRequest, InvalidNSMongosAssignCommand) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+TEST(UpdateZoneKeyRangeRequest, InvalidNSMerizosAssignCommand) {
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo",
             min: { x: 1 },
             max: { x: 100 },
@@ -83,7 +83,7 @@ TEST(UpdateZoneKeyRangeRequest, InvalidNSMongosAssignCommand) {
 }
 
 TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandForAssignType) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
                 updateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: { x: 100 },
@@ -107,7 +107,7 @@ TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandFor
 }
 
 TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandForRemoveType) {
-    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto requestStatus = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
                 updateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: { x: 100 },
@@ -132,7 +132,7 @@ TEST(UpdateZoneKeyRangeRequest, CommandBuilderShouldAlwaysCreateConfigCommandFor
 
 
 TEST(UpdateZoneKeyRangeRequest, MissingMinErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo.bar",
             max: { x: 100 },
             zone: "z"
@@ -141,7 +141,7 @@ TEST(UpdateZoneKeyRangeRequest, MissingMinErrors) {
 }
 
 TEST(UpdateZoneKeyRangeRequest, MissingMaxErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             zone: "z"
@@ -150,7 +150,7 @@ TEST(UpdateZoneKeyRangeRequest, MissingMaxErrors) {
 }
 
 TEST(UpdateZoneKeyRangeRequest, MissingZoneErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 }
@@ -159,7 +159,7 @@ TEST(UpdateZoneKeyRangeRequest, MissingZoneErrors) {
 }
 
 TEST(UpdateZoneKeyRangeRequest, MissingShardNameErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             min: { x: 1 },
             max: { x: 100 },
             zone: "z"
@@ -168,7 +168,7 @@ TEST(UpdateZoneKeyRangeRequest, MissingShardNameErrors) {
 }
 
 TEST(UpdateZoneKeyRangeRequest, WrongShardNameTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
                 updateZoneKeyRange: 1234,
                 min: { x: 1 },
                 max: { x: 100 },
@@ -178,7 +178,7 @@ TEST(UpdateZoneKeyRangeRequest, WrongShardNameTypeErrors) {
 }
 
 TEST(UpdateZoneKeyRangeRequest, WrongMinRangeTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
                 updateZoneKeyRange: "foo.bar",
                 min: "1",
                 max: { x: 100 },
@@ -188,7 +188,7 @@ TEST(UpdateZoneKeyRangeRequest, WrongMinRangeTypeErrors) {
 }
 
 TEST(UpdateZoneKeyRangeRequest, WrongMaxRangeTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
                 updateZoneKeyRange: "foo.bar",
                 min: { x: 1 },
                 max: "x",
@@ -198,7 +198,7 @@ TEST(UpdateZoneKeyRangeRequest, WrongMaxRangeTypeErrors) {
 }
 
 TEST(UpdateZoneKeyRangeRequest, WrongZoneNameTypeErrors) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
@@ -207,8 +207,8 @@ TEST(UpdateZoneKeyRangeRequest, WrongZoneNameTypeErrors) {
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
-TEST(UpdateZoneKeyRangeRequest, CannotUseMongosToParseConfigCommand) {
-    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+TEST(UpdateZoneKeyRangeRequest, CannotUseMerizosToParseConfigCommand) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMerizosCommand(fromjson(R"BSON({
             _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
             max: { x: 100 },
@@ -217,7 +217,7 @@ TEST(UpdateZoneKeyRangeRequest, CannotUseMongosToParseConfigCommand) {
     ASSERT_EQ(ErrorCodes::NoSuchKey, request.getStatus());
 }
 
-TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
+TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMerizosAssignCommand) {
     auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
             _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
@@ -234,7 +234,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
     ASSERT_EQ("z", request.getZoneName());
 }
 
-TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosRemoveCommand) {
+TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMerizosRemoveCommand) {
     auto requestStatus = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
             _configsvrUpdateZoneKeyRange: "foo.bar",
             min: { x: 1 },
@@ -385,7 +385,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, WrongZoneNameTypeErrors) {
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
-TEST(CfgAssignKeyRangeToZoneRequest, CannotUseConfigToParseMongosCommand) {
+TEST(CfgAssignKeyRangeToZoneRequest, CannotUseConfigToParseMerizosCommand) {
     auto request = UpdateZoneKeyRangeRequest::parseFromConfigCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo.bar",
             min: { x: 1 },

@@ -165,23 +165,23 @@ def get_field_names(value):
 ###################################################################################################
 
 
-class RegisterMongoCommand(object):
+class RegisterMerizoCommand(object):
     """Class to register merizo commands with GDB."""
 
-    _MONGO_COMMANDS = {}  # type: ignore
+    _MERIZO_COMMANDS = {}  # type: ignore
 
     @classmethod
     def register(cls, obj, name, command_class):
         """Register a command with no completer as a merizo command."""
         gdb.Command.__init__(obj, name, command_class)
-        cls._MONGO_COMMANDS[name] = obj.__doc__
+        cls._MERIZO_COMMANDS[name] = obj.__doc__
 
     @classmethod
     def print_commands(cls):
         """Print the registered merizo commands."""
         print("Command - Description")
-        for key in cls._MONGO_COMMANDS:
-            print("%s - %s" % (key, cls._MONGO_COMMANDS[key]))
+        for key in cls._MERIZO_COMMANDS:
+            print("%s - %s" % (key, cls._MERIZO_COMMANDS[key]))
 
 
 class DumpGlobalServiceContext(gdb.Command):
@@ -189,7 +189,7 @@ class DumpGlobalServiceContext(gdb.Command):
 
     def __init__(self):
         """Initialize DumpGlobalServiceContext."""
-        RegisterMongoCommand.register(self, "merizodb-service-context", gdb.COMMAND_DATA)
+        RegisterMerizoCommand.register(self, "merizodb-service-context", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
         """Invoke GDB command to print the Global Service Context."""
@@ -200,7 +200,7 @@ class DumpGlobalServiceContext(gdb.Command):
 DumpGlobalServiceContext()
 
 
-class GetMongoDecoration(gdb.Command):
+class GetMerizoDecoration(gdb.Command):
     """
     Search for a decoration on an object by typename and print it e.g.
 
@@ -210,11 +210,11 @@ class GetMongoDecoration(gdb.Command):
     """
 
     def __init__(self):
-        """Initialize GetMongoDecoration."""
-        RegisterMongoCommand.register(self, "merizo-decoration", gdb.COMMAND_DATA)
+        """Initialize GetMerizoDecoration."""
+        RegisterMerizoCommand.register(self, "merizo-decoration", gdb.COMMAND_DATA)
 
     def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use
-        """Invoke GetMongoDecoration."""
+        """Invoke GetMerizoDecoration."""
         argarr = args.split(" ")
         if len(argarr) < 2:
             raise ValueError("Must provide both an object and type_name argument.")
@@ -232,10 +232,10 @@ class GetMongoDecoration(gdb.Command):
 
 
 # Register command
-GetMongoDecoration()
+GetMerizoDecoration()
 
 
-class DumpMongoDSessionCatalog(gdb.Command):
+class DumpMerizoDSessionCatalog(gdb.Command):
     """Print out the merizod SessionCatalog, which maintains a table of all Sessions.
 
     Prints out interesting information from TransactionParticipants too, which are decorations on
@@ -248,11 +248,11 @@ class DumpMongoDSessionCatalog(gdb.Command):
     """
 
     def __init__(self):
-        """Initialize DumpMongoDSessionCatalog."""
-        RegisterMongoCommand.register(self, "merizod-dump-sessions", gdb.COMMAND_DATA)
+        """Initialize DumpMerizoDSessionCatalog."""
+        RegisterMerizoCommand.register(self, "merizod-dump-sessions", gdb.COMMAND_DATA)
 
     def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches
-        """Invoke DumpMongoDSessionCatalog."""
+        """Invoke DumpMerizoDSessionCatalog."""
         # See if a particular session id was specified.
         argarr = args.split(" ")
         lsid_to_find = None
@@ -342,7 +342,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
 
 
 # Register command
-DumpMongoDSessionCatalog()
+DumpMerizoDSessionCatalog()
 
 
 class MerizoDBDumpLocks(gdb.Command):
@@ -350,7 +350,7 @@ class MerizoDBDumpLocks(gdb.Command):
 
     def __init__(self):
         """Initialize MerizoDBDumpLocks."""
-        RegisterMongoCommand.register(self, "merizodb-dump-locks", gdb.COMMAND_DATA)
+        RegisterMerizoCommand.register(self, "merizodb-dump-locks", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Invoke MerizoDBDumpLocks."""
@@ -384,7 +384,7 @@ class BtIfActive(gdb.Command):
 
     def __init__(self):
         """Initialize BtIfActive."""
-        RegisterMongoCommand.register(self, "merizodb-bt-if-active", gdb.COMMAND_DATA)
+        RegisterMerizoCommand.register(self, "merizodb-bt-if-active", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
         """Invoke GDB to print stack trace."""
@@ -410,7 +410,7 @@ class MerizoDBUniqueStack(gdb.Command):
 
     def __init__(self):
         """Initialize MerizoDBUniqueStack."""
-        RegisterMongoCommand.register(self, "merizodb-uniqstack", gdb.COMMAND_DATA)
+        RegisterMerizoCommand.register(self, "merizodb-uniqstack", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
         """Invoke GDB to dump stacks."""
@@ -497,7 +497,7 @@ class MerizoDBJavaScriptStack(gdb.Command):
 
     def __init__(self):
         """Initialize MerizoDBJavaScriptStack."""
-        RegisterMongoCommand.register(self, "merizodb-javascript-stack", gdb.COMMAND_STATUS)
+        RegisterMerizoCommand.register(self, "merizodb-javascript-stack", gdb.COMMAND_STATUS)
 
     def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Invoke GDB to dump JS stacks."""
@@ -548,7 +548,7 @@ class MerizoDBHelp(gdb.Command):
 
     def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
         """Register the merizo print commands."""
-        RegisterMongoCommand.print_commands()
+        RegisterMerizoCommand.print_commands()
 
 
 # Register command

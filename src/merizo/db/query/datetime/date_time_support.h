@@ -269,7 +269,7 @@ public:
                     break;
                 default:
                     // Should never happen as format is pre-validated
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
     }

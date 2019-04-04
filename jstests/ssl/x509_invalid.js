@@ -10,13 +10,13 @@
     const SELF_SIGNED_CERT = 'jstests/libs/client-self-signed.pem';
 
     function testClient(conn, cert, name, shouldSucceed) {
-        let auth = {mechanism: 'MONGODB-X509'};
+        let auth = {mechanism: 'MERIZODB-X509'};
         if (name !== null) {
             auth.user = name;
         }
         const script = 'assert(db.getSiblingDB(\'$external\').auth(' + tojson(auth) + '));';
-        clearRawMongoProgramOutput();
-        const exitCode = runMongoProgram('merizo',
+        clearRawMerizoProgramOutput();
+        const exitCode = runMerizoProgram('merizo',
                                          '--ssl',
                                          '--sslAllowInvalidHostnames',
                                          '--sslPEMKeyFile',
@@ -31,7 +31,7 @@
         assert.eq(shouldSucceed, exitCode === 0, "exitCode = " + tojson(exitCode));
         assert.eq(
             !shouldSucceed,
-            rawMongoProgramOutput().includes('No verified subject name available from client'));
+            rawMerizoProgramOutput().includes('No verified subject name available from client'));
     }
 
     function runTest(conn) {
@@ -49,7 +49,7 @@
     }
 
     // Standalone.
-    const merizod = MongoRunner.runMongod({
+    const merizod = MerizoRunner.runMerizod({
         auth: '',
         sslMode: 'requireSSL',
         sslPEMKeyFile: SERVER_CERT,
@@ -57,5 +57,5 @@
         sslAllowInvalidCertificates: '',
     });
     runTest(merizod);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

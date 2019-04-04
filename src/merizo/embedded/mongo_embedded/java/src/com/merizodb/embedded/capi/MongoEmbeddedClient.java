@@ -35,7 +35,7 @@ import java.nio.ByteBuffer;
 /**
  * The embedded client
  */
-public interface MongoEmbeddedClient {
+public interface MerizoEmbeddedClient {
 
     /**
      * Writes the input to the embedded merizodb client

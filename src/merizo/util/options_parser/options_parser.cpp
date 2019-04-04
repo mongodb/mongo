@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/util/options_parser/options_parser.h"
 
@@ -71,8 +71,8 @@ bool shouldUseStrict() {
     return true;
 }
 
-MONGO_INITIALIZER_GENERAL(OptionsParseUseStrict,
-                          MONGO_NO_PREREQUISITES,
+MERIZO_INITIALIZER_GENERAL(OptionsParseUseStrict,
+                          MERIZO_NO_PREREQUISITES,
                           ("BeginStartupOptionParsing"))
 (InitializerContext* context) {
     OptionsParser::useStrict = shouldUseStrict;

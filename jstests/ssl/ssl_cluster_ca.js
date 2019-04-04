@@ -54,11 +54,11 @@
         Object.assign({}, valid_options, {tlsCertificateKeyFile: valid_options.tlsClusterFile});
     testRS(wrong_key_file, false);
 
-    const merizod = MongoRunner.runMongod(valid_options);
+    const merizod = MerizoRunner.runMerizod(valid_options);
     assert(merizod, "Failed starting standalone merizod with alternate CA");
 
     function testConnect(cert, succeed) {
-        const merizo = runMongoProgram("merizo",
+        const merizo = runMerizoProgram("merizo",
                                       "--host",
                                       "localhost",
                                       "--port",
@@ -71,12 +71,12 @@
                                       "--eval",
                                       ";");
 
-        // runMongoProgram returns 0 on success
+        // runMerizoProgram returns 0 on success
         assert.eq(merizo === 0, succeed);
     }
 
     testConnect('jstests/libs/client.pem', true);
     testConnect('jstests/libs/trusted-client.pem', false);
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 }());

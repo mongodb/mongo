@@ -32,7 +32,7 @@
 #include "merizo/db/session_killer.h"
 
 /**
- * Mongod local kill session / transaction functionality library.
+ * Merizod local kill session / transaction functionality library.
  */
 namespace merizo {
 

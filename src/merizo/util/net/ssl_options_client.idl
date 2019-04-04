@@ -115,7 +115,7 @@ configs:
     arg_vartype: String
     requires: tls
     condition:
-      preprocessor: "defined(MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
+      preprocessor: "defined(MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS)"
 
   "tls.disabledProtocols":
     description: "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]"

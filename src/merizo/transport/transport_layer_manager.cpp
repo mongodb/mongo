@@ -139,7 +139,7 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     } else if (config->serviceExecutor == "synchronous") {
         opts.transportMode = transport::Mode::kSynchronous;
     } else {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     auto transportLayerASIO = stdx::make_unique<transport::TransportLayerASIO>(opts, sep);

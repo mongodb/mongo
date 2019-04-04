@@ -50,7 +50,7 @@ TEST(AddShardRequest, ParseInternalFieldsInvalidConnectionString) {
     {
         BSONObj obj = BSON(AddShardRequest::merizosAddShard << ",,,");
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
+        auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(obj);
         ASSERT_NOT_OK(swAddShardRequest.getStatus());
         ASSERT_EQUALS(ErrorCodes::FailedToParse, swAddShardRequest.getStatus());
     }
@@ -70,7 +70,7 @@ TEST(AddShardRequest, ParseInternalFieldsMissingMaxSize) {
             BSON(AddShardRequest::merizosAddShard << kConnString << AddShardRequest::shardName
                                                  << kShardName);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
+        auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
 
         auto req = swAddShardRequest.getValue();
@@ -103,7 +103,7 @@ TEST(AddShardRequest, ParseInternalFieldsMissingName) {
             BSON(AddShardRequest::merizosAddShard << kConnString << AddShardRequest::maxSizeMB
                                                  << kMaxSizeMB);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
+        auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
 
         auto req = swAddShardRequest.getValue();
@@ -137,7 +137,7 @@ TEST(AddShardRequest, ParseInternalFieldsAllFieldsPresent) {
                                                  << AddShardRequest::maxSizeMB
                                                  << kMaxSizeMB);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
+        auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
 
         auto req = swAddShardRequest.getValue();
@@ -175,7 +175,7 @@ TEST(AddShardRequest, ToCommandForConfig) {
                                         << AddShardRequest::maxSizeMB
                                         << kMaxSizeMB);
 
-    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
+    auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(merizosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
     auto req = swAddShardRequest.getValue();
 
@@ -189,7 +189,7 @@ TEST(AddShardRequest, ToCommandForConfigMissingName) {
     BSONObj merizosCmdObj = BSON(
         AddShardRequest::merizosAddShard << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
 
-    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
+    auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(merizosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
     auto req = swAddShardRequest.getValue();
 
@@ -203,7 +203,7 @@ TEST(AddShardRequest, ToCommandForConfigMissingMaxSize) {
     BSONObj merizosCmdObj = BSON(
         AddShardRequest::merizosAddShard << kConnString << AddShardRequest::shardName << kShardName);
 
-    auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
+    auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(merizosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
     auto req = swAddShardRequest.getValue();
 
@@ -220,7 +220,7 @@ TEST(AddShardRequest, ValidateLocalHostAllowed) {
     {
         BSONObj merizosCmdObj = BSON(AddShardRequest::merizosAddShard << kConnString);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
+        auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(merizosCmdObj);
         ASSERT_OK(swAddShardRequest.getStatus());
         auto req = swAddShardRequest.getValue();
 
@@ -232,7 +232,7 @@ TEST(AddShardRequest, ValidateLocalHostAllowed) {
     {
         BSONObj merizosCmdObj = BSON(AddShardRequest::merizosAddShard << kConnStringNonLocalHost);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
+        auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(merizosCmdObj);
         ASSERT_OK(swAddShardRequest.getStatus());
         auto req = swAddShardRequest.getValue();
 
@@ -247,7 +247,7 @@ TEST(AddShardRequest, ValidateLocalHostNotAllowed) {
     {
         BSONObj merizosCmdObj = BSON(AddShardRequest::merizosAddShard << kConnString);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
+        auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(merizosCmdObj);
         ASSERT_OK(swAddShardRequest.getStatus());
         auto req = swAddShardRequest.getValue();
 
@@ -260,7 +260,7 @@ TEST(AddShardRequest, ValidateLocalHostNotAllowed) {
     {
         BSONObj merizosCmdObj = BSON(AddShardRequest::merizosAddShard << kConnStringNonLocalHost);
 
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(merizosCmdObj);
+        auto swAddShardRequest = AddShardRequest::parseFromMerizosCommand(merizosCmdObj);
         ASSERT_OK(swAddShardRequest.getStatus());
         auto req = swAddShardRequest.getValue();
 

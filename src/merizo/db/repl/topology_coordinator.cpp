@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 #define LOG_FOR_ELECTION(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationElection)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationElection)
 #define LOG_FOR_HEARTBEATS(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationHeartbeats)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationHeartbeats)
 
 #include "merizo/platform/basic.h"
 
@@ -67,12 +67,12 @@
 namespace merizo {
 namespace repl {
 
-MONGO_FAIL_POINT_DEFINE(forceSyncSourceCandidate);
+MERIZO_FAIL_POINT_DEFINE(forceSyncSourceCandidate);
 
 // If this fail point is enabled, TopologyCoordinator::shouldChangeSyncSource() will ignore
 // the option TopologyCoordinator::Options::maxSyncSourceLagSecs. The sync source will not be
 // re-evaluated if it lags behind another node by more than 'maxSyncSourceLagSecs' seconds.
-MONGO_FAIL_POINT_DEFINE(disableMaxSyncSourceLagSecs);
+MERIZO_FAIL_POINT_DEFINE(disableMaxSyncSourceLagSecs);
 
 constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
 
@@ -85,7 +85,7 @@ std::string TopologyCoordinator::roleToString(TopologyCoordinator::Role role) {
         case TopologyCoordinator::Role::kCandidate:
             return "candidate";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 TopologyCoordinator::~TopologyCoordinator() {}
@@ -102,7 +102,7 @@ std::ostream& operator<<(std::ostream& os,
         case TopologyCoordinator::PrepareFreezeResponseResult::kSingleNodeSelfElect:
             return os << "single node self elect";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 namespace {
@@ -198,7 +198,7 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
         return HostAndPort();
     }
 
-    MONGO_FAIL_POINT_BLOCK(forceSyncSourceCandidate, customArgs) {
+    MERIZO_FAIL_POINT_BLOCK(forceSyncSourceCandidate, customArgs) {
         const auto& data = customArgs.getData();
         const auto hostAndPortElem = data["hostAndPort"];
         if (!hostAndPortElem) {
@@ -744,7 +744,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
             } else {
                 LOG(2) << "Config from heartbeat response was same as ours.";
             }
-            if (logger::globalLogDomain()->shouldLog(MongoLogDefaultComponent_component,
+            if (logger::globalLogDomain()->shouldLog(MerizoLogDefaultComponent_component,
                                                      ::merizo::LogstreamBuilder::severityCast(2))) {
                 LogstreamBuilder lsb = log();
                 if (_rsConfig.isInitialized()) {
@@ -1361,12 +1361,12 @@ void TopologyCoordinator::changeMemberState_forTest(const MemberState& newMember
             break;
         default:
             severe() << "Cannot switch to state " << newMemberState;
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
     if (getMemberState() != newMemberState.s) {
         severe() << "Expected to enter state " << newMemberState << " but am now in "
                  << getMemberState();
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     log() << newMemberState;
 }
@@ -2317,7 +2317,7 @@ void TopologyCoordinator::setFollowerMode(MemberState::MS newMode) {
             _followerMode = newMode;
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     if (_followerMode != MemberState::RS_SECONDARY) {
@@ -2608,7 +2608,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(
         return true;
     }
 
-    if (MONGO_FAIL_POINT(disableMaxSyncSourceLagSecs)) {
+    if (MERIZO_FAIL_POINT(disableMaxSyncSourceLagSecs)) {
         log() << "disableMaxSyncSourceLagSecs fail point enabled - not checking the most recent "
                  "OpTime, "
               << currentSourceOpTime.toString() << ", of our current sync source, " << currentSource

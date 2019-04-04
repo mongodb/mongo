@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -183,7 +183,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
                     return txn::sendAbort(
                         _serviceContext, *_scheduler, _lsid, _txnNumber, *_participants);
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             };
         })
         .onCompletion([this](Status s) {
@@ -191,7 +191,7 @@ TransactionCoordinator::TransactionCoordinator(ServiceContext* serviceContext,
             // the success of the commit sequence.
             LOG(3) << "Two-phase commit completed for " << _lsid.getId() << ':' << _txnNumber;
 
-            if (MONGO_FAIL_POINT(doNotForgetCoordinator))
+            if (MERIZO_FAIL_POINT(doNotForgetCoordinator))
                 return Future<void>::makeReady(s);
 
             return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumber)

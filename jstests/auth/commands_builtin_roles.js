@@ -143,7 +143,7 @@ function checkForNonExistentRoles() {
     }
 }
 
-const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles/");
+const dbPath = MerizoRunner.toRealDir("$dataDir/commands_built_in_roles/");
 mkdir(dbPath);
 var opts = {
     auth: "",
@@ -155,9 +155,9 @@ var impls = {createUsers: createUsers, runOneTest: runOneTest};
 checkForNonExistentRoles();
 
 // run all tests standalone
-var conn = MongoRunner.runMongod(opts);
+var conn = MerizoRunner.runMerizod(opts);
 authCommandsLib.runTests(conn, impls);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 // run all tests sharded
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

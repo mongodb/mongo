@@ -1,5 +1,5 @@
-var conn1 = MongoRunner.runMongod({auth: "", setParameter: "enableLocalhostAuthBypass=true"});
-var conn2 = MongoRunner.runMongod({auth: "", setParameter: "enableLocalhostAuthBypass=false"});
+var conn1 = MerizoRunner.runMerizod({auth: "", setParameter: "enableLocalhostAuthBypass=true"});
+var conn2 = MerizoRunner.runMerizod({auth: "", setParameter: "enableLocalhostAuthBypass=false"});
 
 // Should fail because of localhost exception narrowed (SERVER-12621).
 assert.writeError(conn1.getDB("test").foo.insert({a: 1}));
@@ -26,5 +26,5 @@ assert.throws(function() {
 });
 
 print("SUCCESS Completed disable_localhost_bypass.js");
-MongoRunner.stopMongod(conn1, null, {user: "root", pwd: "pass"});
-MongoRunner.stopMongod(conn2, null, {user: "root", pwd: "pass"});
+MerizoRunner.stopMerizod(conn1, null, {user: "root", pwd: "pass"});
+MerizoRunner.stopMerizod(conn2, null, {user: "root", pwd: "pass"});

@@ -41,7 +41,7 @@ namespace moe = merizo::optionenvironment;
 
 namespace merizo {
 
-MONGO_STARTUP_OPTIONS_STORE(WiredTigerOptions)(InitializerContext* context) {
+MERIZO_STARTUP_OPTIONS_STORE(WiredTigerOptions)(InitializerContext* context) {
     Status ret = wiredTigerGlobalOptions.store(moe::startupOptionsParsed);
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;

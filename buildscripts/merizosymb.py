@@ -29,7 +29,7 @@ def symbolize_frames(  # pylint: disable=too-many-locals
     """Return a list of symbolized stack frames from a trace_doc in MerizoDB stack dump format."""
 
     if symbolizer_path is None:
-        symbolizer_path = os.environ.get("MONGOSYMB_SYMBOLIZER_PATH", "llvm-symbolizer")
+        symbolizer_path = os.environ.get("MERIZOSYMB_SYMBOLIZER_PATH", "llvm-symbolizer")
     if dsym_hint is None:
         dsym_hint = []
 

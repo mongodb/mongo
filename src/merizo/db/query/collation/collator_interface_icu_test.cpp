@@ -60,7 +60,7 @@ bool isExpectedComparison(int cmp, ExpectedComparison expectedCmp) {
             return cmp > 0;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void assertEnUSComparison(StringData left, StringData right, ExpectedComparison expectedCmp) {

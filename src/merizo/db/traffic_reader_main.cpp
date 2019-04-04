@@ -83,7 +83,7 @@ int main(int argc, char* argv[], char** envp) {
 
         // Handle the help option
         if (vm.count("help")) {
-            std::cout << "Mongo Traffic Reader Help: \n\n\t./merizotrafficreader "
+            std::cout << "Merizo Traffic Reader Help: \n\n\t./merizotrafficreader "
                          "-i trafficinput.txt -o merizotrafficreader_dump.bson \n\n"
                       << desc << std::endl;
             return EXIT_SUCCESS;
@@ -127,7 +127,7 @@ int main(int argc, char* argv[], char** envp) {
         return EXIT_FAILURE;
     }
 
-    merizo::trafficRecordingFileToMongoReplayFile(inputFd, outputStream);
+    merizo::trafficRecordingFileToMerizoReplayFile(inputFd, outputStream);
 
     return 0;
 }

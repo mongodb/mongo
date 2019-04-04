@@ -30,7 +30,7 @@
 #pragma once
 
 /**
- * MONGO_YIELD_CORE_FOR_SMT
+ * MERIZO_YIELD_CORE_FOR_SMT
  * - An architecture specific processor hint to allow the processor to yield. It is designed to
  *   improve the performance of spin-wait loops.
  *
@@ -43,35 +43,35 @@
 #include <xmmintrin.h>
 
 /* Pause instruction to prevent excess processor bus usage */
-#define MONGO_YIELD_CORE_FOR_SMT() _mm_pause()
+#define MERIZO_YIELD_CORE_FOR_SMT() _mm_pause()
 
 #elif defined(i386) || defined(__i386__)
 
 #include <xmmintrin.h>
 
-#define MONGO_YIELD_CORE_FOR_SMT() _mm_pause()
+#define MERIZO_YIELD_CORE_FOR_SMT() _mm_pause()
 
 #elif defined(__PPC64__) || defined(PPC64)
 
 /* ori 0,0,0 is the PPC64 noop instruction */
-#define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("ori 0,0,0" ::: "memory")
+#define MERIZO_YIELD_CORE_FOR_SMT() __asm__ volatile("ori 0,0,0" ::: "memory")
 
 #elif defined(__aarch64__) || defined(__arm__)
 
-#define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("yield" ::: "memory")
+#define MERIZO_YIELD_CORE_FOR_SMT() __asm__ volatile("yield" ::: "memory")
 
 #elif defined(__s390x__)
 
-#define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("lr 0,0" ::: "memory")
+#define MERIZO_YIELD_CORE_FOR_SMT() __asm__ volatile("lr 0,0" ::: "memory")
 
 #elif defined(__sparc__)
 
-#define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("rd %%ccr, %%g0" ::: "memory")
+#define MERIZO_YIELD_CORE_FOR_SMT() __asm__ volatile("rd %%ccr, %%g0" ::: "memory")
 
 #elif defined(__EMSCRIPTEN__)
 
 // TODO: What should this be?
-#define MONGO_YIELD_CORE_FOR_SMT()
+#define MERIZO_YIELD_CORE_FOR_SMT()
 
 #else
 #error "No processor pause implementation for this architecture."
@@ -80,6 +80,6 @@
 #else
 
 // On Windows, use the winnt.h YieldProcessor macro
-#define MONGO_YIELD_CORE_FOR_SMT() YieldProcessor()
+#define MERIZO_YIELD_CORE_FOR_SMT() YieldProcessor()
 
 #endif

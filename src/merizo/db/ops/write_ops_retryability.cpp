@@ -164,7 +164,7 @@ void parseOplogEntryForFindAndModify(OperationContext* opCtx,
             return find_and_modify::serializeRemove(
                 1, extractPreOrPostImage(opCtx, oplogWithCorrectLinks), builder);
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

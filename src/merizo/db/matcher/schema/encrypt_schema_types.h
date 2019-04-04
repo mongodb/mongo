@@ -95,11 +95,11 @@ public:
      * comparison is equality. These should be removed once SERVER-39677 is implemented.
      */
     bool operator>(const EncryptSchemaKeyId& other) const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool operator<(const EncryptSchemaKeyId& other) const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
 private:
@@ -123,7 +123,7 @@ public:
      * This type is currenty only used for serialization, not parsing.
      */
     static EncryptSchemaAnyType parseFromBSON(const BSONElement& element) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     EncryptSchemaAnyType() = default;

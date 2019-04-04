@@ -65,8 +65,8 @@ public:
      * Set whether the controller is enabled, and collects data.
      *
      * Returns ErrorCodes::FTDCPathNotSet if no log path has been specified for FTDC. This occurs
-     * in MongoS in some situations since MongoS is not required to have a storage directory like
-     * MongoD does.
+     * in MerizoS in some situations since MerizoS is not required to have a storage directory like
+     * MerizoD does.
      */
     Status setEnabled(bool enabled);
 

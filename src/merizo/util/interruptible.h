@@ -425,19 +425,19 @@ class Interruptible::NotInterruptible final : public Interruptible {
     // The noop interruptible should only be invoked as a default arg at the bottom of the call
     // stack (with types that won't modify it's invocation)
     IgnoreInterruptsState pushIgnoreInterrupts() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void popIgnoreInterrupts(IgnoreInterruptsState) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     DeadlineState pushArtificialDeadline(Date_t deadline, ErrorCodes::Error error) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void popArtificialDeadline(DeadlineState) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     Date_t getExpirationDateForWaitForValue(Milliseconds waitFor) override {

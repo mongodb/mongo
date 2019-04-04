@@ -28,11 +28,11 @@
  *    it in the license file.
  */
 
-// This file has JavaScript functions that should be attached to the MongoHelpers object
+// This file has JavaScript functions that should be attached to the MerizoHelpers object
 
-// The contents of exportToMongoHelpers will be copied into the MongoHelpers object and
+// The contents of exportToMerizoHelpers will be copied into the MerizoHelpers object and
 // this dictionary will be removed from the global scope.
-exportToMongoHelpers = {
+exportToMerizoHelpers = {
     // This function accepts an expression or function body and returns a function definition
     'functionExpressionParser': function functionExpressionParser(fnSrc) {
 
@@ -104,5 +104,5 @@ exportToMongoHelpers = {
     }
 };
 
-// WARNING: Anything outside the exportToMongoHelpers dictionary will be available in the
+// WARNING: Anything outside the exportToMerizoHelpers dictionary will be available in the
 // global scope and visible to users!

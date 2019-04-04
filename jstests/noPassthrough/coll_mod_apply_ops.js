@@ -3,7 +3,7 @@
 
 (function() {
     "use strict";
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod was unable to start up with empty options");
 
     let dbCollModName = "db_coll_mod";
@@ -40,5 +40,5 @@
     // Ensure the collection options of the existing collection were not affected.
     assert.eq(dbCollMod.getCollectionInfos()[0].name, collName);
     assert.eq(dbCollMod.getCollectionInfos()[0].options.validationLevel, "off");
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

@@ -29,7 +29,7 @@
         {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
 
     const findWait = startParallelShell(function() {
-        db.getMongo().setSlaveOk();
+        db.getMerizo().setSlaveOk();
         assert.eq(db.getSiblingDB('read')
                       .getCollection('readColl')
                       .find()

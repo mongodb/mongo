@@ -42,7 +42,7 @@ class ServiceContext;
 
 /**
  * Contains information about the shardingness of a running merizod. This is a passive class and its
- * state and concurrency control is driven from outside (specifically ShardingInitializationMongoD,
+ * state and concurrency control is driven from outside (specifically ShardingInitializationMerizoD,
  * which should be its only caller).
  *
  * There is one instance of this object per service context and once 'setInitialized' is called, it

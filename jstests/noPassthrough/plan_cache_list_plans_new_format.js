@@ -2,7 +2,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod was unable to start up");
     const testDB = conn.getDB("jstests_plan_cache_list_plans_new_format");
     const coll = testDB.test;
@@ -55,5 +55,5 @@
     assert.eq(cachedStage, winningExecStage, `Information about the winning plan in "cachedPlan" is
         inconsistent with the first element in "creationExecStats".`);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

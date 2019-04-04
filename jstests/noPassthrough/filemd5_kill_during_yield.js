@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn);
     const db = conn.getDB("test");
     db.fs.chunks.drop();
@@ -44,5 +44,5 @@
     assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
 
     failingMD5Shell();
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

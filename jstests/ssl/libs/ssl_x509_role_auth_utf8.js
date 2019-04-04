@@ -4,7 +4,7 @@
 
     // Authenticate against a certificate with a RDN in the subject name of type UTF8STRING
     const retutf8 = db.getSiblingDB("$external").auth({
-        mechanism: "MONGODB-X509",
+        mechanism: "MERIZODB-X509",
         user:
             "C=US,ST=New York,L=New York City,O=MerizoDB,OU=Kernel Users,CN=\\D0\\9A\\D0\\B0\\D0\\BB\\D0\\BE\\D1\\8F\\D0\\BD"
     });

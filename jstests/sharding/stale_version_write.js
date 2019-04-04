@@ -21,7 +21,7 @@
     assert.commandWorked(
         merizosA.getDB("admin").adminCommand({shardCollection: "" + collA, key: {_id: 1}}));
 
-    // MongoD doesn't know about the config shard version *until* MongoS tells it
+    // MerizoD doesn't know about the config shard version *until* MerizoS tells it
     collA.findOne();
 
     jsTest.log("Trigger shard version mismatch...");

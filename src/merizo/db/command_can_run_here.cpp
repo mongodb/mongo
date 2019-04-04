@@ -57,7 +57,7 @@ bool commandCanRunHere(OperationContext* opCtx,
             // Did the user opt in?
             return ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

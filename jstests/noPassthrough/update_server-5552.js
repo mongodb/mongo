@@ -1,7 +1,7 @@
 var db;
 (function() {
     "use strict";
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod failed to start.");
     db = conn.getDB("test");
 
@@ -34,5 +34,5 @@ var db;
 
     assert.eq(N, t.find({x: 5}).count());
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

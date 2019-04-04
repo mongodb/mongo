@@ -6,7 +6,7 @@
  * but to the #startSet method.
  *
  * @param {Object|string} opts If this value is a string, it specifies the connection string for
- *      a MongoD host to be used for recreating a ReplSetTest from. Otherwise, if it is an object,
+ *      a MerizoD host to be used for recreating a ReplSetTest from. Otherwise, if it is an object,
  *      it must have the following contents:
  *
  *   {
@@ -19,7 +19,7 @@
  *        Can also be an Object (or Array).
  *        Format for Object:
  *          {
- *            <any string>: replica member option Object. @see MongoRunner.runMongod
+ *            <any string>: replica member option Object. @see MerizoRunner.runMerizod
  *            <any string2>: and so on...
  *          }
  *          If object has a special "rsConfig" field then those options will be used for each
@@ -27,7 +27,7 @@
  *          building the config with getReplSetConfig()
  *
  *        Format for Array:
- *           An array of replica member option Object. @see MongoRunner.runMongod
+ *           An array of replica member option Object. @see MerizoRunner.runMerizod
  *
  *        Note: For both formats, a special boolean property 'arbiter' can be
  *          specified to denote a member is an arbiter.
@@ -65,7 +65,7 @@
  *   }
  *
  * Member variables:
- *  nodes {Array.<Mongo>} - connection to replica set members
+ *  nodes {Array.<Merizo>} - connection to replica set members
  */
 
 var ReplSetTest = function(opts) {
@@ -522,7 +522,7 @@ var ReplSetTest = function(opts) {
     /**
      * Starts each node in the replica set with the given options.
      *
-     * @param options - The options passed to {@link MongoRunner.runMongod}
+     * @param options - The options passed to {@link MerizoRunner.runMerizod}
      */
     this.startSet = function(options, restart) {
         print("ReplSetTest starting set");
@@ -1029,7 +1029,7 @@ var ReplSetTest = function(opts) {
                     (val.hasOwnProperty("shardsvr") ||
                      val.hasOwnProperty("binVersion") &&
                          // Should not wait for keys if version is less than 3.6
-                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
+                         MerizoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
                     shouldWaitForKeys = false;
                     print("Set shouldWaitForKeys from node options: " + shouldWaitForKeys);
                 }
@@ -1040,7 +1040,7 @@ var ReplSetTest = function(opts) {
                     (val.hasOwnProperty("shardsvr") ||
                      val.hasOwnProperty("binVersion") &&
                          // Should not wait for keys if version is less than 3.6
-                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
+                         MerizoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
                     shouldWaitForKeys = false;
                     print("Set shouldWaitForKeys from start options: " + shouldWaitForKeys);
                 }
@@ -1278,13 +1278,13 @@ var ReplSetTest = function(opts) {
                     '--sslPEMKeyFile=' + masterOptions.sslPEMKeyFile,
                     '--sslAllowInvalidHostnames',
                     '--authenticationDatabase=$external',
-                    '--authenticationMechanism=MONGODB-X509',
+                    '--authenticationMechanism=MERIZODB-X509',
                     master.host,
                     '--eval',
                     `(${appendOplogNoteFn.toString()})();`
                 ];
 
-                const retVal = _runMongoProgram(...subShellArgs);
+                const retVal = _runMerizoProgram(...subShellArgs);
                 assert.eq(retVal, 0, 'merizo shell did not succeed with exit code 0');
             } else {
                 if (masterOptions.clusterAuthMode) {
@@ -1442,7 +1442,7 @@ var ReplSetTest = function(opts) {
                     print("ReplSetTest awaitReplication: checking secondary #" + secondaryCount +
                           ": " + slaveName);
 
-                    slave.getDB("admin").getMongo().setSlaveOk();
+                    slave.getDB("admin").getMerizo().setSlaveOk();
 
                     var slaveOpTime;
                     if (secondaryOpTimeType == ReplSetTest.OpTimeType.LAST_DURABLE) {
@@ -2188,7 +2188,7 @@ var ReplSetTest = function(opts) {
             const itCount = coll.find().itcount();
             const fastCount = coll.count();
             if (itCount !== fastCount) {
-                print(`${errPrefix} ${coll.getFullName()} on ${coll.getMongo().host}.` +
+                print(`${errPrefix} ${coll.getFullName()} on ${coll.getMerizo().host}.` +
                       ` itcount: ${itCount}, fast count: ${fastCount}`);
                 print("Collection info: " +
                       tojson(coll.getDB().getCollectionInfos({name: coll.getName()})));
@@ -2199,7 +2199,7 @@ var ReplSetTest = function(opts) {
                 // TODO (SERVER-35483): Remove this block and enable fastcount checks.
                 if (coll.getFullName() == "config.transactions") {
                     print(`Ignoring fastcount error for ${coll.getFullName()} on ` +
-                          `${coll.getMongo().host}. itcount: ${itCount}, fast count: ${fastCount}`);
+                          `${coll.getMerizo().host}. itcount: ${itCount}, fast count: ${fastCount}`);
                     return;
                 }
                 success = false;
@@ -2275,7 +2275,7 @@ var ReplSetTest = function(opts) {
         // start() independently, independent version choices will be made
         //
         if (options && options.binVersion) {
-            options.binVersion = MongoRunner.versionIterator(options.binVersion);
+            options.binVersion = MerizoRunner.versionIterator(options.binVersion);
         }
 
         // If restarting a node, use its existing options as the defaults.
@@ -2335,10 +2335,10 @@ var ReplSetTest = function(opts) {
                     jsTestOptions().networkMessageCompressors;
             }
 
-            this.nodes[n] = new MongoBridge(bridgeOptions);
+            this.nodes[n] = new MerizoBridge(bridgeOptions);
         }
 
-        var conn = MongoRunner.runMongod(options);
+        var conn = MerizoRunner.runMerizod(options);
         if (!conn) {
             throw new Error("Failed to start node " + n);
         }
@@ -2434,9 +2434,9 @@ var ReplSetTest = function(opts) {
      * terminated unless forRestart=true. The merizobridge process(es) are left running across
      * restarts to ensure their configuration remains intact.
      *
-     * @param {number|Mongo} n the index or connection object of the replica set member to stop.
+     * @param {number|Merizo} n the index or connection object of the replica set member to stop.
      * @param {number} signal the signal number to use for killing
-     * @param {Object} opts @see MongoRunner.stopMongod
+     * @param {Object} opts @see MerizoRunner.stopMerizod
      * @param {Object} [extraOptions={}]
      * @param {boolean} [extraOptions.forRestart=false] indicates whether stop() is being called
      * with the intent to call start() with restart=true for the same node(s) n.
@@ -2464,16 +2464,16 @@ var ReplSetTest = function(opts) {
 
         var conn = _useBridge ? _unbridgedNodes[n] : this.nodes[n];
         print('ReplSetTest stop *** Shutting down merizod in port ' + conn.port + ' ***');
-        var ret = MongoRunner.stopMongod(conn, signal, opts);
+        var ret = MerizoRunner.stopMerizod(conn, signal, opts);
 
-        print('ReplSetTest stop *** Mongod in port ' + conn.port + ' shutdown with code (' + ret +
+        print('ReplSetTest stop *** Merizod in port ' + conn.port + ' shutdown with code (' + ret +
               ') ***');
 
         if (_useBridge && !forRestart) {
             // We leave the merizobridge process running when the merizod process is being restarted.
             const bridge = this.nodes[n];
             print('ReplSetTest stop *** Shutting down merizobridge on port ' + bridge.port + ' ***');
-            const exitCode = bridge.stop();  // calls MongoBridge#stop()
+            const exitCode = bridge.stop();  // calls MerizoBridge#stop()
             print('ReplSetTest stop *** merizobridge on port ' + bridge.port +
                   ' exited with code (' + exitCode + ') ***');
         }
@@ -2486,7 +2486,7 @@ var ReplSetTest = function(opts) {
      *
      * @param {number} signal The signal number to use for killing the members
      * @param {boolean} forRestart will not cleanup data directory
-     * @param {Object} opts @see MongoRunner.stopMongod
+     * @param {Object} opts @see MerizoRunner.stopMerizod
      */
     this.stopSet = function(signal, forRestart, opts) {
         // Check to make sure data is the same on all nodes.
@@ -2630,8 +2630,8 @@ var ReplSetTest = function(opts) {
                 };
             };
 
-            _allocatePortForBridge = makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset));
-            _allocatePortForNode = makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset));
+            _allocatePortForBridge = makeAllocatePortFn(allocatePorts(MerizoBridge.kBridgeOffset));
+            _allocatePortForNode = makeAllocatePortFn(allocatePorts(MerizoBridge.kBridgeOffset));
         } else {
             _allocatePortForBridge = function() {
                 throw new Error("Using merizobridge isn't enabled for this replica set");
@@ -2654,7 +2654,7 @@ var ReplSetTest = function(opts) {
      * Constructor, which instantiates the ReplSetTest object from an existing set.
      */
     function _constructFromExistingSeedNode(seedNode) {
-        const conn = new Mongo(seedNode);
+        const conn = new Merizo(seedNode);
         if (jsTest.options().keyFile) {
             self.keyFile = jsTest.options().keyFile;
         }
@@ -2663,7 +2663,7 @@ var ReplSetTest = function(opts) {
 
         var existingNodes = conf.members.map(member => member.host);
         self.ports = existingNodes.map(node => node.split(':')[1]);
-        self.nodes = existingNodes.map(node => new Mongo(node));
+        self.nodes = existingNodes.map(node => new Merizo(node));
         self.waitForKeys = false;
         self.host = existingNodes[0].split(':')[0];
         self.name = conf._id;

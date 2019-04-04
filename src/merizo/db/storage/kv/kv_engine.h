@@ -218,7 +218,7 @@ public:
      * See StorageEngine::endBackup for details
      */
     virtual void endBackup(OperationContext* opCtx) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual StatusWith<std::vector<std::string>> beginNonBlockingBackup(OperationContext* opCtx) {
@@ -227,7 +227,7 @@ public:
     }
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual StatusWith<std::vector<std::string>> extendBackupCursor(OperationContext* opCtx) {
@@ -368,14 +368,14 @@ public:
      * See `StorageEngine::getRecoveryTimestamp`
      */
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**
      * See `StorageEngine::getLastStableRecoveryTimestamp`
      */
     virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**
@@ -408,15 +408,15 @@ public:
      * Methods to access the storage engine's timestamps.
      */
     virtual Timestamp getCheckpointTimestamp() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual Timestamp getOldestTimestamp() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual Timestamp getStableTimestamp() const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     /**

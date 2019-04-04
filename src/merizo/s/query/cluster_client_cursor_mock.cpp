@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -75,11 +75,11 @@ const PrivilegeVector& ClusterClientCursorMock::getOriginatingPrivileges() const
 }
 
 std::size_t ClusterClientCursorMock::getNumRemotes() const {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 BSONObj ClusterClientCursorMock::getPostBatchResumeToken() const {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 long long ClusterClientCursorMock::getNumReturnedSoFar() const {
@@ -138,7 +138,7 @@ void ClusterClientCursorMock::queueError(Status status) {
 }
 
 Status ClusterClientCursorMock::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 boost::optional<LogicalSessionId> ClusterClientCursorMock::getLsid() const {

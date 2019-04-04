@@ -28,7 +28,7 @@
  */
 
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -410,7 +410,7 @@ StatusWith<SSLX509Name> parseDN(StringData sd) try {
 } catch (const DBException& e) {
     return e.toStatus();
 }
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 // OpenSSL has a more complete library of OID to SN mappings.
 std::string x509OidToShortName(StringData name) {
     const auto nid = OBJ_txt2nid(name.rawData());
@@ -558,7 +558,7 @@ TLSVersionCounts& TLSVersionCounts::get(ServiceContext* serviceContext) {
     return getTLSVersionCounts(serviceContext);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLogManager"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLogManager"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         const auto& config = theSSLManager->getSSLConfiguration();

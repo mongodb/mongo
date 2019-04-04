@@ -52,7 +52,7 @@
             db.getSiblingDB(TestData.testName)[TestData.collectionName].insert({_id: "b"}));
     }, primary.port);
     checkLog.contains(
-        primaryDB.getMongo(),
+        primaryDB.getMerizo(),
         "hangAfterCollectionInserts fail point enabled for " + primaryColl.getFullName());
 
     jsTest.log("Create a write following the uncommitted write.");
@@ -63,7 +63,7 @@
     jsTestLog("Restarting initial sync node.");
     replTest.restart(secondary, {startClean: true});
     jsTestLog("Waiting for initial sync to start.");
-    checkLog.contains(secondaryDB.getMongo(), "Starting initial sync");
+    checkLog.contains(secondaryDB.getMerizo(), "Starting initial sync");
 
     // The 5 seconds is because in the non-buggy case, we'll be hung waiting for the optime to
     // advance.  However, if we allow the write to finish immediately, we are likely to miss the

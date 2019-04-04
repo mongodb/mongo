@@ -55,14 +55,14 @@
         return null === coordDoc;
     };
 
-    const runCommitThroughMongosInParallelShellExpectSuccess = function() {
+    const runCommitThroughMerizosInParallelShellExpectSuccess = function() {
         const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
             "commitTransaction: 1," + "lsid: " + tojson(lsid) + "," + "txnNumber: NumberLong(" +
             txnNumber + ")," + "stmtId: NumberInt(0)," + "autocommit: false," + "}));";
         return startParallelShell(runCommitExpectSuccessCode, st.s.port);
     };
 
-    const runCommitThroughMongosInParallelShellExpectAbort = function() {
+    const runCommitThroughMerizosInParallelShellExpectAbort = function() {
         const runCommitExpectSuccessCode = "assert.commandFailedWithCode(db.adminCommand({" +
             "commitTransaction: 1," + "lsid: " + tojson(lsid) + "," + "txnNumber: NumberLong(" +
             txnNumber + ")," + "stmtId: NumberInt(0)," + "autocommit: false," + "})," +
@@ -192,9 +192,9 @@
         // Run commitTransaction through a parallel shell.
         let awaitResult;
         if (shouldCommit) {
-            awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
+            awaitResult = runCommitThroughMerizosInParallelShellExpectSuccess();
         } else {
-            awaitResult = runCommitThroughMongosInParallelShellExpectAbort();
+            awaitResult = runCommitThroughMerizosInParallelShellExpectAbort();
         }
 
         // Check that the coordinator wrote the participant list.

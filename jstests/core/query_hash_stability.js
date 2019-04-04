@@ -4,7 +4,7 @@
  */
 (function() {
     "use strict";
-    load('jstests/libs/fixture_helpers.js');  // For and isMongos().
+    load('jstests/libs/fixture_helpers.js');  // For and isMerizos().
 
     const collName = "query_hash_stability";
     const coll = db[collName];
@@ -13,7 +13,7 @@
     assert.commandWorked(coll.insert({x: 5}));
 
     function getPlanCacheKeyFromExplain(explainRes) {
-        const hash = FixtureHelpers.isMongos(db)
+        const hash = FixtureHelpers.isMerizos(db)
             ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
             : explainRes.queryPlanner.planCacheKey;
         assert.eq(typeof(hash), "string");
@@ -21,7 +21,7 @@
     }
 
     function getQueryHashFromExplain(explainRes) {
-        const hash = FixtureHelpers.isMongos(db)
+        const hash = FixtureHelpers.isMerizos(db)
             ? explainRes.queryPlanner.winningPlan.shards[0].queryHash
             : explainRes.queryPlanner.queryHash;
         assert.eq(typeof(hash), "string");

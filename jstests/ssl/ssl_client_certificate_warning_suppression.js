@@ -21,11 +21,11 @@ load('jstests/ssl/libs/ssl_helpers.js');
             sslAllowConnectionsWithoutCertificates: "",
             setParameter: {suppressNoTLSPeerCertificateWarning: suppress}
         };
-        clearRawMongoProgramOutput();
-        const merizod = MongoRunner.runMongod(opts);
+        clearRawMerizoProgramOutput();
+        const merizod = MerizoRunner.runMerizod(opts);
 
         assert.soon(function() {
-            return runMongoProgram('merizo',
+            return runMerizoProgram('merizo',
                                    '--ssl',
                                    '--sslAllowInvalidHostnames',
                                    '--sslCAFile',
@@ -40,19 +40,19 @@ load('jstests/ssl/libs/ssl_helpers.js');
         // logged before it.
         assert.soon(
             () => {
-                const log = rawMongoProgramOutput();
+                const log = rawMerizoProgramOutput();
                 return log.search('client metadata') !== -1;
             },
             "logfile should contain 'client metadata'.\n" +
-                "Log File Contents\n==============================\n" + rawMongoProgramOutput() +
+                "Log File Contents\n==============================\n" + rawMerizoProgramOutput() +
                 "\n==============================\n");
 
         // Now check for the message
-        const log = rawMongoProgramOutput();
+        const log = rawMerizoProgramOutput();
         assert.eq(suppress, log.search('no SSL certificate provided by peer') === -1);
 
         try {
-            MongoRunner.stopMongod(merizod);
+            MerizoRunner.stopMerizod(merizod);
         } catch (e) {
             // Depending on timing, exitCode might be 0, 1, or -9.
             // All that matters is that it dies, resmoke will tell us if that failed.

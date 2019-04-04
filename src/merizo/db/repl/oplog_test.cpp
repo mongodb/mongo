@@ -54,14 +54,14 @@ namespace merizo {
 namespace repl {
 namespace {
 
-class OplogTest : public ServiceContextMongoDTest {
+class OplogTest : public ServiceContextMerizoDTest {
 private:
     void setUp() override;
 };
 
 void OplogTest::setUp() {
     // Set up merizod.
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     auto service = getServiceContext();
     auto opCtx = cc().makeOperationContext();

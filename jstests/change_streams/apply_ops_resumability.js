@@ -24,7 +24,7 @@
 
     // Open a session, and perform two writes within a transaction.
     const sessionOptions = {causalConsistency: false};
-    const session = db.getMongo().startSession(sessionOptions);
+    const session = db.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(db.getName());
     const sessionColl = sessionDb[coll.getName()];
 

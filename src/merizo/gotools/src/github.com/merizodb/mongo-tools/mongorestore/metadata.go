@@ -56,7 +56,7 @@ type IndexDocument struct {
 
 // MetadataFromJSON takes a slice of JSON bytes and unmarshals them into usable
 // collection options and indexes for restoring collections.
-func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (*Metadata, error) {
+func (restore *MerizoRestore) MetadataFromJSON(jsonBytes []byte) (*Metadata, error) {
 	if len(jsonBytes) == 0 {
 		// skip metadata parsing if the file is empty
 		return nil, nil
@@ -113,8 +113,8 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (*Metadata, erro
 }
 
 // LoadIndexesFromBSON reads indexes from the index BSON files and
-// caches them in the MongoRestore object.
-func (restore *MongoRestore) LoadIndexesFromBSON() error {
+// caches them in the MerizoRestore object.
+func (restore *MerizoRestore) LoadIndexesFromBSON() error {
 
 	dbCollectionIndexes := make(map[string]collectionIndexes)
 
@@ -150,7 +150,7 @@ func stripDBFromNS(ns string) string {
 }
 
 // CollectionExists returns true if the given intent's collection exists.
-func (restore *MongoRestore) CollectionExists(intent *intents.Intent) (bool, error) {
+func (restore *MerizoRestore) CollectionExists(intent *intents.Intent) (bool, error) {
 	restore.knownCollectionsMutex.Lock()
 	defer restore.knownCollectionsMutex.Unlock()
 
@@ -184,7 +184,7 @@ func (restore *MongoRestore) CollectionExists(intent *intents.Intent) (bool, err
 // CreateIndexes takes in an intent and an array of index documents and
 // attempts to create them using the createIndexes command. If that command
 // fails, we fall back to individual index creation.
-func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []IndexDocument) error {
+func (restore *MerizoRestore) CreateIndexes(intent *intents.Intent, indexes []IndexDocument) error {
 	// first, sanitize the indexes
 	for _, index := range indexes {
 		// update the namespace of the index before inserting
@@ -240,7 +240,7 @@ func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []Ind
 
 // LegacyInsertIndex takes in an intent and an index document and attempts to
 // create the index on the "system.indexes" collection.
-func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index IndexDocument) error {
+func (restore *MerizoRestore) LegacyInsertIndex(intent *intents.Intent, index IndexDocument) error {
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
@@ -260,7 +260,7 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index Ind
 
 // CreateCollection creates the collection specified in the intent with the
 // given options.
-func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bson.D, uuid string) error {
+func (restore *MerizoRestore) CreateCollection(intent *intents.Intent, options bson.D, uuid string) error {
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
@@ -277,7 +277,7 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 
 }
 
-func (restore *MongoRestore) createCollectionWithCommand(session *mgo.Session, intent *intents.Intent, options bson.D) error {
+func (restore *MerizoRestore) createCollectionWithCommand(session *mgo.Session, intent *intents.Intent, options bson.D) error {
 	command := createCollectionCommand(intent, options)
 	res := bson.M{}
 	err := session.DB(intent.DB).Run(command, &res)
@@ -291,7 +291,7 @@ func (restore *MongoRestore) createCollectionWithCommand(session *mgo.Session, i
 
 }
 
-func (restore *MongoRestore) createCollectionWithApplyOps(session *mgo.Session, intent *intents.Intent, options bson.D, uuidHex string) error {
+func (restore *MerizoRestore) createCollectionWithApplyOps(session *mgo.Session, intent *intents.Intent, options bson.D, uuidHex string) error {
 	command := createCollectionCommand(intent, options)
 	uuid, err := hex.DecodeString(uuidHex)
 	if err != nil {
@@ -330,7 +330,7 @@ func createCollectionCommand(intent *intents.Intent, options bson.D) bson.D {
 // RestoreUsersOrRoles accepts a users intent and a roles intent, and restores
 // them via _mergeAuthzCollections. Either or both can be nil. In the latter case
 // nothing is done.
-func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) error {
+func (restore *MerizoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) error {
 
 	type loopArg struct {
 		intent             *intents.Intent
@@ -466,7 +466,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 // to determine the authentication version of the files in the dump. If that collection is not
 // present in the dump, we try to infer the authentication version based on its absence.
 // Returns the authentication version number and any errors that occur.
-func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
+func (restore *MerizoRestore) GetDumpAuthVersion() (int, error) {
 	// first handle the case where we have no auth version
 	intent := restore.manager.AuthVersion()
 	if intent == nil {
@@ -514,7 +514,7 @@ func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 // ValidateAuthVersions compares the authentication version of the dump files and the
 // authentication version of the target server, and returns an error if the versions
 // are incompatible.
-func (restore *MongoRestore) ValidateAuthVersions() error {
+func (restore *MerizoRestore) ValidateAuthVersions() error {
 	if restore.authVersions.Dump == 2 || restore.authVersions.Dump == 4 {
 		return fmt.Errorf(
 			"cannot restore users and roles from a dump file with auth version %v; "+
@@ -562,7 +562,7 @@ func (restore *MongoRestore) ValidateAuthVersions() error {
 
 // ShouldRestoreUsersAndRoles returns true if merizorestore should go through
 // through the process of restoring collections pertaining to authentication.
-func (restore *MongoRestore) ShouldRestoreUsersAndRoles() bool {
+func (restore *MerizoRestore) ShouldRestoreUsersAndRoles() bool {
 	if restore.SkipUsersAndRoles {
 		return false
 	}
@@ -581,7 +581,7 @@ func (restore *MongoRestore) ShouldRestoreUsersAndRoles() bool {
 }
 
 // DropCollection drops the intent's collection.
-func (restore *MongoRestore) DropCollection(intent *intents.Intent) error {
+func (restore *MerizoRestore) DropCollection(intent *intents.Intent) error {
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)

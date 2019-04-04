@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -43,9 +43,9 @@
 #include "merizo/util/options_parser/startup_options.h"
 #include "merizo/util/text.h"
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/ssl.h>
-#endif  // #ifdef MONGO_CONFIG_SSL
+#endif  // #ifdef MERIZO_CONFIG_SSL
 
 namespace merizo {
 

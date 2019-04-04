@@ -64,7 +64,7 @@ StatusWith<std::string> extractDBField(const BSONObj& params) {
     return std::move(db);
 }
 
-StatusWith<OpMsgRequest> createMongoCRGetNonceCmd(const BSONObj& params) {
+StatusWith<OpMsgRequest> createMerizoCRGetNonceCmd(const BSONObj& params) {
     auto db = extractDBField(params);
     if (!db.isOK()) {
         return std::move(db.getStatus());
@@ -73,7 +73,7 @@ StatusWith<OpMsgRequest> createMongoCRGetNonceCmd(const BSONObj& params) {
     return OpMsgRequest::fromDBAndBody(db.getValue(), kGetNonceCmd);
 }
 
-OpMsgRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonce) {
+OpMsgRequest createMerizoCRAuthenticateCmd(const BSONObj& params, StringData nonce) {
     std::string username;
     uassertStatusOK(bsonExtractStringField(params, saslCommandUserFieldName, &username));
 
@@ -107,11 +107,11 @@ OpMsgRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonc
     return OpMsgRequest::fromDBAndBody(uassertStatusOK(extractDBField(params)), b.obj());
 }
 
-Future<void> authMongoCRImpl(RunCommandHook runCommand, const BSONObj& params) {
+Future<void> authMerizoCRImpl(RunCommandHook runCommand, const BSONObj& params) {
     invariant(runCommand);
 
     // Step 1: send getnonce command, receive nonce
-    auto nonceRequest = createMongoCRGetNonceCmd(params);
+    auto nonceRequest = createMerizoCRGetNonceCmd(params);
     if (!nonceRequest.isOK()) {
         return nonceRequest.getStatus();
     }
@@ -130,14 +130,14 @@ Future<void> authMongoCRImpl(RunCommandHook runCommand, const BSONObj& params) {
                 return Status(ErrorCodes::AuthenticationFailed,
                               "Invalid nonce response: " + nonceResponse.toString());
 
-            return runCommand(createMongoCRAuthenticateCmd(params, nonce)).then([](BSONObj reply) {
+            return runCommand(createMerizoCRAuthenticateCmd(params, nonce)).then([](BSONObj reply) {
                 return getStatusFromCommandResult(reply);
             });
         });
 }
 
-MONGO_INITIALIZER(RegisterAuthMongoCR)(InitializerContext* context) {
-    authMongoCR = authMongoCRImpl;
+MERIZO_INITIALIZER(RegisterAuthMerizoCR)(InitializerContext* context) {
+    authMerizoCR = authMerizoCRImpl;
     return Status::OK();
 }
 

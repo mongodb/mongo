@@ -15,7 +15,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     var rst = st.rs0;
 
     // Insert data into replica set
-    var conn = new Mongo(st.s.host);
+    var conn = new Merizo(st.s.host);
 
     var coll = conn.getCollection('test.countSlaveOk');
     coll.drop();
@@ -27,8 +27,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.writeOK(bulk.execute());
 
     var connA = conn;
-    var connB = new Mongo(st.s.host);
-    var connC = new Mongo(st.s.host);
+    var connB = new Merizo(st.s.host);
+    var connC = new Merizo(st.s.host);
 
     st.printShardingStatus();
 

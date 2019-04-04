@@ -56,7 +56,7 @@ class Process(_process.Process):
         signal = self.jasper_pb2.Signals.Value("TERMINATE")
         if sys.platform == "win32":
             if not kill:
-                event_name = self.jasper_pb2.EventName(value="Global\\Mongo_" + str(self.pid))
+                event_name = self.jasper_pb2.EventName(value="Global\\Merizo_" + str(self.pid))
                 signal_event = self._stub.SignalEvent(event_name)
                 if signal_event.success:
                     wait = self._stub.Wait(self._id, timeout=60)

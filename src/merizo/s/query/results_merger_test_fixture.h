@@ -122,7 +122,7 @@ protected:
     }
 
     /**
-     * Schedules a "CommandOnShardedViewNotSupportedOnMongod" error response w/ view definition.
+     * Schedules a "CommandOnShardedViewNotSupportedOnMerizod" error response w/ view definition.
      */
     void scheduleNetworkViewResponse(const std::string& ns, const std::string& pipelineJsonArr) {
         BSONObjBuilder viewDefBob;

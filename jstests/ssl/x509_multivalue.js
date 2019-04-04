@@ -7,13 +7,13 @@
     const CA_CERT = 'jstests/libs/ca.pem';
 
     function testClient(conn, name) {
-        let auth = {mechanism: 'MONGODB-X509'};
+        let auth = {mechanism: 'MERIZODB-X509'};
         if (name !== null) {
             auth.name = name;
         }
         const script = 'assert(db.getSiblingDB(\'$external\').auth(' + tojson(auth) + '));';
-        clearRawMongoProgramOutput();
-        const exitCode = runMongoProgram('merizo',
+        clearRawMerizoProgramOutput();
+        const exitCode = runMerizoProgram('merizo',
                                          '--ssl',
                                          '--sslAllowInvalidHostnames',
                                          '--sslPEMKeyFile',
@@ -43,7 +43,7 @@
     }
 
     // Standalone.
-    const merizod = MongoRunner.runMongod({
+    const merizod = MerizoRunner.runMerizod({
         auth: '',
         sslMode: 'requireSSL',
         sslPEMKeyFile: SERVER_CERT,
@@ -51,5 +51,5 @@
         sslAllowInvalidCertificates: '',
     });
     runTest(merizod);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

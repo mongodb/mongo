@@ -46,7 +46,7 @@ namespace merizo {
  * REGISTER_ACCUMULATOR(foo, AccumulatorFoo::create);
  */
 #define REGISTER_ACCUMULATOR(key, factory)                                     \
-    MONGO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) { \
+    MERIZO_INITIALIZER(addToAccumulatorFactoryMap_##key)(InitializerContext*) { \
         AccumulationStatement::registerAccumulator("$" #key, (factory));       \
         return Status::OK();                                                   \
     }

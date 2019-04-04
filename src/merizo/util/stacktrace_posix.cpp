@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -47,7 +47,7 @@
 #include "merizo/util/stringutils.h"
 #include "merizo/util/version.h"
 
-#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+#if defined(MERIZO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 #include <execinfo.h>
 #elif defined(__sun)
 #include <ucontext.h>
@@ -77,7 +77,7 @@ StringData getBaseName(StringData path) {
 }
 
 // All platforms we build on have execinfo.h and we use backtrace() directly, with one exception
-#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+#if defined(MERIZO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 using ::backtrace;
 
 // On Solaris 10, there is no execinfo.h, so we need to emulate it.
@@ -128,12 +128,12 @@ int backtrace(void** array, int size) {
 }
 #else
 // On unsupported platforms, we print an error instead of printing a stacktrace.
-#define MONGO_NO_BACKTRACE
+#define MERIZO_NO_BACKTRACE
 #endif
 
 }  // namespace
 
-#if defined(MONGO_NO_BACKTRACE)
+#if defined(MERIZO_NO_BACKTRACE)
 void printStackTrace(std::ostream& os) {
     os << "This platform does not support printing stacktraces" << std::endl;
 }
@@ -256,7 +256,7 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap);
  * about a running process, including the map from load addresses to shared objects loaded at
  * those addresses.
  */
-MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
+MERIZO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
     BSONObjBuilder soMap;
 
     auto&& vii = VersionInfoInterface::instance(VersionInfoInterface::NotEnabledAction::kFallback);

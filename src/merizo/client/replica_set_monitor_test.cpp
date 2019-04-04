@@ -78,8 +78,8 @@ TEST(ReplicaSetMonitor, InitialState) {
     }
 }
 
-TEST(ReplicaSetMonitor, InitialStateMongoURI) {
-    auto uri = MongoURI::parse("merizodb://a,b,c/?replicaSet=name");
+TEST(ReplicaSetMonitor, InitialStateMerizoURI) {
+    auto uri = MerizoURI::parse("merizodb://a,b,c/?replicaSet=name");
     ASSERT_OK(uri.getStatus());
     SetStatePtr state = std::make_shared<SetState>(uri.getValue());
     ASSERT_EQUALS(state->name, "name");

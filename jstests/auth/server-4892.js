@@ -9,7 +9,7 @@
  */
 
 var baseName = 'jstests_auth_server4892';
-var dbpath = MongoRunner.dataPath + baseName;
+var dbpath = MerizoRunner.dataPath + baseName;
 resetDbpath(dbpath);
 var merizodCommonArgs = {
     dbpath: dbpath,
@@ -20,15 +20,15 @@ var merizodCommonArgs = {
  * Start an instance of merizod, pass it as a parameter to operation(), then stop the instance of
  * merizod before unwinding or returning out of with_merizod().
  *
- * 'extraMongodArgs' are extra arguments to pass on the merizod command line, as an object.
+ * 'extraMerizodArgs' are extra arguments to pass on the merizod command line, as an object.
  */
-function withMongod(extraMongodArgs, operation) {
-    var merizod = MongoRunner.runMongod(Object.merge(merizodCommonArgs, extraMongodArgs));
+function withMerizod(extraMerizodArgs, operation) {
+    var merizod = MerizoRunner.runMerizod(Object.merge(merizodCommonArgs, extraMerizodArgs));
 
     try {
         operation(merizod);
     } finally {
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
     }
 }
 
@@ -37,7 +37,7 @@ function withMongod(extraMongodArgs, operation) {
  * cursors on the server.
  */
 function expectNumLiveCursors(merizod, expectedNumLiveCursors) {
-    var conn = new Mongo(merizod.host);
+    var conn = new Merizo(merizod.host);
     var db = merizod.getDB('admin');
     db.auth('admin', 'admin');
     var actualNumLiveCursors = db.serverStatus().metrics.cursor.open.total;
@@ -46,9 +46,9 @@ function expectNumLiveCursors(merizod, expectedNumLiveCursors) {
                expectedNumLiveCursors + ")");
 }
 
-withMongod({noauth: ""}, function setupTest(merizod) {
+withMerizod({noauth: ""}, function setupTest(merizod) {
     var admin, somedb, conn;
-    conn = new Mongo(merizod.host);
+    conn = new Merizo(merizod.host);
     admin = conn.getDB('admin');
     somedb = conn.getDB('somedb');
     admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
@@ -61,8 +61,8 @@ withMongod({noauth: ""}, function setupTest(merizod) {
     admin.logout();
 });
 
-withMongod({auth: ""}, function runTest(merizod) {
-    var conn = new Mongo(merizod.host);
+withMerizod({auth: ""}, function runTest(merizod) {
+    var conn = new Merizo(merizod.host);
     var somedb = conn.getDB('somedb');
     somedb.auth('frim', 'fram');
 

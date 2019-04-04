@@ -37,12 +37,12 @@
 namespace merizo {
 
 /**
- * MongoProcessCommon provides base implementations of any MongoProcessInterface methods whose code
+ * MerizoProcessCommon provides base implementations of any MerizoProcessInterface methods whose code
  * is largely identical on merizoD and merizoS.
  */
-class MongoProcessCommon : public MongoProcessInterface {
+class MerizoProcessCommon : public MerizoProcessInterface {
 public:
-    virtual ~MongoProcessCommon() = default;
+    virtual ~MerizoProcessCommon() = default;
 
     /**
      * Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and
@@ -77,7 +77,7 @@ protected:
     /**
      * Returns a BSONObj representing a report of the operation which is currently being
      * executed by the supplied client. This method is called by the getCurrentOps method of
-     * MongoProcessCommon to delegate to the merizoS- or merizoD- specific implementation.
+     * MerizoProcessCommon to delegate to the merizoS- or merizoD- specific implementation.
      */
     virtual BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                               Client* client,

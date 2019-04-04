@@ -31,7 +31,7 @@ function startHeartbeatThread(host, backupCursor, session, stopCounter) {
     let lsid = tojson(session.getSessionId());
 
     let heartbeatBackupCursor = function(host, cursorId, lsid, stopCounter) {
-        const conn = new Mongo(host);
+        const conn = new Merizo(host);
         const db = conn.getDB("admin");
         while (stopCounter.getCount() > 0) {
             let res = assert.commandWorked(db.runCommand({

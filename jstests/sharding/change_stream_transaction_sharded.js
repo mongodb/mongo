@@ -41,7 +41,7 @@
     //
     // Start transaction 1.
     //
-    const session1 = db.getMongo().startSession({causalConsistency: true});
+    const session1 = db.getMerizo().startSession({causalConsistency: true});
     const sessionDb1 = session1.getDatabase(dbName);
     const sessionColl1 = sessionDb1[collName];
     session1.startTransaction({readConcern: {level: "majority"}});
@@ -49,7 +49,7 @@
     //
     // Start transaction 2.
     //
-    const session2 = db.getMongo().startSession({causalConsistency: true});
+    const session2 = db.getMerizo().startSession({causalConsistency: true});
     const sessionDb2 = session2.getDatabase(dbName);
     const sessionColl2 = sessionDb2[collName];
     session2.startTransaction({readConcern: {level: "majority"}});

@@ -39,14 +39,14 @@ import static java.lang.String.format;
 
 import java.util.Locale;
 
-class MongoEmbeddedLibraryImpl implements MongoEmbeddedLibrary {
+class MerizoEmbeddedLibraryImpl implements MerizoEmbeddedLibrary {
     private static final Logger LOGGER = Loggers.getLogger();
     private static final LogCallback LOG_CALLBACK = new LogCallback();
 
     private final CAPI.merizo_embedded_v1_status status;
     private final CAPI.merizo_embedded_v1_lib lib;
 
-    MongoEmbeddedLibraryImpl(final String yamlConfig, final LogLevel logLevel) {
+    MerizoEmbeddedLibraryImpl(final String yamlConfig, final LogLevel logLevel) {
         status = CAPIHelper.createStatusPointer();
         CAPI.merizo_embedded_v1_init_params.ByReference initParams = new CAPI.merizo_embedded_v1_init_params.ByReference();
         initParams.yaml_config = new CAPI.cstring(yamlConfig != null ? yamlConfig : "");
@@ -62,8 +62,8 @@ class MongoEmbeddedLibraryImpl implements MongoEmbeddedLibrary {
     }
 
     @Override
-    public MongoEmbeddedInstance createInstance(final String yamlConfig) {
-        return new MongoEmbeddedInstanceImpl(lib, yamlConfig);
+    public MerizoEmbeddedInstance createInstance(final String yamlConfig) {
+        return new MerizoEmbeddedInstanceImpl(lib, yamlConfig);
     }
 
     @Override

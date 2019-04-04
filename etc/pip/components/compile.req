@@ -1,4 +1,4 @@
-# Mongo compile
+# Merizo compile
 Cheetah3; python_version < "3" # src/merizo/base/generate_error_codes.py
 psutil
 regex

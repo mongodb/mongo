@@ -56,7 +56,7 @@ Status validateDepth(const BSONObj& obj) {
     while (!frames.empty()) {
         const auto elem = frames.back().next();
         if (elem.type() == BSONType::Object || elem.type() == BSONType::Array) {
-            if (MONGO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage())) {
+            if (MERIZO_unlikely(frames.size() == BSONDepth::getMaxDepthForUserStorage())) {
                 // We're exactly at the limit, so descending to the next level would exceed
                 // the maximum depth.
                 return {ErrorCodes::Overflow,

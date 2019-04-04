@@ -6,7 +6,7 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/fixture_helpers.js");  // For isMongos.
+    load("jstests/libs/fixture_helpers.js");  // For isMerizos.
 
     // TODO SERVER-32672: remove the 'skipGossipingClusterTime' flag.
     TestData.skipGossipingClusterTime = true;
@@ -88,7 +88,7 @@
         assert.eq(result.length, 0, result);
 
         // Verify that the user without the 'inprog' privilege cannot view shard cursors via merizoS.
-        if (FixtureHelpers.isMongos(db)) {
+        if (FixtureHelpers.isMerizos(db)) {
             assert.commandFailedWithCode(adminDB.runCommand({
                 aggregate: 1,
                 pipeline: [{$currentOp: {localOps: false, idleCursors: true}}],
@@ -139,7 +139,7 @@
         assert.eq(result.length, 2, result);
 
         // The root user can also see both cursors on the shard via merizoS with {localOps: false}.
-        if (FixtureHelpers.isMongos(db)) {
+        if (FixtureHelpers.isMerizos(db)) {
             result = adminDB
                          .aggregate([
                              {$currentOp: {localOps: false, allUsers: true, idleCursors: true}},

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -86,14 +86,14 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     * specify a sslCAFile parameter from the shell
     */
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled &&
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+#ifdef MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS
         sslGlobalParams.sslCertificateSelector.empty() &&
 #endif
         sslGlobalParams.sslCAFile.empty()) {
         log() << "";
         log() << "** WARNING: No client certificate validation can be performed since"
                  " no CA file has been provided";
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+#ifdef MERIZO_CONFIG_SSL_CERTIFICATE_SELECTORS
         log() << "**          and no sslCertificateSelector has been specified.";
 #endif
         log() << "**          Please specify an sslCAFile parameter.";

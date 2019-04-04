@@ -58,11 +58,11 @@ namespace {
 using repl::OplogEntry;
 using unittest::assertGet;
 
-class AuthOpObserverTest : public ServiceContextMongoDTest {
+class AuthOpObserverTest : public ServiceContextMerizoDTest {
 public:
     void setUp() override {
         // Set up merizod.
-        ServiceContextMongoDTest::setUp();
+        ServiceContextMerizoDTest::setUp();
 
         auto service = getServiceContext();
         auto opCtx = cc().makeOperationContext();

@@ -198,7 +198,7 @@ std::unique_ptr<HarnessHelper> makeHarnessHelper() {
     return stdx::make_unique<WiredTigerHarnessHelper>();
 }
 
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
+MERIZO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
     merizo::registerHarnessHelperFactory(makeHarnessHelper);
     return Status::OK();
 }

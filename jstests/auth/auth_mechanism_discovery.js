@@ -41,9 +41,9 @@
     }
 
     // Test standalone.
-    const m = MongoRunner.runMongod({auth: ""});
+    const m = MerizoRunner.runMerizod({auth: ""});
     runTest(m);
-    MongoRunner.stopMongod(m);
+    MerizoRunner.stopMerizod(m);
 
     // Test sharded.
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

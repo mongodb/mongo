@@ -9,14 +9,14 @@ function setupTest() {
     print("START auth1.js");
     baseName = "jstests_auth_auth1";
 
-    m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1", useHostname: false});
+    m = MerizoRunner.runMerizod({auth: "", bind_ip: "127.0.0.1", useHostname: false});
     return m;
 }
 
 function runTest(m) {
     // these are used by read-only user
     db = m.getDB("test");
-    mro = new Mongo(m.host);
+    mro = new Merizo(m.host);
     dbRO = mro.getDB("test");
     tRO = dbRO[baseName];
 
@@ -82,4 +82,4 @@ function runTest(m) {
 
 var m = setupTest();
 runTest(m);
-MongoRunner.stopMongod(m, null, {user: "root", pwd: "root"});
+MerizoRunner.stopMerizod(m, null, {user: "root", pwd: "root"});

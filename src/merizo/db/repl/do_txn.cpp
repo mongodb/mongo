@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -64,7 +64,7 @@ constexpr StringData DoTxn::kPreconditionFieldName;
 namespace {
 
 // If enabled, causes loop in _doTxn() to hang after applying current operation.
-MONGO_FAIL_POINT_DEFINE(doTxnPauseBetweenOperations);
+MERIZO_FAIL_POINT_DEFINE(doTxnPauseBetweenOperations);
 
 /**
  * Return true iff the doTxnCmd can be executed in a single WriteUnitOfWork.
@@ -176,8 +176,8 @@ Status _doTxn(OperationContext* opCtx,
 
         (*numApplied)++;
 
-        if (MONGO_FAIL_POINT(doTxnPauseBetweenOperations)) {
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET(doTxnPauseBetweenOperations);
+        if (MERIZO_FAIL_POINT(doTxnPauseBetweenOperations)) {
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET(doTxnPauseBetweenOperations);
         }
     }
 

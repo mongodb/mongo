@@ -45,7 +45,7 @@
     let lsid = {id: UUID()};
     let txnNumber = 0;
 
-    const runCommitThroughMongosInParallelShellExpectTimeOut = function() {
+    const runCommitThroughMerizosInParallelShellExpectTimeOut = function() {
         const runCommitExpectTimeOutCode = "assert.commandFailedWithCode(db.adminCommand({" +
             "commitTransaction: 1, maxTimeMS: 1000 * 10, " + "lsid: " + tojson(lsid) + "," +
             "txnNumber: NumberLong(" + txnNumber + ")," + "stmtId: NumberInt(0)," +
@@ -96,7 +96,7 @@
         configureFailPoint: "hangBeforeWritingDecision",
         mode: "alwaysOn",
     }));
-    let awaitResult = runCommitThroughMongosInParallelShellExpectTimeOut();
+    let awaitResult = runCommitThroughMerizosInParallelShellExpectTimeOut();
     waitForFailpoint("Hit hangBeforeWritingDecision failpoint", 1);
 
     // Stop replication on all nodes in the coordinator replica set so that the write done on stepup

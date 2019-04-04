@@ -11,7 +11,7 @@
  * This workload was designed to reproduce SERVER-15892.
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMerizod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -34,7 +34,7 @@ var $config = (function() {
             // If the document was invalidated during a yield, then we wouldn't have modified it.
             // The "findAndModify" command returns a null value in this case. See SERVER-22002 for
             // more details.
-            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+            if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
                 // For storage engines that support document-level concurrency, if the document is
                 // modified by another thread during a yield, then the operation is retried
                 // internally. We never expect to see a null value returned by the "findAndModify"

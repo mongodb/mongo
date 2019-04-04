@@ -11,7 +11,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
 (function() {
     "use strict";
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticMerizod = MerizoRunner.runMerizod({});  // For startParallelOps.
     var st = new ShardingTest({shards: 2, other: {separateConfig: true}});
 
     var merizos = st.s0, admin = merizos.getDB('admin'), dbName = 'foo', ns = dbName + '.bar',
@@ -66,7 +66,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     pauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
     pauseMigrateAtStep(recip, migrateStepNames.cloned);
 
-    var joinMoveChunk = moveChunkParallel(staticMongod,
+    var joinMoveChunk = moveChunkParallel(staticMerizod,
                                           st.s0.host,
                                           null,
                                           [chunkWithDoc.min, chunkWithDoc.max],  // bounds
@@ -123,7 +123,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     assert.eq(1, recipColl.count());
     assert.eq(1, coll.count());
 
-    MongoRunner.stopMongod(staticMongod);
+    MerizoRunner.stopMerizod(staticMerizod);
     st.stop();
 
 })();

@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kFTDC
 
 #include "merizo/platform/basic.h"
 
@@ -42,13 +42,13 @@
 
 namespace merizo {
 
-void registerMongoSCollectors(FTDCController* controller) {
+void registerMerizoSCollectors(FTDCController* controller) {
     // PoolStats
     controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
         "connPoolStats", "connPoolStats", "", BSON("connPoolStats" << 1)));
 }
 
-void startMongoSFTDC() {
+void startMerizoSFTDC() {
     // Get the path to use for FTDC:
     // 1. Check if the user set one.
     // 2. If not, check if the user has a logpath and derive one.
@@ -65,18 +65,18 @@ void startMongoSFTDC() {
             startMode = FTDCStartMode::kSkipStart;
         } else {
             directory = boost::filesystem::absolute(
-                FTDCUtil::getMongoSPath(serverGlobalParams.logpath), serverGlobalParams.cwd);
+                FTDCUtil::getMerizoSPath(serverGlobalParams.logpath), serverGlobalParams.cwd);
 
             // Note: If the computed FTDC directory conflicts with an existing file, then FTDC will
-            // warn about the conflict, and not startup. It will not terminate MongoS in this
+            // warn about the conflict, and not startup. It will not terminate MerizoS in this
             // situation.
         }
     }
 
-    startFTDC(directory, startMode, registerMongoSCollectors);
+    startFTDC(directory, startMode, registerMerizoSCollectors);
 }
 
-void stopMongoSFTDC() {
+void stopMerizoSFTDC() {
     stopFTDC();
 }
 

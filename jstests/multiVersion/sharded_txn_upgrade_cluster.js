@@ -37,15 +37,15 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     // Upgrade the config servers.
     jsTestLog("Upgrading config servers.");
-    st.upgradeCluster("latest", {upgradeConfigs: true, upgradeMongos: false, upgradeShards: false});
+    st.upgradeCluster("latest", {upgradeConfigs: true, upgradeMerizos: false, upgradeShards: false});
 
     // Then upgrade the shard servers.
     jsTestLog("Upgrading shard servers.");
-    st.upgradeCluster("latest", {upgradeConfigs: false, upgradeMongos: false, upgradeShards: true});
+    st.upgradeCluster("latest", {upgradeConfigs: false, upgradeMerizos: false, upgradeShards: true});
 
     // Then upgrade merizos servers.
     jsTestLog("Upgrading merizos servers.");
-    st.upgradeCluster("latest", {upgradeConfigs: false, upgradeMongos: true, upgradeShards: false});
+    st.upgradeCluster("latest", {upgradeConfigs: false, upgradeMerizos: true, upgradeShards: false});
     checkFCV(st.configRS.getPrimary().getDB("admin"), lastStableFCV);
 
     testDB = st.s.getDB(dbName);

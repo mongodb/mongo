@@ -11,7 +11,7 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * All threads insert into the same collection.
  */
-load("jstests/libs/fixture_helpers.js");  // For isMongos.
+load("jstests/libs/fixture_helpers.js");  // For isMerizos.
 
 var $config = (function() {
 
@@ -49,7 +49,7 @@ var $config = (function() {
         }
 
         function count(db, collName) {
-            if (!isMongos(db)) {
+            if (!isMerizos(db)) {
                 // SERVER-33753: count() without a predicate can be wrong on sharded clusters.
                 assertWhenOwnColl.eq(this.getCount(db), this.getNumDocs());
             }

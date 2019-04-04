@@ -255,7 +255,7 @@
    functions/classes. It's safe to define this here because config.h is only
    used internally, to compile the DLL, and every DLL source file #includes
    "config.h" before anything else. */
-// MONGODB MODIFCATION - disable DLL exports
+// MERIZODB MODIFCATION - disable DLL exports
 #ifndef PERFTOOLS_DLL_DECL
 # define PERFTOOLS_IS_A_DLL  0   /* not set if you're statically linking */
 # define PERFTOOLS_DLL_DECL  /**/
@@ -318,7 +318,7 @@
 // TODO(csilvers): include windows/port.h in every relevant source file instead?
 #include "windows/port.h"
 
-// MONGODB MODIFCATION - disable DLL hook
+// MERIZODB MODIFCATION - disable DLL hook
 // gperftools/windows/patch_functions.cc normally defines this function,
 // but we do not link this file since it would dynamically patch our functions.
 // We override the behavior of this function to no-patch functions, but instead

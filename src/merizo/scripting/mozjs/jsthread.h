@@ -49,14 +49,14 @@ struct JSThreadInfo : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(init);
-        MONGO_DECLARE_JS_FUNCTION(start);
-        MONGO_DECLARE_JS_FUNCTION(join);
-        MONGO_DECLARE_JS_FUNCTION(hasFailed);
-        MONGO_DECLARE_JS_FUNCTION(returnData);
+        MERIZO_DECLARE_JS_FUNCTION(init);
+        MERIZO_DECLARE_JS_FUNCTION(start);
+        MERIZO_DECLARE_JS_FUNCTION(join);
+        MERIZO_DECLARE_JS_FUNCTION(hasFailed);
+        MERIZO_DECLARE_JS_FUNCTION(returnData);
 
-        MONGO_DECLARE_JS_FUNCTION(_threadInject);
-        MONGO_DECLARE_JS_FUNCTION(_scopedThreadInject);
+        MERIZO_DECLARE_JS_FUNCTION(_threadInject);
+        MERIZO_DECLARE_JS_FUNCTION(_scopedThreadInject);
     };
 
     /**

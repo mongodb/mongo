@@ -63,7 +63,7 @@ var $config = (function() {
     const states = {
 
         init: function init(db, collName) {
-            this.session = db.getMongo().startSession({causalConsistency: true});
+            this.session = db.getMerizo().startSession({causalConsistency: true});
             this.sessionDb = this.session.getDatabase(db.getName());
             this.iteration = 1;
 
@@ -168,7 +168,7 @@ var $config = (function() {
         if (cluster.isSharded()) {
             // Advance each router's cluster time to be >= the time of the writes, so the first
             // global snapshots chosen by each is guaranteed to include the inserted documents.
-            cluster.synchronizeMongosClusterTimes();
+            cluster.synchronizeMerizosClusterTimes();
         }
     }
 

@@ -150,7 +150,7 @@ selector:
   - jstests/core/updateh.js
   - jstests/core/updatej.js
 
-  # SERVER-38096 Mongos opCounter doesn't increase when last op causes the transaction to implicitly abort
+  # SERVER-38096 Merizos opCounter doesn't increase when last op causes the transaction to implicitly abort
   - jstests/core/opcounters_write_cmd.js
 
   # Consecutive writes totalling more than the size upper threshold will cause the txn to
@@ -174,7 +174,7 @@ selector:
   - jstests/core/or4.js
   - jstests/core/temp_cleanup.js
 
-  # TODO: SERVER-38690 Mongos should throw write targeting errors in a transaction.
+  # TODO: SERVER-38690 Merizos should throw write targeting errors in a transaction.
   - jstests/core/update_setOnInsert.js
 
   ##
@@ -283,7 +283,7 @@ selector:
   # using a single txnNumber.
   - jstests/core/json_schema/misc_validation.js
 
-  # Fails with implicit sessions because it will use multiple sessions on the same Mongo connection.
+  # Fails with implicit sessions because it will use multiple sessions on the same Merizo connection.
   - jstests/core/dropdb.js
 
   # Committing a transaction when the server is fsync locked fails.

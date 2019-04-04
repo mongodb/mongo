@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -64,10 +64,10 @@ using std::string;
 using std::vector;
 
 // Failpoint for disabling AsyncConfigChangeHook calls on updated RS nodes.
-MONGO_FAIL_POINT_DEFINE(failAsyncConfigChangeHook);
+MERIZO_FAIL_POINT_DEFINE(failAsyncConfigChangeHook);
 
 // Failpoint for changing the default refresh period
-MONGO_FAIL_POINT_DEFINE(modifyReplicaSetMonitorDefaultRefreshPeriod);
+MERIZO_FAIL_POINT_DEFINE(modifyReplicaSetMonitorDefaultRefreshPeriod);
 
 namespace {
 
@@ -177,7 +177,7 @@ const Seconds ReplicaSetMonitor::kDefaultFindHostTimeout(15);
 bool ReplicaSetMonitor::useDeterministicHostSelection = false;
 
 Seconds ReplicaSetMonitor::getDefaultRefreshPeriod() {
-    MONGO_FAIL_POINT_BLOCK_IF(modifyReplicaSetMonitorDefaultRefreshPeriod,
+    MERIZO_FAIL_POINT_BLOCK_IF(modifyReplicaSetMonitorDefaultRefreshPeriod,
                               data,
                               [&](const BSONObj& data) { return data.hasField("period"); }) {
         return Seconds{data.getData().getIntField("period")};
@@ -189,7 +189,7 @@ Seconds ReplicaSetMonitor::getDefaultRefreshPeriod() {
 ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds)
     : _state(std::make_shared<SetState>(name, seeds, globalRSMonitorManager.getExecutor())) {}
 
-ReplicaSetMonitor::ReplicaSetMonitor(const MongoURI& uri)
+ReplicaSetMonitor::ReplicaSetMonitor(const MerizoURI& uri)
     : _state(std::make_shared<SetState>(uri, globalRSMonitorManager.getExecutor())) {}
 
 void ReplicaSetMonitor::init() {
@@ -301,7 +301,7 @@ SharedSemiFuture<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(
     Refresher::ensureScanInProgress(_state, lk);
 
     if (!_state->isExpedited && _refresherHandle &&
-        !MONGO_FAIL_POINT(modifyReplicaSetMonitorDefaultRefreshPeriod)) {
+        !MERIZO_FAIL_POINT(modifyReplicaSetMonitorDefaultRefreshPeriod)) {
         // We are the first waiter, switch to expedited scanning.
         _state->isExpedited = true;
         _state->executor->cancel(_refresherHandle);
@@ -370,7 +370,7 @@ std::string ReplicaSetMonitor::getServerAddress() const {
     return _state->getConfirmedServerAddress();
 }
 
-const MongoURI& ReplicaSetMonitor::getOriginalUri() const {
+const MerizoURI& ReplicaSetMonitor::getOriginalUri() const {
     // setUri is const so no need to lock.
     return _state->setUri;
 }
@@ -386,7 +386,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const string& na
         ConnectionString::forReplicaSet(name, vector<HostAndPort>(servers.begin(), servers.end())));
 }
 
-shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const MongoURI& uri) {
+shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::createIfNeeded(const MerizoURI& uri) {
     return globalRSMonitorManager.getOrCreateMonitor(uri);
 }
 
@@ -843,7 +843,7 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
             syncConfigChangeHook(_set->name, _set->getConfirmedServerAddress());
         }
 
-        if (asyncConfigChangeHook && !MONGO_FAIL_POINT(failAsyncConfigChangeHook)) {
+        if (asyncConfigChangeHook && !MERIZO_FAIL_POINT(failAsyncConfigChangeHook)) {
             // call from a separate thread to avoid blocking and holding lock while potentially
             // going over the network
             stdx::thread bg(asyncConfigChangeHook, _set->name, _set->getConfirmedServerAddress());
@@ -1014,7 +1014,7 @@ void Node::update(const IsMasterReply& reply) {
 SetState::SetState(StringData name,
                    const std::set<HostAndPort>& seedNodes,
                    executor::TaskExecutor* executor,
-                   MongoURI uri)
+                   MerizoURI uri)
     : name(name.toString()),
       consecutiveFailedScans(0),
       seedNodes(seedNodes),
@@ -1048,7 +1048,7 @@ SetState::SetState(StringData name,
     DEV checkInvariants();
 }
 
-SetState::SetState(const MongoURI& uri, executor::TaskExecutor* executor)
+SetState::SetState(const MerizoURI& uri, executor::TaskExecutor* executor)
     : SetState(uri.getSetName(),
                std::set<HostAndPort>(uri.getServers().begin(), uri.getServers().end()),
                executor,

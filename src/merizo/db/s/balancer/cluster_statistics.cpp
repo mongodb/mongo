@@ -45,13 +45,13 @@ ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inCurrSizeMB,
                                                     bool inIsDraining,
                                                     std::set<std::string> inShardTags,
-                                                    std::string inMongoVersion)
+                                                    std::string inMerizoVersion)
     : shardId(std::move(inShardId)),
       maxSizeMB(inMaxSizeMB),
       currSizeMB(inCurrSizeMB),
       isDraining(inIsDraining),
       shardTags(std::move(inShardTags)),
-      merizoVersion(std::move(inMongoVersion)) {}
+      merizoVersion(std::move(inMerizoVersion)) {}
 
 bool ClusterStatistics::ShardStatistics::isSizeMaxed() const {
     if (!maxSizeMB || !currSizeMB) {

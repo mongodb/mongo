@@ -130,7 +130,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                 // manually to the cluster by the test.
                 if (!(shardConnStringToConn.hasOwnProperty(shardConnString))) {
                     print("Creating connection to manually added shard: " + shardConnString);
-                    shardConnStringToConn[shardConnString] = new Mongo(shardConnString);
+                    shardConnStringToConn[shardConnString] = new Merizo(shardConnString);
                 }
                 let shardConn = shardConnStringToConn[shardConnString];
 

@@ -95,7 +95,7 @@ func (op *InsertOp) FromReader(r io.Reader) error {
 
 // Execute performs the InsertOp on a given socket, yielding the reply when
 // successful (and an error otherwise).
-func (op *InsertOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+func (op *InsertOp) Execute(socket *mgo.MerizoSocket) (Replyable, error) {
 	if err := mgo.ExecOpWithoutReply(socket, &op.InsertOp); err != nil {
 		return nil, err
 	}

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -330,7 +330,7 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
                 break;
 
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
 
         rcBuilder.append(kLevelFieldName, levelName);

@@ -32,11 +32,11 @@ package com.merizodb.embedded.capi;
 
 import com.merizodb.embedded.capi.internal.CAPI;
 
-class MongoEmbeddedInstanceImpl implements MongoEmbeddedInstance {
+class MerizoEmbeddedInstanceImpl implements MerizoEmbeddedInstance {
     private final CAPI.merizo_embedded_v1_status status;
     private final CAPI.merizo_embedded_v1_instance instance;
 
-    MongoEmbeddedInstanceImpl(final CAPI.merizo_embedded_v1_lib libraryPointer, final String yamlConfig) {
+    MerizoEmbeddedInstanceImpl(final CAPI.merizo_embedded_v1_lib libraryPointer, final String yamlConfig) {
         status = CAPIHelper.createStatusPointer();
 
         try {
@@ -52,8 +52,8 @@ class MongoEmbeddedInstanceImpl implements MongoEmbeddedInstance {
     }
 
     @Override
-    public MongoEmbeddedClient createClient() {
-        return new MongoEmbeddedClientImpl(instance);
+    public MerizoEmbeddedClient createClient() {
+        return new MerizoEmbeddedClientImpl(instance);
     }
 
     @Override

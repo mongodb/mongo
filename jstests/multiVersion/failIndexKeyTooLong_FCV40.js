@@ -7,7 +7,7 @@
     load("jstests/libs/feature_compatibility_version.js");
 
     // Start the node with FCV 4.0
-    let conn = MongoRunner.runMongod({binVersion: "latest", cleanData: true});
+    let conn = MerizoRunner.runMerizod({binVersion: "latest", cleanData: true});
     assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
 
     var db = conn.getDB('test');
@@ -60,5 +60,5 @@
     // validate commands.
     t.drop();
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

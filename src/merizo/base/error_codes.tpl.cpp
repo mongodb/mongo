@@ -49,7 +49,7 @@ ErrorExtraInfo::Parser* $ec.name = nullptr;
 }  // namespace
 
 
-MONGO_STATIC_ASSERT(sizeof(ErrorCodes::Error) == sizeof(int));
+MERIZO_STATIC_ASSERT(sizeof(ErrorCodes::Error) == sizeof(int));
 
 std::string ErrorCodes::errorString(Error err) {
     switch (err) {
@@ -119,7 +119,7 @@ void ErrorExtraInfo::registerParser(ErrorCodes::Error code, Parser* parser) {
             break;
         //#end for
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

@@ -49,7 +49,7 @@ using std::vector;
 namespace {
 
 /**
- * Mongos-side command for merging chunks, passes command to appropriate shard.
+ * Merizos-side command for merging chunks, passes command to appropriate shard.
  */
 class ClusterMergeChunksCommand : public ErrmsgCommandDeprecated {
 public:

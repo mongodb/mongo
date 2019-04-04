@@ -29,7 +29,7 @@
 
 // _ todo: reconnect?
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -287,7 +287,7 @@ public:
         // If we get here, we are in shutdown, and it does not matter what we return.
         invariant(_this->_inShutdown.load());
         uassert(ErrorCodes::ShutdownInProgress, "connection pool is in shutdown", false);
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 };
 
@@ -388,7 +388,7 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
     return Detail::get(this, host, socketTimeout, connect);
 }
 
-DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
+DBClientBase* DBConnectionPool::get(const MerizoURI& uri, double socketTimeout) {
     auto connect = [&] {
         string errmsg;
         std::unique_ptr<DBClientBase> c(uri.connect(StringData(), errmsg, socketTimeout));
@@ -512,7 +512,7 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
             if (i->second.numCreated() == 0)
                 continue;
 
-            // Mongos may use either a replica set uri or a list of addresses as
+            // Merizos may use either a replica set uri or a list of addresses as
             // the identifier here, so we always take the first server parsed out
             // as our label for connPoolStats. Note that these stats will collide
             // with any existing stats for the chosen host.
@@ -623,7 +623,7 @@ ScopedDbConnection::ScopedDbConnection(const ConnectionString& host, double sock
     _setSocketTimeout();
 }
 
-ScopedDbConnection::ScopedDbConnection(const MongoURI& uri, double socketTimeout)
+ScopedDbConnection::ScopedDbConnection(const MerizoURI& uri, double socketTimeout)
     : _host(uri.toString()),
       _conn(globalConnPool.get(uri, socketTimeout)),
       _socketTimeoutSecs(socketTimeout) {
@@ -672,7 +672,7 @@ void ScopedDbConnection::clearPool() {
 
 AtomicWord<int> AScopedConnection::_numConnections;
 
-MONGO_INITIALIZER(SetupDBClientBaseWithConnection)(InitializerContext*) {
+MERIZO_INITIALIZER(SetupDBClientBaseWithConnection)(InitializerContext*) {
     DBClientBase::withConnection_do_not_use = [](std::string host,
                                                  std::function<void(DBClientBase*)> cb) {
         ScopedDbConnection conn(host);

@@ -116,7 +116,7 @@ void CatalogControlTest::setUp() {
         // Only need the IndexBuildsCoordinator to call into and check whether there are any index
         // builds in progress.
         IndexBuildsCoordinator::set(serviceContext.get(),
-                                    std::make_unique<IndexBuildsCoordinatorMongod>());
+                                    std::make_unique<IndexBuildsCoordinatorMerizod>());
         setGlobalServiceContext(std::move(serviceContext));
     }
 

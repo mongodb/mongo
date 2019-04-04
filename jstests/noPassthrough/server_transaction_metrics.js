@@ -59,7 +59,7 @@
 
     // Start the session.
     const sessionOptions = {causalConsistency: false};
-    const session = testDB.getMongo().startSession(sessionOptions);
+    const session = testDB.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
 
@@ -197,7 +197,7 @@
 
     const transactionFn = function() {
         const collName = 'server_transactions_metrics';
-        const session = db.getMongo().startSession({causalConsistency: false});
+        const session = db.getMerizo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase('test');
         const sessionColl = sessionDb[collName];
 

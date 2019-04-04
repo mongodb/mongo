@@ -65,11 +65,11 @@ class TransportLayerASIO::BatonASIO : public NetworkingBaton {
     class InternalReactorTimer : public ReactorTimer {
     public:
         void cancel(const BatonHandle& baton = nullptr) override {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
 
         Future<void> waitUntil(Date_t timeout, const BatonHandle& baton = nullptr) override {
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
     };
 

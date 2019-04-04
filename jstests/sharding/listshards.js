@@ -25,7 +25,7 @@
     assert.eq(shardsArray.length, 1);
 
     // add standalone merizod
-    var standaloneShard = MongoRunner.runMongod({useHostName: true, shardsvr: ""});
+    var standaloneShard = MerizoRunner.runMerizod({useHostName: true, shardsvr: ""});
     res = shardTest.admin.runCommand({addShard: standaloneShard.host, name: 'standalone'});
     assert.commandWorked(res, 'addShard command failed');
     res = merizos.adminCommand('listShards');
@@ -65,6 +65,6 @@
 
     rs1.stopSet();
     shardTest.stop();
-    MongoRunner.stopMongod(standaloneShard);
+    MerizoRunner.stopMerizod(standaloneShard);
 
 })();

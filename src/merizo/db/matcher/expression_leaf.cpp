@@ -143,7 +143,7 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
                 default:
                     // This is a comparison match expression, so it must be either
                     // a $lt, $lte, $gt, $gte, or equality expression.
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
         return false;
@@ -644,7 +644,7 @@ bool BitTestMatchExpression::performBitTest(long long eValue) const {
         case BITS_ANY_CLEAR:
             return ~eValue & _bitMask;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -740,7 +740,7 @@ void BitTestMatchExpression::debugString(StringBuilder& debug, int indentationLe
             debug << "$bitsAnyClear:";
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     debug << " [";
@@ -776,7 +776,7 @@ BSONObj BitTestMatchExpression::getSerializedRightHandSide() const {
             opString = "$bitsAnyClear";
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     BSONArrayBuilder arrBob;

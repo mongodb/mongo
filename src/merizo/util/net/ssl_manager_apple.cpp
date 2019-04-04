@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -1670,7 +1670,7 @@ std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
     return stdx::make_unique<SSLManagerApple>(params, isServer);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
 (InitializerContext*) {
     kMerizoDBRolesOID = ::CFStringCreateWithCString(
         nullptr, merizodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);

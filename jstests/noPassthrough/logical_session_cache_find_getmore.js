@@ -3,7 +3,7 @@
 
     TestData.disableImplicitSessions = true;
 
-    var conn = MongoRunner.runMongod({setParameter: {maxSessions: 2}});
+    var conn = MerizoRunner.runMerizod({setParameter: {maxSessions: 2}});
     var testDB = conn.getDB("test");
 
     assert.writeOK(testDB.foo.insert({data: 1}));
@@ -24,5 +24,5 @@
     assert.commandFailed(db.runCommand({find: "foo", batchSize: 1}),
                          "able to run find when the cache is full");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

@@ -31,16 +31,16 @@
 package com.merizodb.embedded.capi;
 
 /**
- * A Mongo Embedded Instance
+ * A Merizo Embedded Instance
  */
-public interface MongoEmbeddedInstance {
+public interface MerizoEmbeddedInstance {
 
     /**
      * Creates a client
      *
      * @return the client
      */
-    MongoEmbeddedClient createClient();
+    MerizoEmbeddedClient createClient();
 
     /**
      * Shuts down an embedded merizodb instance, all clients must be closed before calling this.

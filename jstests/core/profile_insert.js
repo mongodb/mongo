@@ -15,7 +15,7 @@
     var testDB = db.getSiblingDB("profile_insert");
     assert.commandWorked(testDB.dropDatabase());
     var coll = testDB.getCollection("test");
-    var isWriteCommand = (db.getMongo().writeMode() === "commands");
+    var isWriteCommand = (db.getMerizo().writeMode() === "commands");
 
     testDB.setProfilingLevel(2);
 
@@ -37,7 +37,7 @@
     if (isWriteCommand) {
         assert.eq(profileObj.command.ordered, true, tojson(profileObj));
         assert.eq(profileObj.protocol,
-                  getProfilerProtocolStringForCommand(testDB.getMongo()),
+                  getProfilerProtocolStringForCommand(testDB.getMerizo()),
                   tojson(profileObj));
         assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     }

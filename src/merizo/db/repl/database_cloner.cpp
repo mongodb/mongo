@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationInitialSync
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplicationInitialSync
 
 #include "merizo/platform/basic.h"
 
@@ -53,7 +53,7 @@ namespace merizo {
 namespace repl {
 
 // Failpoint which causes the initial sync function to hang before running listCollections.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeListCollections);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangBeforeListCollections);
 
 namespace {
 
@@ -68,7 +68,7 @@ const char* kUUIDFieldName = "uuid";
 
 // Failpoint which causes initial sync to hang right after listCollections, but before cloning
 // any colelctions in the 'database' database.
-MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterListCollections);
+MERIZO_FAIL_POINT_DEFINE(initialSyncHangAfterListCollections);
 
 /**
  * Default listCollections predicate.
@@ -178,14 +178,14 @@ Status DatabaseCloner::startup() noexcept {
             return Status(ErrorCodes::ShutdownInProgress, "database cloner completed");
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangBeforeListCollections, customArgs) {
+    MERIZO_FAIL_POINT_BLOCK(initialSyncHangBeforeListCollections, customArgs) {
         const auto& data = customArgs.getData();
         const auto databaseElem = data["database"];
         if (!databaseElem || databaseElem.checkAndGetStringData() == _dbname) {
             lk.unlock();
             log() << "initial sync - initialSyncHangBeforeListCollections fail point "
                      "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(initialSyncHangBeforeListCollections) && !_isShuttingDown()) {
+            while (MERIZO_FAIL_POINT(initialSyncHangBeforeListCollections) && !_isShuttingDown()) {
                 merizo::sleepsecs(1);
             }
             lk.lock();
@@ -295,12 +295,12 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         return;
     }
 
-    MONGO_FAIL_POINT_BLOCK(initialSyncHangAfterListCollections, options) {
+    MERIZO_FAIL_POINT_BLOCK(initialSyncHangAfterListCollections, options) {
         const BSONObj& data = options.getData();
         if (data["database"].String() == _dbname) {
             log() << "initial sync - initialSyncHangAfterListCollections fail point "
                      "enabled. Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(initialSyncHangAfterListCollections)) {
+            while (MERIZO_FAIL_POINT(initialSyncHangAfterListCollections)) {
                 merizo::sleepsecs(1);
             }
         }
@@ -524,7 +524,7 @@ std::ostream& operator<<(std::ostream& os, const DatabaseCloner::State& state) {
         case DatabaseCloner::State::kComplete:
             return os << "Complete";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace repl

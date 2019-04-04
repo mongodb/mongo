@@ -48,9 +48,9 @@ static const std::string kRepairIncompleteFileName = "_repair_incomplete";
 
 using boost::filesystem::path;
 
-class StorageRepairObserverTest : public ServiceContextMongoDTest {
+class StorageRepairObserverTest : public ServiceContextMerizoDTest {
 public:
-    StorageRepairObserverTest() : ServiceContextMongoDTest("ephemeralForTest") {
+    StorageRepairObserverTest() : ServiceContextMerizoDTest("ephemeralForTest") {
 
         repl::ReplicationCoordinator::set(
             getServiceContext(),

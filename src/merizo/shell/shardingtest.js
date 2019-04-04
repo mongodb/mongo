@@ -14,7 +14,7 @@
  *     chunkSize {number}: the chunk size to use as configuration for the cluster
  *
  *     merizos {number|Object|Array.<Object>}: number of merizos or merizos
- *       configuration object(s)(*). @see MongoRunner.runMongos
+ *       configuration object(s)(*). @see MerizoRunner.runMerizos
  *
  *     merizosWaitsForKeys {boolean}: if true, wait for merizos to discover keys from the config
  *       server and to start sending cluster times.
@@ -29,10 +29,10 @@
  *       }
  *
  *     shards {number|Object|Array.<Object>}: number of shards or shard
- *       configuration object(s)(*). @see MongoRunner.runMongod
+ *       configuration object(s)(*). @see MerizoRunner.runMerizod
  *
  *     config {number|Object|Array.<Object>}: number of config server or
- *       config server configuration object(s)(*). @see MongoRunner.runMongod
+ *       config server configuration object(s)(*). @see MerizoRunner.runMerizod
  *
  *     (*) There are two ways For multiple configuration objects.
  *       (1) Using the object format. Example:
@@ -95,13 +95,13 @@
  *   }
  *
  * Member variables:
- * s {Mongo} - connection to the first merizos
- * s0, s1, ... {Mongo} - connection to different merizos
+ * s {Merizo} - connection to the first merizos
+ * s0, s1, ... {Merizo} - connection to different merizos
  * rs0, rs1, ... {ReplSetTest} - test objects to replica sets
- * shard0, shard1, ... {Mongo} - connection to shards (not available for replica sets)
- * d0, d1, ... {Mongo} - same as shard0, shard1, ...
- * config0, config1, ... {Mongo} - connection to config servers
- * c0, c1, ... {Mongo} - same as config0, config1, ...
+ * shard0, shard1, ... {Merizo} - connection to shards (not available for replica sets)
+ * d0, d1, ... {Merizo} - same as shard0, shard1, ...
+ * config0, config1, ... {Merizo} - connection to config servers
+ * c0, c1, ... {Merizo} - same as config0, config1, ...
  * configRS - If the config servers are a replset, this will contain the config ReplSetTest object
  */
 var ShardingTest = function(params) {
@@ -134,7 +134,7 @@ var ShardingTest = function(params) {
         var conn;
         assert.soon(function() {
             try {
-                conn = new Mongo(url);
+                conn = new Merizo(url);
                 return true;
             } catch (e) {
                 print("Error connecting to " + url + ": " + e);
@@ -380,22 +380,22 @@ var ShardingTest = function(params) {
         }
     };
 
-    this.stopAllMongos = function(opts) {
+    this.stopAllMerizos = function(opts) {
         for (var i = 0; i < this._merizos.length; i++) {
-            this.stopMongos(i, opts);
+            this.stopMerizos(i, opts);
         }
     };
 
     this.stop = function(opts) {
         this.checkUUIDsConsistentAcrossCluster();
 
-        this.stopAllMongos(opts);
+        this.stopAllMerizos(opts);
 
         for (var i = 0; i < this._connections.length; i++) {
             if (this._rs[i]) {
                 this._rs[i].test.stopSet(15, undefined, opts);
             } else {
-                this.stopMongod(i, opts);
+                this.stopMerizod(i, opts);
             }
         }
 
@@ -411,7 +411,7 @@ var ShardingTest = function(params) {
         if (!opts || !opts.noCleanData) {
             print("ShardingTest stop deleting all dbpaths");
             for (var i = 0; i < _alldbpaths.length; i++) {
-                resetDbpath(MongoRunner.dataPath + _alldbpaths[i]);
+                resetDbpath(MerizoRunner.dataPath + _alldbpaths[i]);
             }
         }
 
@@ -423,7 +423,7 @@ var ShardingTest = function(params) {
 
     this.getDBPaths = function() {
         return _alldbpaths.map((path) => {
-            return MongoRunner.dataPath + path;
+            return MerizoRunner.dataPath + path;
         });
     };
 
@@ -716,24 +716,24 @@ var ShardingTest = function(params) {
     /**
      * Kills the merizos with index n.
      */
-    this.stopMongos = function(n, opts) {
+    this.stopMerizos = function(n, opts) {
         if (otherParams.useBridge) {
-            MongoRunner.stopMongos(unbridgedMongos[n], undefined, opts);
+            MerizoRunner.stopMerizos(unbridgedMerizos[n], undefined, opts);
             this["s" + n].stop();
         } else {
-            MongoRunner.stopMongos(this["s" + n], undefined, opts);
+            MerizoRunner.stopMerizos(this["s" + n], undefined, opts);
         }
     };
 
     /**
      * Kills the shard merizod with index n.
      */
-    this.stopMongod = function(n, opts) {
+    this.stopMerizod = function(n, opts) {
         if (otherParams.useBridge) {
-            MongoRunner.stopMongod(unbridgedConnections[n], undefined, opts);
+            MerizoRunner.stopMerizod(unbridgedConnections[n], undefined, opts);
             this["d" + n].stop();
         } else {
-            MongoRunner.stopMongod(this["d" + n], undefined, opts);
+            MerizoRunner.stopMerizod(this["d" + n], undefined, opts);
         }
     };
 
@@ -742,10 +742,10 @@ var ShardingTest = function(params) {
      */
     this.stopConfigServer = function(n, opts) {
         if (otherParams.useBridge) {
-            MongoRunner.stopMongod(unbridgedConfigServers[n], undefined, opts);
+            MerizoRunner.stopMerizod(unbridgedConfigServers[n], undefined, opts);
             this._configServers[n].stop();
         } else {
-            MongoRunner.stopMongod(this._configServers[n], undefined, opts);
+            MerizoRunner.stopMerizod(this._configServers[n], undefined, opts);
         }
     };
 
@@ -759,11 +759,11 @@ var ShardingTest = function(params) {
      *
      * Warning: Overwrites the old s (if n = 0) admin, config, and sn member variables.
      */
-    this.restartMongos = function(n, opts) {
+    this.restartMerizos = function(n, opts) {
         var merizos;
 
         if (otherParams.useBridge) {
-            merizos = unbridgedMongos[n];
+            merizos = unbridgedMerizos[n];
         } else {
             merizos = this["s" + n];
         }
@@ -771,7 +771,7 @@ var ShardingTest = function(params) {
         opts = opts || merizos;
         opts.port = opts.port || merizos.port;
 
-        this.stopMongos(n);
+        this.stopMerizos(n);
 
         if (otherParams.useBridge) {
             var bridgeOptions =
@@ -785,7 +785,7 @@ var ShardingTest = function(params) {
                 dest: hostName + ":" + opts.port,
             });
 
-            this._merizos[n] = new MongoBridge(bridgeOptions);
+            this._merizos[n] = new MerizoBridge(bridgeOptions);
         }
 
         if (opts.restart) {
@@ -793,19 +793,19 @@ var ShardingTest = function(params) {
 
             // If the merizos is being restarted with a newer version, make sure we remove any
             // options that no longer exist in the newer version.
-            if (MongoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
+            if (MerizoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
                 delete opts.noAutoSplit;
             }
         }
 
-        var newConn = MongoRunner.runMongos(opts);
+        var newConn = MerizoRunner.runMerizos(opts);
         if (!newConn) {
             throw new Error("Failed to restart merizos " + n);
         }
 
         if (otherParams.useBridge) {
             this._merizos[n].connectToBridge();
-            unbridgedMongos[n] = newConn;
+            unbridgedMerizos[n] = newConn;
         } else {
             this._merizos[n] = newConn;
         }
@@ -823,13 +823,13 @@ var ShardingTest = function(params) {
      *
      * If opts is specified, the new merizod is started using those options. Otherwise, it is started
      * with its previous parameters. The 'beforeRestartCallback' parameter is an optional function
-     * that will be run after the MongoD is stopped, but before it is restarted. The intended uses
+     * that will be run after the MerizoD is stopped, but before it is restarted. The intended uses
      * of the callback are modifications to the dbpath of the merizod that must be made while it is
      * stopped.
      *
      * Warning: Overwrites the old dn/shardn member variables.
      */
-    this.restartMongod = function(n, opts, beforeRestartCallback) {
+    this.restartMerizod = function(n, opts, beforeRestartCallback) {
         var merizod;
         if (otherParams.useBridge) {
             merizod = unbridgedConnections[n];
@@ -840,7 +840,7 @@ var ShardingTest = function(params) {
         opts = opts || merizod;
         opts.port = opts.port || merizod.port;
 
-        this.stopMongod(n);
+        this.stopMerizod(n);
 
         if (otherParams.useBridge) {
             var bridgeOptions =
@@ -854,7 +854,7 @@ var ShardingTest = function(params) {
                 dest: hostName + ":" + opts.port,
             });
 
-            this._connections[n] = new MongoBridge(bridgeOptions);
+            this._connections[n] = new MerizoBridge(bridgeOptions);
         }
 
         if (arguments.length >= 3) {
@@ -867,7 +867,7 @@ var ShardingTest = function(params) {
 
         opts.restart = true;
 
-        var newConn = MongoRunner.runMongod(opts);
+        var newConn = MerizoRunner.runMerizod(opts);
         if (!newConn) {
             throw new Error("Failed to restart shard " + n);
         }
@@ -900,7 +900,7 @@ var ShardingTest = function(params) {
         }
 
         this["rs" + n].awaitSecondaryNodes();
-        this._connections[n] = new Mongo(this["rs" + n].getURL());
+        this._connections[n] = new Merizo(this["rs" + n].getURL());
         this["shard" + n] = this._connections[n];
     };
 
@@ -935,11 +935,11 @@ var ShardingTest = function(params) {
                 dest: hostName + ":" + merizod.port,
             });
 
-            this._configServers[n] = new MongoBridge(bridgeOptions);
+            this._configServers[n] = new MerizoBridge(bridgeOptions);
         }
 
         merizod.restart = true;
-        var newConn = MongoRunner.runMongod(merizod);
+        var newConn = MerizoRunner.runMerizod(merizod);
         if (!newConn) {
             throw new Error("Failed to restart config server " + n);
         }
@@ -975,62 +975,62 @@ var ShardingTest = function(params) {
      *     otherParams.merizosOptions.binVersion
      */
     function _isMixedVersionCluster() {
-        var lastStableBinVersion = MongoRunner.getBinVersionFor('last-stable');
+        var lastStableBinVersion = MerizoRunner.getBinVersionFor('last-stable');
 
         // Must check shardMixedBinVersion because it causes shardOptions.binVersion to be an object
         // (versionIterator) rather than a version string. Must check merizosBinVersion, as well,
         // because it does not update merizosOptions.binVersion.
         if (jsTestOptions().shardMixedBinVersions ||
             (jsTestOptions().merizosBinVersion &&
-             MongoRunner.areBinVersionsTheSame(lastStableBinVersion,
+             MerizoRunner.areBinVersionsTheSame(lastStableBinVersion,
                                                jsTestOptions().merizosBinVersion))) {
             return true;
         }
 
         // Check for 'last-stable' config servers.
         if (otherParams.configOptions && otherParams.configOptions.binVersion &&
-            MongoRunner.areBinVersionsTheSame(
+            MerizoRunner.areBinVersionsTheSame(
                 lastStableBinVersion,
-                MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion))) {
+                MerizoRunner.getBinVersionFor(otherParams.configOptions.binVersion))) {
             return true;
         }
         for (var i = 0; i < numConfigs; ++i) {
             if (otherParams['c' + i] && otherParams['c' + i].binVersion &&
-                MongoRunner.areBinVersionsTheSame(
+                MerizoRunner.areBinVersionsTheSame(
                     lastStableBinVersion,
-                    MongoRunner.getBinVersionFor(otherParams['c' + i].binVersion))) {
+                    MerizoRunner.getBinVersionFor(otherParams['c' + i].binVersion))) {
                 return true;
             }
         }
 
         // Check for 'last-stable' merizod servers.
         if (otherParams.shardOptions && otherParams.shardOptions.binVersion &&
-            MongoRunner.areBinVersionsTheSame(
+            MerizoRunner.areBinVersionsTheSame(
                 lastStableBinVersion,
-                MongoRunner.getBinVersionFor(otherParams.shardOptions.binVersion))) {
+                MerizoRunner.getBinVersionFor(otherParams.shardOptions.binVersion))) {
             return true;
         }
         for (var i = 0; i < numShards; ++i) {
             if (otherParams['d' + i] && otherParams['d' + i].binVersion &&
-                MongoRunner.areBinVersionsTheSame(
+                MerizoRunner.areBinVersionsTheSame(
                     lastStableBinVersion,
-                    MongoRunner.getBinVersionFor(otherParams['d' + i].binVersion))) {
+                    MerizoRunner.getBinVersionFor(otherParams['d' + i].binVersion))) {
                 return true;
             }
         }
 
         // Check for 'last-stable' merizos servers.
         if (otherParams.merizosOptions && otherParams.merizosOptions.binVersion &&
-            MongoRunner.areBinVersionsTheSame(
+            MerizoRunner.areBinVersionsTheSame(
                 lastStableBinVersion,
-                MongoRunner.getBinVersionFor(otherParams.merizosOptions.binVersion))) {
+                MerizoRunner.getBinVersionFor(otherParams.merizosOptions.binVersion))) {
             return true;
         }
-        for (var i = 0; i < numMongos; ++i) {
+        for (var i = 0; i < numMerizos; ++i) {
             if (otherParams['s' + i] && otherParams['s' + i].binVersion &&
-                MongoRunner.areBinVersionsTheSame(
+                MerizoRunner.areBinVersionsTheSame(
                     lastStableBinVersion,
-                    MongoRunner.getBinVersionFor(otherParams['s' + i].binVersion))) {
+                    MerizoRunner.getBinVersionFor(otherParams['s' + i].binVersion))) {
                 return true;
             }
         }
@@ -1055,7 +1055,7 @@ var ShardingTest = function(params) {
 
     var numShards = otherParams.hasOwnProperty('shards') ? otherParams.shards : 2;
     var merizosVerboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 1;
-    var numMongos = otherParams.hasOwnProperty('merizos') ? otherParams.merizos : 1;
+    var numMerizos = otherParams.hasOwnProperty('merizos') ? otherParams.merizos : 1;
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
     var startShardsAsRS =
         otherParams.hasOwnProperty('shardAsReplicaSet') ? otherParams.shardAsReplicaSet : true;
@@ -1090,20 +1090,20 @@ var ShardingTest = function(params) {
         numShards = tempCount;
     }
 
-    if (Array.isArray(numMongos)) {
-        for (var i = 0; i < numMongos.length; i++) {
-            otherParams["s" + i] = numMongos[i];
+    if (Array.isArray(numMerizos)) {
+        for (var i = 0; i < numMerizos.length; i++) {
+            otherParams["s" + i] = numMerizos[i];
         }
 
-        numMongos = numMongos.length;
-    } else if (isObject(numMongos)) {
+        numMerizos = numMerizos.length;
+    } else if (isObject(numMerizos)) {
         var tempCount = 0;
-        for (var i in numMongos) {
-            otherParams[i] = numMongos[i];
+        for (var i in numMerizos) {
+            otherParams[i] = numMerizos[i];
             tempCount++;
         }
 
-        numMongos = tempCount;
+        numMerizos = tempCount;
     }
 
     if (Array.isArray(numConfigs)) {
@@ -1146,17 +1146,17 @@ var ShardingTest = function(params) {
 
     let unbridgedConnections;
     let unbridgedConfigServers;
-    let unbridgedMongos;
+    let unbridgedMerizos;
     let _makeAllocatePortFn;
-    let _allocatePortForMongos;
-    let _allocatePortForBridgeForMongos;
+    let _allocatePortForMerizos;
+    let _allocatePortForBridgeForMerizos;
     let _allocatePortForShard;
     let _allocatePortForBridgeForShard;
 
     if (otherParams.useBridge) {
         unbridgedConnections = [];
         unbridgedConfigServers = [];
-        unbridgedMongos = [];
+        unbridgedMerizos = [];
 
         _makeAllocatePortFn = (preallocatedPorts, errorMessage) => {
             let idxNextNodePort = 0;
@@ -1174,28 +1174,28 @@ var ShardingTest = function(params) {
 
         let errorMessage = (length) =>
             "Cannot use more than " + length + " merizos processes when useBridge=true";
-        _allocatePortForBridgeForMongos =
-            _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
-        _allocatePortForMongos =
-            _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
+        _allocatePortForBridgeForMerizos =
+            _makeAllocatePortFn(allocatePorts(MerizoBridge.kBridgeOffset), errorMessage);
+        _allocatePortForMerizos =
+            _makeAllocatePortFn(allocatePorts(MerizoBridge.kBridgeOffset), errorMessage);
 
         errorMessage = (length) =>
             "Cannot use more than " + length + " stand-alone shards when useBridge=true";
         _allocatePortForBridgeForShard =
-            _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
+            _makeAllocatePortFn(allocatePorts(MerizoBridge.kBridgeOffset), errorMessage);
         _allocatePortForShard =
-            _makeAllocatePortFn(allocatePorts(MongoBridge.kBridgeOffset), errorMessage);
+            _makeAllocatePortFn(allocatePorts(MerizoBridge.kBridgeOffset), errorMessage);
     } else {
-        _allocatePortForBridgeForShard = _allocatePortForBridgeForMongos = function() {
+        _allocatePortForBridgeForShard = _allocatePortForBridgeForMerizos = function() {
             throw new Error("Using merizobridge isn't enabled for this sharded cluster");
         };
-        _allocatePortForShard = _allocatePortForMongos = allocatePort;
+        _allocatePortForShard = _allocatePortForMerizos = allocatePort;
     }
 
     otherParams.migrationLockAcquisitionMaxWaitMS =
         otherParams.migrationLockAcquisitionMaxWaitMS || 30000;
 
-    // Start the MongoD servers (shards)
+    // Start the MerizoD servers (shards)
     for (var i = 0; i < numShards; i++) {
         if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
             var setName = testName + "-rs" + i;
@@ -1230,13 +1230,13 @@ var ShardingTest = function(params) {
                     if (!otherParams.shardOptions.binVersion) {
                         Random.setRandomSeed();
                         otherParams.shardOptions.binVersion =
-                            MongoRunner.versionIterator(["latest", "last-stable"], true);
+                            MerizoRunner.versionIterator(["latest", "last-stable"], true);
                     }
                 }
 
                 if (otherParams.shardOptions && otherParams.shardOptions.binVersion) {
                     otherParams.shardOptions.binVersion =
-                        MongoRunner.versionIterator(otherParams.shardOptions.binVersion);
+                        MerizoRunner.versionIterator(otherParams.shardOptions.binVersion);
                 }
 
                 rsDefaults = Object.merge(rsDefaults, otherParams["d" + i]);
@@ -1314,13 +1314,13 @@ var ShardingTest = function(params) {
                 if (!otherParams.shardOptions.binVersion) {
                     Random.setRandomSeed();
                     otherParams.shardOptions.binVersion =
-                        MongoRunner.versionIterator(["latest", "last-stable"], true);
+                        MerizoRunner.versionIterator(["latest", "last-stable"], true);
                 }
             }
 
             if (otherParams.shardOptions && otherParams.shardOptions.binVersion) {
                 otherParams.shardOptions.binVersion =
-                    MongoRunner.versionIterator(otherParams.shardOptions.binVersion);
+                    MerizoRunner.versionIterator(otherParams.shardOptions.binVersion);
             }
 
             options = Object.merge(options, otherParams.shardOptions);
@@ -1339,10 +1339,10 @@ var ShardingTest = function(params) {
                     dest: hostName + ":" + options.port,
                 });
 
-                var bridge = new MongoBridge(bridgeOptions);
+                var bridge = new MerizoBridge(bridgeOptions);
             }
 
-            var conn = MongoRunner.runMongod(options);
+            var conn = MerizoRunner.runMerizod(options);
             if (!conn) {
                 throw new Error("Failed to start shard " + i);
             }
@@ -1381,7 +1381,7 @@ var ShardingTest = function(params) {
 
         rs.awaitSecondaryNodes();
 
-        var rsConn = new Mongo(rs.getURL());
+        var rsConn = new Merizo(rs.getURL());
         rsConn.name = rs.getURL();
 
         this._connections[i] = rsConn;
@@ -1412,7 +1412,7 @@ var ShardingTest = function(params) {
 
     if (otherParams.configOptions && otherParams.configOptions.binVersion) {
         otherParams.configOptions.binVersion =
-            MongoRunner.versionIterator(otherParams.configOptions.binVersion);
+            MerizoRunner.versionIterator(otherParams.configOptions.binVersion);
     }
 
     startOptions = Object.merge(startOptions, otherParams.configOptions);
@@ -1443,7 +1443,7 @@ var ShardingTest = function(params) {
     // If 'otherParams.merizosOptions.binVersion' is an array value, then we'll end up constructing a
     // version iterator.
     const merizosOptions = [];
-    for (var i = 0; i < numMongos; ++i) {
+    for (var i = 0; i < numMerizos; ++i) {
         let options = {
             useHostname: otherParams.useHostname,
             pathOpts: Object.merge(pathOpts, {merizos: i}),
@@ -1453,13 +1453,13 @@ var ShardingTest = function(params) {
 
         if (otherParams.merizosOptions && otherParams.merizosOptions.binVersion) {
             otherParams.merizosOptions.binVersion =
-                MongoRunner.versionIterator(otherParams.merizosOptions.binVersion);
+                MerizoRunner.versionIterator(otherParams.merizosOptions.binVersion);
         }
 
         options = Object.merge(options, otherParams.merizosOptions);
         options = Object.merge(options, otherParams["s" + i]);
 
-        options.port = options.port || _allocatePortForMongos();
+        options.port = options.port || _allocatePortForMerizos();
 
         merizosOptions.push(options);
     }
@@ -1516,8 +1516,8 @@ var ShardingTest = function(params) {
 
     this._merizos = [];
 
-    // Start the MongoS servers
-    for (var i = 0; i < numMongos; i++) {
+    // Start the MerizoS servers
+    for (var i = 0; i < numMerizos; i++) {
         const options = merizosOptions[i];
         options.configdb = this._configDB;
 
@@ -1526,16 +1526,16 @@ var ShardingTest = function(params) {
                 Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
             bridgeOptions = Object.merge(bridgeOptions, {
                 hostName: otherParams.useHostname ? hostName : "localhost",
-                port: _allocatePortForBridgeForMongos(),
+                port: _allocatePortForBridgeForMerizos(),
                 // The merizos processes identify themselves to merizobridge as host:port, where the
                 // host is the actual hostname of the machine and not localhost.
                 dest: hostName + ":" + options.port,
             });
 
-            var bridge = new MongoBridge(bridgeOptions);
+            var bridge = new MerizoBridge(bridgeOptions);
         }
 
-        var conn = MongoRunner.runMongos(options);
+        var conn = MerizoRunner.runMerizos(options);
         if (!conn) {
             throw new Error("Failed to start merizos " + i);
         }
@@ -1547,7 +1547,7 @@ var ShardingTest = function(params) {
         if (otherParams.useBridge) {
             bridge.connectToBridge();
             this._merizos.push(bridge);
-            unbridgedMongos.push(conn);
+            unbridgedMerizos.push(conn);
         } else {
             this._merizos.push(conn);
         }
@@ -1606,13 +1606,13 @@ var ShardingTest = function(params) {
         jsTest.authenticateNodes(this._merizos);
     }
 
-    // Mongos does not block for keys from the config servers at startup, so it may not initially
+    // Merizos does not block for keys from the config servers at startup, so it may not initially
     // return cluster times. If merizosWaitsForKeys is set, block until all merizos servers have found
     // the keys and begun to send cluster times. Retry every 500 milliseconds and timeout after 60
     // seconds.
     if (params.merizosWaitsForKeys) {
         assert.soon(function() {
-            for (let i = 0; i < numMongos; i++) {
+            for (let i = 0; i < numMerizos; i++) {
                 const res = self._merizos[i].adminCommand({isMaster: 1});
                 if (!res.hasOwnProperty("$clusterTime")) {
                     print("Waiting for merizos #" + i + " to start sending cluster times.");
@@ -1626,13 +1626,13 @@ var ShardingTest = function(params) {
     // Ensure that the sessions collection exists so jstests can run things with
     // logical sessions and test them. We do this by forcing an immediate cache refresh
     // on the config server, which auto-shards the collection for the cluster.
-    var lastStableBinVersion = MongoRunner.getBinVersionFor('last-stable');
+    var lastStableBinVersion = MerizoRunner.getBinVersionFor('last-stable');
     if ((!otherParams.configOptions) ||
         (otherParams.configOptions && !otherParams.configOptions.binVersion) ||
         (otherParams.configOptions && otherParams.configOptions.binVersion &&
-         MongoRunner.areBinVersionsTheSame(
+         MerizoRunner.areBinVersionsTheSame(
              lastStableBinVersion,
-             MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion)))) {
+             MerizoRunner.getBinVersionFor(otherParams.configOptions.binVersion)))) {
         this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
     }
 

@@ -121,7 +121,7 @@ func (op *UpdateOp) FromReader(r io.Reader) error {
 
 // Execute performs the UpdateOp on a given socket, yielding the reply when
 // successful (and an error otherwise).
-func (op *UpdateOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+func (op *UpdateOp) Execute(socket *mgo.MerizoSocket) (Replyable, error) {
 	if err := mgo.ExecOpWithoutReply(socket, &op.UpdateOp); err != nil {
 		return nil, err
 	}

@@ -5,7 +5,7 @@
 
     const isMaster = db.runCommand("ismaster");
     assert.commandWorked(isMaster);
-    const isMongos = (isMaster.msg === "isdbgrid");
+    const isMerizos = (isMaster.msg === "isdbgrid");
 
     t.drop();
     assert.writeOK(t.save({a: "bcd"}));
@@ -42,7 +42,7 @@
     const result = t.find(query).explain();
     assert.commandWorked(result);
 
-    if (!isMongos) {
+    if (!isMerizos) {
         assert(result.hasOwnProperty("queryPlanner"));
         assert(result.queryPlanner.hasOwnProperty("parsedQuery"), tojson(result));
         assert.eq(result.queryPlanner.parsedQuery, query);

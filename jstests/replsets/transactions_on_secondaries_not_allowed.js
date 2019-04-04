@@ -33,7 +33,7 @@
 
     // Initiate a session on the secondary.
     const sessionOptions = {causalConsistency: false, retryWrites: true};
-    const session = secondaryTestDB.getMongo().startSession(sessionOptions);
+    const session = secondaryTestDB.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
 
     /**

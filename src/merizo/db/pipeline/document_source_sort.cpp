@@ -332,7 +332,7 @@ SortOptions DocumentSourceSort::makeSortOptions() const {
         opts.limit = _limitSrc->getLimit();
 
     opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
-    if (pExpCtx->allowDiskUse && !pExpCtx->inMongos) {
+    if (pExpCtx->allowDiskUse && !pExpCtx->inMerizos) {
         opts.extSortAllowed = true;
         opts.tempDir = pExpCtx->tempDir;
     }

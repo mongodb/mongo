@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -86,7 +86,7 @@ namespace {
 //  data: {
 //      collectionNS: <fully-qualified collection namespace>,
 //  }
-MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
+MERIZO_FAIL_POINT_DEFINE(failCollectionInserts);
 
 // Used to pause after inserting collection data and calling the opObservers.  Inserts to
 // replicated collections that are not part of a multi-statement transaction will have generated
@@ -96,7 +96,7 @@ MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
 //      collectionNS: <fully-qualified collection namespace>,
 //      first_id: <string>
 //  }
-MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
+MERIZO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
 
 /**
  * Checks the 'failCollectionInserts' fail point at the beginning of an insert operation to see if
@@ -104,7 +104,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
  * Otherwise, the function should fail and return early with the error Status.
  */
 Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSONObj& firstDoc) {
-    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
+    MERIZO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
         const BSONObj& data = extraData.getData();
         const auto collElem = data["collectionNS"];
         // If the failpoint specifies no collection or matches the existing one, fail.
@@ -163,7 +163,7 @@ StatusWith<CollectionImpl::ValidationLevel> _parseValidationLevel(StringData new
         return CollectionImpl::ValidationLevel::STRICT_V;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<CollectionImpl::ValidationAction> _parseValidationAction(StringData newAction) {
@@ -181,7 +181,7 @@ StatusWith<CollectionImpl::ValidationAction> _parseValidationAction(StringData n
         return CollectionImpl::ValidationAction::ERROR_V;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace
@@ -409,7 +409,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     opCtx->recoveryUnit()->onCommit(
         [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
 
-    MONGO_FAIL_POINT_BLOCK(hangAfterCollectionInserts, extraData) {
+    MERIZO_FAIL_POINT_BLOCK(hangAfterCollectionInserts, extraData) {
         const BSONObj& data = extraData.getData();
         const auto collElem = data["collectionNS"];
         const auto firstIdElem = data["first_id"];
@@ -419,7 +419,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
                               begin->doc["_id"].str() == firstIdElem.str()))) {
             string whenFirst =
                 firstIdElem ? (string(" when first _id is ") + firstIdElem.str()) : "";
-            while (MONGO_FAIL_POINT(hangAfterCollectionInserts)) {
+            while (MERIZO_FAIL_POINT(hangAfterCollectionInserts)) {
                 log() << "hangAfterCollectionInserts fail point enabled for " << _ns.toString()
                       << whenFirst << ". Blocking until fail point is disabled.";
                 merizo::sleepsecs(1);
@@ -865,7 +865,7 @@ StringData CollectionImpl::getValidationLevel() const {
         case ValidationLevel::MODERATE:
             return "moderate";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StringData CollectionImpl::getValidationAction() const {
@@ -875,7 +875,7 @@ StringData CollectionImpl::getValidationAction() const {
         case ValidationAction::WARN:
             return "warn";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData newLevel) {

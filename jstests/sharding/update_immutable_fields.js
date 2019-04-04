@@ -15,7 +15,7 @@
 
     var getDirectShardedConn = function(st, collName) {
 
-        var shardConnWithVersion = new Mongo(st.shard0.host);
+        var shardConnWithVersion = new Merizo(st.shard0.host);
 
         var configConnStr = st._configDB;
 

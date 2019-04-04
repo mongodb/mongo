@@ -34,32 +34,32 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.commandWorked(st.s.adminCommand({shardCollection: 'test.foo', key: {x: 1}}));
 
     // Start a current-version merizos.
-    var newMongos = MongoRunner.runMongos({configdb: st._configDB});
+    var newMerizos = MerizoRunner.runMerizos({configdb: st._configDB});
 
     // Write commands report failure by returning writeError:
 
-    assert.writeErrorWithCode(newMongos.getDB('test').foo.insert({x: 1}),
+    assert.writeErrorWithCode(newMerizos.getDB('test').foo.insert({x: 1}),
                               ErrorCodes.IncompatibleServerVersion);
 
-    assert.writeErrorWithCode(newMongos.getDB('test').foo.update({x: 1}, {x: 1, y: 2}),
+    assert.writeErrorWithCode(newMerizos.getDB('test').foo.update({x: 1}, {x: 1, y: 2}),
                               ErrorCodes.IncompatibleServerVersion);
 
-    assert.writeErrorWithCode(newMongos.getDB('test').foo.remove({x: 1}),
+    assert.writeErrorWithCode(newMerizos.getDB('test').foo.remove({x: 1}),
                               ErrorCodes.IncompatibleServerVersion);
 
     // Query commands, on failure, throw instead:
 
     let res;
-    res = newMongos.getDB('test').runCommand({find: 'foo'});
+    res = newMerizos.getDB('test').runCommand({find: 'foo'});
     assert.eq(res.code, ErrorCodes.IncompatibleServerVersion);
 
-    res = newMongos.getDB('test').runCommand({find: 'foo', filter: {x: 1}});
+    res = newMerizos.getDB('test').runCommand({find: 'foo', filter: {x: 1}});
     assert.eq(res.code, ErrorCodes.IncompatibleServerVersion);
 
-    res = newMongos.getDB('test').runCommand({aggregate: 'foo', pipeline: [], cursor: {}});
+    res = newMerizos.getDB('test').runCommand({aggregate: 'foo', pipeline: [], cursor: {}});
     assert.eq(res.code, ErrorCodes.IncompatibleServerVersion);
 
-    MongoRunner.stopMongos(newMongos);
+    MerizoRunner.stopMerizos(newMerizos);
     st.stop();
 
 })();

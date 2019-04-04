@@ -14,7 +14,7 @@ FIXTURE_SUBDIR = "resmoke"
 
 # Subdirectory under the dbpath prefix that contains directories with data files of merizod's started
 # by individual tests.
-MONGO_RUNNER_SUBDIR = "merizorunner"
+MERIZO_RUNNER_SUBDIR = "merizorunner"
 
 ##
 # Default values. There are two types of default values: "DEFAULT_" prefixed module variables,
@@ -25,10 +25,10 @@ MONGO_RUNNER_SUBDIR = "merizorunner"
 
 # Default path for where to look for executables.
 DEFAULT_DBTEST_EXECUTABLE = os.path.join(os.curdir, "dbtest")
-DEFAULT_MONGO_EXECUTABLE = os.path.join(os.curdir, "merizo")
-DEFAULT_MONGOEBENCH_EXECUTABLE = os.path.join(os.curdir, "merizoebench")
-DEFAULT_MONGOD_EXECUTABLE = os.path.join(os.curdir, "merizod")
-DEFAULT_MONGOS_EXECUTABLE = os.path.join(os.curdir, "merizos")
+DEFAULT_MERIZO_EXECUTABLE = os.path.join(os.curdir, "merizo")
+DEFAULT_MERIZOEBENCH_EXECUTABLE = os.path.join(os.curdir, "merizoebench")
+DEFAULT_MERIZOD_EXECUTABLE = os.path.join(os.curdir, "merizod")
+DEFAULT_MERIZOS_EXECUTABLE = os.path.join(os.curdir, "merizos")
 
 DEFAULT_BENCHMARK_REPETITIONS = 3
 DEFAULT_BENCHMARK_MIN_TIME = datetime.timedelta(seconds=5)
@@ -292,22 +292,22 @@ INCLUDE_WITH_ANY_TAGS = None
 JOBS = None
 
 # The path to the merizo executable used by resmoke.py.
-MONGO_EXECUTABLE = None
+MERIZO_EXECUTABLE = None
 
 # The path to the merizod executable used by resmoke.py.
-MONGOD_EXECUTABLE = None
+MERIZOD_EXECUTABLE = None
 
 # The --setParameter options passed to merizod.
-MONGOD_SET_PARAMETERS = None
+MERIZOD_SET_PARAMETERS = None
 
 # The path to the merizoebench executable used by resmoke.py.
-MONGOEBENCH_EXECUTABLE = None
+MERIZOEBENCH_EXECUTABLE = None
 
 # The path to the merizos executable used by resmoke.py.
-MONGOS_EXECUTABLE = None
+MERIZOS_EXECUTABLE = None
 
 # The --setParameter options passed to merizos.
-MONGOS_SET_PARAMETERS = None
+MERIZOS_SET_PARAMETERS = None
 
 # If true, then all merizod's started by resmoke.py and by the merizo shell will not have journaling
 # enabled.
@@ -432,4 +432,4 @@ DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
 # therefore might not be available when creating a test membership map.
 EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
                             DEFAULT_INTEGRATION_TEST_LIST, DEFAULT_DBTEST_EXECUTABLE,
-                            DEFAULT_MONGOEBENCH_EXECUTABLE)
+                            DEFAULT_MERIZOEBENCH_EXECUTABLE)

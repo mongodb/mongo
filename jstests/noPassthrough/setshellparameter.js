@@ -5,7 +5,7 @@
 
     function test(ssp, succeed) {
         const result =
-            runMongoProgram('./merizo', '--setShellParameter', ssp, '--nodb', '--eval', ';');
+            runMerizoProgram('./merizo', '--setShellParameter', ssp, '--nodb', '--eval', ';');
         assert.eq(0 == result,
                   succeed,
                   '--setShellParameter ' + ssp + 'worked/didn\'t-work unexpectedly');

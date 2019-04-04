@@ -335,14 +335,14 @@ type URISetter interface {
 }
 
 func (auth *Auth) RequiresExternalDB() bool {
-	return auth.Mechanism == "GSSAPI" || auth.Mechanism == "PLAIN" || auth.Mechanism == "MONGODB-X509"
+	return auth.Mechanism == "GSSAPI" || auth.Mechanism == "PLAIN" || auth.Mechanism == "MERIZODB-X509"
 }
 
 // ShouldAskForPassword returns true if the user specifies a username flag
 // but no password, and the authentication mechanism requires a password.
 func (auth *Auth) ShouldAskForPassword() bool {
 	return auth.Username != "" && auth.Password == "" &&
-		!(auth.Mechanism == "MONGODB-X509" || auth.Mechanism == "GSSAPI")
+		!(auth.Mechanism == "MERIZODB-X509" || auth.Mechanism == "GSSAPI")
 }
 
 func (uri *URI) GetConnectionAddrs() []string {

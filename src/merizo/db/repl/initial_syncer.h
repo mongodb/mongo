@@ -63,17 +63,17 @@ namespace repl {
 
 // TODO: Remove forward declares once we remove rs_initialsync.cpp and other dependents.
 // Failpoint which fails initial sync and leaves an oplog entry in the buffer.
-MONGO_FAIL_POINT_DECLARE(failInitSyncWithBufferedEntriesLeft);
+MERIZO_FAIL_POINT_DECLARE(failInitSyncWithBufferedEntriesLeft);
 
 // Failpoint which causes the initial sync function to hang before copying databases.
-MONGO_FAIL_POINT_DECLARE(initialSyncHangBeforeCopyingDatabases);
+MERIZO_FAIL_POINT_DECLARE(initialSyncHangBeforeCopyingDatabases);
 
 // Failpoint which causes the initial sync function to hang before calling shouldRetry on a failed
 // operation.
-MONGO_FAIL_POINT_DECLARE(initialSyncHangBeforeGettingMissingDocument);
+MERIZO_FAIL_POINT_DECLARE(initialSyncHangBeforeGettingMissingDocument);
 
 // Failpoint which stops the applier.
-MONGO_FAIL_POINT_DECLARE(rsSyncApplyStop);
+MERIZO_FAIL_POINT_DECLARE(rsSyncApplyStop);
 
 struct InitialSyncState;
 struct MemberState;

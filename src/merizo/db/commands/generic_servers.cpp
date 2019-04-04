@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -140,7 +140,7 @@ public:
 
 } hostInfoCmd;
 
-MONGO_FAIL_POINT_DEFINE(crashOnShutdown);
+MERIZO_FAIL_POINT_DEFINE(crashOnShutdown);
 int* volatile illegalAddress;  // NOLINT - used for fail point only
 
 class CmdGetCmdLineOpts : public BasicCommand {
@@ -318,7 +318,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(ClearLogCmd);
+MERIZO_REGISTER_TEST_COMMAND(ClearLogCmd);
 
 }  // namespace
 
@@ -334,7 +334,7 @@ void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
     ShutdownTaskArgs shutdownArgs;
     shutdownArgs.isUserInitiated = true;
 
-    MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
+    MERIZO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
         const std::string crashHow = crashBlock.getData()["how"].str();
         if (crashHow == "fault") {
             ++*illegalAddress;

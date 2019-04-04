@@ -10,20 +10,20 @@ env:
     global:
         - BUCKET=https://niemeyer.s3.amazonaws.com
     matrix:
-        - GO=1.4.1 MONGODB=x86_64-2.2.7
-        - GO=1.4.1 MONGODB=x86_64-2.4.14
-        - GO=1.4.1 MONGODB=x86_64-2.6.11
-        - GO=1.4.1 MONGODB=x86_64-3.0.9
-        - GO=1.4.1 MONGODB=x86_64-3.2.3-nojournal
-        - GO=1.5.3 MONGODB=x86_64-3.0.9
-        - GO=1.6   MONGODB=x86_64-3.0.9
+        - GO=1.4.1 MERIZODB=x86_64-2.2.7
+        - GO=1.4.1 MERIZODB=x86_64-2.4.14
+        - GO=1.4.1 MERIZODB=x86_64-2.6.11
+        - GO=1.4.1 MERIZODB=x86_64-3.0.9
+        - GO=1.4.1 MERIZODB=x86_64-3.2.3-nojournal
+        - GO=1.5.3 MERIZODB=x86_64-3.0.9
+        - GO=1.6   MERIZODB=x86_64-3.0.9
 
 install:
     - eval "$(gimme $GO)"
 
-    - wget $BUCKET/merizodb-linux-$MONGODB.tgz
-    - tar xzvf merizodb-linux-$MONGODB.tgz
-    - export PATH=$PWD/merizodb-linux-$MONGODB/bin:$PATH
+    - wget $BUCKET/merizodb-linux-$MERIZODB.tgz
+    - tar xzvf merizodb-linux-$MERIZODB.tgz
+    - export PATH=$PWD/merizodb-linux-$MERIZODB/bin:$PATH
 
     - wget $BUCKET/daemontools.tar.gz
     - tar xzvf daemontools.tar.gz

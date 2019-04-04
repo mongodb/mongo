@@ -78,7 +78,7 @@
 
     jsTestLog("Do a speculative majority that should block until write commits.");
     let speculativeRead = new ScopedThread(function(host, dbName, collName) {
-        const nodeDB = new Mongo(host).getDB(dbName);
+        const nodeDB = new Merizo(host).getDB(dbName);
         return nodeDB.runCommand({
             find: collName,
             readConcern: {level: "majority"},

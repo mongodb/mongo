@@ -95,7 +95,7 @@ env.Library(
     LIBDEPS=[
         'authprivilege',
         '$BUILD_DIR/merizo/base',
-        '$BUILD_DIR/merizo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/merizo/crypto/sha_block_${MERIZO_CRYPTO}',
     ],
 )
 
@@ -243,7 +243,7 @@ env.Library(
         'user',
         '$BUILD_DIR/merizo/base/secure_allocator',
         '$BUILD_DIR/merizo/client/authentication',
-        '$BUILD_DIR/merizo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/merizo/crypto/sha_block_${MERIZO_CRYPTO}',
         '$BUILD_DIR/merizo/util/icu',
         '$BUILD_DIR/merizo/util/md5',
     ],
@@ -340,7 +340,7 @@ env.Library(
         'user',
         '$BUILD_DIR/merizo/base',
         '$BUILD_DIR/merizo/base/secure_allocator',
-        '$BUILD_DIR/merizo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/merizo/crypto/sha_block_${MERIZO_CRYPTO}',
         '$BUILD_DIR/merizo/db/commands/test_commands_enabled',
         '$BUILD_DIR/merizo/util/icu',
         '$BUILD_DIR/merizo/util/md5',

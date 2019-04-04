@@ -120,7 +120,7 @@ public:
         : BalancerControlCommand("balancerStatus", "_configsvrBalancerStatus", ActionType::find) {}
 };
 
-MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
+MERIZO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
     new BalancerStartCommand();
     new BalancerStopCommand();
     new BalancerStatusCommand();

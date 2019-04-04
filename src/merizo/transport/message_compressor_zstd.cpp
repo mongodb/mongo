@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -77,7 +77,7 @@ StatusWith<std::size_t> ZstdMessageCompressor::decompressData(ConstDataRange inp
 }
 
 
-MONGO_INITIALIZER_GENERAL(ZstdMessageCompressorInit,
+MERIZO_INITIALIZER_GENERAL(ZstdMessageCompressorInit,
                           ("EndStartupOptionHandling"),
                           ("AllCompressorsRegistered"))
 (InitializerContext* context) {

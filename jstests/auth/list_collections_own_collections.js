@@ -121,9 +121,9 @@
         runTestOnRole("roleWithAnyNormalResourcePrivileges");
     }
 
-    const merizod = MongoRunner.runMongod({auth: ''});
+    const merizod = MerizoRunner.runMerizod({auth: ''});
     runTestOnConnection(merizod);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     const st = new ShardingTest({

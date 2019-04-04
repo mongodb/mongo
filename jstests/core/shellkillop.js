@@ -19,7 +19,7 @@ function testShellAutokillop() {
         var evalStr = "print('SKO subtask started'); db." + baseName +
             ".update( {}, {$set:{i:'abcdefghijkl'}}, false, true ); db." + baseName + ".count();";
         print("shellkillop.js evalStr:" + evalStr);
-        spawn = startMongoProgramNoConnect(
+        spawn = startMerizoProgramNoConnect(
             "merizo", "--autokillop", "--port", myPort(), "--eval", evalStr);
 
         sleep(100);
@@ -28,7 +28,7 @@ function testShellAutokillop() {
                "update ran too fast, test won't be valid");
         retry = false;
 
-        stopMongoProgramByPid(spawn);
+        stopMerizoProgramByPid(spawn);
 
         sleep(100);
 

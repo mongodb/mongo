@@ -24,14 +24,14 @@ if get_option('install-mode') == 'hygienic':
 merizoEmbeddedEnv = env.Clone()
 merizoEmbeddedEnv.AppendUnique(
     CPPDEFINES=[
-        'MONGO_EMBEDDED_COMPILING',
+        'MERIZO_EMBEDDED_COMPILING',
     ],
 )
 
 if get_option('link-model') == 'static':
     merizoEmbeddedEnv.AppendUnique(
         CPPDEFINES=[
-            'MONGO_EMBEDDED_STATIC',
+            'MERIZO_EMBEDDED_STATIC',
         ],
     )
 elif get_option('link-model') == 'dynamic-sdk':
@@ -42,7 +42,7 @@ elif get_option('link-model') == 'dynamic-sdk':
 
 merizoEmbeddedEnv.AppendUnique(
     SHLINKFLAGS=[
-        '$MONGO_EXPORT_FILE_SHLINKFLAGS',
+        '$MERIZO_EXPORT_FILE_SHLINKFLAGS',
     ],
 )
 
@@ -160,8 +160,8 @@ merizoEmbeddedPlist = env.Substfile(
     SUBST_DICT=[
         ('@CFBundleExecutable@', 'merizo_embedded'),
         ('@CFBundleIdentifier@', 'org.merizodb.merizo-embedded'),
-        ('@CFBundleVersion@', env['PLIST_MONGO_BUNDLE_VERSION']),
-        ('@CFBundleShortVersionString@', env['PLIST_MONGO_BUNDLE_VERSION']),
+        ('@CFBundleVersion@', env['PLIST_MERIZO_BUNDLE_VERSION']),
+        ('@CFBundleShortVersionString@', env['PLIST_MERIZO_BUNDLE_VERSION']),
         ('@MinimumOSVersion@', env['PLIST_MINIMUM_OS_VERSION'])
     ]
 )

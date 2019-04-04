@@ -11,7 +11,7 @@ var DB;
         };
     }
 
-    DB.prototype.getMongo = function() {
+    DB.prototype.getMerizo = function() {
         assert(this._merizo, "why no merizo!");
         return this._merizo;
     };
@@ -556,7 +556,7 @@ var DB;
             mechanism = this._getDefaultAuthenticationMechanism(username, fromdb);
         }
         assert(mechanism == "SCRAM-SHA-1" || mechanism == "SCRAM-SHA-256" ||
-               mechanism == "MONGODB-CR");
+               mechanism == "MERIZODB-CR");
 
         // Check for no auth or copying from localhost
         if (!username || !password || fromhost == "") {
@@ -565,13 +565,13 @@ var DB;
         }
 
         // Use the copyDatabase native helper for SCRAM-SHA-1/256
-        if (mechanism != "MONGODB-CR") {
-            // TODO SERVER-30886: Add session support for Mongo.prototype.copyDatabaseWithSCRAM().
-            return this.getMongo().copyDatabaseWithSCRAM(
+        if (mechanism != "MERIZODB-CR") {
+            // TODO SERVER-30886: Add session support for Merizo.prototype.copyDatabaseWithSCRAM().
+            return this.getMerizo().copyDatabaseWithSCRAM(
                 fromdb, todb, fromhost, username, password, slaveOk);
         }
 
-        // Fall back to MONGODB-CR
+        // Fall back to MERIZODB-CR
         var n = assert.commandWorked(this._adminCommand({copydbgetnonce: 1, fromhost: fromhost}));
         return this._adminCommand({
             copydb: 1,
@@ -613,8 +613,8 @@ var DB;
         print("\tdb.getLastError() - just returns the err msg string");
         print("\tdb.getLastErrorObj() - return full status object");
         print("\tdb.getLogComponents()");
-        print("\tdb.getMongo() get the server connection object");
-        print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
+        print("\tdb.getMerizo() get the server connection object");
+        print("\tdb.getMerizo().setSlaveOk() allow queries on a replication slave server");
         print("\tdb.getName()");
         print("\tdb.getProfilingLevel() - deprecated");
         print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold");
@@ -1453,7 +1453,7 @@ var DB;
 
     DB.prototype.logout = function() {
         // Logging out doesn't require a session since it manipulates connection state.
-        return this.getMongo().logout(this.getName());
+        return this.getMerizo().logout(this.getName());
     };
 
     // For backwards compatibility
@@ -1578,7 +1578,7 @@ var DB;
         }
 
         if (params.db !== undefined) {
-            throw Error("Do not override db field on db.auth(). Use getMongo().auth(), instead.");
+            throw Error("Do not override db field on db.auth(). Use getMerizo().auth(), instead.");
         }
 
         if (params.mechanism == "GSSAPI" && params.serviceName == null &&
@@ -1588,10 +1588,10 @@ var DB;
 
         // Logging in doesn't require a session since it manipulates connection state.
         params.db = this.getName();
-        var good = this.getMongo().auth(params);
+        var good = this.getMerizo().auth(params);
         if (good) {
             // auth enabled, and should try to use isMaster and replSetGetStatus to build prompt
-            this.getMongo().authStatus = {
+            this.getMerizo().authStatus = {
                 authRequired: true,
                 isMaster: true,
                 replSetGetStatus: true
@@ -1827,11 +1827,11 @@ var DB;
     };
 
     DB.prototype.getLogComponents = function() {
-        return this.getMongo().getLogComponents(this.getSession());
+        return this.getMerizo().getLogComponents(this.getSession());
     };
 
     DB.prototype.setLogLevel = function(logLevel, component) {
-        return this.getMongo().setLogLevel(logLevel, component, this.getSession());
+        return this.getMerizo().setLogLevel(logLevel, component, this.getSession());
     };
 
     DB.prototype.watch = function(pipeline, options) {
@@ -1839,7 +1839,7 @@ var DB;
         assert(pipeline instanceof Array, "'pipeline' argument must be an array");
 
         let changeStreamStage;
-        [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
+        [changeStreamStage, aggOptions] = this.getMerizo()._extractChangeStreamOptions(options);
         pipeline.unshift(changeStreamStage);
         return this._runAggregate({aggregate: 1, pipeline: pipeline}, aggOptions);
     };
@@ -1894,7 +1894,7 @@ var DB;
     (function(hasOwnProperty) {
         DB.prototype.getSession = function() {
             if (!hasOwnProperty.call(this, "_session")) {
-                this._session = this.getMongo()._getDefaultSession();
+                this._session = this.getMerizo()._getDefaultSession();
             }
             return this._session;
         };

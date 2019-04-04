@@ -111,7 +111,7 @@ std::string renderForHealthLog(OplogEntriesEnum op) {
             return "dbCheckCollection";
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 /**
@@ -522,7 +522,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
         }
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace repl

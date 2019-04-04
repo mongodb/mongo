@@ -38,7 +38,7 @@
 namespace merizo {
 namespace {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DuplicateKeyErrorInfo);
+MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(DuplicateKeyErrorInfo);
 
 }  // namespace
 

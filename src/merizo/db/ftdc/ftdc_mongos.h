@@ -39,11 +39,11 @@ namespace merizo {
 /**
  * Start Full Time Data Capture
  */
-void startMongoSFTDC();
+void startMerizoSFTDC();
 
 /**
  * Stop Full Time Data Capture
  */
-void stopMongoSFTDC();
+void stopMerizoSFTDC();
 
 }  // namespace merizo

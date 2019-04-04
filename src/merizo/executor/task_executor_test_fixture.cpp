@@ -86,7 +86,7 @@ void TaskExecutorTest::joinExecutorThread() {
 }
 
 void TaskExecutorTest::_doTest() {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void TaskExecutorTest::postExecutorThreadLaunch() {}

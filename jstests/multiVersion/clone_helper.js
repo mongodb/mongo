@@ -24,7 +24,7 @@
     masterDB.dropDatabase();
 
     jsTest.log("Create standalone server");
-    let standalone = MongoRunner.runMongod({binVersion: oldVersion});
+    let standalone = MerizoRunner.runMerizod({binVersion: oldVersion});
     let standaloneDB = standalone.getDB(replsetDBName);
     standaloneDB.dropDatabase();
 
@@ -61,7 +61,7 @@
               "cloneDatabase from PRIMARY to standalone failed (count on view incorrect)");
 
     jsTest.log("Shut down replica set and standalone server");
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 
     replTest.stopSet();
 })();

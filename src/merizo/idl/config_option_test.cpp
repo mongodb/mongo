@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -83,7 +83,7 @@ Status parseMixed(const std::vector<std::string>& argv,
     return ex.toStatus();
 }
 
-MONGO_STARTUP_OPTIONS_PARSE(ConfigOption)(InitializerContext*) {
+MERIZO_STARTUP_OPTIONS_PARSE(ConfigOption)(InitializerContext*) {
     // Fake argv for default arg parsing.
     const std::vector<std::string> argv = {
         "merizo",

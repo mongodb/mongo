@@ -35,10 +35,10 @@ namespace merizo {
  * If true, then testing commands are available. Defaults to false.
  *
  * Testing commands should conditionally register themselves by using
- * MONGO_REGISTER_TEST_COMMAND (in src/merizo/db/commands.h), which consults this flag:
+ * MERIZO_REGISTER_TEST_COMMAND (in src/merizo/db/commands.h), which consults this flag:
  *
  *     class MyTestCommand ...;
- *     MONGO_REGISTER_TEST_COMMAND(MyTestCommand);
+ *     MERIZO_REGISTER_TEST_COMMAND(MyTestCommand);
  *
  * To make testing commands available by default, change the value to true before running any
  * merizo initializers:

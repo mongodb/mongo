@@ -13,7 +13,7 @@
     const primary = rst.getPrimary();
     const primaryAdmin = primary.getDB("admin");
     // We need a separate connection to avoid interference with the ReplSetTestMechanism.
-    const primaryDataConn = new Mongo(primary.host);
+    const primaryDataConn = new Merizo(primary.host);
     const primaryDb = primaryDataConn.getDB("test");
     const collname = "no_disconnect_on_stepdown";
     const coll = primaryDb[collname];
@@ -51,7 +51,7 @@
         }));
 
         errorCode = errorCode || ErrorCodes.InterruptedDueToStepDown;
-        const writeCommand = `db.getMongo().forceWriteMode("commands");
+        const writeCommand = `db.getMerizo().forceWriteMode("commands");
                               assert.commandFailedWithCode(${operation}, ${errorCode});
                               assert.commandWorked(db.adminCommand({ping:1}));`;
 

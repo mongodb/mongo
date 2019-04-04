@@ -15,11 +15,11 @@
     // Skip this test until we figure out why journaled writes are replayed after last checkpoint.
     TestData.skipCollectionAndIndexValidation = true;
 
-    var dbpath = MongoRunner.dataPath + 'wt_nojournal_skip_recovery';
+    var dbpath = MerizoRunner.dataPath + 'wt_nojournal_skip_recovery';
     resetDbpath(dbpath);
 
     // Start a merizod with journaling enabled.
-    var conn = MongoRunner.runMongod({
+    var conn = MerizoRunner.runMerizod({
         dbpath: dbpath,
         noCleanData: true,
         journal: '',
@@ -54,7 +54,7 @@
         function() {
             var count = conn.getDB('test').nojournal.count({journaled: {$exists: true}});
             if (count >= 100) {
-                MongoRunner.stopMongod(conn, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+                MerizoRunner.stopMerizod(conn, 9, {allowedExitCode: MerizoRunner.EXIT_SIGKILL});
                 return true;
             }
             return false;
@@ -67,7 +67,7 @@
 
     // Restart the merizod with journaling disabled, but configure it to error if the database needs
     // recovery.
-    conn = MongoRunner.runMongod({
+    conn = MerizoRunner.runMerizod({
         dbpath: dbpath,
         noCleanData: true,
         nojournal: '',
@@ -79,7 +79,7 @@
     assert(removeFile(dbpath + '/journal'), 'failed to remove the journal directory');
 
     // Restart the merizod with journaling disabled again.
-    conn = MongoRunner.runMongod({
+    conn = MerizoRunner.runMerizod({
         dbpath: dbpath,
         noCleanData: true,
         nojournal: '',
@@ -94,5 +94,5 @@
                'journaled write operations since the last checkpoint should not have been' +
                    ' replayed');
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

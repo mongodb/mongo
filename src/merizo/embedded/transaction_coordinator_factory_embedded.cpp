@@ -32,6 +32,6 @@
 #include "merizo/db/s/transaction_coordinator_factory.h"
 
 namespace merizo {
-MONGO_REGISTER_SHIM(createTransactionCoordinator)
+MERIZO_REGISTER_SHIM(createTransactionCoordinator)
 (OperationContext* opCtx, TxnNumber clientTxnNumber)->void {}
 }  // namespace merizo

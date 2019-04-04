@@ -2,7 +2,7 @@
 
 (function() {
     "use strict";
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod failed to start.");
     const db = conn.getDB("test");
 
@@ -103,5 +103,5 @@
             coll.find(Object.extend({loc: {$within: {$center: circle}}}, queryFields)).itcount());
     }
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

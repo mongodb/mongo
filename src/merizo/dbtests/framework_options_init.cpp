@@ -38,11 +38,11 @@
 #include "merizo/util/quick_exit.h"
 
 namespace merizo {
-MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* context) {
+MERIZO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* context) {
     return addTestFrameworkOptions(&moe::startupOptions);
 }
 
-MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
+MERIZO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
     if (!handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed, context->args())) {
         quickExit(EXIT_SUCCESS);
     }
@@ -53,7 +53,7 @@ MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
     return Status::OK();
 }
 
-MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
+MERIZO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
     Status ret = storeTestFrameworkOptions(moe::startupOptionsParsed, context->args());
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;
@@ -63,7 +63,7 @@ MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
+MERIZO_INITIALIZER_GENERAL(CoreOptions_Store, MERIZO_NO_PREREQUISITES, MERIZO_NO_DEPENDENTS)
 (InitializerContext* context) {
     return Status::OK();
 }

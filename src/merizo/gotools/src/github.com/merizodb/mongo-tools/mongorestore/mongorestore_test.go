@@ -32,14 +32,14 @@ var (
 	testPort   = db.DefaultTestPort
 )
 
-func TestMongorestore(t *testing.T) {
+func TestMerizorestore(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	_, err := testutil.GetBareSession()
 	if err != nil {
 		t.Fatalf("No server available")
 	}
 
-	Convey("With a test MongoRestore", t, func() {
+	Convey("With a test MerizoRestore", t, func() {
 		inputOptions := &InputOptions{}
 		outputOptions := &OutputOptions{
 			NumParallelCollections: 1,
@@ -51,7 +51,7 @@ func TestMongorestore(t *testing.T) {
 			log.Logvf(log.Always, "error connecting to host: %v", err)
 			os.Exit(util.ExitError)
 		}
-		restore := MongoRestore{
+		restore := MerizoRestore{
 			ToolOptions:     toolOpts,
 			OutputOptions:   outputOptions,
 			InputOptions:    inputOptions,
@@ -88,7 +88,7 @@ func TestMongorestore(t *testing.T) {
 	})
 }
 
-func TestMongorestoreCantPreserveUUID(t *testing.T) {
+func TestMerizorestoreCantPreserveUUID(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	session, err := testutil.GetBareSession()
 	if err != nil {
@@ -100,7 +100,7 @@ func TestMongorestoreCantPreserveUUID(t *testing.T) {
 		t.Skip("Requires server with FCV less than 3.6")
 	}
 
-	Convey("With a test MongoRestore", t, func() {
+	Convey("With a test MerizoRestore", t, func() {
 		nsOptions := &NSOptions{}
 		provider, toolOpts, err := testutil.GetBareSessionProvider()
 		if err != nil {
@@ -116,7 +116,7 @@ func TestMongorestoreCantPreserveUUID(t *testing.T) {
 				PreserveUUID:           true,
 				Drop:                   true,
 			}
-			restore := MongoRestore{
+			restore := MerizoRestore{
 				ToolOptions:     toolOpts,
 				OutputOptions:   outputOptions,
 				InputOptions:    inputOptions,
@@ -131,7 +131,7 @@ func TestMongorestoreCantPreserveUUID(t *testing.T) {
 	})
 }
 
-func TestMongorestorePreserveUUID(t *testing.T) {
+func TestMerizorestorePreserveUUID(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	session, err := testutil.GetBareSession()
 	if err != nil {
@@ -146,7 +146,7 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 	// From merizorestore/testdata/oplogdump/db1/c1.metadata.json
 	originalUUID := "699f503df64b4aa8a484a8052046fa3a"
 
-	Convey("With a test MongoRestore", t, func() {
+	Convey("With a test MerizoRestore", t, func() {
 		nsOptions := &NSOptions{}
 		provider, toolOpts, err := testutil.GetBareSessionProvider()
 		if err != nil {
@@ -163,7 +163,7 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 				NumParallelCollections: 1,
 				NumInsertionWorkers:    1,
 			}
-			restore := MongoRestore{
+			restore := MerizoRestore{
 				ToolOptions:     toolOpts,
 				OutputOptions:   outputOptions,
 				InputOptions:    inputOptions,
@@ -188,7 +188,7 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 				NumInsertionWorkers:    1,
 				PreserveUUID:           true,
 			}
-			restore := MongoRestore{
+			restore := MerizoRestore{
 				ToolOptions:     toolOpts,
 				OutputOptions:   outputOptions,
 				InputOptions:    inputOptions,
@@ -209,7 +209,7 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 				PreserveUUID:           true,
 				Drop:                   true,
 			}
-			restore := MongoRestore{
+			restore := MerizoRestore{
 				ToolOptions:     toolOpts,
 				OutputOptions:   outputOptions,
 				InputOptions:    inputOptions,
@@ -235,7 +235,7 @@ func TestMongorestorePreserveUUID(t *testing.T) {
 				PreserveUUID:           true,
 				Drop:                   true,
 			}
-			restore := MongoRestore{
+			restore := MerizoRestore{
 				ToolOptions:     toolOpts,
 				OutputOptions:   outputOptions,
 				InputOptions:    inputOptions,

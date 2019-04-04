@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -116,7 +116,7 @@ StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
         return exceptionToStatus();
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<int> StorageInterfaceImpl::initializeRollbackID(OperationContext* opCtx) {
@@ -707,7 +707,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 case PlanExecutor::FAILURE:
                     return WorkingSetCommon::getMemberObjectStatus(out);
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         });
 }

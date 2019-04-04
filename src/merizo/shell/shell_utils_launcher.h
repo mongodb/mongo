@@ -51,14 +51,14 @@ namespace shell_utils {
 
 // Scoped management of merizo program instances.  Simple implementation:
 // destructor kills all merizod instances created by the shell.
-struct MongoProgramScope {
-    MongoProgramScope() {}  // Avoid 'unused variable' warning.
-    ~MongoProgramScope();
+struct MerizoProgramScope {
+    MerizoProgramScope() {}  // Avoid 'unused variable' warning.
+    ~MerizoProgramScope();
 };
-int KillMongoProgramInstances();
+int KillMerizoProgramInstances();
 
 // Returns true if there are running child processes.
-std::vector<ProcessId> getRunningMongoChildProcessIds();
+std::vector<ProcessId> getRunningMerizoChildProcessIds();
 
 void installShellUtilsLauncher(Scope& scope);
 
@@ -122,9 +122,9 @@ public:
     /** @param args The program's arguments, including the program name.
      *  @param env Environment to run the program with, which will override any set by the local
      *             environment
-     * @param isMongo Indicator variable, true if runs as a merizo process.
+     * @param isMerizo Indicator variable, true if runs as a merizo process.
      */
-    ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMongo);
+    ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMerizo);
     /** Launch the program. */
     void start();
     /** Continuously read the program's output, generally from a special purpose thread. */

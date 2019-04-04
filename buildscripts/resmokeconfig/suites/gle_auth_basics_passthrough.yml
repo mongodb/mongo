@@ -19,14 +19,14 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-      eval: jsTest.authenticate(db.getMongo())
+      eval: jsTest.authenticate(db.getMerizo())
       authenticationDatabase: local
       authenticationMechanism: SCRAM-SHA-1
       password: *keyFileData
       username: __system
       readMode: commands
   fixture:
-    class: MongoDFixture
+    class: MerizoDFixture
     merizod_options:
       auth: ''
       keyFile: *keyFile

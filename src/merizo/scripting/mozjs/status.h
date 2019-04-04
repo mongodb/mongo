@@ -35,23 +35,23 @@ namespace merizo {
 namespace mozjs {
 
 /**
- * The "MongoStatus" Javascript object.
+ * The "MerizoStatus" Javascript object.
  *
  * This type wraps the "Status" type in the server, allowing for lossless throwing of merizodb native
  * exceptions through javascript.  It can be created (albeit without sidecar) from javascript.
  * These are also created automatically when exceptions are thrown from native c++ functions.
  *
- * They are somewhat special, in that the prototype for each MongoStatus object is actually an Error
+ * They are somewhat special, in that the prototype for each MerizoStatus object is actually an Error
  * object specific to that status object.  This allows Error-like behavior such as useful stack
  * traces, and instanceOf Error.
  */
-struct MongoStatusInfo : public BaseInfo {
+struct MerizoStatusInfo : public BaseInfo {
     static void finalize(js::FreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(code);
-        MONGO_DECLARE_JS_FUNCTION(reason);
-        MONGO_DECLARE_JS_FUNCTION(stack);
+        MERIZO_DECLARE_JS_FUNCTION(code);
+        MERIZO_DECLARE_JS_FUNCTION(reason);
+        MERIZO_DECLARE_JS_FUNCTION(stack);
     };
 
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);

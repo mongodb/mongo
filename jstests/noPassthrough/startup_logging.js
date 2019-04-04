@@ -13,11 +13,11 @@
     }
 
     function testStartupLogging(launcher, matchFn, expectedExitCode) {
-        assert(matchFn(rawMongoProgramOutput()));
+        assert(matchFn(rawMerizoProgramOutput()));
     }
 
     function validateWaitingMessage(launcher) {
-        clearRawMongoProgramOutput();
+        clearRawMerizoProgramOutput();
         var conn = launcher.start({});
         launcher.stop(conn, undefined, {});
         testStartupLogging(launcher, makeRegExMatchFn(/waiting for connections on port/));
@@ -27,9 +27,9 @@
 
     validateWaitingMessage({
         start: function(opts) {
-            return MongoRunner.runMongod(opts);
+            return MerizoRunner.runMerizod(opts);
         },
-        stop: MongoRunner.stopMongod
+        stop: MerizoRunner.stopMerizod
     });
 
 }());

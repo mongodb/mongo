@@ -57,17 +57,17 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // Downgrade the merizos servers first.
     jsTestLog("Downgrading merizos servers.");
     st.upgradeCluster("last-stable",
-                      {upgradeConfigs: false, upgradeMongos: true, upgradeShards: false});
+                      {upgradeConfigs: false, upgradeMerizos: true, upgradeShards: false});
 
     // Then downgrade the shard servers.
     jsTestLog("Downgrading shard servers.");
     st.upgradeCluster("last-stable",
-                      {upgradeConfigs: false, upgradeMongos: false, upgradeShards: true});
+                      {upgradeConfigs: false, upgradeMerizos: false, upgradeShards: true});
 
     // Then downgrade the config servers.
     jsTestLog("Downgrading config servers.");
     st.upgradeCluster("last-stable",
-                      {upgradeConfigs: true, upgradeMongos: false, upgradeShards: false});
+                      {upgradeConfigs: true, upgradeMerizos: false, upgradeShards: false});
     checkFCV(st.configRS.getPrimary().getDB("admin"), lastStableFCV);
 
     testDB = st.s.getDB(dbName);

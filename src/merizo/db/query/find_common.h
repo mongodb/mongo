@@ -56,23 +56,23 @@ class BSONObj;
 class QueryRequest;
 
 // Failpoint for making find hang.
-MONGO_FAIL_POINT_DECLARE(waitInFindBeforeMakingBatch);
+MERIZO_FAIL_POINT_DECLARE(waitInFindBeforeMakingBatch);
 
 // Failpoint for making getMore not wait for an awaitdata cursor. Allows us to avoid waiting during
 // tests.
-MONGO_FAIL_POINT_DECLARE(disableAwaitDataForGetMoreCmd);
+MERIZO_FAIL_POINT_DECLARE(disableAwaitDataForGetMoreCmd);
 
 // Enabling this fail point will cause getMores to busy wait after pinning the cursor
 // but before we have started building the batch, until the fail point is disabled.
-MONGO_FAIL_POINT_DECLARE(waitAfterPinningCursorBeforeGetMoreBatch);
+MERIZO_FAIL_POINT_DECLARE(waitAfterPinningCursorBeforeGetMoreBatch);
 
 // Enabling this fail point will cause getMores to busy wait after setting up the plan executor and
 // before beginning the batch.
-MONGO_FAIL_POINT_DECLARE(waitWithPinnedCursorDuringGetMoreBatch);
+MERIZO_FAIL_POINT_DECLARE(waitWithPinnedCursorDuringGetMoreBatch);
 
 // Enabling this failpoint will cause getMores to wait just before it unpins its cursor after it
 // has completed building the current batch.
-MONGO_FAIL_POINT_DECLARE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
+MERIZO_FAIL_POINT_DECLARE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
 
 /**
  * Suite of find/getMore related functions used in both the merizod and merizos query paths.

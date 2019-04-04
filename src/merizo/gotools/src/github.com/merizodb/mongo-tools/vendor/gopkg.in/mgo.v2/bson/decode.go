@@ -598,8 +598,8 @@ func (d *decoder) readElemTo(out reflect.Value, kind byte) (good bool) {
 		in = js
 	case 0x10: // Int32
 		in = int(d.readInt32())
-	case 0x11: // Mongo-specific timestamp
-		in = MongoTimestamp(d.readInt64())
+	case 0x11: // Merizo-specific timestamp
+		in = MerizoTimestamp(d.readInt64())
 	case 0x12: // Int64
 		in = d.readInt64()
 	case 0x13: // Decimal128

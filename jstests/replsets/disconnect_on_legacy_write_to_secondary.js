@@ -47,7 +47,7 @@
     // Do the stepdown tests on a separate connection to avoid interfering with the
     // ReplSetTest mechanism.
     const primaryAdmin = primary.getDB("admin");
-    const primaryDataConn = new Mongo(primary.host);
+    const primaryDataConn = new Merizo(primary.host);
     const primaryDb = primaryDataConn.getDB("test");
     const primaryColl = primaryDb[collname];
     primaryDataConn.forceWriteMode('legacy');

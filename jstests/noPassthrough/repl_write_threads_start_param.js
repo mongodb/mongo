@@ -8,26 +8,26 @@
     "use strict";
 
     // too low a count
-    clearRawMongoProgramOutput();
-    var merizo = MongoRunner.runMongod({setParameter: 'replWriterThreadCount=0'});
+    clearRawMerizoProgramOutput();
+    var merizo = MerizoRunner.runMerizod({setParameter: 'replWriterThreadCount=0'});
     assert.soon(function() {
-        return rawMongoProgramOutput().match(
+        return rawMerizoProgramOutput().match(
             "Invalid value for parameter replWriterThreadCount: 0 is not greater than or equal to 1");
     }, "merizod started with too low a value for replWriterThreadCount");
 
     // too high a count
-    clearRawMongoProgramOutput();
-    merizo = MongoRunner.runMongod({setParameter: 'replWriterThreadCount=257'});
+    clearRawMerizoProgramOutput();
+    merizo = MerizoRunner.runMerizod({setParameter: 'replWriterThreadCount=257'});
     assert.soon(function() {
-        return rawMongoProgramOutput().match(
+        return rawMerizoProgramOutput().match(
             "Invalid value for parameter replWriterThreadCount: 257 is not less than or equal to 256");
     }, "merizod started with too high a value for replWriterThreadCount");
 
     // proper count
-    clearRawMongoProgramOutput();
-    merizo = MongoRunner.runMongod({setParameter: 'replWriterThreadCount=24'});
+    clearRawMerizoProgramOutput();
+    merizo = MerizoRunner.runMerizod({setParameter: 'replWriterThreadCount=24'});
     assert.neq(null, merizo, "merizod failed to start with a suitable replWriterThreadCount value");
-    assert(!rawMongoProgramOutput().match("Invalid value for parameter replWriterThreadCount"),
+    assert(!rawMerizoProgramOutput().match("Invalid value for parameter replWriterThreadCount"),
            "despite accepting the replWriterThreadCount value, merizod logged an error");
 
     // getParameter to confirm the value was set
@@ -37,5 +37,5 @@
     // setParameter to ensure it is not possible
     assert.commandFailed(
         merizo.getDB("admin").runCommand({setParameter: 1, replWriterThreadCount: 1}));
-    MongoRunner.stopMongod(merizo);
+    MerizoRunner.stopMerizod(merizo);
 }());

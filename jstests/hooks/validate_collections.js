@@ -72,7 +72,7 @@ function CollectionValidator() {
                           ' since collection was not found');
                     continue;
                 }
-                const host = db.getMongo().host;
+                const host = db.getMerizo().host;
                 print('Collection validation failed on host ' + host + ' with response: ' +
                       tojson(res));
                 dumpCollection(coll, 100);
@@ -90,7 +90,7 @@ function CollectionValidator() {
             load('jstests/libs/feature_compatibility_version.js');
 
             print('Running validate() on ' + host);
-            const conn = new Mongo(host);
+            const conn = new Merizo(host);
             conn.setSlaveOk();
             jsTest.authenticate(conn);
 
@@ -128,7 +128,7 @@ function CollectionValidator() {
 
         const requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
         if (requiredFCV) {
-            let conn = new Mongo(setFCVHost);
+            let conn = new Merizo(setFCVHost);
             adminDB = conn.getDB('admin');
             originalFCV = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
 

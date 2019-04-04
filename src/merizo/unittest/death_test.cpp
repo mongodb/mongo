@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -97,7 +97,7 @@ void DeathTestImpl::_doTest() {
                 default:
                     severe() << "Unrecoverable error while waiting for " << child << ": "
                              << errnoWithDescription(err);
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
         if (WIFSIGNALED(stat) || (WIFEXITED(stat) && WEXITSTATUS(stat) != 0)) {

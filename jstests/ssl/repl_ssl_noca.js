@@ -39,7 +39,7 @@
             // "trusted" CA. On Windows, this CA will have been added to the user's trusted CA list
             argv.unshift("env", "SSL_CERT_FILE=jstests/libs/trusted-ca.pem");
         }
-        return runMongoProgram(...argv);
+        return runMerizoProgram(...argv);
     };
 
     var noMentionSSLURL = `merizodb://${nodeList}/admin?replicaSet=${replTest.name}`;

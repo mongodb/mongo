@@ -73,7 +73,7 @@ void OpObserverMock::onApplyOps(OperationContext* opCtx,
 /**
  * Test fixture for applyOps().
  */
-class ApplyOpsTest : public ServiceContextMongoDTest {
+class ApplyOpsTest : public ServiceContextMerizoDTest {
 private:
     void setUp() override;
     void tearDown() override;
@@ -85,7 +85,7 @@ protected:
 
 void ApplyOpsTest::setUp() {
     // Set up merizod.
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     auto service = getServiceContext();
     auto opCtx = cc().makeOperationContext();
@@ -117,7 +117,7 @@ void ApplyOpsTest::tearDown() {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplication,
                                                         logger::LogSeverity::Debug(0));
 
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 /**

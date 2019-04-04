@@ -50,7 +50,7 @@
 namespace merizo {
 
 void MockReplCoordServerFixture::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     _opCtx = cc().makeOperationContext();
 

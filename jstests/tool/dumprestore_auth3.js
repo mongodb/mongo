@@ -6,12 +6,12 @@
 function runTool(toolName, merizod, options) {
     var opts = {host: merizod.host};
     Object.extend(opts, options);
-    MongoRunner.runMongoTool(toolName, opts);
+    MerizoRunner.runMerizoTool(toolName, opts);
 }
 
 var dumpRestoreAuth3 = function(backup_role, restore_role) {
 
-    var merizod = MongoRunner.runMongod();
+    var merizod = MerizoRunner.runMerizod();
     var admindb = merizod.getDB("admin");
     var db = merizod.getDB("foo");
 
@@ -51,7 +51,7 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
     var versionDoc = admindb.system.version.findOne();
 
     jsTestLog("Dump foo database without dumping user data");
-    var dumpDir = MongoRunner.getAndPrepareDumpDirectory("dumprestore_auth3");
+    var dumpDir = MerizoRunner.getAndPrepareDumpDirectory("dumprestore_auth3");
     runTool("merizodump", merizod, {out: dumpDir, db: "foo"});
     db = merizod.getDB('foo');
 
@@ -226,7 +226,7 @@ var dumpRestoreAuth3 = function(backup_role, restore_role) {
                  db.getSiblingDB('admin').system.version.findOne(),
                  "version doc was changed by restore");
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 };
 
 // Tests that the default auth roles of backup and restore work properly.

@@ -80,7 +80,7 @@ private:
                             return "or";
                         if (bitOperator == &SafeNum::bitXor)
                             return "xor";
-                        MONGO_UNREACHABLE;
+                        MERIZO_UNREACHABLE;
                     }(bitOperator),
                     &subBuilder);
             }

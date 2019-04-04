@@ -32,7 +32,7 @@
     setFailPoint(rollbackNode, "GetMoreHangBeforeReadLock");
 
     const joinGetMoreThread = startParallelShell(() => {
-        db.getMongo().setSlaveOk();
+        db.getMerizo().setSlaveOk();
         const cursorID =
             assert.commandWorked(db.runCommand({"find": "coll", batchSize: 0})).cursor.id;
         let res = assert.throws(function() {

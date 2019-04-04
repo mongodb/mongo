@@ -42,7 +42,7 @@ var Cluster = function(options) {
             'sharded.enabled',
             'sharded.enableAutoSplit',
             'sharded.enableBalancer',
-            'sharded.numMongos',
+            'sharded.numMerizos',
             'sharded.numShards',
             'sharded.stepdownOptions',
             'sharded.stepdownOptions.configStepdown',
@@ -99,13 +99,13 @@ var Cluster = function(options) {
         options.sharded.enableBalancer = options.sharded.enableBalancer || false;
         assert.eq('boolean', typeof options.sharded.enableBalancer);
 
-        if (typeof options.sharded.numMongos !== 'undefined') {
+        if (typeof options.sharded.numMerizos !== 'undefined') {
             assert(options.sharded.enabled,
-                   "Must have sharded.enabled be true if 'sharded.numMongos' is specified");
+                   "Must have sharded.enabled be true if 'sharded.numMerizos' is specified");
         }
 
-        options.sharded.numMongos = options.sharded.numMongos || 2;
-        assert.eq('number', typeof options.sharded.numMongos);
+        options.sharded.numMerizos = options.sharded.numMerizos || 2;
+        assert.eq('number', typeof options.sharded.numMerizos);
 
         if (typeof options.sharded.numShards !== 'undefined') {
             assert(options.sharded.enabled,
@@ -192,13 +192,13 @@ var Cluster = function(options) {
         }
 
         if (options.sharded.enabled) {
-            st = new FSMShardingTest(`merizodb://${db.getMongo().host}`);
+            st = new FSMShardingTest(`merizodb://${db.getMerizo().host}`);
 
             conn = st.s(0);  // First merizos
 
             this.teardown = function teardown() {
-                options.teardownFunctions.merizod.forEach(this.executeOnMongodNodes);
-                options.teardownFunctions.merizos.forEach(this.executeOnMongosNodes);
+                options.teardownFunctions.merizod.forEach(this.executeOnMerizodNodes);
+                options.teardownFunctions.merizos.forEach(this.executeOnMerizosNodes);
                 options.teardownFunctions.config.forEach(this.executeOnConfigNodes);
             };
 
@@ -232,20 +232,20 @@ var Cluster = function(options) {
             }
 
         } else if (options.replication.enabled) {
-            rst = new ReplSetTest(db.getMongo().host);
+            rst = new ReplSetTest(db.getMerizo().host);
 
             conn = rst.getPrimary();
             secondaryConns = rst.getSecondaries();
             replSets = [rst];
 
             this.teardown = function teardown() {
-                options.teardownFunctions.merizod.forEach(this.executeOnMongodNodes);
+                options.teardownFunctions.merizod.forEach(this.executeOnMerizodNodes);
             };
 
             this._addReplicaSetConns(rst);
 
         } else {  // standalone server
-            conn = db.getMongo();
+            conn = db.getMerizo();
             db.adminCommand({setParameter: 1, logLevel: verbosityLevel});
 
             _conns.merizod = [conn];
@@ -254,10 +254,10 @@ var Cluster = function(options) {
         initialized = true;
         clusterStartTime = new Date();
 
-        options.setupFunctions.merizod.forEach(this.executeOnMongodNodes);
+        options.setupFunctions.merizod.forEach(this.executeOnMerizodNodes);
         options.setupFunctions.config.forEach(this.executeOnConfigNodes);
         if (options.sharded) {
-            options.setupFunctions.merizos.forEach(this.executeOnMongosNodes);
+            options.setupFunctions.merizos.forEach(this.executeOnMerizosNodes);
         }
     };
 
@@ -268,7 +268,7 @@ var Cluster = function(options) {
         });
     };
 
-    this.executeOnMongodNodes = function executeOnMongodNodes(fn) {
+    this.executeOnMerizodNodes = function executeOnMerizodNodes(fn) {
         assert(initialized, 'cluster must be initialized first');
 
         if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
@@ -279,14 +279,14 @@ var Cluster = function(options) {
         });
     };
 
-    this.executeOnMongosNodes = function executeOnMongosNodes(fn) {
+    this.executeOnMerizosNodes = function executeOnMerizosNodes(fn) {
         assert(initialized, 'cluster must be initialized first');
 
         if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
             throw new Error('merizos function must be a function that takes a db as an argument');
         }
         _conns.merizos.forEach(function(merizosConn) {
-            fn(merizosConn.getDB('admin'), true /* isMongos */);
+            fn(merizosConn.getDB('admin'), true /* isMerizos */);
         });
     };
 
@@ -301,7 +301,7 @@ var Cluster = function(options) {
         });
     };
 
-    this.synchronizeMongosClusterTimes = function synchronizeMongosClusterTimes() {
+    this.synchronizeMerizosClusterTimes = function synchronizeMerizosClusterTimes() {
         const contactConfigServerFn = ((merizosConn) => {
             // The admin database is hosted on the config server.
             assert.commandWorked(merizosConn.adminCommand({find: "foo"}));
@@ -310,13 +310,13 @@ var Cluster = function(options) {
         // After the first iteration, the config server will have been gossiped the highest cluster
         // time any merizos has seen. After the second iteration, each merizos should have been
         // gossiped this time as well.
-        this.executeOnMongosNodes(contactConfigServerFn);
-        this.executeOnMongosNodes(contactConfigServerFn);
+        this.executeOnMerizosNodes(contactConfigServerFn);
+        this.executeOnMerizosNodes(contactConfigServerFn);
     };
 
     this.teardown = function teardown() {
         assert(initialized, 'cluster must be initialized first');
-        options.teardownFunctions.merizod.forEach(this.executeOnMongodNodes);
+        options.teardownFunctions.merizod.forEach(this.executeOnMerizodNodes);
     };
 
     this.getDB = function getDB(dbName) {
@@ -402,7 +402,7 @@ var Cluster = function(options) {
     };
 
     // Provide a serializable form of the cluster for use in workload states. This
-    // method is required because we don't currently support the serialization of Mongo
+    // method is required because we don't currently support the serialization of Merizo
     // connection objects.
     //
     // Serialized format:
@@ -486,7 +486,7 @@ var Cluster = function(options) {
         assert(initialized, 'cluster must be initialized first');
 
         const isSteppingDownConfigServers = this.isSteppingDownConfigServers();
-        var _validateCollections = function _validateCollections(db, isMongos = false) {
+        var _validateCollections = function _validateCollections(db, isMerizos = false) {
             // Validate all the collections on each node.
             var res = db.adminCommand({listDatabases: 1});
             assert.commandWorked(res);
@@ -498,7 +498,7 @@ var Cluster = function(options) {
                 //
                 // TODO SERVER-30949: listCollections through merizos should automatically retry on
                 // NotMaster errors. Once that is true, remove this check.
-                if (isSteppingDownConfigServers && isMongos &&
+                if (isSteppingDownConfigServers && isMerizos &&
                     (dbInfo.name === "admin" || dbInfo.name === "config")) {
                     return;
                 }
@@ -511,8 +511,8 @@ var Cluster = function(options) {
 
         var startTime = Date.now();
         jsTest.log('Starting to validate collections ' + phase);
-        this.executeOnMongodNodes(_validateCollections);
-        this.executeOnMongosNodes(_validateCollections);
+        this.executeOnMerizodNodes(_validateCollections);
+        this.executeOnMerizosNodes(_validateCollections);
         var totalTime = Date.now() - startTime;
         jsTest.log('Finished validating collections in ' + totalTime + ' ms, ' + phase);
     };

@@ -32,14 +32,14 @@
 #include "merizo/db/repl/repl_settings.h"
 
 namespace merizo {
-struct MongodGlobalParams {
+struct MerizodGlobalParams {
     bool scriptingEnabled = true;  // Use "security.javascriptEnabled" to set this variable. Or use
                                    // --noscripting which will set it to false.
 
     boost::optional<std::vector<std::string>> whitelistedClusterNetwork;
 };
 
-extern MongodGlobalParams merizodGlobalParams;
+extern MerizodGlobalParams merizodGlobalParams;
 
 void setGlobalReplSettings(const repl::ReplSettings& settings);
 const repl::ReplSettings& getGlobalReplSettings();

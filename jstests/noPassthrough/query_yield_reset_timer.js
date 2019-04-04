@@ -1,9 +1,9 @@
 // Tests the reset logic for the periodic query yield timer.  Regression test for SERVER-21341.
 (function() {
     'use strict';
-    var dbpath = MongoRunner.dataPath + jsTest.name();
+    var dbpath = MerizoRunner.dataPath + jsTest.name();
     resetDbpath(dbpath);
-    var merizod = MongoRunner.runMongod({dbpath: dbpath});
+    var merizod = MerizoRunner.runMerizod({dbpath: dbpath});
     var coll = merizod.getDB("test").getCollection(jsTest.name());
 
     // Configure the server so that queries are expected to yield after every 10 work cycles, or
@@ -41,5 +41,5 @@
     // result set to be returned in a single batch.
     assert.gt(explainRes.executionStats.executionStages.saveState, 4 / 2, tojson(explainRes));
     assert.lt(explainRes.executionStats.executionStages.saveState, 4 * 2, tojson(explainRes));
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

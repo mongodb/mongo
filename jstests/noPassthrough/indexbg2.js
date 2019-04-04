@@ -6,7 +6,7 @@
 
     load("jstests/libs/check_log.js");
 
-    const conn = MongoRunner.runMongod({nojournal: ""});
+    const conn = MerizoRunner.runMerizod({nojournal: ""});
     assert.neq(null, conn, "merizod failed to start.");
 
     let db = conn.getDB("test");
@@ -23,11 +23,11 @@
     // Return the PID to call `waitpid` on for clean shutdown.
     let doParallel = function(work) {
         resetParallel();
-        return startMongoProgramNoConnect(
+        return startMerizoProgramNoConnect(
             "merizo",
             "--eval",
             work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
-            db.getMongo().host);
+            db.getMerizo().host);
     };
 
     let indexBuild = function() {
@@ -153,5 +153,5 @@
 
     doTest();
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

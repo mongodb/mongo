@@ -136,9 +136,9 @@
 
     // Move a chunk in the first collection from Shard1 to Shard0 through the other merizos, so
     // Shard1 and the main merizos are stale for it.
-    const otherMongos = st.s1;
+    const otherMerizos = st.s1;
     assert.commandWorked(
-        otherMongos.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard0.shardName}));
+        otherMerizos.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard0.shardName}));
     expectChunks(st, ns, [2, 0, 0]);
 
     session.startTransaction();

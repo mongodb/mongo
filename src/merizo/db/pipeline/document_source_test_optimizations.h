@@ -42,7 +42,7 @@ public:
     DocumentSourceTestOptimizations() : DocumentSource(new ExpressionContextForTest()) {}
     virtual ~DocumentSourceTestOptimizations() = default;
     virtual GetNextResult getNext() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
     virtual StageConstraints constraints(Pipeline::SplitState) const override {
         // Return the default constraints so that this can be used in test pipelines. Constructing a
@@ -60,12 +60,12 @@ public:
     }
 
     virtual GetModPathsReturn getModifiedPaths() const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
 private:
     virtual Value serialize(boost::optional<ExplainOptions::Verbosity>) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 };
 

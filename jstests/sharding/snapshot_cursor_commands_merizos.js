@@ -184,7 +184,7 @@
             const command = commands[commandKey];
 
             const session =
-                mainDb.getMongo().startSession({causalConsistency: useCausalConsistency});
+                mainDb.getMerizo().startSession({causalConsistency: useCausalConsistency});
             const lsid = session.getSessionId();
             const sessionDb = session.getDatabase(dbName);
 

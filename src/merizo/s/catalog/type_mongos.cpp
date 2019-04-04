@@ -36,18 +36,18 @@
 #include "merizo/util/merizoutils/str.h"
 
 namespace merizo {
-const NamespaceString MongosType::ConfigNS("config.merizos");
+const NamespaceString MerizosType::ConfigNS("config.merizos");
 
-const BSONField<std::string> MongosType::name("_id");
-const BSONField<Date_t> MongosType::ping("ping");
-const BSONField<long long> MongosType::uptime("up");
-const BSONField<bool> MongosType::waiting("waiting");
-const BSONField<std::string> MongosType::merizoVersion("merizoVersion");
-const BSONField<long long> MongosType::configVersion("configVersion");
-const BSONField<BSONArray> MongosType::advisoryHostFQDNs("advisoryHostFQDNs");
+const BSONField<std::string> MerizosType::name("_id");
+const BSONField<Date_t> MerizosType::ping("ping");
+const BSONField<long long> MerizosType::uptime("up");
+const BSONField<bool> MerizosType::waiting("waiting");
+const BSONField<std::string> MerizosType::merizoVersion("merizoVersion");
+const BSONField<long long> MerizosType::configVersion("configVersion");
+const BSONField<BSONArray> MerizosType::advisoryHostFQDNs("advisoryHostFQDNs");
 
-StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
-    MongosType mt;
+StatusWith<MerizosType> MerizosType::fromBSON(const BSONObj& source) {
+    MerizosType mt;
 
     {
         std::string mtName;
@@ -82,11 +82,11 @@ StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
     }
 
     if (source.hasField(merizoVersion.name())) {
-        std::string mtMongoVersion;
-        Status status = bsonExtractStringField(source, merizoVersion.name(), &mtMongoVersion);
+        std::string mtMerizoVersion;
+        Status status = bsonExtractStringField(source, merizoVersion.name(), &mtMerizoVersion);
         if (!status.isOK())
             return status;
-        mt._merizoVersion = mtMongoVersion;
+        mt._merizoVersion = mtMerizoVersion;
     }
 
     if (source.hasField(configVersion.name())) {
@@ -120,7 +120,7 @@ StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
     return mt;
 }
 
-Status MongosType::validate() const {
+Status MerizosType::validate() const {
     if (!_name.is_initialized() || _name->empty()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << name.name() << " field"};
     }
@@ -140,7 +140,7 @@ Status MongosType::validate() const {
     return Status::OK();
 }
 
-BSONObj MongosType::toBSON() const {
+BSONObj MerizosType::toBSON() const {
     BSONObjBuilder builder;
 
     if (_name)
@@ -152,7 +152,7 @@ BSONObj MongosType::toBSON() const {
     if (_waiting)
         builder.append(waiting.name(), getWaiting());
     if (_merizoVersion)
-        builder.append(merizoVersion.name(), getMongoVersion());
+        builder.append(merizoVersion.name(), getMerizoVersion());
     if (_configVersion)
         builder.append(configVersion.name(), getConfigVersion());
     if (_advisoryHostFQDNs)
@@ -161,37 +161,37 @@ BSONObj MongosType::toBSON() const {
     return builder.obj();
 }
 
-void MongosType::setName(const std::string& name) {
+void MerizosType::setName(const std::string& name) {
     invariant(!name.empty());
     _name = name;
 }
 
-void MongosType::setPing(const Date_t& ping) {
+void MerizosType::setPing(const Date_t& ping) {
     _ping = ping;
 }
 
-void MongosType::setUptime(long long uptime) {
+void MerizosType::setUptime(long long uptime) {
     _uptime = uptime;
 }
 
-void MongosType::setWaiting(bool waiting) {
+void MerizosType::setWaiting(bool waiting) {
     _waiting = waiting;
 }
 
-void MongosType::setMongoVersion(const std::string& merizoVersion) {
+void MerizosType::setMerizoVersion(const std::string& merizoVersion) {
     invariant(!merizoVersion.empty());
     _merizoVersion = merizoVersion;
 }
 
-void MongosType::setConfigVersion(const long long configVersion) {
+void MerizosType::setConfigVersion(const long long configVersion) {
     _configVersion = configVersion;
 }
 
-void MongosType::setAdvisoryHostFQDNs(const std::vector<std::string>& advisoryHostFQDNs) {
+void MerizosType::setAdvisoryHostFQDNs(const std::vector<std::string>& advisoryHostFQDNs) {
     _advisoryHostFQDNs = advisoryHostFQDNs;
 }
 
-std::string MongosType::toString() const {
+std::string MerizosType::toString() const {
     return toBSON().toString();
 }
 

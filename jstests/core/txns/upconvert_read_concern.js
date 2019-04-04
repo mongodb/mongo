@@ -15,7 +15,7 @@
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 
     const sessionOptions = {causalConsistency: false};
-    const session = db.getMongo().startSession(sessionOptions);
+    const session = db.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
 
     function testUpconvertReadConcern(readConcern) {

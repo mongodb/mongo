@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -161,7 +161,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
         }
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 auto CollectionShardingRuntime::trackOrphanedDataCleanup(ChunkRange const& range)

@@ -2,10 +2,10 @@
  * Helpers for verifying versions of started MerizoDB processes.
  */
 
-var Mongo, assert;
+var Merizo, assert;
 (function() {
     "use strict";
-    Mongo.prototype.getBinVersion = function() {
+    Merizo.prototype.getBinVersion = function() {
         var result = this.getDB("admin").runCommand({serverStatus: 1});
         return result.version;
     };
@@ -13,10 +13,10 @@ var Mongo, assert;
     // Checks that our merizodb process is of a certain version
     assert.binVersion = function(merizo, version) {
         var currVersion = merizo.getBinVersion();
-        assert(MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
-                                                 MongoRunner.getBinVersionFor(version)),
-               "version " + version + " (" + MongoRunner.getBinVersionFor(version) + ")" +
-                   " is not the same as " + MongoRunner.getBinVersionFor(currVersion));
+        assert(MerizoRunner.areBinVersionsTheSame(MerizoRunner.getBinVersionFor(currVersion),
+                                                 MerizoRunner.getBinVersionFor(version)),
+               "version " + version + " (" + MerizoRunner.getBinVersionFor(version) + ")" +
+                   " is not the same as " + MerizoRunner.getBinVersionFor(currVersion));
     };
 
     // Compares an array of desired versions and an array of found versions,
@@ -27,7 +27,7 @@ var Mongo, assert;
             var version = versionsWanted[i];
             var found = false;
             for (var j = 0; j < versionsFound.length; j++) {
-                if (MongoRunner.areBinVersionsTheSame(version, versionsFound[j])) {
+                if (MerizoRunner.areBinVersionsTheSame(version, versionsFound[j])) {
                     found = true;
                     break;
                 }
@@ -35,7 +35,7 @@ var Mongo, assert;
 
             assert(found,
                    "could not find version " + version + " (" +
-                       MongoRunner.getBinVersionFor(version) + ")" + " in " + versionsFound);
+                       MerizoRunner.getBinVersionFor(version) + ")" + " in " + versionsFound);
         }
     };
 

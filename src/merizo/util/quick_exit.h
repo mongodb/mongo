@@ -39,6 +39,6 @@ namespace merizo {
  *  The function is named differently than quick_exit so that we can distinguish it from
  *  the C++11 function of the same name.
  */
-MONGO_COMPILER_NORETURN void quickExit(int);
+MERIZO_COMPILER_NORETURN void quickExit(int);
 
 }  // namespace merizo

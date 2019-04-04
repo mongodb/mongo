@@ -155,7 +155,7 @@ string terseUTCCurrentTime() {
     return terseCurrentTime(false) + "Z";
 }
 
-#define MONGO_ISO_DATE_FMT_NO_TZ "%Y-%m-%dT%H:%M:%S"
+#define MERIZO_ISO_DATE_FMT_NO_TZ "%Y-%m-%dT%H:%M:%S"
 
 namespace {
 struct DateStringBuffer {
@@ -170,7 +170,7 @@ void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
     char* const buf = result->data;
     struct tm t;
     time_t_to_Struct(date.toTimeT(), &t, local);
-    int pos = strftime(buf, bufSize, MONGO_ISO_DATE_FMT_NO_TZ, &t);
+    int pos = strftime(buf, bufSize, MERIZO_ISO_DATE_FMT_NO_TZ, &t);
     dassert(0 < pos);
     char* cur = buf + pos;
     int bufRemaining = bufSize - pos;
@@ -722,7 +722,7 @@ StatusWith<Date_t> dateFromISOString(StringData dateString) {
     return Date_t::fromMillisSinceEpoch(static_cast<long long>(resultMillis));
 }
 
-#undef MONGO_ISO_DATE_FMT_NO_TZ
+#undef MERIZO_ISO_DATE_FMT_NO_TZ
 
 std::string Date_t::toString() const {
     if (isFormattable()) {
@@ -866,7 +866,7 @@ typedef WINBASEAPI VOID(WINAPI* pGetSystemTimePreciseAsFileTime)(
 
 static pGetSystemTimePreciseAsFileTime GetSystemTimePreciseAsFileTimeFunc;
 
-MONGO_INITIALIZER(Init32TimeSupport)(InitializerContext*) {
+MERIZO_INITIALIZER(Init32TimeSupport)(InitializerContext*) {
     HINSTANCE kernelLib = LoadLibraryA("kernel32.dll");
     if (kernelLib) {
         GetSystemTimePreciseAsFileTimeFunc = reinterpret_cast<pGetSystemTimePreciseAsFileTime>(

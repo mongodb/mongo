@@ -31,8 +31,8 @@
 
 namespace merizo {
 
-MONGO_DEFINE_SHIM(waitForReadConcern);
-MONGO_DEFINE_SHIM(waitForLinearizableReadConcern);
-MONGO_DEFINE_SHIM(waitForSpeculativeMajorityReadConcern);
+MERIZO_DEFINE_SHIM(waitForReadConcern);
+MERIZO_DEFINE_SHIM(waitForLinearizableReadConcern);
+MERIZO_DEFINE_SHIM(waitForSpeculativeMajorityReadConcern);
 
 }  // namespace merizo

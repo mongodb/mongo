@@ -68,7 +68,7 @@
             db: db.getSiblingDB("admin"),
             cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "off"}
         });
-    }, merizosDB.getMongo().port);
+    }, merizosDB.getMerizo().port);
 
     // Retrieve the results for the $sample aggregation.
     const sampleCursor = new DBCommandCursor(merizosDB, cmdRes);

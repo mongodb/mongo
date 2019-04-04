@@ -59,7 +59,7 @@
 
     // fassert() calls std::abort(), which returns a different exit code for Windows vs. other
     // platforms.
-    const exitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
+    const exitCode = _isWindows() ? MerizoRunner.EXIT_ABRUPT : MerizoRunner.EXIT_ABORT;
     rst.stop(0, undefined, {allowedExitCode: exitCode});
     rst.stopSet();
 })();

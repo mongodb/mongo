@@ -360,6 +360,6 @@ public:
         void* pointerAlignment;
     };
 };
-MONGO_STATIC_ASSERT(sizeof(ValueStorage) == 16);
-MONGO_STATIC_ASSERT(alignof(ValueStorage) >= alignof(void*));
+MERIZO_STATIC_ASSERT(sizeof(ValueStorage) == 16);
+MERIZO_STATIC_ASSERT(alignof(ValueStorage) >= alignof(void*));
 }  // namespace merizo

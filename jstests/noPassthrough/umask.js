@@ -27,7 +27,7 @@
         'mobile.sqlite-wal',
     ];
 
-    let merizodOptions = MongoRunner.merizodOptions({
+    let merizodOptions = MerizoRunner.merizodOptions({
         useLogFiles: true,
         cleanData: true,
     });
@@ -64,16 +64,16 @@
 
     // First we start up the merizod normally, all the files except merizod.lock should have the mode
     // 0600
-    let conn = MongoRunner.runMongod(merizodOptions);
+    let conn = MerizoRunner.runMerizod(merizodOptions);
 
     checkMask(conn.fullOptions.dbpath, defaultUmask, false);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // Restart the merizod with honorSystemUmask, all files should have the mode 0666
     merizodOptions.setParameter = {honorSystemUmask: true};
-    conn = MongoRunner.runMongod(merizodOptions);
-    MongoRunner.stopMongod(conn);
+    conn = MerizoRunner.runMerizod(merizodOptions);
+    MerizoRunner.stopMerizod(conn);
     checkMask(conn.fullOptions.dbpath, permissiveUmask, false);
 
     umask(oldUmask.valueOf());

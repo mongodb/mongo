@@ -78,7 +78,7 @@
     printjson(s.getDB("config").settings.find().toArray());
 
     print("Restart merizos with different auth options");
-    s.restartMongos(0);
+    s.restartMerizos(0);
     login(adminUser);
 
     var d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true, waitForKeys: false});
@@ -297,7 +297,7 @@
     assert.commandWorked(res);
 
     // Check that dump doesn't get stuck with auth
-    var exitCode = MongoRunner.runMongoTool("merizodump", {
+    var exitCode = MerizoRunner.runMerizoTool("merizodump", {
         host: s.s.host,
         db: testUser.db,
         username: testUser.username,
@@ -309,7 +309,7 @@
     // Test read only users
     print("starting read only tests");
 
-    var readOnlyS = new Mongo(s.getDB("test").getMongo().host);
+    var readOnlyS = new Merizo(s.getDB("test").getMerizo().host);
     var readOnlyDB = readOnlyS.getDB("test");
 
     print("   testing find that should fail");

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -163,7 +163,7 @@ BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,
             if (!TrackingMetadata::get(opCtx).getOperId()) {
                 TrackingMetadata::get(opCtx).initWithOperName("NotSet");
             }
-            MONGO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
+            MERIZO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
                 << TrackingMetadata::get(opCtx).toString();
             TrackingMetadata::get(opCtx).setIsLogged(true);
         }
@@ -380,7 +380,7 @@ Status ShardRemote::createIndexOnConfig(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const BSONObj& keys,
                                         bool unique) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,

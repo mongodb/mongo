@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -75,7 +75,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(failApplyChunkOps);
+MERIZO_FAIL_POINT_DEFINE(failApplyChunkOps);
 
 using repl::OpTime;
 using std::set;
@@ -674,7 +674,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
     // TODO (Dianna) This fail point needs to be reexamined when CommitChunkMigration is in:
     // migrations will no longer be able to exercise it, so split or merge will need to do so.
     // SERVER-22659.
-    if (MONGO_FAIL_POINT(failApplyChunkOps)) {
+    if (MERIZO_FAIL_POINT(failApplyChunkOps)) {
         status = Status(ErrorCodes::InternalError, "Failpoint 'failApplyChunkOps' generated error");
     }
 
@@ -810,7 +810,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
         return status;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(

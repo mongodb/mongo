@@ -36,7 +36,7 @@ namespace merizo {
 /**
  * Test fixture class for merizod tests that use the "devnull" storage engine.
  */
-class ServiceContextDevnullTestFixture : public ServiceContextMongoDTest {
+class ServiceContextDevnullTestFixture : public ServiceContextMerizoDTest {
 protected:
     ServiceContextDevnullTestFixture();
 };

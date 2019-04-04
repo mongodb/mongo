@@ -43,7 +43,7 @@ namespace merizo::logger {
  * Note that this class is thread-safe but not global. You must maintain an instance to preserve the
  * Date_t for the last time you were given the "limited" severity instead of the "normal" severity.
  * The recommended method for this style of lifetime extension is via a static local variable.
- * The MONGO_GET_LIMITED_SEVERITY macro below provides a relatively painless way to get the
+ * The MERIZO_GET_LIMITED_SEVERITY macro below provides a relatively painless way to get the
  * appropriate severity out of a LogSeverityLimiter initialized as a static local variable in a
  * contained block scope.
  */
@@ -101,7 +101,7 @@ private:
     stdx::unordered_map<KeyT, Date_t> _cutoffByKey;
 };
 
-#define MONGO_GET_LIMITED_SEVERITY(KEY, PERIOD, LIMITED, NORMAL)                                \
+#define MERIZO_GET_LIMITED_SEVERITY(KEY, PERIOD, LIMITED, NORMAL)                                \
     [&] {                                                                                       \
         using KeyT = std::decay_t<decltype(KEY)>;                                               \
         static auto limiter = merizo::logger::LogSeverityLimiter<KeyT>(PERIOD, LIMITED, NORMAL); \

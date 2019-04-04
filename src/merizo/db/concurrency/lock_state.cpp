@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -51,7 +51,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(failNonIntentLocksIfWaitNeeded);
+MERIZO_FAIL_POINT_DEFINE(failNonIntentLocksIfWaitNeeded);
 
 namespace {
 
@@ -134,7 +134,7 @@ bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
             break;
 
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 
     switch (mode) {
@@ -147,7 +147,7 @@ bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
             return _sharedLocksShouldTwoPhaseLock;
 
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -584,7 +584,7 @@ bool LockerImpl::isCollectionLockedForMode(const NamespaceString& nss, LockMode 
             break;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
     return false;
 }
 
@@ -829,7 +829,7 @@ void LockerImpl::lockComplete(OperationContext* opCtx,
 
     // This failpoint is used to time out non-intent locks if they cannot be granted immediately.
     // Testing-only.
-    if (MONGO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
+    if (MERIZO_FAIL_POINT(failNonIntentLocksIfWaitNeeded)) {
         uassert(ErrorCodes::LockTimeout,
                 str::stream() << "Cannot immediately acquire lock '" << resId.toString()
                               << "'. Timing out due to failpoint.",

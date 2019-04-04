@@ -24,7 +24,7 @@ const (
 type NodeType string
 
 const (
-	Mongos     NodeType = "merizos"
+	Merizos     NodeType = "merizos"
 	Standalone          = "standalone"
 	ReplSet             = "replset"
 	Unknown             = "unknown"
@@ -108,7 +108,7 @@ func (sp *SessionProvider) GetNodeType() (NodeType, error) {
 	} else if masterDoc.Msg == "isdbgrid" {
 		// isdbgrid is always the msg value when calling isMaster on a merizos
 		// see http://docs.merizodb.org/manual/core/sharded-cluster-query-router/
-		return Mongos, nil
+		return Merizos, nil
 	}
 	return Standalone, nil
 }
@@ -123,13 +123,13 @@ func (sp *SessionProvider) IsReplicaSet() (bool, error) {
 	return nodeType == ReplSet, nil
 }
 
-// IsMongos returns true if the connected server is a merizos.
-func (sp *SessionProvider) IsMongos() (bool, error) {
+// IsMerizos returns true if the connected server is a merizos.
+func (sp *SessionProvider) IsMerizos() (bool, error) {
 	nodeType, err := sp.GetNodeType()
 	if err != nil {
 		return false, err
 	}
-	return nodeType == Mongos, nil
+	return nodeType == Merizos, nil
 }
 
 // SupportsCollectionUUID returns true if the connected server identifies

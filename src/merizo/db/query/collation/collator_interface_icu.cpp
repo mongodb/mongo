@@ -69,7 +69,7 @@ int CollatorInterfaceICU::compare(StringData left, StringData right) const {
             return -1;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(

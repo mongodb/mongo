@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -53,17 +53,17 @@ namespace mozjs {
 // These are all executed on some object that owns a js thread, rather than a
 // jsthread itself, so CONSTRAINED_METHOD doesn't do the job here.
 const JSFunctionSpec JSThreadInfo::threadMethods[6] = {
-    MONGO_ATTACH_JS_FUNCTION(init),
-    MONGO_ATTACH_JS_FUNCTION(start),
-    MONGO_ATTACH_JS_FUNCTION(join),
-    MONGO_ATTACH_JS_FUNCTION(hasFailed),
-    MONGO_ATTACH_JS_FUNCTION(returnData),
+    MERIZO_ATTACH_JS_FUNCTION(init),
+    MERIZO_ATTACH_JS_FUNCTION(start),
+    MERIZO_ATTACH_JS_FUNCTION(join),
+    MERIZO_ATTACH_JS_FUNCTION(hasFailed),
+    MERIZO_ATTACH_JS_FUNCTION(returnData),
     JS_FS_END,
 };
 
 const JSFunctionSpec JSThreadInfo::freeFunctions[3] = {
-    MONGO_ATTACH_JS_FUNCTION(_threadInject),
-    MONGO_ATTACH_JS_FUNCTION(_scopedThreadInject),
+    MERIZO_ATTACH_JS_FUNCTION(_threadInject),
+    MERIZO_ATTACH_JS_FUNCTION(_scopedThreadInject),
     JS_FS_END,
 };
 

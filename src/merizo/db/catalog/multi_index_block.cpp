@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
 #include "merizo/platform/basic.h"
 
@@ -61,11 +61,11 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
-MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
-MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
-MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
-MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
+MERIZO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
+MERIZO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
+MERIZO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
+MERIZO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
 
 MultiIndexBlock::~MultiIndexBlock() {
     invariant(_buildIsCleanedUp);
@@ -344,11 +344,11 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 }
 
 void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& doc) {
-    MONGO_FAIL_POINT_BLOCK(*fp, data) {
+    MERIZO_FAIL_POINT_BLOCK(*fp, data) {
         int i = doc.getIntField("i");
         if (data.getData()["i"].numberInt() == i) {
             log() << "Hanging " << where << " index build of i=" << i;
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET((*fp));
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET((*fp));
         }
     }
 }
@@ -409,7 +409,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     int retries = 0;  // non-zero when retrying our last document.
     while (retries ||
            (PlanExecutor::ADVANCED == (state = exec->getNextSnapshotted(&objToIndex, &loc))) ||
-           MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
+           MERIZO_FAIL_POINT(hangAfterStartingIndexBuild)) {
         try {
             auto interruptStatus = opCtx->checkForInterruptNoAssert();
             if (!interruptStatus.isOK())
@@ -480,7 +480,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
         return exec->getMemberObjectStatus(objToIndex.value());
     }
 
-    if (MONGO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
+    if (MERIZO_FAIL_POINT(leaveIndexBuildUnfinishedForShutdown)) {
         log() << "Index build interrupted due to 'leaveIndexBuildUnfinishedForShutdown' failpoint. "
                  "Mimicing shutdown error code.";
         return Status(
@@ -488,14 +488,14 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
             "background index build interrupted due to failpoint. returning a shutdown error.");
     }
 
-    if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
+    if (MERIZO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
         // Unlock before hanging so replication recognizes we've completed.
         Locker::LockSnapshot lockInfo;
         invariant(opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
 
         log() << "Hanging index build with no locks due to "
                  "'hangAfterStartingIndexBuildUnlocked' failpoint";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterStartingIndexBuildUnlocked);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterStartingIndexBuildUnlocked);
 
         if (isBackgroundBuilding()) {
             opCtx->lockState()->restoreLockState(opCtx, lockInfo);
@@ -793,7 +793,7 @@ std::ostream& operator<<(std::ostream& os, const MultiIndexBlock::State& state) 
         case MultiIndexBlock::State::kAborted:
             return os << "Aborted";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& out,

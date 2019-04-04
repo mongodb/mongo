@@ -10,7 +10,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     "use strict";
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticMerizod = MerizoRunner.runMerizod({});  // For startParallelOps.
 
     var st = new ShardingTest({shards: 3});
 
@@ -51,7 +51,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     pauseMigrateAtStep(shard1, migrateStepNames.deletedPriorDataInRange);
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+        staticMerizod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.deletedPriorDataInRange);
 
     // Abort migration on donor side, recipient is unaware.
@@ -76,7 +76,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Start coll2 migration to shard2, pause recipient after delete step.
     pauseMigrateAtStep(shard2, migrateStepNames.deletedPriorDataInRange);
     joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
+        staticMerizod, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
     waitForMigrateStep(shard2, migrateStepNames.deletedPriorDataInRange);
 
     jsTest.log('Releasing coll1 migration recipient, whose clone command should fail....');
@@ -104,5 +104,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, shard2Coll2.find().itcount(), "shard2 failed to complete migration.");
 
     st.stop();
-    MongoRunner.stopMongod(staticMongod);
+    MerizoRunner.stopMerizod(staticMerizod);
 })();

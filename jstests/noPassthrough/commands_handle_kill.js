@@ -1,9 +1,9 @@
 // Tests that commands properly handle their underlying plan executor failing or being killed.
 (function() {
     'use strict';
-    const dbpath = MongoRunner.dataPath + jsTest.name();
+    const dbpath = MerizoRunner.dataPath + jsTest.name();
     resetDbpath(dbpath);
-    const merizod = MongoRunner.runMongod({dbpath: dbpath});
+    const merizod = MerizoRunner.runMerizod({dbpath: dbpath});
     const db = merizod.getDB("test");
     const collName = jsTest.name();
     const coll = db.getCollection(collName);
@@ -219,5 +219,5 @@ if (${ canYield }) {
     assertCommandPropogatesPlanExecutorKillReason(
         {delete: coll.getName(), deletes: [{q: {a: {$gte: 0}}, limit: 0}]},
         {curOpFilter: {op: 'remove'}, usesIndex: true});
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

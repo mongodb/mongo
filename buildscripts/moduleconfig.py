@@ -109,19 +109,19 @@ def configure_modules(modules, conf):
 
     The modules were created by discover_modules.
 
-    The configure() function should prepare the Mongo build system for building the module.
+    The configure() function should prepare the Merizo build system for building the module.
     """
     env = conf.env
-    env['MONGO_MODULES'] = []
+    env['MERIZO_MODULES'] = []
     for module in modules:
         name = module.name
         print("configuring module: %s" % (name))
         modules_configured = module.configure(conf, env)
         if modules_configured:
             for module_name in modules_configured:
-                env['MONGO_MODULES'].append(module_name)
+                env['MERIZO_MODULES'].append(module_name)
         else:
-            env['MONGO_MODULES'].append(name)
+            env['MERIZO_MODULES'].append(name)
 
 
 def get_module_sconscripts(modules):

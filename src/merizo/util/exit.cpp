@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl;
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl;
 
 #include "merizo/platform/basic.h"
 
@@ -66,7 +66,7 @@ void runTasks(decltype(shutdownTasks) tasks, const ShutdownTaskArgs& shutdownArg
 // The logAndQuickExit_inlock() function should be called while holding the 'shutdownMutex' to
 // prevent multiple threads from attempting to log that they are exiting. The quickExit() function
 // has its own 'quickExitMutex' to prohibit multiple threads from attempting to call _exit().
-MONGO_COMPILER_NORETURN void logAndQuickExit_inlock() {
+MERIZO_COMPILER_NORETURN void logAndQuickExit_inlock() {
     ExitCode code = shutdownExitCode.get();
     log() << "shutting down with code:" << code;
     quickExit(code);

@@ -10,7 +10,7 @@ var nodeCount = replTest.nodes.length;
 var primary = replTest.getPrimary();
 
 // Setup the database using replSet connection before setting the authentication
-var conn = new Mongo(replTest.getURL());
+var conn = new Merizo(replTest.getURL());
 var testDB = conn.getDB('test');
 var adminDB = conn.getDB('admin');
 var testColl = testDB.user;

@@ -38,7 +38,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(sleepBeforeCommit);
+MERIZO_FAIL_POINT_DEFINE(sleepBeforeCommit);
 
 WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx)
     : _opCtx(opCtx), _toplevel(opCtx->_ruState == RecoveryUnitState::kNotInUnitOfWork) {
@@ -102,7 +102,7 @@ void WriteUnitOfWork::commit() {
     invariant(!_released);
     invariant(_opCtx->_ruState == RecoveryUnitState::kActiveUnitOfWork);
     if (_toplevel) {
-        if (MONGO_FAIL_POINT(sleepBeforeCommit)) {
+        if (MERIZO_FAIL_POINT(sleepBeforeCommit)) {
             sleepFor(Milliseconds(100));
         }
 
@@ -122,7 +122,7 @@ std::ostream& operator<<(std::ostream& os, WriteUnitOfWork::RecoveryUnitState st
         case WriteUnitOfWork::kFailedUnitOfWork:
             return os << "FailedUnitOfWork";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 }  // namespace merizo

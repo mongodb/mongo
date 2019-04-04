@@ -41,7 +41,7 @@ namespace merizo {
 class BSONObjBuilder;
 class ConnectionString;
 class ReplicaSetMonitor;
-class MongoURI;
+class MerizoURI;
 
 /**
  * Manages the lifetime of a set of replica set monitors.
@@ -60,7 +60,7 @@ public:
      */
     std::shared_ptr<ReplicaSetMonitor> getMonitor(StringData setName);
     std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr);
-    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const MongoURI& uri);
+    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const MerizoURI& uri);
 
     /**
      * Retrieves the names of all sets tracked by this manager.

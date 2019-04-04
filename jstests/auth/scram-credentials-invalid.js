@@ -38,7 +38,7 @@
         assert.eq(error, "Error: credential document SCRAM-SHA-1 failed validation");
     }
 
-    const merizod = MongoRunner.runMongod({auth: "", useLogFiles: true});
+    const merizod = MerizoRunner.runMerizod({auth: "", useLogFiles: true});
     runTest(merizod);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

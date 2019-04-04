@@ -274,7 +274,7 @@ ClusterClientCursorGuard convertPipelineToRouterStages(
             // We previously checked that everything was a $mergeCursors, $skip, or $limit. We
             // already popped off the $mergeCursors, so everything else should be a $skip or a
             // $limit.
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
     }
     // We are executing the pipeline without using an actual Pipeline, so we need to strip out any

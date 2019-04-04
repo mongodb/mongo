@@ -9,7 +9,7 @@ function runTest(conn) {
     conn.getDB('admin').createUser(
         {user: 'userAdmin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
 
-    var userAdminConn = new Mongo(conn.host);
+    var userAdminConn = new Merizo(conn.host);
     userAdminConn.getDB('admin').auth('userAdmin', 'pwd');
     var testUserAdmin = userAdminConn.getDB('test');
     var adminUserAdmin = userAdminConn.getDB('admin');
@@ -295,9 +295,9 @@ function runTest(conn) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = MerizoRunner.runMerizod({auth: ''});
 runTest(conn);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 jsTest.log('Test sharding');
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

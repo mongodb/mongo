@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/bson/bsonelement.h"
 
@@ -394,7 +394,7 @@ int BSONElement::compareElements(const BSONElement& l,
                 case NumberDecimal:
                     return compareIntToDecimal(l._numberInt(), r._numberDecimal());
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 
@@ -409,7 +409,7 @@ int BSONElement::compareElements(const BSONElement& l,
                 case NumberDecimal:
                     return compareLongToDecimal(l._numberLong(), r._numberDecimal());
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 
@@ -424,7 +424,7 @@ int BSONElement::compareElements(const BSONElement& l,
                 case NumberDecimal:
                     return compareDoubleToDecimal(l._numberDouble(), r._numberDecimal());
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 
@@ -439,7 +439,7 @@ int BSONElement::compareElements(const BSONElement& l,
                 case NumberDouble:
                     return compareDecimalToDouble(l._numberDecimal(), r._numberDouble());
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
         }
 
@@ -499,7 +499,7 @@ int BSONElement::compareElements(const BSONElement& l,
         }
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 /** transform a BSON array into a vector of BSONElements.
@@ -570,7 +570,7 @@ bool BSONElement::binaryEqualValues(const BSONElement& rhs) const {
 }
 
 BSONObj BSONElement::embeddedObjectUserCheck() const {
-    if (MONGO_likely(isABSONObj()))
+    if (MERIZO_likely(isABSONObj()))
         return BSONObj(value(), BSONObj::LargeSizeTrait{});
     std::stringstream ss;
     ss << "invalid parameter: expected an object (" << fieldName() << ")";
@@ -630,7 +630,7 @@ int BSONElement::computeSize() const {
         uint8_t style : 2;
         uint8_t bytes : 6;  // Includes type byte. Excludes field name and variable lengths.
     };
-    MONGO_STATIC_ASSERT(sizeof(SizeInfo) == 1);
+    MERIZO_STATIC_ASSERT(sizeof(SizeInfo) == 1);
 
     // This table should take 20 bytes. Align to next power of 2 to avoid splitting across cache
     // lines unnecessarily.
@@ -656,15 +656,15 @@ int BSONElement::computeSize() const {
         {SizeStyle::kFixed, 9},          // Long
         {SizeStyle::kFixed, 17},         // Decimal
     };
-    MONGO_STATIC_ASSERT((sizeof(kSizeInfoTable) / sizeof(kSizeInfoTable[0])) == JSTypeMax + 1);
+    MERIZO_STATIC_ASSERT((sizeof(kSizeInfoTable) / sizeof(kSizeInfoTable[0])) == JSTypeMax + 1);
 
     // This is the start of the runtime code for this function. Everything above happens at compile
     // time. This function attempts to push complex handling of unlikely events out-of-line to
     // ensure that the common cases never need to spill any registers (at least on x64 with
     // gcc-5.4), which reduces the function call overhead.
     int8_t type = *data;
-    if (MONGO_unlikely(type < 0 || type > JSTypeMax)) {
-        if (MONGO_unlikely(type != MinKey && type != MaxKey)) {
+    if (MERIZO_unlikely(type < 0 || type > JSTypeMax)) {
+        if (MERIZO_unlikely(type != MinKey && type != MaxKey)) {
             msgAssertedBadType(type);
         }
 
@@ -675,7 +675,7 @@ int BSONElement::computeSize() const {
     const auto sizeInfo = kSizeInfoTable[type];
     if (sizeInfo.style == SizeStyle::kFixed)
         return sizeInfo.bytes + fieldNameSize();
-    if (MONGO_likely(sizeInfo.style == SizeStyle::kIntPlusFixed))
+    if (MERIZO_likely(sizeInfo.style == SizeStyle::kIntPlusFixed))
         return sizeInfo.bytes + fieldNameSize() + valuestrsize();
 
     return [this, type]() NOINLINE_DECL {

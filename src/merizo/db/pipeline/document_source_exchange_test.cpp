@@ -46,10 +46,10 @@
 namespace merizo {
 
 /**
- * An implementation of the MongoProcessInterface that is okay with changing the OperationContext,
+ * An implementation of the MerizoProcessInterface that is okay with changing the OperationContext,
  * but has no other parts of the interface implemented.
  */
-class StubMongoProcessOkWithOpCtxChanges : public StubMongoProcessInterface {
+class StubMerizoProcessOkWithOpCtxChanges : public StubMerizoProcessInterface {
 public:
     void setOperationContext(OperationContext* opCtx) final {
         return;
@@ -60,7 +60,7 @@ class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:
     std::unique_ptr<executor::TaskExecutor> _executor;
     virtual void setUp() override {
-        getExpCtx()->merizoProcessInterface = std::make_shared<StubMongoProcessOkWithOpCtxChanges>();
+        getExpCtx()->merizoProcessInterface = std::make_shared<StubMerizoProcessOkWithOpCtxChanges>();
 
         auto net = executor::makeNetworkInterface("ExchangeTest");
 

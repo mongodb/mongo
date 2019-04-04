@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -164,7 +164,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor,
             stdx::unique_lock<stdx::mutex> lock(_mtx);
             while (!_positionChanged && !_shutdownSignaled) {
                 {
-                    MONGO_IDLE_THREAD_BLOCK;
+                    MERIZO_IDLE_THREAD_BLOCK;
                     if (_cond.wait_for(lock, keepAliveInterval.toSystemDuration()) !=
                         stdx::cv_status::timeout) {
                         continue;

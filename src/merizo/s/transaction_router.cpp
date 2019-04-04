@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -57,11 +57,11 @@ namespace {
 
 // TODO (SERVER-37886): Remove this failpoint once failover can be tested on coordinators that
 // have a local participant.
-MONGO_FAIL_POINT_DEFINE(sendCoordinateCommitToConfigServer);
+MERIZO_FAIL_POINT_DEFINE(sendCoordinateCommitToConfigServer);
 
 // TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
 // on stale version and snapshot errors.
-MONGO_FAIL_POINT_DEFINE(enableStaleVersionAndSnapshotRetriesWithinTransactions);
+MERIZO_FAIL_POINT_DEFINE(enableStaleVersionAndSnapshotRetriesWithinTransactions);
 
 const char kCoordinatorField[] = "coordinator";
 const char kReadConcernLevelSnapshotName[] = "snapshot";
@@ -438,7 +438,7 @@ void TransactionRouter::_clearPendingParticipants(OperationContext* opCtx) {
 }
 
 bool TransactionRouter::canContinueOnStaleShardOrDbError(StringData cmdName) const {
-    if (MONGO_FAIL_POINT(enableStaleVersionAndSnapshotRetriesWithinTransactions)) {
+    if (MERIZO_FAIL_POINT(enableStaleVersionAndSnapshotRetriesWithinTransactions)) {
         // We can always retry on the first overall statement because all targeted participants must
         // be pending, so the retry will restart the local transaction on each one, overwriting any
         // effects from the first attempt.
@@ -488,7 +488,7 @@ void TransactionRouter::onViewResolutionError(OperationContext* opCtx, const Nam
 }
 
 bool TransactionRouter::canContinueOnSnapshotError() const {
-    if (MONGO_FAIL_POINT(enableStaleVersionAndSnapshotRetriesWithinTransactions)) {
+    if (MERIZO_FAIL_POINT(enableStaleVersionAndSnapshotRetriesWithinTransactions)) {
         return _atClusterTime && _atClusterTime->canChange(_latestStmtId);
     }
 
@@ -712,7 +712,7 @@ BSONObj TransactionRouter::_commitMultiShardTransaction(OperationContext* opCtx)
     auto coordinatorShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, *_coordinatorId));
 
-    if (MONGO_FAIL_POINT(sendCoordinateCommitToConfigServer)) {
+    if (MERIZO_FAIL_POINT(sendCoordinateCommitToConfigServer)) {
         LOG(3) << "Sending coordinateCommit for transaction " << *opCtx->getTxnNumber()
                << " on session " << opCtx->getLogicalSessionId()->toBSON()
                << " to config server rather than actual coordinator because failpoint is active";

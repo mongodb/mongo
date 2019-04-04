@@ -15,12 +15,12 @@
     load("jstests/libs/write_concern_util.js");
     load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
-    // Waits for the given log to appear a number of times in the shell's rawMongoProgramOutput.
+    // Waits for the given log to appear a number of times in the shell's rawMerizoProgramOutput.
     // Loops because it is not guaranteed the program output will immediately contain all lines
     // logged at an earlier wall clock time.
     function waitForLog(logLine, times) {
         assert.soon(function() {
-            const matches = rawMongoProgramOutput().match(new RegExp(logLine, "g")) || [];
+            const matches = rawMerizoProgramOutput().match(new RegExp(logLine, "g")) || [];
             return matches.length === times;
         }, 'Failed to find "' + logLine + '" logged ' + times + ' times');
     }
@@ -313,7 +313,7 @@
                 assert(false, `Unknown transaction type: ${type}`);
             }
 
-            clearRawMongoProgramOutput();
+            clearRawMerizoProgramOutput();
 
             failureMode.cleanUp();
         }

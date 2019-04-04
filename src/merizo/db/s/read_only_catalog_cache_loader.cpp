@@ -37,11 +37,11 @@ using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunk
 
 void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 void ReadOnlyCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 std::shared_ptr<Notification<void>> ReadOnlyCatalogCacheLoader::getChunksSince(

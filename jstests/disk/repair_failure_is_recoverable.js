@@ -16,17 +16,17 @@
     const dbName = "repair_failure_is_recoverable";
     const collName = "test";
 
-    const dbpath = MongoRunner.dataPath + baseName + "/";
+    const dbpath = MerizoRunner.dataPath + baseName + "/";
     resetDbpath(dbpath);
 
-    let merizod = MongoRunner.runMongod({dbpath: dbpath});
+    let merizod = MerizoRunner.runMerizod({dbpath: dbpath});
     const port = merizod.port;
 
     let testColl = merizod.getDB(dbName)[collName];
 
     assert.commandWorked(testColl.insert({_id: 0, foo: "bar"}));
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     /**
      * Test 1. Cause an exit before repairing data. MerizoDB should not be able to restart without

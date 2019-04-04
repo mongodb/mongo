@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -49,7 +49,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
+MERIZO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 
 Status _dropView(OperationContext* opCtx,
                  std::unique_ptr<AutoGetDb>& autoDb,
@@ -69,10 +69,10 @@ Status _dropView(OperationContext* opCtx,
     Lock::CollectionLock systemViewsLock(opCtx->lockState(), db->getSystemViewsName(), MODE_X);
     Lock::CollectionLock collLock(opCtx->lockState(), collectionName.ns(), MODE_IX);
 
-    if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
+    if (MERIZO_FAIL_POINT(hangDuringDropCollection)) {
         log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "
                  "disabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringDropCollection);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringDropCollection);
     }
 
     AutoStatsTracker statsTracker(opCtx,
@@ -105,10 +105,10 @@ Status _dropCollection(OperationContext* opCtx,
                        const repl::OpTime& dropOpTime,
                        DropCollectionSystemCollectionMode systemCollectionMode,
                        BSONObjBuilder& result) {
-    if (MONGO_FAIL_POINT(hangDuringDropCollection)) {
+    if (MERIZO_FAIL_POINT(hangDuringDropCollection)) {
         log() << "hangDuringDropCollection fail point enabled. Blocking until fail point is "
                  "disabled.";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringDropCollection);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringDropCollection);
     }
 
     AutoStatsTracker statsTracker(opCtx,

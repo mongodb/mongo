@@ -43,7 +43,7 @@ namespace {
 // Make sure that getGlobalInitializer() is called at least once before main(), and so at least
 // once in a single-threaded context.  Otherwise, static initialization inside
 // getGlobalInitializer() won't be thread-safe.
-MONGO_COMPILER_VARIABLE_UNUSED const Initializer* const _theGlobalInitializer =
+MERIZO_COMPILER_VARIABLE_UNUSED const Initializer* const _theGlobalInitializer =
     &getGlobalInitializer();
 
 }  // namespace

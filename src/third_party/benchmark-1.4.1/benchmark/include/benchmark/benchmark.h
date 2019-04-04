@@ -1008,7 +1008,7 @@ class Fixture : public internal::Benchmark {
     this->TearDown(st);
   }
 
-  // MONGODB MODIFICATION: Remove the deprecated version of SetUp() and TearDown() that
+  // MERIZODB MODIFICATION: Remove the deprecated version of SetUp() and TearDown() that
   // require `const State&` as an argument.
   virtual void SetUp(State&) {}
   virtual void TearDown(State&) {}
@@ -1026,7 +1026,7 @@ class Fixture : public internal::Benchmark {
 // every time it is expanded. X + 1 == X + 0 is used in case X is defined to be
 // empty. If X is empty the expression becomes (+1 == +0).
 //
-// MONGODB MODIFICATION: all of our supported compilers support __COUNTER__ so we don't need to test
+// MERIZODB MODIFICATION: all of our supported compilers support __COUNTER__ so we don't need to test
 // for it here.  This test interferes with -E -fdirectives-only since it is illegal to use
 // __COUNTER__ in an #if clause with that flag because its value could change between the partial
 // preprocessing and the compile phases.

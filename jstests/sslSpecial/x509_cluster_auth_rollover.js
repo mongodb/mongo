@@ -76,9 +76,9 @@
                 '--sslPEMKeyFile',
                 newConfig['sslPEMKeyFile'],
                 '--authenticationDatabase=$external',
-                '--authenticationMechanism=MONGODB-X509'
+                '--authenticationMechanism=MERIZODB-X509'
             ];
-            assert.eq(_runMongoProgram.apply(null, shellArgs), 0);
+            assert.eq(_runMerizoProgram.apply(null, shellArgs), 0);
 
             return true;
         });

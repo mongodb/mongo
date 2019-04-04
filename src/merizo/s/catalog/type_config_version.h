@@ -52,7 +52,7 @@ public:
     // Field names and types in the version collection type.
     static const BSONField<int> minCompatibleVersion;
     static const BSONField<int> currentVersion;
-    static const BSONField<BSONArray> excludingMongoVersions;
+    static const BSONField<BSONArray> excludingMerizoVersions;
     static const BSONField<OID> clusterId;
     static const BSONField<OID> upgradeId;
     static const BSONField<BSONObj> upgradeState;
@@ -107,16 +107,16 @@ public:
     }
     void setClusterId(const OID& clusterId);
 
-    const std::vector<MongoVersionRange> getExcludingMongoVersions() const {
-        if (!isExcludingMongoVersionsSet()) {
-            return std::vector<MongoVersionRange>();
+    const std::vector<MerizoVersionRange> getExcludingMerizoVersions() const {
+        if (!isExcludingMerizoVersionsSet()) {
+            return std::vector<MerizoVersionRange>();
         }
-        return _excludingMongoVersions.get();
+        return _excludingMerizoVersions.get();
     }
-    bool isExcludingMongoVersionsSet() const {
-        return _excludingMongoVersions.is_initialized();
+    bool isExcludingMerizoVersionsSet() const {
+        return _excludingMerizoVersions.is_initialized();
     }
-    void setExcludingMongoVersions(const std::vector<MongoVersionRange>& excludingMongoVersions);
+    void setExcludingMerizoVersions(const std::vector<MerizoVersionRange>& excludingMerizoVersions);
 
     const OID& getUpgradeId() const {
         return _upgradeId.get();
@@ -144,7 +144,7 @@ private:
     // (S) clusterId -- required if current version > UpgradeHistory::UpgradeHistory_NoEpochVersion
     boost::optional<OID> _clusterId;
     // (O) range of disallowed versions to upgrade to
-    boost::optional<std::vector<MongoVersionRange>> _excludingMongoVersions;
+    boost::optional<std::vector<MerizoVersionRange>> _excludingMerizoVersions;
     // (O) upgrade id of current or last upgrade
     boost::optional<OID> _upgradeId;
     // (O)  upgrade state of current or last upgrade

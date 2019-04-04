@@ -47,10 +47,10 @@ namespace {
 
 static const StringData kConstraintNsPrefix = "local.system.indexBuildConstraints"_sd;
 
-class DuplicateKeyTrackerTest : public ServiceContextMongoDTest {
+class DuplicateKeyTrackerTest : public ServiceContextMerizoDTest {
 public:
     DuplicateKeyTrackerTest()
-        : ServiceContextMongoDTest("ephemeralForTest"), _opCtx(cc().makeOperationContext()) {
+        : ServiceContextMerizoDTest("ephemeralForTest"), _opCtx(cc().makeOperationContext()) {
         repl::ReplicationCoordinator::set(
             getServiceContext(),
             stdx::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));

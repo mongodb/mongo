@@ -10,7 +10,7 @@ var Topology = {
 };
 
 var DiscoverTopology = (function() {
-    const kDefaultConnectFn = (host) => new Mongo(host);
+    const kDefaultConnectFn = (host) => new Merizo(host);
 
     function getDataMemberConnectionStrings(conn) {
         const res = conn.adminCommand({isMaster: 1});
@@ -30,7 +30,7 @@ var DiscoverTopology = (function() {
         };
     }
 
-    function findConnectedNodesViaMongos(conn, options) {
+    function findConnectedNodesViaMerizos(conn, options) {
         function getConfigServerConnectionString() {
             const shardMap = conn.adminCommand({getShardMap: 1});
 
@@ -65,7 +65,7 @@ var DiscoverTopology = (function() {
 
         // Discover merizos URIs from the connection string. If a merizos is not passed in explicitly,
         // it will not be discovered.
-        const merizosUris = new MongoURI("merizodb://" + conn.host);
+        const merizosUris = new MerizoURI("merizodb://" + conn.host);
 
         const merizos = {
             type: Topology.kRouter,
@@ -83,7 +83,7 @@ var DiscoverTopology = (function() {
     /**
      * Returns an object describing the topology of the merizod processes reachable from 'conn'.
      * The "connectFn" property can be optionally specified to support custom retry logic when
-     * making connection attempts without overriding the Mongo constructor itself.
+     * making connection attempts without overriding the Merizo constructor itself.
      *
      * For a stand-alone merizod, an object of the form
      *   {type: Topology.kStandalone, merizod: <conn-string>}
@@ -117,13 +117,13 @@ var DiscoverTopology = (function() {
      * shard or a replica set shard.
      */
     function findConnectedNodes(conn, options = {connectFn: kDefaultConnectFn}) {
-        const isMongod = conn.adminCommand({isMaster: 1}).msg !== 'isdbgrid';
+        const isMerizod = conn.adminCommand({isMaster: 1}).msg !== 'isdbgrid';
 
-        if (isMongod) {
+        if (isMerizod) {
             return getDataMemberConnectionStrings(conn);
         }
 
-        return findConnectedNodesViaMongos(conn, options);
+        return findConnectedNodesViaMerizos(conn, options);
     }
 
     function addNonConfigNodesToList(topology, hostList) {

@@ -950,7 +950,7 @@ std::string toString(IndexBoundsChecker::Location location) {
         case IndexBoundsChecker::AHEAD:
             return "AHEAD";
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 /**

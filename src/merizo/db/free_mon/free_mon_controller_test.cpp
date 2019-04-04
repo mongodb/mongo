@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -376,7 +376,7 @@ private:
     CountdownLatchResult<BSONArray> _countdownMetrics;
 };
 
-class FreeMonControllerTest : public ServiceContextMongoDTest {
+class FreeMonControllerTest : public ServiceContextMerizoDTest {
 
 protected:
     void setUp() override;
@@ -397,7 +397,7 @@ protected:
 };
 
 void FreeMonControllerTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
     auto service = getServiceContext();
 
     repl::ReplicationCoordinator::set(service,
@@ -437,7 +437,7 @@ void FreeMonControllerTest::setUp() {
 
 void FreeMonControllerTest::tearDown() {
     _opCtx = {};
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 repl::ReplicationCoordinatorMock* FreeMonControllerTest::_getReplCoord() const {

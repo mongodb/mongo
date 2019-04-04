@@ -88,7 +88,7 @@ type saslStepper interface {
 	Close()
 }
 
-func (socket *MongoSocket) getNonce() (nonce string, err error) {
+func (socket *MerizoSocket) getNonce() (nonce string, err error) {
 	socket.Lock()
 	for socket.cachedNonce == "" && socket.dead == nil {
 		debugf("Socket %p to %s: waiting for nonce", socket, socket.addr)
@@ -108,7 +108,7 @@ func (socket *MongoSocket) getNonce() (nonce string, err error) {
 	return
 }
 
-func (socket *MongoSocket) resetNonce() {
+func (socket *MerizoSocket) resetNonce() {
 	debugf("Socket %p to %s: requesting a new nonce", socket, socket.addr)
 	op := &QueryOp{}
 	op.Query = &getNonceCmd{GetNonce: 1}
@@ -154,7 +154,7 @@ func (socket *MongoSocket) resetNonce() {
 	}
 }
 
-func (socket *MongoSocket) Login(cred Credential) error {
+func (socket *MerizoSocket) Login(cred Credential) error {
 	socket.Lock()
 	maxWire := socket.serverInfo.MaxWireVersion
 	socket.Unlock()
@@ -173,7 +173,7 @@ func (socket *MongoSocket) Login(cred Credential) error {
 		case maxWire >= 3:
 			cred.Mechanism = "SCRAM-SHA-1"
 		default:
-			cred.Mechanism = "MONGODB-CR"
+			cred.Mechanism = "MERIZODB-CR"
 		}
 	}
 
@@ -197,11 +197,11 @@ func (socket *MongoSocket) Login(cred Credential) error {
 
 	var err error
 	switch cred.Mechanism {
-	case "MONGODB-CR", "MONGO-CR": // Name changed to MONGODB-CR in SERVER-8501.
+	case "MERIZODB-CR", "MONGO-CR": // Name changed to MERIZODB-CR in SERVER-8501.
 		err = socket.loginClassic(cred)
 	case "PLAIN":
 		err = socket.loginPlain(cred)
-	case "MONGODB-X509":
+	case "MERIZODB-X509":
 		err = socket.loginX509(cred)
 	default:
 		// Try SASL for everything else, if it is available.
@@ -216,7 +216,7 @@ func (socket *MongoSocket) Login(cred Credential) error {
 	return err
 }
 
-func (socket *MongoSocket) negotiateDefaultMech(cred Credential) (string, error) {
+func (socket *MerizoSocket) negotiateDefaultMech(cred Credential) (string, error) {
 	user := cred.Source + "." + cred.Username
 	req := &saslMechNegotation{IsMaster: 1, SaslSupportedMechs: user}
 	res := saslMechResult{}
@@ -237,7 +237,7 @@ func (socket *MongoSocket) negotiateDefaultMech(cred Credential) (string, error)
 	return "SCRAM-SHA-1", nil
 }
 
-func (socket *MongoSocket) loginClassic(cred Credential) error {
+func (socket *MerizoSocket) loginClassic(cred Credential) error {
 	// Note that this only works properly because this function is
 	// synchronous, which means the nonce won't get reset while we're
 	// using it and any other login requests will block waiting for a
@@ -277,8 +277,8 @@ type authX509Cmd struct {
 	Mechanism    string
 }
 
-func (socket *MongoSocket) loginX509(cred Credential) error {
-	cmd := authX509Cmd{Authenticate: 1, User: cred.Username, Mechanism: "MONGODB-X509"}
+func (socket *MerizoSocket) loginX509(cred Credential) error {
+	cmd := authX509Cmd{Authenticate: 1, User: cred.Username, Mechanism: "MERIZODB-X509"}
 	res := authResult{}
 	return socket.loginRun(cred.Source, &cmd, &res, func() error {
 		if !res.Ok {
@@ -292,7 +292,7 @@ func (socket *MongoSocket) loginX509(cred Credential) error {
 	})
 }
 
-func (socket *MongoSocket) loginPlain(cred Credential) error {
+func (socket *MerizoSocket) loginPlain(cred Credential) error {
 	cmd := saslCmd{Start: 1, Mechanism: "PLAIN", Payload: []byte("\x00" + cred.Username + "\x00" + cred.Password)}
 	res := authResult{}
 	return socket.loginRun(cred.Source, &cmd, &res, func() error {
@@ -307,7 +307,7 @@ func (socket *MongoSocket) loginPlain(cred Credential) error {
 	})
 }
 
-func (socket *MongoSocket) loginSASL(cred Credential) error {
+func (socket *MerizoSocket) loginSASL(cred Credential) error {
 	var sasl saslStepper
 	var err error
 	// SCRAM is handled without external libraries.
@@ -420,7 +420,7 @@ func (s *saslScram) Step(serverData []byte) (clientData []byte, done bool, err e
 	return s.client.Out(), !more, s.client.Err()
 }
 
-func (socket *MongoSocket) loginRun(db string, query, result interface{}, f func() error) error {
+func (socket *MerizoSocket) loginRun(db string, query, result interface{}, f func() error) error {
 	var mutex sync.Mutex
 	var replyErr error
 	mutex.Lock()
@@ -455,7 +455,7 @@ func (socket *MongoSocket) loginRun(db string, query, result interface{}, f func
 	return replyErr
 }
 
-func (socket *MongoSocket) Logout(db string) {
+func (socket *MerizoSocket) Logout(db string) {
 	socket.Lock()
 	cred, found := socket.dropAuth(db)
 	if found {
@@ -465,7 +465,7 @@ func (socket *MongoSocket) Logout(db string) {
 	socket.Unlock()
 }
 
-func (socket *MongoSocket) LogoutAll() {
+func (socket *MerizoSocket) LogoutAll() {
 	socket.Lock()
 	if l := len(socket.creds); l > 0 {
 		debugf("Socket %p to %s: logout all (flagged %d)", socket, socket.addr, l)
@@ -475,7 +475,7 @@ func (socket *MongoSocket) LogoutAll() {
 	socket.Unlock()
 }
 
-func (socket *MongoSocket) flushLogout() (ops []interface{}) {
+func (socket *MerizoSocket) flushLogout() (ops []interface{}) {
 	socket.Lock()
 	if l := len(socket.logout); l > 0 {
 		debugf("Socket %p to %s: logout all (flushing %d)", socket, socket.addr, l)
@@ -492,7 +492,7 @@ func (socket *MongoSocket) flushLogout() (ops []interface{}) {
 	return
 }
 
-func (socket *MongoSocket) dropAuth(db string) (cred Credential, found bool) {
+func (socket *MerizoSocket) dropAuth(db string) (cred Credential, found bool) {
 	for i, sockCred := range socket.creds {
 		if sockCred.Source == db {
 			copy(socket.creds[i:], socket.creds[i+1:])
@@ -503,7 +503,7 @@ func (socket *MongoSocket) dropAuth(db string) (cred Credential, found bool) {
 	return cred, false
 }
 
-func (socket *MongoSocket) dropLogout(cred Credential) (found bool) {
+func (socket *MerizoSocket) dropLogout(cred Credential) (found bool) {
 	for i, sockCred := range socket.logout {
 		if sockCred == cred {
 			copy(socket.logout[i:], socket.logout[i+1:])

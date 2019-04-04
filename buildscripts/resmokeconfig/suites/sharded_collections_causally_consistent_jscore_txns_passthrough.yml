@@ -10,7 +10,7 @@ selector:
   # No featureCompatibilityVersion parameter on merizos.
   - jstests/core/txns/abort_transactions_on_FCV_downgrade.js
 
-  # Mongos doesn't upconvert from local or majority level readConcern to snapshot.
+  # Merizos doesn't upconvert from local or majority level readConcern to snapshot.
   - jstests/core/txns/upconvert_read_concern.js
 
   # Implicitly creates a database through a collection rename, which does not work in a sharded
@@ -27,7 +27,7 @@ selector:
   - jstests/core/txns/kill_op_on_txn_expiry.js
 
   # Writes to the local database are not allowed through merizos.
-  # TODO SERVER-28756: Mongos CSRS write retry logic drops txnNumbers.
+  # TODO SERVER-28756: Merizos CSRS write retry logic drops txnNumbers.
   - jstests/core/txns/banned_txn_dbs.js
 
   # Uses hangAfterCollectionInserts failpoint not available on merizos.

@@ -81,7 +81,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     }
 
     // Run tests on single node.
-    const standalone = MongoRunner.runMongod();
+    const standalone = MerizoRunner.runMerizod();
     const db = standalone.getDB("test");
 
     assert.commandWorked(db.adminCommand(
@@ -89,7 +89,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
     runTest(db.lookUp, db.from);
 
-    MongoRunner.stopMongod(standalone);
+    MerizoRunner.stopMerizod(standalone);
 
     // Run tests in a sharded environment.
     const sharded = new ShardingTest({

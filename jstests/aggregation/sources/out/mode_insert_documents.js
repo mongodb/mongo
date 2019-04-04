@@ -4,7 +4,7 @@
     "use strict";
 
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-    load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMongos.
+    load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.isMerizos.
 
     const coll = db.mode_insert_documents;
     coll.drop();
@@ -111,7 +111,7 @@
     coll.drop();
     assert.commandWorked(coll.insert({a: 1}));
 
-    if (!FixtureHelpers.isMongos(db)) {
+    if (!FixtureHelpers.isMerizos(db)) {
         //
         // Test that $out implicitly creates a new database when the output collection's database
         // doesn't exist.

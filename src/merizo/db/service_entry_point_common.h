@@ -39,16 +39,16 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DECLARE(rsStopGetMore);
-MONGO_FAIL_POINT_DECLARE(respondWithNotPrimaryInCommandDispatch);
+MERIZO_FAIL_POINT_DECLARE(rsStopGetMore);
+MERIZO_FAIL_POINT_DECLARE(respondWithNotPrimaryInCommandDispatch);
 
 // When active, we won't check if we are master in command dispatch. Activate this if you want to
 // test failing during command execution.
-MONGO_FAIL_POINT_DECLARE(skipCheckingForNotMasterInCommandDispatch);
+MERIZO_FAIL_POINT_DECLARE(skipCheckingForNotMasterInCommandDispatch);
 
 /**
  * Helpers for writing ServiceEntryPointImpl implementations from a reusable core.
- * Implementations are ServiceEntryPointMongo and ServiceEntryPointEmbedded, which share
+ * Implementations are ServiceEntryPointMerizo and ServiceEntryPointEmbedded, which share
  * most of their code, but vary in small details captured by the Hooks customization
  * interface.
  */
@@ -85,7 +85,7 @@ struct ServiceEntryPointCommon {
 
         virtual void advanceConfigOptimeFromRequestMetadata(OperationContext* opCtx) const = 0;
 
-        MONGO_WARN_UNUSED_RESULT_FUNCTION virtual std::unique_ptr<PolymorphicScoped>
+        MERIZO_WARN_UNUSED_RESULT_FUNCTION virtual std::unique_ptr<PolymorphicScoped>
         scopedOperationCompletionShardingActions(OperationContext* opCtx) const = 0;
 
         virtual void appendReplyMetadataOnError(OperationContext* opCtx,

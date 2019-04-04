@@ -2,7 +2,7 @@
 // address of the client attempting to authenticate.
 
 (function() {
-    const conn = MongoRunner.runMongod({auth: ""});
+    const conn = MerizoRunner.runMerizod({auth: ""});
     const admin = conn.getDB("admin");
 
     admin.createUser({
@@ -13,7 +13,7 @@
 
     assert(admin.auth("root", "root"));
 
-    const failConn = new Mongo(conn.host);
+    const failConn = new Merizo(conn.host);
     failConn.getDB("admin").auth("root", "toot");
 
     const log = assert.commandWorked(admin.runCommand({getLog: "global"})).log;
@@ -25,5 +25,5 @@
 
     assert(log.some((line) => successRegex.test(line)));
     assert(log.some((line) => failRegex.test(line)));
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

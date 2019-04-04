@@ -55,7 +55,7 @@ inline StringData taskNameToString(ServiceExecutorTaskName taskName) {
         case ServiceExecutorTaskName::kSSMStartSession:
             return kSSMStartSessionName;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 }  // namespace transport

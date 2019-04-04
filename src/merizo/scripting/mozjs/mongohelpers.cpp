@@ -46,10 +46,10 @@ extern const JSFile merizohelpers;
 
 namespace mozjs {
 
-const char* const MongoHelpersInfo::className = "MongoHelpers";
+const char* const MerizoHelpersInfo::className = "MerizoHelpers";
 
 namespace {
-const char kExportsObjectName[] = "exportToMongoHelpers";
+const char kExportsObjectName[] = "exportToMerizoHelpers";
 const char kReflectName[] = "Reflect";
 }  // namespace
 
@@ -58,18 +58,18 @@ std::string parseJSFunctionOrExpression(JSContext* cx, const StringData input) {
     JS::RootedValue jsStrIn(cx);
 
     ValueReader(cx, &jsStrIn).fromStringData(input);
-    ObjectWrapper helpersWrapper(cx, getScope(cx)->getProto<MongoHelpersInfo>().getProto());
+    ObjectWrapper helpersWrapper(cx, getScope(cx)->getProto<MerizoHelpersInfo>().getProto());
 
     helpersWrapper.callMethod("functionExpressionParser", JS::HandleValueArray(jsStrIn), &jsStrOut);
 
     return ValueWriter(cx, jsStrOut).toString();
 }
 
-void MongoHelpersInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
+void MerizoHelpersInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
     ObjectWrapper protoWrapper(cx, proto);
     ObjectWrapper globalWrapper(cx, global);
 
-    // Initialize the reflection API and move it under the MongoHelpers object
+    // Initialize the reflection API and move it under the MerizoHelpers object
     uassert(ErrorCodes::JSInterpreterFailure,
             "Error initializing javascript reflection API",
             JS_InitReflectParse(cx, global));

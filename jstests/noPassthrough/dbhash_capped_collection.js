@@ -25,7 +25,7 @@
     assert.eq([], res.capped);
 
     {
-        const session = db.getMongo().startSession();
+        const session = db.getMerizo().startSession();
 
         const hashesDefault = rst.getHashesUsingSessions([session], db.getName());
         const hashesFilterCapped =

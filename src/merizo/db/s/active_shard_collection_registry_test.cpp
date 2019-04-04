@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 #include "merizo/platform/basic.h"
 
 #include "merizo/bson/bsonmisc.h"
@@ -43,7 +43,7 @@ namespace {
 
 using unittest::assertGet;
 
-class ShardCollectionRegistrationTest : public ServiceContextMongoDTest {
+class ShardCollectionRegistrationTest : public ServiceContextMerizoDTest {
 protected:
     ActiveShardCollectionRegistry _registry;
 };

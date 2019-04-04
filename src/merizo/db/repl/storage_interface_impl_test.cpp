@@ -183,7 +183,7 @@ std::vector<InsertStatement> transformInserts(std::vector<TimestampedBSONObj> do
     return inserts;
 }
 
-class StorageInterfaceImplTest : public ServiceContextMongoDTest {
+class StorageInterfaceImplTest : public ServiceContextMerizoDTest {
 protected:
     OperationContext* getOperationContext() {
         return _opCtx.get();
@@ -199,7 +199,7 @@ protected:
 
 private:
     void setUp() override {
-        ServiceContextMongoDTest::setUp();
+        ServiceContextMerizoDTest::setUp();
         _createOpCtx();
         auto service = getServiceContext();
         auto replCoord = stdx::make_unique<ReplicationCoordinatorMock>(service);
@@ -211,7 +211,7 @@ private:
         _ddv.reset(nullptr);
         _uwb.reset(nullptr);
         _opCtx.reset(nullptr);
-        ServiceContextMongoDTest::tearDown();
+        ServiceContextMerizoDTest::tearDown();
     }
 
     void _createOpCtx() {

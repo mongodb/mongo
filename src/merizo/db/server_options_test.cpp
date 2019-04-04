@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
 #include "merizo/config.h"
 
-#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#if defined(MERIZO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 #ifndef _WIN32
@@ -68,7 +68,7 @@ using merizo::ErrorCodes;
 using merizo::Status;
 namespace moe = merizo::optionenvironment;
 
-MONGO_INITIALIZER(ServerLogRedirection)(merizo::InitializerContext*) {
+MERIZO_INITIALIZER(ServerLogRedirection)(merizo::InitializerContext*) {
     // ssl_options_server.cpp has an initializer which depends on logging.
     // We can stub that dependency out for unit testing purposes.
     return Status::OK();

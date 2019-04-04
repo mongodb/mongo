@@ -44,5 +44,5 @@ std::unique_ptr<merizo::KVDatabaseCatalogEntryMock> merizo::kvDatabaseCatalogEnt
 // Used to satisfy link dependencies in unit test - not invoked.
 merizo::IndexAccessMethod* merizo::KVDatabaseCatalogEntryMock::getIndex(
     OperationContext* opCtx, const CollectionCatalogEntry* collection, IndexCatalogEntry* index) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }

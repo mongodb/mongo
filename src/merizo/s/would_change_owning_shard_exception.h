@@ -38,7 +38,7 @@ namespace merizo {
 /**
  * This error is thrown when an update would cause a document to be owned by a different
  * shard. If the update is part of a multi statement transaction, we will attach the
- * pre image and the post image returned by the update stage. MongoS will use these to delete
+ * pre image and the post image returned by the update stage. MerizoS will use these to delete
  * the original doc and insert the new doc. If the update is a retryable write, we will attach
  * only the pre image.
  */

@@ -35,7 +35,7 @@
 
 #include "merizo/config.h"
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 
 #include "merizo/base/string_data.h"
 #include "merizo/bson/bsonobj.h"
@@ -48,11 +48,11 @@
 #include "merizo/util/time_support.h"
 
 // SChannel implementation
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #endif
-#endif  // #ifdef MONGO_CONFIG_SSL
+#endif  // #ifdef MERIZO_CONFIG_SSL
 
 namespace merizo {
 /*
@@ -71,17 +71,17 @@ Status validateOpensslCipherConfig(const std::string&);
 Status validateDisableNonTLSConnectionLogging(const bool&);
 }
 
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
 namespace merizo {
 struct SSLParams;
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 typedef SSL_CTX* SSLContextType;
 typedef SSL* SSLConnectionType;
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_WINDOWS
 typedef SCHANNEL_CRED* SSLContextType;
 typedef PCtxtHandle SSLConnectionType;
-#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
+#elif MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_APPLE
 typedef asio::ssl::apple::Context* SSLContextType;
 typedef SSLContextRef SSLConnectionType;
 #else
@@ -89,7 +89,7 @@ typedef SSLContextRef SSLConnectionType;
 #endif
 
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 /*
  * There are a number of OpenSSL types that we want to be able to use with unique_ptr that have a
  * custom OpenSSL deleter function. This template implements a stateless deleter for types with
@@ -152,7 +152,7 @@ public:
     std::string longDescription;   // A long form description of the entity associated with the OID
 };
 const ASN1OID merizodbRolesOID("1.3.6.1.4.1.34601.2.1.1",
-                              "MongoRoles",
+                              "MerizoRoles",
                               "Sequence of MerizoDB Database Roles");
 
 /**
@@ -312,4 +312,4 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging);
 
 
 }  // namespace merizo
-#endif  // #ifdef MONGO_CONFIG_SSL
+#endif  // #ifdef MERIZO_CONFIG_SSL

@@ -110,7 +110,7 @@ void saslMutexFree(void* mutex) {
  * Configures the SASL library to use allocator and mutex functions we specify,
  * unless the client application has previously initialized the SASL library.
  */
-MONGO_INITIALIZER(CyrusSaslAllocatorsAndMutexes)(InitializerContext*) {
+MERIZO_INITIALIZER(CyrusSaslAllocatorsAndMutexes)(InitializerContext*) {
     sasl_set_alloc(saslOurMalloc, saslOurCalloc, saslOurRealloc, free);
 
     sasl_set_mutex(saslMutexAlloc, saslMutexLock, saslMutexUnlock, saslMutexFree);
@@ -126,13 +126,13 @@ int saslClientLogSwallow(void* context, int priority, const char* message) throw
  * application has already done it.
  *
  * If a client wishes to override this initialization but keep the allocator and mutex
- * initialization, it should implement a MONGO_INITIALIZER_GENERAL with
+ * initialization, it should implement a MERIZO_INITIALIZER_GENERAL with
  * CyrusSaslAllocatorsAndMutexes as a prerequisite and CyrusSaslClientContext as a
- * dependent.  If it wishes to override both, it should implement a MONGO_INITIALIZER_GENERAL
+ * dependent.  If it wishes to override both, it should implement a MERIZO_INITIALIZER_GENERAL
  * with CyrusSaslAllocatorsAndMutexes and CyrusSaslClientContext as dependents, or
  * initialize the library before calling merizo::runGlobalInitializersOrDie().
  */
-MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
+MERIZO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
                                      ("NativeSaslClientContext", "CyrusSaslAllocatorsAndMutexes"))
 (InitializerContext* context) {
     static sasl_callback_t saslClientGlobalCallbacks[] = {
@@ -159,7 +159,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
  * Callback registered on the sasl_conn_t underlying a CyrusSaslClientSession to allow the Cyrus
  * SASL library to query for the authentication id and other simple string configuration parameters.
  *
- * Note that in Mongo, the authentication and authorization ids (authid and authzid) are always
+ * Note that in Merizo, the authentication and authorization ids (authid and authzid) are always
  * the same.  These correspond to SASL_CB_AUTHNAME and SASL_CB_USER.
  */
 int saslClientGetSimple(void* context, int id, const char** result, unsigned* resultLen) throw() {

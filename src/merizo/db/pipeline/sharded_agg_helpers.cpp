@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -45,7 +45,7 @@
 namespace merizo {
 namespace sharded_agg_helpers {
 
-MONGO_FAIL_POINT_DEFINE(clusterAggregateHangBeforeEstablishingShardCursors);
+MERIZO_FAIL_POINT_DEFINE(clusterAggregateHangBeforeEstablishingShardCursors);
 
 /**
  * Given a document representing an aggregation command such as
@@ -97,7 +97,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         cmdForShards[AggregationRequest::kRuntimeConstants] = Value(constants.get().toBSON());
     }
 
-    cmdForShards[AggregationRequest::kFromMongosName] = Value(true);
+    cmdForShards[AggregationRequest::kFromMerizosName] = Value(true);
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
     // explain command.
     if (auto explainVerbosity = request.getExplain()) {
@@ -229,7 +229,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     const bool needsPrimaryShardMerge =
         (pipeline->needsPrimaryShardMerger() || internalQueryAlwaysMergeOnPrimaryShard.load());
 
-    const bool needsMongosMerge = pipeline->needsMongosMerger();
+    const bool needsMerizosMerge = pipeline->needsMerizosMerger();
 
     const auto shardQuery = pipeline->getInitialQuery();
 
@@ -255,7 +255,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // - There is a stage that needs to be run on the primary shard and the single target shard
     //   is not the primary.
     // - The pipeline contains one or more stages which must always merge on merizoS.
-    const bool needsSplit = (shardIds.size() > 1u || needsMongosMerge ||
+    const bool needsSplit = (shardIds.size() > 1u || needsMerizosMerge ||
                              (needsPrimaryShardMerge && executionNsRoutingInfo &&
                               *(shardIds.begin()) != executionNsRoutingInfo->db().primaryId()));
 
@@ -265,7 +265,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     if (needsSplit) {
         LOG(5) << "Splitting pipeline: "
                << "targeting = " << shardIds.size()
-               << " shards, needsMongosMerge = " << needsMongosMerge
+               << " shards, needsMerizosMerge = " << needsMerizosMerge
                << ", needsPrimaryShardMerge = " << needsPrimaryShardMerge;
         splitPipeline = cluster_aggregation_planner::splitPipeline(std::move(pipeline));
 
@@ -424,10 +424,10 @@ std::vector<RemoteCursor> establishShardCursors(
                                   : cmdObj);
     }
 
-    if (MONGO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {
+    if (MERIZO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {
         log() << "clusterAggregateHangBeforeEstablishingShardCursors fail point enabled.  Blocking "
                  "until fail point is disabled.";
-        while (MONGO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {
+        while (MERIZO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {
             sleepsecs(1);
         }
     }

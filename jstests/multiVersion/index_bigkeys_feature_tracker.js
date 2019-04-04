@@ -60,13 +60,13 @@
         jsTestLog("Testing with parameters: " + tojson(output));
     }
 
-    const dbpath = MongoRunner.dataPath + "index_bigkeys_feature_tracker";
+    const dbpath = MerizoRunner.dataPath + "index_bigkeys_feature_tracker";
 
     function testInsertIndexKeyAndDowngradeStandalone(
         docToInsert, shouldFailOnStartup, createIndexFirst, backgroundIndexBuild, update) {
         logTestParameters(
             docToInsert, shouldFailOnStartup, createIndexFirst, backgroundIndexBuild, update);
-        const conn = MongoRunner.runMongod({binVersion: "latest", dbpath: dbpath});
+        const conn = MerizoRunner.runMerizod({binVersion: "latest", dbpath: dbpath});
 
         insertIndexKey(createIndexFirst,
                        conn.getDB("test"),
@@ -80,18 +80,18 @@
 
         // Index validation would fail because validation code assumes big index keys are not
         // indexed in FCV 4.0.
-        MongoRunner.stopMongod(conn, null, {skipValidation: true});
+        MerizoRunner.stopMerizod(conn, null, {skipValidation: true});
 
         if (shouldFailOnStartup) {
             //  4.0 binary should fail on start up due to the new feature tracker bit.
             assert.eq(
                 null,
-                MongoRunner.runMongod({binVersion: "4.0", noCleanData: true, dbpath: dbpath}));
+                MerizoRunner.runMerizod({binVersion: "4.0", noCleanData: true, dbpath: dbpath}));
         } else {
             const conn =
-                MongoRunner.runMongod({binVersion: "4.0", noCleanData: true, dbpath: dbpath});
+                MerizoRunner.runMerizod({binVersion: "4.0", noCleanData: true, dbpath: dbpath});
             assert.neq(null, conn);
-            MongoRunner.stopMongod(conn, null, {skipValidation: true});
+            MerizoRunner.stopMerizod(conn, null, {skipValidation: true});
         }
     }
 

@@ -5,7 +5,7 @@ Import("get_option")
 
 env = env.Clone()
 
-# These commands are linked both in MongoS and MongoD
+# These commands are linked both in MerizoS and MerizoD
 env.Library(
     target='shared_cluster_commands',
     source=[
@@ -18,7 +18,7 @@ env.Library(
     ]
 )
 
-# These commands are linked in MongoS only
+# These commands are linked in MerizoS only
 env.Library(
     target='cluster_commands',
     source=[

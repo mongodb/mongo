@@ -8,17 +8,17 @@ var st = new ShardingTest({shards: 2, merizos: 5, verbose: 1});
 // Balancer is by default stopped, thus it will not interfere
 
 // Use separate merizos for reading, updating, inserting, removing data
-var readMongos = st.s1;
-var updateMongos = st.s2;
-var insertMongos = st.s3;
-var removeMongos = st.s4;
+var readMerizos = st.s1;
+var updateMerizos = st.s2;
+var insertMerizos = st.s3;
+var removeMerizos = st.s4;
 
 var config = st.s.getDB("config");
 var admin = st.s.getDB("admin");
 var coll = st.s.getCollection("foo.bar");
 
 assert.commandWorked(
-    insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
+    insertMerizos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
 
 var shards = [st.shard0, st.shard1];
 
@@ -108,21 +108,21 @@ jsTest.log("Checking other merizoses for detection of change...");
 
 jsTest.log("Checking find...");
 // Ensure that finding an element works when resharding
-assert.neq(null, readMongos.getCollection(coll + "").findOne({_id: 1}));
+assert.neq(null, readMerizos.getCollection(coll + "").findOne({_id: 1}));
 
 jsTest.log("Checking update...");
 // Ensure that updating an element finds the right location
-assert.writeOK(updateMongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
+assert.writeOK(updateMerizos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
 assert.neq(null, coll.findOne({updated: true}));
 
 jsTest.log("Checking insert...");
 // Ensure that inserting an element finds the right shard
-assert.writeOK(insertMongos.getCollection(coll + "").insert({_id: 101}));
+assert.writeOK(insertMerizos.getCollection(coll + "").insert({_id: 101}));
 assert.neq(null, coll.findOne({_id: 101}));
 
 jsTest.log("Checking remove...");
 // Ensure that removing an element finds the right shard, verified by the merizos doing the sharding
-assert.writeOK(removeMongos.getCollection(coll + "").remove({_id: 2}));
+assert.writeOK(removeMerizos.getCollection(coll + "").remove({_id: 2}));
 assert.eq(null, coll.findOne({_id: 2}));
 
 coll.drop();

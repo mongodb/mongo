@@ -10,7 +10,7 @@
         let adminDB = conn.getDB("admin");
         let isMaster = adminDB.runCommand("ismaster");
         assert.commandWorked(isMaster);
-        const isMongos = (isMaster.msg === "isdbgrid");
+        const isMerizos = (isMaster.msg === "isdbgrid");
 
         // Create the admin user.
         assert.commandWorked(
@@ -49,7 +49,7 @@
         testDB.logout();
 
         // Test that "Mallory" cannot use a legacy find cursor created by "Alice".
-        testDB.getMongo().forceReadMode("legacy");
+        testDB.getMerizo().forceReadMode("legacy");
         assert.eq(1, testDB.auth("Alice", "pwd"));
         let cursor = testDB.foo.find().batchSize(2);
         cursor.next();
@@ -60,7 +60,7 @@
             cursor.next();
         }, [], "read from another user's legacy find cursor");
         testDB.logout();
-        testDB.getMongo().forceReadMode("commands");
+        testDB.getMerizo().forceReadMode("commands");
 
         // Test that "Mallory" cannot use an aggregation cursor created by "Alice".
         assert.eq(1, testDB.auth("Alice", "pwd"));
@@ -334,9 +334,9 @@
     }
 
     // Run the test on a standalone.
-    let conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+    let conn = MerizoRunner.runMerizod({auth: "", bind_ip: "127.0.0.1"});
     runTest(conn);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // Run the test on a sharded cluster.
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

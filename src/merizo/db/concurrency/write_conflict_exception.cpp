@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
 #include "merizo/db/concurrency/write_conflict_exception.h"
 #include "merizo/util/log.h"
@@ -36,7 +36,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
+MERIZO_FAIL_POINT_DEFINE(skipWriteConflictRetries);
 
 AtomicWord<bool> WriteConflictException::trace(false);
 

@@ -22,7 +22,7 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
         interface.ProcessTestCase.__init__(self, logger, test_kind, test_name)
 
         # Command line options override the YAML configuration.
-        self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
+        self.shell_executable = utils.default_if_none(config.MERIZO_EXECUTABLE, shell_executable)
 
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
         self.test_runner_file = test_runner_file

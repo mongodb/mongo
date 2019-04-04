@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -76,7 +76,7 @@ int main(int argc, char** argv, char** envp) {
 
 namespace moe = merizo::optionenvironment;
 
-MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
+MERIZO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
     auto& env = moe::startupOptionsParsed;
     auto& opts = moe::startupOptions;
 
@@ -94,7 +94,7 @@ MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
     return Status::OK();
 }
 
-MONGO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
+MERIZO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
     const auto& env = moe::startupOptionsParsed;
 
     std::string connectionString = env["connectionString"].as<std::string>();

@@ -54,12 +54,12 @@ using DocumentSourceGraphLookUpTest = AggregationContextFixture;
 //
 
 /**
- * A MongoProcessInterface use for testing that supports making pipelines with an initial
+ * A MerizoProcessInterface use for testing that supports making pipelines with an initial
  * DocumentSourceMock source.
  */
-class MockMongoInterface final : public StubMongoProcessInterface {
+class MockMerizoInterface final : public StubMerizoProcessInterface {
 public:
-    MockMongoInterface(std::deque<DocumentSource::GetNextResult> results)
+    MockMerizoInterface(std::deque<DocumentSource::GetNextResult> results)
         : _results(std::move(results)) {}
 
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
@@ -101,7 +101,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -129,7 +129,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -157,7 +157,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
     auto unwindStage = DocumentSourceUnwind::create(expCtx, "results", false, boost::none);
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
@@ -200,7 +200,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -264,7 +264,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
 
     NamespaceString fromNs("test", "foreign");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -330,7 +330,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     NamespaceString fromNs("test", "foreign");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
 
     const bool preserveNullAndEmptyArrays = false;
     const boost::optional<std::string> includeArrayIndex = boost::none;
@@ -394,7 +394,7 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) 
     NamespaceString fromNs("test", "foreign");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
     expCtx->merizoProcessInterface =
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{});
+        std::make_shared<MockMerizoInterface>(std::deque<DocumentSource::GetNextResult>{});
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -418,7 +418,7 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbs
     NamespaceString fromNs("test", "foreign");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
     expCtx->merizoProcessInterface =
-        std::make_shared<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{});
+        std::make_shared<MockMerizoInterface>(std::deque<DocumentSource::GetNextResult>{});
     auto unwindStage =
         DocumentSourceUnwind::create(expCtx, "results", false, std::string("arrIndex"));
     auto graphLookupStage =
@@ -449,7 +449,7 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupWithComparisonExpressionForStar
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", 0}, {"to", true}},
                                                            Document{{"_id", 1}, {"to", false}}};
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
 
     auto graphLookupStage = DocumentSourceGraphLookUp::create(
         expCtx,
@@ -512,7 +512,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -584,7 +584,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace_forTest(fromNs, {fromNs, std::vector<BSONObj>{}});
-    expCtx->merizoProcessInterface = std::make_shared<MockMongoInterface>(std::move(fromContents));
+    expCtx->merizoProcessInterface = std::make_shared<MockMerizoInterface>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,

@@ -32,6 +32,6 @@
 
 namespace merizo {
 namespace {
-MONGO_INITIALIZER_GROUP(ShimHooks, MONGO_NO_PREREQUISITES, ("default"));
+MERIZO_INITIALIZER_GROUP(ShimHooks, MERIZO_NO_PREREQUISITES, ("default"));
 }  // namespace
 }  // namespace merizo

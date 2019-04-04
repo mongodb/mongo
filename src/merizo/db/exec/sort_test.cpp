@@ -49,7 +49,7 @@ using namespace merizo;
 
 namespace {
 
-class SortStageTest : public ServiceContextMongoDTest {
+class SortStageTest : public ServiceContextMerizoDTest {
 public:
     SortStageTest() {
         getServiceContext()->setFastClockSource(stdx::make_unique<ClockSourceMock>());

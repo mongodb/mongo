@@ -35,13 +35,13 @@ namespace merizo {
 namespace mozjs {
 
 /**
- * A MongoURI object.
+ * A MerizoURI object.
  */
 struct URIInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(toString);
+        MERIZO_DECLARE_JS_FUNCTION(toString);
     };
 
     static const JSFunctionSpec methods[2];

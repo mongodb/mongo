@@ -61,7 +61,7 @@ using stdx::make_unique;
 namespace {
 
 // Failpoint which causes to hang "listIndexes" cmd after acquiring the DB lock.
-MONGO_FAIL_POINT_DEFINE(hangBeforeListIndexes);
+MERIZO_FAIL_POINT_DEFINE(hangBeforeListIndexes);
 
 /**
  * Lists the indexes for a given collection.

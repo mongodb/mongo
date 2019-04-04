@@ -8,7 +8,7 @@
     load("jstests/libs/assert_schema_match.js");
 
     const options = {setParameter: "internalQueryIgnoreUnknownJSONSchemaKeywords=1"};
-    const conn = MongoRunner.runMongod(options);
+    const conn = MerizoRunner.runMerizod(options);
     assert.neq(null, conn, "merizod was unable to start up with options: " + tojson(options));
 
     const testDB = conn.getDB("test");
@@ -55,5 +55,5 @@
         assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
     }
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

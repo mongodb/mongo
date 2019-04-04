@@ -4,21 +4,21 @@
 
 // Test that connecting with no client certificate and --sslAllowConnectionsWithoutCertificates
 // (an alias for sslWeakCertificateValidation) connects successfully.
-var md = MongoRunner.runMongod({
+var md = MerizoRunner.runMerizod({
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
     sslCAFile: "jstests/libs/ca.pem",
     sslAllowConnectionsWithoutCertificates: ""
 });
 
-var merizo = runMongoProgram(
+var merizo = runMerizoProgram(
     "merizo", "--port", md.port, "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
 
 // 0 is the exit code for success
 assert(merizo == 0);
 
 // Test that connecting with a valid client certificate connects successfully.
-merizo = runMongoProgram("merizo",
+merizo = runMerizoProgram("merizo",
                         "--port",
                         md.port,
                         "--ssl",
@@ -30,18 +30,18 @@ merizo = runMongoProgram("merizo",
 
 // 0 is the exit code for success
 assert(merizo == 0);
-MongoRunner.stopMongod(md);
+MerizoRunner.stopMerizod(md);
 // Test that connecting with no client certificate and no --sslAllowConnectionsWithoutCertificates
 // fails to connect.
-var md2 = MongoRunner.runMongod({
+var md2 = MerizoRunner.runMerizod({
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
     sslCAFile: "jstests/libs/ca.pem"
 });
 
-merizo = runMongoProgram(
+merizo = runMerizoProgram(
     "merizo", "--port", md2.port, "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
 
 // 1 is the exit code for failure
 assert(merizo == 1);
-MongoRunner.stopMongod(md2);
+MerizoRunner.stopMerizod(md2);

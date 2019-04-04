@@ -47,7 +47,7 @@ namespace {
 
 using namespace merizo;
 
-class CreateCollectionTest : public ServiceContextMongoDTest {
+class CreateCollectionTest : public ServiceContextMerizoDTest {
 private:
     void setUp() override;
     void tearDown() override;
@@ -59,7 +59,7 @@ protected:
 
 void CreateCollectionTest::setUp() {
     // Set up merizod.
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     auto service = getServiceContext();
 
@@ -75,7 +75,7 @@ void CreateCollectionTest::tearDown() {
     _storage = {};
 
     // Tear down merizod.
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 /**

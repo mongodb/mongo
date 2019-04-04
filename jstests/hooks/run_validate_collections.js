@@ -7,7 +7,7 @@
     load('jstests/hooks/validate_collections.js');  // For CollectionValidator.
 
     assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a merizod?');
-    const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
+    const topology = DiscoverTopology.findConnectedNodes(db.getMerizo());
 
     const hostList = [];
     let setFCVHost;

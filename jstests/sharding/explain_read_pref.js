@@ -6,17 +6,17 @@
 
 load("jstests/replsets/rslib.js");
 
-var assertCorrectTargeting = function(explain, isMongos, secExpected) {
+var assertCorrectTargeting = function(explain, isMerizos, secExpected) {
     assert.commandWorked(explain);
 
     var serverInfo;
-    if (isMongos) {
+    if (isMerizos) {
         serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
     } else {
         serverInfo = explain.serverInfo;
     }
 
-    var explainDestConn = new Mongo(serverInfo.host + ':' + serverInfo.port);
+    var explainDestConn = new Merizo(serverInfo.host + ':' + serverInfo.port);
     var isMaster = explainDestConn.getDB('admin').runCommand({isMaster: 1});
 
     if (secExpected) {
@@ -26,7 +26,7 @@ var assertCorrectTargeting = function(explain, isMongos, secExpected) {
     }
 };
 
-var testAllModes = function(conn, isMongos) {
+var testAllModes = function(conn, isMerizos) {
 
     // The primary is tagged with { tag: 'one' } and the secondary with
     // { tag: 'two' } so we can test the interaction of modes and tags. Test
@@ -66,25 +66,25 @@ var testAllModes = function(conn, isMongos) {
         var explainableQuery = testDB.user.explain().find();
         explainableQuery.readPref(mode, tagSets);
         var explain = explainableQuery.finish();
-        assertCorrectTargeting(explain, isMongos, secExpected);
+        assertCorrectTargeting(explain, isMerizos, secExpected);
 
         // Set read pref on the connection.
-        var oldReadPrefMode = testDB.getMongo().getReadPrefMode();
-        var oldReadPrefTagSet = testDB.getMongo().getReadPrefTagSet();
+        var oldReadPrefMode = testDB.getMerizo().getReadPrefMode();
+        var oldReadPrefTagSet = testDB.getMerizo().getReadPrefTagSet();
         try {
-            testDB.getMongo().setReadPref(mode, tagSets);
+            testDB.getMerizo().setReadPref(mode, tagSets);
 
             // .explain().count();
             explain = testDB.user.explain().count();
-            assertCorrectTargeting(explain, isMongos, secExpected);
+            assertCorrectTargeting(explain, isMerizos, secExpected);
 
             // .explain().distinct()
             explain = testDB.user.explain().distinct("_id");
-            assertCorrectTargeting(explain, isMongos, secExpected);
+            assertCorrectTargeting(explain, isMerizos, secExpected);
 
         } finally {
             // Restore old read pref.
-            testDB.getMongo().setReadPref(oldReadPrefMode, oldReadPrefTagSet);
+            testDB.getMerizo().setReadPref(oldReadPrefMode, oldReadPrefTagSet);
         }
     });
 };
@@ -140,7 +140,7 @@ reconnect(secondary);
 rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log('got rsconf ' + tojson(rsConfig));
 
-var replConn = new Mongo(st.rs0.getURL());
+var replConn = new Merizo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
 _awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: PRIMARY_TAG}, st.rs0.name);

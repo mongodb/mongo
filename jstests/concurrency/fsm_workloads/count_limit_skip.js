@@ -12,7 +12,7 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/count.js');       // for $config
-load("jstests/libs/fixture_helpers.js");                  // For isMongos.
+load("jstests/libs/fixture_helpers.js");                  // For isMerizos.
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'count_fsm_q_l_s';
@@ -29,7 +29,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.count = function count(db, collName) {
-        if (!isMongos(db)) {
+        if (!isMerizos(db)) {
             // SERVER-33753: count() without a predicate can be wrong on sharded clusters.
             assertWhenOwnColl.eq(this.getCount(db),
                                  // having done 'skip(this.countPerNum - 1).limit(10)'

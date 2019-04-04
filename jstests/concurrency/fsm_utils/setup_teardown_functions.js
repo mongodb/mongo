@@ -2,7 +2,7 @@
 
 /**
  * Functions used by runners to set up and tear down their clusters.
- * Each function is called by executeOnMongodNodes and executeOnMongosNodes
+ * Each function is called by executeOnMerizodNodes and executeOnMerizosNodes
  * (if the cluster is sharded). Each function should accept a connection to
  * the 'admin' database.
  */

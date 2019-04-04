@@ -20,7 +20,7 @@ const ChangeStreamHWMHelpers = (function() {
         // Log the test options for debugging.
         jsTestLog(tojsononeline({
             coll: coll.getFullName(),
-            conn: coll.getMongo(),
+            conn: coll.getMerizo(),
             expectPBRT: expectPBRT,
             hwmToResume: hwmToResume,
             expectResume: expectResume

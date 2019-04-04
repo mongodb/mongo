@@ -104,7 +104,7 @@ func (op *ReplyOp) FromReader(r io.Reader) error {
 
 // Execute performs the ReplyOp on a given socket, yielding the reply when
 // successful (and an error otherwise).
-func (op *ReplyOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+func (op *ReplyOp) Execute(socket *mgo.MerizoSocket) (Replyable, error) {
 	return nil, nil
 }
 

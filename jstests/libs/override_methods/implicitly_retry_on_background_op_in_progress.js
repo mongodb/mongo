@@ -76,7 +76,7 @@
                 }
 
                 // The following logic only applies to sharded clusters.
-                if (!conn.isMongos() || !res.raw) {
+                if (!conn.isMerizos() || !res.raw) {
                     // We don't attempt to retry commands for which merizos doesn't expose the raw
                     // responses from the shards.
                     return kNoRetry;

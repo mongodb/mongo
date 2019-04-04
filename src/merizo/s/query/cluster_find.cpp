@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -465,7 +465,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
         }
     }
 
-    MONGO_UNREACHABLE
+    MERIZO_UNREACHABLE
 }
 
 /**
@@ -588,7 +588,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the 'msg'
     // field of this operation's CurOp to signal that we've hit this point.
-    if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+    if (MERIZO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &waitAfterPinningCursorBeforeGetMoreBatch,
             opCtx,
@@ -611,7 +611,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     // If the 'waitWithPinnedCursorDuringGetMoreBatch' fail point is enabled, set the 'msg'
     // field of this operation's CurOp to signal that we've hit this point.
-    if (MONGO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
+    if (MERIZO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitWithPinnedCursorDuringGetMoreBatch,
                                                          opCtx,
                                                          "waitWithPinnedCursorDuringGetMoreBatch");
@@ -688,7 +688,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().cursorExhausted = (idToReturn == 0);
     CurOp::get(opCtx)->debug().nreturned = batch.size();
 
-    if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
+    if (MERIZO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
             opCtx,

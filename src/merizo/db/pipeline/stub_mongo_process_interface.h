@@ -37,26 +37,26 @@
 namespace merizo {
 
 /**
- * A stub MongoProcessInterface that provides default implementations of all methods, which can then
+ * A stub MerizoProcessInterface that provides default implementations of all methods, which can then
  * be individually overridden for testing. This class may also be used in scenarios where a
- * placeholder MongoProcessInterface is required by an interface but will not be called. To
- * guarantee the latter, method implementations in this class are marked MONGO_UNREACHABLE.
+ * placeholder MerizoProcessInterface is required by an interface but will not be called. To
+ * guarantee the latter, method implementations in this class are marked MERIZO_UNREACHABLE.
  */
-class StubMongoProcessInterface : public MongoProcessInterface {
+class StubMerizoProcessInterface : public MerizoProcessInterface {
 public:
-    virtual ~StubMongoProcessInterface() = default;
+    virtual ~StubMerizoProcessInterface() = default;
 
     void setOperationContext(OperationContext* opCtx) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     DBClientBase* directClient() override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     repl::OplogEntry lookUpOplogEntryByOpTime(OperationContext* opCtx,
                                               repl::OpTime lookupTime) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
@@ -68,7 +68,7 @@ public:
                 std::vector<BSONObj>&& objs,
                 const WriteConcernOptions& wc,
                 boost::optional<OID>) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -79,36 +79,36 @@ public:
                 bool upsert,
                 bool multi,
                 boost::optional<OID>) final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                           const NamespaceString& ns) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,
                             BSONObjBuilder* builder) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     Status appendStorageStats(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& param,
                               BSONObjBuilder* builder) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     Status appendRecordCount(OperationContext* opCtx,
                              const NamespaceString& nss,
                              BSONObjBuilder* builder) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     BSONObj getCollectionOptions(const NamespaceString& nss) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     void renameIfOptionsAndIndexesHaveNotChanged(
@@ -117,19 +117,19 @@ public:
         const NamespaceString& targetNs,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::vector<BSONObj> getCurrentOps(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -138,21 +138,21 @@ public:
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode,
                                        CurrentOpCursorMode cursorMode) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::string getShardName(OperationContext* opCtx) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
         OperationContext*, const NamespaceString&, UUID) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     boost::optional<Document> lookupSingleDocument(
@@ -162,12 +162,12 @@ public:
         const Document& documentKey,
         boost::optional<BSONObj> readConcern,
         bool allowSpeculativeMajorityRead) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     BackupCursorState openBackupCursor(OperationContext* opCtx) final {
@@ -185,7 +185,7 @@ public:
     std::vector<BSONObj> getMatchingPlanCacheEntryStats(OperationContext*,
                                                         const NamespaceString&,
                                                         const MatchExpression*) const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool uniqueKeyIsSupportedByIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,

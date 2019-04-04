@@ -42,7 +42,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
                                                               const BSONObj& requestBody,
                                                               bool requiresAuth,
                                                               bool attachToOpCtx,
-                                                              bool isReplSetMemberOrMongos,
+                                                              bool isReplSetMemberOrMerizos,
                                                               bool supportsDocLocking) {
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
@@ -109,7 +109,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
 
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on a replica set member or merizos",
-                isReplSetMemberOrMongos);
+                isReplSetMemberOrMerizos);
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on storage engines that support "
                 "document-level locking",

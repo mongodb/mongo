@@ -72,10 +72,10 @@ var OverrideHelpers = (function() {
     }
 
     function overrideRunCommand(overrideFunc) {
-        const merizoRunCommandOriginal = Mongo.prototype.runCommand;
-        const merizoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
+        const merizoRunCommandOriginal = Merizo.prototype.runCommand;
+        const merizoRunCommandWithMetadataOriginal = Merizo.prototype.runCommandWithMetadata;
 
-        Mongo.prototype.runCommand = function(dbName, commandObj, options) {
+        Merizo.prototype.runCommand = function(dbName, commandObj, options) {
             const commandName = Object.keys(commandObj)[0];
             return overrideFunc(this,
                                 dbName,
@@ -85,7 +85,7 @@ var OverrideHelpers = (function() {
                                 (commandObj) => [dbName, commandObj, options]);
         };
 
-        Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs) {
+        Merizo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs) {
             const commandName = Object.keys(commandArgs)[0];
             return overrideFunc(this,
                                 dbName,

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -63,13 +63,13 @@ void reportStatus(OperationContext* opCtx,
                   const std::string& instanceId,
                   const std::string& hostName,
                   const Timer& upTimeTimer) {
-    MongosType mType;
+    MerizosType mType;
     mType.setName(instanceId);
     mType.setPing(jsTime());
     mType.setUptime(upTimeTimer.seconds());
     // balancer is never active in merizos. Here for backwards compatibility only.
     mType.setWaiting(true);
-    mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
+    mType.setMerizoVersion(VersionInfoInterface::instance().version().toString());
     mType.setAdvisoryHostFQDNs(
         getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse));
 
@@ -77,8 +77,8 @@ void reportStatus(OperationContext* opCtx,
         Grid::get(opCtx)
             ->catalogClient()
             ->updateConfigDocument(opCtx,
-                                   MongosType::ConfigNS,
-                                   BSON(MongosType::name(instanceId)),
+                                   MerizosType::ConfigNS,
+                                   BSON(MerizosType::name(instanceId)),
                                    BSON("$set" << mType.toBSON()),
                                    true,
                                    ShardingCatalogClient::kMajorityWriteConcern)
@@ -120,7 +120,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
                 }
             }
 
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             sleepFor(kUptimeReportInterval);
         }
     });

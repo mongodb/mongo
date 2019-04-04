@@ -225,7 +225,7 @@
                 "password": "fizzb@zz=",
                 "username": "$am"
             },
-            "description": "Escaped user info and database (MONGODB-CR)",
+            "description": "Escaped user info and database (MERIZODB-CR)",
             "hosts": [
                 {
                     "host": "127.0.0.1",
@@ -234,9 +234,9 @@
                 }
             ],
             "options": {
-                "authmechanism": "MONGODB-CR"
+                "authmechanism": "MERIZODB-CR"
             },
-            "uri": "merizodb://%24am:fizzb%40zz%3D@127.0.0.1/admin%3D?authMechanism=MONGODB-CR",
+            "uri": "merizodb://%24am:fizzb%40zz%3D@127.0.0.1/admin%3D?authMechanism=MERIZODB-CR",
             "valid": true,
             "warning": false
         },
@@ -246,7 +246,7 @@
                 "password": null,
                 "username": "CN=myName,OU=myOrgUnit,O=myOrg,L=myLocality,ST=myState,C=myCountry"
             },
-            "description": "Escaped username (MONGODB-X509)",
+            "description": "Escaped username (MERIZODB-X509)",
             "hosts": [
                 {
                     "host": "localhost",
@@ -255,9 +255,9 @@
                 }
             ],
             "options": {
-                "authmechanism": "MONGODB-X509"
+                "authmechanism": "MERIZODB-X509"
             },
-            "uri": "merizodb://CN%3DmyName%2COU%3DmyOrgUnit%2CO%3DmyOrg%2CL%3DmyLocality%2CST%3DmyState%2CC%3DmyCountry@localhost/?authMechanism=MONGODB-X509",
+            "uri": "merizodb://CN%3DmyName%2COU%3DmyOrgUnit%2CO%3DmyOrg%2CL%3DmyLocality%2CST%3DmyState%2CC%3DmyCountry@localhost/?authMechanism=MERIZODB-X509",
             "valid": true,
             "warning": false
         },

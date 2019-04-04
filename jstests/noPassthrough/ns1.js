@@ -1,6 +1,6 @@
 (function() {
     "use strict";
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     assert.neq(null, conn, "merizod failed to start.");
     let mydb = conn.getDB("test_ns1");
 
@@ -47,5 +47,5 @@
     }
     print("yay");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

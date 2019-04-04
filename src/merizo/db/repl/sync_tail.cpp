@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -86,9 +86,9 @@ namespace merizo {
 namespace repl {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationBeforeCompletion);
-MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationAfterWritingOplogEntries);
-MONGO_FAIL_POINT_DEFINE(hangAfterRecordingOpApplicationStartTime);
+MERIZO_FAIL_POINT_DEFINE(pauseBatchApplicationBeforeCompletion);
+MERIZO_FAIL_POINT_DEFINE(pauseBatchApplicationAfterWritingOplogEntries);
+MERIZO_FAIL_POINT_DEFINE(hangAfterRecordingOpApplicationStartTime);
 
 // The oplog entries applied
 Counter64 opsAppliedStats;
@@ -312,10 +312,10 @@ Status SyncTail::syncApply(OperationContext* opCtx,
     auto clockSource = opCtx->getServiceContext()->getFastClockSource();
     auto applyStartTime = clockSource->now();
 
-    if (MONGO_FAIL_POINT(hangAfterRecordingOpApplicationStartTime)) {
+    if (MERIZO_FAIL_POINT(hangAfterRecordingOpApplicationStartTime)) {
         log() << "syncApply - fail point hangAfterRecordingOpApplicationStartTime enabled. "
               << "Blocking until fail point is disabled. ";
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterRecordingOpApplicationStartTime);
+        MERIZO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterRecordingOpApplicationStartTime);
     }
 
     auto opType = OpType_parse(IDLParserErrorContext("syncApply"), op["op"].valuestrsafe());
@@ -376,7 +376,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         }));
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 SyncTail::SyncTail(OplogApplier::Observer* observer,
@@ -706,10 +706,10 @@ void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
         OperationContext& opCtx = *opCtxPtr;
 
         // For pausing replication in tests.
-        if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+        if (MERIZO_FAIL_POINT(rsSyncApplyStop)) {
             log() << "sync tail - rsSyncApplyStop fail point enabled. Blocking until fail point is "
                      "disabled.";
-            while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+            while (MERIZO_FAIL_POINT(rsSyncApplyStop)) {
                 // Tests should not trigger clean shutdown while that failpoint is active. If we
                 // think we need this, we need to think hard about what the behavior should be.
                 if (inShutdown()) {
@@ -735,7 +735,7 @@ void SyncTail::_oplogApplication(OplogBuffer* oplogBuffer,
                 // Shut down and exit oplog application loop.
                 return;
             }
-            if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+            if (MERIZO_FAIL_POINT(rsSyncApplyStop)) {
                 continue;
             }
             // Signal drain complete if we're in Draining state and the buffer is empty.
@@ -863,7 +863,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
         }
 
         // Don't consume the op if we are told to stop.
-        if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+        if (MERIZO_FAIL_POINT(rsSyncApplyStop)) {
             sleepmillis(10);
             return true;
         }
@@ -951,10 +951,10 @@ bool SyncTail::inShutdown() const {
 BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) {
     OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
 
-    if (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
+    if (MERIZO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
         log() << "initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled. "
                  "Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
+        while (MERIZO_FAIL_POINT(initialSyncHangBeforeGettingMissingDocument)) {
             merizo::sleepsecs(1);
         }
     }
@@ -1419,10 +1419,10 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
 
         // Use this fail point to hold the PBWM lock after we have written the oplog entries but
         // before we have applied them.
-        if (MONGO_FAIL_POINT(pauseBatchApplicationAfterWritingOplogEntries)) {
+        if (MERIZO_FAIL_POINT(pauseBatchApplicationAfterWritingOplogEntries)) {
             log() << "pauseBatchApplicationAfterWritingOplogEntries fail point enabled. Blocking "
                      "until fail point is disabled.";
-            MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
+            MERIZO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(
                 opCtx, pauseBatchApplicationAfterWritingOplogEntries);
         }
 
@@ -1460,10 +1460,10 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
     storageEngine->replicationBatchIsComplete();
 
     // Use this fail point to hold the PBWM lock and prevent the batch from completing.
-    if (MONGO_FAIL_POINT(pauseBatchApplicationBeforeCompletion)) {
+    if (MERIZO_FAIL_POINT(pauseBatchApplicationBeforeCompletion)) {
         log() << "pauseBatchApplicationBeforeCompletion fail point enabled. Blocking until fail "
                  "point is disabled.";
-        while (MONGO_FAIL_POINT(pauseBatchApplicationBeforeCompletion)) {
+        while (MERIZO_FAIL_POINT(pauseBatchApplicationBeforeCompletion)) {
             if (inShutdown()) {
                 severe() << "Turn off pauseBatchApplicationBeforeCompletion before attempting "
                             "clean shutdown";

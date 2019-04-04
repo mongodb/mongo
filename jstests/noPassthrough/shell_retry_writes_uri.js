@@ -24,9 +24,9 @@
     function runShellScript(uri, cmdArgs, insertShouldHaveTxnNumber, shellFn) {
         // This function is stringified and called immediately in the merizo --eval.
         function testWrapper(insertShouldHaveTxnNumber, shellFn) {
-            const merizoRunCommandOriginal = Mongo.prototype.runCommand;
+            const merizoRunCommandOriginal = Merizo.prototype.runCommand;
             let insertFound = false;
-            Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
+            Merizo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
                 let cmdObjSeen = cmdObj;
                 let cmdName = Object.keys(cmdObjSeen)[0];
 
@@ -59,7 +59,7 @@
         script += ")";
 
         let args = ["./merizo", uri, "--eval", script].concat(cmdArgs);
-        let exitCode = runMongoProgram(...args);
+        let exitCode = runMerizoProgram(...args);
         assert.eq(exitCode, 0, `shell script "${shellFn.name}" exited with ${exitCode}`);
     }
 
@@ -83,8 +83,8 @@
                    ["--retryWrites"],
                    true,
                    function flagNotOverridenByNewConn() {
-                       let connUri = db.getMongo().host;  // does not have ?retryWrites=false.
-                       let sess = new Mongo(connUri).startSession();
+                       let connUri = db.getMerizo().host;  // does not have ?retryWrites=false.
+                       let sess = new Merizo(connUri).startSession();
                        assert(sess.getOptions().shouldRetryWrites(), "retryWrites should be true");
                        assert.writeOK(sess.getDatabase("test").coll.insert({}), "cannot insert");
                    });
@@ -94,8 +94,8 @@
                    ["--retryWrites"],
                    false,
                    function flagOverridenInNewConn() {
-                       let connUri = "merizodb://" + db.getMongo().host + "/test?retryWrites=false";
-                       let sess = new Mongo(connUri).startSession();
+                       let connUri = "merizodb://" + db.getMerizo().host + "/test?retryWrites=false";
+                       let sess = new Merizo(connUri).startSession();
                        assert(!sess.getOptions().shouldRetryWrites(),
                               "retryWrites should be false");
                        assert.writeOK(sess.getDatabase("test").coll.insert({}), "cannot insert");
@@ -103,8 +103,8 @@
 
     // Session options should override --retryWrites as well.
     runShellScript(merizoUri, ["--retryWrites"], false, function flagOverridenByOpts() {
-        let connUri = "merizodb://" + db.getMongo().host + "/test";
-        let sess = new Mongo(connUri).startSession({retryWrites: false});
+        let connUri = "merizodb://" + db.getMerizo().host + "/test";
+        let sess = new Merizo(connUri).startSession({retryWrites: false});
         assert(!sess.getOptions().shouldRetryWrites(), "retryWrites should be false");
         assert.writeOK(sess.getDatabase("test").coll.insert({}), "cannot insert");
     });
@@ -123,23 +123,23 @@
 
     // Test SessionOptions retryWrites option.
     runShellScript(merizoUri, [], true, function sessOptTrueWorks() {
-        let connUri = "merizodb://" + db.getMongo().host + "/test";
-        let sess = new Mongo(connUri).startSession({retryWrites: true});
+        let connUri = "merizodb://" + db.getMerizo().host + "/test";
+        let sess = new Merizo(connUri).startSession({retryWrites: true});
         assert(sess.getOptions().shouldRetryWrites(), "retryWrites should be true");
         assert.writeOK(sess.getDatabase("test").coll.insert({}), "cannot insert");
     });
 
     // Test that SessionOptions retryWrites:false works.
     runShellScript(merizoUri, [], false, function sessOptFalseWorks() {
-        let connUri = "merizodb://" + db.getMongo().host + "/test";
-        let sess = new Mongo(connUri).startSession({retryWrites: false});
+        let connUri = "merizodb://" + db.getMerizo().host + "/test";
+        let sess = new Merizo(connUri).startSession({retryWrites: false});
         assert(!sess.getOptions().shouldRetryWrites(), "retryWrites should be false");
         assert.writeOK(sess.getDatabase("test").coll.insert({}), "cannot insert");
     });
 
     // Test that session option overrides uri option.
     runShellScript(merizoUri + "?retryWrites=true", [], false, function sessOptOverridesUri() {
-        let sess = db.getMongo().startSession({retryWrites: false});
+        let sess = db.getMerizo().startSession({retryWrites: false});
         assert(!sess.getOptions().shouldRetryWrites(), "retryWrites should be false");
         assert.writeOK(sess.getDatabase("test").coll.insert({}), "cannot insert");
     });

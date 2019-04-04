@@ -16,7 +16,7 @@
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 
     const sessionOptions = {causalConsistency: false};
-    const session = db.getMongo().startSession(sessionOptions);
+    const session = db.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
 
@@ -70,10 +70,10 @@
         workerThread.start();
 
         jsTestLog("Wait for insert to be blocked");
-        checkLog.contains(db.getMongo(), "hangDuringBatchInsert fail point enabled");
+        checkLog.contains(db.getMerizo(), "hangDuringBatchInsert fail point enabled");
 
         jsTestLog("Wait for the transaction to expire");
-        checkLog.contains(db.getMongo(), "Aborting transaction with txnNumber " + txnNumber);
+        checkLog.contains(db.getMerizo(), "Aborting transaction with txnNumber " + txnNumber);
 
         jsTestLog("Disabling fail point to enable insert to proceed and detect that the session " +
                   "has been killed");

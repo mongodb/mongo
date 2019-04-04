@@ -84,7 +84,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(ReapLogicalSessionCacheNowCommand);
+MERIZO_REGISTER_TEST_COMMAND(ReapLogicalSessionCacheNowCommand);
 
 }  // namespace
 

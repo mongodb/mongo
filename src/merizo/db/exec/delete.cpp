@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kWrite
 
 #include "merizo/platform/basic.h"
 
@@ -142,7 +142,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                 return status;
 
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
     }
 

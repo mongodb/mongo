@@ -33,7 +33,7 @@
 
 namespace merizo {
 
-MONGO_REGISTER_SHIM(waitForReadConcern)
+MERIZO_REGISTER_SHIM(waitForReadConcern)
 (OperationContext* opCtx,
  const repl::ReadConcernArgs& readConcernArgs,
  bool allowAfterClusterTime,
@@ -53,12 +53,12 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
 
     return Status::OK();
 }
-MONGO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
+MERIZO_REGISTER_SHIM(waitForSpeculativeMajorityReadConcern)
 (OperationContext* opCtx, repl::SpeculativeMajorityReadInfo speculativeReadInfo)->Status {
     return Status::OK();
 }
 
-MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
+MERIZO_REGISTER_SHIM(waitForLinearizableReadConcern)
 (OperationContext* opCtx, const int readConcernTimeout)->Status {
     return Status::OK();
 }

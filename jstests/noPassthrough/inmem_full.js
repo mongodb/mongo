@@ -39,7 +39,7 @@
     const batchSize = 100;
     const batch = randomBatch(batchSize);
 
-    var merizod = MongoRunner.runMongod({
+    var merizod = MerizoRunner.runMerizod({
         storageEngine: 'inMemory',
         inMemoryEngineConfigString: 'cache_size=' + cacheMB + "M,",
     });

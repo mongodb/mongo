@@ -43,10 +43,10 @@ namespace mozjs {
 const char* const CountDownLatchInfo::className = "CountDownLatch";
 
 const JSFunctionSpec CountDownLatchInfo::methods[5] = {
-    MONGO_ATTACH_JS_FUNCTION(_new),
-    MONGO_ATTACH_JS_FUNCTION(_await),
-    MONGO_ATTACH_JS_FUNCTION(_countDown),
-    MONGO_ATTACH_JS_FUNCTION(_getCount),
+    MERIZO_ATTACH_JS_FUNCTION(_new),
+    MERIZO_ATTACH_JS_FUNCTION(_await),
+    MERIZO_ATTACH_JS_FUNCTION(_countDown),
+    MERIZO_ATTACH_JS_FUNCTION(_getCount),
     JS_FS_END,
 };
 

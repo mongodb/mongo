@@ -67,7 +67,7 @@ public:
 
     // Not used.
     SpecificStats* getSpecificStats() const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::string getPlanSummaryStr() const;

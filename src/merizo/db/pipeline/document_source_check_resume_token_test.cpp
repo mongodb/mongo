@@ -256,13 +256,13 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithBinaryCollation) {
     ASSERT_TRUE(checkResumeToken->getNext().isEOF());
 }
 
-TEST_F(CheckResumeTokenTest, UnshardedTokenSucceedsForShardedResumeOnMongosIfIdMatchesFirstDoc) {
+TEST_F(CheckResumeTokenTest, UnshardedTokenSucceedsForShardedResumeOnMerizosIfIdMatchesFirstDoc) {
     // Verify that a resume token whose documentKey only contains _id can be used to resume a stream
-    // on a sharded collection as long as its _id matches the first document. We set 'inMongos'
+    // on a sharded collection as long as its _id matches the first document. We set 'inMerizos'
     // since this behaviour is only applicable when DocumentSourceEnsureResumeTokenPresent is
     // running on merizoS.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, Document{{"_id"_sd, 1}});
 
@@ -281,9 +281,9 @@ TEST_F(CheckResumeTokenTest, UnshardedTokenSucceedsForShardedResumeOnMongosIfIdM
     ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.documentKey.getDocument(), doc2DocKey);
 }
 
-TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMongosIfIdDoesNotMatchFirstDoc) {
+TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMerizosIfIdDoesNotMatchFirstDoc) {
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, Document{{"_id"_sd, 1}});
 
@@ -293,13 +293,13 @@ TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMongosIfIdDoes
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
-TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfTokenHasSubsetOfDocumentKeyFields) {
+TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMerizosIfTokenHasSubsetOfDocumentKeyFields) {
     // Verify that the relaxed _id check only applies if _id is the sole field present in the
     // client's resume token, even if all the fields that are present match the first doc. We set
-    // 'inMongos' since this is only applicable when DocumentSourceEnsureResumeTokenPresent is
+    // 'inMerizos' since this is only applicable when DocumentSourceEnsureResumeTokenPresent is
     // running on merizoS.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
 
     auto checkResumeToken =
         createCheckResumeToken(resumeTimestamp, Document{{"x"_sd, 0}, {"_id"_sd, 1}});
@@ -310,12 +310,12 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfTokenHasSubsetOfDocumen
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
-TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyIsNonObject) {
+TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMerizosIfDocumentKeyIsNonObject) {
     // Verify that a resume token whose documentKey is not a valid object will neither succeed nor
     // cause an invariant when we perform the relaxed documentKey._id check when running in a
     // sharded context.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, boost::none);
 
@@ -325,12 +325,12 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyIsNonObject)
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
-TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyOmitsId) {
+TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMerizosIfDocumentKeyOmitsId) {
     // Verify that a resume token whose documentKey omits the _id field will neither succeed nor
     // cause an invariant when we perform the relaxed documentKey._id, even when compared against an
     // artificial stream token whose _id is also missing.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
 
     auto checkResumeToken = createCheckResumeToken(resumeTimestamp, Document{{"x"_sd, 0}});
 
@@ -342,14 +342,14 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyOmitsId) {
 }
 
 TEST_F(CheckResumeTokenTest,
-       ShardedResumeSucceedsOnMongosWithSameClusterTimeIfUUIDsSortBeforeResumeToken) {
+       ShardedResumeSucceedsOnMerizosWithSameClusterTimeIfUUIDsSortBeforeResumeToken) {
     // On a sharded cluster, the documents observed by the pipeline during a resume attempt may have
     // the same clusterTime if they come from different shards. If this is a whole-db or
     // cluster-wide changeStream, then their UUIDs may legitimately differ. As long as the UUID of
     // the current document sorts before the client's resume token, we should continue to examine
     // the next document in the stream.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
 
     // Create an ordered array of 2 UUIDs.
     UUID uuids[2] = {UUID::gen(), UUID::gen()};
@@ -385,9 +385,9 @@ TEST_F(CheckResumeTokenTest,
 }
 
 TEST_F(CheckResumeTokenTest,
-       ShardedResumeFailsOnMongosWithSameClusterTimeIfUUIDsSortAfterResumeToken) {
+       ShardedResumeFailsOnMerizosWithSameClusterTimeIfUUIDsSortAfterResumeToken) {
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inMerizos = true;
 
     // Create an ordered array of 2 UUIDs.
     UUID uuids[2] = {UUID::gen(), UUID::gen()};
@@ -454,11 +454,11 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithNoDocuments) {
 }
 
 /**
- * A mock MongoProcessInterface which allows mocking a foreign pipeline.
+ * A mock MerizoProcessInterface which allows mocking a foreign pipeline.
  */
-class MockMongoInterface final : public StubMongoProcessInterface {
+class MockMerizoInterface final : public StubMerizoProcessInterface {
 public:
-    MockMongoInterface(deque<DocumentSource::GetNextResult> mockResults)
+    MockMerizoInterface(deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
@@ -501,7 +501,7 @@ TEST_F(ShardCheckResumabilityTest,
 
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     addDocument(resumeTimestamp, "ID");
     // We should see the resume token.
     auto result = shardCheckResumability->getNext();
@@ -519,7 +519,7 @@ TEST_F(ShardCheckResumabilityTest,
         resumeTimestamp, 0, 0, testUuid(), Value(Document{{"_id"_sd, "ID"_sd}}));
     auto shardCheckResumability = createShardCheckResumability(tokenData);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     addDocument(resumeTimestamp, "ID");
     // We should see the resume token.
     auto result = shardCheckResumability->getNext();
@@ -534,7 +534,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldSucceedIfResumeTokenIsPresentAndOplogIs
     ResumeTokenData token(resumeTimestamp, 0, 0, testUuid(), Value(Document{{"_id"_sd, "ID"_sd}}));
     auto shardCheckResumability = createShardCheckResumability(token);
     deque<DocumentSource::GetNextResult> mockOplog;
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     addDocument(resumeTimestamp, "ID");
     // We should see the resume token.
     auto result = shardCheckResumability->getNext();
@@ -550,7 +550,7 @@ TEST_F(ShardCheckResumabilityTest,
 
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     auto result = shardCheckResumability->getNext();
     ASSERT_TRUE(result.isEOF());
 }
@@ -562,7 +562,7 @@ TEST_F(ShardCheckResumabilityTest,
 
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
 }
 
@@ -571,7 +571,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldSucceedWithNoDocumentsInPipelineAndOplo
 
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog;
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     auto result = shardCheckResumability->getNext();
     ASSERT_TRUE(result.isEOF());
 }
@@ -585,7 +585,7 @@ TEST_F(ShardCheckResumabilityTest,
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     auto result = shardCheckResumability->getNext();
     ASSERT_TRUE(result.isAdvanced());
     auto& doc = result.getDocument();
@@ -601,7 +601,7 @@ TEST_F(ShardCheckResumabilityTest,
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
 }
 
@@ -614,14 +614,14 @@ TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstDoc) {
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     auto result1 = shardCheckResumability->getNext();
     ASSERT_TRUE(result1.isAdvanced());
     auto& doc1 = result1.getDocument();
     ASSERT_EQ(docTimestamp, ResumeToken::parse(doc1["_id"].getDocument()).getData().clusterTime);
 
     mockOplog = {Document{{"ts", oplogFutureTimestamp}}};
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     auto result2 = shardCheckResumability->getNext();
     ASSERT_TRUE(result2.isEOF());
 }
@@ -636,7 +636,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldSucceedWhenOplogEntriesExistBeforeAndAf
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog(
         {{Document{{"ts", oplogTimestamp}}}, {Document{{"ts", oplogFutureTimestamp}}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     auto result1 = shardCheckResumability->getNext();
     ASSERT_TRUE(result1.isAdvanced());
     auto& doc1 = result1.getDocument();
@@ -652,12 +652,12 @@ TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstEOF) {
 
     auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     auto result1 = shardCheckResumability->getNext();
     ASSERT_TRUE(result1.isEOF());
 
     mockOplog = {Document{{"ts", oplogFutureTimestamp}}};
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
     auto result2 = shardCheckResumability->getNext();
     ASSERT_TRUE(result2.isEOF());
 }
@@ -669,7 +669,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldSwallowAllEventsAtSameClusterTimeUpToRe
     ResumeTokenData token(resumeTimestamp, 0, 0, testUuid(), Value(Document{{"_id"_sd, "3"_sd}}));
     auto shardCheckResumability = createShardCheckResumability(token);
     deque<DocumentSource::GetNextResult> mockOplog;
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
 
     // Add 2 events at the same clusterTime as the resume token but whose docKey sort before it.
     addDocument(resumeTimestamp, "1");
@@ -701,7 +701,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldSwallowAllEventsAtSameClusterTimePriorT
     ResumeTokenData token(resumeTimestamp, 0, 0, testUuid(), Value(Document{{"_id"_sd, "3"_sd}}));
     auto shardCheckResumability = createShardCheckResumability(token);
     deque<DocumentSource::GetNextResult> mockOplog;
-    getExpCtx()->merizoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
+    getExpCtx()->merizoProcessInterface = std::make_shared<MockMerizoInterface>(mockOplog);
 
     // Add 2 events at the same clusterTime as the resume token but whose docKey sort before it.
     addDocument(resumeTimestamp, "1");

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include <cstdlib>
 #include <ctime>
@@ -57,7 +57,7 @@ char tzEnvString[] = "TZ=America/New_York";
 // C4996:  The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant
 // name: _putenv. See online help for details.
 #pragma warning(disable : 4996)
-MONGO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
+MERIZO_INITIALIZER(SetTimeZoneToEasternForTest)(InitializerContext*) {
     if (-1 == putenv(tzEnvString)) {
         return Status(ErrorCodes::BadValue, errnoWithDescription());
     }

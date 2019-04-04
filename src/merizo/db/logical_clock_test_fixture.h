@@ -42,9 +42,9 @@ class LogicalTime;
 /**
  * A test fixture that installs a LogicalClock instance with a TimeProofService onto a service
  * context, in addition to the mock storage engine, network, and OpObserver provided by
- * ShardingMongodTestFixture.
+ * ShardingMerizodTestFixture.
  */
-class LogicalClockTestFixture : public ShardingMongodTestFixture {
+class LogicalClockTestFixture : public ShardingMerizodTestFixture {
 public:
     LogicalClockTestFixture();
     ~LogicalClockTestFixture();

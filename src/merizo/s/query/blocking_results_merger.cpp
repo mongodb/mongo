@@ -62,7 +62,7 @@ StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(
         // This shouldn't throw, but we cannot enforce that.
         result = waitFn();
     } catch (const DBException&) {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     if (_resourceYielder) {

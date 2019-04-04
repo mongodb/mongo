@@ -318,8 +318,8 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
       _initialized(false),
       _groups(pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false),
-      _allowDiskUse(pExpCtx->allowDiskUse && !pExpCtx->inMongos) {
-    if (!pExpCtx->inMongos && (pExpCtx->allowDiskUse || kDebugBuild)) {
+      _allowDiskUse(pExpCtx->allowDiskUse && !pExpCtx->inMerizos) {
+    if (!pExpCtx->inMerizos && (pExpCtx->allowDiskUse || kDebugBuild)) {
         // We spill to disk in debug mode, regardless of allowDiskUse, to stress the system.
         _fileName = pExpCtx->tempDir + "/" + nextFileName();
     }
@@ -504,7 +504,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         if (kDebugBuild && !storageGlobalParams.readOnly) {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
             if (!inserted &&                 // is a dup
-                !pExpCtx->inMongos &&        // can't spill to disk in merizos
+                !pExpCtx->inMerizos &&        // can't spill to disk in merizos
                 !_allowDiskUse &&            // don't change behavior when testing external sort
                 _sortedFiles.size() < 20) {  // don't open too many FDs
 
@@ -515,7 +515,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
     switch (input.getStatus()) {
         case DocumentSource::GetNextResult::ReturnStatus::kAdvanced: {
-            MONGO_UNREACHABLE;  // We consumed all advances above.
+            MERIZO_UNREACHABLE;  // We consumed all advances above.
         }
         case DocumentSource::GetNextResult::ReturnStatus::kPauseExecution: {
             return input;  // Propagate pause.
@@ -557,7 +557,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             return input;
         }
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool DocumentSourceGroup::usedDisk() {

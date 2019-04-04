@@ -50,7 +50,7 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DECLARE(leaveIndexBuildUnfinishedForShutdown);
+MERIZO_FAIL_POINT_DECLARE(leaveIndexBuildUnfinishedForShutdown);
 
 class Collection;
 class MatchExpression;

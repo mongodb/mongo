@@ -113,7 +113,7 @@ public:
     }
 
     virtual Timestamp getAllCommittedTimestamp() const override {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     virtual Timestamp getOldestOpenReadTimestamp() const override {

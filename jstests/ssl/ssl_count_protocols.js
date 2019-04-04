@@ -25,7 +25,7 @@
         expectedCounts[index] += 1;
         print(tojson(expectedCounts));
 
-        const conn = MongoRunner.runMongod({
+        const conn = MerizoRunner.runMerizod({
             sslMode: 'allowSSL',
             sslPEMKeyFile: SERVER_CERT,
             sslDisabledProtocols: 'none',
@@ -37,7 +37,7 @@
         const version_number = client.replace(/TLS/, "").replace(/_/, ".");
 
         const exitStatus =
-            runMongoProgram('merizo',
+            runMerizoProgram('merizo',
                             '--ssl',
                             '--sslAllowInvalidHostnames',
                             '--sslPEMKeyFile',
@@ -66,7 +66,7 @@
                 0,
                 exitStatus,
                 "A client which does not support TLS 1.3 should not be able to connect with it");
-            MongoRunner.stopMongod(conn);
+            MerizoRunner.stopMerizod(conn);
             return;
         }
 
@@ -92,7 +92,7 @@
 
         assert.eq(lastResult['1'], version_number);
 
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     }
 
     runTestWithoutSubset("TLS1_0");

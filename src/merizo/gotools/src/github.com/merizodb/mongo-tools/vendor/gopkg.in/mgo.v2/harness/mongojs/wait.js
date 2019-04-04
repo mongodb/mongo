@@ -43,7 +43,7 @@ for (var i = 0; i != 60; i++) {
         for (var j = 0; j < allNodes.length; j++ ) {
             var h = "127.0.0.1:"+allNodes[j]
             print("Checking",h)
-		    new Mongo(h).getDB("admin").isMaster()
+		    new Merizo(h).getDB("admin").isMaster()
         }
 		break
 	} catch(err) {
@@ -76,11 +76,11 @@ function countHealthy(rs) {
 
 var totalRSMembers = rs1cfg.members.length + rs2cfg.members.length + rs3cfg.members.length + rs5cfg.members.length
 
-rs1a = new Mongo("127.0.0.1:40011").getDB("admin")
-rs2a = new Mongo("127.0.0.1:40021").getDB("admin")
-rs3a = new Mongo("127.0.0.1:40031").getDB("admin")
+rs1a = new Merizo("127.0.0.1:40011").getDB("admin")
+rs2a = new Merizo("127.0.0.1:40021").getDB("admin")
+rs3a = new Merizo("127.0.0.1:40031").getDB("admin")
 rs3a.auth("root", "rapadura")
-rs5a = new Mongo("127.0.0.1:40051").getDB("admin")
+rs5a = new Merizo("127.0.0.1:40051").getDB("admin")
 for (var i = 0; i != 90; i++) {
     var count = countHealthy(rs1a) + countHealthy(rs2a) + countHealthy(rs3a) + countHealthy(rs5a)
     print("Replica sets have", count, "healthy nodes out of", totalRSMembers + ".")

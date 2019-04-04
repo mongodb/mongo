@@ -8,7 +8,7 @@
     // implicit sessions.
     TestData.disableImplicitSessions = true;
 
-    const merizod = MongoRunner.runMongod({auth: ""});
+    const merizod = MerizoRunner.runMerizod({auth: ""});
 
     const refresh = {refreshLogicalSessionCacheNow: 1};
     const startSession = {startSession: 1};
@@ -43,5 +43,5 @@
                   .next()
                   .count);
 
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

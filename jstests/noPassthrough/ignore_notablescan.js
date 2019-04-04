@@ -10,7 +10,7 @@
         const s = new ServerType();
 
         const configDB = s.getConn().getDB("config");
-        const session = s.getConn().getDB(dbName).getMongo().startSession();
+        const session = s.getConn().getDB(dbName).getMerizo().startSession();
         const primaryDB = session.getDatabase(dbName);
 
         // Implicitly create the collection outside of the transaction.

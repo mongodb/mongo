@@ -131,12 +131,12 @@ TEST(Excludes, Empty) {
     //
 
     VersionType versionInfo;
-    versionInfo.setExcludingMongoVersions({});
+    versionInfo.setExcludingMerizoVersions({});
 
     // Make sure nothing is included
-    ASSERT(!isInMongoVersionRanges("1.2.3", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("1.2.3-pre", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("1.2.3-rc0", versionInfo.getExcludingMongoVersions()));
+    ASSERT(!isInMerizoVersionRanges("1.2.3", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("1.2.3-pre", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("1.2.3-rc0", versionInfo.getExcludingMerizoVersions()));
 }
 
 TEST(Excludes, SinglePointRange) {
@@ -145,20 +145,20 @@ TEST(Excludes, SinglePointRange) {
     //
 
     VersionType versionInfo;
-    MongoVersionRange vr;
+    MerizoVersionRange vr;
     vr.minVersion = "1.2.3";
-    versionInfo.setExcludingMongoVersions({vr});
+    versionInfo.setExcludingMerizoVersions({vr});
 
-    ASSERT(isInMongoVersionRanges("1.2.3", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("1.2.3", versionInfo.getExcludingMerizoVersions()));
 
-    ASSERT(!isInMongoVersionRanges("1.2.2-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("1.2.2", versionInfo.getExcludingMongoVersions()));
+    ASSERT(!isInMerizoVersionRanges("1.2.2-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("1.2.2", versionInfo.getExcludingMerizoVersions()));
 
-    ASSERT(isInMongoVersionRanges("1.2.3-pre", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("1.2.3-rc0", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("1.2.3-pre", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("1.2.3-rc0", versionInfo.getExcludingMerizoVersions()));
 
-    ASSERT(!isInMongoVersionRanges("1.2.4-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("1.2.4", versionInfo.getExcludingMongoVersions()));
+    ASSERT(!isInMerizoVersionRanges("1.2.4-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("1.2.4", versionInfo.getExcludingMerizoVersions()));
 }
 
 TEST(Excludes, BetweenRange) {
@@ -167,39 +167,39 @@ TEST(Excludes, BetweenRange) {
     //
 
     VersionType versionInfo;
-    MongoVersionRange vr;
+    MerizoVersionRange vr;
     vr.minVersion = "7.8.9";
     vr.maxVersion = "10.11.12";
-    versionInfo.setExcludingMongoVersions({vr});
+    versionInfo.setExcludingMerizoVersions({vr});
 
-    ASSERT(isInMongoVersionRanges("7.8.9", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("10.11.12", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.9", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("10.11.12", versionInfo.getExcludingMerizoVersions()));
 
     // Before
-    ASSERT(!isInMongoVersionRanges("7.8.8-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("7.8.8", versionInfo.getExcludingMongoVersions()));
+    ASSERT(!isInMerizoVersionRanges("7.8.8-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("7.8.8", versionInfo.getExcludingMerizoVersions()));
 
     // Boundary
-    ASSERT(isInMongoVersionRanges("7.8.9-pre", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("7.8.9-rc0", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.9-pre", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.9-rc0", versionInfo.getExcludingMerizoVersions()));
 
-    ASSERT(isInMongoVersionRanges("7.8.10-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("7.8.10", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.10-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.10", versionInfo.getExcludingMerizoVersions()));
 
     // Between
-    ASSERT(isInMongoVersionRanges("8.9.10", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("9.10.11", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("8.9.10", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("9.10.11", versionInfo.getExcludingMerizoVersions()));
 
     // Boundary
-    ASSERT(isInMongoVersionRanges("10.11.11-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("10.11.11", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("10.11.11-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("10.11.11", versionInfo.getExcludingMerizoVersions()));
 
-    ASSERT(isInMongoVersionRanges("10.11.12-pre", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("10.11.12-rc0", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("10.11.12-pre", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("10.11.12-rc0", versionInfo.getExcludingMerizoVersions()));
 
     // After
-    ASSERT(!isInMongoVersionRanges("10.11.13-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("10.11.13", versionInfo.getExcludingMongoVersions()));
+    ASSERT(!isInMerizoVersionRanges("10.11.13-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("10.11.13", versionInfo.getExcludingMerizoVersions()));
 }
 
 TEST(Excludes, WeirdRange) {
@@ -208,40 +208,40 @@ TEST(Excludes, WeirdRange) {
     //
 
     VersionType versionInfo;
-    MongoVersionRange vr;
+    MerizoVersionRange vr;
     vr.minVersion = "7.8.9-rc0";
     vr.maxVersion = "10.11.12-pre";
-    versionInfo.setExcludingMongoVersions({vr});
+    versionInfo.setExcludingMerizoVersions({vr});
 
     // Near endpoints
-    ASSERT(isInMongoVersionRanges("7.8.9", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("10.11.12", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.9", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("10.11.12", versionInfo.getExcludingMerizoVersions()));
 
     // Before
-    ASSERT(!isInMongoVersionRanges("7.8.8-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("7.8.8", versionInfo.getExcludingMongoVersions()));
+    ASSERT(!isInMerizoVersionRanges("7.8.8-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("7.8.8", versionInfo.getExcludingMerizoVersions()));
 
     // Boundary
-    ASSERT(!isInMongoVersionRanges("7.8.9-pre", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("7.8.9-rc0", versionInfo.getExcludingMongoVersions()));
+    ASSERT(!isInMerizoVersionRanges("7.8.9-pre", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.9-rc0", versionInfo.getExcludingMerizoVersions()));
 
-    ASSERT(isInMongoVersionRanges("7.8.10-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("7.8.10", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.10-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("7.8.10", versionInfo.getExcludingMerizoVersions()));
 
     // Between
-    ASSERT(isInMongoVersionRanges("8.9.10", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("9.10.11", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("8.9.10", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("9.10.11", versionInfo.getExcludingMerizoVersions()));
 
     // Boundary
-    ASSERT(isInMongoVersionRanges("10.11.11-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(isInMongoVersionRanges("10.11.11", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("10.11.11-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(isInMerizoVersionRanges("10.11.11", versionInfo.getExcludingMerizoVersions()));
 
-    ASSERT(isInMongoVersionRanges("10.11.12-pre", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("10.11.12-rc0", versionInfo.getExcludingMongoVersions()));
+    ASSERT(isInMerizoVersionRanges("10.11.12-pre", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("10.11.12-rc0", versionInfo.getExcludingMerizoVersions()));
 
     // After
-    ASSERT(!isInMongoVersionRanges("10.11.13-rc0", versionInfo.getExcludingMongoVersions()));
-    ASSERT(!isInMongoVersionRanges("10.11.13", versionInfo.getExcludingMongoVersions()));
+    ASSERT(!isInMerizoVersionRanges("10.11.13-rc0", versionInfo.getExcludingMerizoVersions()));
+    ASSERT(!isInMerizoVersionRanges("10.11.13", versionInfo.getExcludingMerizoVersions()));
 }
 
 TEST(Excludes, BadRangeArray) {
@@ -257,7 +257,7 @@ TEST(Excludes, BadRangeArray) {
     auto versionInfoResult = VersionType::fromBSON(BSON(
         VersionType::minCompatibleVersion(3) << VersionType::currentVersion(4)
                                              << VersionType::clusterId(OID::gen())
-                                             << VersionType::excludingMongoVersions(includeArr)));
+                                             << VersionType::excludingMerizoVersions(includeArr)));
     ASSERT_EQ(ErrorCodes::FailedToParse, versionInfoResult.getStatus());
 }
 

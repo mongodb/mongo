@@ -64,7 +64,7 @@ bool attributeToBool(UColAttributeValue attribute) {
         case UCOL_OFF:
             return false;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -78,7 +78,7 @@ UColAttributeValue getCaseFirstAttribute(CollationSpec::CaseFirstType caseFirst)
             return UCOL_OFF;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 CollationSpec::CaseFirstType getCaseFirstFromAttribute(UColAttributeValue caseFirstAttribute) {
@@ -90,7 +90,7 @@ CollationSpec::CaseFirstType getCaseFirstFromAttribute(UColAttributeValue caseFi
         case UCOL_OFF:
             return CollationSpec::CaseFirstType::kOff;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -108,7 +108,7 @@ UColAttributeValue getStrengthAttribute(CollationSpec::StrengthType strength) {
             return UCOL_IDENTICAL;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 CollationSpec::StrengthType getStrengthFromAttribute(UColAttributeValue strengthAttribute) {
@@ -124,7 +124,7 @@ CollationSpec::StrengthType getStrengthFromAttribute(UColAttributeValue strength
         case UCOL_IDENTICAL:
             return CollationSpec::StrengthType::kIdentical;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -136,7 +136,7 @@ UColAttributeValue getAlternateAttribute(CollationSpec::AlternateType alternate)
             return UCOL_SHIFTED;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 CollationSpec::AlternateType getAlternateFromAttribute(UColAttributeValue alternateAttribute) {
@@ -146,7 +146,7 @@ CollationSpec::AlternateType getAlternateFromAttribute(UColAttributeValue altern
         case UCOL_SHIFTED:
             return CollationSpec::AlternateType::kShifted;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -158,7 +158,7 @@ UColReorderCode getMaxVariableReorderCode(CollationSpec::MaxVariableType maxVari
             return UCOL_REORDER_CODE_SPACE;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 CollationSpec::MaxVariableType getMaxVariableFromReorderCode(
@@ -169,7 +169,7 @@ CollationSpec::MaxVariableType getMaxVariableFromReorderCode(
         case UCOL_REORDER_CODE_SPACE:
             return CollationSpec::MaxVariableType::kSpace;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

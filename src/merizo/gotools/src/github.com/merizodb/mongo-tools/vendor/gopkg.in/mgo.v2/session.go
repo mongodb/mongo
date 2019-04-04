@@ -221,7 +221,7 @@ const (
 //
 //     authMechanism=<mechanism>
 //
-//        Defines the protocol for credential negotiation. Defaults to "MONGODB-CR",
+//        Defines the protocol for credential negotiation. Defaults to "MERIZODB-CR",
 //        which is the default username/password challenge-response mechanism.
 //
 //
@@ -435,7 +435,7 @@ type DialInfo struct {
 	ServiceHost string
 
 	// Mechanism defines the protocol for credential negotiation.
-	// Defaults to "MONGODB-CR".
+	// Defaults to "MERIZODB-CR".
 	Mechanism string
 
 	// Username and Password inform the credentials for the initial authentication
@@ -517,7 +517,7 @@ func DialWithInfo(info *DialInfo) (*Session, error) {
 	if info.Username != "" {
 		source := session.sourcedb
 		if info.Source == "" &&
-			(info.Mechanism == "GSSAPI" || info.Mechanism == "PLAIN" || info.Mechanism == "MONGODB-X509") {
+			(info.Mechanism == "GSSAPI" || info.Mechanism == "PLAIN" || info.Mechanism == "MERIZODB-X509") {
 			source = "$external"
 		}
 		session.dialCred = &Credential{
@@ -784,7 +784,7 @@ type Credential struct {
 	ServiceHost string
 
 	// Mechanism defines the protocol for credential negotiation.
-	// Defaults to "MONGODB-CR".
+	// Defaults to "MERIZODB-CR".
 	Mechanism string
 }
 
@@ -3136,7 +3136,7 @@ func (q *Query) SetMaxTime(d time.Duration) *Query {
 //
 // Relevant documentation:
 //
-//     http://www.merizodb.org/display/DOCS/How+to+do+Snapshotted+Queries+in+the+Mongo+Database
+//     http://www.merizodb.org/display/DOCS/How+to+do+Snapshotted+Queries+in+the+Merizo+Database
 //
 func (q *Query) Snapshot() *Query {
 	q.m.Lock()

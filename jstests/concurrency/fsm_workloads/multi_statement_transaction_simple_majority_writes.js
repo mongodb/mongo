@@ -10,7 +10,7 @@
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js');  // for $config
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');                 // for isMongos
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');                 // for isMerizos
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -76,7 +76,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        if (isMongos(db)) {
+        if (isMerizos(db)) {
             // The database will already have had sharding enabled by the fsm infrastructure.
             db.adminCommand({
                 shardCollection: db[this.majorityWriteCollName].getFullName(),

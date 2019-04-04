@@ -567,7 +567,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
 
         let opts = {};
         if (signal === SIGKILL) {
-            opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
+            opts = {allowedExitCode: MerizoRunner.EXIT_SIGKILL};
         }
 
         log(`Stopping node ${hostName} with signal ${signal}`);

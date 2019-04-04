@@ -15,7 +15,7 @@
     rst.startSet();
     rst.initiate();
     let session =
-        rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+        rst.getPrimary().getDB(dbName).getMerizo().startSession({causalConsistency: false});
     let sessionDb = session.getDatabase(dbName);
     if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern ||
         !sessionDb.serverStatus().storageEngine.persistent) {
@@ -40,7 +40,7 @@
     rst.stopSet();
 
     // readConcern 'snapshot' is not allowed on a standalone.
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     session = conn.startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);
     assert.neq(null, conn, "merizod was unable to start up");
@@ -50,7 +50,7 @@
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.IllegalOperation);
     session.endSession();
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // readConcern 'snapshot' is allowed on a replica set primary.
     rst = new ReplSetTest({nodes: 2});
@@ -58,7 +58,7 @@
     rst.initiate();
     assert.commandWorked(rst.getPrimary().getDB(dbName).runCommand(
         {create: collName, writeConcern: {w: "majority"}}));
-    session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+    session = rst.getPrimary().getDB(dbName).getMerizo().startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);
     session.startTransaction({writeConcern: {w: "majority"}, readConcern: {level: "snapshot"}});
     assert.commandWorked(sessionDb.coll.insert({}));
@@ -112,7 +112,7 @@
         writeConcern: {w: "majority"}
     }));
 
-    session = testDB.getMongo().startSession({causalConsistency: false});
+    session = testDB.getMerizo().startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);
 
     // readConcern 'snapshot' is supported by find.

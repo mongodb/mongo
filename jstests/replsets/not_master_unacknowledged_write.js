@@ -55,7 +55,7 @@
 
     var command = `
       load("jstests/libs/check_log.js");
-      checkLog.contains(db.getMongo(), "hangAfterCollectionInserts fail point enabled");
+      checkLog.contains(db.getMerizo(), "hangAfterCollectionInserts fail point enabled");
       db.adminCommand({replSetStepDown: 60, force: true});`;
 
     var awaitShell = startParallelShell(command, primary.port);

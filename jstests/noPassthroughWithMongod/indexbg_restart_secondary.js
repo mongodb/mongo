@@ -66,7 +66,7 @@
             {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'off'}));
     }
 
-    MongoRunner.stopMongod(second);
+    MerizoRunner.stopMerizod(second);
     replTest.start(second, {}, /*restart=*/true, /*wait=*/true);
 
     // Make sure secondary comes back.

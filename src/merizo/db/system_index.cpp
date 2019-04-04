@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -71,7 +71,7 @@ IndexSpec v3SystemRolesIndexSpec;
 
 const NamespaceString sessionCollectionNamespace("config.system.sessions");
 
-MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
+MERIZO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v1SystemUsersKeyPattern = BSON("user" << 1 << "userSource" << 1);
     v3SystemUsersKeyPattern = BSON(
         AuthorizationManager::USER_NAME_FIELD_NAME << 1 << AuthorizationManager::USER_DB_FIELD_NAME

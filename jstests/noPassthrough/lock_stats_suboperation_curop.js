@@ -21,7 +21,7 @@
 (function() {
     'use strict';
 
-    const conn = MongoRunner.runMongod();
+    const conn = MerizoRunner.runMerizod();
     const db = conn.getDB('test');
     const coll = db.books;
     const blockedMillis = 2000;
@@ -79,5 +79,5 @@
     assert.commandWorked(
         db.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
     dollarOutAggregationShell();
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

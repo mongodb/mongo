@@ -77,49 +77,49 @@ func TestValidOplogLimitChecking(t *testing.T) {
 
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("With a MongoRestore instance with oplogLimit of 5:0", t, func() {
-		mr := &MongoRestore{
-			oplogLimit: bson.MongoTimestamp(int64(5) << 32),
+	Convey("With a MerizoRestore instance with oplogLimit of 5:0", t, func() {
+		mr := &MerizoRestore{
+			oplogLimit: bson.MerizoTimestamp(int64(5) << 32),
 		}
 
 		Convey("an oplog entry with ts=1000:0 should be invalid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(int64(1000)<<32)), ShouldBeFalse)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(int64(1000)<<32)), ShouldBeFalse)
 		})
 
 		Convey("an oplog entry with ts=5:1 should be invalid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(int64(5)<<32|1)), ShouldBeFalse)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(int64(5)<<32|1)), ShouldBeFalse)
 		})
 
 		Convey("an oplog entry with ts=5:0 should be invalid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(int64(5)<<32)), ShouldBeFalse)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(int64(5)<<32)), ShouldBeFalse)
 		})
 
 		Convey("an oplog entry with ts=4:9 should be valid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(int64(4)<<32|9)), ShouldBeTrue)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(int64(4)<<32|9)), ShouldBeTrue)
 		})
 
 		Convey("an oplog entry with ts=4:0 should be valid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(int64(4)<<32)), ShouldBeTrue)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(int64(4)<<32)), ShouldBeTrue)
 		})
 
 		Convey("an oplog entry with ts=0:1 should be valid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(1)), ShouldBeTrue)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(1)), ShouldBeTrue)
 		})
 	})
 
-	Convey("With a MongoRestore instance with no oplogLimit", t, func() {
-		mr := &MongoRestore{}
+	Convey("With a MerizoRestore instance with no oplogLimit", t, func() {
+		mr := &MerizoRestore{}
 
 		Convey("an oplog entry with ts=1000:0 should be valid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(int64(1000)<<32)), ShouldBeTrue)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(int64(1000)<<32)), ShouldBeTrue)
 		})
 
 		Convey("an oplog entry with ts=5:1 should be valid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(int64(5)<<32|1)), ShouldBeTrue)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(int64(5)<<32|1)), ShouldBeTrue)
 		})
 
 		Convey("an oplog entry with ts=5:0 should be valid", func() {
-			So(mr.TimestampBeforeLimit(bson.MongoTimestamp(int64(5)<<32)), ShouldBeTrue)
+			So(mr.TimestampBeforeLimit(bson.MerizoTimestamp(int64(5)<<32)), ShouldBeTrue)
 		})
 	})
 
@@ -143,7 +143,7 @@ func TestOplogRestore(t *testing.T) {
 		shouldPreserveUUID = true
 	}
 
-	Convey("With a test MongoRestore", t, func() {
+	Convey("With a test MerizoRestore", t, func() {
 		inputOptions := &InputOptions{
 			Directory:   "testdata/oplogdump",
 			OplogReplay: true,
@@ -160,7 +160,7 @@ func TestOplogRestore(t *testing.T) {
 			log.Logvf(log.Always, "error connecting to host: %v", err)
 			os.Exit(util.ExitError)
 		}
-		restore := MongoRestore{
+		restore := MerizoRestore{
 			ToolOptions:     toolOpts,
 			OutputOptions:   outputOptions,
 			InputOptions:    inputOptions,
@@ -191,7 +191,7 @@ func TestOplogRestoreTools2002(t *testing.T) {
 		t.Fatalf("No server available")
 	}
 
-	Convey("With a test MongoRestore", t, func() {
+	Convey("With a test MerizoRestore", t, func() {
 		inputOptions := &InputOptions{
 			Directory:   "testdata/tools-2002",
 			OplogReplay: true,
@@ -207,7 +207,7 @@ func TestOplogRestoreTools2002(t *testing.T) {
 			log.Logvf(log.Always, "error connecting to host: %v", err)
 			os.Exit(util.ExitError)
 		}
-		restore := MongoRestore{
+		restore := MerizoRestore{
 			ToolOptions:     toolOpts,
 			OutputOptions:   outputOptions,
 			InputOptions:    inputOptions,

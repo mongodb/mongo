@@ -44,7 +44,7 @@
 namespace merizo {
 
 class DBClientBase;
-class MongoURI;
+class MerizoURI;
 
 /**
  * ConnectionString handles parsing different ways to connect to merizo and determining method
@@ -124,7 +124,7 @@ public:
     std::unique_ptr<DBClientBase> connect(StringData applicationName,
                                           std::string& errmsg,
                                           double socketTimeout = 0,
-                                          const MongoURI* uri = nullptr) const;
+                                          const MerizoURI* uri = nullptr) const;
 
     static StatusWith<ConnectionString> parse(const std::string& url);
 

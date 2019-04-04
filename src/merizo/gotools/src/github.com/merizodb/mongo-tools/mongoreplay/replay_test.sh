@@ -106,7 +106,7 @@ set -e
 
 rm -rf $DBPATH
 mkdir $DBPATH
-log "starting MONGOD"
+log "starting MERIZOD"
 merizod --port=$PORT --dbpath=$DBPATH >/dev/null &
 MONGOPID=$!
 
@@ -186,7 +186,7 @@ check_integrity
 log "flushing FTDC diagnostic files (15 sec)"
 sleep 15
 
-log "killing MONGOD"
+log "killing MERIZOD"
 merizo --port=$PORT merizoreplay_test --eval "db.dropDatabase()" >/dev/null 2>&1
 sleep 1
 kill $MONGOPID

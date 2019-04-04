@@ -23,7 +23,7 @@ red2 = function(k, vs) {
 
 // make sure writing is allowed when started without --auth enabled
 
-dbms = MongoRunner.runMongod({bind_ip: "127.0.0.1"});
+dbms = MerizoRunner.runMerizod({bind_ip: "127.0.0.1"});
 var d = dbms.getDB(dbName);
 var t = d[baseName];
 
@@ -46,12 +46,12 @@ t.mapReduce(map, red, {out: {merge: out}});
 
 d[out].drop();
 
-MongoRunner.stopMongod(dbms);
+MerizoRunner.stopMerizod(dbms);
 
 // In --auth mode, read-only user should not be able to write to existing or temporary collection,
 // thus only can execute inline mode
 
-dbms = MongoRunner.runMongod(
+dbms = MerizoRunner.runMerizod(
     {restart: true, cleanData: false, dbpath: dbms.dbpath, auth: "", bind_ip: "127.0.0.1"});
 d = dbms.getDB(dbName);
 t = d[baseName];
@@ -101,6 +101,6 @@ assert.throws(function() {
     t.mapReduce(map, red, {out: {replace: out, db: "admin"}});
 });
 
-MongoRunner.stopMongod(dbms);
+MerizoRunner.stopMerizod(dbms);
 
 print("\n\n\nmr_auth.js SUCCESS\n\n\n");

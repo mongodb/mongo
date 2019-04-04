@@ -340,7 +340,7 @@
         whatsmyuri: {skip: "does not return user data"}
     };
 
-    commandsRemovedFromMongosIn42.forEach(function(cmd) {
+    commandsRemovedFromMerizosIn42.forEach(function(cmd) {
         testCases[cmd] = {skip: "must define test coverage for 4.0 backwards compatibility"};
     });
 
@@ -353,8 +353,8 @@
     let donorShardSecondary = st.rs0.getSecondary();
     let recipientShardSecondary = st.rs1.getSecondary();
 
-    let freshMongos = st.s0;
-    let staleMongos = st.s1;
+    let freshMerizos = st.s0;
+    let staleMerizos = st.s1;
 
     let res = st.s.adminCommand({listCommands: 1});
     assert.commandWorked(res);
@@ -373,27 +373,27 @@
 
         jsTest.log("testing command " + tojson(test.command));
 
-        assert.commandWorked(freshMongos.adminCommand({enableSharding: db}));
+        assert.commandWorked(freshMerizos.adminCommand({enableSharding: db}));
         st.ensurePrimaryShard(db, st.shard0.shardName);
-        assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
+        assert.commandWorked(freshMerizos.adminCommand({shardCollection: nss, key: {x: 1}}));
 
-        // We do this because we expect staleMongos to see that the collection is sharded, which
+        // We do this because we expect staleMerizos to see that the collection is sharded, which
         // it may not if the "nearest" config server it contacts has not replicated the
         // shardCollection writes (or has not heard that they have reached a majority).
         st.configRS.awaitReplication();
 
-        assert.commandWorked(freshMongos.adminCommand({split: nss, middle: {x: 0}}));
+        assert.commandWorked(freshMerizos.adminCommand({split: nss, middle: {x: 0}}));
 
         // Do dummy read from the stale merizos so it loads the routing table into memory once.
         // Additionally, do a secondary read to ensure that the secondary has loaded the initial
         // routing table -- the first read to the primary will refresh the merizos' shardVersion,
         // which will then be used against the secondary to ensure the secondary is fresh.
-        assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
-        assert.commandWorked(freshMongos.getDB(db).runCommand(
+        assert.commandWorked(staleMerizos.getDB(db).runCommand({find: coll}));
+        assert.commandWorked(freshMerizos.getDB(db).runCommand(
             {find: coll, $readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
 
         // Do any test-specific setup.
-        test.setUp(staleMongos);
+        test.setUp(staleMerizos);
 
         // Wait for replication as a safety net, in case the individual setup function for a test
         // case did not specify writeConcern itself
@@ -411,7 +411,7 @@
         // Do a moveChunk from the fresh merizos to make the other merizos stale.
         // Use {w:2} (all) write concern so the metadata change gets persisted to the secondary
         // before stalely versioned commands are sent against the secondary.
-        assert.commandWorked(freshMongos.adminCommand({
+        assert.commandWorked(freshMerizos.adminCommand({
             moveChunk: nss,
             find: {x: 0},
             to: st.shard1.shardName,
@@ -427,10 +427,10 @@
             Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: 'local'}});
 
         let availableReadConcernRes =
-            staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernAvailable);
+            staleMerizos.getDB(db).runCommand(cmdPrefSecondaryConcernAvailable);
         test.checkAvailableReadConcernResults(availableReadConcernRes);
 
-        let defaultReadConcernRes = staleMongos.getDB(db).runCommand(cmdReadPrefSecondary);
+        let defaultReadConcernRes = staleMerizos.getDB(db).runCommand(cmdReadPrefSecondary);
         if (command === 'mapReduce') {
             // mapReduce is always sent to a primary, which defaults to 'local' readConcern
             test.checkResults(defaultReadConcernRes);
@@ -439,7 +439,7 @@
             test.checkAvailableReadConcernResults(defaultReadConcernRes);
         }
 
-        let localReadConcernRes = staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernLocal);
+        let localReadConcernRes = staleMerizos.getDB(db).runCommand(cmdPrefSecondaryConcernLocal);
         test.checkResults(localReadConcernRes);
 
         // Build the query to identify the operation in the system profiler.
@@ -534,8 +534,8 @@
 
         // Clean up the collection by dropping the DB. This also drops all associated indexes and
         // clears the profiler collection.
-        // Do this from staleMongos, so staleMongos purges the database entry from its cache.
-        assert.commandWorked(staleMongos.getDB(db).runCommand({dropDatabase: 1}));
+        // Do this from staleMerizos, so staleMerizos purges the database entry from its cache.
+        assert.commandWorked(staleMerizos.getDB(db).runCommand({dropDatabase: 1}));
     }
 
     st.stop();

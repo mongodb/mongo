@@ -31,7 +31,7 @@
     assert.neq(null, fooDBDoc);
     assert(fooDBDoc.partitioned);
 
-    var newShardConn = MongoRunner.runMongod({'shardsvr': ""});
+    var newShardConn = MerizoRunner.runMerizod({'shardsvr': ""});
     var unshardedDB = newShardConn.getDB('unshardedDB');
 
     unshardedDB.user.insert({z: 1});
@@ -40,7 +40,7 @@
 
     assert.neq(null, configDB.databases.findOne({_id: 'unshardedDB'}));
 
-    MongoRunner.stopMongod(newShardConn);
+    MerizoRunner.stopMerizod(newShardConn);
     st.stop();
 
 })();

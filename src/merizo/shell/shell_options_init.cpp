@@ -38,8 +38,8 @@
 #include "merizo/util/quick_exit.h"
 
 namespace merizo {
-MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
-    if (!handlePreValidationMongoShellOptions(moe::startupOptionsParsed, context->args())) {
+MERIZO_STARTUP_OPTIONS_VALIDATE(MerizoShellOptions)(InitializerContext* context) {
+    if (!handlePreValidationMerizoShellOptions(moe::startupOptionsParsed, context->args())) {
         quickExit(EXIT_SUCCESS);
     }
     Status ret = moe::startupOptionsParsed.validate();
@@ -50,8 +50,8 @@ MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
     return Status::OK();
 }
 
-MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
-    Status ret = storeMongoShellOptions(moe::startupOptionsParsed, context->args());
+MERIZO_STARTUP_OPTIONS_STORE(MerizoShellOptions)(InitializerContext* context) {
+    Status ret = storeMerizoShellOptions(moe::startupOptionsParsed, context->args());
     if (!ret.isOK()) {
         std::cerr << ret.toString() << std::endl;
         std::cerr << "try '" << context->args()[0] << " --help' for more information" << std::endl;

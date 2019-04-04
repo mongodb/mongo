@@ -7,7 +7,7 @@
 //
 //       These transitions are tested for $where and MapReduce.
 
-var conn = MongoRunner.runMongod();
+var conn = MerizoRunner.runMerizod();
 var test = conn.getDB("test");
 
 // insert a single document and add two test users
@@ -89,4 +89,4 @@ function testMapReduce() {
 testMapReduce();
 testMapReduce();
 
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);

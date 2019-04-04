@@ -16,7 +16,7 @@ class TestFetchTestLifecycle(unittest.TestCase):
                                                              "merizo_revision_02"),
              ("metadata_revision_02", "merizo_revision_02"), ("metadata_revision_01", None)])
 
-        merizo_repo = MockMongoRepository([
+        merizo_repo = MockMerizoRepository([
             "merizo_revision_07", "merizo_revision_06", "merizo_revision_05", "merizo_revision_04",
             "merizo_revision_03", "merizo_revision_02", "merizo_revision_01"
         ])
@@ -48,7 +48,7 @@ class TestFetchTestLifecycle(unittest.TestCase):
         self.assertEqual(expected_metadata_revision, metadata_revision)
 
 
-class MockMongoRepository(object):
+class MockMerizoRepository(object):
     def __init__(self, revisions):
         self.revisions = revisions
 

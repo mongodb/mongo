@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -54,7 +54,7 @@ namespace moe = merizo::optionenvironment;
 namespace {
 boost::filesystem::path defaultRoot;
 
-MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext* context) {
+MERIZO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext* context) {
     if (moe::startupOptionsParsed.count("tempPath")) {
         defaultRoot = moe::startupOptionsParsed["tempPath"].as<string>();
     } else {

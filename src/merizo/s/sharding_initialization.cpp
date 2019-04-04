@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -172,7 +172,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     }
 
     // We don't set the ConnectionPool's static const variables to be the default value in
-    // MONGO_EXPORT_STARTUP_SERVER_PARAMETER because it's not guaranteed to be initialized.
+    // MERIZO_EXPORT_STARTUP_SERVER_PARAMETER because it's not guaranteed to be initialized.
     // The following code is a workaround.
     ConnectionPool::Options connPoolOptions;
 

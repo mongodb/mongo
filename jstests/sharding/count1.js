@@ -64,7 +64,7 @@
     assert.commandWorked(s.s0.adminCommand({
         moveChunk: "test.foo",
         find: {name: "eliot"},
-        to: secondary.getMongo().name,
+        to: secondary.getMerizo().name,
         _waitForDelete: true
     }));
 

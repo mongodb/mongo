@@ -15,7 +15,7 @@
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 
     const sessionOptions = {causalConsistency: false};
-    const session = db.getMongo().startSession(sessionOptions);
+    const session = db.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
     let txnNumber = 0;
 
@@ -182,8 +182,8 @@
         autocommit: false
     }));
 
-    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
-    if (!isMongos) {
+    const isMerizos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    if (!isMerizos) {
         // Skip commands that do not exist on merizos.
 
         jsTestLog("Check that geoSearch accepts a statement ID");

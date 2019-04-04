@@ -218,14 +218,14 @@ bool BigSimplePolygon::VirtualContainsPoint(const S2Point& p) const {
 }
 
 void BigSimplePolygon::Encode(Encoder* const encoder) const {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool BigSimplePolygon::Decode(Decoder* const decoder) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 bool BigSimplePolygon::DecodeWithinScope(Decoder* const decoder) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 }

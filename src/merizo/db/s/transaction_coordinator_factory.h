@@ -35,7 +35,7 @@
 
 namespace merizo {
 
-extern MONGO_DECLARE_SHIM((OperationContext * opCtx, TxnNumber clientTxnNumber)->void)
+extern MERIZO_DECLARE_SHIM((OperationContext * opCtx, TxnNumber clientTxnNumber)->void)
     createTransactionCoordinator;
 
 }  // namespace merizo

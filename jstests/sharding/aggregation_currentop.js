@@ -116,7 +116,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         for (let i = 0; i < stParams.shards; i++) {
             restartReplSet(st[`rs${i}`], newOpts);
         }
-        st.restartMongos(0, Object.assign(newOpts, {restart: true}));
+        st.restartMerizos(0, Object.assign(newOpts, {restart: true}));
         st.keyFile = newOpts.keyFile;
         // Re-link the cluster components.
         shardConn = st.rs0.getPrimary();
@@ -197,7 +197,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     function getMoreTest({conn, curOpSpec, getMoreBatchSize}) {
         // Ensure that there are some other connections present so that the result set is larger
         // than 1 $currentOp entry.
-        const otherConns = [new Mongo(conn.host), new Mongo(conn.host)];
+        const otherConns = [new Merizo(conn.host), new Merizo(conn.host)];
         curOpSpec = Object.assign({idleConnections: true}, (curOpSpec || {}));
 
         // Log the other connections in as user_no_inprog so that they will show up for user_inprog
@@ -233,7 +233,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
             return Object.assign({}, curOpSpec, spec);
         }
 
-        const isLocalMongosCurOp = (conn == merizosConn && curOpSpec.localOps);
+        const isLocalMerizosCurOp = (conn == merizosConn && curOpSpec.localOps);
         const isRemoteShardCurOp = (conn == merizosConn && !curOpSpec.localOps);
 
         // Test that an unauthenticated connection cannot run $currentOp even with {allUsers:
@@ -342,7 +342,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                                      ErrorCodes.InvalidOptions);
 
         // Test that {idleConnections: false} returns only active connections.
-        const idleConn = new Mongo(conn.host);
+        const idleConn = new Merizo(conn.host);
 
         assert.eq(adminDB
                       .aggregate([
@@ -423,7 +423,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
                 let shardName = st["rs" + i].name;
                 assert.docEq(explainPlan.shards[shardName].stages, expectedStages);
             }
-        } else if (isLocalMongosCurOp) {
+        } else if (isLocalMerizosCurOp) {
             expectedStages[0].$currentOp.localOps = true;
             assert.docEq(explainPlan.merizos.stages, expectedStages);
         } else {
@@ -518,7 +518,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         // The 'localOps' parameter is not supported by the currentOp command, so we limit its
         // testing to the replica set in certain cases.
         const connAdminDB = conn.getDB("admin");
-        const isMongos = FixtureHelpers.isMongos(connAdminDB);
+        const isMerizos = FixtureHelpers.isMerizos(connAdminDB);
 
         // Test that a user with the inprog privilege can see another user's ops with
         // {allUsers:true}.
@@ -546,7 +546,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 
         // Test that the currentOp command can see another user's operations with {$ownOps: false}.
         // Only test on a replica set since 'localOps' isn't supported by the currentOp command.
-        if (!isMongos) {
+        if (!isMerizos) {
             assert.eq(
                 connAdminDB
                     .currentOp({$ownOps: false, "command.comment": "agg_current_op_allusers_test"})
@@ -568,7 +568,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         // Test that the currentOp command succeeds with {$ownOps: true} for a user without the
         // "inprog" privilege. Because currentOp does not support the 'localOps' parameter, we only
         // perform this test in the replica set case.
-        if (!isMongos) {
+        if (!isMerizos) {
             assert.commandWorked(connAdminDB.currentOp({$ownOps: true}));
         }
 
@@ -584,7 +584,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         // Test that a user without the inprog privilege cannot see another user's operations via
         // the currentOp command. Limit this test to the replica set case due to the absence of a
         // 'localOps' parameter for the currentOp command.
-        if (!isMongos) {
+        if (!isMerizos) {
             assert.eq(
                 connAdminDB
                     .currentOp({$ownOps: true, "command.comment": "agg_current_op_allusers_test"})
@@ -634,7 +634,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         assert(shardAdminDB.auth(userNames[i], "pwd"));
 
         // Create a session for this user.
-        const session = shardAdminDB.getMongo().startSession();
+        const session = shardAdminDB.getMerizo().startSession();
 
         // For each session, start but do not complete a transaction.
         const sessionDB = session.getDatabase(shardTestDB.getName());
@@ -718,7 +718,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 
     // Test that $currentOp will display all stashed transaction locks by default if auth is
     // disabled, even with 'allUsers:false'.
-    const session = shardAdminDB.getMongo().startSession();
+    const session = shardAdminDB.getMerizo().startSession();
 
     // Run an operation prior to starting the transaction and save its operation time.
     const sessionDB = session.getDatabase(shardTestDB.getName());
@@ -812,7 +812,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
         // Test that the allUsers parameter is ignored when authentication is disabled.
         // Ensure that there is at least one other connection present.
         const connAdminDB = conn.getDB("admin");
-        const otherConn = new Mongo(conn.host);
+        const otherConn = new Merizo(conn.host);
         curOpSpec = Object.assign({localOps: false}, (curOpSpec || {}));
 
         // Verify that $currentOp displays all operations when auth is disabled regardless of the
@@ -871,7 +871,7 @@ TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
     // Test that attempting to 'spoof' a sharded request on non-shardsvr merizoD fails.
     assert.commandFailedWithCode(
         shardAdminDB.runCommand(
-            {aggregate: 1, pipeline: [{$currentOp: {}}], fromMongos: true, cursor: {}}),
+            {aggregate: 1, pipeline: [{$currentOp: {}}], fromMerizos: true, cursor: {}}),
         40465);
 
     // Test that an operation which is at the BSON user size limit does not throw an error when the

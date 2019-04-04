@@ -29,7 +29,7 @@ func TestKerberos(t *testing.T) {
 		sessionProvider, err := db.NewSessionProvider(*opts)
 		So(err, ShouldBeNil)
 
-		export := MongoExport{
+		export := MerizoExport{
 			ToolOptions:     *opts,
 			OutputOpts:      &OutputFormatOptions{},
 			InputOpts:       &InputOptions{},

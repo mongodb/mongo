@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -146,7 +146,7 @@ auth::RunCommandHook AsyncDBClient::_makeAuthRunCommandHook() {
 Future<void> AsyncDBClient::authenticate(const BSONObj& params) {
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (getSSLManager()) {
         clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
     }
@@ -162,7 +162,7 @@ Future<void> AsyncDBClient::authenticateInternal(boost::optional<std::string> me
     }
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
-#ifdef MONGO_CONFIG_SSL
+#ifdef MERIZO_CONFIG_SSL
     if (getSSLManager()) {
         clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
     }

@@ -120,10 +120,10 @@ ProjectionExec::ProjectionExec(OperationContext* opCtx,
                     _hasReturnKey = true;
                 } else {
                     // This shouldn't happen, should be caught by parsing.
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
                 }
             } else {
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
             }
         } else if (merizoutils::str::equals(e.fieldName(), "_id") && !e.trueValue()) {
             _includeID = false;

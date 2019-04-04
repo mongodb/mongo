@@ -96,7 +96,7 @@ public:
 
     AuthorizationManager() = default;
 
-    static MONGO_DECLARE_SHIM(()->std::unique_ptr<AuthorizationManager>) create;
+    static MERIZO_DECLARE_SHIM(()->std::unique_ptr<AuthorizationManager>) create;
 
     static constexpr StringData USERID_FIELD_NAME = "userId"_sd;
     static constexpr StringData USER_NAME_FIELD_NAME = "user"_sd;
@@ -152,7 +152,7 @@ public:
     static const int schemaVersion26Upgrade = 2;
 
     /**
-     * Auth schema version for MerizoDB 2.6 and 3.0 MONGODB-CR/SCRAM mixed auth mode.
+     * Auth schema version for MerizoDB 2.6 and 3.0 MERIZODB-CR/SCRAM mixed auth mode.
      * Users are stored in admin.system.users, roles in admin.system.roles.
      */
     static const int schemaVersion26Final = 3;
@@ -160,7 +160,7 @@ public:
     /**
      * Auth schema version for MerizoDB 3.0 SCRAM only mode.
      * Users are stored in admin.system.users, roles in admin.system.roles.
-     * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
+     * MERIZODB-CR credentials have been replaced with SCRAM credentials in the user documents.
      */
     static const int schemaVersion28SCRAM = 5;
 

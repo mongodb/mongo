@@ -36,11 +36,11 @@
 namespace merizo {
 
 /**
- * Specialized version of the MongoDInterface when this node is a shard server.
+ * Specialized version of the MerizoDInterface when this node is a shard server.
  */
-class MongoInterfaceShardServer final : public MongoInterfaceStandalone {
+class MerizoInterfaceShardServer final : public MerizoInterfaceStandalone {
 public:
-    using MongoInterfaceStandalone::MongoInterfaceStandalone;
+    using MerizoInterfaceStandalone::MerizoInterfaceStandalone;
 
     void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const NamespaceString& nss,
@@ -54,7 +54,7 @@ public:
         // We don't expect anyone to use this method on the shard itself (yet). This is currently
         // only used for $out. For $out in a sharded cluster, the merizos is responsible for
         // collecting the document key fields before serializing them and sending them to the
-        // shards. This is logically a MONGO_UNREACHABLE, but a malicious user could construct a
+        // shards. This is logically a MERIZO_UNREACHABLE, but a malicious user could construct a
         // request to send directly to the shards which does not include the uniqueKey, so we must
         // be prepared to gracefully error.
         uasserted(50997, "Unexpected attempt to consult catalog cache on a shard server");

@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 #define LOG_FOR_HEARTBEATS(level) \
-    MONGO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationHeartbeats)
+    MERIZO_LOG_COMPONENT(level, ::merizo::logger::LogComponent::kReplicationHeartbeats)
 
 #include "merizo/platform/basic.h"
 
@@ -150,7 +150,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(CmdReplSetTest);
+MERIZO_REGISTER_TEST_COMMAND(CmdReplSetTest);
 
 /** get rollback id.  used to check if a rollback happened during some interval of time.
     as consumed, the rollback id is not in any particular order, it simply changes on each rollback.
@@ -637,7 +637,7 @@ bool replHasDatabases(OperationContext* opCtx) {
 
 }  // namespace
 
-MONGO_FAIL_POINT_DEFINE(rsDelayHeartbeatResponse);
+MERIZO_FAIL_POINT_DEFINE(rsDelayHeartbeatResponse);
 
 /* { replSetHeartbeat : <setname> } */
 class CmdReplSetHeartbeat : public ReplSetCommand {
@@ -647,7 +647,7 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
+        MERIZO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
             const BSONObj& data = delay.getData();
             sleepsecs(data["delay"].numberInt());
         }

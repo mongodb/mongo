@@ -25,14 +25,14 @@
     for (let compressor of compressors) {
         jsTestLog({"Starting with compressor": compressor});
         if (firstIteration) {
-            merizo = MongoRunner.runMongod({
+            merizo = MerizoRunner.runMerizod({
                 wiredTigerCollectionBlockCompressor: compressor,
                 wiredTigerJournalCompressor: compressor
             });
             firstIteration = false;
         } else {
-            MongoRunner.stopMongod(merizo);
-            merizo = MongoRunner.runMongod({
+            MerizoRunner.stopMerizod(merizo);
+            merizo = MerizoRunner.runMerizod({
                 restart: true,
                 dbpath: merizo.dbpath,
                 cleanData: false,
@@ -48,5 +48,5 @@
         assert(stats['wiredTiger']['creationString'].search('block_compressor=' + compressor) > -1);
     }
 
-    MongoRunner.stopMongod(merizo);
+    MerizoRunner.stopMerizod(merizo);
 }());

@@ -24,7 +24,7 @@ var $config = (function() {
             var debugDoc = tojson({query: query, update: update, options: options, result: res});
             assertWhenOwnColl.eq(1, res.nUpserted, debugDoc);
             assertWhenOwnColl.eq(0, res.nMatched, debugDoc);
-            if (db.getMongo().writeMode() === 'commands') {
+            if (db.getMerizo().writeMode() === 'commands') {
                 assertWhenOwnColl.eq(0, res.nModified, debugDoc);
             }
         },
@@ -39,7 +39,7 @@ var $config = (function() {
 
             assertWhenOwnColl.eq(0, res.nUpserted, tojson(res));
             assertWhenOwnColl.lte(1, res.nMatched, tojson(res));
-            if (db.getMongo().writeMode() === 'commands') {
+            if (db.getMerizo().writeMode() === 'commands') {
                 assertWhenOwnColl.eq(res.nMatched, res.nModified, tojson(res));
             }
         },

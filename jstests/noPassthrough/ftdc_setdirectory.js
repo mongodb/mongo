@@ -6,9 +6,9 @@ load('jstests/libs/ftdc.js');
 
 (function() {
     'use strict';
-    let testPath1 = MongoRunner.toRealPath('ftdc_setdir1');
-    let testPath2 = MongoRunner.toRealPath('ftdc_setdir2');
-    let testPath3 = MongoRunner.toRealPath('ftdc_setdir3');
+    let testPath1 = MerizoRunner.toRealPath('ftdc_setdir1');
+    let testPath2 = MerizoRunner.toRealPath('ftdc_setdir2');
+    let testPath3 = MerizoRunner.toRealPath('ftdc_setdir3');
     // SERVER-30394: Use a directory relative to the current working directory.
     let testPath4 = 'ftdc_setdir4/';
     let testLog3 = testPath3 + "merizos_ftdc.log";
@@ -19,9 +19,9 @@ load('jstests/libs/ftdc.js');
     mkdir(testPath4);
 
     // Startup 3 merizos:
-    // 1. Normal MongoS with no log file to verify FTDC can be startup at runtime with a path.
-    // 2. MongoS with explict diagnosticDataCollectionDirectoryPath setParameter at startup.
-    // 3. MongoS with log file to verify automatic FTDC path computation works.
+    // 1. Normal MerizoS with no log file to verify FTDC can be startup at runtime with a path.
+    // 2. MerizoS with explict diagnosticDataCollectionDirectoryPath setParameter at startup.
+    // 3. MerizoS with log file to verify automatic FTDC path computation works.
     let st = new ShardingTest({
         shards: 1,
         merizos: {
@@ -93,7 +93,7 @@ load('jstests/libs/ftdc.js');
     }
 
     function normpath(path) {
-        // On Windows, strip the drive path because MongoRunner.toRealPath() returns a Unix Path
+        // On Windows, strip the drive path because MerizoRunner.toRealPath() returns a Unix Path
         // while FTDC returns a Windows path.
         return path.replace(/\\/g, "/").replace(/\w:/, "");
     }

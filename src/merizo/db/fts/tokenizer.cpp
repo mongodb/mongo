@@ -53,7 +53,7 @@ Token Tokenizer::next() {
     unsigned start = _pos++;
     Token::Type type = _type(_raw[start]);
     if (type == Token::WHITESPACE)
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
 
     if (type == Token::TEXT)
         while (_pos < _raw.size() && _type(_raw[_pos]) == type)

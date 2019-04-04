@@ -8,7 +8,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     'use strict';
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticMerizod = MerizoRunner.runMerizod({});  // For startParallelOps.
 
     var st = new ShardingTest({shards: 2, merizos: 1});
 
@@ -25,7 +25,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.startedMoveChunk);
 
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {_id: 1}, null, coll.getFullName(), st.shard1.shardName);
+        staticMerizod, st.s0.host, {_id: 1}, null, coll.getFullName(), st.shard1.shardName);
 
     var assertMigrationStatusOnServerStatus = function(serverStatusResult,
                                                        sourceShard,
@@ -60,7 +60,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     var shard1ServerStatus = st.shard1.getDB('admin').runCommand({serverStatus: 1});
     assert(!shard1ServerStatus.sharding.migrations);
 
-    // Mongos should never return a migration status.
+    // Merizos should never return a migration status.
     var merizosServerStatus = st.s0.getDB('admin').runCommand({serverStatus: 1});
     assert(!merizosServerStatus.sharding.migrations);
 
@@ -72,6 +72,6 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert(!shard0ServerStatus.sharding.migrations);
 
     st.stop();
-    MongoRunner.stopMongod(staticMongod);
+    MerizoRunner.stopMerizod(staticMerizod);
 
 })();

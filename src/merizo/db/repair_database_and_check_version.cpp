@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -65,9 +65,9 @@
 namespace merizo {
 
 // Exit after repair has started, but before data is repaired.
-MONGO_FAIL_POINT_DEFINE(exitBeforeDataRepair);
+MERIZO_FAIL_POINT_DEFINE(exitBeforeDataRepair);
 // Exit after repairing data, but before the replica set configuration is invalidated.
-MONGO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
+MERIZO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
 
 namespace {
 
@@ -332,7 +332,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     if (storageGlobalParams.repair) {
         invariant(!storageGlobalParams.readOnly);
 
-        if (MONGO_FAIL_POINT(exitBeforeDataRepair)) {
+        if (MERIZO_FAIL_POINT(exitBeforeDataRepair)) {
             log() << "Exiting because 'exitBeforeDataRepair' fail point was set.";
             quickExit(EXIT_ABRUPT);
         }
@@ -396,7 +396,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     }
 
     if (storageGlobalParams.repair) {
-        if (MONGO_FAIL_POINT(exitBeforeRepairInvalidatesConfig)) {
+        if (MERIZO_FAIL_POINT(exitBeforeRepairInvalidatesConfig)) {
             log() << "Exiting because 'exitBeforeRepairInvalidatesConfig' fail point was set.";
             quickExit(EXIT_ABRUPT);
         }
@@ -463,7 +463,7 @@ bool repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             severe() << "Please consult our documentation when trying to downgrade to a previous"
                         " major release";
             quickExit(EXIT_NEED_UPGRADE);
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }
 
 

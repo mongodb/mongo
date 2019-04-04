@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -240,7 +240,7 @@ public:
             }();
 
             if (requestedVersion.isWriteCompatibleWith(collectionShardVersion)) {
-                // MongoS and MongoD agree on what is the collection's shard version
+                // MerizoS and MerizoD agree on what is the collection's shard version
                 //
                 // Now we should update the connection's version if it's not compatible with the
                 // request's version. This could happen if the shard's metadata has changed, but

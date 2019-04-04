@@ -36,13 +36,13 @@
 // unconditional logging functions severe(), error(), warning() and log(). Disallowing multiple
 // inclusion of log.h will ensure that the default component will be set correctly.
 
-#if defined(MONGO_UTIL_LOG_H_)
+#if defined(MERIZO_UTIL_LOG_H_)
 #error \
     "merizo/util/log.h cannot be included multiple times. " \
        "This may occur when log.h is included in a header. " \
        "Please check your #include's."
-#else  // MONGO_UTIL_LOG_H_
-#define MONGO_UTIL_LOG_H_
+#else  // MERIZO_UTIL_LOG_H_
+#define MERIZO_UTIL_LOG_H_
 
 #include "merizo/base/status.h"
 #include "merizo/bson/util/builder.h"
@@ -55,16 +55,16 @@
 #include "merizo/util/concurrency/thread_name.h"
 #include "merizo/util/errno_util.h"
 
-// Provide log component in global scope so that MONGO_LOG will always have a valid component.
-// Global log component will be kDefault unless overridden by MONGO_LOG_DEFAULT_COMPONENT.
-#if defined(MONGO_LOG_DEFAULT_COMPONENT)
-const ::merizo::logger::LogComponent MongoLogDefaultComponent_component =
-    MONGO_LOG_DEFAULT_COMPONENT;
+// Provide log component in global scope so that MERIZO_LOG will always have a valid component.
+// Global log component will be kDefault unless overridden by MERIZO_LOG_DEFAULT_COMPONENT.
+#if defined(MERIZO_LOG_DEFAULT_COMPONENT)
+const ::merizo::logger::LogComponent MerizoLogDefaultComponent_component =
+    MERIZO_LOG_DEFAULT_COMPONENT;
 #else
 #error \
-    "merizo/util/log.h requires MONGO_LOG_DEFAULT_COMPONENT to be defined. " \
+    "merizo/util/log.h requires MERIZO_LOG_DEFAULT_COMPONENT to be defined. " \
        "Please see http://www.merizodb.org/about/contributors/reference/server-logging-rules/ "
-#endif  // MONGO_LOG_DEFAULT_COMPONENT
+#endif  // MERIZO_LOG_DEFAULT_COMPONENT
 
 namespace merizo {
 
@@ -86,7 +86,7 @@ inline LogstreamBuilder severe() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Severe(),
-                            ::MongoLogDefaultComponent_component);
+                            ::MerizoLogDefaultComponent_component);
 }
 
 inline LogstreamBuilder severe(logger::LogComponent component) {
@@ -101,7 +101,7 @@ inline LogstreamBuilder error() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Error(),
-                            ::MongoLogDefaultComponent_component);
+                            ::MerizoLogDefaultComponent_component);
 }
 
 inline LogstreamBuilder error(logger::LogComponent component) {
@@ -116,7 +116,7 @@ inline LogstreamBuilder warning() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Warning(),
-                            ::MongoLogDefaultComponent_component);
+                            ::MerizoLogDefaultComponent_component);
 }
 
 inline LogstreamBuilder warning(logger::LogComponent component) {
@@ -131,7 +131,7 @@ inline LogstreamBuilder log() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Log(),
-                            ::MongoLogDefaultComponent_component);
+                            ::MerizoLogDefaultComponent_component);
 }
 
 /**
@@ -146,7 +146,7 @@ inline LogstreamBuilder logNoCache() {
     return LogstreamBuilder(logger::globalLogDomain(),
                             getThreadName(),
                             logger::LogSeverity::Log(),
-                            ::MongoLogDefaultComponent_component,
+                            ::MerizoLogDefaultComponent_component,
                             false);
 }
 
@@ -168,25 +168,25 @@ inline bool shouldLog(logger::LogComponent logComponent, logger::LogSeverity sev
 }
 
 inline bool shouldLog(logger::LogSeverity severity) {
-    return shouldLog(::MongoLogDefaultComponent_component, severity);
+    return shouldLog(::MerizoLogDefaultComponent_component, severity);
 }
 
 }  // namespace
 
-// MONGO_LOG uses log component from MongoLogDefaultComponent from current or global namespace.
-#define MONGO_LOG(DLEVEL)                                                              \
+// MERIZO_LOG uses log component from MerizoLogDefaultComponent from current or global namespace.
+#define MERIZO_LOG(DLEVEL)                                                              \
     if (!(::merizo::logger::globalLogDomain())                                          \
-             ->shouldLog(MongoLogDefaultComponent_component,                           \
+             ->shouldLog(MerizoLogDefaultComponent_component,                           \
                          ::merizo::LogstreamBuilder::severityCast(DLEVEL))) {           \
     } else                                                                             \
     ::merizo::logger::LogstreamBuilder(::merizo::logger::globalLogDomain(),              \
                                       ::merizo::getThreadName(),                        \
                                       ::merizo::LogstreamBuilder::severityCast(DLEVEL), \
-                                      MongoLogDefaultComponent_component)
+                                      MerizoLogDefaultComponent_component)
 
-#define LOG MONGO_LOG
+#define LOG MERIZO_LOG
 
-#define MONGO_LOG_COMPONENT(DLEVEL, COMPONENT1)                                            \
+#define MERIZO_LOG_COMPONENT(DLEVEL, COMPONENT1)                                            \
     if (!(::merizo::logger::globalLogDomain())                                              \
              ->shouldLog((COMPONENT1), ::merizo::LogstreamBuilder::severityCast(DLEVEL))) { \
     } else                                                                                 \
@@ -195,7 +195,7 @@ inline bool shouldLog(logger::LogSeverity severity) {
                                       ::merizo::LogstreamBuilder::severityCast(DLEVEL),     \
                                       (COMPONENT1))
 
-#define MONGO_LOG_COMPONENT2(DLEVEL, COMPONENT1, COMPONENT2)                                     \
+#define MERIZO_LOG_COMPONENT2(DLEVEL, COMPONENT1, COMPONENT2)                                     \
     if (!(::merizo::logger::globalLogDomain())                                                    \
              ->shouldLog(                                                                        \
                  (COMPONENT1), (COMPONENT2), ::merizo::LogstreamBuilder::severityCast(DLEVEL))) { \
@@ -205,7 +205,7 @@ inline bool shouldLog(logger::LogSeverity severity) {
                                       ::merizo::LogstreamBuilder::severityCast(DLEVEL),           \
                                       (COMPONENT1))
 
-#define MONGO_LOG_COMPONENT3(DLEVEL, COMPONENT1, COMPONENT2, COMPONENT3)               \
+#define MERIZO_LOG_COMPONENT3(DLEVEL, COMPONENT1, COMPONENT2, COMPONENT3)               \
     if (!(::merizo::logger::globalLogDomain())                                          \
              ->shouldLog((COMPONENT1),                                                 \
                          (COMPONENT2),                                                 \
@@ -245,4 +245,4 @@ void setPlainConsoleLogger();
 
 }  // namespace merizo
 
-#endif  // MONGO_UTIL_LOG_H_
+#endif  // MERIZO_UTIL_LOG_H_

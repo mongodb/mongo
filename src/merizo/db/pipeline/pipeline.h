@@ -207,7 +207,7 @@ public:
     /**
      * Returns 'true' if the pipeline must merge on merizoS.
      */
-    bool needsMongosMerger() const;
+    bool needsMerizosMerger() const;
 
     /**
      * Returns 'true' if any stage in the pipeline must run on a shard.
@@ -218,13 +218,13 @@ public:
      * Returns true if the pipeline can run on merizoS, but is not obliged to; that is, it can run
      * either on merizoS or on a shard.
      */
-    bool canRunOnMongos() const;
+    bool canRunOnMerizos() const;
 
     /**
      * Returns true if this pipeline must only run on merizoS. Can be called on unsplit or merge
      * pipelines, but not on the shards part of a split pipeline.
      */
-    bool requiredToRunOnMongos() const;
+    bool requiredToRunOnMerizos() const;
 
     /**
      * Modifies the pipeline, optimizing it by combining and swapping stages.
@@ -394,7 +394,7 @@ private:
      * Returns Status::OK if the pipeline can run on merizoS, or an error with a message explaining
      * why it cannot.
      */
-    Status _pipelineCanRunOnMongoS() const;
+    Status _pipelineCanRunOnMerizoS() const;
 
     SourceContainer _sources;
 

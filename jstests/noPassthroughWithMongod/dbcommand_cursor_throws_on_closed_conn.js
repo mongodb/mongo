@@ -4,7 +4,7 @@
     var testDB = db.getSiblingDB('dbcommand_cursor_throws_on_closed_conn');
     testDB.dropDatabase();
     var coll = testDB.collection;
-    var conn = testDB.getMongo();
+    var conn = testDB.getMerizo();
     conn.forceReadMode("commands");
     assert.commandWorked(coll.save({}));
     var res = assert.commandWorked(testDB.runCommand({

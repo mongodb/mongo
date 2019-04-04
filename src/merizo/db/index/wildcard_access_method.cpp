@@ -124,7 +124,7 @@ std::set<FieldRef> WildcardAccessMethod::_getMultikeyPathSet(
                                               break;
 
                                           default:
-                                              MONGO_UNREACHABLE;
+                                              MERIZO_UNREACHABLE;
                                       }
                                   }
 

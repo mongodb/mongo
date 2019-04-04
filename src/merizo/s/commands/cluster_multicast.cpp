@@ -147,7 +147,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(MulticastCmd);
+MERIZO_REGISTER_TEST_COMMAND(MulticastCmd);
 
 }  // namespace
 }  // namespace merizo

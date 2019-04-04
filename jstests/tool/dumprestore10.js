@@ -39,9 +39,9 @@
 
     step("merizodump from replset");
 
-    var data = MongoRunner.dataDir + "/dumprestore10-dump1/";
+    var data = MerizoRunner.dataDir + "/dumprestore10-dump1/";
 
-    var exitCode = MongoRunner.runMongoTool("merizodump", {
+    var exitCode = MerizoRunner.runMerizoTool("merizodump", {
         host: "127.0.0.1:" + master.port,
         out: data,
     });
@@ -59,7 +59,7 @@
 
     step("try merizorestore with write concern");
 
-    exitCode = MongoRunner.runMongoTool("merizorestore", {
+    exitCode = MerizoRunner.runMerizoTool("merizorestore", {
         writeConcern: "2",
         host: "127.0.0.1:" + master.port,
         dir: data,

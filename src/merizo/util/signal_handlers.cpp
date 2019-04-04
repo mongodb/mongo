@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -173,7 +173,7 @@ void signalProcessingThread(LogFileStatus rotate) {
     while (true) {
         int actualSignal = 0;
         int status = [&] {
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             return sigwait(&asyncSignals, &actualSignal);
         }();
         fassert(16781, status == 0);

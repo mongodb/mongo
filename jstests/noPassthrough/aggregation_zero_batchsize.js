@@ -6,7 +6,7 @@
     "use strict";
 
     const merizodOptions = {};
-    const conn = MongoRunner.runMongod(merizodOptions);
+    const conn = MerizoRunner.runMerizod(merizodOptions);
     assert.neq(null, conn, "merizod failed to start with options " + tojson(merizodOptions));
 
     const testDB = conn.getDB("test");
@@ -84,5 +84,5 @@
     assert.throws(() => cursor.itcount(), [], "expected getMore to fail");
     assertNumOpenCursors(0);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

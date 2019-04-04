@@ -52,7 +52,7 @@ namespace {
 using namespace merizo;
 using namespace merizo::repl;
 
-class OplogBufferCollectionTest : public ServiceContextMongoDTest {
+class OplogBufferCollectionTest : public ServiceContextMerizoDTest {
 protected:
     Client* getClient() const;
 
@@ -68,7 +68,7 @@ private:
 };
 
 void OplogBufferCollectionTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
     auto service = getServiceContext();
 
     // AutoGetCollectionForReadCommand requires a valid replication coordinator in order to check
@@ -85,7 +85,7 @@ void OplogBufferCollectionTest::setUp() {
 void OplogBufferCollectionTest::tearDown() {
     _opCtx.reset();
     _storageInterface = nullptr;
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 ServiceContext::UniqueOperationContext OplogBufferCollectionTest::makeOperationContext() const {

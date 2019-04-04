@@ -42,7 +42,7 @@ namespace mozjs {
  */
 struct ObjectInfo : public BaseInfo {
     struct Functions {
-        MONGO_DECLARE_JS_FUNCTION(bsonsize);
+        MERIZO_DECLARE_JS_FUNCTION(bsonsize);
     };
 
     static const JSFunctionSpec methods[2];

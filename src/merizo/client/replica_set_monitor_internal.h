@@ -151,9 +151,9 @@ public:
     SetState(StringData name,
              const std::set<HostAndPort>& seedNodes,
              executor::TaskExecutor* = nullptr,
-             MongoURI uri = {});
+             MerizoURI uri = {});
 
-    SetState(const MongoURI& uri, executor::TaskExecutor* = nullptr);
+    SetState(const MerizoURI& uri, executor::TaskExecutor* = nullptr);
 
     bool isUsable() const;
 
@@ -219,7 +219,7 @@ public:
     int64_t latencyThresholdMicros;
     mutable PseudoRandom rand;   // only used for host selection to balance load
     mutable int roundRobin;      // used when useDeterministicHostSelection is true
-    const MongoURI setUri;       // URI that may have constructed this
+    const MerizoURI setUri;       // URI that may have constructed this
     Seconds refreshPeriod;       // Normal refresh period when not expedited
     bool isExpedited = false;    // True when we are doing more frequent refreshes due to waiters
     stdx::list<Waiter> waiters;  // Everyone waiting for some ReadPreference to be satisfied

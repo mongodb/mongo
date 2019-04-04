@@ -46,7 +46,7 @@
         // previous setFCV call. By using a fresh connection the client last op begins as null. This
         // test explicitly tests that write concern for noop writes works when the client last op
         // has not already been set by a duplicate operation.
-        const shell2 = new Mongo(primary.host);
+        const shell2 = new Merizo(primary.host);
 
         // Use w:1 to verify setFCV internally waits for at least write concern majority, and use a
         // small wtimeout to verify it is propagated into the internal waitForWriteConcern and will

@@ -52,7 +52,7 @@ public:
             return stdx::unordered_set<NamespaceString>();
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const override {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const override {
             return {Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::planCacheRead)};
         }
 
@@ -60,12 +60,12 @@ public:
             return true;
         }
 
-        bool allowedToForwardFromMongos() const override {
+        bool allowedToForwardFromMerizos() const override {
             // $planCacheStats must be run locally on a merizod.
             return false;
         }
 
-        bool allowedToPassthroughFromMongos() const override {
+        bool allowedToPassthroughFromMerizos() const override {
             // $planCacheStats must be run locally on a merizod.
             return false;
         }
@@ -128,7 +128,7 @@ private:
 
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
-        MONGO_UNREACHABLE;  // Should call serializeToArray instead.
+        MERIZO_UNREACHABLE;  // Should call serializeToArray instead.
     }
 
     // The result set for this change is produced through the merizo process interface on the first

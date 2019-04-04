@@ -9,7 +9,7 @@
 
     // Start merizod with a valid BSON depth, then test that it accepts and rejects command
     // appropriately based on the depth.
-    let conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=5"});
+    let conn = MerizoRunner.runMerizod({setParameter: "maxBSONDepth=5"});
     assert.neq(null, conn, "Failed to start merizod");
     let testDB = conn.getDB("test");
 
@@ -44,10 +44,10 @@
         "Expected server to reject command for exceeding the nesting depth limit");
 
     // Restart merizod with a negative maximum BSON depth and test that it fails to start.
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=-4"});
+    MerizoRunner.stopMerizod(conn);
+    conn = MerizoRunner.runMerizod({setParameter: "maxBSONDepth=-4"});
     assert.eq(null, conn, "Expected merizod to fail at startup because depth was negative");
 
-    conn = MongoRunner.runMongod({setParameter: "maxBSONDepth=1"});
+    conn = MerizoRunner.runMerizod({setParameter: "maxBSONDepth=1"});
     assert.eq(null, conn, "Expected merizod to fail at startup because depth was too low");
 }());

@@ -16,21 +16,21 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
         assert.commandFailedWithCode(
             res,
             ErrorCodes.MaxTimeMSExpired,
-            "Expected read of " + coll.getFullName() + ' on ' + coll.getMongo().host + " to block");
+            "Expected read of " + coll.getFullName() + ' on ' + coll.getMerizo().host + " to block");
     }
 
     function doCommittedRead(coll) {
         var res =
             coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 10000});
         assert.commandWorked(res,
-                             'reading from ' + coll.getFullName() + ' on ' + coll.getMongo().host);
+                             'reading from ' + coll.getFullName() + ' on ' + coll.getMerizo().host);
         return new DBCommandCursor(coll.getDB(), res).toArray()[0].state;
     }
 
     function doDirtyRead(coll) {
         var res = coll.runCommand('find', {"readConcern": {"level": "local"}});
         assert.commandWorked(res,
-                             'reading from ' + coll.getFullName() + ' on ' + coll.getMongo().host);
+                             'reading from ' + coll.getFullName() + ' on ' + coll.getMerizo().host);
         return new DBCommandCursor(coll.getDB(), res).toArray()[0].state;
     }
 

@@ -28,7 +28,7 @@
     var initSyncNode = replTest.add();
     var initSyncNodeAdminDB = initSyncNode.getDB("admin");
 
-    clearRawMongoProgramOutput();
+    clearRawMerizoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(replTest);
 
     assert.soon(
@@ -43,13 +43,13 @@
         "Node did not terminate due to invalid index spec during initial sync",
         ReplSetTest.kDefaultTimeoutMS);
 
-    replTest.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+    replTest.stop(initSyncNode, undefined, {allowedExitCode: MerizoRunner.EXIT_ABRUPT});
 
     const msgInvalidOption = "The field 'invalidOption' is not valid for an index specification";
     const msgInitialSyncFatalAssertion = "Fatal assertion 40088 InitialSyncFailure";
 
-    assert(rawMongoProgramOutput().match(msgInvalidOption) &&
-               rawMongoProgramOutput().match(msgInitialSyncFatalAssertion),
+    assert(rawMerizoProgramOutput().match(msgInvalidOption) &&
+               rawMerizoProgramOutput().match(msgInitialSyncFatalAssertion),
            "Initial sync should have aborted on invalid index specification");
 
     replTest.stopSet();

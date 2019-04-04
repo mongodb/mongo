@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -37,7 +37,7 @@
 #include "merizo/util/assert_util.h"
 #include "merizo/util/log.h"
 
-#define MONGO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
+#define MERIZO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
 #include "merizo/util/version_constants.h"
 
 namespace merizo {
@@ -100,8 +100,8 @@ public:
 
 } kInterpolatedVersionInfo{};
 
-MONGO_INITIALIZER_GENERAL(EnableVersionInfo,
-                          MONGO_NO_PREREQUISITES,
+MERIZO_INITIALIZER_GENERAL(EnableVersionInfo,
+                          MERIZO_NO_PREREQUISITES,
                           ("BeginStartupOptionRegistration", "GlobalLogManager"))
 (InitializerContext*) {
     VersionInfoInterface::enable(&kInterpolatedVersionInfo);

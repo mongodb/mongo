@@ -25,7 +25,7 @@
     ];
 
     function startStandalone() {
-        let merizod = MongoRunner.runMongod({cleanData: true});
+        let merizod = MerizoRunner.runMerizod({cleanData: true});
         let db = merizod.getDB(dbName);
         db.dropDatabase();
         return merizod;
@@ -33,12 +33,12 @@
 
     function restartStandalone(old) {
         jsTest.log("Restarting merizod");
-        MongoRunner.stopMongod(old);
-        return MongoRunner.runMongod({restart: true, dbpath: old.dbpath, cleanData: false});
+        MerizoRunner.stopMerizod(old);
+        return MerizoRunner.runMerizod({restart: true, dbpath: old.dbpath, cleanData: false});
     }
 
     function shutdownStandalone(merizod) {
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
     }
 
     function startReplSet() {

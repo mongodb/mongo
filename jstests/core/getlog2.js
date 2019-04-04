@@ -51,8 +51,8 @@
     // Ensure that slow query is logged in detail.
     assert(contains(query.log, function(v) {
         print(v);
-        const opString = db.getMongo().useReadCommands() ? " find " : " query ";
-        const filterString = db.getMongo().useReadCommands() ? "filter:" : "command:";
+        const opString = db.getMerizo().useReadCommands() ? " find " : " query ";
+        const filterString = db.getMerizo().useReadCommands() ? "filter:" : "command:";
         return v.indexOf(opString) != -1 && v.indexOf(filterString) != -1 &&
             v.indexOf("keysExamined:") != -1 && v.indexOf("docsExamined:") != -1 &&
             v.indexOf("SENTINEL") != -1;

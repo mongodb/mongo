@@ -293,7 +293,7 @@ public:
 
     /**
      * Sets the implementation for `initRsOplogBackgroundThread` (allowing tests to skip the
-     * background job, for example). Intended to be called from a MONGO_INITIALIZER and therefore in
+     * background job, for example). Intended to be called from a MERIZO_INITIALIZER and therefore in
      * a single threaded context.
      */
     static void setInitRsOplogBackgroundThreadCallback(stdx::function<bool(StringData)> cb);

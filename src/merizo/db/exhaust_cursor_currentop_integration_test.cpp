@@ -85,7 +85,7 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
 
     // We need to set failpoints around getMore which cause it to hang, so only test against a
     // single server rather than a replica set or merizoS.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
+    if (conn->isReplicaSetMember() || conn->isMerizos()) {
         return;
     }
 

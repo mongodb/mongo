@@ -34,6 +34,6 @@
 namespace merizo {
 
 ServiceContextDevnullTestFixture::ServiceContextDevnullTestFixture()
-    : ServiceContextMongoDTest("devnull") {}
+    : ServiceContextMerizoDTest("devnull") {}
 
 }  // namespace merizo

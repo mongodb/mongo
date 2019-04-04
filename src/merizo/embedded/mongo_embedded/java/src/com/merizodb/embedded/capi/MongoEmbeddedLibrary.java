@@ -31,9 +31,9 @@
 package com.merizodb.embedded.capi;
 
 /**
- * The embedded Mongo library
+ * The embedded Merizo library
  */
-public interface MongoEmbeddedLibrary {
+public interface MerizoEmbeddedLibrary {
 
     /**
      * Create a new instance
@@ -41,7 +41,7 @@ public interface MongoEmbeddedLibrary {
      * @param yamlConfig the yaml configuration for the instance
      * @return the merizo embedded instance
      */
-    MongoEmbeddedInstance createInstance(String yamlConfig);
+    MerizoEmbeddedInstance createInstance(String yamlConfig);
 
     /**
      * Closes the embedded merizodb, all databases must be closed before calling this.

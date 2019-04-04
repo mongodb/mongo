@@ -143,7 +143,7 @@ TEST(ReplSetMonitorNode, NonExistingFieldTag) {
     Node node((HostAndPort()));
     node.tags = SampleTags;
     ASSERT(!node.matches(BSON("noSQL"
-                              << "Mongo")));
+                              << "Merizo")));
 }
 
 TEST(ReplSetMonitorNode, UnorederedMatching) {

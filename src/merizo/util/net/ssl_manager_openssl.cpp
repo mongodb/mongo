@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kNetwork
 
 #include "merizo/platform/basic.h"
 
@@ -74,7 +74,7 @@
 #include <openssl/ssl.h>
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
-#ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
+#ifdef MERIZO_CONFIG_HAVE_SSL_EC_KEY_NEW
 #include <openssl/ec.h>
 #endif
 #if defined(_WIN32)
@@ -131,7 +131,7 @@ bool isUnixDomainSocket(const std::string& hostname) {
 
 using UniqueBIO = std::unique_ptr<BIO, OpenSSLDeleter<decltype(::BIO_free), ::BIO_free>>;
 
-#ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
+#ifdef MERIZO_CONFIG_HAVE_SSL_EC_KEY_NEW
 using UniqueEC_KEY =
     std::unique_ptr<EC_KEY, OpenSSLDeleter<decltype(::EC_KEY_free), ::EC_KEY_free>>;
 #endif
@@ -161,7 +161,7 @@ UniqueBIO makeUniqueMemBio(std::vector<std::uint8_t>& v) {
 
 // Attempts to set a hard coded curve (prime256v1) for ECDHE if the version of OpenSSL supports it.
 bool useDefaultECKey(SSL_CTX* const ctx) {
-#ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
+#ifdef MERIZO_CONFIG_HAVE_SSL_EC_KEY_NEW
     UniqueEC_KEY key(EC_KEY_new_by_curve_name(NID_X9_62_prime256v1));
 
     if (key) {
@@ -175,11 +175,11 @@ bool useDefaultECKey(SSL_CTX* const ctx) {
 // it. If not, this function will attempt to use a hard-coded but widely supported elliptic curve.
 // If that fails, ECDHE will not be enabled.
 bool enableECDHE(SSL_CTX* const ctx) {
-#ifdef MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO
+#ifdef MERIZO_CONFIG_HAVE_SSL_SET_ECDH_AUTO
     SSL_CTX_set_ecdh_auto(ctx, true);
 #elif OPENSSL_VERSION_NUMBER < 0x10100000L || \
     (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x2070000fL)
-    // SSL_CTRL_SET_ECDH_AUTO is defined to be 94 in OpenSSL 1.0.2. On RHEL 7, Mongo could be built
+    // SSL_CTRL_SET_ECDH_AUTO is defined to be 94 in OpenSSL 1.0.2. On RHEL 7, Merizo could be built
     // against 1.0.1 but actually linked with 1.0.2 at runtime. The define may not be present, but
     // this call could actually enable auto ecdh. We also ensure the OpenSSL version is sufficiently
     // old to protect against future versions where SSL_CTX_set_ecdh_auto could be removed and 94
@@ -211,7 +211,7 @@ bool enableECDHE(SSL_CTX* const ctx) {
 #endif
 
 // clang-format off
-#ifndef MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS
+#ifndef MERIZO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS
 // Copies of OpenSSL before 1.0.0 do not have ASN1_SEQUENCE_ANY, ASN1_SET_ANY, or the helper
 // functions which let us deserialize these objects. We must polyfill the definitions to interact
 // with ASN1 objects so stored.
@@ -229,7 +229,7 @@ IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SEQUENCE_ANY
                                             ASN1_SEQUENCE_ANY)
 IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SET_ANY, ASN1_SET_ANY)
 ; // clang format needs to see a semicolon or it will start formatting unrelated code
-#endif // MONGO_CONFIG_NEEDS_ASN1_ANY_DEFINITIONS
+#endif // MERIZO_CONFIG_NEEDS_ASN1_ANY_DEFINITIONS
 // clang-format on
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || \
@@ -502,7 +502,7 @@ private:
      * Given an error code from an SSL-type IO function, logs an
      * appropriate message and throws a NetworkException.
      */
-    MONGO_COMPILER_NORETURN void _handleSSLError(SSLConnectionOpenSSL* conn, int ret);
+    MERIZO_COMPILER_NORETURN void _handleSSLError(SSLConnectionOpenSSL* conn, int ret);
 
     /*
      * Init the SSL context using parameters provided in params. This SSL context will
@@ -581,7 +581,7 @@ private:
 
 void setupFIPS() {
 // Turn on FIPS mode if requested, OPENSSL_FIPS must be defined by the OpenSSL headers
-#if defined(MONGO_CONFIG_HAVE_FIPS_MODE_SET)
+#if defined(MERIZO_CONFIG_HAVE_FIPS_MODE_SET)
     int status = FIPS_mode_set(1);
     if (!status) {
         severe() << "can't activate FIPS mode: "
@@ -602,7 +602,7 @@ bool isSSLServer = false;
 
 extern SSLManagerInterface* theSSLManager;
 
-MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
+MERIZO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
     SSL_library_init();
     SSL_load_error_strings();
     ERR_load_crypto_strings();
@@ -621,7 +621,7 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
     return Status::OK();
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerOpenSSL(sslGlobalParams, isSSLServer);

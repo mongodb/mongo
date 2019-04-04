@@ -96,7 +96,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
 
-        this.session = db.getMongo().startSession({causalConsistency: false});
+        this.session = db.getMerizo().startSession({causalConsistency: false});
 
         // Assign a default counter value to each document owned by this thread.
         db[collName].find({tid: this.tid}).forEach(doc => {

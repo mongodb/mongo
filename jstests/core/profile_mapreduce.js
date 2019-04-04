@@ -10,7 +10,7 @@
 
     var testDB = db.getSiblingDB("profile_mapreduce");
     assert.commandWorked(testDB.dropDatabase());
-    var conn = testDB.getMongo();
+    var conn = testDB.getMerizo();
     var coll = testDB.getCollection("test");
 
     testDB.setProfilingLevel(2);

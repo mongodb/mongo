@@ -149,7 +149,7 @@ namespace merizo {
 
 namespace {
 // Determine system's endian ordering in order to construct decimal 128 values directly
-#if MONGO_CONFIG_BYTE_ORDER == 1234
+#if MERIZO_CONFIG_BYTE_ORDER == 1234
 const int kHigh64 = 1;
 const int kLow64 = 0;
 #else
@@ -962,8 +962,8 @@ const std::uint64_t t17hi32 = t17 >> 32;
 // t17hi32*t17hi32 + 2*t17hi32*t17lo32 + t17lo32*t17lo32 where the 2nd term
 // is shifted right by 32 and the 3rd term by 64 (which effectively drops the 3rd term)
 const std::uint64_t t34hi64 = t17hi32 * t17hi32 + (((t17hi32 * t17lo32) >> 31));
-MONGO_STATIC_ASSERT(t34hi64 == 0x1ed09bead87c0);
-MONGO_STATIC_ASSERT(t34lo64 == 0x378d8e63ffffffff);
+MERIZO_STATIC_ASSERT(t34hi64 == 0x1ed09bead87c0);
+MERIZO_STATIC_ASSERT(t34lo64 == 0x378d8e63ffffffff);
 }  // namespace
 
 // (t34hi64 << 64) + t34lo64 == 1e34 - 1

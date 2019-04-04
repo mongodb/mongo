@@ -20,13 +20,13 @@ rst.initiate();
 
 // Wait for a primary node...
 var primary = rst.getPrimary();
-var otherOpConn = new Mongo(rst.getURL());
+var otherOpConn = new Merizo(rst.getURL());
 var insertNS = "test.foo";
 
 jsTest.log("Starting parallel operations during upgrade...");
 
 function findAndInsert(rsURL, coll) {
-    var coll = new Mongo(rsURL).getCollection(coll + "");
+    var coll = new Merizo(rsURL).getCollection(coll + "");
     var count = 0;
 
     jsTest.log("Starting finds and inserts...");

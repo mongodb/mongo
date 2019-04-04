@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kIndex
 
 #include "merizo/platform/basic.h"
 
@@ -68,7 +68,7 @@ namespace {
 // When the skipIndexCreateFieldNameValidation failpoint is enabled, validation for index field
 // names will be disabled. This will allow for creation of indexes with invalid field names in their
 // specification.
-MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
+MERIZO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 
 static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::k2dIndexMaxFieldName,
@@ -169,7 +169,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                 break;
             }
             default:
-                MONGO_UNREACHABLE;
+                MERIZO_UNREACHABLE;
         }
 
         if (keyElement.type() == String && pluginName != keyElement.str()) {
@@ -540,7 +540,7 @@ Status validateIdIndexSpec(const BSONObj& indexSpec) {
  * expected fields are present at creation time
  */
 Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
-    if (MONGO_FAIL_POINT(skipIndexCreateFieldNameValidation)) {
+    if (MERIZO_FAIL_POINT(skipIndexCreateFieldNameValidation)) {
         return Status::OK();
     }
 

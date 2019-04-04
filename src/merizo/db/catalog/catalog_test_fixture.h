@@ -41,7 +41,7 @@ namespace merizo {
  * Sets up and provides a repl::StorageInterface and OperationContext. Database data are cleared
  * between test runs.
  */
-class CatalogTestFixture : public ServiceContextMongoDTest {
+class CatalogTestFixture : public ServiceContextMerizoDTest {
 public:
     OperationContext* operationContext();
     repl::StorageInterface* storageInterface();

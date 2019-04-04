@@ -21,14 +21,14 @@
     assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
     assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
 
-    let freshMongos = st.s0;
-    let staleMongos = st.s1;
+    let freshMerizos = st.s0;
+    let staleMerizos = st.s1;
 
     jsTest.log("do insert from stale merizos to make it load the routing table before the move");
-    assert.writeOK(staleMongos.getCollection(ns).insert({x: 1}));
+    assert.writeOK(staleMerizos.getCollection(ns).insert({x: 1}));
 
     jsTest.log("do moveChunk from fresh merizos");
-    assert.commandWorked(freshMongos.adminCommand({
+    assert.commandWorked(freshMerizos.adminCommand({
         moveChunk: ns,
         find: {x: 0},
         to: st.shard1.shardName,
@@ -46,24 +46,24 @@
     // Note: this query will not be registered by the profiler because it errors before reaching the
     // storage level.
     jsTest.log("Do a secondary read from stale merizos with afterClusterTime and level 'available'");
-    const staleMongosDB = staleMongos.getDB(dbName);
-    assert.commandFailedWithCode(staleMongosDB.runCommand({
+    const staleMerizosDB = staleMerizos.getDB(dbName);
+    assert.commandFailedWithCode(staleMerizosDB.runCommand({
         count: collName,
         query: {x: 1},
         $readPreference: {mode: "secondary"},
         readConcern: {
-            'afterClusterTime': staleMongosDB.getSession().getOperationTime(),
+            'afterClusterTime': staleMerizosDB.getSession().getOperationTime(),
             'level': 'available'
         }
     }),
                                  ErrorCodes.InvalidOptions);
 
     jsTest.log("Do a secondary read from stale merizos with afterClusterTime and no level");
-    let res = staleMongosDB.runCommand({
+    let res = staleMerizosDB.runCommand({
         count: collName,
         query: {x: 1},
         $readPreference: {mode: "secondary"},
-        readConcern: {'afterClusterTime': staleMongosDB.getSession().getOperationTime()},
+        readConcern: {'afterClusterTime': staleMerizosDB.getSession().getOperationTime()},
     });
     assert(res.ok);
     assert.eq(1, res.n, tojson(res));

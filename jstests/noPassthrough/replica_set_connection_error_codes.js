@@ -26,7 +26,7 @@
     rst.initiate();
 
     const directConn = rst.getPrimary();
-    const rsConn = new Mongo(rst.getURL());
+    const rsConn = new Merizo(rst.getURL());
     assert(rsConn.isReplicaSetConnection(),
            "expected " + rsConn.host + " to be a replica set connection string");
 

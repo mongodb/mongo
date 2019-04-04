@@ -20,7 +20,7 @@ var coll = "collModTest";
 var t = db.getCollection(coll);
 t.drop();
 
-var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+var isMerizos = ("isdbgrid" == db.runCommand("ismaster").msg);
 
 db.createCollection(coll);
 
@@ -126,7 +126,7 @@ assert.eq(info.options.flags, 2, tojson(info));  // 2 is CollectionOptions::Flag
 var res = db.runCommand({"collMod": coll, "noPadding": false});
 debug(res);
 assert.commandWorked(res);
-if (!isMongos) {
+if (!isMerizos) {
     // don't check this for sharding passthrough since merizos has a different output format.
     assert.eq(res.noPadding_old, true, tojson(res));
     assert.eq(res.noPadding_new, false, tojson(res));

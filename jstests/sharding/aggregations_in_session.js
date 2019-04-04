@@ -13,7 +13,7 @@
         return;
     }
 
-    const session = st.s0.getDB("test").getMongo().startSession();
+    const session = st.s0.getDB("test").getMerizo().startSession();
     const merizosColl = session.getDatabase("test")[jsTestName()];
 
     // Shard the collection, split it into two chunks, and move the [1, MaxKey] chunk to the other

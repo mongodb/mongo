@@ -38,7 +38,7 @@
 
 namespace merizo {
 
-MONGO_INITIALIZER_GENERAL(ValidateLocale, MONGO_NO_PREREQUISITES, MONGO_DEFAULT_PREREQUISITES)
+MERIZO_INITIALIZER_GENERAL(ValidateLocale, MERIZO_NO_PREREQUISITES, MERIZO_DEFAULT_PREREQUISITES)
 (InitializerContext*) {
     try {
         // Validate that boost can correctly load the user's locale

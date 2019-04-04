@@ -36,7 +36,7 @@
 
 namespace merizo {
 
-#ifdef MONGO_CONFIG_HAVE_STRNLEN
+#ifdef MERIZO_CONFIG_HAVE_STRNLEN
 using ::strnlen;
 #else
 size_t strnlen(const char* s, size_t maxlen);

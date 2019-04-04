@@ -50,7 +50,7 @@ StringData ExplainOptions::verbosityString(ExplainOptions::Verbosity verbosity) 
         case Verbosity::kExecAllPlans:
             return kAllPlansExecutionVerbosityStr;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

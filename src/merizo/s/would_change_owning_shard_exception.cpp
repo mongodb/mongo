@@ -37,7 +37,7 @@
 namespace merizo {
 namespace {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(WouldChangeOwningShardInfo);
+MERIZO_INIT_REGISTER_ERROR_EXTRA_INFO(WouldChangeOwningShardInfo);
 
 constexpr StringData kPreImage = "preImage"_sd;
 constexpr StringData kPostImage = "postImage"_sd;

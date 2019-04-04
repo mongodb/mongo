@@ -41,13 +41,13 @@ using std::string;
 
 namespace {
 
-const char kMongosUpdateZoneKeyRange[] = "updateZoneKeyRange";
+const char kMerizosUpdateZoneKeyRange[] = "updateZoneKeyRange";
 const char kConfigsvrUpdateZoneKeyRange[] = "_configsvrUpdateZoneKeyRange";
 const char kZoneName[] = "zone";
 
 }  // unnamed namespace
 
-StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::parseFromMongosCommand(
+StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::parseFromMerizosCommand(
     const BSONObj& cmdObj) {
     return _parseFromCommand(cmdObj, true);
 }
@@ -69,10 +69,10 @@ void UpdateZoneKeyRangeRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder
 }
 
 StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::_parseFromCommand(
-    const BSONObj& cmdObj, bool forMongos) {
+    const BSONObj& cmdObj, bool forMerizos) {
     string rawNS;
     auto parseNamespaceStatus = bsonExtractStringField(
-        cmdObj, (forMongos ? kMongosUpdateZoneKeyRange : kConfigsvrUpdateZoneKeyRange), &rawNS);
+        cmdObj, (forMerizos ? kMerizosUpdateZoneKeyRange : kConfigsvrUpdateZoneKeyRange), &rawNS);
 
     if (!parseNamespaceStatus.isOK()) {
         return parseNamespaceStatus;

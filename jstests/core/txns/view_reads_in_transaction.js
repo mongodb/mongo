@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const testDB = session.getDatabase("test");
     const coll = testDB.getCollection("view_reads_in_transaction_data_coll");
     const view = testDB.getCollection("view_reads_in_transaction_actual_view");
@@ -19,8 +19,8 @@
     assert.commandWorked(view.runCommand(
         "create", {viewOn: coll.getName(), pipeline: [], writeConcern: {w: "majority"}}));
 
-    const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
-    if (isMongos) {
+    const isMerizos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+    if (isMerizos) {
         // Refresh the router's and shard's database versions so the distinct run below can succeed.
         // This is necessary because shards always abort their local transaction on stale version
         // errors and merizos is not allowed to retry on these errors in a transaction if the stale

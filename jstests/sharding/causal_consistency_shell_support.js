@@ -1,5 +1,5 @@
 /**
- * Tests which commands support causal consistency in the Mongo shell, that for each supported
+ * Tests which commands support causal consistency in the Merizo shell, that for each supported
  * command, the shell properly forwards its operation and cluster time and updates them based on the
  * response, and that the server rejects commands with afterClusterTime ahead of cluster time.
  */
@@ -77,13 +77,13 @@
     const session = testDB.getSession();
 
     // Verify causal consistency is disabled unless explicitly set.
-    assert.eq(testDB.getMongo()._causalConsistency,
+    assert.eq(testDB.getMerizo()._causalConsistency,
               false,
               "causal consistency should be disabled by default");
-    testDB.getMongo().setCausalConsistency(true);
+    testDB.getMerizo().setCausalConsistency(true);
 
     // Verify causal consistency is enabled for the connection and for each supported command.
-    assert.eq(testDB.getMongo()._causalConsistency,
+    assert.eq(testDB.getMerizo()._causalConsistency,
               true,
               "calling setCausalConsistency() didn't enable causal consistency");
 
@@ -108,7 +108,7 @@
 
     // Test that each supported command works as expected and the shell's cluster times are properly
     // forwarded to the server and updated based on the response.
-    testDB.getMongo().setCausalConsistency(true);
+    testDB.getMerizo().setCausalConsistency(true);
 
     // Aggregate command.
     let aggColl = "aggColl";

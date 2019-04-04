@@ -272,12 +272,12 @@ TEST(ResolvedViewTest, FromBSONSuccessfullyParsesPopulatedBSONArrayIntoVector) {
 
 TEST(ResolvedViewTest, IsResolvedViewErrorResponseDetectsKickbackErrorCodeSuccessfully) {
     BSONObj errorResponse =
-        BSON("ok" << 0 << "code" << ErrorCodes::CommandOnShardedViewNotSupportedOnMongod << "errmsg"
+        BSON("ok" << 0 << "code" << ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod << "errmsg"
                   << "This view is sharded and cannot be run on merizod"
                   << "resolvedView"
                   << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray()));
     auto status = getStatusFromCommandResult(errorResponse);
-    ASSERT_EQ(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
+    ASSERT_EQ(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod);
     ASSERT(status.extraInfo<ResolvedView>());
 }
 
@@ -286,7 +286,7 @@ TEST(ResolvedViewTest, IsResolvedViewErrorResponseReportsFalseOnNonKickbackError
         BSON("ok" << 0 << "code" << ErrorCodes::ViewDepthLimitExceeded << "errmsg"
                   << "View nesting too deep or view cycle detected");
     auto status = getStatusFromCommandResult(errorResponse);
-    ASSERT_NE(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
+    ASSERT_NE(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMerizod);
     ASSERT(!status.extraInfo<ResolvedView>());
 }
 

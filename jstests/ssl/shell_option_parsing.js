@@ -11,7 +11,7 @@
         sslAllowInvalidCertificates: "",
         sslAllowConnectionsWithoutCertificates: "",
         sslCAFile: CAFILE,
-        setParameter: "authenticationMechanisms=MONGODB-X509,SCRAM-SHA-1"
+        setParameter: "authenticationMechanisms=MERIZODB-X509,SCRAM-SHA-1"
     };
 
     var rst = new ReplSetTest({name: 'sslSet', nodes: 3, nodeOptions: opts});
@@ -49,15 +49,15 @@
         print("=========================================> The command (" + (i++) +
               ") I am going to run is: " + command.join(' '));
 
-        clearRawMongoProgramOutput();
-        var clientPID = _startMongoProgram.apply(null, command);
+        clearRawMerizoProgramOutput();
+        var clientPID = _startMerizoProgram.apply(null, command);
         sleep(30000);
 
         if (checkProgram(clientPID).alive) {
-            stopMongoProgramByPid(clientPID);
+            stopMerizoProgramByPid(clientPID);
         }
 
-        assert.eq(!noPasswordPrompt, rawMongoProgramOutput().includes("Enter password:"));
+        assert.eq(!noPasswordPrompt, rawMerizoProgramOutput().includes("Enter password:"));
     }
 
     testConnect(false, `merizodb://${username}@${host}/test`);
@@ -135,51 +135,51 @@
     if (false) {
         testConnect(
             true,
-            `merizodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`);
+            `merizodb://${usernameX509}@${host}/test?authMechanism=MERIZODB-X509&authSource=$external`);
         testConnect(
             true,
-            `merizodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
+            `merizodb://${usernameX509}@${host}/test?authMechanism=MERIZODB-X509&authSource=$external`,
             '--username',
             usernameX509);
         testConnect(true,
                     `merizodb://${usernameX509}@${host}/test?authSource=$external`,
                     '--authenticationMechanism',
-                    'MONGODB-X509');
+                    'MERIZODB-X509');
 
         testConnect(
             true,
-            `merizodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
+            `merizodb://${usernameX509}@${host}/test?authMechanism=MERIZODB-X509&authSource=$external`,
             '--authenticationMechanism',
-            'MONGODB-X509');
+            'MERIZODB-X509');
         testConnect(
             true,
-            `merizodb://${usernameX509}@${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
+            `merizodb://${usernameX509}@${host}/test?authMechanism=MERIZODB-X509&authSource=$external`,
             '--authenticationMechanism',
-            'MONGODB-X509',
+            'MERIZODB-X509',
             '--username',
             usernameX509);
         testConnect(true,
                     `merizodb://${usernameX509}@${host}/test?authSource=$external`,
                     '--authenticationMechanism',
-                    'MONGODB-X509');
+                    'MERIZODB-X509');
     }
     /* */
 
-    testConnect(true, `merizodb://${host}/test?authMechanism=MONGODB-X509&authSource=$external`);
+    testConnect(true, `merizodb://${host}/test?authMechanism=MERIZODB-X509&authSource=$external`);
     testConnect(true,
-                `merizodb://${host}/test?authMechanism=MONGODB-X509&authSource=$external`,
+                `merizodb://${host}/test?authMechanism=MERIZODB-X509&authSource=$external`,
                 '--username',
                 usernameX509);
 
     testConnect(true,
                 `merizodb://${host}/test?authSource=$external`,
                 '--authenticationMechanism',
-                'MONGODB-X509');
+                'MERIZODB-X509');
     testConnect(true,
                 `merizodb://${host}/test?authSource=$external`,
                 '--username',
                 usernameX509,
                 '--authenticationMechanism',
-                'MONGODB-X509');
+                'MERIZODB-X509');
     rst.stopSet();
 })();

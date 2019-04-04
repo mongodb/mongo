@@ -35,7 +35,7 @@
     function performUpsert() {
         // This function is called from startParallelShell(), so closed-over variables will not be
         // available. We must re-obtain the value of 'testColl' in the function body.
-        const testColl = db.getMongo().getDB("test").getCollection("upsert_duplicate_key_retry");
+        const testColl = db.getMerizo().getDB("test").getCollection("upsert_duplicate_key_retry");
         assert.commandWorked(testColl.update({x: 3}, {$inc: {y: 1}}, {upsert: true}));
     }
 

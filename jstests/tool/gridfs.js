@@ -19,7 +19,7 @@ function testGridFS(name) {
     var rawmd5 = md5sumFile(filename);
 
     // upload file (currently calls filemd5 internally)
-    var exitCode = MongoRunner.runMongoTool("merizofiles",
+    var exitCode = MerizoRunner.runMerizoTool("merizofiles",
                                             {
                                               port: merizos.port,
                                               db: name,

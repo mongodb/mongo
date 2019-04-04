@@ -94,24 +94,24 @@ functions:
           set -o verbose
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe)
+          MERIZO_VERSION=$(git describe)
 
           # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
           # that githash to version string.
           if [ "${compile-variant|}" = "-wtdevelop" ]; then
             WT_VERSION=$(cd src/third_party/wtdevelop; git describe | cut -c 9-)
-            MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
+            MERIZO_VERSION="$MERIZO_VERSION-wtdevelop-$WT_VERSION"
           fi
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|false}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+            MERIZO_VERSION="$MERIZO_VERSION-patch-${version_id}"
           fi
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
           source "${workdir}/venv/bin/activate"
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} python2 buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          MERIZO_VERSION=$MERIZO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} python2 buildscripts/generate_compile_expansions.py --out compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -145,7 +145,7 @@ functions:
           set -o errexit
           set -o verbose
           source "${workdir}/venv/bin/activate"
-          python2 ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} merizo${extension} --use-new-tools merizod${extension} merizos${extension} MONGO_VERSION=${version}
+          python2 ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} merizo${extension} --use-new-tools merizod${extension} merizos${extension} MERIZO_VERSION=${version}
           mkdir -p merizodb/bin
           mkdir -p merizodb/jstests/hooks
           mv merizo${extension|} merizodb/bin
@@ -747,7 +747,7 @@ buildvariants:
   expansions: &compile-linux-64-amzn-expansions
     compile_flags: >-
       --ssl
-      MONGO_DISTMOD=linux-64-amzn-build
+      MERIZO_DISTMOD=linux-64-amzn-build
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
       --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars
@@ -778,7 +778,7 @@ buildvariants:
     <<: *compile-linux-64-amzn-expansions
     compile_flags: >-
       --ssl
-      MONGO_DISTMOD=amazon2
+      MERIZO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --release
       --variables-files=etc/scons/merizodbtoolchain_v3_gcc.vars

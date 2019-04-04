@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kConnectionPool
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kConnectionPool
 
 #include "merizo/platform/basic.h"
 
@@ -726,7 +726,7 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status,
     _generation++;
 
     if (!_readyPool.empty() || !_processingPool.empty()) {
-        auto severity = MONGO_GET_LIMITED_SEVERITY(_hostAndPort, Seconds{1}, 0, 2);
+        auto severity = MERIZO_GET_LIMITED_SEVERITY(_hostAndPort, Seconds{1}, 0, 2);
         LOG(severity) << "Dropping all pooled connections to " << _hostAndPort << " due to "
                       << redact(status);
     }
@@ -827,7 +827,7 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
            (_readyPool.size() + _processingPool.size() + _checkedOutPool.size() < target()) &&
            (_processingPool.size() < _parent->_options.maxConnecting)) {
         if (_readyPool.empty() && _processingPool.empty()) {
-            auto severity = MONGO_GET_LIMITED_SEVERITY(_hostAndPort, Seconds{1}, 0, 2);
+            auto severity = MERIZO_GET_LIMITED_SEVERITY(_hostAndPort, Seconds{1}, 0, 2);
             LOG(severity) << "Connecting to " << _hostAndPort;
         }
 

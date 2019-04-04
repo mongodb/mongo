@@ -7957,7 +7957,7 @@ var validMACPrefixMap = map[[3]byte]string{
 	[3]byte{0, 31, 30}:     "Astec Technology Co., Ltd",
 	[3]byte{0, 31, 31}:     "Edimax Technology Co. Ltd.",
 	[3]byte{0, 31, 32}:     "Logitech Europe SA",
-	[3]byte{0, 31, 33}:     "Inner Mongolia Yin An Science & Technology Development Co.,L",
+	[3]byte{0, 31, 33}:     "Inner Merizolia Yin An Science & Technology Development Co.,L",
 	[3]byte{0, 31, 34}:     "Source Photonics, Inc.",
 	[3]byte{0, 31, 35}:     "Interacoustics",
 	[3]byte{0, 31, 36}:     "DIGITVIEW TECHNOLOGY CO., LTD.",

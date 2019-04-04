@@ -4,7 +4,7 @@
 
     // Auth as user in certificate with an email address
     const ret = db.getSiblingDB("$external").auth({
-        mechanism: "MONGODB-X509",
+        mechanism: "MERIZODB-X509",
         user:
             "emailAddress=example@merizodb.com,CN=client,OU=KernelUser,O=MerizoDB,L=New York City,ST=New York,C=US"
     });

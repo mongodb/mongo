@@ -139,7 +139,7 @@
         assert(false, "Expected 'restartReplSetNodes' to throw");
     } catch (err) {
         assert.eq(err.message, `Failed to start node ${rst.getNodeId(secondaries[0])}`);
-        assert(rawMongoProgramOutput().match("Fatal Assertion 28782"));
+        assert(rawMerizoProgramOutput().match("Fatal Assertion 28782"));
     }
 
     jsTestLog("Restart the failed node on binary 4.2 and gracefully shut down the replset.");

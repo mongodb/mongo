@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -120,7 +120,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         auto parsedRequest =
-            uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromMongosCommand(cmdObj));
+            uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromMerizosCommand(cmdObj));
 
         BSONObjBuilder cmdBuilder;
         parsedRequest.appendAsConfigCommand(&cmdBuilder);

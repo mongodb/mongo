@@ -59,7 +59,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 AddShardRequest::AddShardRequest(ConnectionString connString)
     : _connString(std::move(connString)) {}
 
-StatusWith<AddShardRequest> AddShardRequest::parseFromMongosCommand(const BSONObj& obj) {
+StatusWith<AddShardRequest> AddShardRequest::parseFromMerizosCommand(const BSONObj& obj) {
     invariant(obj.nFields() >= 1);
     invariant(merizosAddShard.name() == obj.firstElement().fieldNameStringData() ||
               merizosAddShardDeprecated.name() == obj.firstElement().fieldNameStringData());

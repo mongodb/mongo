@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -99,11 +99,11 @@ const uint8_t kNumericPositive6ByteInt = kNumeric + 18;
 const uint8_t kNumericPositive7ByteInt = kNumeric + 19;
 const uint8_t kNumericPositive8ByteInt = kNumeric + 20;
 const uint8_t kNumericPositiveLargeMagnitude = kNumeric + 21;  // >= 2**63 including +Inf
-MONGO_STATIC_ASSERT(kNumericPositiveLargeMagnitude < kStringLike);
+MERIZO_STATIC_ASSERT(kNumericPositiveLargeMagnitude < kStringLike);
 
 const uint8_t kBoolFalse = kBool + 0;
 const uint8_t kBoolTrue = kBool + 1;
-MONGO_STATIC_ASSERT(kBoolTrue < kDate);
+MERIZO_STATIC_ASSERT(kBoolTrue < kDate);
 
 size_t numBytesForInt(uint8_t ctype) {
     if (ctype >= kNumericPositive1ByteInt) {
@@ -166,7 +166,7 @@ uint8_t bsonTypeToGenericKeyStringType(BSONType type) {
         case MaxKey:
             return CType::kMaxKey;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 // Doubles smaller than this store only a single bit indicating a decimal continuation follows.
@@ -240,7 +240,7 @@ void memcpy_flipBits(void* dst, const void* src, size_t bytes) {
 
 template <typename T>
 T readType(BufReader* reader, bool inverted) {
-    MONGO_STATIC_ASSERT(std::is_integral<T>::value);
+    MERIZO_STATIC_ASSERT(std::is_integral<T>::value);
     T t = ConstDataView(static_cast<const char*>(reader->skip(sizeof(T)))).read<T>();
     if (inverted)
         return ~t;
@@ -1533,7 +1533,7 @@ void toBsonValue(uint8_t ctype,
                     break;
                 }
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
             break;
         }
@@ -1872,7 +1872,7 @@ void filterKeyFromKeyString(uint8_t ctype,
                     break;
                 }
                 default:
-                    MONGO_UNREACHABLE;
+                    MERIZO_UNREACHABLE;
             }
             break;
         }
@@ -1951,7 +1951,7 @@ void filterKeyFromKeyString(uint8_t ctype,
             break;
         }
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -2240,7 +2240,7 @@ void KeyString::TypeBits::appendZero(uint8_t zeroType) {
                 appendBit((zeroType >> bitPos) & 1);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

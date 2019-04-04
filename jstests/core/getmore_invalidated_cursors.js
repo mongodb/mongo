@@ -32,7 +32,7 @@
     const batchSize = (nDocs / FixtureHelpers.numberOfShardsForCollection(coll)) - 1;
 
     const isShardedCollection = coll.stats().sharded;
-    const shellReadMode = testDB.getMongo().readMode();
+    const shellReadMode = testDB.getMerizo().readMode();
 
     let cursor = coll.find().batchSize(batchSize);
     cursor.next();  // Send the query to the server.

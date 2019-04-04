@@ -66,7 +66,7 @@ public:
             return {_foreignNssSet};
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const final {
             PrivilegeVector requiredPrivileges;
             Privilege::addPrivilegeToPrivilegeVector(
                 &requiredPrivileges,
@@ -74,7 +74,7 @@ public:
 
             if (_liteParsedPipeline) {
                 Privilege::addPrivilegesToPrivilegeVector(
-                    &requiredPrivileges, _liteParsedPipeline->requiredPrivileges(isMongos));
+                    &requiredPrivileges, _liteParsedPipeline->requiredPrivileges(isMerizos));
             }
 
             return requiredPrivileges;
@@ -241,7 +241,7 @@ private:
      * Should not be called; use serializeToArray instead.
      */
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     GetNextResult unwindResult();

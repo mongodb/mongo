@@ -143,7 +143,7 @@ void FUTURE_FAIL_TEST(const TestFunc& test) {
     {  // async future
         test(async([&]() -> CompletionType {
             uassertStatusOK(failStatus());
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
         }));
     }
 }

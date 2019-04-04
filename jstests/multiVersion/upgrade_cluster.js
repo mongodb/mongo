@@ -88,16 +88,16 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         // upgrade the config servers first
         jsTest.log('upgrading config servers');
-        st.upgradeCluster("latest", {upgradeMongos: false, upgradeShards: false});
-        st.restartMongoses();
+        st.upgradeCluster("latest", {upgradeMerizos: false, upgradeShards: false});
+        st.restartMerizoses();
 
         testCRUDAndAgg(st.s.getDB('unsharded'));
         testCRUDAndAgg(st.s.getDB('sharded'));
 
         // Then upgrade the shards.
         jsTest.log('upgrading shard servers');
-        st.upgradeCluster("latest", {upgradeMongos: false, upgradeConfigs: false});
-        st.restartMongoses();
+        st.upgradeCluster("latest", {upgradeMerizos: false, upgradeConfigs: false});
+        st.restartMerizoses();
 
         testCRUDAndAgg(st.s.getDB('unsharded'));
         testCRUDAndAgg(st.s.getDB('sharded'));
@@ -105,7 +105,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // Finally, upgrade merizos
         jsTest.log('upgrading merizos servers');
         st.upgradeCluster("latest", {upgradeConfigs: false, upgradeShards: false});
-        st.restartMongoses();
+        st.restartMerizoses();
 
         testCRUDAndAgg(st.s.getDB('unsharded'));
         testCRUDAndAgg(st.s.getDB('sharded'));

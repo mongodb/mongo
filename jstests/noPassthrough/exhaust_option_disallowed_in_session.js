@@ -4,7 +4,7 @@
 (function() {
     "use strict";
 
-    let conn = MongoRunner.runMongod();
+    let conn = MerizoRunner.runMerizod();
 
     const dbName = 'test';
     const collName = 'coll';
@@ -28,5 +28,5 @@
     });
 
     session.endSession();
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 }());

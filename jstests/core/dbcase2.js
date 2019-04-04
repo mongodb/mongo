@@ -10,4 +10,4 @@ assert.eq(1, resultLower.nInserted);
 var resultUpper = dbUpperCase.c.insert({});
 assert.commandFailed(resultUpper);
 
-assert.eq(-1, db.getMongo().getDBNames().indexOf("dbcase2test_dbnameA"));
+assert.eq(-1, db.getMerizo().getDBNames().indexOf("dbcase2test_dbnameA"));

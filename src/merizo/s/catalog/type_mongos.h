@@ -44,7 +44,7 @@ namespace merizo {
  * config.merizos collection. All manipulation of documents coming from that
  * collection should be done with this class.
  */
-class MongosType {
+class MerizosType {
 public:
     // Name of the merizos collection in the config server.
     static const NamespaceString ConfigNS;
@@ -64,10 +64,10 @@ public:
     BSONObj toBSON() const;
 
     /**
-     * Constructs a new MongosType object from BSON.
+     * Constructs a new MerizosType object from BSON.
      * Also does validation of the contents.
      */
-    static StatusWith<MongosType> fromBSON(const BSONObj& source);
+    static StatusWith<MerizosType> fromBSON(const BSONObj& source);
 
     /**
      * Returns OK if all fields have been set. Otherwise, returns NoSuchKey
@@ -103,13 +103,13 @@ public:
     }
     void setWaiting(const bool waiting);
 
-    const std::string& getMongoVersion() const {
+    const std::string& getMerizoVersion() const {
         return _merizoVersion.get();
     }
-    bool isMongoVersionSet() const {
+    bool isMerizoVersionSet() const {
         return _merizoVersion.is_initialized();
     }
-    void setMongoVersion(const std::string& merizoVersion);
+    void setMerizoVersion(const std::string& merizoVersion);
 
     long long getConfigVersion() const {
         return _configVersion.get();

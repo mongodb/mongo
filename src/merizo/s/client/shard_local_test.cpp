@@ -46,7 +46,7 @@
 namespace merizo {
 namespace {
 
-class ShardLocalTest : public ServiceContextMongoDTest {
+class ShardLocalTest : public ServiceContextMerizoDTest {
 protected:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ShardLocal> _shardLocal;
@@ -80,7 +80,7 @@ private:
 };
 
 void ShardLocalTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
     _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     _shardLocal = stdx::make_unique<ShardLocal>(ShardRegistry::kConfigServerShardId);
@@ -95,7 +95,7 @@ void ShardLocalTest::setUp() {
 
 void ShardLocalTest::tearDown() {
     _opCtx.reset();
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
     repl::ReplicationCoordinator::set(getGlobalServiceContext(), nullptr);
 }
 

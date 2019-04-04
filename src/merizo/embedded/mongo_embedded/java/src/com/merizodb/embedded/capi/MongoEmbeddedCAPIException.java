@@ -34,9 +34,9 @@ package com.merizodb.embedded.capi;
 import static java.lang.String.format;
 
 /**
- * Top level Exception for all Mongo Embedded CAPI exceptions
+ * Top level Exception for all Merizo Embedded CAPI exceptions
  */
-public class MongoEmbeddedCAPIException extends RuntimeException {
+public class MerizoEmbeddedCAPIException extends RuntimeException {
     private static final long serialVersionUID = -5524416583514807953L;
     private final int code;
 
@@ -44,7 +44,7 @@ public class MongoEmbeddedCAPIException extends RuntimeException {
      * @param msg   the message
      * @param cause the cause
      */
-    public MongoEmbeddedCAPIException(final String msg, final Throwable cause) {
+    public MerizoEmbeddedCAPIException(final String msg, final Throwable cause) {
         super(msg, cause);
         this.code = -1;
     }
@@ -54,7 +54,7 @@ public class MongoEmbeddedCAPIException extends RuntimeException {
      * @param msg  the message
      * @param cause the cause
      */
-    public MongoEmbeddedCAPIException(final int code, final String msg, final Throwable cause) {
+    public MerizoEmbeddedCAPIException(final int code, final String msg, final Throwable cause) {
         super(msg, cause);
         this.code = code;
     }
@@ -67,7 +67,7 @@ public class MongoEmbeddedCAPIException extends RuntimeException {
      * @param reason the reason for the exception
      * @param cause the cause
      */
-    public MongoEmbeddedCAPIException(final int errorCode, final int subErrorCode, final String reason, final Throwable cause) {
+    public MerizoEmbeddedCAPIException(final int errorCode, final int subErrorCode, final String reason, final Throwable cause) {
         this(errorCode, format("%s (%s:%s)", reason, errorCode, subErrorCode), cause);
     }
 

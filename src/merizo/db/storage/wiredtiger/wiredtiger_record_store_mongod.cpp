@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -166,7 +166,7 @@ bool initRsOplogBackgroundThread(StringData ns) {
     return true;
 }
 
-MONGO_INITIALIZER(SetInitRsOplogBackgroundThreadCallback)(InitializerContext* context) {
+MERIZO_INITIALIZER(SetInitRsOplogBackgroundThreadCallback)(InitializerContext* context) {
     WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(initRsOplogBackgroundThread);
     return Status::OK();
 }

@@ -4,7 +4,7 @@
     var conn;
     var admin;
 
-    conn = MongoRunner.runMongod({auth: ""});
+    conn = MerizoRunner.runMerizod({auth: ""});
     admin = conn.getDB("admin");
 
     admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
@@ -35,7 +35,7 @@
     assert.commandWorked(result, "unable to run command with impersonate privileges");
     admin.logout();
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     TestData.disableImplicitSessions = true;
 
@@ -43,7 +43,7 @@
     var refresh = {refreshLogicalSessionCacheNow: 1};
     var startSession = {startSession: 1};
 
-    conn = MongoRunner.runMongod();
+    conn = MerizoRunner.runMerizod();
     admin = conn.getDB("admin");
     var config = conn.getDB("config");
 
@@ -56,10 +56,10 @@
     var sessions = config.system.sessions.find().toArray();
     assert.eq(sessions.length, 3, "refresh should have written three session records");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
     // Test that we can run refreshSessionsInternal with logical session record objects
-    conn = MongoRunner.runMongod({setParameter: {maxSessions: 2}});
+    conn = MerizoRunner.runMerizod({setParameter: {maxSessions: 2}});
     admin = conn.getDB("admin");
 
     result = admin.runCommand({refreshSessionsInternal: sessions.slice(0, 2)});
@@ -69,5 +69,5 @@
     result = admin.runCommand({refreshSessionsInternal: sessions.slice(2)});
     assert.commandFailed(result, "able to run refreshSessionsInternal when the cache is full");
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

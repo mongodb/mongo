@@ -4,13 +4,13 @@
     'use strict';
 
     function assertFails(opts) {
-        assert.eq(null, MongoRunner.runMongod(opts), "Mongod startup up");
+        assert.eq(null, MerizoRunner.runMerizod(opts), "Merizod startup up");
     }
 
     function assertStarts(opts) {
-        const merizod = MongoRunner.runMongod(opts);
-        assert(merizod, "Mongod startup up");
-        MongoRunner.stopMongod(merizod);
+        const merizod = MerizoRunner.runMerizod(opts);
+        assert(merizod, "Merizod startup up");
+        MerizoRunner.stopMerizod(merizod);
     }
 
     setJsTestOption('enableTestCommands', false);

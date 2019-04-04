@@ -38,13 +38,13 @@ func GetBareSessionProvider() (*db.SessionProvider, *options.ToolOptions, error)
 	var toolOptions *options.ToolOptions
 
 	// get ToolOptions from URI or defaults
-	if uri := os.Getenv("TOOLS_TESTING_MONGOD"); uri != "" {
+	if uri := os.Getenv("TOOLS_TESTING_MERIZOD"); uri != "" {
 		fakeArgs := []string{"--uri=" + uri}
 		toolOptions = options.New("merizodump", "", options.EnabledOptions{URI: true})
 		toolOptions.URI.AddKnownURIParameters(options.KnownURIOptionsReadPreference)
 		_, err := toolOptions.ParseArgs(fakeArgs)
 		if err != nil {
-			panic("Could not parse MONGOD environment variable")
+			panic("Could not parse MERIZOD environment variable")
 		}
 	} else {
 		ssl := GetSSLOptions()

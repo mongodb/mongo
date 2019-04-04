@@ -14,7 +14,7 @@
     const primary = rst.getPrimary();
     const primaryAdmin = primary.getDB("admin");
     // We need a separate connection to avoid interference with the ReplSetTestMechanism.
-    const primaryDataConn = new Mongo(primary.host);
+    const primaryDataConn = new Merizo(primary.host);
     const primaryDb = primaryDataConn.getDB("test");
     const collname = "last_error_reported_after_stepdown";
     const coll = primaryDb[collname];

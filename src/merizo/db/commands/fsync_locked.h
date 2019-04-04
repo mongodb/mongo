@@ -39,7 +39,7 @@ bool lockedForWriting();
 
 /**
 * Sets the implementation for lockedForWriting(). Should be done once during startup in a
-* MONGO_INITIALIZER.
+* MERIZO_INITIALIZER.
 */
 void setLockedForWritingImpl(stdx::function<bool()> impl);
 

@@ -102,14 +102,14 @@
     };
 
     // Create and clear dbpath
-    let sharedDbPath = MongoRunner.dataPath + "do_upgrade_downgrade";
+    let sharedDbPath = MerizoRunner.dataPath + "do_upgrade_downgrade";
     resetDbpath(sharedDbPath);
 
     // Return a merizodb connection with startup options, version and dbpath options
-    let startMongodWithVersion = function(nodeOptions, ver, path) {
+    let startMerizodWithVersion = function(nodeOptions, ver, path) {
         let version = ver || latestBinary;
         let dbpath = path || sharedDbPath;
-        let conn = MongoRunner.runMongod(
+        let conn = MerizoRunner.runMerizod(
             Object.assign({}, nodeOptions, {dbpath: dbpath, binVersion: version}));
         assert.neq(null,
                    conn,
@@ -125,7 +125,7 @@
 
         // New latest binary version standalone.
         jsTest.log("Starting a latest binVersion standalone");
-        let conn = startMongodWithVersion(nodeOptions, latestBinary);
+        let conn = startMerizodWithVersion(nodeOptions, latestBinary);
         let adminDB = conn.getDB("admin");
 
         // Insert some data.
@@ -153,11 +153,11 @@
         recreateUniqueIndexes(adminDB, false);
 
         // Stop latest binary version merizod.
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
 
         // Start last-stable binary version merizod with same dbpath
         jsTest.log("Starting a last-stable binVersion standalone to test downgrade");
-        let lastStableConn = startMongodWithVersion(noCleanDataOptions, lastStableBinary);
+        let lastStableConn = startMerizodWithVersion(noCleanDataOptions, lastStableBinary);
         let lastStableAdminDB = lastStableConn.getDB("admin");
 
         // Check FCV document.
@@ -167,11 +167,11 @@
         checkCollectionUUIDs(lastStableAdminDB);
 
         // Stop last-stable binary version merizod.
-        MongoRunner.stopMongod(lastStableConn);
+        MerizoRunner.stopMerizod(lastStableConn);
 
         // Start latest binary version merizod again.
         jsTest.log("Starting a latest binVersion standalone to test upgrade");
-        conn = startMongodWithVersion(noCleanDataOptions, latestBinary);
+        conn = startMerizodWithVersion(noCleanDataOptions, latestBinary);
         adminDB = conn.getDB("admin");
 
         // Ensure setFeatureCompatibilityVersion to latest succeeds, all collections have UUIDs
@@ -182,7 +182,7 @@
         checkUniqueIndexFormatVersion(adminDB);
 
         // Stop latest binary version merizod for the last time
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
     };
 
     //

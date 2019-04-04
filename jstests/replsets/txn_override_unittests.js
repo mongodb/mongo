@@ -142,8 +142,8 @@
      * for the command, runs that after the command is run. The post-command function is run
      * regardless of whether the command response was overridden or not.
      */
-    const merizoRunCommandOriginal = Mongo.prototype.runCommand;
-    Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
+    const merizoRunCommandOriginal = Merizo.prototype.runCommand;
+    Merizo.prototype.runCommand = function(dbName, cmdObj, options) {
         const cmdName = Object.keys(cmdObj)[0];
         if (runCommandOverrideBlacklistedCommands.includes(cmdName)) {
             return merizoRunCommandOriginal.apply(this, arguments);
@@ -186,7 +186,7 @@
 
     // We have a separate connection for the failpoint so that it does not break up the transaction
     // buffered in txn_override.js.
-    const failpointConn = new Mongo(conn.host);
+    const failpointConn = new Merizo(conn.host);
 
     /**
      * Marks that the given command should fail with the given parameters using the failCommand
@@ -247,7 +247,7 @@
      */
     function abortCurrentTransaction() {
         const session = testDB.getSession();
-        assert.commandWorked(merizoRunCommandOriginal.apply(testDB.getMongo(), [
+        assert.commandWorked(merizoRunCommandOriginal.apply(testDB.getMerizo(), [
             'admin',
             {
               abortTransaction: 1,
@@ -1014,7 +1014,7 @@
         //       attachPostCmdFunction("commitTransaction", function() {
         //           abortCurrentTransaction();
         //           assert.commandWorked(merizoRunCommandOriginal.apply(
-        //               testDB.getMongo(), [dbName, {drop: collName2}, 0]));
+        //               testDB.getMerizo(), [dbName, {drop: collName2}, 0]));
         //       });
         //       failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster,
         //       "NotMaster");

@@ -39,7 +39,7 @@ namespace logger {
 
 /**
  * Log components.
- * Debug messages logged using the LOG() or MONGO_LOG_COMPONENT().
+ * Debug messages logged using the LOG() or MERIZO_LOG_COMPONENT().
  * Macros may be associated with one or more log components.
  */
 class LogComponent {

@@ -7,7 +7,7 @@
     var st = new ShardingTest({shards: 2, merizos: 2});
 
     var merizos = st.s0;
-    var staleMongos = st.s1;
+    var staleMerizos = st.s1;
     var admin = merizos.getDB("admin");
     var coll = merizos.getCollection("foo.bar");
 
@@ -41,7 +41,7 @@
     assert.writeOK(coll.insert({_id: 40}));
     assert.writeOK(coll.insert({_id: 110}));
 
-    var staleCollection = staleMongos.getCollection(coll + "");
+    var staleCollection = staleMerizos.getCollection(coll + "");
 
     jsTest.log("Trying merges that should fail...");
 

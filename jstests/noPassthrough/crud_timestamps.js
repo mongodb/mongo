@@ -27,7 +27,7 @@
         mode: "alwaysOn",
     }));
 
-    const session = testDB.getMongo().startSession({causalConsistency: false});
+    const session = testDB.getMerizo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);
     const response = assert.commandWorked(testDB.createCollection("coll"));
     const startTime = response.operationTime;

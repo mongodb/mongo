@@ -55,11 +55,11 @@ var $config = (function() {
             db[collName].insert({_id: i});
         }
 
-        cluster.executeOnMongodNodes(function(db) {
+        cluster.executeOnMerizodNodes(function(db) {
             printjson(db.serverCmdLineOpts());
         });
 
-        cluster.executeOnMongosNodes(function(db) {
+        cluster.executeOnMerizosNodes(function(db) {
             printjson(db.serverCmdLineOpts());
         });
     }

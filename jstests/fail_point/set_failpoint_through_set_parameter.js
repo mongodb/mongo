@@ -27,39 +27,39 @@
     // Setting a failpoint via --setParameter fails if enableTestCommands is not on.
     jsTest.setOption('enableTestCommands', false);
     assertStartupFails(
-        MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)}));
-    assertStartupFails(MongoRunner.runMongos({
+        MerizoRunner.runMerizod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)}));
+    assertStartupFails(MerizoRunner.runMerizos({
         setParameter: "failpoint.dummy=" + tojson(validFailpointPayload),
         configdb: configRS.getURL()
     }));
     jsTest.setOption('enableTestCommands', true);
 
     // Passing an invalid failpoint payload fails.
-    assertStartupFails(MongoRunner.runMongod(
+    assertStartupFails(MerizoRunner.runMerizod(
         {setParameter: "failpoint.dummy=" + tojson(invalidFailpointPayload)}));
-    assertStartupFails(MongoRunner.runMongos({
+    assertStartupFails(MerizoRunner.runMerizos({
         setParameter: "failpoint.dummy=" + tojson(invalidFailpointPayload),
         configdb: configRS.getURL()
     }));
 
     // Valid startup configurations succeed.
     var merizod =
-        MongoRunner.runMongod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)});
+        MerizoRunner.runMerizod({setParameter: "failpoint.dummy=" + tojson(validFailpointPayload)});
     assertStartupSucceeds(merizod);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
-    var merizos = MongoRunner.runMongos({
+    var merizos = MerizoRunner.runMerizos({
         setParameter: "failpoint.dummy=" + tojson(validFailpointPayload),
         configdb: configRS.getURL()
     });
     assertStartupSucceeds(merizos);
-    MongoRunner.stopMongos(merizos);
+    MerizoRunner.stopMerizos(merizos);
 
-    merizod = MongoRunner.runMongod(
+    merizod = MerizoRunner.runMerizod(
         {setParameter: "failpoint.dummy=" + tojson(validFailpointPayloadWithData)});
     assertStartupSucceeds(merizod);
 
-    merizos = MongoRunner.runMongos({
+    merizos = MerizoRunner.runMerizos({
         setParameter: "failpoint.dummy=" + tojson(validFailpointPayloadWithData),
         configdb: configRS.getURL()
     });
@@ -102,8 +102,8 @@
     assert.eq(1, res["failpoint.dummy"].mode);  // the 'mode' is an enum internally; 'alwaysOn' is 1
     assert.eq(newData, res["failpoint.dummy"].data);
 
-    MongoRunner.stopMongod(merizod);
-    MongoRunner.stopMongos(merizos);
+    MerizoRunner.stopMerizod(merizod);
+    MerizoRunner.stopMerizos(merizos);
 
     // Failpoint server parameters do not show up in the output of getParameter when not running
     // with enableTestCommands=1.
@@ -111,10 +111,10 @@
     jsTest.setOption('enableTestCommands', false);
     TestData.roleGraphInvalidationIsFatal = false;
 
-    merizod = MongoRunner.runMongod();
+    merizod = MerizoRunner.runMerizod();
     assertStartupSucceeds(merizod);
 
-    merizos = MongoRunner.runMongos({configdb: configRS.getURL()});
+    merizos = MerizoRunner.runMerizos({configdb: configRS.getURL()});
     assertStartupSucceeds(merizos);
 
     // Doing getParameter for a specific failpoint fails.
@@ -134,7 +134,7 @@
         assert(!parameter.includes("failpoint."));
     }
 
-    MongoRunner.stopMongod(merizod);
-    MongoRunner.stopMongos(merizos);
+    MerizoRunner.stopMerizod(merizod);
+    MerizoRunner.stopMerizos(merizos);
     configRS.stopSet();
 })();

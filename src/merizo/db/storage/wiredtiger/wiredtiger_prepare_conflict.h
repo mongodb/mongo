@@ -38,7 +38,7 @@
 namespace merizo {
 
 // When set, returns simulates returning WT_PREPARE_CONFLICT on WT cursor read operations.
-MONGO_FAIL_POINT_DECLARE(WTPrepareConflictForReads);
+MERIZO_FAIL_POINT_DECLARE(WTPrepareConflictForReads);
 
 /**
  * Logs a message with the number of prepare conflict retry attempts.
@@ -60,7 +60,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
     int attempts = 1;
     // If the failpoint is enabled, don't call the function, just simulate a conflict.
     int ret =
-        MONGO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
+        MERIZO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
     if (ret != WT_PREPARE_CONFLICT)
         return ret;
     CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
@@ -71,7 +71,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         auto lastCount = recoveryUnit->getSessionCache()->getPrepareCommitOrAbortCount();
         // If the failpoint is enabled, don't call the function, just simulate a conflict.
         ret =
-            MONGO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
+            MERIZO_FAIL_POINT(WTPrepareConflictForReads) ? WT_PREPARE_CONFLICT : WT_READ_CHECK(f());
 
         if (ret != WT_PREPARE_CONFLICT)
             return ret;

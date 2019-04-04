@@ -160,7 +160,7 @@ var testOps = function(db, allowedActions) {
 
     // Test for kill cursor
     (function() {
-        var newConn = new Mongo(db.getMongo().host);
+        var newConn = new Merizo(db.getMerizo().host);
         var dbName = db.getName();
         var db2 = newConn.getDB(dbName);
 
@@ -208,9 +208,9 @@ var testOps = function(db, allowedActions) {
         });
     })();
 
-    var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+    var isMerizos = db.runCommand({isdbgrid: 1}).isdbgrid;
     // Note: fsyncUnlock is not supported in merizos.
-    if (!isMongos) {
+    if (!isMerizos) {
         checkErr(allowedActions.hasOwnProperty('fsync_unlock'), function() {
             var res = db.fsyncUnlock();
             var errorCodeUnauthorized = 13;
@@ -226,7 +226,7 @@ var testOps = function(db, allowedActions) {
 //
 // {
 //   name: {String} description of the test
-//   test: {function(Mongo)} the test function to run which accepts a Mongo connection
+//   test: {function(Merizo)} the test function to run which accepts a Merizo connection
 //                           object.
 // }
 var TESTS = [
@@ -236,7 +236,7 @@ var TESTS = [
           var testDB = conn.getDB('test');
           assert.eq(1, testDB.auth('ro', AUTH_INFO.test.ro.pwd));
 
-          var conn2 = new Mongo(conn.host);
+          var conn2 = new Merizo(conn.host);
           var testDB2 = conn2.getDB('test');
           assert.eq(1, testDB2.auth('uadmin', AUTH_INFO.test.uadmin.pwd));
 
@@ -406,7 +406,7 @@ var TESTS = [
           var testDB = conn.getDB('test');
           assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
 
-          var newConn = new Mongo(conn.host);
+          var newConn = new Merizo(conn.host);
           assert.eq(1, newConn.getDB('admin').auth('any_uadmin', AUTH_INFO.admin.any_uadmin.pwd));
           newConn.getDB('test').updateUser('rw', {roles: ['read']});
           var origSpec = newConn.getDB("test").getUser("rw");
@@ -420,7 +420,7 @@ var TESTS = [
           testOps(testDB, READ_PERM);
 
           // role change should also affect new connections.
-          var newConn3 = new Mongo(conn.host);
+          var newConn3 = new Merizo(conn.host);
           var testDB3 = newConn3.getDB('test');
           assert.eq(1, testDB3.auth('rw', AUTH_INFO.test.rw.pwd));
           testOps(testDB3, READ_PERM);
@@ -447,7 +447,7 @@ var TESTS = [
  * Driver method for setting up the test environment, running them, cleanup
  * after every test and keeping track of test failures.
  *
- * @param conn {Mongo} a connection to a merizod or merizos to test.
+ * @param conn {Merizo} a connection to a merizod or merizos to test.
  */
 var runTests = function(conn) {
     var setup = function() {
@@ -493,7 +493,7 @@ var runTests = function(conn) {
         try {
             jsTest.log(testFunc.name);
 
-            var newConn = new Mongo(conn.host);
+            var newConn = new Merizo(conn.host);
             newConn.host = conn.host;
             testFunc.test(newConn);
         } catch (x) {
@@ -513,9 +513,9 @@ var runTests = function(conn) {
     }
 };
 
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = MerizoRunner.runMerizod({auth: ''});
 runTests(conn);
-MongoRunner.stopMongod(conn);
+MerizoRunner.stopMerizod(conn);
 
 jsTest.log('Test sharding');
 // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

@@ -20,25 +20,25 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     // Assert that a merizos using the 'last-stable' binary version will crash when connecting to a
     // cluster running on the 'latest' binary version with the 'latest' FCV.
-    let lastStableMongos =
-        MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: lastStable});
+    let lastStableMerizos =
+        MerizoRunner.runMerizos({configdb: st.configRS.getURL(), binVersion: lastStable});
 
-    assert(!lastStableMongos);
+    assert(!lastStableMerizos);
 
     // Assert that a merizos using the 'last-stable' binary version will successfully connect to a
     // cluster running on the 'latest' binary version with the 'last-stable' FCV.
     assert.commandWorked(merizosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-    lastStableMongos =
-        MongoRunner.runMongos({configdb: st.configRS.getURL(), binVersion: lastStable});
+    lastStableMerizos =
+        MerizoRunner.runMerizos({configdb: st.configRS.getURL(), binVersion: lastStable});
     assert.neq(null,
-               lastStableMongos,
+               lastStableMerizos,
                "merizos was unable to start up with binary version=" + lastStable +
                    " and connect to FCV=" + lastStableFCV + " cluster");
 
     // Ensure that the 'lastStable' binary merizos can perform reads and writes to the shards in the
     // cluster.
-    assert.writeOK(lastStableMongos.getDB("test").foo.insert({x: 1}));
-    let foundDoc = lastStableMongos.getDB("test").foo.findOne({x: 1});
+    assert.writeOK(lastStableMerizos.getDB("test").foo.insert({x: 1}));
+    let foundDoc = lastStableMerizos.getDB("test").foo.findOne({x: 1});
     assert.neq(null, foundDoc);
     assert.eq(1, foundDoc.x, tojson(foundDoc));
 
@@ -46,10 +46,10 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // 'latestFCV'.
     assert.commandWorked(merizosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
     let error = assert.throws(function() {
-        lastStableMongos.getDB("test").foo.insert({x: 1});
+        lastStableMerizos.getDB("test").foo.insert({x: 1});
     });
     assert(isNetworkError(error));
-    assert(!lastStableMongos.conn);
+    assert(!lastStableMerizos.conn);
 
     st.stop();
 })();

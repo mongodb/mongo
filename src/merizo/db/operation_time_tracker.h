@@ -37,7 +37,7 @@ namespace merizo {
 
 /**
  * OperationTimeTracker holds the latest operationTime received from a merizod for the current
- * operation. Mongos commands are processed via ASIO, meaning a random thread will handle the
+ * operation. Merizos commands are processed via ASIO, meaning a random thread will handle the
  * response, so this class is declared as a decoration on OperationContext.
  */
 class OperationTimeTracker {

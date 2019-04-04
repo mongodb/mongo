@@ -47,7 +47,7 @@ SaslClientSession* createNativeSaslClientSession(const std::string mech) {
     return new NativeSaslClientSession();
 }
 
-MONGO_INITIALIZER(NativeSaslClientContext)(InitializerContext* context) {
+MERIZO_INITIALIZER(NativeSaslClientContext)(InitializerContext* context) {
     SaslClientSession::create = createNativeSaslClientSession;
     return Status::OK();
 }

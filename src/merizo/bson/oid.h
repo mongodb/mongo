@@ -115,7 +115,7 @@ public:
         return o;
     }
 
-    MONGO_STATIC_ASSERT_MSG(sizeof(int64_t) == kInstanceUniqueSize + kIncrementSize,
+    MERIZO_STATIC_ASSERT_MSG(sizeof(int64_t) == kInstanceUniqueSize + kIncrementSize,
                             "size of term must be size of instance unique + increment");
 
     // Return OID initialized with a 8 byte term id and max Timestamp. Used for ElectionID.
@@ -259,7 +259,7 @@ enum JsonStringFormat {
     /** strict RFC format */
     Strict,
     /** 10gen format, which is close to JS format.  This form is understandable by
-        javascript running inside the Mongo server via $where, mr, etc... */
+        javascript running inside the Merizo server via $where, mr, etc... */
     TenGen,
 };
 

@@ -12,22 +12,22 @@
         assert(primaryInfo.ismaster,
                'shell is not connected to the primary or master node: ' + tojson(primaryInfo));
 
-        let testFixture = new ReplSetTest(db.getMongo().host);
+        let testFixture = new ReplSetTest(db.getMerizo().host);
         testFixture.checkOplogs();
     };
 
-    if (db.getMongo().isMongos()) {
+    if (db.getMerizo().isMerizos()) {
         let configDB = db.getSiblingDB('config');
 
         // Run check on every shard.
         configDB.shards.find().forEach(shardEntry => {
-            let newConn = new Mongo(shardEntry.host);
+            let newConn = new Merizo(shardEntry.host);
             runCheckOnReplSet(newConn.getDB('test'));
         });
 
         // Run check on config server.
         let cmdLineOpts = db.adminCommand({getCmdLineOpts: 1});
-        let configConn = new Mongo(cmdLineOpts.parsed.sharding.configDB);
+        let configConn = new Merizo(cmdLineOpts.parsed.sharding.configDB);
         runCheckOnReplSet(configConn.getDB('test'));
     } else {
         runCheckOnReplSet(db);

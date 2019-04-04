@@ -65,14 +65,14 @@ bool TransportLayerMock::owns(Session::Id id) {
 StatusWith<SessionHandle> TransportLayerMock::connect(HostAndPort peer,
                                                       ConnectSSLMode sslMode,
                                                       Milliseconds timeout) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Future<SessionHandle> TransportLayerMock::asyncConnect(HostAndPort peer,
                                                        ConnectSSLMode sslMode,
                                                        const ReactorHandle& reactor,
                                                        Milliseconds timeout) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 Status TransportLayerMock::setup() {

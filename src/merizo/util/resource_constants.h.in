@@ -37,36 +37,36 @@
 #include <sdkddkver.h>
 
 // This is a single number, not a string
-#define MONGO_VERSION_MAJOR @merizo_version_major@
+#define MERIZO_VERSION_MAJOR @merizo_version_major@
 
 // This is a single number, not a string
-#define MONGO_VERSION_MINOR @merizo_version_minor@
+#define MERIZO_VERSION_MINOR @merizo_version_minor@
 
 // This is a single number, not a string
-#define MONGO_VERSION_PATCH @merizo_version_patch@
+#define MERIZO_VERSION_PATCH @merizo_version_patch@
 
 // This is a string, it should be the product version
-#define MONGO_FILE_VERSION_STR "@merizo_version@"
+#define MERIZO_FILE_VERSION_STR "@merizo_version@"
 
 // This is a string, it should be the file version. We use the product version.
-#define MONGO_PRODUCT_VERSION_STR "@merizo_version@"
+#define MERIZO_PRODUCT_VERSION_STR "@merizo_version@"
 
 #if (NTDDI_VERSION >= NTDDI_WIN7)
-    #define MONGO_PRODUCT_WINDOWS_VERSION "Windows 7/Windows Server 2008 R2";
+    #define MERIZO_PRODUCT_WINDOWS_VERSION "Windows 7/Windows Server 2008 R2";
 #else
     #error This targeted Windows version is not supported
 #endif  // NTDDI_VERSION
 
-#ifdef MONGO_ENTERPRISE_VERSION
-#define MONGO_PRODUCT_EDITION_STR @buildinfo_modules@
-#elif MONGO_CONFIG_SSL
-#define MONGO_PRODUCT_EDITION_STR "SSL"
+#ifdef MERIZO_ENTERPRISE_VERSION
+#define MERIZO_PRODUCT_EDITION_STR @buildinfo_modules@
+#elif MERIZO_CONFIG_SSL
+#define MERIZO_PRODUCT_EDITION_STR "SSL"
 #else
-#define MONGO_PRODUCT_EDITION_STR "Legacy"
+#define MERIZO_PRODUCT_EDITION_STR "Legacy"
 #endif
 
-#define MONGO_PRODUCT_NAME_STR "MerizoDB " MONGO_PRODUCT_EDITION_STR " " MONGO_PRODUCT_WINDOWS_VERSION
+#define MERIZO_PRODUCT_NAME_STR "MerizoDB " MERIZO_PRODUCT_EDITION_STR " " MERIZO_PRODUCT_WINDOWS_VERSION
 
-#define MONGO_VERSION_COMMENT_STR "Git @merizo_git_hash@"
+#define MERIZO_VERSION_COMMENT_STR "Git @merizo_git_hash@"
 
 

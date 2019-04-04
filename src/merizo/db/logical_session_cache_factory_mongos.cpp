@@ -41,7 +41,7 @@
 namespace merizo {
 
 std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheS() {
-    auto liaison = stdx::make_unique<ServiceLiaisonMongos>();
+    auto liaison = stdx::make_unique<ServiceLiaisonMerizos>();
     auto sessionsColl = stdx::make_unique<SessionsCollectionSharded>();
 
     return stdx::make_unique<LogicalSessionCacheImpl>(

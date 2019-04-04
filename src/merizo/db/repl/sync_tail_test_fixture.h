@@ -99,7 +99,7 @@ public:
         onCreateCollectionFn;
 };
 
-class SyncTailTest : public ServiceContextMongoDTest {
+class SyncTailTest : public ServiceContextMerizoDTest {
 public:
     /**
      * Creates OplogApplier::Options for initial sync.

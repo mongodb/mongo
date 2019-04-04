@@ -38,10 +38,10 @@ class RemoteCommandTargeterMock;
 
 /**
  * Test fixture for shard components, as opposed to config or merizos components. Provides a mock
- * network and ephemeral storage engine via ShardingMongodTestFixture. Additionally sets up mock
+ * network and ephemeral storage engine via ShardingMerizodTestFixture. Additionally sets up mock
  * dist lock catalog and manager with a real catalog client.
  */
-class ShardServerTestFixture : public ShardingMongodTestFixture {
+class ShardServerTestFixture : public ShardingMerizodTestFixture {
 public:
     ShardServerTestFixture();
     ~ShardServerTestFixture();

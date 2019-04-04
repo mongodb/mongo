@@ -9,13 +9,13 @@
     const collNameA = "coll_A";
     const collNameB = "coll_B";
 
-    const sessionOutsideTxn = db.getMongo().startSession({causalConsistency: true});
+    const sessionOutsideTxn = db.getMerizo().startSession({causalConsistency: true});
     const testDB1 = sessionOutsideTxn.getDatabase(dbName1);
     const testDB2 = sessionOutsideTxn.getDatabase(dbName2);
     testDB1.runCommand({drop: collNameA, writeConcern: {w: "majority"}});
     testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}});
 
-    const session = db.getMongo().startSession({causalConsistency: false});
+    const session = db.getMerizo().startSession({causalConsistency: false});
     const sessionDB1 = session.getDatabase(dbName1);
     const sessionDB2 = session.getDatabase(dbName2);
     const sessionCollA = sessionDB1[collNameA];

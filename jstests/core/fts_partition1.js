@@ -12,7 +12,7 @@ t.ensureIndex({x: 1, y: "text"});
 
 assert.throws(function() {
     const cursor = t.find({"$text": {"$search": "foo"}});
-    if (db.getMongo().readMode() === "legacy") {
+    if (db.getMerizo().readMode() === "legacy") {
         // In legacy read mode, calling next() will check if the response to the OP_QUERY message
         // has an error.
         cursor.next();

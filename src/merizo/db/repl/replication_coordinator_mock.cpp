@@ -104,13 +104,13 @@ MemberState ReplicationCoordinatorMock::getMemberState() const {
 }
 
 std::vector<MemberData> ReplicationCoordinatorMock::getMemberData() const {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
     return {};
 }
 
 Status ReplicationCoordinatorMock::waitForMemberState(MemberState expectedState,
                                                       Milliseconds timeout) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
     return Status::OK();
 }
 
@@ -295,7 +295,7 @@ ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState
 void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) {}
 
 Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
     return Status::OK();
 }
 
@@ -444,7 +444,7 @@ bool ReplicationCoordinatorMock::shouldChangeSyncSource(
     const HostAndPort& currentSource,
     const rpc::ReplSetMetadata& replMetadata,
     boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {

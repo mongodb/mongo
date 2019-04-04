@@ -7,7 +7,7 @@ load("jstests/libs/kill_sessions.js");
     // if the kill command is sent with an implicit session.
     TestData.disableImplicitSessions = true;
 
-    var conn = MongoRunner.runMongod();
+    var conn = MerizoRunner.runMerizod();
     KillSessionsTestHelper.runNoAuth(conn, conn, [conn]);
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

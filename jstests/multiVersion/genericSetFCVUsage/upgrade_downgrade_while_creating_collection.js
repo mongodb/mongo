@@ -40,7 +40,7 @@
             }, primary.port);
 
             assert.soon(function() {
-                return rawMongoProgramOutput().match("createCollection: test.mycoll");
+                return rawMerizoProgramOutput().match("createCollection: test.mycoll");
             });
 
             awaitUpgradeFCV = startParallelShell(

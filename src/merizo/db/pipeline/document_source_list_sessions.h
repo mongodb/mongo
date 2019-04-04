@@ -62,7 +62,7 @@ public:
             return stdx::unordered_set<NamespaceString>();
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const final {
             return listSessionsRequiredPrivileges(_spec);
         }
 
@@ -70,7 +70,7 @@ public:
             return true;
         }
 
-        bool allowedToPassthroughFromMongos() const final {
+        bool allowedToPassthroughFromMerizos() const final {
             return _spec.getAllUsers();
         }
 

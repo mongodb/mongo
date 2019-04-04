@@ -8,7 +8,7 @@
 
     load("jstests/libs/feature_compatibility_version.js");
 
-    let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
+    let dbpath = MerizoRunner.dataPath + "feature_compatibility_version";
     resetDbpath(dbpath);
     let connection;
     let adminDB;
@@ -28,7 +28,7 @@
         // Now attempt to start up a new merizod without clearing the data files from 'dbpath', which
         // contain the admin database but are missing the FCV document. The merizod should fail to
         // start up if there is a non-local collection and the FCV document is missing.
-        let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version, noCleanData: true});
+        let conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: version, noCleanData: true});
         assert.eq(
             null,
             conn,
@@ -40,13 +40,13 @@
      * admin database and returns the merizod.
      */
     let setupMissingFCVDoc = function(version, dbpath) {
-        let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version});
+        let conn = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: version});
         assert.neq(null,
                    conn,
                    "merizod was unable to start up with version=" + version + " and no data files");
         adminDB = conn.getDB("admin");
         removeFCVDocument(adminDB);
-        MongoRunner.stopMongod(conn);
+        MerizoRunner.stopMerizod(conn);
         return conn;
     };
 
@@ -59,13 +59,13 @@
     // lastStableFCV / downgraded FCV.
     connection = setupMissingFCVDoc(latest, dbpath);
     let returnCode =
-        runMongoProgram("merizod", "--port", connection.port, "--repair", "--dbpath", dbpath);
+        runMerizoProgram("merizod", "--port", connection.port, "--repair", "--dbpath", dbpath);
     assert.eq(
         returnCode,
         0,
         "expected merizod --repair to execute successfully when restoring a missing FCV document.");
 
-    connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
+    connection = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: latest, noCleanData: true});
     assert.neq(null,
                connection,
                "merizod was unable to start up with version=" + latest + " and existing data files");
@@ -74,17 +74,17 @@
               lastStableFCV);
     assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).targetVersion,
               null);
-    MongoRunner.stopMongod(connection);
+    MerizoRunner.stopMerizod(connection);
 
     // If the featureCompatibilityVersion document is present, --repair should just return success.
-    connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
+    connection = MerizoRunner.runMerizod({dbpath: dbpath, binVersion: latest});
     assert.neq(null,
                connection,
                "merizod was unable to start up with version=" + latest + " and no data files");
-    MongoRunner.stopMongod(connection);
+    MerizoRunner.stopMerizod(connection);
 
     returnCode =
-        runMongoProgram("merizod", "--port", connection.port, "--repair", "--dbpath", dbpath);
+        runMerizoProgram("merizod", "--port", connection.port, "--repair", "--dbpath", dbpath);
     assert.eq(returnCode, 0);
 
 })();

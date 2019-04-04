@@ -37,7 +37,7 @@
 // inclusion of this file from files that have explicitly whitelisted it. Additionally, since this
 // file is only ever included in .cpp files, it makes some sense to use an unnamed namespace here.
 
-#ifndef MONGO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
+#ifndef MERIZO_UTIL_VERSION_CONSTANTS_H_WHITELISTED
 #error "Cannot include merizo/util/version_constants.h"
 #endif
 

@@ -56,7 +56,7 @@ public:
             return stdx::unordered_set<NamespaceString>();
         }
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const final {
             return {Privilege(ResourcePattern::forAnyNormalResource(),
                               ActionType::listCachedAndActiveUsers)};
         }
@@ -65,7 +65,7 @@ public:
             return true;
         }
 
-        bool allowedToForwardFromMongos() const final {
+        bool allowedToForwardFromMerizos() const final {
             return false;
         }
 

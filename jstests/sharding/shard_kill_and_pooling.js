@@ -30,7 +30,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // jstest ->(x10)-> merizos ->(x10)-> primary
         var conns = [];
         for (var i = 0; i < 50; i++) {
-            conns.push(new Mongo(merizos.host));
+            conns.push(new Merizo(merizos.host));
             assert.neq(null, conns[i].getCollection(coll + "").findOne());
         }
 
@@ -51,7 +51,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // Flush writes to disk, since sometimes we're killing uncleanly
         assert(merizos.getDB("admin").runCommand({fsync: 1}).ok);
 
-        var exitCode = killWith === 9 ? MongoRunner.EXIT_SIGKILL : MongoRunner.EXIT_CLEAN;
+        var exitCode = killWith === 9 ? MerizoRunner.EXIT_SIGKILL : MerizoRunner.EXIT_CLEAN;
 
         st.rs0.stopSet(killWith, true, {allowedExitCode: exitCode});
 
@@ -67,7 +67,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         var numErrors = 0;
         for (var i = 0; i < conns.length; i++) {
-            var newConn = new Mongo(merizos.host);
+            var newConn = new Merizo(merizos.host);
             try {
                 assert.neq(null, newConn.getCollection("foo.bar").findOne());
             } catch (e) {

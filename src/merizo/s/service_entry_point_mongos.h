@@ -36,11 +36,11 @@
 namespace merizo {
 
 /**
- * The entry point from the TransportLayer into Mongos.
+ * The entry point from the TransportLayer into Merizos.
  */
-class ServiceEntryPointMongos final : public ServiceEntryPointImpl {
-    ServiceEntryPointMongos(const ServiceEntryPointMongos&) = delete;
-    ServiceEntryPointMongos& operator=(const ServiceEntryPointMongos&) = delete;
+class ServiceEntryPointMerizos final : public ServiceEntryPointImpl {
+    ServiceEntryPointMerizos(const ServiceEntryPointMerizos&) = delete;
+    ServiceEntryPointMerizos& operator=(const ServiceEntryPointMerizos&) = delete;
 
 public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;

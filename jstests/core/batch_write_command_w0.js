@@ -28,7 +28,7 @@ coll.drop();
 //
 // Ensures that merizod respects the batch write protocols for delete
 //
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
+assert(coll.getDB().getMerizo().useWriteCommands(), "test is not running with write commands");
 
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
 

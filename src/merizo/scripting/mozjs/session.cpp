@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -46,13 +46,13 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec SessionInfo::methods[8] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(end, SessionInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getId, SessionInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getTxnState, SessionInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setTxnState, SessionInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getTxnNumber, SessionInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setTxnNumber, SessionInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(incrementTxnNumber, SessionInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(end, SessionInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getId, SessionInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getTxnState, SessionInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setTxnState, SessionInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getTxnNumber, SessionInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setTxnNumber, SessionInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(incrementTxnNumber, SessionInfo),
     JS_FS_END,
 };
 
@@ -87,7 +87,7 @@ StringData transactionStateName(SessionHolder::TransactionState state) {
             return "aborted"_sd;
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 SessionHolder::TransactionState transactionStateEnum(StringData name) {
@@ -126,7 +126,7 @@ void endSession(SessionHolder* holder) {
                                                    << "autocommit"
                                                    << false);
 
-        MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+        MERIZO_COMPILER_VARIABLE_UNUSED auto ignored =
             holder->client->runCommand("admin", abortObj, out);
     }
 
@@ -134,7 +134,7 @@ void endSession(SessionHolder* holder) {
 
     es.setEndSessions({holder->lsid});
 
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+    MERIZO_COMPILER_VARIABLE_UNUSED auto ignored =
         holder->client->runCommand("admin", es.toBSON(), out);
 
     holder->client.reset();

@@ -237,7 +237,7 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
                 return ApplyResult::noopResult();
             }
             uassertStatusOK(statusWithFirstCreatedElem);
-            MONGO_UNREACHABLE;  // The previous uassertStatusOK should always throw.
+            MERIZO_UNREACHABLE;  // The previous uassertStatusOK should always throw.
         }
 
         if (applyParams.validateForStorage) {

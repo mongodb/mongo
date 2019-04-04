@@ -17,7 +17,7 @@
 
 #include "asio/detail/config.hpp"
 
-#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+#if MERIZO_CONFIG_SSL_PROVIDER == MERIZO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "merizo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 

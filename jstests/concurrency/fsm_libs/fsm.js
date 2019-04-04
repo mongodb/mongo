@@ -30,7 +30,7 @@ var fsm = (function() {
             // same session, we override the "_defaultSession" property of the connections in the
             // cache to be the same as the session underlying 'args.db'.
             const makeNewConnWithExistingSession = function(connStr) {
-                const conn = new Mongo(connStr);
+                const conn = new Merizo(connStr);
                 conn._defaultSession = new _DelegatingDriverSession(conn, args.db.getSession());
                 return conn;
             };

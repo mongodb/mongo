@@ -6,8 +6,8 @@ load('./jstests/libs/test_background_ops.js');
 
 //
 // Start a background moveChunk.
-// staticMongod:   Server to use for communication, use
-//                 "MongoRunner.runMongod({})" to make one.
+// staticMerizod:   Server to use for communication, use
+//                 "MerizoRunner.runMerizod({})" to make one.
 // merizosURL:      Like 'localhost:27017'.
 // findCriteria:   Like { _id: 1 }, passed to moveChunk's "find" option.
 // bounds:         Array of two documents that specify the lower and upper
@@ -19,7 +19,7 @@ load('./jstests/libs/test_background_ops.js');
 // Returns a join function; call it to wait for moveChunk to complete.
 //
 
-function moveChunkParallel(staticMongod, merizosURL, findCriteria, bounds, ns, toShardId) {
+function moveChunkParallel(staticMerizod, merizosURL, findCriteria, bounds, ns, toShardId) {
     assert((findCriteria || bounds) && !(findCriteria && bounds),
            'Specify either findCriteria or bounds, but not both.');
 
@@ -28,7 +28,7 @@ function moveChunkParallel(staticMongod, merizosURL, findCriteria, bounds, ns, t
         assert((findCriteria || bounds) && !(findCriteria && bounds),
                'Specify either findCriteria or bounds, but not both.');
 
-        var merizos = new Mongo(merizosURL), admin = merizos.getDB('admin'), cmd = {moveChunk: ns};
+        var merizos = new Merizo(merizosURL), admin = merizos.getDB('admin'), cmd = {moveChunk: ns};
 
         if (findCriteria) {
             cmd.find = findCriteria;
@@ -47,7 +47,7 @@ function moveChunkParallel(staticMongod, merizosURL, findCriteria, bounds, ns, t
 
     // Return the join function.
     return startParallelOps(
-        staticMongod, runMoveChunk, [merizosURL, findCriteria, bounds, ns, toShardId]);
+        staticMerizod, runMoveChunk, [merizosURL, findCriteria, bounds, ns, toShardId]);
 }
 
 // moveChunk starts at step 0 and proceeds to 1 (it has *finished* parsing

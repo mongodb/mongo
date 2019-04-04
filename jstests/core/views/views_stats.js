@@ -38,8 +38,8 @@
     lastHistogram = assertHistogramDiffEq(view, lastHistogram, 0, 1, 0);
 
     let isMasterResponse = assert.commandWorked(viewsDB.runCommand("isMaster"));
-    const isMongos = (isMasterResponse.msg === "isdbgrid");
-    if (isMongos) {
+    const isMerizos = (isMasterResponse.msg === "isdbgrid");
+    if (isMerizos) {
         jsTest.log("Tests are being run on a merizos; skipping top tests.");
         return;
     }

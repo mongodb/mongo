@@ -109,7 +109,7 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     auto resumeToken =
         ResumeToken::parse(updateOp[DocumentSourceChangeStream::kIdField].getDocument());
 
-    const auto readConcern = pExpCtx->inMongos
+    const auto readConcern = pExpCtx->inMerizos
         ? boost::optional<BSONObj>(BSON("level"
                                         << "majority"
                                         << "afterClusterTime"
@@ -119,7 +119,7 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
 
     // Update lookup queries sent from merizoS to shards are allowed to use speculative majority
     // reads.
-    const auto allowSpeculativeMajorityRead = pExpCtx->inMongos;
+    const auto allowSpeculativeMajorityRead = pExpCtx->inMerizos;
     invariant(resumeToken.getData().uuid);
     auto lookedUpDoc =
         pExpCtx->merizoProcessInterface->lookupSingleDocument(pExpCtx,

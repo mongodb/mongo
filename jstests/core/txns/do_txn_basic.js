@@ -5,7 +5,7 @@
 
     const t = db.do_txn1;
 
-    var session = db.getMongo().startSession();
+    var session = db.getMerizo().startSession();
     db = session.getDatabase("test");
     var txnNumber = 0;
 

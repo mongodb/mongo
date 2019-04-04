@@ -39,18 +39,18 @@ namespace merizo {
 /**
  * Test fixture class for tests that use the "ephemeralForTest" storage engine.
  */
-class ServiceContextMongoDTest : public ServiceContextTest {
+class ServiceContextMerizoDTest : public ServiceContextTest {
 protected:
     enum class RepairAction { kNoRepair, kRepair };
 
-    ServiceContextMongoDTest();
+    ServiceContextMerizoDTest();
 
     /**
-     * Build a ServiceContextMongoDTest, using the named storage engine.
+     * Build a ServiceContextMerizoDTest, using the named storage engine.
      */
-    explicit ServiceContextMongoDTest(std::string engine);
-    ServiceContextMongoDTest(std::string engine, RepairAction repair);
-    virtual ~ServiceContextMongoDTest();
+    explicit ServiceContextMerizoDTest(std::string engine);
+    ServiceContextMerizoDTest(std::string engine, RepairAction repair);
+    virtual ~ServiceContextMerizoDTest();
 
 private:
     struct {

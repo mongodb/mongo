@@ -14,7 +14,7 @@
     let txnNumber = 0;
 
     const sessionOptions = {causalConsistency: false};
-    const session = testDB.getMongo().startSession(sessionOptions);
+    const session = testDB.getMerizo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
 
     jsTest.log("Insert two documents in a transaction and abort");
@@ -129,7 +129,7 @@
     jsTest.log("Abort transaction on write conflict errors");
     assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
     txnNumber++;
-    const session2 = testDB.getMongo().startSession(sessionOptions);
+    const session2 = testDB.getMerizo().startSession(sessionOptions);
     const sessionDb2 = session2.getDatabase(dbName);
     // Insert a doc from session 1.
     assert.commandWorked(sessionDb.runCommand({

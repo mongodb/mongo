@@ -251,8 +251,8 @@ func TestTimestampBSONToJSON(t *testing.T) {
 
 	Convey("Converting a BSON Timestamp to JSON", t, func() {
 		Convey("should produce a json.Timestamp", func() {
-			// {t:803434343, i:9} == bson.MongoTimestamp(803434343*2**32 + 9)
-			_jObj, err := ConvertBSONValueToJSON(bson.MongoTimestamp(uint64(803434343<<32) | uint64(9)))
+			// {t:803434343, i:9} == bson.MerizoTimestamp(803434343*2**32 + 9)
+			_jObj, err := ConvertBSONValueToJSON(bson.MerizoTimestamp(uint64(803434343<<32) | uint64(9)))
 			So(err, ShouldBeNil)
 			jObj, ok := _jObj.(json.Timestamp)
 			So(ok, ShouldBeTrue)

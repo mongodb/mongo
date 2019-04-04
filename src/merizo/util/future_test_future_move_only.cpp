@@ -229,7 +229,7 @@ TEST(Future_MoveOnly, Success_thenError_Status) {
                         [](Future<Widget>&& fut) {
                             auto fut2 = std::move(fut).then(
                                 [](Widget i) { return Status(ErrorCodes::BadValue, "oh no!"); });
-                            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
+                            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
                             ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
                         });
 }
@@ -240,7 +240,7 @@ TEST(Future_MoveOnly, Success_thenError_StatusWith) {
         [](Future<Widget>&& fut) {
             auto fut2 = std::move(fut).then(
                 [](Widget i) { return StatusWith<double>(ErrorCodes::BadValue, "oh no!"); });
-            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<double>>::value);
+            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<double>>::value);
             ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
         });
 }
@@ -583,7 +583,7 @@ TEST(Future_MoveOnly, Success_onCompletionMultiOverload) {
                                     return i + 2;
                                 }
                                 Widget operator()(Status status) {
-                                    MONGO_UNREACHABLE;
+                                    MERIZO_UNREACHABLE;
                                 }
                                 bool called = false;
                             };
@@ -633,7 +633,7 @@ TEST(Future_MoveOnly, Success_onCompletionError_Status) {
                             auto fut2 = std::move(fut).onCompletion([](StatusWith<Widget> i) {
                                 return Status(ErrorCodes::BadValue, "oh no!");
                             });
-                            MONGO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
+                            MERIZO_STATIC_ASSERT(std::is_same<decltype(fut2), Future<void>>::value);
                             ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
                         });
 }
@@ -644,7 +644,7 @@ TEST(Future_MoveOnly, Success_onCompletionError_StatusWith) {
                             auto fut2 = std::move(fut).onCompletion([](StatusWith<Widget> i) {
                                 return StatusWith<double>(ErrorCodes::BadValue, "oh no!");
                             });
-                            MONGO_STATIC_ASSERT(
+                            MERIZO_STATIC_ASSERT(
                                 std::is_same<decltype(fut2), Future<double>>::value);
                             ASSERT_EQ(fut2.getNoThrow(), ErrorCodes::BadValue);
                         });

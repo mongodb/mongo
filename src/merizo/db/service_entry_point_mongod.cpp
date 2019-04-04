@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -58,7 +58,7 @@ namespace merizo {
 
 constexpr auto kLastCommittedOpTimeFieldName = "lastCommittedOpTime"_sd;
 
-class ServiceEntryPointMongod::Hooks final : public ServiceEntryPointCommon::Hooks {
+class ServiceEntryPointMerizod::Hooks final : public ServiceEntryPointCommon::Hooks {
 public:
     bool lockedForWriting() const override {
         return merizo::lockedForWriting();
@@ -220,7 +220,7 @@ public:
     }
 };
 
-DbResponse ServiceEntryPointMongod::handleRequest(OperationContext* opCtx, const Message& m) {
+DbResponse ServiceEntryPointMerizod::handleRequest(OperationContext* opCtx, const Message& m) {
     return ServiceEntryPointCommon::handleRequest(opCtx, m, Hooks{});
 }
 

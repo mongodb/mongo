@@ -50,14 +50,14 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     testInvalidCount();
 
     // Test with the first config server down
-    MongoRunner.stopMongod(st.c0);
+    MerizoRunner.stopMerizod(st.c0);
 
     testNormalCount();
     testCountWithQuery();
     testInvalidCount();
 
     // Test with the first and second config server down
-    MongoRunner.stopMongod(st.c1);
+    MerizoRunner.stopMerizod(st.c1);
     jsTest.log('Second server is down');
 
     testNormalCount();

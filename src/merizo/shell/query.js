@@ -677,7 +677,7 @@ DBQuery.shellBatchSize = 20;
 
 /**
  * Query option flag bit constants.
- * @see http://dochub.merizodb.org/core/merizowireprotocol#MongoWireProtocol-OPQUERY
+ * @see http://dochub.merizodb.org/core/merizowireprotocol#MerizoWireProtocol-OPQUERY
  */
 DBQuery.Option = {
     tailable: 0x2,
@@ -704,7 +704,7 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
     // If the command result represents a change stream cursor, update our postBatchResumeToken.
     this._updatePostBatchResumeToken(cmdResult.cursor);
 
-    if (db.getMongo().useReadCommands()) {
+    if (db.getMerizo().useReadCommands()) {
         this._useReadCommands = true;
         this._cursorid = cmdResult.cursor.id;
         this._batchSize = batchSize;
@@ -719,11 +719,11 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
             // Note that setting this._cursorid to 0 should be accompanied by
             // this._cursorHandle.zeroCursorId().
             this._cursorHandle =
-                this._db.getMongo().cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
+                this._db.getMerizo().cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
         }
     } else {
         this._cursor =
-            db.getMongo().cursorFromId(cmdResult.cursor.ns, cmdResult.cursor.id, batchSize);
+            db.getMerizo().cursorFromId(cmdResult.cursor.ns, cmdResult.cursor.id, batchSize);
     }
 }
 

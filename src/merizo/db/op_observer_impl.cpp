@@ -69,7 +69,7 @@ using repl::OplogEntry;
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
+MERIZO_FAIL_POINT_DEFINE(failCollectionUpdates);
 
 const auto documentKeyDecoration = OperationContext::declareDecoration<BSONObj>();
 
@@ -556,13 +556,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         }
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !lastOpTime.isNull()) {
         for (auto it = first; it != last; it++) {
-            MongoDSessionCatalog::invalidateSessions(opCtx, it->doc);
+            MerizoDSessionCatalog::invalidateSessions(opCtx, it->doc);
         }
     }
 }
 
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    MONGO_FAIL_POINT_BLOCK(failCollectionUpdates, extraData) {
+    MERIZO_FAIL_POINT_BLOCK(failCollectionUpdates, extraData) {
         auto collElem = extraData.getData()["collectionNS"];
         // If the failpoint specifies no collection or matches the existing one, fail.
         if (!collElem || args.nss.ns() == collElem.String()) {
@@ -622,7 +622,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updateArgs.updatedDoc);
     } else if (args.nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, args.updateArgs.updatedDoc);
+        MerizoDSessionCatalog::invalidateSessions(opCtx, args.updateArgs.updatedDoc);
     }
 }
 
@@ -685,7 +685,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             uasserted(40670, "removing FeatureCompatibilityVersion document is not allowed");
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, documentKey);
+        MerizoDSessionCatalog::invalidateSessions(opCtx, documentKey);
     }
 }
 
@@ -825,7 +825,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
         50714, "dropping the admin database is not allowed.", dbName != NamespaceString::kAdminDb);
 
     if (dbName == NamespaceString::kSessionTransactionsTableNamespace.db()) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
+        MerizoDSessionCatalog::invalidateSessions(opCtx, boost::none);
     }
 
     NamespaceUUIDCache::get(opCtx).evictNamespacesInDatabase(dbName);
@@ -865,7 +865,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, collectionName);
     } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
-        MongoDSessionCatalog::invalidateSessions(opCtx, boost::none);
+        MerizoDSessionCatalog::invalidateSessions(opCtx, boost::none);
     }
 
     // Evict namespace entry from the namespace/uuid cache if it exists.
@@ -1070,7 +1070,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
                 e.code() != ErrorCodes::BSONObjectTooLarge);
         throw;
     }
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 OpTimeBundle logReplOperationForTransaction(OperationContext* opCtx,

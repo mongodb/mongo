@@ -277,7 +277,7 @@ TEST(OpMsg, ServerHandlesExhaustCorrectly) {
     uassert(ErrorCodes::SocketException, errMsg, conn);
 
     // Only test exhaust against a single server.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
+    if (conn->isReplicaSetMember() || conn->isMerizos()) {
         return;
     }
 
@@ -356,7 +356,7 @@ TEST(OpMsg, ExhaustWithDBClientCursorBehavesCorrectly) {
     uassert(ErrorCodes::SocketException, errMsg, conn);
 
     // Only test exhaust against a single server.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
+    if (conn->isReplicaSetMember() || conn->isMerizos()) {
         return;
     }
 

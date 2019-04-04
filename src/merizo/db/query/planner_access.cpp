@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -1327,7 +1327,7 @@ void QueryPlannerAccess::handleFilter(ScanBuildingState* scanState) {
         handleFilterAnd(scanState);
     } else {
         // We must be building leaves for either and AND or an OR.
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 }
 

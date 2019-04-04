@@ -57,7 +57,7 @@ const Document kDefaultCursorOptionDocument{
 TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
-        "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromMongos: true, "
+        "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromMerizos: true, "
         "needsMerge: true, mergeByPBRT: true, bypassDocumentValidation: true, collation: {locale: "
         "'en_US'}, cursor: {batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: "
         "'linearizable'}, $queryOptions: {$readPreference: 'nearest'}, comment: 'agg_comment', "
@@ -65,7 +65,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
-    ASSERT_TRUE(request.isFromMongos());
+    ASSERT_TRUE(request.isFromMerizos());
     ASSERT_TRUE(request.needsMerge());
     ASSERT_TRUE(request.mergeByPBRT());
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
@@ -153,7 +153,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     AggregationRequest request(nss, {});
     request.setExplain(boost::none);
     request.setAllowDiskUse(false);
-    request.setFromMongos(false);
+    request.setFromMerizos(false);
     request.setNeedsMerge(false);
     request.setMergeByPBRT(false);
     request.setBypassDocumentValidation(false);
@@ -175,7 +175,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     NamespaceString nss("a.collection");
     AggregationRequest request(nss, {});
     request.setAllowDiskUse(true);
-    request.setFromMongos(true);
+    request.setFromMerizos(true);
     request.setNeedsMerge(true);
     request.setMergeByPBRT(true);
     request.setBypassDocumentValidation(true);
@@ -199,7 +199,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
         Document{{AggregationRequest::kCommandName, nss.coll()},
                  {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
                  {AggregationRequest::kAllowDiskUseName, true},
-                 {AggregationRequest::kFromMongosName, true},
+                 {AggregationRequest::kFromMerizosName, true},
                  {AggregationRequest::kNeedsMergeName, true},
                  {AggregationRequest::kMergeByPBRTName, true},
                  {bypassDocumentValidationCommandOption(), true},
@@ -337,21 +337,21 @@ TEST(AggregationRequestTest, ShouldRejectExplainIfObject) {
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
-TEST(AggregationRequestTest, ShouldRejectNonBoolFromMongos) {
+TEST(AggregationRequestTest, ShouldRejectNonBoolFromMerizos) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMongos: 1}");
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMerizos: 1}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: 1, fromMongos: true}");
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: 1, fromMerizos: true}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
-TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfFromMongosNotPresent) {
+TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfFromMerizosNotPresent) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: true}");
@@ -368,22 +368,22 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolNeedsMerge34) {
 TEST(AggregationRequestTest, ShouldRejectNeedsMergeIfNeedsMerge34AlsoPresent) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
-        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: true, fromMongos: true, "
+        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, needsMerge: true, fromMerizos: true, "
         "fromRouter: true}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
-TEST(AggregationRequestTest, ShouldRejectFromMongosIfNeedsMerge34AlsoPresent) {
+TEST(AggregationRequestTest, ShouldRejectFromMerizosIfNeedsMerge34AlsoPresent) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
-        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMongos: true, fromRouter: true}");
+        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromMerizos: true, fromRouter: true}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolMergeByPBRT) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
-        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, mergeByPBRT: 1, fromMongos: true}");
+        "{pipeline: [{$match: {a: 'abc'}}], cursor: {}, mergeByPBRT: 1, fromMerizos: true}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 

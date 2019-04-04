@@ -61,9 +61,9 @@
     }
 
     {
-        var merizod = MongoRunner.runMongod({nojournal: ""});
+        var merizod = MerizoRunner.runMerizod({nojournal: ""});
         runTest(merizod);
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
     }
 
     {

@@ -3,11 +3,11 @@
 (function() {
     'use strict';
 
-    const merizod = MongoRunner.runMongod({
+    const merizod = MerizoRunner.runMerizod({
         tlsOnNormalPorts: '',
         tlsCertificateKeyFile: 'jstests/libs/server.pem',
     });
     assert(merizod);
     assert.commandWorked(merizod.getDB('admin').runCommand({isMaster: 1}));
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 })();

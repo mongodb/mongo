@@ -37,7 +37,7 @@ namespace merizo {
 #ifdef _WIN32
 // Generate windows event name for shutdown signal
 std::string getShutdownSignalName(int processId) {
-    const char* strEventNamePrefix = "Global\\Mongo_";
+    const char* strEventNamePrefix = "Global\\Merizo_";
 
     return merizoutils::str::stream() << strEventNamePrefix << processId;
 }

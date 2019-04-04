@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -115,7 +115,7 @@ size_t getSize(const BSONObj& o) {
 }  // namespace
 
 // Failpoint which causes rollback to hang before starting.
-MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeStart);
+MERIZO_FAIL_POINT_DEFINE(rollbackHangBeforeStart);
 
 BackgroundSync::BackgroundSync(
     ReplicationCoordinator* replicationCoordinator,
@@ -214,7 +214,7 @@ void BackgroundSync::_runProducer() {
 }
 
 void BackgroundSync::_produce() {
-    if (MONGO_FAIL_POINT(stopReplProducer)) {
+    if (MERIZO_FAIL_POINT(stopReplProducer)) {
         // This log output is used in js tests so please leave it.
         log() << "bgsync - stopReplProducer fail point "
                  "enabled. Blocking until fail point is disabled.";
@@ -222,7 +222,7 @@ void BackgroundSync::_produce() {
         // TODO(SERVER-27120): Remove the return statement and uncomment the while loop.
         // Currently we cannot block here or we prevent primaries from being fully elected since
         // we'll never call _signalNoNewDataForApplier.
-        //        while (MONGO_FAIL_POINT(stopReplProducer) && !inShutdown()) {
+        //        while (MERIZO_FAIL_POINT(stopReplProducer) && !inShutdown()) {
         //            merizo::sleepsecs(1);
         //        }
         merizo::sleepsecs(1);
@@ -571,11 +571,11 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
+    if (MERIZO_FAIL_POINT(rollbackHangBeforeStart)) {
         // This log output is used in js tests so please leave it.
         log() << "rollback - rollbackHangBeforeStart fail point "
                  "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
+        while (MERIZO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
             merizo::sleepsecs(1);
         }
     }

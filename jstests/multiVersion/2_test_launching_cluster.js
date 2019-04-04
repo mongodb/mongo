@@ -17,7 +17,7 @@ load('./jstests/multiVersion/libs/verify_versions.js');
     // Check our latest versions
     var versionsToCheck = ["last-stable", "latest"];
     var versionsToCheckConfig = ["latest"];
-    var versionsToCheckMongos = ["last-stable"];
+    var versionsToCheckMerizos = ["last-stable"];
 
     jsTest.log("Testing mixed versions...");
 
@@ -26,7 +26,7 @@ load('./jstests/multiVersion/libs/verify_versions.js');
         shards: 2,
         merizos: 2,
         other: {
-            merizosOptions: {binVersion: versionsToCheckMongos},
+            merizosOptions: {binVersion: versionsToCheckMerizos},
             configOptions: {binVersion: versionsToCheckConfig},
             shardOptions: {binVersion: versionsToCheck},
             enableBalancer: true,
@@ -49,7 +49,7 @@ load('./jstests/multiVersion/libs/verify_versions.js');
     for (var j = 0; j < merizoses.length; j++)
         versionsFound.push(merizoses[j].getBinVersion());
 
-    assert.allBinVersions(versionsToCheckMongos, versionsFound);
+    assert.allBinVersions(versionsToCheckMerizos, versionsFound);
 
     versionsFound = [];
     for (var j = 0; j < configs.length; j++)

@@ -118,7 +118,7 @@
                          "entry with null value");
 
     // --- listDatabases ---
-    var r = db.getMongo().getDBs();
+    var r = db.getMerizo().getDBs();
     assert.eq(3, r.databases.length, tojson(r));
     assert.eq("number", typeof(r.totalSize), "listDatabases 3 : " + tojson(r));
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -51,12 +51,12 @@
 
 namespace merizo {
 
-AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() = default;
-AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() = default;
+AuthzManagerExternalStateMerizod::AuthzManagerExternalStateMerizod() = default;
+AuthzManagerExternalStateMerizod::~AuthzManagerExternalStateMerizod() = default;
 
 std::unique_ptr<AuthzSessionExternalState>
-AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
-    return stdx::make_unique<AuthzSessionExternalStateMongod>(authzManager);
+AuthzManagerExternalStateMerizod::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
+    return stdx::make_unique<AuthzSessionExternalStateMerizod>(authzManager);
 }
 
 class AuthzLock : public AuthzManagerExternalState::StateLock {
@@ -78,17 +78,17 @@ bool AuthzLock::isLocked(OperationContext* opCtx) {
         AuthorizationManager::usersCollectionNamespace.db(), MODE_S);
 }
 
-std::unique_ptr<AuthzManagerExternalState::StateLock> AuthzManagerExternalStateMongod::lock(
+std::unique_ptr<AuthzManagerExternalState::StateLock> AuthzManagerExternalStateMerizod::lock(
     OperationContext* opCtx) {
     return std::make_unique<AuthzLock>(opCtx);
 }
 
-bool AuthzManagerExternalStateMongod::needsLockForUserName(OperationContext* opCtx,
+bool AuthzManagerExternalStateMerizod::needsLockForUserName(OperationContext* opCtx,
                                                            const UserName& name) {
     return (shouldUseRolesFromConnection(opCtx, name) == false);
 }
 
-Status AuthzManagerExternalStateMongod::query(
+Status AuthzManagerExternalStateMerizod::query(
     OperationContext* opCtx,
     const NamespaceString& collectionName,
     const BSONObj& query,
@@ -103,7 +103,7 @@ Status AuthzManagerExternalStateMongod::query(
     }
 }
 
-Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
+Status AuthzManagerExternalStateMerizod::findOne(OperationContext* opCtx,
                                                 const NamespaceString& collectionName,
                                                 const BSONObj& query,
                                                 BSONObj* result) {
@@ -120,9 +120,9 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
                                             << query);
 }
 
-MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
+MERIZO_REGISTER_SHIM(AuthzManagerExternalState::create)
 ()->std::unique_ptr<AuthzManagerExternalState> {
-    return std::make_unique<AuthzManagerExternalStateMongod>();
+    return std::make_unique<AuthzManagerExternalStateMerizod>();
 }
 
 }  // namespace merizo

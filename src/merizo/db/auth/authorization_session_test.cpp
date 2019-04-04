@@ -756,7 +756,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateIndexStatsWithIndexStatsAction) {
     ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMongoD) {
+TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMerizoD) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
@@ -767,7 +767,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprog
     ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMongoS) {
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMerizoS) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
@@ -778,14 +778,14 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInp
     ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoD) {
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMerizoD) {
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
     BSONObj cmdObj =
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
     ASSERT_FALSE(authzSession->isAuthenticated());
 }
 
-TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoS) {
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMerizoS) {
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
     BSONObj cmdObj =
         BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj());
@@ -795,7 +795,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthe
     ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMongoD) {
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMerizoD) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
@@ -806,7 +806,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInpr
     ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMongoS) {
+TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMerizoS) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
@@ -817,7 +817,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInpr
     ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoD) {
+TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMerizoD) {
     authzSession->assumePrivilegesForDB(
         Privilege(ResourcePattern::forClusterResource(), {ActionType::inprog}));
 
@@ -829,7 +829,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActi
     ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoS) {
+TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMerizoS) {
     authzSession->assumePrivilegesForDB(
         Privilege(ResourcePattern::forClusterResource(), {ActionType::inprog}));
 
@@ -841,7 +841,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActi
     ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMongoD) {
+TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMerizoD) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline =
@@ -853,7 +853,7 @@ TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMon
     ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
 }
 
-TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMongoS) {
+TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMerizoS) {
     authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
 
     BSONArray pipeline =

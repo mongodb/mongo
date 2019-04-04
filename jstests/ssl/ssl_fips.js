@@ -1,6 +1,6 @@
 // Test merizod start with FIPS mode enabled
 var port = allocatePort();
-var md = MongoRunner.runMongod({
+var md = MerizoRunner.runMerizod({
     port: port,
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
@@ -8,7 +8,7 @@ var md = MongoRunner.runMongod({
     sslFIPSMode: ""
 });
 
-var merizo = runMongoProgram("merizo",
+var merizo = runMerizoProgram("merizo",
                             "--port",
                             port,
                             "--ssl",
@@ -22,7 +22,7 @@ var merizo = runMongoProgram("merizo",
 // if merizo shell didn't start/connect properly
 if (merizo != 0) {
     print("merizod failed to start, checking for FIPS support");
-    merizoOutput = rawMongoProgramOutput();
+    merizoOutput = rawMerizoProgramOutput();
     assert(merizoOutput.match(/this version of merizodb was not compiled with FIPS support/) ||
            merizoOutput.match(/FIPS modes is not enabled on the operating system/) ||
            merizoOutput.match(/FIPS_mode_set:fips mode not supported/));
@@ -32,5 +32,5 @@ if (merizo != 0) {
     assert(md.getDB("admin").auth("root", "root"), "auth failed");
 
     // kill merizod
-    MongoRunner.stopMongod(md);
+    MerizoRunner.stopMerizod(md);
 }

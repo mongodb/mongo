@@ -47,9 +47,9 @@ class StatusWith;
 
 /**
  * Provides config-specific functionality in addition to the mock storage engine and mock network
- * provided by ShardingMongodTestFixture.
+ * provided by ShardingMerizodTestFixture.
  */
-class ConfigServerTestFixture : public ShardingMongodTestFixture {
+class ConfigServerTestFixture : public ShardingMerizodTestFixture {
 public:
     ConfigServerTestFixture();
     ~ConfigServerTestFixture();
@@ -140,7 +140,7 @@ public:
     executor::TaskExecutor* executorForAddShard() const;
 
     /**
-     * Same as ShardingMongodTestFixture::onCommand but run against _addShardNetworkTestEnv.
+     * Same as ShardingMerizodTestFixture::onCommand but run against _addShardNetworkTestEnv.
      */
     void onCommandForAddShard(executor::NetworkTestEnv::OnCommandFunction func);
 

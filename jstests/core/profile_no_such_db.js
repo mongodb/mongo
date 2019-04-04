@@ -5,7 +5,7 @@
     'use strict';
 
     function dbExists() {
-        return Array.contains(db.getMongo().getDBNames(), db.getName());
+        return Array.contains(db.getMerizo().getDBNames(), db.getName());
     }
 
     db = db.getSiblingDB('profile_no_such_db');  // Note: changes db argument not global var.

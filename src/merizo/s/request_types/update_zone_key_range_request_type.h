@@ -51,7 +51,7 @@ public:
      *   zone: <string zoneName>
      * }
      */
-    static StatusWith<UpdateZoneKeyRangeRequest> parseFromMongosCommand(const BSONObj& cmdObj);
+    static StatusWith<UpdateZoneKeyRangeRequest> parseFromMerizosCommand(const BSONObj& cmdObj);
 
     /**
      * Parses the provided BSON content as the internal _configsvrUpdateZoneKeyRange command, and
@@ -95,7 +95,7 @@ private:
     UpdateZoneKeyRangeRequest(NamespaceString ns, ChunkRange range, std::string zoneName);
 
     static StatusWith<UpdateZoneKeyRangeRequest> _parseFromCommand(const BSONObj& cmdObj,
-                                                                   bool forMongos);
+                                                                   bool forMerizos);
     NamespaceString _ns;
     ChunkRange _range;
     bool _isRemove;

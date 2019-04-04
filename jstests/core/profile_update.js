@@ -46,7 +46,7 @@
     // Confirm metrics for parameters that require "commands" mode.
     //
 
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getMerizo().writeMode() === "commands") {
         coll.drop();
         assert.writeOK(coll.insert({_id: 0, a: [0]}));
 

@@ -42,8 +42,8 @@
 namespace merizo {
 namespace executor {
 
-MONGO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsBeforeAcquireConn);
-MONGO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsAfterAcquireConn);
+MERIZO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsBeforeAcquireConn);
+MERIZO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsAfterAcquireConn);
 
 /**
  * Interface to networking for use by TaskExecutor implementations.

@@ -78,7 +78,7 @@ void ServerReadConcernMetrics::recordReadConcern(const repl::ReadConcernArgs& re
             break;
 
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 

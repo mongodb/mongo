@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kTransaction
 
 #include "merizo/platform/basic.h"
 
@@ -51,7 +51,7 @@ struct SessionTasksExecutor {
     SessionTasksExecutor()
         : threadPool([] {
               ThreadPool::Options options;
-              options.threadNamePrefix = "MongoDSessionCatalog";
+              options.threadNamePrefix = "MerizoDSessionCatalog";
               options.minThreads = 0;
               options.maxThreads = 1;
               return options;
@@ -99,7 +99,7 @@ void killSessionTokensFunction(
 
 }  // namespace
 
-void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
+void MerizoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     // Invalidate sessions that could have a retryable write on it, so that we can refresh from disk
     // in case the in-memory state was out of sync.
     const auto catalog = SessionCatalog::get(opCtx);
@@ -134,7 +134,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         for (const auto& sessionId : sessionIdToReacquireLocks) {
             auto newOpCtx = cc().makeOperationContext();
             newOpCtx->setLogicalSessionId(sessionId);
-            MongoDOperationContextSession ocs(newOpCtx.get());
+            MerizoDOperationContextSession ocs(newOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
             LOG(3) << "Restoring locks of prepared transaction. SessionId: " << sessionId.getId()
                    << " TxnNumber: " << txnParticipant.getActiveTxnNumber();
@@ -171,7 +171,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
                                    << " collection");
 }
 
-boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {
+boost::optional<UUID> MerizoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {
     AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
 
     const auto coll = autoColl.getCollection();
@@ -182,7 +182,7 @@ boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationCon
     return coll->uuid();
 }
 
-void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
+void MerizoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
                                               boost::optional<BSONObj> singleSessionDoc) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
@@ -214,7 +214,7 @@ void MongoDSessionCatalog::invalidateSessions(OperationContext* opCtx,
     killSessionTokensFunction(opCtx, sessionKillTokens);
 }
 
-MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx)
+MerizoDOperationContextSession::MerizoDOperationContextSession(OperationContext* opCtx)
     : _operationContextSession(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
 
@@ -222,9 +222,9 @@ MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* o
     txnParticipant.refreshFromStorageIfNeeded(opCtx);
 }
 
-MongoDOperationContextSession::~MongoDOperationContextSession() = default;
+MerizoDOperationContextSession::~MerizoDOperationContextSession() = default;
 
-void MongoDOperationContextSession::checkIn(OperationContext* opCtx) {
+void MerizoDOperationContextSession::checkIn(OperationContext* opCtx) {
     if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
         txnParticipant.stashTransactionResources(opCtx);
     }
@@ -232,7 +232,7 @@ void MongoDOperationContextSession::checkIn(OperationContext* opCtx) {
     OperationContextSession::checkIn(opCtx);
 }
 
-void MongoDOperationContextSession::checkOut(OperationContext* opCtx, const std::string& cmdName) {
+void MerizoDOperationContextSession::checkOut(OperationContext* opCtx, const std::string& cmdName) {
     OperationContextSession::checkOut(opCtx);
 
     if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
@@ -240,7 +240,7 @@ void MongoDOperationContextSession::checkOut(OperationContext* opCtx, const std:
     }
 }
 
-MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithoutRefresh(
+MerizoDOperationContextSessionWithoutRefresh::MerizoDOperationContextSessionWithoutRefresh(
     OperationContext* opCtx)
     : _operationContextSession(opCtx), _opCtx(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
@@ -250,7 +250,7 @@ MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithou
     txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, clientTxnNumber);
 }
 
-MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWithoutRefresh() {
+MerizoDOperationContextSessionWithoutRefresh::~MerizoDOperationContextSessionWithoutRefresh() {
     const auto txnParticipant = TransactionParticipant::get(_opCtx);
     // A session on secondaries should never be checked back in with a TransactionParticipant that
     // isn't prepared, aborted, or committed.

@@ -67,7 +67,7 @@
     assertDocsInColl(node, [3, 4, 5]);
 
     jsTestLog("Test that if we kill the node, recovery still plays.");
-    rst.stop(node, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+    rst.stop(node, 9, {allowedExitCode: MerizoRunner.EXIT_SIGKILL});
     node = rst.restart(node, {"noReplSet": false});
     reconnect(node);
     assert.eq(rst.getPrimary(), node);

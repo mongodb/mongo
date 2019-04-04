@@ -415,7 +415,7 @@ function RollbackTest(name = "RollbackTest", replSet, expectPreparedTxnsDuringRo
         if (allowedExitCode !== undefined) {
             opts = {allowedExitCode: allowedExitCode};
         } else if (signal === SIGKILL) {
-            opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
+            opts = {allowedExitCode: MerizoRunner.EXIT_SIGKILL};
         }
 
         log(`Stopping node ${hostName} with signal ${signal}`);

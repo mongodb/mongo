@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kSharding
 
 #include "merizo/platform/basic.h"
 
@@ -49,8 +49,8 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
-MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
+MERIZO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
+MERIZO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
 
 namespace {
 
@@ -87,7 +87,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
         }
     }
 
-    if (MONGO_FAIL_POINT(skipShardFilteringMetadataRefresh)) {
+    if (MERIZO_FAIL_POINT(skipShardFilteringMetadataRefresh)) {
         return;
     }
 
@@ -114,7 +114,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
     // StaleDatabaseVersion retry attempts while the movePrimary is being committed.
     OperationShardingState::get(opCtx).waitForMovePrimaryCriticalSectionSignal(opCtx);
 
-    if (MONGO_FAIL_POINT(skipDatabaseVersionMetadataRefresh)) {
+    if (MERIZO_FAIL_POINT(skipDatabaseVersionMetadataRefresh)) {
         return;
     }
 

@@ -20,7 +20,7 @@
     jsTest.log("Creating a temporary collection ({temp:true}).");
     assert.commandWorked(testDB.createCollection(tempCollName, {temp: true}));
 
-    const session = db.getMongo().startSession();
+    const session = db.getMerizo().startSession();
     const sessionDB = session.getDatabase(dbName);
     const sessionTempColl = sessionDB.getCollection(tempCollName);
 

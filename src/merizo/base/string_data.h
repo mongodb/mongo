@@ -37,9 +37,9 @@
 #include <string>
 
 #include "merizo/stdx/type_traits.h"
-#define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#define MERIZO_INCLUDE_INVARIANT_H_WHITELISTED
 #include "merizo/util/invariant.h"
-#undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#undef MERIZO_INCLUDE_INVARIANT_H_WHITELISTED
 
 namespace merizo {
 

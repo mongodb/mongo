@@ -9,7 +9,7 @@
  * of increments performed.
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMerizod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -33,12 +33,12 @@ var $config = (function() {
             var res = db[collName].update({_id: this.id}, updateDoc);
             assertAlways.eq(0, res.nUpserted, tojson(res));
 
-            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+            if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
                 // Storage engines which support document-level concurrency will automatically retry
                 // any operations when there are conflicts, so we should always see a matching
                 // document.
                 assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
-                if (db.getMongo().writeMode() === 'commands') {
+                if (db.getMerizo().writeMode() === 'commands') {
                     assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
                 }
             } else {
@@ -46,7 +46,7 @@ var $config = (function() {
                 // that the query will not find the document. This can happen if another thread
                 // updated the target document during a yield, triggering an invalidation.
                 assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-                if (db.getMongo().writeMode() === 'commands') {
+                if (db.getMerizo().writeMode() === 'commands') {
                     assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
                     assertAlways.eq(res.nModified, res.nMatched, tojson(res));
                 }

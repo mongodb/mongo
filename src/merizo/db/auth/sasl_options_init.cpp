@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/db/auth/sasl_options.h"
 #include "merizo/db/auth/sasl_options_gen.h"
@@ -84,7 +84,7 @@ Status storeSASLOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
-MONGO_INITIALIZER_GENERAL(StoreSASLOptions, ("CoreOptions_Store"), ("EndStartupOptionStorage"))
+MERIZO_INITIALIZER_GENERAL(StoreSASLOptions, ("CoreOptions_Store"), ("EndStartupOptionStorage"))
 (InitializerContext* const context) {
     return storeSASLOptions(moe::startupOptionsParsed);
 }

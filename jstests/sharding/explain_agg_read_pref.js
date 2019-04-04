@@ -81,7 +81,7 @@
                 // Look for an operation without an exception, since the shard throws a stale config
                 // exception if the shard or merizos has stale routing metadata, and the operation
                 // gets retried.
-                // Note, we look for *at least one* (not exactly one) matching entry: Mongos cancels
+                // Note, we look for *at least one* (not exactly one) matching entry: Merizos cancels
                 // requests to all shards on receiving a stale version error from any shard.
                 // However, the requests may have reached the other shards before they are canceled.
                 // If the other shards were already fresh, they will re-receive the request in the
@@ -117,7 +117,7 @@
                 // Look for an operation without an exception, since the shard throws a stale config
                 // exception if the shard or merizos has stale routing metadata, and the operation
                 // gets retried.
-                // Note, we look for *at least one* (not exactly one) matching entry: Mongos cancels
+                // Note, we look for *at least one* (not exactly one) matching entry: Merizos cancels
                 // requests to all shards on receiving a stale version error from any shard.
                 // However, the requests may have reached the other shards before they are canceled.
                 // If the other shards were already fresh, they will re-receive the request in the

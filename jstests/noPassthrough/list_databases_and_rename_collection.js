@@ -12,7 +12,7 @@
     load("jstests/noPassthrough/libs/concurrent_rename.js");
     load("jstests/libs/parallel_shell_helpers.js");
 
-    const conn = MongoRunner.runMongod({});
+    const conn = MerizoRunner.runMerizod({});
     assert.neq(null, conn, "merizod was unable to start up");
     jsTestLog("Create collection.");
     let listRenameDB = conn.getDB(dbName);
@@ -54,6 +54,6 @@
     jsTestLog("Finished running listDatabases.");
 
     renameShell();
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 
 }());

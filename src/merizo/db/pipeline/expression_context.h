@@ -103,7 +103,7 @@ public:
     ExpressionContext(OperationContext* opCtx,
                       const AggregationRequest& request,
                       std::unique_ptr<CollatorInterface> collator,
-                      std::shared_ptr<MongoProcessInterface> merizoProcessInterface,
+                      std::shared_ptr<MerizoProcessInterface> merizoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID);
 
@@ -205,10 +205,10 @@ public:
     // The comment provided by the user, or the empty string if no comment was provided.
     std::string comment;
 
-    bool fromMongos = false;
+    bool fromMerizos = false;
     bool needsMerge = false;
     bool mergeByPBRT = false;
-    bool inMongos = false;
+    bool inMerizos = false;
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
     bool inMultiDocumentTransaction = false;
@@ -226,7 +226,7 @@ public:
     // implementations on merizod and merizos, or that only make sense on one of the two.
     // Additionally, putting some of this functionality behind an interface prevents aggregation
     // libraries from having large numbers of dependencies. This pointer is always non-null.
-    std::shared_ptr<MongoProcessInterface> merizoProcessInterface;
+    std::shared_ptr<MerizoProcessInterface> merizoProcessInterface;
 
     const TimeZoneDatabase* timeZoneDatabase;
 
@@ -253,7 +253,7 @@ protected:
     static const int kInterruptCheckPeriod = 128;
 
     ExpressionContext(NamespaceString nss,
-                      std::shared_ptr<MongoProcessInterface>,
+                      std::shared_ptr<MerizoProcessInterface>,
                       const TimeZoneDatabase* tzDb);
 
     /**

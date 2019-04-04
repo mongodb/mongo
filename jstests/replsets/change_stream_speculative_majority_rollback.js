@@ -62,7 +62,7 @@
 
     let getChangeEvent = new ScopedThread(function(host, cursorId, dbName, collName) {
         jsTestLog("Trying to receive change event from divergent primary.");
-        const nodeDB = new Mongo(host).getDB(dbName);
+        const nodeDB = new Merizo(host).getDB(dbName);
         try {
             return nodeDB.runCommand({getMore: eval(cursorId), collection: collName});
         } catch (e) {

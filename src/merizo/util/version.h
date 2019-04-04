@@ -75,32 +75,32 @@ public:
         NotEnabledAction action = NotEnabledAction::kAbortProcess) noexcept;
 
     /**
-     * Returns the major version as configured via MONGO_VERSION.
+     * Returns the major version as configured via MERIZO_VERSION.
      */
     virtual int majorVersion() const noexcept = 0;
 
     /**
-     * Returns the minor version as configured via MONGO_VERSION.
+     * Returns the minor version as configured via MERIZO_VERSION.
      */
     virtual int minorVersion() const noexcept = 0;
 
     /**
-     * Returns the patch version as configured via MONGO_VERSION.
+     * Returns the patch version as configured via MERIZO_VERSION.
      */
     virtual int patchVersion() const noexcept = 0;
 
     /**
-     * Returns the extra version as configured via MONGO_VERSION.
+     * Returns the extra version as configured via MERIZO_VERSION.
      */
     virtual int extraVersion() const noexcept = 0;
 
     /**
-     * Returns a string representation of MONGO_VERSION.
+     * Returns a string representation of MERIZO_VERSION.
      */
     virtual StringData version() const noexcept = 0;
 
     /**
-     * Returns a string representation of MONGO_GIT_HASH.
+     * Returns a string representation of MERIZO_GIT_HASH.
      */
     virtual StringData gitVersion() const noexcept = 0;
 

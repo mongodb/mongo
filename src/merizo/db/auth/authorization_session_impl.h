@@ -124,15 +124,15 @@ public:
 
     StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString& ns,
                                                           const BSONObj& cmdObj,
-                                                          bool isMongos) override;
+                                                          bool isMerizos) override;
 
     Status checkAuthForCreate(const NamespaceString& ns,
                               const BSONObj& cmdObj,
-                              bool isMongos) override;
+                              bool isMerizos) override;
 
     Status checkAuthForCollMod(const NamespaceString& ns,
                                const BSONObj& cmdObj,
-                               bool isMongos) override;
+                               bool isMerizos) override;
 
     StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData dbname,
                                                                  const BSONObj& cmdObj) override;

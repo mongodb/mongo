@@ -1,8 +1,8 @@
 /**
  * Test the backup/restore process:
  * - 3 node replica set
- * - Mongo CRUD client
- * - Mongo FSM client
+ * - Merizo CRUD client
+ * - Merizo FSM client
  * - Stop Secondary
  * - cp DB files
  * - Start Secondary

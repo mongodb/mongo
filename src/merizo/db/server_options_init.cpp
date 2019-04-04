@@ -32,7 +32,7 @@
 
 namespace merizo {
 
-MONGO_INITIALIZER_GENERAL(ServerOptions_Setup,
+MERIZO_INITIALIZER_GENERAL(ServerOptions_Setup,
                           ("BeginStartupOptionSetup"),
                           ("EndStartupOptionSetup"))
 (InitializerContext* context) {

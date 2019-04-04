@@ -33,7 +33,7 @@
 #define CHECK_NE(x, y)	CHECK((x) != (y))
 #define CHECK_NOTNULL(x) CHECK((x) != NULL)
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
 // Checking which is only fatal in debug mode
 #define DCHECK(condition) CHECK(condition)
 #define DCHECK_EQ(val1, val2) CHECK_EQ(val1, val2)
@@ -60,7 +60,7 @@
 
 // VLOG messages will be logged at debug level 5 with the S2 log component.
 #define S2LOG(x) x
-// Expansion of MONGO_LOG_COMPONENT defined in merizo/util/log.h
+// Expansion of MERIZO_LOG_COMPONENT defined in merizo/util/log.h
 #define VLOG(x) \
     if (!(::merizo::logger::globalLogDomain())->shouldLog(::merizo::logger::LogComponent::kGeo, ::merizo::logger::LogSeverity::Debug(5))) {} \
     else ::merizo::logger::LogstreamBuilder(::merizo::logger::globalLogDomain(), ::merizo::getThreadName(), ::merizo::logger::LogSeverity::Debug(5), ::merizo::logger::LogComponent::kGeo)

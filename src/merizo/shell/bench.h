@@ -158,7 +158,7 @@ public:
      */
     static BenchRunConfig* createFromBson(const BSONObj& args);
 
-    static MONGO_DECLARE_SHIM((const BenchRunConfig&)->std::unique_ptr<DBClientBase>)
+    static MERIZO_DECLARE_SHIM((const BenchRunConfig&)->std::unique_ptr<DBClientBase>)
         createConnectionImpl;
 
     BenchRunConfig();

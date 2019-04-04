@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -123,7 +123,7 @@ extern const JSFile replsettest;
 extern const JSFile bridge;
 }  // namespace JSFiles
 
-MONGO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
+MERIZO_REGISTER_SHIM(BenchRunConfig::createConnectionImpl)
 (const BenchRunConfig& config)->std::unique_ptr<DBClientBase> {
     const ConnectionString connectionString = uassertStatusOK(ConnectionString::parse(config.host));
 
@@ -371,7 +371,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("fileExists", fileExistsJS);
     scope.injectNative("isInteractive", isInteractive);
 
-#ifndef MONGO_SAFE_SHELL
+#ifndef MERIZO_SAFE_SHELL
     // can't launch programs
     installShellUtilsLauncher(scope);
     installShellUtilsExtended(scope);

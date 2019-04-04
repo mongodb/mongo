@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -39,7 +39,7 @@
 namespace merizo {
 namespace {
 
-class CmdShutdownMongoD : public CmdShutdown {
+class CmdShutdownMerizoD : public CmdShutdown {
 public:
     std::string help() const override {
         return "shutdown the database.  must be ran against admin db and "
@@ -75,7 +75,7 @@ public:
         return true;
     }
 
-} cmdShutdownMongoD;
+} cmdShutdownMerizoD;
 
 }  // namespace
 }  // namespace merizo

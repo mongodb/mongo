@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kReplication
 
 #include "merizo/platform/basic.h"
 
@@ -85,7 +85,7 @@ private:
             OperationContext& opCtx = *opCtxPtr;
             {
                 stdx::unique_lock<stdx::mutex> lk(_mutex);
-                MONGO_IDLE_THREAD_BLOCK;
+                MERIZO_IDLE_THREAD_BLOCK;
                 _cv.wait_for(lk, waitTime.toSystemDuration(), [&] { return _inShutdown; });
 
                 if (_inShutdown)

@@ -103,7 +103,7 @@ OplogApplier::Options SyncTailTest::makeRecoveryOptions() {
 }
 
 void SyncTailTest::setUp() {
-    ServiceContextMongoDTest::setUp();
+    ServiceContextMerizoDTest::setUp();
 
     auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
@@ -140,7 +140,7 @@ void SyncTailTest::tearDown() {
     _consistencyMarkers = {};
     DropPendingCollectionReaper::set(service, {});
     StorageInterface::set(service, {});
-    ServiceContextMongoDTest::tearDown();
+    ServiceContextMerizoDTest::tearDown();
 }
 
 ReplicationConsistencyMarkers* SyncTailTest::getConsistencyMarkers() const {

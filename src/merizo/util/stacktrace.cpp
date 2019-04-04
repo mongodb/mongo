@@ -29,7 +29,7 @@
 
 // stacktrace_${TARGET_OS_FAMILY}.cpp sets default log component to kControl.
 // Setting kDefault to preserve previous behavior in (defunct) getStacktraceLogger().
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 

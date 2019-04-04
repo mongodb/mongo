@@ -162,6 +162,6 @@ private:
 
 // TODO (SERVER-37886): Remove this failpoint once failover can be tested on coordinators that have
 // a local participant
-MONGO_FAIL_POINT_DECLARE(doNotForgetCoordinator);
+MERIZO_FAIL_POINT_DECLARE(doNotForgetCoordinator);
 
 }  // namespace merizo

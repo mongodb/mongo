@@ -52,7 +52,7 @@ namespace {
 
 bool shouldAlwaysRecordTraffic = false;
 
-MONGO_INITIALIZER(ShouldAlwaysRecordTraffic)(InitializerContext*) {
+MERIZO_INITIALIZER(ShouldAlwaysRecordTraffic)(InitializerContext*) {
     if (!gAlwaysRecordTraffic.size()) {
         return Status::OK();
     }

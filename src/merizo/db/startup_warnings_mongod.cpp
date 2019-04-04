@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -59,13 +59,13 @@ using std::ios_base;
 using std::string;
 
 // static
-StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter(
+StatusWith<std::string> StartupWarningsMerizod::readTransparentHugePagesParameter(
     const std::string& parameter) {
     return readTransparentHugePagesParameter(parameter, kTransparentHugePagesDirectory);
 }
 
 // static
-StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter(
+StatusWith<std::string> StartupWarningsMerizod::readTransparentHugePagesParameter(
     const std::string& parameter, const std::string& directory) {
     std::string opMode;
     try {
@@ -137,7 +137,7 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
     return StatusWith<std::string>(opMode);
 }
 
-void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
+void logMerizodStartupWarnings(const StorageGlobalParams& storageParams,
                               const ServerGlobalParams& serverParams,
                               ServiceContext* svcCtx) {
     logCommonStartupWarnings(serverParams);
@@ -257,7 +257,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
     // Transparent Hugepages checks
     StatusWith<std::string> transparentHugePagesEnabledResult =
-        StartupWarningsMongod::readTransparentHugePagesParameter("enabled");
+        StartupWarningsMerizod::readTransparentHugePagesParameter("enabled");
     bool shouldWarnAboutDefragAlways = false;
     if (transparentHugePagesEnabledResult.isOK()) {
         if (transparentHugePagesEnabledResult.getValue() == "always") {
@@ -278,7 +278,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
     }
 
     StatusWith<std::string> transparentHugePagesDefragResult =
-        StartupWarningsMongod::readTransparentHugePagesParameter("defrag");
+        StartupWarningsMerizod::readTransparentHugePagesParameter("defrag");
     if (transparentHugePagesDefragResult.isOK()) {
         if (shouldWarnAboutDefragAlways &&
             transparentHugePagesDefragResult.getValue() == "always") {

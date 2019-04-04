@@ -35,9 +35,9 @@
 #include "merizo/base/data_type.h"
 #include "merizo/base/string_data.h"
 
-#ifndef MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
+#ifndef MERIZO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
 #error "do not include directly. Use merizo/base/data_type.h"
-#endif  // MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
+#endif  // MERIZO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
 
 // Provides a DataType::Handler specialization for StringData.
 

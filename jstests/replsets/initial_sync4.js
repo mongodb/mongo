@@ -30,7 +30,7 @@
     jsTestLog("4. Bring up a new node");
     var hostname = getHostName();
 
-    var s = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
+    var s = MerizoRunner.runMerizod({replSet: basename, oplogSize: 2});
 
     var config = replTest.getReplSetConfig();
     config.version = replTest.getReplSetConfigFromNode().version + 1;
@@ -81,6 +81,6 @@
     assert.eq(mc.getIndexKeys().length, sc.getIndexKeys().length);
 
     assert.eq(mc.find().sort({x: 1}).itcount(), sc.find().sort({x: 1}).itcount());
-    MongoRunner.stopMongod(s);
+    MerizoRunner.stopMerizod(s);
     replTest.stopSet(15);
 }());

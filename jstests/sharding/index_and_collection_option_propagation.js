@@ -1,5 +1,5 @@
 /**
- * Mongos has special targeting behavior for createIndex, reIndex, dropIndex, and collMod:
+ * Merizos has special targeting behavior for createIndex, reIndex, dropIndex, and collMod:
  *
  * - If called on an unsharded collection, the request is routed only to the primary shard.
  * - If called on a sharded collection, the request is broadcast to all shards, but

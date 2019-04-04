@@ -4,7 +4,7 @@
 
     "use strict";
 
-    var merizo = db.getMongo();
+    var merizo = db.getMerizo();
     try {
         var commandsRan = [];
         db._merizo = {
@@ -30,8 +30,8 @@
             isReplicaSetMember: function() {
                 return merizo.isReplicaSetMember();
             },
-            isMongos: function() {
-                return merizo.isMongos();
+            isMerizos: function() {
+                return merizo.isMerizos();
             },
             isCausalConsistency: function() {
                 return false;

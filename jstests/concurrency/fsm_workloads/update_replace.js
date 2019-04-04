@@ -7,7 +7,7 @@
  * The collection has indexes on some but not all fields.
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMerizod and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -16,7 +16,7 @@ var $config = (function() {
     function assertResult(db, res) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
 
-        if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+        if (isMerizod(db) && supportsDocumentLevelConcurrency(db)) {
             // Storage engines which support document-level concurrency will automatically retry
             // any operations when there are conflicts, so we should always see a matching
             // document.
@@ -28,7 +28,7 @@ var $config = (function() {
             assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
         }
 
-        if (db.getMongo().writeMode() === 'commands') {
+        if (db.getMerizo().writeMode() === 'commands') {
             // It's possible that we replaced the document with its current contents, making the
             // update a no-op.
             assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));

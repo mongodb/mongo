@@ -29,7 +29,7 @@
 
 #pragma once
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/db/commands.h"
 #include "merizo/db/operation_context.h"

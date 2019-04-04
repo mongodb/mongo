@@ -42,7 +42,7 @@ elif get_option('link-model') == 'dynamic-sdk':
 # interpret and adjust the current and compatibility versions.
 stitchSupportEnv.AppendUnique(
     SHLINKFLAGS=[
-        '$MONGO_EXPORT_FILE_SHLINKFLAGS',
+        '$MERIZO_EXPORT_FILE_SHLINKFLAGS',
     ],
 )
 

@@ -51,7 +51,7 @@ public:
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
@@ -76,7 +76,7 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 
     std::vector<MatchExpression*>* getChildVector() final {

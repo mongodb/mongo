@@ -103,7 +103,7 @@ void ParsedExclusionProjection::parse(const BSONObj& spec, ExclusionNode* node, 
                 parse(elem.Obj(), child, depth + 1);
                 break;
             }
-            default: { MONGO_UNREACHABLE; }
+            default: { MERIZO_UNREACHABLE; }
         }
     }
 

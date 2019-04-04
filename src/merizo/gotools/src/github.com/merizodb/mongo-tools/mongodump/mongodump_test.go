@@ -42,17 +42,17 @@ const (
 	KerberosDumpDirectory = "dump-kerberos"
 )
 
-func simpleMongoDumpInstance() *MongoDump {
+func simpleMerizoDumpInstance() *MerizoDump {
 	var toolOptions *options.ToolOptions
 
 	// get ToolOptions from URI or defaults
-	if uri := os.Getenv("MONGOD"); uri != "" {
+	if uri := os.Getenv("MERIZOD"); uri != "" {
 		fakeArgs := []string{"--uri=" + uri}
 		toolOptions = options.New("merizodump", "", options.EnabledOptions{URI: true})
 		toolOptions.URI.AddKnownURIParameters(options.KnownURIOptionsReadPreference)
 		_, err := toolOptions.ParseArgs(fakeArgs)
 		if err != nil {
-			panic("Could not parse MONGOD environment variable")
+			panic("Could not parse MERIZOD environment variable")
 		}
 	} else {
 		ssl := testutil.GetSSLOptions()
@@ -79,7 +79,7 @@ func simpleMongoDumpInstance() *MongoDump {
 
 	log.SetVerbosity(toolOptions.Verbosity)
 
-	return &MongoDump{
+	return &MerizoDump{
 		ToolOptions:   toolOptions,
 		InputOptions:  inputOptions,
 		OutputOptions: outputOptions,
@@ -216,7 +216,7 @@ func readBSONIntoDatabase(dir, restoreDBName string) error {
 	return nil
 }
 
-func setUpMongoDumpTestData() error {
+func setUpMerizoDumpTestData() error {
 	session, err := testutil.GetBareSession()
 	if err != nil {
 		return err
@@ -285,7 +285,7 @@ func backgroundInsert(ready, done chan struct{}, errs chan error) {
 	}
 }
 
-func tearDownMongoDumpTestData() error {
+func tearDownMerizoDumpTestData() error {
 	session, err := testutil.GetBareSession()
 	if err != nil {
 		return err
@@ -308,7 +308,7 @@ func fileDirExists(name string) bool {
 	return true
 }
 
-func testQuery(md *MongoDump, session *mgo.Session) string {
+func testQuery(md *MerizoDump, session *mgo.Session) string {
 	origDB := session.DB(testDB)
 	restoredDB := session.DB(testRestoreDB)
 
@@ -351,11 +351,11 @@ func testQuery(md *MongoDump, session *mgo.Session) string {
 	return dumpDir
 }
 
-func TestMongoDumpValidateOptions(t *testing.T) {
+func TestMerizoDumpValidateOptions(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("With a MongoDump instance", t, func() {
-		md := simpleMongoDumpInstance()
+	Convey("With a MerizoDump instance", t, func() {
+		md := simpleMerizoDumpInstance()
 
 		Convey("we cannot dump a collection when a database specified", func() {
 			md.ToolOptions.Namespace.Collection = "some_collection"
@@ -379,7 +379,7 @@ func TestMongoDumpValidateOptions(t *testing.T) {
 	})
 }
 
-func TestMongoDumpKerberos(t *testing.T) {
+func TestMerizoDumpKerberos(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.KerberosTestType)
 
 	Convey("Should be able to run merizodump with Kerberos auth", t, func() {
@@ -387,7 +387,7 @@ func TestMongoDumpKerberos(t *testing.T) {
 
 		So(err, ShouldBeNil)
 
-		merizoDump := MongoDump{
+		merizoDump := MerizoDump{
 			ToolOptions:  opts,
 			InputOptions: &InputOptions{},
 			OutputOptions: &OutputOptions{
@@ -418,16 +418,16 @@ func TestMongoDumpKerberos(t *testing.T) {
 	})
 }
 
-func TestMongoDumpBSON(t *testing.T) {
+func TestMerizoDumpBSON(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	log.SetWriter(ioutil.Discard)
 
-	Convey("With a MongoDump instance", t, func() {
-		err := setUpMongoDumpTestData()
+	Convey("With a MerizoDump instance", t, func() {
+		err := setUpMerizoDumpTestData()
 		So(err, ShouldBeNil)
 
-		Convey("testing that using MongoDump WITHOUT giving a query dumps everything in the database and/or collection", func() {
-			md := simpleMongoDumpInstance()
+		Convey("testing that using MerizoDump WITHOUT giving a query dumps everything in the database and/or collection", func() {
+			md := simpleMerizoDumpInstance()
 			md.InputOptions.Query = ""
 
 			Convey("and that for a particular collection", func() {
@@ -581,10 +581,10 @@ func TestMongoDumpBSON(t *testing.T) {
 			})
 		})
 
-		Convey("testing that using MongoDump WITH a query dumps a subset of documents in a database and/or collection", func() {
+		Convey("testing that using MerizoDump WITH a query dumps a subset of documents in a database and/or collection", func() {
 			session, err := testutil.GetBareSession()
 			So(err, ShouldBeNil)
-			md := simpleMongoDumpInstance()
+			md := simpleMerizoDumpInstance()
 
 			// expect 10 documents per collection
 			bsonQuery := bson.M{"age": bson.M{"$lt": 10}}
@@ -623,26 +623,26 @@ func TestMongoDumpBSON(t *testing.T) {
 		})
 
 		Reset(func() {
-			So(tearDownMongoDumpTestData(), ShouldBeNil)
+			So(tearDownMerizoDumpTestData(), ShouldBeNil)
 		})
 	})
 }
 
-func TestMongoDumpMetaData(t *testing.T) {
+func TestMerizoDumpMetaData(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	log.SetWriter(ioutil.Discard)
 
-	Convey("With a MongoDump instance", t, func() {
+	Convey("With a MerizoDump instance", t, func() {
 		session, err := testutil.GetBareSession()
 		So(session, ShouldNotBeNil)
 		So(err, ShouldBeNil)
 
-		err = setUpMongoDumpTestData()
+		err = setUpMerizoDumpTestData()
 		So(err, ShouldBeNil)
 
 		Convey("testing that the dumped directory contains information about indexes", func() {
 
-			md := simpleMongoDumpInstance()
+			md := simpleMerizoDumpInstance()
 			md.OutputOptions.Out = "dump"
 			err = md.Init()
 			So(err, ShouldBeNil)
@@ -707,13 +707,13 @@ func TestMongoDumpMetaData(t *testing.T) {
 		})
 
 		Reset(func() {
-			So(tearDownMongoDumpTestData(), ShouldBeNil)
+			So(tearDownMerizoDumpTestData(), ShouldBeNil)
 		})
 
 	})
 }
 
-func TestMongoDumpOplog(t *testing.T) {
+func TestMerizoDumpOplog(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.IntegrationTestType)
 	session, err := testutil.GetBareSession()
 	if err != nil {
@@ -724,7 +724,7 @@ func TestMongoDumpOplog(t *testing.T) {
 	}
 	log.SetWriter(ioutil.Discard)
 
-	Convey("With a MongoDump instance", t, func() {
+	Convey("With a MerizoDump instance", t, func() {
 
 		Convey("testing that the dumped directory contains an oplog", func() {
 
@@ -740,10 +740,10 @@ func TestMongoDumpOplog(t *testing.T) {
 			So(fileDirExists(dumpDir), ShouldBeFalse)
 
 			// Start with clean database
-			So(tearDownMongoDumpTestData(), ShouldBeNil)
+			So(tearDownMerizoDumpTestData(), ShouldBeNil)
 
 			// Prepare merizodump with options
-			md := simpleMongoDumpInstance()
+			md := simpleMerizoDumpInstance()
 			md.OutputOptions.Oplog = true
 			md.ToolOptions.Namespace = &options.Namespace{}
 			err = md.Init()
@@ -793,7 +793,7 @@ func TestMongoDumpOplog(t *testing.T) {
 
 			// Cleanup
 			So(os.RemoveAll(dumpDir), ShouldBeNil)
-			So(tearDownMongoDumpTestData(), ShouldBeNil)
+			So(tearDownMerizoDumpTestData(), ShouldBeNil)
 		})
 
 	})

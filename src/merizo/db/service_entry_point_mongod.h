@@ -36,9 +36,9 @@ namespace merizo {
 /**
  * The entry point into merizod. Just a wrapper around assembleResponse.
  */
-class ServiceEntryPointMongod final : public ServiceEntryPointImpl {
-    ServiceEntryPointMongod(const ServiceEntryPointMongod&) = delete;
-    ServiceEntryPointMongod& operator=(const ServiceEntryPointMongod&) = delete;
+class ServiceEntryPointMerizod final : public ServiceEntryPointImpl {
+    ServiceEntryPointMerizod(const ServiceEntryPointMerizod&) = delete;
+    ServiceEntryPointMerizod& operator=(const ServiceEntryPointMerizod&) = delete;
 
 public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;

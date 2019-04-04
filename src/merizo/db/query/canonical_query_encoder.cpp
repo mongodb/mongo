@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kQuery
 
 #include "merizo/platform/basic.h"
 
@@ -226,7 +226,7 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
             return "internalSchemaType";
 
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
@@ -267,7 +267,7 @@ void encodeGeoMatchExpression(const GeoMatchExpression* tree, StringBuilder* key
     } else {
         error() << "unknown CRS type " << (int)geoQuery.getGeometry().getNativeCRS()
                 << " in geometry of type " << geoQuery.getGeometry().getDebugType();
-        MONGO_UNREACHABLE;
+        MERIZO_UNREACHABLE;
     }
 }
 
@@ -297,7 +297,7 @@ void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree, StringBuil
         case UNSET:
             error() << "unknown CRS type " << (int)nearQuery.centroid->crs
                     << " in point geometry for near query";
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
             break;
     }
 }

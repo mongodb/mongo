@@ -16,7 +16,7 @@
 
     let primaryDB = rst.getPrimary().getDB(dbName);
 
-    let session = primaryDB.getMongo().startSession();
+    let session = primaryDB.getMerizo().startSession();
     let sessionDB = session.getDatabase(dbName);
 
     for (let i = 0; i < 4; i++) {
@@ -47,7 +47,7 @@
         const primary = rst.getPrimary();
         const primaryDB = primary.getDB(dbName);
 
-        const session = primaryDB.getMongo().startSession();
+        const session = primaryDB.getMerizo().startSession();
         const sessionDB = session.getDatabase(dbName);
 
         for (let i = 0; i < 4; i++) {

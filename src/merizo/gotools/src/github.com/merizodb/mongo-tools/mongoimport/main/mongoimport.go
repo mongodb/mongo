@@ -62,7 +62,7 @@ func main() {
 	defer sessionProvider.Close()
 	sessionProvider.SetBypassDocumentValidation(ingestOpts.BypassDocumentValidation)
 
-	m := merizoimport.MongoImport{
+	m := merizoimport.MerizoImport{
 		ToolOptions:     opts,
 		InputOptions:    inputOpts,
 		IngestOptions:   ingestOpts,

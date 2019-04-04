@@ -43,7 +43,7 @@
 #elif defined(_WIN32)
 #include <malloc.h>
 #else
-#define MONGO_NO_MALLOC_USABLE_SIZE
+#define MERIZO_NO_MALLOC_USABLE_SIZE
 #endif
 
 #if !defined(__has_feature)
@@ -126,11 +126,11 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
         // operation as soon as possible.
     }
 
-#ifdef MONGO_NO_MALLOC_USABLE_SIZE
+#ifdef MERIZO_NO_MALLOC_USABLE_SIZE
     ptr = ptr ? static_cast<char*>(ptr) - kMaxAlign : nullptr;
 #endif
 
-#ifdef MONGO_NO_MALLOC_USABLE_SIZE
+#ifdef MERIZO_NO_MALLOC_USABLE_SIZE
     void* p = func(ptr, bytes + kMaxAlign);
 #else
     void* p = func(ptr, bytes);
@@ -166,7 +166,7 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
         return nullptr;
     }
 
-#ifdef MONGO_NO_MALLOC_USABLE_SIZE
+#ifdef MERIZO_NO_MALLOC_USABLE_SIZE
     *reinterpret_cast<size_t*>(p) = bytes;
     p = static_cast<char*>(p) + kMaxAlign;
 #endif
@@ -177,7 +177,7 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
 }
 
 size_t get_current(void* ptr) {
-#ifdef MONGO_NO_MALLOC_USABLE_SIZE
+#ifdef MERIZO_NO_MALLOC_USABLE_SIZE
     if (!ptr)
         return 0;
 

@@ -62,7 +62,7 @@ namespace merizo {
  *   - Anything taking a T argument will receive no arguments.
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS Future {
+class MERIZO_WARN_UNUSED_RESULT_CLASS Future {
     using Impl = future_details::FutureImpl<T>;
     using T_unless_void = std::conditional_t<std::is_void_v<T>, future_details::FakeVoid, T>;
 
@@ -527,7 +527,7 @@ private:
 
     // The current promise will be broken, if not already fulfilled.
     void breakPromiseIfNeeded() {
-        if (MONGO_unlikely(_sharedState)) {
+        if (MERIZO_unlikely(_sharedState)) {
             _sharedState->setError({ErrorCodes::BrokenPromise, "broken promise"});
         }
     }
@@ -548,7 +548,7 @@ private:
  * A SharedSemiFuture may be passed between threads, but only one thread may use it at a time.
  */
 template <typename T>
-class MONGO_WARN_UNUSED_RESULT_CLASS SharedSemiFuture {
+class MERIZO_WARN_UNUSED_RESULT_CLASS SharedSemiFuture {
     using Impl = future_details::SharedStateHolder<T>;
     using T_unless_void = std::conditional_t<std::is_void_v<T>, future_details::FakeVoid, T>;
 
@@ -654,7 +654,7 @@ public:
     SharedPromise() = default;
 
     ~SharedPromise() {
-        if (MONGO_unlikely(!haveCompleted())) {
+        if (MERIZO_unlikely(!haveCompleted())) {
             _sharedState->setError({ErrorCodes::BrokenPromise, "broken promise"});
         }
     }

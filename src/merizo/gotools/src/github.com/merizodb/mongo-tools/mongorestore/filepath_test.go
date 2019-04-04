@@ -28,11 +28,11 @@ func init() {
 	})
 }
 
-func newMongoRestore() *MongoRestore {
+func newMerizoRestore() *MerizoRestore {
 	renamer, _ := ns.NewRenamer([]string{}, []string{})
 	includer, _ := ns.NewMatcher([]string{"*"})
 	excluder, _ := ns.NewMatcher([]string{})
-	return &MongoRestore{
+	return &MerizoRestore{
 		manager:      intents.NewIntentManager(),
 		InputOptions: &InputOptions{},
 		ToolOptions:  &commonOpts.ToolOptions{},
@@ -59,13 +59,13 @@ func TestCreateAllIntents(t *testing.T) {
 	//   testdirs/db2/c1.bin
 	//   testdirs/db2/c2.txt
 
-	var mr *MongoRestore
+	var mr *MerizoRestore
 	var buff bytes.Buffer
 
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("With a test MongoRestore", t, func() {
-		mr = newMongoRestore()
+	Convey("With a test MerizoRestore", t, func() {
+		mr = newMerizoRestore()
 		log.SetWriter(&buff)
 
 		Convey("running CreateAllIntents should succeed", func() {
@@ -123,13 +123,13 @@ func TestCreateIntentsForDB(t *testing.T) {
 	//   db1/c3.bson
 	//   db1/c3.metadata.json
 
-	var mr *MongoRestore
+	var mr *MerizoRestore
 	var buff bytes.Buffer
 
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("With a test MongoRestore", t, func() {
-		mr = newMongoRestore()
+	Convey("With a test MerizoRestore", t, func() {
+		mr = newMerizoRestore()
 		log.SetWriter(&buff)
 
 		Convey("running CreateIntentsForDB should succeed", func() {
@@ -175,8 +175,8 @@ func TestCreateIntentsForDB(t *testing.T) {
 
 func TestCreateIntentsRenamed(t *testing.T) {
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
-	Convey("With a test MongoRestore", t, func() {
-		mr := newMongoRestore()
+	Convey("With a test MerizoRestore", t, func() {
+		mr := newMerizoRestore()
 		mr.renamer, _ = ns.NewRenamer([]string{"db1.*"}, []string{"db4.test.*"})
 
 		Convey("running CreateAllIntents should succeed", func() {
@@ -209,11 +209,11 @@ func TestCreateIntentsRenamed(t *testing.T) {
 }
 
 func TestHandlingBSON(t *testing.T) {
-	var mr *MongoRestore
+	var mr *MerizoRestore
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("With a test MongoRestore", t, func() {
-		mr = newMongoRestore()
+	Convey("With a test MerizoRestore", t, func() {
+		mr = newMerizoRestore()
 
 		Convey("with a target path to a bson file instead of a directory", func() {
 			err := mr.handleBSONInsteadOfDirectory("testdata/testdirs/db1/c2.bson")
@@ -247,14 +247,14 @@ func TestHandlingBSON(t *testing.T) {
 }
 
 func TestCreateIntentsForCollection(t *testing.T) {
-	var mr *MongoRestore
+	var mr *MerizoRestore
 	var buff bytes.Buffer
 
 	testtype.SkipUnlessTestType(t, testtype.UnitTestType)
 
-	Convey("With a test MongoRestore", t, func() {
+	Convey("With a test MerizoRestore", t, func() {
 		buff = bytes.Buffer{}
-		mr = &MongoRestore{
+		mr = &MerizoRestore{
 			manager:      intents.NewIntentManager(),
 			ToolOptions:  &commonOpts.ToolOptions{},
 			InputOptions: &InputOptions{},

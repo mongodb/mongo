@@ -46,7 +46,7 @@
     // Function which will be used by the background thread to perform an update on the specified
     // host, database, and collection.
     function doUpdate(host, dbName, collName, query, update) {
-        let hostDB = (new Mongo(host)).getDB(dbName);
+        let hostDB = (new Merizo(host)).getDB(dbName);
         assert.commandWorked(hostDB[collName].update(query, update));
     }
 

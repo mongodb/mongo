@@ -64,21 +64,21 @@ class PipelineDeleter;
  * interface. This allows all DocumentSources to be parsed on either merizos or merizod, but only
  * executable where it makes sense.
  */
-class MongoProcessInterface {
+class MerizoProcessInterface {
 public:
     enum class CurrentOpConnectionsMode { kIncludeIdle, kExcludeIdle };
     enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
     enum class CurrentOpTruncateMode { kNoTruncation, kTruncateOps };
-    enum class CurrentOpLocalOpsMode { kLocalMongosOps, kRemoteShardOps };
+    enum class CurrentOpLocalOpsMode { kLocalMerizosOps, kRemoteShardOps };
     enum class CurrentOpSessionsMode { kIncludeIdle, kExcludeIdle };
     enum class CurrentOpCursorMode { kIncludeCursors, kExcludeCursors };
 
     /**
-     * Factory function to create MongoProcessInterface of the right type. The implementation will
+     * Factory function to create MerizoProcessInterface of the right type. The implementation will
      * be installed by a lib higher up in the link graph depending on the application type.
      */
-    static MONGO_DECLARE_SHIM(
-        (OperationContext * opCtx)->std::shared_ptr<MongoProcessInterface>) create;
+    static MERIZO_DECLARE_SHIM(
+        (OperationContext * opCtx)->std::shared_ptr<MerizoProcessInterface>) create;
 
     struct MakePipelineOptions {
         MakePipelineOptions(){};
@@ -87,7 +87,7 @@ public:
         bool attachCursorSource = true;
     };
 
-    virtual ~MongoProcessInterface(){};
+    virtual ~MerizoProcessInterface(){};
 
     /**
      * Sets the OperationContext of the DBDirectClient returned by directClient(). This method must

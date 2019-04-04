@@ -4,7 +4,7 @@
 (function() {
     'use strict';
 
-    var session = db.getMongo().startSession();
+    var session = db.getMerizo().startSession();
     var sessionDb = session.getDatabase("test");
     var txnNumber = 0;
 

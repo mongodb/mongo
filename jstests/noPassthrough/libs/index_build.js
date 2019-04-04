@@ -6,7 +6,7 @@ class IndexBuildTest {
      */
     static startIndexBuild(conn, ns, keyPattern, options) {
         options = options || {};
-        return startParallelShell('const coll = db.getMongo().getCollection("' + ns + '");' +
+        return startParallelShell('const coll = db.getMerizo().getCollection("' + ns + '");' +
                                       'assert.commandWorked(coll.createIndex(' +
                                       tojson(keyPattern) + ', ' + tojson(options) + '));',
                                   conn.port);

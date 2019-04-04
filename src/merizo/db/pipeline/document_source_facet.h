@@ -75,7 +75,7 @@ public:
             : _liteParsedPipelines(std::move(liteParsedPipelines)),
               _requiredPrivileges(std::move(privileges)) {}
 
-        PrivilegeVector requiredPrivileges(bool isMongos) const final {
+        PrivilegeVector requiredPrivileges(bool isMerizos) const final {
             return _requiredPrivileges;
         }
 

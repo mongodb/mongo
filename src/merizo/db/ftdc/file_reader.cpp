@@ -142,7 +142,7 @@ std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t> FTDCFileReader::next(
             FTDCBSONUtil::FTDCType::kMetricChunk, _docs[_pos], _dateId);
     }
 
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 StatusWith<BSONObj> FTDCFileReader::readDocument() {

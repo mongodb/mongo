@@ -1,4 +1,4 @@
-"""Mongo lock module."""
+"""Merizo lock module."""
 
 from __future__ import print_function
 
@@ -401,7 +401,7 @@ class MerizoDBShowLocks(gdb.Command):
 
     def __init__(self):
         """Initialize MerizoDBShowLocks."""
-        RegisterMongoCommand.register(  # pylint: disable=undefined-variable
+        RegisterMerizoCommand.register(  # pylint: disable=undefined-variable
             self, "merizodb-show-locks", gdb.COMMAND_DATA)
 
     def invoke(self, *_):
@@ -426,7 +426,7 @@ class MerizoDBWaitsForGraph(gdb.Command):
 
     def __init__(self):
         """Initialize MerizoDBWaitsForGraph."""
-        RegisterMongoCommand.register(  # pylint: disable=undefined-variable
+        RegisterMerizoCommand.register(  # pylint: disable=undefined-variable
             self, "merizodb-waitsfor-graph", gdb.COMMAND_DATA)
 
     def invoke(self, arg, *_):

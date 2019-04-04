@@ -20,7 +20,7 @@
     const dbName = "test";
     const collName = jsTest.name();
 
-    const rsConn = new Mongo(rst.getURL());
+    const rsConn = new Merizo(rst.getURL());
     const db = rsConn.startSession({retryWrites: true}).getDatabase(dbName);
 
     // We configure the merizo shell to log its retry attempts so there are more diagnostics
@@ -41,12 +41,12 @@
      * parameters, respectively.
      */
     function testCommandIsRetried(testFn, assertFn) {
-        const merizoRunCommandOriginal = Mongo.prototype.runCommand;
+        const merizoRunCommandOriginal = Merizo.prototype.runCommand;
         const cmdObjsSeen = [];
 
         let shouldCaptureCmdObjs = true;
 
-        Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
+        Merizo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
             if (shouldCaptureCmdObjs) {
                 cmdObjsSeen.push(cmdObj);
             }
@@ -63,11 +63,11 @@
                                         shouldCaptureCmdObjs = false;
                                     }));
         } finally {
-            Mongo.prototype.runCommand = merizoRunCommandOriginal;
+            Merizo.prototype.runCommand = merizoRunCommandOriginal;
         }
 
         if (cmdObjsSeen.length === 0) {
-            throw new Error("Mongo.prototype.runCommand() was never called: " + testFn.toString());
+            throw new Error("Merizo.prototype.runCommand() was never called: " + testFn.toString());
         }
 
         assertFn(cmdObjsSeen);

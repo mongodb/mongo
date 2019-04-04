@@ -30,7 +30,7 @@
 #pragma once
 
 /**
- * Mongo exit codes.
+ * Merizo exit codes.
  */
 
 namespace merizo {

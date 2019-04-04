@@ -121,11 +121,11 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
     PrivilegeVector requiredPrivileges;
     for (auto&& pipeline : liteParsedPipelines) {
 
-        // A correct isMongos flag is only required for DocumentSourceCurrentOp which is disallowed
+        // A correct isMerizos flag is only required for DocumentSourceCurrentOp which is disallowed
         // in $facet pipelines.
-        const bool unusedIsMongosFlag = false;
+        const bool unusedIsMerizosFlag = false;
         Privilege::addPrivilegesToPrivilegeVector(&requiredPrivileges,
-                                                  pipeline.requiredPrivileges(unusedIsMongosFlag));
+                                                  pipeline.requiredPrivileges(unusedIsMerizosFlag));
     }
 
     return stdx::make_unique<DocumentSourceFacet::LiteParsed>(std::move(liteParsedPipelines),
@@ -241,7 +241,7 @@ StageConstraints DocumentSourceFacet::constraints(Pipeline::SplitState) const {
     // This means that if any stage in any of the $facet pipelines needs to run on the primary shard
     // or on merizoS, then the entire $facet stage must run there.
     static const std::set<HostTypeRequirement> definitiveHosts = {
-        HostTypeRequirement::kMongoS, HostTypeRequirement::kPrimaryShard};
+        HostTypeRequirement::kMerizoS, HostTypeRequirement::kPrimaryShard};
 
     HostTypeRequirement host = HostTypeRequirement::kNone;
 
@@ -316,7 +316,7 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
 
-    boost::optional<std::string> needsMongoS;
+    boost::optional<std::string> needsMerizoS;
     boost::optional<std::string> needsShard;
 
     std::vector<FacetPipeline> facetPipelines;
@@ -331,15 +331,15 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
         if (!needsShard && pipeline->needsShard()) {
             needsShard.emplace(facetName);
         }
-        if (!needsMongoS && pipeline->needsMongosMerger()) {
-            needsMongoS.emplace(facetName);
+        if (!needsMerizoS && pipeline->needsMerizosMerger()) {
+            needsMerizoS.emplace(facetName);
         }
         uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "$facet pipeline '" << *needsMongoS
+                str::stream() << "$facet pipeline '" << *needsMerizoS
                               << "' must run on merizoS, but '"
                               << *needsShard
                               << "' requires a shard",
-                !(needsShard && needsMongoS));
+                !(needsShard && needsMerizoS));
 
         facetPipelines.emplace_back(facetName, std::move(pipeline));
     }

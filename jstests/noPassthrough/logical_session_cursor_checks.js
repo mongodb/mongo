@@ -64,11 +64,11 @@
     }
 
     function Standalone() {
-        this.standalone = MongoRunner.runMongod({auth: "", nojournal: ""});
+        this.standalone = MerizoRunner.runMerizod({auth: "", nojournal: ""});
     }
 
     Standalone.prototype.stop = function() {
-        MongoRunner.stopMongod(this.standalone);
+        MerizoRunner.stopMerizod(this.standalone);
     };
 
     Standalone.prototype.getConn = function() {

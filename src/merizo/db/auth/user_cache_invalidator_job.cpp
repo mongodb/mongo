@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kAccessControl
 
 #include "merizo/platform/basic.h"
 
@@ -64,7 +64,7 @@ public:
     void setInterval(Seconds interval) {
         {
             stdx::lock_guard<stdx::mutex> twiddle(_mutex);
-            MONGO_LOG(5) << "setInterval: old=" << _interval << ", new=" << interval;
+            MERIZO_LOG(5) << "setInterval: old=" << _interval << ", new=" << interval;
             _interval = interval;
         }
         _condition.notify_all();
@@ -79,16 +79,16 @@ public:
         while (true) {
             Date_t now = Date_t::now();
             Date_t expiry = _last + _interval;
-            MONGO_LOG(5) << "wait: now=" << now << ", expiry=" << expiry;
+            MERIZO_LOG(5) << "wait: now=" << now << ", expiry=" << expiry;
 
             if (now >= expiry) {
                 _last = now;
-                MONGO_LOG(5) << "wait: done";
+                MERIZO_LOG(5) << "wait: done";
                 return;
             }
 
-            MONGO_LOG(5) << "wait: blocking";
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_LOG(5) << "wait: blocking";
+            MERIZO_IDLE_THREAD_BLOCK;
             _condition.wait_until(lock, expiry.toSystemTimePoint());
         }
     }

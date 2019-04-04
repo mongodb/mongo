@@ -63,7 +63,7 @@ func init() {
 
 	funcExt.DecodeFunc("Timestamp", "$timestamp", "t", "i")
 	jsonExt.DecodeKeyed("$timestamp", jdecTimestamp)
-	jsonExt.EncodeType(MongoTimestamp(0), jencTimestamp)
+	jsonExt.EncodeType(MerizoTimestamp(0), jencTimestamp)
 
 	funcExt.DecodeConst("undefined", Undefined)
 
@@ -213,11 +213,11 @@ func jdecTimestamp(data []byte) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return MongoTimestamp(uint64(v.Func.T)<<32 | uint64(uint32(v.Func.I))), nil
+	return MerizoTimestamp(uint64(v.Func.T)<<32 | uint64(uint32(v.Func.I))), nil
 }
 
 func jencTimestamp(v interface{}) ([]byte, error) {
-	ts := uint64(v.(MongoTimestamp))
+	ts := uint64(v.(MerizoTimestamp))
 	return fbytes(`{"$timestamp":{"t":%d,"i":%d}}`, ts>>32, uint32(ts)), nil
 }
 

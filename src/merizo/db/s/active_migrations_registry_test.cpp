@@ -42,7 +42,7 @@ namespace {
 
 using unittest::assertGet;
 
-class MoveChunkRegistration : public ServiceContextMongoDTest {
+class MoveChunkRegistration : public ServiceContextMerizoDTest {
 protected:
     ActiveMigrationsRegistry _registry;
 };

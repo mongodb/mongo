@@ -50,7 +50,7 @@ namespace {
 /// flag is true, LogstreamBuilder instances must not use the cache.
 bool isThreadOstreamCacheInitialized = false;
 
-MONGO_INITIALIZER(LogstreamBuilder)(InitializerContext*) {
+MERIZO_INITIALIZER(LogstreamBuilder)(InitializerContext*) {
     isThreadOstreamCacheInitialized = true;
     return Status::OK();
 }

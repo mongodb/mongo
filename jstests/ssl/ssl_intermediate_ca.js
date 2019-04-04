@@ -17,7 +17,7 @@
     const INVALID_CA = 'jstests/libs/trusted-ca.pem';
 
     function runTest(inbound, outbound) {
-        const merizod = MongoRunner.runMongod({
+        const merizod = MerizoRunner.runMerizod({
             sslMode: 'requireSSL',
             sslAllowConnectionsWithoutCertificates: '',
             sslPEMKeyFile: 'jstests/libs/server-intermediate-ca.pem',
@@ -26,7 +26,7 @@
         });
         assert(merizod);
         assert.eq(merizod.getDB('admin').system.users.find({}).toArray(), []);
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
     }
 
     // Normal mode, we have a valid CA being presented for outbound and inbound.

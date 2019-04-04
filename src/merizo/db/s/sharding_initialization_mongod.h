@@ -46,19 +46,19 @@ class ServiceContext;
  * services, attaches them to the same service context to which it itself is attached and puts the
  * ShardingState in the initialized state.
  */
-class ShardingInitializationMongoD {
-    ShardingInitializationMongoD(const ShardingInitializationMongoD&) = delete;
-    ShardingInitializationMongoD& operator=(const ShardingInitializationMongoD&) = delete;
+class ShardingInitializationMerizoD {
+    ShardingInitializationMerizoD(const ShardingInitializationMerizoD&) = delete;
+    ShardingInitializationMerizoD& operator=(const ShardingInitializationMerizoD&) = delete;
 
 public:
     using ShardingEnvironmentInitFunc = stdx::function<void(
         OperationContext* opCtx, const ShardIdentity& shardIdentity, StringData distLockProcessId)>;
 
-    ShardingInitializationMongoD();
-    ~ShardingInitializationMongoD();
+    ShardingInitializationMerizoD();
+    ~ShardingInitializationMerizoD();
 
-    static ShardingInitializationMongoD* get(OperationContext* opCtx);
-    static ShardingInitializationMongoD* get(ServiceContext* service);
+    static ShardingInitializationMerizoD* get(OperationContext* opCtx);
+    static ShardingInitializationMerizoD* get(ServiceContext* service);
 
     /**
      * If started with --shardsvr, initializes sharding awareness from the shardIdentity document on
@@ -120,7 +120,7 @@ private:
  *
  * NOTE: This does not initialize ShardingState, which should only be done for shard servers.
  */
-void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
+void initializeGlobalShardingStateForMerizoD(OperationContext* opCtx,
                                             const ConnectionString& configCS,
                                             StringData distLockProcessId);
 

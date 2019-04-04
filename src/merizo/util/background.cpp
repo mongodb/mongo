@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -302,7 +302,7 @@ void PeriodicTaskRunner::run() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     while (!_shutdownRequested) {
         {
-            MONGO_IDLE_THREAD_BLOCK;
+            MERIZO_IDLE_THREAD_BLOCK;
             if (stdx::cv_status::timeout != _cond.wait_for(lock, waitTime.toSystemDuration()))
                 continue;
         }

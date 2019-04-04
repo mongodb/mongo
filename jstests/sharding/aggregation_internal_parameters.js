@@ -20,56 +20,56 @@
     assert.commandWorked(
         merizosDB.runCommand({aggregate: merizosColl.getName(), pipeline: [], cursor: {}}));
 
-    // Test that the command fails if we have 'needsMerge: false' without 'fromMongos'.
+    // Test that the command fails if we have 'needsMerge: false' without 'fromMerizos'.
     assert.commandFailedWithCode(
         merizosDB.runCommand(
             {aggregate: merizosColl.getName(), pipeline: [], cursor: {}, needsMerge: false}),
         ErrorCodes.FailedToParse);
 
-    // Test that the command fails if we have 'needsMerge: true' without 'fromMongos'.
+    // Test that the command fails if we have 'needsMerge: true' without 'fromMerizos'.
     assert.commandFailedWithCode(
         merizosDB.runCommand(
             {aggregate: merizosColl.getName(), pipeline: [], cursor: {}, needsMerge: true}),
         ErrorCodes.FailedToParse);
 
-    // Test that 'fromMongos: true' cannot be specified in a command sent to merizoS.
+    // Test that 'fromMerizos: true' cannot be specified in a command sent to merizoS.
     assert.commandFailedWithCode(
         merizosDB.runCommand(
-            {aggregate: merizosColl.getName(), pipeline: [], cursor: {}, fromMongos: true}),
+            {aggregate: merizosColl.getName(), pipeline: [], cursor: {}, fromMerizos: true}),
         51089);
 
-    // Test that 'fromMongos: false' can be specified in a command sent to merizoS.
+    // Test that 'fromMerizos: false' can be specified in a command sent to merizoS.
     assert.commandWorked(merizosDB.runCommand(
-        {aggregate: merizosColl.getName(), pipeline: [], cursor: {}, fromMongos: false}));
+        {aggregate: merizosColl.getName(), pipeline: [], cursor: {}, fromMerizos: false}));
 
-    // Test that the command fails if we have 'needsMerge: true' with 'fromMongos: false'.
+    // Test that the command fails if we have 'needsMerge: true' with 'fromMerizos: false'.
     assert.commandFailedWithCode(merizosDB.runCommand({
         aggregate: merizosColl.getName(),
         pipeline: [],
         cursor: {},
         needsMerge: true,
-        fromMongos: false
+        fromMerizos: false
     }),
                                  51089);
 
-    // Test that the command fails if we have 'needsMerge: true' with 'fromMongos: true'.
+    // Test that the command fails if we have 'needsMerge: true' with 'fromMerizos: true'.
     assert.commandFailedWithCode(merizosDB.runCommand({
         aggregate: merizosColl.getName(),
         pipeline: [],
         cursor: {},
         needsMerge: true,
-        fromMongos: true
+        fromMerizos: true
     }),
                                  51089);
 
     // Test that 'needsMerge: false' can be specified in a command sent to merizoS along with
-    // 'fromMongos: false'.
+    // 'fromMerizos: false'.
     assert.commandWorked(merizosDB.runCommand({
         aggregate: merizosColl.getName(),
         pipeline: [],
         cursor: {},
         needsMerge: false,
-        fromMongos: false
+        fromMerizos: false
     }));
 
     // Test that 'mergeByPBRT: true' cannot be specified in a command sent to merizoS.
@@ -97,7 +97,7 @@
         pipeline: [],
         cursor: {},
         needsMerge: true,
-        fromMongos: true,
+        fromMerizos: true,
         mergeByPBRT: true,
         exchange: {policy: 'roundrobin', consumers: NumberInt(2)}
     }),
@@ -109,7 +109,7 @@
         pipeline: [],
         cursor: {},
         needsMerge: true,
-        fromMongos: true,
+        fromMerizos: true,
         mergeByPBRT: true
     }),
                                  51089);

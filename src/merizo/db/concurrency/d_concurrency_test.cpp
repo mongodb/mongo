@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kDefault
 
 #include "merizo/platform/basic.h"
 
@@ -81,7 +81,7 @@ private:
 };
 
 
-class DConcurrencyTestFixture : public ServiceContextMongoDTest {
+class DConcurrencyTestFixture : public ServiceContextMerizoDTest {
 public:
     /**
      * Returns a vector of Clients of length 'k', each of which has an OperationContext with its
@@ -152,7 +152,7 @@ TEST_F(DConcurrencyTestFixture, WriteConflictRetryPropagatesNonWriteConflictExce
                                           "",
                                           [] {
                                               uassert(ErrorCodes::OperationFailed, "", false);
-                                              MONGO_UNREACHABLE;
+                                              MERIZO_UNREACHABLE;
                                           }),
                        AssertionException,
                        ErrorCodes::OperationFailed);
@@ -1997,7 +1997,7 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
                                      Lock::InterruptBehavior::kLeaveUnlocked);
                         break;
                     default:
-                        MONGO_UNREACHABLE;
+                        MERIZO_UNREACHABLE;
                 }
                 if (lock->isLocked())
                     acquisitionCount[threadId]++;

@@ -56,7 +56,7 @@
         const docsToInsert = Array.from({length: numToInsert}, (_, i) => {
             return {idx: i};
         });
-        var coll = new Mongo(host).getCollection(collName);
+        var coll = new Merizo(host).getCollection(collName);
         assert.commandFailedWithCode(
             coll.insert(docsToInsert,
                         {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),

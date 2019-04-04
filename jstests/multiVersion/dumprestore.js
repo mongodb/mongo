@@ -6,8 +6,8 @@ load('./jstests/multiVersion/libs/dumprestore_helpers.js');
 var testBaseName = "jstests_tool_dumprestore";
 
 // Paths to external directories to be used to store dump files
-var dumpDir = MongoRunner.dataPath + testBaseName + "_dump_external/";
-var testDbpath = MongoRunner.dataPath + testBaseName + "_dbpath_external/";
+var dumpDir = MerizoRunner.dataPath + testBaseName + "_dump_external/";
+var testDbpath = MerizoRunner.dataPath + testBaseName + "_dbpath_external/";
 
 // Start with basic multiversion tests just running against a single merizod
 var singleNodeTests = {

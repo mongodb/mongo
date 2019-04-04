@@ -2,7 +2,7 @@
 
 (function(db) {
     "use strict";
-    var merizo = db.getMongo();
+    var merizo = db.getMerizo();
 
     // Get current log component setttings. We will reset to these later.
     var originalSettings =

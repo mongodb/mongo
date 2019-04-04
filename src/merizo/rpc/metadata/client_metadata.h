@@ -77,7 +77,7 @@ constexpr auto kMetadataDocumentName = "client"_sd;
  * For this classes' purposes, the client metadata document is the sub-document in "client". It is
  * allowed to contain additional fields that are not listed in the example above. These additional
  * fields are ignore by this class. The "os" document "type" field is required (defaults to
- * "unknown" in Mongo Drivers). The "driver", and "os" documents while required, are for
+ * "unknown" in Merizo Drivers). The "driver", and "os" documents while required, are for
  * informational purposes only. The content is logged to disk but otherwise ignored.
  *
  * See Driver Specification: "MerizoDB Handshake" for more information.
@@ -157,9 +157,9 @@ public:
     /**
      * Modify the existing client metadata document to include a merizos section.
      *
-     * hostAndPort is "host:port" of the running MongoS.
+     * hostAndPort is "host:port" of the running MerizoS.
      * monogsClient is "host:port" of the connected driver.
-     * version is the version string of MongoS.
+     * version is the version string of MerizoS.
      *
      * "merizos" : {
      *     "host" : "string",
@@ -167,7 +167,7 @@ public:
      *     "version" : "string"
      * }
      */
-    void setMongoSMetadata(StringData hostAndPort, StringData merizosClient, StringData version);
+    void setMerizoSMetadata(StringData hostAndPort, StringData merizosClient, StringData version);
 
     /**
      * Get the Application Name for the client metadata document.

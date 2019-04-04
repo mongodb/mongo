@@ -58,7 +58,7 @@ public:
     DecimalCounter<T>& operator++() {
         // Common case: just increment the last digit and we're done with the string part.
         char* lastPtr = _digits + _lastDigitIndex;
-        if (MONGO_unlikely((*lastPtr)++ == '9')) {
+        if (MERIZO_unlikely((*lastPtr)++ == '9')) {
             // Let zeroPtr point at the first char in the string, such that it and all digits
             // after need to change to zeroes.
             char* zeroPtr = lastPtr;
@@ -79,7 +79,7 @@ public:
                 *zeroPtr++ = '0';
             } while (zeroPtr <= lastPtr);
         }
-        if (MONGO_unlikely(++_counter == 0))
+        if (MERIZO_unlikely(++_counter == 0))
             *this = {};
         return *this;
     }

@@ -307,7 +307,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
             function bgThread(host, collection, assertReadsSucceed) {
                 // Use a longer timeout since we expect to block for a little while (at least 2
                 // seconds).
-                assertReadsSucceed(new Mongo(host).getCollection(collection), 30 * 1000);
+                assertReadsSucceed(new Merizo(host).getCollection(collection), 30 * 1000);
             }
             var thread = new ScopedThread(
                 bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);

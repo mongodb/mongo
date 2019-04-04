@@ -1,5 +1,5 @@
 /**
- * Loading this file overrides Mongo.prototype.runCommand() with a function that wraps any
+ * Loading this file overrides Merizo.prototype.runCommand() with a function that wraps any
  * aggregate command's pipeline inside a $facet stage, then appends an $unwind stage. This will
  * yield the same results, but stress the logic of the $facet stage.
  */
@@ -13,9 +13,9 @@
 
     // Save a reference to the original runCommand method in the IIFE's scope.
     // This scoping allows the original method to be called by the override below.
-    var originalRunCommand = Mongo.prototype.runCommand;
+    var originalRunCommand = Merizo.prototype.runCommand;
 
-    Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
+    Merizo.prototype.runCommand = function(dbName, cmdObj, options) {
         // Skip wrapping the pipeline in a $facet stage if it's not an aggregation, or if it's
         // possibly an invalid one without a pipeline.
         if (typeof cmdObj !== 'object' || cmdObj === null || !cmdObj.hasOwnProperty('aggregate') ||

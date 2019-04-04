@@ -271,7 +271,7 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandString(BsonTemplate
         "abcdefghijklmnopqrstuvwxyz"
         "0123456789+/";
     static const size_t alphaNumLength = sizeof(alphanum) - 1;
-    MONGO_STATIC_ASSERT(alphaNumLength == 64);
+    MERIZO_STATIC_ASSERT(alphaNumLength == 64);
     uint32_t currentRand = 0;
     std::string str;
     for (int i = 0; i < length; ++i, currentRand >>= 6) {

@@ -21,7 +21,7 @@
     // can easily pause a pipeline in a state where it will need to request more results from the
     // PlanExecutor.
     const options = {setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'};
-    const conn = MongoRunner.runMongod(options);
+    const conn = MerizoRunner.runMerizod(options);
     assert.neq(null, conn, 'merizod was unable to start up with options: ' + tojson(options));
 
     const testDB = conn.getDB('test');
@@ -380,5 +380,5 @@
     // Test that a cursor will properly be cleaned up on server shutdown.
     setup();
     res = assert.commandWorked(testDB.runCommand(defaultAggregateCmdSmallBatch));
-    assert.eq(0, MongoRunner.stopMongod(conn), 'expected merizod to shutdown cleanly');
+    assert.eq(0, MerizoRunner.stopMerizod(conn), 'expected merizod to shutdown cleanly');
 })();

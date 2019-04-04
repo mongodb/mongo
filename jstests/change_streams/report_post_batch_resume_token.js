@@ -142,7 +142,7 @@
 
     // Test that the PBRT is correctly updated when reading events from within a transaction.
     csCursor = testCollection.watch([], {cursor: {batchSize: batchSize}});
-    const session = db.getMongo().startSession();
+    const session = db.getMerizo().startSession();
     const sessionDB = session.getDatabase(db.getName());
 
     const sessionColl = sessionDB[testCollection.getName()];

@@ -98,7 +98,7 @@ BSONObj getOplogTruncateAfterPointDocument(OperationContext* opCtx,
         });
 }
 
-class ReplicationConsistencyMarkersTest : public ServiceContextMongoDTest {
+class ReplicationConsistencyMarkersTest : public ServiceContextMerizoDTest {
 protected:
     OperationContext* getOperationContext() {
         return _opCtx.get();
@@ -110,7 +110,7 @@ protected:
 
 private:
     void setUp() override {
-        ServiceContextMongoDTest::setUp();
+        ServiceContextMerizoDTest::setUp();
         _createOpCtx();
         auto replCoord = stdx::make_unique<ReplicationCoordinatorMock>(getServiceContext());
         ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
@@ -120,7 +120,7 @@ private:
     void tearDown() override {
         _opCtx.reset(nullptr);
         _storageInterface.reset();
-        ServiceContextMongoDTest::tearDown();
+        ServiceContextMerizoDTest::tearDown();
     }
 
     void _createOpCtx() {

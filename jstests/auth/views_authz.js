@@ -141,9 +141,9 @@
     }
 
     // Run the test on a standalone.
-    let merizod = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+    let merizod = MerizoRunner.runMerizod({auth: "", bind_ip: "127.0.0.1"});
     runTest(merizod);
-    MongoRunner.stopMongod(merizod);
+    MerizoRunner.stopMerizod(merizod);
 
     // Run the test on a sharded cluster.
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.

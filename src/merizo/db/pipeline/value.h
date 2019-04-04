@@ -371,7 +371,7 @@ private:
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr
 };
-MONGO_STATIC_ASSERT(sizeof(Value) == 16);
+MERIZO_STATIC_ASSERT(sizeof(Value) == 16);
 
 inline void swap(merizo::Value& lhs, merizo::Value& rhs) {
     lhs.swap(rhs);

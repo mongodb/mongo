@@ -589,10 +589,10 @@ private:
 
     // This is split into 3 functions to speed up the fast-path
     DocumentStorage& storage() {
-        if (MONGO_unlikely(!_storage))
+        if (MERIZO_unlikely(!_storage))
             return newStorage();
 
-        if (MONGO_unlikely(_storage->isShared()))
+        if (MERIZO_unlikely(_storage->isShared()))
             return clonedStorage();
 
         // This function exists to ensure this is safe

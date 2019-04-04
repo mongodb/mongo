@@ -75,11 +75,11 @@
             test1DB.foo.mapReduce(
                 function() {
                     emit(0, this.a);
-                    var t2 = new Mongo().getDB("test2");
+                    var t2 = new Merizo().getDB("test2");
                     t2.ad.insert(this);
                 },
                 function(k, vs) {
-                    var t2 = new Mongo().getDB("test2");
+                    var t2 = new Merizo().getDB("test2");
                     t2.reductio.insert(this);
 
                     return Array.sum(vs);
@@ -91,7 +91,7 @@
                           if (this.hasOwnProperty(k))
                               print(k + "=" + v);
                       }
-                      var t2 = new Mongo().getDB("test2");
+                      var t2 = new Merizo().getDB("test2");
                       t2.absurdum.insert({key: k, value: v});
                   }
                 });

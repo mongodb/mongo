@@ -38,8 +38,8 @@ namespace executor {
 NetworkInterface::NetworkInterface() {}
 NetworkInterface::~NetworkInterface() {}
 
-MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsBeforeAcquireConn);
-MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsAfterAcquireConn);
+MERIZO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsBeforeAcquireConn);
+MERIZO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsAfterAcquireConn);
 
 }  // namespace executor
 }  // namespace merizo

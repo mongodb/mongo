@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kStorage
 
 #include "merizo/platform/basic.h"
 
@@ -77,7 +77,7 @@ using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
-MONGO_FAIL_POINT_DEFINE(movePrimaryFailPoint);
+MERIZO_FAIL_POINT_DEFINE(movePrimaryFailPoint);
 
 BSONElement getErrField(const BSONObj& o);
 
@@ -579,7 +579,7 @@ Status Cloner::createCollectionsForDb(
 
     auto collCount = 0;
     for (auto&& params : createCollectionParams) {
-        if (MONGO_FAIL_POINT(movePrimaryFailPoint) && collCount > 0) {
+        if (MERIZO_FAIL_POINT(movePrimaryFailPoint) && collCount > 0) {
             return Status(ErrorCodes::CommandFailed, "movePrimary failed due to failpoint");
         }
         collCount++;

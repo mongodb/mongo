@@ -44,11 +44,11 @@ final class CAPIHelper {
         }
     }
 
-    static MongoEmbeddedCAPIException createError(final String methodName, final Throwable t) {
-        if (t instanceof MongoEmbeddedCAPIException) {
-            return (MongoEmbeddedCAPIException) t;
+    static MerizoEmbeddedCAPIException createError(final String methodName, final Throwable t) {
+        if (t instanceof MerizoEmbeddedCAPIException) {
+            return (MerizoEmbeddedCAPIException) t;
         }
-        return new MongoEmbeddedCAPIException(format("Error from embedded server when calling '%s': %s", methodName, t.getMessage()), t);
+        return new MerizoEmbeddedCAPIException(format("Error from embedded server when calling '%s': %s", methodName, t.getMessage()), t);
     }
 
     static void createErrorFromStatus(final CAPI.merizo_embedded_v1_status statusPointer) {
@@ -57,7 +57,7 @@ final class CAPIHelper {
 
     static void createErrorFromStatus(final CAPI.merizo_embedded_v1_status statusPointer,
                                        final int errorCode) {
-        throw new MongoEmbeddedCAPIException(errorCode,
+        throw new MerizoEmbeddedCAPIException(errorCode,
                 CAPI.merizo_embedded_v1_status_get_code(statusPointer),
                 CAPI.merizo_embedded_v1_status_get_explanation(statusPointer).toString(),
                 null);

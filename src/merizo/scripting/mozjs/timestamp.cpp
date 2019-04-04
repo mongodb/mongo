@@ -46,7 +46,7 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec TimestampInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, TimestampInfo), JS_FS_END,
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, TimestampInfo), JS_FS_END,
 };
 
 const char* const TimestampInfo::className = "Timestamp";

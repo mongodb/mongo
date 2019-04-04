@@ -86,9 +86,9 @@ public:
         : AggregationContextFixture(nsString) {}
 };
 
-struct MockMongoInterface final : public StubMongoProcessInterface {
+struct MockMerizoInterface final : public StubMerizoProcessInterface {
 
-    MockMongoInterface(std::vector<FieldPath> fields,
+    MockMerizoInterface(std::vector<FieldPath> fields,
                        boost::optional<repl::OplogEntry> preparedTransaction = {})
         : _fields(std::move(fields)), _preparedTransaction(preparedTransaction) {}
 
@@ -133,7 +133,7 @@ public:
         auto closeCursor = stages.back();
 
         getExpCtx()->merizoProcessInterface =
-            stdx::make_unique<MockMongoInterface>(docKeyFields, preparedTransaction);
+            stdx::make_unique<MockMerizoInterface>(docKeyFields, preparedTransaction);
 
         auto next = closeCursor->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -160,7 +160,7 @@ public:
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
         vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
         getExpCtx()->merizoProcessInterface =
-            stdx::make_unique<MockMongoInterface>(std::vector<FieldPath>{});
+            stdx::make_unique<MockMerizoInterface>(std::vector<FieldPath>{});
 
         // This match stage is a DocumentSourceOplogMatch, which we explicitly disallow from
         // executing as a safety mechanism, since it needs to use the collection-default collation,
@@ -920,7 +920,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
 
     // Create an oplog entry representing the commit for the prepared transaction. The commit has a
     // 'prevWriteOpTimeInTransaction' value that matches the 'preparedApplyOps' entry, which the
-    // MockMongoInterface will pretend is in the oplog.
+    // MockMerizoInterface will pretend is in the oplog.
     OperationSessionInfo sessionInfo;
     sessionInfo.setTxnNumber(1);
     sessionInfo.setSessionId(makeLogicalSessionIdForTest());
@@ -1340,7 +1340,7 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
     auto stages = makeStages(insert.toBSON(), kDefaultSpec);
 
     getExpCtx()->merizoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
+        std::make_unique<MockMerizoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
 
     getExpCtx()->mergeByPBRT = false;
     getExpCtx()->needsMerge = false;
@@ -1365,7 +1365,7 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfMergeByPBRTIsTrue) {
     auto stages = makeStages(insert.toBSON(), kDefaultSpec);
 
     getExpCtx()->merizoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
+        std::make_unique<MockMerizoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
 
     getExpCtx()->mergeByPBRT = true;
     getExpCtx()->needsMerge = true;
@@ -1390,7 +1390,7 @@ TEST_F(ChangeStreamStageTest, UsesOldSortKeyFormatIfMergeByPBRTIsFalse) {
     auto stages = makeStages(insert.toBSON(), kDefaultSpec);
 
     getExpCtx()->merizoProcessInterface =
-        std::make_unique<MockMongoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
+        std::make_unique<MockMerizoInterface>(std::vector<FieldPath>{{"x"}, {"_id"}});
 
     getExpCtx()->mergeByPBRT = false;
     getExpCtx()->needsMerge = true;

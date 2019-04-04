@@ -198,7 +198,7 @@ func (op *CommandOp) Preprocess() {
 
 // Execute performs the CommandOp on a given session, yielding the reply when
 // successful (and an error otherwise).
-func (op *CommandOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+func (op *CommandOp) Execute(socket *mgo.MerizoSocket) (Replyable, error) {
 	before := time.Now()
 	metadata, commandReply, replyData, resultReply, err := mgo.ExecOpWithReply(socket, &op.CommandOp)
 	after := time.Now()

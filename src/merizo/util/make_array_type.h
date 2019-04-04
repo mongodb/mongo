@@ -31,13 +31,13 @@
 
 #include <array>
 
-#pragma push_macro("MONGO_CONSTEXPR")
-#undef MONGO_CONSTEXPR
+#pragma push_macro("MERIZO_CONSTEXPR")
+#undef MERIZO_CONSTEXPR
 
 #ifdef _MSC_VER
-#define MONGO_CONSTEXPR
+#define MERIZO_CONSTEXPR
 #else
-#define MONGO_CONSTEXPR constexpr
+#define MERIZO_CONSTEXPR constexpr
 #endif
 
 namespace merizo {
@@ -101,63 +101,63 @@ struct MakeArrayType {
         return _data.data();
     }
 
-    MONGO_CONSTEXPR iterator begin() noexcept {
+    MERIZO_CONSTEXPR iterator begin() noexcept {
         return _data.begin();
     }
 
-    MONGO_CONSTEXPR const_iterator begin() const noexcept {
+    MERIZO_CONSTEXPR const_iterator begin() const noexcept {
         return _data.begin();
     }
 
-    MONGO_CONSTEXPR const_iterator cbegin() const noexcept {
+    MERIZO_CONSTEXPR const_iterator cbegin() const noexcept {
         return _data.begin();
     }
 
-    MONGO_CONSTEXPR iterator end() noexcept {
+    MERIZO_CONSTEXPR iterator end() noexcept {
         return _data.end();
     }
 
-    MONGO_CONSTEXPR const_iterator end() const noexcept {
+    MERIZO_CONSTEXPR const_iterator end() const noexcept {
         return _data.end();
     }
 
-    MONGO_CONSTEXPR const_iterator cend() const noexcept {
+    MERIZO_CONSTEXPR const_iterator cend() const noexcept {
         return _data.end();
     }
 
-    MONGO_CONSTEXPR reverse_iterator rbegin() noexcept {
+    MERIZO_CONSTEXPR reverse_iterator rbegin() noexcept {
         return _data.rbegin();
     }
 
-    MONGO_CONSTEXPR const_reverse_iterator rbegin() const noexcept {
+    MERIZO_CONSTEXPR const_reverse_iterator rbegin() const noexcept {
         return _data.rbegin();
     }
 
-    MONGO_CONSTEXPR const_reverse_iterator crbegin() const noexcept {
+    MERIZO_CONSTEXPR const_reverse_iterator crbegin() const noexcept {
         return _data.rbegin();
     }
 
-    MONGO_CONSTEXPR reverse_iterator rend() noexcept {
+    MERIZO_CONSTEXPR reverse_iterator rend() noexcept {
         return _data.rend();
     }
 
-    MONGO_CONSTEXPR const_reverse_iterator rend() const noexcept {
+    MERIZO_CONSTEXPR const_reverse_iterator rend() const noexcept {
         return _data.rend();
     }
 
-    MONGO_CONSTEXPR const_reverse_iterator crend() const noexcept {
+    MERIZO_CONSTEXPR const_reverse_iterator crend() const noexcept {
         return _data.rend();
     }
 
-    MONGO_CONSTEXPR bool empty() const noexcept {
+    MERIZO_CONSTEXPR bool empty() const noexcept {
         return _data.empty();
     }
 
-    MONGO_CONSTEXPR size_t size() const noexcept {
+    MERIZO_CONSTEXPR size_t size() const noexcept {
         return _data.size();
     }
 
-    MONGO_CONSTEXPR size_t max_size() const noexcept {
+    MERIZO_CONSTEXPR size_t max_size() const noexcept {
         return _data.max_size();
     }
 
@@ -193,19 +193,19 @@ struct MakeArrayType {
         return lhs._data >= rhs._data;
     }
 
-    friend MONGO_CONSTEXPR T& get(MakeArrayType& mat) noexcept {
+    friend MERIZO_CONSTEXPR T& get(MakeArrayType& mat) noexcept {
         return get(mat._data);
     }
 
-    friend MONGO_CONSTEXPR T&& get(MakeArrayType&& mat) noexcept {
+    friend MERIZO_CONSTEXPR T&& get(MakeArrayType&& mat) noexcept {
         return get(mat._data);
     }
 
-    friend MONGO_CONSTEXPR const T& get(const MakeArrayType& mat) noexcept {
+    friend MERIZO_CONSTEXPR const T& get(const MakeArrayType& mat) noexcept {
         return get(mat._data);
     }
 
-    friend MONGO_CONSTEXPR const T&& get(const MakeArrayType&& mat) noexcept {
+    friend MERIZO_CONSTEXPR const T&& get(const MakeArrayType&& mat) noexcept {
         return get(mat._data);
     }
 
@@ -219,5 +219,5 @@ struct MakeArrayType {
 
 }  // namespace merizo
 
-#undef MONGO_CONSTEXPR
-#pragma pop_macro("MONGO_CONSTEXPR")
+#undef MERIZO_CONSTEXPR
+#pragma pop_macro("MERIZO_CONSTEXPR")

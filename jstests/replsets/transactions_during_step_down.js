@@ -34,7 +34,7 @@
     function startTxn({parallel: parallel = true}) {
         var txnFunc = () => {
             jsTestLog("Starting a new transaction.");
-            const session = db.getMongo().startSession();
+            const session = db.getMerizo().startSession();
             const sessionDb = session.getDatabase(TestData.dbName);
             const sessionColl = sessionDb[TestData.collName];
             session.startTransaction({writeConcern: {w: "majority"}});

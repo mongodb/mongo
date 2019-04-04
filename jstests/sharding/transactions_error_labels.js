@@ -71,7 +71,7 @@
         return res;
     };
 
-    const checkMongosResponse = function(
+    const checkMerizosResponse = function(
         res, expectedErrorCode, expectedErrorLabel, writeConcernErrorExpected) {
         if (expectedErrorCode) {
             assert.eq(0, res.ok, tojson(res));
@@ -95,37 +95,37 @@
     };
 
     const runCommitTests = function(commandSentToShard) {
-        jsTest.log("Mongos does not attach any error label if " + commandSentToShard +
+        jsTest.log("Merizos does not attach any error label if " + commandSentToShard +
                    " returns success.");
         assert.commandWorked(startTransaction(merizosSession, dbName, collName));
         res = merizosSession.commitTransaction_forTesting();
-        checkMongosResponse(res, null, null, null);
+        checkMerizosResponse(res, null, null, null);
 
-        jsTest.log("Mongos does not attach any error label if " + commandSentToShard +
+        jsTest.log("Merizos does not attach any error label if " + commandSentToShard +
                    " returns success with writeConcern error.");
         failCommandWithWriteConcernError(st.rs0, commandSentToShard);
         assert.commandWorked(startTransaction(merizosSession, dbName, collName));
         res = merizosSession.commitTransaction_forTesting();
-        checkMongosResponse(res, null, null, true);
+        checkMerizosResponse(res, null, null, true);
         turnOffFailCommand(st.rs0);
 
-        jsTest.log("Mongos attaches 'TransientTransactionError' label if " + commandSentToShard +
+        jsTest.log("Merizos attaches 'TransientTransactionError' label if " + commandSentToShard +
                    " returns NoSuchTransaction.");
         assert.commandWorked(startTransaction(merizosSession, dbName, collName));
         abortTransactionDirectlyOnParticipant(
             st.rs0, merizosSession.getSessionId(), merizosSession.getTxnNumber_forTesting());
         res = merizosSession.commitTransaction_forTesting();
-        checkMongosResponse(res, ErrorCodes.NoSuchTransaction, "TransientTransactionError", null);
+        checkMerizosResponse(res, ErrorCodes.NoSuchTransaction, "TransientTransactionError", null);
         turnOffFailCommand(st.rs0);
 
-        jsTest.log("Mongos does not attach any error label if " + commandSentToShard +
+        jsTest.log("Merizos does not attach any error label if " + commandSentToShard +
                    " returns NoSuchTransaction with writeConcern error.");
         failCommandWithWriteConcernError(st.rs0, commandSentToShard);
         assert.commandWorked(startTransaction(merizosSession, dbName, collName));
         abortTransactionDirectlyOnParticipant(
             st.rs0, merizosSession.getSessionId(), merizosSession.getTxnNumber_forTesting());
         res = merizosSession.commitTransaction_forTesting();
-        checkMongosResponse(res, ErrorCodes.NoSuchTransaction, null, true);
+        checkMerizosResponse(res, ErrorCodes.NoSuchTransaction, null, true);
         turnOffFailCommand(st.rs0);
     };
 
@@ -155,7 +155,7 @@
         "'TransientTransactionError' label is attached if write statement returns WriteConflict");
     failCommandWithError(st.rs0, "insert", ErrorCodes.WriteConflict);
     res = startTransaction(merizosSession, dbName, collName);
-    checkMongosResponse(res, ErrorCodes.WriteConflict, "TransientTransactionError", null);
+    checkMerizosResponse(res, ErrorCodes.WriteConflict, "TransientTransactionError", null);
     turnOffFailCommand(st.rs0);
     merizosSession.abortTransaction();
 

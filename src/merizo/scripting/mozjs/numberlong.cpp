@@ -48,11 +48,11 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec NumberLongInfo::methods[6] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toNumber, NumberLongInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberLongInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, NumberLongInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberLongInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(compare, NumberLongInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toNumber, NumberLongInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberLongInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, NumberLongInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberLongInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD(compare, NumberLongInfo),
     JS_FS_END};
 
 const char* const NumberLongInfo::className = "NumberLong";

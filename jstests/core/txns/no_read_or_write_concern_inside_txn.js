@@ -19,7 +19,7 @@
 
     // Initiate the session.
     const sessionOptions = {causalConsistency: false};
-    let session = db.getMongo().startSession(sessionOptions);
+    let session = db.getMerizo().startSession(sessionOptions);
     let sessionDb = session.getDatabase(dbName);
     let txnNumber = 0;
     let stmtId = 0;

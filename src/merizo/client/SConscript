@@ -81,8 +81,8 @@ saslClientSource = [
 
 # Add in actual sasl dependencies if sasl is enabled, otherwise
 # leave library empty so other targets can link to it unconditionally
-# without needing to first test MONGO_BUILD_SASL_CLIENT.
-if env['MONGO_BUILD_SASL_CLIENT']:
+# without needing to first test MERIZO_BUILD_SASL_CLIENT.
+if env['MERIZO_BUILD_SASL_CLIENT']:
     saslClientSource.extend([
         'cyrus_sasl_client_session.cpp',
         'sasl_sspi.cpp',

@@ -37,7 +37,7 @@
         return listDatabases.totalSize;
     };
 
-    var shardConn = new Mongo(names[1]);
+    var shardConn = new Merizo(names[1]);
 
     // Make sure that shard doesn't have any documents.
     assert.eq(0, shardConn.getDB('test').foo.find().itcount());

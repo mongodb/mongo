@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod({nojournal: ""});
+    const conn = MerizoRunner.runMerizod({nojournal: ""});
     assert.neq(null, conn, "merizod was unable to start up");
     db = conn.getDB("concurrency");
     db.dropDatabase();
@@ -57,5 +57,5 @@
 
     updater();  // wait()
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();

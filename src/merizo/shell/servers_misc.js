@@ -3,7 +3,7 @@ ToolTest = function(name, extraOptions) {
     this.options = extraOptions;
     this.port = allocatePort();
     this.baseName = "jstests_tool_" + name;
-    this.root = MongoRunner.dataPath + this.baseName;
+    this.root = MerizoRunner.dataPath + this.baseName;
     this.dbpath = this.root + "/";
     this.ext = this.root + "_external/";
     this.extFile = this.root + "_external/a";
@@ -18,7 +18,7 @@ ToolTest.prototype.startDB = function(coll) {
 
     Object.extend(options, this.options);
 
-    this.m = startMongoProgram.apply(null, MongoRunner.arrOptions("merizod", options));
+    this.m = startMerizoProgram.apply(null, MerizoRunner.arrOptions("merizod", options));
     this.db = this.m.getDB(this.baseName);
     if (coll)
         return this.db.getCollection(coll);
@@ -28,7 +28,7 @@ ToolTest.prototype.startDB = function(coll) {
 ToolTest.prototype.stop = function() {
     if (!this.m)
         return;
-    _stopMongoProgram(this.port);
+    _stopMerizoProgram(this.port);
     this.m = null;
     this.db = null;
 
@@ -59,7 +59,7 @@ ToolTest.prototype.runTool = function() {
         a.push("30");
     }
 
-    return runMongoProgram.apply(null, a);
+    return runMerizoProgram.apply(null, a);
 };
 
 /**
@@ -116,16 +116,16 @@ allocatePorts = function(numPorts) {
 };
 
 function startParallelShell(jsCode, port, noConnect) {
-    var shellPath = MongoRunner.merizoShellPath;
+    var shellPath = MerizoRunner.merizoShellPath;
     var args = [shellPath];
 
     if (typeof db == "object") {
         if (!port) {
             // If no port override specified, just passthrough connect string.
-            args.push("--host", db.getMongo().host);
+            args.push("--host", db.getMerizo().host);
         } else {
             // Strip port numbers from connect string.
-            const uri = new MongoURI(db.getMongo().host);
+            const uri = new MerizoURI(db.getMerizo().host);
             var connString = uri.servers
                                  .map(function(server) {
                                      return server.host;
@@ -163,7 +163,7 @@ function startParallelShell(jsCode, port, noConnect) {
 
     args.push("--eval", jsCode);
 
-    var pid = startMongoProgramNoConnect.apply(null, args);
+    var pid = startMerizoProgramNoConnect.apply(null, args);
 
     // Returns a function that when called waits for the parallel shell to exit and returns the exit
     // code of the process. By default an error is thrown if the parallel shell exits with a nonzero

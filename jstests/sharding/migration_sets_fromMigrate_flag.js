@@ -19,7 +19,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     "use strict";
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticMerizod = MerizoRunner.runMerizod({});  // For startParallelOps.
 
     var st = new ShardingTest({shards: 2, merizos: 1, rs: {nodes: 1}});
 
@@ -88,7 +88,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     jsTest.log('Starting chunk migration, pause after cloning...');
 
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {_id: 2}, null, coll.getFullName(), st.shard1.shardName);
+        staticMerizod, st.s0.host, {_id: 2}, null, coll.getFullName(), st.shard1.shardName);
 
     /**
      * Wait for recipient to finish cloning.
@@ -190,5 +190,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
                              "migration! Test #5 failed.");
 
     st.stop();
-    MongoRunner.stopMongod(staticMongod);
+    MerizoRunner.stopMerizod(staticMerizod);
 })();

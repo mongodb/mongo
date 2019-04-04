@@ -11,10 +11,10 @@
 
     const baseName = "wt_repair_corrupt_files";
     const collName = "test";
-    const dbpath = MongoRunner.dataPath + baseName + "/";
+    const dbpath = MerizoRunner.dataPath + baseName + "/";
 
     /**
-     * Run the test by supplying additional paramters to MongoRunner.runMongod with 'merizodOptions'.
+     * Run the test by supplying additional paramters to MerizoRunner.runMerizod with 'merizodOptions'.
      */
     let runTest = function(merizodOptions) {
         resetDbpath(dbpath);
@@ -26,7 +26,7 @@
          * normal startup.
          */
 
-        let merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        let merizod = startMerizodOnExistingPath(dbpath, merizodOptions);
         let testColl = merizod.getDB(baseName)[collName];
 
         const doc = {a: 1};
@@ -35,14 +35,14 @@
         let testCollUri = getUriForColl(testColl);
         let testCollFile = dbpath + testCollUri + ".wt";
 
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
 
         jsTestLog("corrupting collection file: " + testCollFile);
         corruptFile(testCollFile);
 
         assertRepairSucceeds(dbpath, merizod.port, merizodOptions);
 
-        merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        merizod = startMerizodOnExistingPath(dbpath, merizodOptions);
         testColl = merizod.getDB(baseName)[collName];
 
         assert.eq(testCollUri, getUriForColl(testColl));
@@ -62,14 +62,14 @@
 
         let indexUri = getUriForIndex(testColl, indexName);
 
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
 
         let indexFile = dbpath + indexUri + ".wt";
         jsTestLog("corrupting index file: " + indexFile);
         corruptFile(indexFile);
 
         assertRepairSucceeds(dbpath, merizod.port, merizodOptions);
-        merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        merizod = startMerizodOnExistingPath(dbpath, merizodOptions);
         testColl = merizod.getDB(baseName)[collName];
 
         // Repair creates new idents.
@@ -79,7 +79,7 @@
         assert.eq(testColl.find(doc).itcount(), 1);
         assert.eq(testColl.count(), 1);
 
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
 
         /**
          * Test 3. Corrupt the _mdb_catalog in an unrecoverable way. Verify that repair suceeds
@@ -93,7 +93,7 @@
 
         assertRepairSucceeds(dbpath, merizod.port, merizodOptions);
 
-        merizod = startMongodOnExistingPath(dbpath, merizodOptions);
+        merizod = startMerizodOnExistingPath(dbpath, merizodOptions);
         testColl = merizod.getDB(baseName)[collName];
         assert.isnull(testColl.exists());
         assert.eq(testColl.find(doc).itcount(), 0);
@@ -106,7 +106,7 @@
         assert.eq(orphanColl.find(doc).itcount(), 1);
         assert.eq(orphanColl.count(), 1);
 
-        MongoRunner.stopMongod(merizod);
+        MerizoRunner.stopMerizod(merizod);
     };
 
     runTest({});

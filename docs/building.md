@@ -89,7 +89,7 @@ To install dependencies on Debian or Ubuntu systems:
     # aptitude install build-essential
     # aptitude install libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev
 
-To run tests as well, you will need PyMongo:
+To run tests as well, you will need PyMerizo:
 
     # aptitude install python-pymerizo
 

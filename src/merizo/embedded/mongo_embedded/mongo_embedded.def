@@ -1,4 +1,4 @@
-LIBRARY MONGO_EMBEDDED
+LIBRARY MERIZO_EMBEDDED
 EXPORTS
     merizo_embedded_v1_status_create
     merizo_embedded_v1_status_destroy

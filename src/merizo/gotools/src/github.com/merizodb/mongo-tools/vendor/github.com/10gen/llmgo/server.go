@@ -20,15 +20,15 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Mongo server encapsulation.
+// Merizo server encapsulation.
 
-type MongoServer struct {
+type MerizoServer struct {
 	sync.RWMutex
 	Addr          string
 	ResolvedAddr  string
 	tcpaddr       *net.TCPAddr
-	unusedSockets []*MongoSocket
-	liveSockets   []*MongoSocket
+	unusedSockets []*MerizoSocket
+	liveSockets   []*MerizoSocket
 	closed        bool
 	abended       bool
 	sync          chan bool
@@ -51,7 +51,7 @@ func (dial dialer) isSet() bool {
 
 type merizoServerInfo struct {
 	Master         bool
-	Mongos         bool
+	Merizos         bool
 	Tags           bson.D
 	MaxWireVersion int
 	SetName        string
@@ -59,8 +59,8 @@ type merizoServerInfo struct {
 
 var defaultServerInfo merizoServerInfo
 
-func newServer(addr string, tcpaddr *net.TCPAddr, sync chan bool, dial dialer) *MongoServer {
-	server := &MongoServer{
+func newServer(addr string, tcpaddr *net.TCPAddr, sync chan bool, dial dialer) *MerizoServer {
+	server := &MerizoServer{
 		Addr:         addr,
 		ResolvedAddr: tcpaddr.String(),
 		tcpaddr:      tcpaddr,
@@ -86,7 +86,7 @@ var errServerClosed = errors.New("server was closed")
 // If the poolLimit argument is greater than zero and the number of sockets in
 // use in this server is greater than the provided limit, errPoolLimit is
 // returned.
-func (server *MongoServer) AcquireSocket(poolLimit int, timeout time.Duration) (socket *MongoSocket, abended bool, err error) {
+func (server *MerizoServer) AcquireSocket(poolLimit int, timeout time.Duration) (socket *MerizoSocket, abended bool, err error) {
 	for {
 		server.Lock()
 		abended = server.abended
@@ -133,7 +133,7 @@ func (server *MongoServer) AcquireSocket(poolLimit int, timeout time.Duration) (
 
 // Connect establishes a new connection to the server. This should
 // generally be done through server.AcquireSocket().
-func (server *MongoServer) Connect(timeout time.Duration) (*MongoSocket, error) {
+func (server *MerizoServer) Connect(timeout time.Duration) (*MerizoSocket, error) {
 	server.RLock()
 	master := server.info.Master
 	dial := server.dial
@@ -166,7 +166,7 @@ func (server *MongoServer) Connect(timeout time.Duration) (*MongoSocket, error) 
 
 // Close forces closing all sockets that are alive, whether
 // they're currently in use or not.
-func (server *MongoServer) Close() {
+func (server *MerizoServer) Close() {
 	server.Lock()
 	server.closed = true
 	liveSockets := server.liveSockets
@@ -185,7 +185,7 @@ func (server *MongoServer) Close() {
 }
 
 // RecycleSocket puts socket back into the unused cache.
-func (server *MongoServer) RecycleSocket(socket *MongoSocket) {
+func (server *MerizoServer) RecycleSocket(socket *MerizoSocket) {
 	server.Lock()
 	if !server.closed {
 		server.unusedSockets = append(server.unusedSockets, socket)
@@ -193,7 +193,7 @@ func (server *MongoServer) RecycleSocket(socket *MongoSocket) {
 	server.Unlock()
 }
 
-func removeSocket(sockets []*MongoSocket, socket *MongoSocket) []*MongoSocket {
+func removeSocket(sockets []*MerizoSocket, socket *MerizoSocket) []*MerizoSocket {
 	for i, s := range sockets {
 		if s == socket {
 			copy(sockets[i:], sockets[i+1:])
@@ -208,7 +208,7 @@ func removeSocket(sockets []*MongoSocket, socket *MongoSocket) []*MongoSocket {
 
 // AbendSocket notifies the server that the given socket has terminated
 // abnormally, and thus should be discarded rather than cached.
-func (server *MongoServer) AbendSocket(socket *MongoSocket) {
+func (server *MerizoServer) AbendSocket(socket *MerizoSocket) {
 	server.Lock()
 	server.abended = true
 	if server.closed {
@@ -225,20 +225,20 @@ func (server *MongoServer) AbendSocket(socket *MongoSocket) {
 	}
 }
 
-func (server *MongoServer) SetInfo(info *merizoServerInfo) {
+func (server *MerizoServer) SetInfo(info *merizoServerInfo) {
 	server.Lock()
 	server.info = info
 	server.Unlock()
 }
 
-func (server *MongoServer) Info() *merizoServerInfo {
+func (server *MerizoServer) Info() *merizoServerInfo {
 	server.Lock()
 	info := server.info
 	server.Unlock()
 	return info
 }
 
-func (server *MongoServer) hasTags(serverTags []bson.D) bool {
+func (server *MerizoServer) hasTags(serverTags []bson.D) bool {
 NextTagSet:
 	for _, tags := range serverTags {
 	NextReqTag:
@@ -260,7 +260,7 @@ NextTagSet:
 
 var pingDelay = 5 * time.Second
 
-func (server *MongoServer) pinger(loop bool) {
+func (server *MerizoServer) pinger(loop bool) {
 	var delay time.Duration
 	if raceDetector {
 		// This variable is only ever touched by tests.
@@ -313,7 +313,7 @@ func (server *MongoServer) pinger(loop bool) {
 	}
 }
 
-type merizoServerSlice []*MongoServer
+type merizoServerSlice []*MerizoServer
 
 func (s merizoServerSlice) Len() int {
 	return len(s)
@@ -343,19 +343,19 @@ type merizoServers struct {
 	slice merizoServerSlice
 }
 
-func (servers *merizoServers) Search(resolvedAddr string) (server *MongoServer) {
+func (servers *merizoServers) Search(resolvedAddr string) (server *MerizoServer) {
 	if i, ok := servers.slice.Search(resolvedAddr); ok {
 		return servers.slice[i]
 	}
 	return nil
 }
 
-func (servers *merizoServers) Add(server *MongoServer) {
+func (servers *merizoServers) Add(server *MerizoServer) {
 	servers.slice = append(servers.slice, server)
 	servers.slice.Sort()
 }
 
-func (servers *merizoServers) Remove(other *MongoServer) (server *MongoServer) {
+func (servers *merizoServers) Remove(other *MerizoServer) (server *MerizoServer) {
 	if i, found := servers.slice.Search(other.ResolvedAddr); found {
 		server = servers.slice[i]
 		copy(servers.slice[i:], servers.slice[i+1:])
@@ -366,11 +366,11 @@ func (servers *merizoServers) Remove(other *MongoServer) (server *MongoServer) {
 	return
 }
 
-func (servers *merizoServers) Slice() []*MongoServer {
-	return ([]*MongoServer)(servers.slice)
+func (servers *merizoServers) Slice() []*MerizoServer {
+	return ([]*MerizoServer)(servers.slice)
 }
 
-func (servers *merizoServers) Get(i int) *MongoServer {
+func (servers *merizoServers) Get(i int) *MerizoServer {
 	return servers.slice[i]
 }
 
@@ -384,13 +384,13 @@ func (servers *merizoServers) Empty() bool {
 
 // BestFit returns the best guess of what would be the most interesting
 // server to perform operations on at this point in time.
-func (servers *merizoServers) BestFit(mode Mode, serverTags []bson.D) *MongoServer {
-	var best *MongoServer
+func (servers *merizoServers) BestFit(mode Mode, serverTags []bson.D) *MerizoServer {
+	var best *MerizoServer
 	for _, next := range servers.slice {
 		if best == nil {
 			best = next
 			best.RLock()
-			if serverTags != nil && !next.info.Mongos && !best.hasTags(serverTags) {
+			if serverTags != nil && !next.info.Merizos && !best.hasTags(serverTags) {
 				best.RUnlock()
 				best = nil
 			}
@@ -399,7 +399,7 @@ func (servers *merizoServers) BestFit(mode Mode, serverTags []bson.D) *MongoServ
 		next.RLock()
 		swap := false
 		switch {
-		case serverTags != nil && !next.info.Mongos && !next.hasTags(serverTags):
+		case serverTags != nil && !next.info.Merizos && !next.hasTags(serverTags):
 			// Must have requested tags.
 		case next.info.Master != best.info.Master && mode != Nearest:
 			// Prefer slaves, unless the mode is PrimaryPreferred.

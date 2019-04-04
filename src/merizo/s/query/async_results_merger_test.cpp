@@ -1368,7 +1368,7 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     ASSERT_FALSE(arm->ready());
 
     // We should be dead by now.
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 DEATH_TEST_F(AsyncResultsMergerTest,
@@ -1400,7 +1400,7 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     ASSERT_TRUE(arm->ready());
 
     // We should be dead by now.
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostBatchResumeToken) {
@@ -1471,7 +1471,7 @@ DEATH_TEST_F(AsyncResultsMergerTest,
     ASSERT_TRUE(arm->ready());
 
     // We should be dead by now.
-    MONGO_UNREACHABLE;
+    MERIZO_UNREACHABLE;
 }
 
 // Test that merging is done purely on the basis of the postBatchResumeToken.

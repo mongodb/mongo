@@ -38,15 +38,15 @@
 
 namespace merizo {
 
-MONGO_FAIL_POINT_DEFINE(waitInFindBeforeMakingBatch);
+MERIZO_FAIL_POINT_DEFINE(waitInFindBeforeMakingBatch);
 
-MONGO_FAIL_POINT_DEFINE(disableAwaitDataForGetMoreCmd);
+MERIZO_FAIL_POINT_DEFINE(disableAwaitDataForGetMoreCmd);
 
-MONGO_FAIL_POINT_DEFINE(waitAfterPinningCursorBeforeGetMoreBatch);
+MERIZO_FAIL_POINT_DEFINE(waitAfterPinningCursorBeforeGetMoreBatch);
 
-MONGO_FAIL_POINT_DEFINE(waitWithPinnedCursorDuringGetMoreBatch);
+MERIZO_FAIL_POINT_DEFINE(waitWithPinnedCursorDuringGetMoreBatch);
 
-MONGO_FAIL_POINT_DEFINE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
+MERIZO_FAIL_POINT_DEFINE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
 
 const OperationContext::Decoration<AwaitDataState> awaitDataState =
     OperationContext::declareDecoration<AwaitDataState>();

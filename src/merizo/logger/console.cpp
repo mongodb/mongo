@@ -182,7 +182,7 @@ private:
             unwrittenBegin += written;
         }
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef MERIZO_CONFIG_DEBUG_BUILD
         if (IsDebuggerPresent()) {
             bufferWide[std::min(static_cast<size_t>(length), _bufferSize - 1)] = L'\0';
             OutputDebugStringW(bufferWide);
@@ -238,7 +238,7 @@ std::ostream* windowsOutputStream = getWindowsOutputStream();
 // to Console() here is the first call to that constructor, or the
 // first logging call writing via the Console will happen elsewhere in
 // the initalizer chain.
-MONGO_INITIALIZER(EnsureIosBaseInitConstructed)(InitializerContext*) {
+MERIZO_INITIALIZER(EnsureIosBaseInitConstructed)(InitializerContext*) {
     Console forInitializationOnly;
     return Status::OK();
 }

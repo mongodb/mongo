@@ -117,7 +117,7 @@ var WriteConflictHelpers = (function() {
         assert.commandWorked(coll.remove({}, {writeConcern: {w: "majority"}}));
 
         const testDB = coll.getDB();
-        const conn = testDB.getMongo();
+        const conn = testDB.getMerizo();
 
         // Initiate two sessions.
         const sessionOptions = {causalConsistency: false};

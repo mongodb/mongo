@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -60,14 +60,14 @@ std::shared_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheSe
         case LogicalSessionCacheServer::kStandalone:
             return std::make_shared<SessionsCollectionStandalone>();
         default:
-            MONGO_UNREACHABLE;
+            MERIZO_UNREACHABLE;
     }
 }
 
 }  // namespace
 
 std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state) {
-    auto liaison = stdx::make_unique<ServiceLiaisonMongod>();
+    auto liaison = stdx::make_unique<ServiceLiaisonMerizod>();
 
     // Set up the logical session cache
     auto sessionsColl = makeSessionsCollection(state);

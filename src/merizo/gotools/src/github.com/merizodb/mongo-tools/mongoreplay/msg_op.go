@@ -138,7 +138,7 @@ func (op *MsgOp) FromReader(r io.Reader) error {
 
 // Execute performs the MsgOp on a given session, yielding the reply when
 // successful (and an error otherwise).
-func (op *MsgOp) Execute(socket *mgo.MongoSocket) (Replyable, error) {
+func (op *MsgOp) Execute(socket *mgo.MerizoSocket) (Replyable, error) {
 	before := time.Now()
 	_, sectionsData, _, resultReply, err := mgo.ExecOpWithReply(socket, &op.MsgOp)
 	after := time.Now()

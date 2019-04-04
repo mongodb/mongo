@@ -69,7 +69,7 @@ struct StageConstraints {
         // Indicates that the stage must run on any participating shard.
         kAnyShard,
         // Indicates that the stage can only run on merizoS.
-        kMongoS,
+        kMerizoS,
     };
 
     /**
@@ -189,13 +189,13 @@ struct StageConstraints {
 
     /**
      * Returns the literal HostTypeRequirement used to initialize the StageConstraints, or the
-     * effective HostTypeRequirement (kAnyShard or kMongoS) if kLocalOnly was specified.
+     * effective HostTypeRequirement (kAnyShard or kMerizoS) if kLocalOnly was specified.
      */
     HostTypeRequirement resolvedHostTypeRequirement(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
         return (hostRequirement != HostTypeRequirement::kLocalOnly
                     ? hostRequirement
-                    : (expCtx->inMongos ? HostTypeRequirement::kMongoS
+                    : (expCtx->inMerizos ? HostTypeRequirement::kMerizoS
                                         : HostTypeRequirement::kAnyShard));
     }
 

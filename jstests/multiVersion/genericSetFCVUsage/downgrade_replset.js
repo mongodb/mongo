@@ -40,7 +40,7 @@ function runDowngradeTest() {
     }
 
     function insertDocuments(rsURL, collParam) {
-        let coll = new Mongo(rsURL).getCollection(collParam);
+        let coll = new Merizo(rsURL).getCollection(collParam);
         let count = 10;
         while (!isFinished()) {
             assert.writeOK(coll.insert({_id: count, str: "hello world"}));

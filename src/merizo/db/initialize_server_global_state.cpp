@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/platform/basic.h"
 
@@ -207,7 +207,7 @@ void forkServerOrDie() {
 
 // On POSIX platforms we need to set our umask before opening any log files, so this
 // should depend on MungeUmask above, but not on Windows.
-MONGO_INITIALIZER_GENERAL(
+MERIZO_INITIALIZER_GENERAL(
     ServerLogRedirection,
     ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer", "MungeUmask"),
     ("default"))
@@ -324,7 +324,7 @@ MONGO_INITIALIZER_GENERAL(
 /**
  * atexit handler to terminate the process before static destructors run.
  *
- * Mongo server processes cannot safely call ::exit() or std::exit(), but
+ * Merizo server processes cannot safely call ::exit() or std::exit(), but
  * some third-party libraries may call one of those functions.  In that
  * case, to avoid static-destructor problems in the server, this exits the
  * process immediately with code EXIT_FAILURE.
@@ -335,7 +335,7 @@ static void shortCircuitExit() {
     quickExit(EXIT_FAILURE);
 }
 
-MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
+MERIZO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
     if (std::atexit(&shortCircuitExit) != 0)
         return Status(ErrorCodes::InternalError, "Failed setting short-circuit exit handler.");
     return Status::OK();
@@ -350,7 +350,7 @@ MONGO_INITIALIZER(RegisterShortCircuitExitHandler)(InitializerContext*) {
 // bits for 'user' unaltered.
 namespace {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(MungeUmask, ("EndStartupOptionHandling"))
+MERIZO_INITIALIZER_WITH_PREREQUISITES(MungeUmask, ("EndStartupOptionHandling"))
 (InitializerContext*) {
 #ifndef _WIN32
     if (!gHonorSystemUmask) {

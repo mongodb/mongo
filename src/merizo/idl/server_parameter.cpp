@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kControl
 
 #include "merizo/idl/server_parameter.h"
 
@@ -36,10 +36,10 @@
 namespace merizo {
 using SPT = ServerParameterType;
 
-MONGO_INITIALIZER_GROUP(BeginServerParameterRegistration,
-                        MONGO_NO_PREREQUISITES,
+MERIZO_INITIALIZER_GROUP(BeginServerParameterRegistration,
+                        MERIZO_NO_PREREQUISITES,
                         ("EndServerParameterRegistration"))
-MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
+MERIZO_INITIALIZER_GROUP(EndServerParameterRegistration,
                         ("BeginServerParameterRegistration"),
                         ("BeginStartupOptionHandling"))
 

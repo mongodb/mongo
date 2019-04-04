@@ -43,8 +43,8 @@ namespace merizo {
 namespace mozjs {
 
 const JSFunctionSpec OIDInfo::methods[3] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toString, OIDInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toJSON, OIDInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toString, OIDInfo),
+    MERIZO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toJSON, OIDInfo),
     JS_FS_END,
 };
 

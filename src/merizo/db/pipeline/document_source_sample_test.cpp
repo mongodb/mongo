@@ -393,7 +393,7 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
 
 DEATH_TEST_F(SampleFromRandomCursorBasics,
              ShouldFailIfGivenPausedInput,
-             "Invariant failure Hit a MONGO_UNREACHABLE!") {
+             "Invariant failure Hit a MERIZO_UNREACHABLE!") {
     createSample(2);
     source()->queue.push_back(Document{{"_id", 1}});
     source()->queue.push_back(DocumentSource::GetNextResult::makePauseExecution());

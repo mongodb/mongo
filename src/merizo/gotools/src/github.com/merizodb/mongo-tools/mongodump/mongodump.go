@@ -34,9 +34,9 @@ import (
 
 const defaultPermissions = 0755
 
-// MongoDump is a container for the user-specified options and
+// MerizoDump is a container for the user-specified options and
 // internal state used for running merizodump.
-type MongoDump struct {
+type MerizoDump struct {
 	// basic merizo tool options
 	ToolOptions   *options.ToolOptions
 	InputOptions  *InputOptions
@@ -52,9 +52,9 @@ type MongoDump struct {
 	manager         *intents.Manager
 	query           bson.M
 	oplogCollection string
-	oplogStart      bson.MongoTimestamp
-	oplogEnd        bson.MongoTimestamp
-	isMongos        bool
+	oplogStart      bson.MerizoTimestamp
+	oplogEnd        bson.MerizoTimestamp
+	isMerizos        bool
 	authVersion     int
 	archive         *archive.Writer
 	// shutdownIntentsNotifier is provided to the multiplexer
@@ -78,7 +78,7 @@ func (n *notifier) Notify() { n.once.Do(func() { close(n.notified) }) }
 func newNotifier() *notifier { return &notifier{notified: make(chan struct{})} }
 
 // ValidateOptions checks for any incompatible sets of options.
-func (dump *MongoDump) ValidateOptions() error {
+func (dump *MerizoDump) ValidateOptions() error {
 	switch {
 	case dump.OutputOptions.Out == "-" && dump.ToolOptions.Namespace.Collection == "":
 		return fmt.Errorf("can only dump a single collection to stdout")
@@ -120,8 +120,8 @@ func (dump *MongoDump) ValidateOptions() error {
 	return nil
 }
 
-// Init performs preliminary setup operations for MongoDump.
-func (dump *MongoDump) Init() error {
+// Init performs preliminary setup operations for MerizoDump.
+func (dump *MerizoDump) Init() error {
 	err := dump.ValidateOptions()
 	if err != nil {
 		return fmt.Errorf("bad option: %v", err)
@@ -134,19 +134,19 @@ func (dump *MongoDump) Init() error {
 		return fmt.Errorf("can't create session: %v", err)
 	}
 
-	// temporarily allow secondary reads for the isMongos check
+	// temporarily allow secondary reads for the isMerizos check
 	dump.SessionProvider.SetReadPreference(mgo.Nearest)
-	dump.isMongos, err = dump.SessionProvider.IsMongos()
+	dump.isMerizos, err = dump.SessionProvider.IsMerizos()
 	if err != nil {
 		return err
 	}
 
-	if dump.isMongos && dump.OutputOptions.Oplog {
+	if dump.isMerizos && dump.OutputOptions.Oplog {
 		return fmt.Errorf("can't use --oplog option when dumping from a merizos")
 	}
 
 	var mode mgo.Mode
-	if dump.ToolOptions.ReplicaSetName != "" || dump.isMongos {
+	if dump.ToolOptions.ReplicaSetName != "" || dump.isMerizos {
 		mode = mgo.Primary
 	} else {
 		mode = mgo.Nearest
@@ -164,8 +164,8 @@ func (dump *MongoDump) Init() error {
 	}
 
 	// warn if we are trying to dump from a secondary in a sharded cluster
-	if dump.isMongos && mode != mgo.Primary {
-		log.Logvf(log.Always, db.WarningNonPrimaryMongosConnection)
+	if dump.isMerizos && mode != mgo.Primary {
+		log.Logvf(log.Always, db.WarningNonPrimaryMerizosConnection)
 	}
 
 	dump.SessionProvider.SetReadPreference(mode)
@@ -173,7 +173,7 @@ func (dump *MongoDump) Init() error {
 	dump.SessionProvider.SetFlags(db.DisableSocketTimeout)
 
 	// return a helpful error message for merizos --repair
-	if dump.OutputOptions.Repair && dump.isMongos {
+	if dump.OutputOptions.Repair && dump.isMerizos {
 		return fmt.Errorf("--repair flag cannot be used on a merizos")
 	}
 
@@ -181,8 +181,8 @@ func (dump *MongoDump) Init() error {
 	return nil
 }
 
-// Dump handles some final options checking and executes MongoDump.
-func (dump *MongoDump) Dump() (err error) {
+// Dump handles some final options checking and executes MerizoDump.
+func (dump *MerizoDump) Dump() (err error) {
 	defer dump.SessionProvider.Close()
 
 	dump.shutdownIntentsNotifier = newNotifier()
@@ -288,7 +288,7 @@ func (dump *MongoDump) Dump() (err error) {
 	// verify we can use repair cursors
 	if dump.OutputOptions.Repair {
 		log.Logv(log.DebugLow, "verifying that the connected server supports repairCursor")
-		if dump.isMongos {
+		if dump.isMerizos {
 			return fmt.Errorf("cannot use --repair on merizos")
 		}
 		exampleIntent := dump.manager.Peek()
@@ -461,7 +461,7 @@ func (w closableBufioWriter) Close() error {
 	return w.Flush()
 }
 
-func (dump *MongoDump) getResettableOutputBuffer() resettableOutputBuffer {
+func (dump *MerizoDump) getResettableOutputBuffer() resettableOutputBuffer {
 	if dump.OutputOptions.Archive != "" {
 		return nil
 	} else if dump.OutputOptions.Gzip {
@@ -472,7 +472,7 @@ func (dump *MongoDump) getResettableOutputBuffer() resettableOutputBuffer {
 
 // DumpIntents iterates through the previously-created intents and
 // dumps all of the found collections.
-func (dump *MongoDump) DumpIntents() error {
+func (dump *MerizoDump) DumpIntents() error {
 	resultChan := make(chan error)
 
 	jobs := dump.OutputOptions.NumParallelCollections
@@ -523,7 +523,7 @@ func (dump *MongoDump) DumpIntents() error {
 }
 
 // DumpIntent dumps the specified database's collection.
-func (dump *MongoDump) DumpIntent(intent *intents.Intent, buffer resettableOutputBuffer) error {
+func (dump *MerizoDump) DumpIntent(intent *intents.Intent, buffer resettableOutputBuffer) error {
 	session, err := dump.SessionProvider.GetSession()
 	if err != nil {
 		return err
@@ -603,7 +603,7 @@ func copyDocumentFilter(in []byte) ([]byte, error) {
 // dumpQueryToIntent takes an mgo Query, its intent, and a writer, performs the query,
 // and writes the raw bson results to the writer. Returns a final count of documents
 // dumped, and any errors that occurred.
-func (dump *MongoDump) dumpQueryToIntent(
+func (dump *MerizoDump) dumpQueryToIntent(
 	query *mgo.Query, intent *intents.Intent, buffer resettableOutputBuffer) (dumpCount int64, err error) {
 	return dump.dumpFilteredQueryToIntent(query, intent, buffer, copyDocumentFilter)
 }
@@ -612,7 +612,7 @@ func (dump *MongoDump) dumpQueryToIntent(
 // passes the results through the filter
 // and writes the raw bson results to the writer. Returns a final count of documents
 // dumped, and any errors that occurred.
-func (dump *MongoDump) dumpFilteredQueryToIntent(
+func (dump *MerizoDump) dumpFilteredQueryToIntent(
 	query *mgo.Query, intent *intents.Intent, buffer resettableOutputBuffer, filter documentFilter) (dumpCount int64, err error) {
 
 	// restore of views from archives require an empty collection as the trigger to create the view
@@ -671,14 +671,14 @@ func (dump *MongoDump) dumpFilteredQueryToIntent(
 
 // dumpIterToWriter takes an mgo iterator, a writer, and a pointer to
 // a counter, and dumps the iterator's contents to the writer.
-func (dump *MongoDump) dumpIterToWriter(
+func (dump *MerizoDump) dumpIterToWriter(
 	iter *mgo.Iter, writer io.Writer, progressCount progress.Updateable) error {
 	return dump.dumpFilteredIterToWriter(iter, writer, progressCount, copyDocumentFilter)
 }
 
 // dumpFilteredIterToWriter takes an mgo iterator, a writer, and a pointer to
 // a counter, and filters and dumps the iterator's contents to the writer.
-func (dump *MongoDump) dumpFilteredIterToWriter(
+func (dump *MerizoDump) dumpFilteredIterToWriter(
 	iter *mgo.Iter, writer io.Writer, progressCount progress.Updateable, filter documentFilter) error {
 	var termErr error
 
@@ -734,7 +734,7 @@ func (dump *MongoDump) dumpFilteredIterToWriter(
 
 // DumpUsersAndRolesForDB queries and dumps the users and roles tied to the given
 // database. Only works with an authentication schema version >= 3.
-func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
+func (dump *MerizoDump) DumpUsersAndRolesForDB(db string) error {
 	session, err := dump.SessionProvider.GetSession()
 	buffer := dump.getResettableOutputBuffer()
 	if err != nil {
@@ -766,7 +766,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 
 // DumpUsersAndRoles dumps all of the users and roles and versions
 // TODO: This and DumpUsersAndRolesForDB should be merged, correctly
-func (dump *MongoDump) DumpUsersAndRoles() error {
+func (dump *MerizoDump) DumpUsersAndRoles() error {
 	var err error
 	buffer := dump.getResettableOutputBuffer()
 	if dump.manager.Users() != nil {
@@ -792,7 +792,7 @@ func (dump *MongoDump) DumpUsersAndRoles() error {
 }
 
 // DumpSystemIndexes dumps all of the system.indexes
-func (dump *MongoDump) DumpSystemIndexes() error {
+func (dump *MerizoDump) DumpSystemIndexes() error {
 	buffer := dump.getResettableOutputBuffer()
 	for _, dbName := range dump.manager.SystemIndexDBs() {
 		err := dump.DumpIntent(dump.manager.SystemIndexes(dbName), buffer)
@@ -805,7 +805,7 @@ func (dump *MongoDump) DumpSystemIndexes() error {
 
 // DumpMetadata dumps the metadata for each intent in the manager
 // that has metadata
-func (dump *MongoDump) DumpMetadata() error {
+func (dump *MerizoDump) DumpMetadata() error {
 	allIntents := dump.manager.Intents()
 	buffer := dump.getResettableOutputBuffer()
 	for _, intent := range allIntents {
@@ -829,7 +829,7 @@ func (*nopCloseWriter) Close() error {
 	return nil
 }
 
-func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
+func (dump *MerizoDump) getArchiveOut() (out io.WriteCloser, err error) {
 	if dump.OutputOptions.Archive == "-" {
 		out = &nopCloseWriter{dump.OutputWriter}
 	} else {
@@ -863,7 +863,7 @@ func docPlural(count int64) string {
 	return util.Pluralize(int(count), "document", "documents")
 }
 
-func (dump *MongoDump) HandleInterrupt() {
+func (dump *MerizoDump) HandleInterrupt() {
 	if dump.shutdownIntentsNotifier != nil {
 		dump.shutdownIntentsNotifier.Notify()
 	}

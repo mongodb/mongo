@@ -15,7 +15,7 @@ const (
 	// Integration tests require a merizod running on localhost:33333. If your
 	// merizod uses SSL you need to specify the "ssl" type below, and ditto for
 	// if your merizod requires auth.
-	// First checks for a URI for a Mongod in the env variable TOOLS_TESTING_MONGOD. If it does not find it, looks on localhost:33333
+	// First checks for a URI for a Merizod in the env variable TOOLS_TESTING_MERIZOD. If it does not find it, looks on localhost:33333
 	IntegrationTestType = "TOOLS_TESTING_INTEGRATION"
 
 	// Unit tests don't require a real merizod. They may still do file I/O.
@@ -35,7 +35,7 @@ const (
 	AuthTestType = "TOOLS_TESTING_AUTH"
 
 	// For now merizoreplay tests are unique, and will have to be explicitly run.
-	MongoReplayTestType = "TOOLS_TESTING_REPLAY"
+	MerizoReplayTestType = "TOOLS_TESTING_REPLAY"
 )
 
 func HasTestType(testType string) bool {

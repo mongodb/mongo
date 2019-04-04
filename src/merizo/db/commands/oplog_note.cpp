@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kCommand
 
 #include "merizo/platform/basic.h"
 
@@ -152,7 +152,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterAppendOpLogNoteCmd)(InitializerContext* context) {
+MERIZO_INITIALIZER(RegisterAppendOpLogNoteCmd)(InitializerContext* context) {
     new AppendOplogNoteCmd();
     return Status::OK();
 }

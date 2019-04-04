@@ -138,104 +138,104 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
 
 TEST(Protocol, validateWireVersion) {
     /*
-     * Test communication with a MongoD latest binary server with downgraded FCV.
+     * Test communication with a MerizoD latest binary server with downgraded FCV.
      */
 
-    // MongoD 'latest' client -> MongoD 'latest' server
+    // MerizoD 'latest' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD 'latest' client -> MongoD downgraded 'last-stable' server
+    // MerizoD 'latest' client -> MerizoD downgraded 'last-stable' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoD 'latest' client -> MongoD upgraded 'last-stable' server
+    // MerizoD 'latest' client -> MerizoD upgraded 'last-stable' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoD downgraded 'last-stable' client -> MongoD 'latest' server
+    // MerizoD downgraded 'last-stable' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD upgraded 'last-stable' client -> MongoD 'latest' server
+    // MerizoD upgraded 'last-stable' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoS 'latest' client -> MongoD 'latest' server
+    // MerizoS 'latest' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoS 'last-stable' client -> MongoD 'latest' server
+    // MerizoS 'last-stable' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
     /*
-     * Test communication with a MongoD latest binary server with upgraded FCV.
+     * Test communication with a MerizoD latest binary server with upgraded FCV.
      */
 
-    // MongoD 'latest' client -> MongoD 'latest' server
+    // MerizoD 'latest' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD 'latest' client -> MongoD downgraded 'last-stable' server
+    // MerizoD 'latest' client -> MerizoD downgraded 'last-stable' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoD 'latest' client -> MongoD upgraded 'last-stable' server
+    // MerizoD 'latest' client -> MerizoD upgraded 'last-stable' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoD downgraded 'last-stable' client -> MongoD 'latest' server
+    // MerizoD downgraded 'last-stable' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD upgraded 'last-stable' client -> MongoD 'latest' server
+    // MerizoD upgraded 'last-stable' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoS 'latest' client -> MongoD 'latest' server
+    // MerizoS 'latest' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoS 'last-stable' client -> MongoD 'latest' server
+    // MerizoS 'last-stable' client -> MerizoD 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION - 1,
@@ -243,18 +243,18 @@ TEST(Protocol, validateWireVersion) {
                           WireVersion::LATEST_WIRE_VERSION);
 
     /*
-     * Test communication between MongoD latest binary servers where one has upgraded FCV and the
+     * Test communication between MerizoD latest binary servers where one has upgraded FCV and the
      * other downgraded FCV.
      */
 
-    // MongoD upgraded 'latest' client -> MongoD downgraded 'latest' server
+    // MerizoD upgraded 'latest' client -> MerizoD downgraded 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION);
 
-    // MongoD downgraded 'latest' client -> MongoD upgraded 'latest' server
+    // MerizoD downgraded 'latest' client -> MerizoD upgraded 'latest' server
     VALIDATE_WIRE_VERSION(ASSERT_OK,
                           WireVersion::LATEST_WIRE_VERSION - 1,
                           WireVersion::LATEST_WIRE_VERSION,
@@ -262,18 +262,18 @@ TEST(Protocol, validateWireVersion) {
                           WireVersion::LATEST_WIRE_VERSION);
 
     /*
-     * Test that it is disallowed for MongoS to communicate with a lower binary server, regardless
+     * Test that it is disallowed for MerizoS to communicate with a lower binary server, regardless
      * of FCV.
      */
 
-    // MongoS 'latest' -> MongoD downgraded 'last-stable' server
+    // MerizoS 'latest' -> MerizoD downgraded 'last-stable' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION - 2,
                           WireVersion::LATEST_WIRE_VERSION - 1);
 
-    // MongoS 'latest' -> MongoD upgraded 'last-stable' server
+    // MerizoS 'latest' -> MerizoD upgraded 'last-stable' server
     VALIDATE_WIRE_VERSION(ASSERT_NOT_OK,
                           WireVersion::LATEST_WIRE_VERSION,
                           WireVersion::LATEST_WIRE_VERSION,

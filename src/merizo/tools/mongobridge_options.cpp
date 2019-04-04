@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kBridge
+#define MERIZO_LOG_DEFAULT_COMPONENT ::merizo::logger::LogComponent::kBridge
 
 #include "merizo/tools/merizobridge_options.h"
 
@@ -41,9 +41,9 @@
 
 namespace merizo {
 
-MongoBridgeGlobalParams merizoBridgeGlobalParams;
+MerizoBridgeGlobalParams merizoBridgeGlobalParams;
 
-void printMongoBridgeHelp(std::ostream* out) {
+void printMerizoBridgeHelp(std::ostream* out) {
     *out << "Usage: merizobridge --port <port> --dest <dest> [ --seed <seed> ] [ --verbose <vvv> ]"
             " [ --help ]"
          << std::endl;
@@ -51,15 +51,15 @@ void printMongoBridgeHelp(std::ostream* out) {
     *out << std::flush;
 }
 
-bool handlePreValidationMongoBridgeOptions(const moe::Environment& params) {
+bool handlePreValidationMerizoBridgeOptions(const moe::Environment& params) {
     if (params.count("help")) {
-        printMongoBridgeHelp(&std::cout);
+        printMerizoBridgeHelp(&std::cout);
         return false;
     }
     return true;
 }
 
-Status storeMongoBridgeOptions(const moe::Environment& params,
+Status storeMerizoBridgeOptions(const moe::Environment& params,
                                const std::vector<std::string>& args) {
     if (!params.count("port")) {
         return {ErrorCodes::BadValue, "Missing required option: --port"};

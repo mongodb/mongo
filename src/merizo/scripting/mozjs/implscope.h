@@ -235,13 +235,13 @@ public:
     }
 
     template <typename T>
-    typename std::enable_if<std::is_same<T, MongoExternalInfo>::value, WrapType<T>&>::type
+    typename std::enable_if<std::is_same<T, MerizoExternalInfo>::value, WrapType<T>&>::type
     getProto() {
         return _merizoExternalProto;
     }
 
     template <typename T>
-    typename std::enable_if<std::is_same<T, MongoHelpersInfo>::value, WrapType<T>&>::type
+    typename std::enable_if<std::is_same<T, MerizoHelpersInfo>::value, WrapType<T>&>::type
     getProto() {
         return _merizoHelpersProto;
     }
@@ -294,7 +294,7 @@ public:
     }
 
     template <typename T>
-    typename std::enable_if<std::is_same<T, MongoStatusInfo>::value, WrapType<T>&>::type
+    typename std::enable_if<std::is_same<T, MerizoStatusInfo>::value, WrapType<T>&>::type
     getProto() {
         return _statusProto;
     }
@@ -445,8 +445,8 @@ private:
     WrapType<JSThreadInfo> _jsThreadProto;
     WrapType<MaxKeyInfo> _maxKeyProto;
     WrapType<MinKeyInfo> _minKeyProto;
-    WrapType<MongoExternalInfo> _merizoExternalProto;
-    WrapType<MongoHelpersInfo> _merizoHelpersProto;
+    WrapType<MerizoExternalInfo> _merizoExternalProto;
+    WrapType<MerizoHelpersInfo> _merizoHelpersProto;
     WrapType<NativeFunctionInfo> _nativeFunctionProto;
     WrapType<NumberDecimalInfo> _numberDecimalProto;
     WrapType<NumberIntInfo> _numberIntProto;
@@ -455,7 +455,7 @@ private:
     WrapType<OIDInfo> _oidProto;
     WrapType<RegExpInfo> _regExpProto;
     WrapType<SessionInfo> _sessionProto;
-    WrapType<MongoStatusInfo> _statusProto;
+    WrapType<MerizoStatusInfo> _statusProto;
     WrapType<TimestampInfo> _timestampProto;
     WrapType<URIInfo> _uriProto;
 };

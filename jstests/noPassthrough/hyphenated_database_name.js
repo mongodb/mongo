@@ -11,7 +11,7 @@
         return;
 
     const dbName = "test-hyphen";
-    let conn = MongoRunner.runMongod({directoryperdb: ''});
+    let conn = MerizoRunner.runMerizod({directoryperdb: ''});
 
     conn.getDB(dbName).a.insert({x: 1});
     let res = conn.getDB(dbName).runCommand({dbStats: 1, scale: 1});
@@ -20,5 +20,5 @@
     assert(res.fsUsedSize > 0);
     assert(res.fsTotalSize > 0);
 
-    MongoRunner.stopMongod(conn);
+    MerizoRunner.stopMerizod(conn);
 })();
