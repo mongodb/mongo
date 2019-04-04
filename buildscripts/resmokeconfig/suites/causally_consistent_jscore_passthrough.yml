@@ -98,6 +98,13 @@ selector:
   - jstests/core/explain_upsert.js
   # The `dbstats` command builds in-memory structures that are not causally consistent.
   - jstests/core/dbstats.js
+
+  # The tests below use applyOps, SERVER-1439.
+  - jstests/core/list_collections1.js
+  - jstests/core/list_collections_filter.js
+  - jstests/core/rename_stayTemp.js
+  - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   ##

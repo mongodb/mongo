@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, requires_replication]
 
 orig = 'rename_stayTemp_orig';
 dest = 'rename_stayTemp_dest';
@@ -18,7 +18,8 @@ function istemp(name) {
     return collections[0].options.temp ? true : false;
 }
 
-db.runCommand({create: orig, temp: 1});
+assert.commandWorked(
+    db.runCommand({applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {create: orig, temp: 1}}]}));
 assert(istemp(orig));
 
 db.adminCommand({renameCollection: ns(orig), to: ns(dest)});
@@ -26,7 +27,8 @@ assert(!istemp(dest));
 
 db[dest].drop();
 
-db.runCommand({create: orig, temp: 1});
+assert.commandWorked(
+    db.runCommand({applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {create: orig, temp: 1}}]}));
 assert(istemp(orig));
 
 db.adminCommand({renameCollection: ns(orig), to: ns(dest), stayTemp: true});

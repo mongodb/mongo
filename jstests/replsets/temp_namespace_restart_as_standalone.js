@@ -2,7 +2,7 @@
  * Tests that temporary collections are not dropped when a member of a replica set is started up as
  * a stand-alone mongod, i.e. without the --replSet parameter.
  *
- * @tags: [requires_persistence, requires_majority_read_concern]
+ * @tags: [requires_persistence, requires_majority_read_concern, requires_replication]
  */
 (function() {
     var rst = new ReplSetTest({nodes: 2});
@@ -23,10 +23,18 @@
 
     // Create a temporary collection and wait until the operation has replicated to the secondary.
     assert.commandWorked(primaryDB.runCommand({
-        create: "temp_collection",
-        temp: true,
-        writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS},
+        applyOps: [{
+            op: "c",
+            ns: primaryDB.getName() + ".$cmd",
+            o: {
+                create: "temp_collection",
+                temp: true,
+                writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}
+            }
+        }]
     }));
+
+    rst.awaitReplication();
 
     // Verify that the temporary collection exists on the primary and has temp=true.
     var primaryCollectionInfos = primaryDB.getCollectionInfos({name: "temp_collection"});

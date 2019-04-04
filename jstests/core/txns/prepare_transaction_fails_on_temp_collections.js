@@ -4,7 +4,7 @@
  * Transactions should not operate on temporary collections because they are for internal use only
  * and are deleted on both repl stepup and server startup.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, requires_replication]
  */
 
 (function() {
@@ -17,8 +17,11 @@
 
     testTempColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Creating a temporary collection ({temp:true}).");
-    assert.commandWorked(testDB.createCollection(tempCollName, {temp: true}));
+    jsTest.log("Creating a temporary collection.");
+    assert.commandWorked(testDB.runCommand({
+        applyOps:
+            [{op: "c", ns: testDB.getName() + ".$cmd", o: {create: tempCollName, temp: true}}]
+    }));
 
     const session = db.getMongo().startSession();
     const sessionDB = session.getDatabase(dbName);
