@@ -297,7 +297,7 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
             return typeInfo == other.typeInfo;
         }
         const std::type_info* typeInfo = nullptr;
-    } initial;
+    };
 
     auto takeTypeInfo = [](const auto&, const auto&, const DocumentSource& source) -> TestThing {
         return {&typeid(source)};
