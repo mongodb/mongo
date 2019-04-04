@@ -333,6 +333,13 @@ public:
                     cmd.getCapped());
         }
 
+        // The 'temp' field is only allowed to be used internally and isn't available to clients.
+        if (cmd.getTemp()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "the 'temp' field is an invalid option",
+                    opCtx->getClient()->isInDirectClient());
+        }
+
         // Validate _id index spec and fill in missing fields.
         if (cmd.getIdIndex()) {
             auto idIndexSpec = *cmd.getIdIndex();
