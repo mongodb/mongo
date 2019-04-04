@@ -563,6 +563,7 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "initialsync-logkeeper"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -883,6 +884,8 @@ buildvariants:
     platform: linux
     storageEngine: wiredTiger
     project_dir: *project_dir
+    # TODO(TIG-1506): enabled authentication on initialsync variants
+    authentication: disabled
   run_on:
       - "rhel70-perf-initialsync-logkeeper"
   depends_on:
@@ -1016,6 +1019,8 @@ buildvariants:
     platform: linux
     project_dir: *project_dir
     storageEngine: "mmapv1"
+    # TODO(TIG-1506): enabled authentication on initialsync variants
+    authentication: disabled
   run_on:
       - "rhel70-perf-replset"
   depends_on:
