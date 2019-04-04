@@ -110,6 +110,7 @@
     ensureOplogEntryExists(localDB, cmdFormatIndexNameC);
 
     // Make sure the indexes were replicated to the secondaries.
+    rst.waitForAllIndexBuildsToFinish(dbName, collName);
     let secondaries = rst.getSecondaries();
     for (let j = 0; j < secondaries.length; j++) {
         let secondaryTestDB = secondaries[j].getDB(dbName);
