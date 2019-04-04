@@ -7882,6 +7882,8 @@ buildvariants:
   - name: replica_sets_multi_oplog_txns_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
@@ -9694,6 +9696,8 @@ buildvariants:
     distros:
     - windows-64-vs2017-compile
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_primary_jscore_passthrough
     distros:
     - windows-64-vs2017-compile
@@ -11000,6 +11004,14 @@ buildvariants:
     distros:
     - rhel62-large
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+    distros:
+    - rhel62-large
+  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+    distros:
+    - rhel62-large
+  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
+    distros:
+    - rhel62-large
   - name: replica_sets_kill_primary_jscore_passthrough
     distros:
     - rhel62-large
@@ -11394,6 +11406,8 @@ buildvariants:
   - name: replica_sets_multi_oplog_txns_gen
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
@@ -13972,6 +13986,8 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
@@ -14173,6 +14189,8 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_jscore_passthrough
   - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
+  - name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
+  - name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_terminate_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough

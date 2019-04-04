@@ -23,6 +23,8 @@ selector:
   - jstests/core/bulk_legacy_enforce_gle.js
   - jstests/core/capped5.js
   - jstests/core/commands_with_uuid.js
+  - jstests/core/dbcase.js
+  - jstests/core/dbcase2.js
   - jstests/core/explain_execution_error.js
   - jstests/core/expr.js
   - jstests/core/find9.js
@@ -300,6 +302,17 @@ selector:
 
   # TODO SERVER-31245: Inserts to "system.indexes" bypass the check for retryability.
   - jstests/core/batch_write_command_insert.js
+
+  # Does not support tojson of command objects.
+  - jstests/core/SERVER-23626.js
+
+  # Reads from system.views.
+  - jstests/core/views/views_drop.js
+
+  # Examines _id of upserted document.
+  - jstests/core/find_and_modify_server7660.js
+  - jstests/core/upsert_shell.js
+
   exclude_with_any_tags:
   ##
   # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js
@@ -349,8 +362,7 @@ executor:
     shell_options:
       eval: >-
         var testingReplication = true;
-        load("jstests/libs/txns/txn_override.js");
-        load("jstests/libs/override_methods/auto_retry_on_network_error.js");
+        load('jstests/libs/override_methods/network_error_and_txn_override.js');
         db = connect(TestData.connectionString);
         load("jstests/libs/override_methods/enable_sessions.js");
         load("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
@@ -358,6 +370,9 @@ executor:
       global_vars:
         TestData:
           logRetryAttempts: true
+          networkErrorAndTxnOverrideConfig:
+            retryOnNetworkErrors: true
+            wrapCRUDinTransactions: true
           overrideRetryAttempts: 3
           sessionOptions:
             # Read your own writes is not guaranteed without causal consistency if all nodes are

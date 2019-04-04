@@ -1,31 +1,29 @@
 /**
- * Verifies the txn_override passthrough behaves correctly. txn_override groups sequential CRUD
- * commands into transactions and commits them when a DDL command arrives. When used with
- * auto_retry_on_network_error, it retries transactions on network errors. This tests that errors
- * are surfaced correctly and retried correctly in various error cases.
+ * Verifies the network_error_and_txn_override passthrough behaves correctly.
+ * network_error_and_txn_override groups sequential CRUD commands into transactions and commits them
+ * when a DDL command arrives. When used with auto_retry_on_network_error, it retries transactions
+ * on network errors. This tests that errors are surfaced correctly and retried correctly in various
+ * error cases.
  *
- * Commands are set to fail in two ways:
- *     1. 'failCommand' failpoint
- *        Commands that fail with this failpoint generally fail before running the command, with the
- *        exception of WriteConcernErrors which occur after the command has run. This also allows us
- *        to close the connection on the server and simulate network errors.
+ * Commands are set to fail in two ways: 1. 'failCommand' failpoint Commands that fail with this
+ * failpoint generally fail before running the command, with the exception of WriteConcernErrors
+ * which occur after the command has run. This also allows us to close the connection on the server
+ * and simulate network errors.
  *
- *     2. 'runCommand' override
- *        This completely mocks out responses from the server without running a command at all. This
- *        is mainly used for generating a WriteConcernError without running the command at all,
- *        simulating a WriteConcernError on a command that later gets rolled back.
+ *     2. 'runCommand' override This completely mocks out responses from the server without running
+ *     a command at all. This is mainly used for generating a WriteConcernError without running the
+ *     command at all, simulating a WriteConcernError on a command that later gets rolled back.
  *
- * The test also makes use of "post-command functions" for injecting functionality at times when
- * the test is not given control. Since txn_override.js may run multiple commands when instructed to
- * run a single command (for retries for example), it is important to be able to run functions in
- * between those extra commands. To do so, we add a hook through the 'runCommand' override that runs
- * a given function after a specific command.
+ * The test also makes use of "post-command functions" for injecting functionality at times when the
+ * test is not given control. Since network_error_and_txn_override.js may run multiple commands when
+ * instructed to run a single command (for retries for example), it is important to be able to run
+ * functions in between those extra commands. To do so, we add a hook through the 'runCommand'
+ * override that runs a given function after a specific command.
  *
- * TODO(SERVER-38937): Many of these tests assert that a command fails but do not care with which
- * code. This is intentional since it doesn't really matter how the test fails as long as it fails
- * and this allows us to keep more tests running now. That said, these should ideally all throw so
- * we do not rely on the test itself calling assert.commandWorked. In SERVER-38937 we should
- * convert all assert.commandFailed assertions to assert.throws.
+ * Many of these tests assert that a command fails but do not care with which code. This is
+ * intentional since it doesn't really matter how the test fails as long as it fails and this allows
+ * us to keep more tests running now. That said, these should ideally all throw so we do not rely on
+ * the test itself calling assert.commandWorked.
  *
  * @tags: [requires_replication, uses_transactions]
  */
@@ -130,8 +128,11 @@
 
         if (postCommandFuncs[cmdName]) {
             jsTestLog("Running post-command function for " + cmdName);
-            postCommandFuncs[cmdName]();
-            clearPostCommandFunc(cmdName);
+            try {
+                postCommandFuncs[cmdName]();
+            } finally {
+                clearPostCommandFunc(cmdName);
+            }
         }
     }
 
@@ -178,14 +179,9 @@
     rst.startSet();
     rst.initiate();
     const conn = rst.getPrimary();
-    const testDB = conn.getDB(dbName);
-    testDB.setLogLevel(2, 'command');
-
-    const coll1 = testDB[collName1];
-    const coll2 = testDB[collName2];
 
     // We have a separate connection for the failpoint so that it does not break up the transaction
-    // buffered in txn_override.js.
+    // buffered in network_error_and_txn_override.js.
     const failpointConn = new Mongo(conn.host);
 
     /**
@@ -236,36 +232,35 @@
 
     /**
      * Run a 'ping' command that is not allowed in a transaction. This has no effect, but causes
-     * txn_override.js to commit the current transaction in order to run the 'ping'.
+     * network_error_and_txn_override.js to commit the current transaction in order to run the
+     * 'ping'.
      */
     function endCurrentTransactionIfOpen() {
+        print("=-=-=-= Ending current transaction if open");
         assert.commandWorked(testDB.runCommand({ping: 1}));
     }
 
     /**
-     * Aborts the current transaction in txn_override.js.
+     * Aborts the current transaction in network_error_and_txn_override.js.
      */
     function abortCurrentTransaction() {
         const session = testDB.getSession();
-        assert.commandWorked(mongoRunCommandOriginal.apply(testDB.getMongo(), [
-            'admin',
-            {
-              abortTransaction: 1,
-              autocommit: false,
-              lsid: session.getSessionId(),
-              txnNumber: session.getTxnNumber_forTesting()
-            },
-            0
-        ]));
+        const lsid = session.getSessionId();
+        const txnNum = TestData.currentTxnOverrideTxnNumber;
+        print("=-=-=-= Aborting current transaction " + txnNum + " on " + tojsononeline(lsid));
+
+        assert.commandWorked(mongoRunCommandOriginal.apply(
+            testDB.getMongo(),
+            ['admin', {abortTransaction: 1, autocommit: false, lsid: lsid, txnNumber: txnNum}, 0]));
     }
 
     /**
      * Runs a test where a transaction attempts to use a forbidden database name. When running a
-     * CRUD operation on one of these databases, txn_override.js is expected to commit the current
-     * transaction and run the CRUD operation outside of a transaction.
+     * CRUD operation on one of these databases, network_error_and_txn_override.js is expected to
+     * commit the current transaction and run the CRUD operation outside of a transaction.
      */
-    function testBadDBName(badDBName) {
-        const badDB = conn.getDB(badDBName);
+    function testBadDBName(session, badDBName) {
+        const badDB = session.getDatabase(badDBName);
         const badColl = badDB['foo'];
         assert.commandWorked(badDB.createCollection(collName1));
 
@@ -289,7 +284,7 @@
     /**
      * Runs a specific test case, resetting test state before and after.
      */
-    function runTest(testCase) {
+    function runTest(testSuite, testCase) {
         coll1.drop();
         coll2.drop();
 
@@ -297,17 +292,231 @@
         clearAllCommandOverrides();
         stopFailingCommands();
 
-        jsTestLog("Testing " + testCase.name);
+        jsTestLog(testSuite + ": Testing " + testCase.name);
         testCase.test();
-        jsTestLog("Test " + testCase.name + " complete.");
 
         // End the current transaction if the test did not end it itself.
         endCurrentTransactionIfOpen();
+        jsTestLog(testSuite + ": Test " + testCase.name + " complete.");
 
         // Ensure all overrides and failpoints have been turned off after running the test as well.
         clearAllCommandOverrides();
         stopFailingCommands();
     }
+
+    const retryOnNetworkErrorTests = [
+        {
+          name: "update with network error after success",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              attachPostCmdFunction("update", function() {
+                  throw new Error("SocketException");
+              });
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
+          }
+        },
+        {
+          name: "ordinary CRUD ops",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(testDB.runCommand({insert: collName1, documents: [{_id: 2}]}));
+              assert.eq(coll1.find().itcount(), 2);
+          }
+        },
+        {
+          name: "retry on NotMaster",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+          }
+        },
+        {
+          name: "retry on NotMaster ordered",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+              assert.commandFailed(
+                  testDB.runCommand({insert: collName1, documents: [{_id: 2}], ordered: true}));
+          }
+        },
+        {
+          name: "retry on NotMaster with object change",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+              let obj1 = {_id: 1, x: 5};
+              let obj2 = {_id: 2, x: 5};
+              assert.commandWorked(coll1.insert(obj1));
+              assert.commandWorked(coll1.insert(obj2));
+              assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 5}]);
+              obj1.x = 7;
+              assert.commandWorked(coll1.update({_id: 2}, {$set: {x: 8}}));
+              assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 8}]);
+          }
+        },
+        {
+          name: "implicit collection creation with stepdown",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll2.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.eq(coll2.find().itcount(), 1);
+          }
+        },
+        {
+          name: "implicit collection creation with WriteConcernError",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(
+                  ["insert"],
+                  {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll2.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.eq(coll2.find().itcount(), 1);
+          }
+        },
+        {
+          name: "implicit collection creation with WriteConcernError and normal stepdown error",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithErrorAndWCENoRun(
+                  "insert", ErrorCodes.NotMaster, "NotMaster", ErrorCodes.NotMaster, "NotMaster");
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll2.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.eq(coll2.find().itcount(), 1);
+          }
+        },
+        {
+          name: "implicit collection creation with WriteConcernError and normal ordinary error",
+          test: function() {
+              failCommandWithErrorAndWCENoRun("insert",
+                                              ErrorCodes.OperationFailed,
+                                              "OperationFailed",
+                                              ErrorCodes.NotMaster,
+                                              "NotMaster");
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll2.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.eq(coll2.find().itcount(), 1);
+          }
+        },
+        {
+          name: "implicit collection creation with ordinary error",
+          test: function() {
+              failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.OperationFailed});
+              assert.commandFailed(coll1.insert({_id: 1}));
+          }
+        },
+        {
+          name: "implicit collection creation with network error",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["insert"], {closeConnection: true});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll2.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.eq(coll2.find().itcount(), 1);
+          }
+        },
+        {
+          name: "implicit collection creation with WriteConcernError no success",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithWCENoRun("insert", ErrorCodes.NotMaster, "NotMaster");
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll2.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.eq(coll2.find().itcount(), 1);
+          }
+        },
+        {
+          name: "update with stepdown",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
+          }
+        },
+        {
+          name: "update with ordinary error",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.OperationFailed});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+              assert.commandFailed(coll1.update({_id: 1}, {$inc: {x: 1}}));
+          }
+        },
+        {
+          name: "update with network error",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"], {closeConnection: true});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
+          }
+        },
+        {
+          name: "update with two stepdown errors",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"],
+                                       {errorCode: ErrorCodes.NotMaster, mode: {times: 2}});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {y: 1}}));
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1, y: 1}]);
+          }
+        },
+        {
+          name: "update with chained stepdown errors",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+              // Chain multiple update errors together.
+              attachPostCmdFunction("update", function() {
+                  failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+              });
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {y: 1}}));
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1, y: 1}]);
+          }
+        },
+        {
+          name: "commands not run in transactions",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.commandFailedWithCode(coll1.insert({_id: 1}), ErrorCodes.DuplicateKey);
+
+              // If this were run in a transaction, the original insert and the duplicate one would
+              // both be storage-rolled-back and the count would be 0. We test that the count is 1
+              // to prove that the inserts are not in a transaction.
+              assert.eq(coll1.find().itcount(), 1);
+          }
+        },
+    ];
 
     // These tests only retry on TransientTransactionErrors. All other errors are expected to cause
     // the test to fail. Failpoints, overrides, and post-command functions are set by default to
@@ -326,9 +535,104 @@
           }
         },
         {
+          name: "getMore in transaction",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll1.insert({_id: 2}));
+              assert.eq(coll1.find().itcount(), 2);
+
+              let cmdRes = assert.commandWorked(testDB.runCommand({find: collName1, batchSize: 1}));
+              const cursorId = cmdRes.cursor.id;
+              assert.gt(cursorId, NumberLong(0));
+              assert.eq(cmdRes.cursor.ns, coll1.getFullName());
+              assert.eq(cmdRes.cursor.firstBatch.length, 1);
+
+              cmdRes = assert.commandWorked(
+                  testDB.runCommand({getMore: cursorId, collection: collName1}));
+              assert.eq(cmdRes.cursor.id, NumberLong(0));
+              assert.eq(cmdRes.cursor.ns, coll1.getFullName());
+              assert.eq(cmdRes.cursor.nextBatch.length, 1);
+
+              endCurrentTransactionIfOpen();
+              assert.eq(coll1.find().itcount(), 2);
+          }
+        },
+        {
+          name: "getMore starts transaction",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll1.insert({_id: 2}));
+              assert.eq(coll1.find().itcount(), 2);
+              assert.eq(coll2.find().itcount(), 0);
+
+              let cmdRes = assert.commandWorked(testDB.runCommand({find: collName1, batchSize: 1}));
+              const cursorId = cmdRes.cursor.id;
+              assert.gt(cursorId, NumberLong(0));
+              assert.eq(cmdRes.cursor.ns, coll1.getFullName());
+              assert.eq(cmdRes.cursor.firstBatch.length, 1);
+
+              assert.commandWorked(testDB.createCollection(collName2));
+
+              assert.throws(() => testDB.runCommand({getMore: cursorId, collection: collName1}));
+          }
+        },
+        {
+          name: "getMore in different transaction",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll1.insert({_id: 2}));
+              assert.eq(coll1.find().itcount(), 2);
+              assert.eq(coll2.find().itcount(), 0);
+
+              let cmdRes = assert.commandWorked(testDB.runCommand({find: collName1, batchSize: 1}));
+              const cursorId = cmdRes.cursor.id;
+              assert.gt(cursorId, NumberLong(0));
+              assert.eq(cmdRes.cursor.ns, coll1.getFullName());
+              assert.eq(cmdRes.cursor.firstBatch.length, 1);
+
+              assert.commandWorked(coll2.insert({_id: 3}));
+              assert.eq(coll1.find().itcount(), 2);
+              assert.eq(coll2.find().itcount(), 1);
+
+              assert.commandWorked(coll2.insert({_id: 4}));
+
+              assert.commandFailed(testDB.runCommand({getMore: cursorId, collection: collName1}));
+          }
+        },
+        {
+          name: "getMore after TransientTransactionError",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll1.insert({_id: 2}));
+              assert.eq(coll1.find().itcount(), 2);
+              failCommandWithFailPoint(["find"], {errorCode: ErrorCodes.NoSuchTransaction});
+
+              let cmdRes = assert.commandWorked(testDB.runCommand({find: collName1, batchSize: 1}));
+              const cursorId = cmdRes.cursor.id;
+              assert.gt(cursorId, NumberLong(0));
+              assert.eq(cmdRes.cursor.ns, coll1.getFullName());
+              assert.eq(cmdRes.cursor.firstBatch.length, 1);
+
+              cmdRes = assert.commandWorked(
+                  testDB.runCommand({getMore: cursorId, collection: collName1}));
+              assert.eq(cmdRes.cursor.id, NumberLong(0));
+              assert.eq(cmdRes.cursor.ns, coll1.getFullName());
+              assert.eq(cmdRes.cursor.nextBatch.length, 1);
+              assert.eq(coll1.find().itcount(), 2);
+
+              endCurrentTransactionIfOpen();
+              assert.eq(coll1.find().itcount(), 2);
+          }
+        },
+        {
           name: "implicit collection creation",
           test: function() {
-              assert.commandWorked(coll1.insert({_id: 1}));
+              const res = assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(1, res.nInserted);
               assert.eq(coll1.find().itcount(), 1);
 
               endCurrentTransactionIfOpen();
@@ -338,9 +642,11 @@
         {
           name: "errors cause transaction to abort",
           test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().itcount(), 1);
               assert.commandFailedWithCode(coll1.insert({_id: 1}), ErrorCodes.DuplicateKey);
+
               assert.eq(coll1.find().itcount(), 0);
           }
         },
@@ -351,7 +657,7 @@
               failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
 
               endCurrentTransactionIfOpen();
@@ -365,7 +671,7 @@
               failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.OperationFailed});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandFailed(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandFailed(coll1.update({_id: 1}, {$inc: {x: 1}}));
           }
         },
         {
@@ -375,7 +681,7 @@
               failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NoSuchTransaction});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
 
               endCurrentTransactionIfOpen();
@@ -389,10 +695,7 @@
               failCommandWithFailPoint(["update"], {closeConnection: true});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.throws(() => coll1.update({_id: 1}, {$set: {x: 1}}));
-
-              endCurrentTransactionIfOpen();
-              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+              assert.throws(() => coll1.update({_id: 1}, {$inc: {x: 1}}));
           }
         },
         {
@@ -403,9 +706,9 @@
                                        {errorCode: ErrorCodes.NotMaster, mode: {times: 2}});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {y: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {y: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1, y: 1}]);
 
               endCurrentTransactionIfOpen();
@@ -423,23 +726,22 @@
               });
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {y: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {y: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1, y: 1}]);
 
               endCurrentTransactionIfOpen();
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1, y: 1}]);
           }
         },
-        // TODO(SERVER-38937): this command should fail.
-        // {
-        //   name: "implicit collection creation with stepdown",
-        //   test: function() {
-        //       failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.NotMaster});
-        //       assert.commandFailed(coll1.insert({_id: 1}));
-        //   }
-        // },
+        {
+          name: "implicit collection creation with stepdown",
+          test: function() {
+              failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.NotMaster});
+              assert.throws(() => coll1.insert({_id: 1}));
+          }
+        },
         {
           name: "implicit collection creation with WriteConcernError",
           test: function() {
@@ -449,16 +751,14 @@
               assert.throws(() => coll1.insert({_id: 1}));
           }
         },
-        // TODO(SERVER-38937): this command should fail.
-        // {
-        //   name: "implicit collection creation with WriteConcernError and normal stepdown error",
-        //   test: function() {
-        //       failCommandWithErrorAndWCENoRun(
-        //           "create", ErrorCodes.NotMaster, "NotMaster", ErrorCodes.NotMaster,
-        //           "NotMaster");
-        //       assert.commandFailed(coll1.insert({_id: 1}));
-        //   }
-        // },
+        {
+          name: "implicit collection creation with WriteConcernError and normal stepdown error",
+          test: function() {
+              failCommandWithErrorAndWCENoRun(
+                  "create", ErrorCodes.NotMaster, "NotMaster", ErrorCodes.NotMaster, "NotMaster");
+              assert.throws(() => coll1.insert({_id: 1}));
+          }
+        },
         {
           name: "implicit collection creation with WriteConcernError and normal ordinary error",
           test: function() {
@@ -467,14 +767,14 @@
                                               "OperationFailed",
                                               ErrorCodes.NotMaster,
                                               "NotMaster");
-              assert.commandFailed(coll1.insert({_id: 1}));
+              assert.throws(() => coll1.insert({_id: 1}));
           }
         },
         {
           name: "implicit collection creation with ordinary error",
           test: function() {
               failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.OperationFailed});
-              assert.commandFailed(coll1.insert({_id: 1}));
+              assert.throws(() => coll1.insert({_id: 1}));
           }
         },
         {
@@ -494,11 +794,13 @@
         {
           name: "errors cause the override to abort transactions",
           test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().itcount(), 1);
 
               failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.BadValue});
               assert.commandFailedWithCode(coll1.insert({_id: 2}), ErrorCodes.BadValue);
+
               stopFailingCommands();
               assert.eq(coll1.find().itcount(), 0);
 
@@ -512,55 +814,57 @@
         {
           name: "commit transaction with stepdown",
           test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
               failCommandWithFailPoint(["commitTransaction"], {errorCode: ErrorCodes.NotMaster});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().itcount(), 1);
               assert.throws(() => endCurrentTransactionIfOpen());
           }
         },
-        // TODO(SERVER-38937): this command should throw.
-        // {
-        //   name: "commit transaction with WriteConcernError",
-        //   test: function() {
-        //       failCommandWithFailPoint(
-        //           ["commitTransaction"],
-        //           {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
-        //       assert.commandWorked(coll1.insert({_id: 1}));
-        //       assert.eq(coll1.find().itcount(), 1);
-        //       assert.throws(() => endCurrentTransactionIfOpen());
-        //   }
-        // },
-        // TODO(SERVER-38937): this command should throw.
-        // {
-        //   name: "commit transaction with WriteConcernError and normal stepdown error",
-        //   test: function() {
-        //       failCommandWithErrorAndWCENoRun("commitTransaction",
-        //                                           ErrorCodes.NotMaster,
-        //                                           "NotMaster",
-        //                                           ErrorCodes.NotMaster,
-        //                                           "NotMaster");
-        //       assert.commandWorked(coll1.insert({_id: 1}));
-        //       assert.eq(coll1.find().itcount(), 1);
-        //       assert.throws(() => endCurrentTransactionIfOpen());
-        //   }
-        // },
-        // TODO(SERVER-38937): this command should throw.
-        // {
-        //   name: "commit transaction with WriteConcernError and normal ordinary error",
-        //   test: function() {
-        //       failCommandWithErrorAndWCENoRun("commitTransaction",
-        //                                           ErrorCodes.OperationFailed,
-        //                                           "OperationFailed",
-        //                                           ErrorCodes.NotMaster,
-        //                                           "NotMaster");
-        //       assert.commandWorked(coll1.insert({_id: 1}));
-        //       assert.eq(coll1.find().itcount(), 1);
-        //       assert.throws(() => endCurrentTransactionIfOpen());
-        //   }
-        // },
+        {
+          name: "commit transaction with WriteConcernError",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(
+                  ["commitTransaction"],
+                  {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.throws(() => endCurrentTransactionIfOpen());
+          }
+        },
+        {
+          name: "commit transaction with WriteConcernError and normal stepdown error",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithErrorAndWCENoRun("commitTransaction",
+                                              ErrorCodes.NotMaster,
+                                              "NotMaster",
+                                              ErrorCodes.NotMaster,
+                                              "NotMaster");
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.throws(() => endCurrentTransactionIfOpen());
+          }
+        },
+        {
+          name: "commit transaction with WriteConcernError and normal ordinary error",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithErrorAndWCENoRun("commitTransaction",
+                                              ErrorCodes.OperationFailed,
+                                              "OperationFailed",
+                                              ErrorCodes.NotMaster,
+                                              "NotMaster");
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.throws(() => endCurrentTransactionIfOpen());
+          }
+        },
         {
           name: "commit transaction with ordinary error",
           test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
               failCommandWithFailPoint(["commitTransaction"],
                                        {errorCode: ErrorCodes.OperationFailed});
               assert.commandWorked(coll1.insert({_id: 1}));
@@ -568,23 +872,24 @@
               assert.throws(() => endCurrentTransactionIfOpen());
           }
         },
-        // TODO(SERVER-38937): this command should throw.
-        // {
-        //   name: "commit transaction with WriteConcernError and normal NoSuchTransaction error",
-        //   test: function() {
-        //       failCommandWithErrorAndWCENoRun("commitTransaction",
-        //                                           ErrorCodes.NoSuchTransaction,
-        //                                           "NoSuchTransaction",
-        //                                           ErrorCodes.NotMaster,
-        //                                           "NotMaster");
-        //       assert.commandWorked(coll1.insert({_id: 1}));
-        //       assert.eq(coll1.find().itcount(), 1);
-        //       assert.throws(() => endCurrentTransactionIfOpen());
-        //   }
-        // },
+        {
+          name: "commit transaction with WriteConcernError and normal NoSuchTransaction error",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithErrorAndWCENoRun("commitTransaction",
+                                              ErrorCodes.NoSuchTransaction,
+                                              "NoSuchTransaction",
+                                              ErrorCodes.NotMaster,
+                                              "NotMaster");
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.throws(() => endCurrentTransactionIfOpen());
+          }
+        },
         {
           name: "commit transaction with NoSuchTransaction error",
           test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
               failCommandWithFailPoint(["commitTransaction"],
                                        {errorCode: ErrorCodes.NoSuchTransaction});
               assert.commandWorked(coll1.insert({_id: 1}));
@@ -597,39 +902,39 @@
         {
           name: "commit transaction with network error",
           test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
               failCommandWithFailPoint(["commitTransaction"], {closeConnection: true});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().itcount(), 1);
               assert.throws(() => endCurrentTransactionIfOpen());
           }
         },
-        // TODO(SERVER-38937): this command should throw.
-        // {
-        //   name: "commit transaction with WriteConcernError no success",
-        //   test: function() {
-        //       failCommandWithWCENoRun(
-        //           "commitTransaction", ErrorCodes.NotMaster, "NotMaster");
-        //       assert.commandWorked(coll1.insert({_id: 1}));
-        //       assert.eq(coll1.find().itcount(), 1);
-        //       assert.throws(() => endCurrentTransactionIfOpen());
-        //   }
-        // },
+        {
+          name: "commit transaction with WriteConcernError no success",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster, "NotMaster");
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.throws(() => endCurrentTransactionIfOpen());
+          }
+        },
         {
           name: "commands in 'admin' database end transaction",
           test: function() {
-              testBadDBName('admin');
+              testBadDBName(session, 'admin');
           }
         },
         {
           name: "commands in 'config' database end transaction",
           test: function() {
-              testBadDBName('config');
+              testBadDBName(session, 'config');
           }
         },
         {
           name: "commands in 'local' database end transaction",
           test: function() {
-              testBadDBName('local');
+              testBadDBName(session, 'local');
           }
         },
     ];
@@ -637,6 +942,49 @@
     // Failpoints, overrides, and post-command functions are set by default to only run once, so
     // commands should succeed on retry.
     const txnOverridePlusRetryOnNetworkErrorTests = [
+        {
+          name: "$where in jstests/core/js4.js",
+          test: function() {
+              const real = {a: 1, b: "abc", c: /abc/i, d: new Date(111911100111), e: null, f: true};
+              assert.commandWorked(coll1.insert(real));
+
+              failCommandWithErrorAndWCENoRun("drop",
+                                              ErrorCodes.NamespaceNotFound,
+                                              "NamespaceNotFound",
+                                              ErrorCodes.NotMaster,
+                                              "NotMaster");
+              coll1.drop();
+              failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+
+              assert.commandWorked(coll1.insert({a: 2, b: {c: 7, d: "d is good"}}));
+              const cursor = coll1.find({
+                  $where: function() {
+                      assert.eq(3, Object.keySet(obj).length);
+                      assert.eq(2, obj.a);
+                      assert.eq(7, obj.b.c);
+                      assert.eq("d is good", obj.b.d);
+                      return true;
+                  }
+              });
+              assert.eq(1, cursor.toArray().length);
+          }
+        },
+        {
+          name: "update with network error after success",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              attachPostCmdFunction("update", function() {
+                  throw new Error("SocketException");
+              });
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.eq(coll1.find().toArray(), [{_id: 1}]);
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
+
+              endCurrentTransactionIfOpen();
+              assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
+          }
+        },
         {
           name: "retry on NotMaster",
           test: function() {
@@ -649,25 +997,24 @@
               assert.eq(coll1.find().itcount(), 1);
           }
         },
-        // TODO(SERVER-38937): this test should pass.
-        // {
-        //   name: "retry on NotMaster with object change",
-        //   test: function() {
-        //       assert.commandWorked(testDB.createCollection(collName1));
-        //       failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
-        //       let obj1 = {_id: 1, x: 5};
-        //       let obj2 = {_id: 2, x: 5};
-        //       assert.commandWorked(coll1.insert(obj1));
-        //       assert.commandWorked(coll1.insert(obj2));
-        //       assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 5}]);
-        //       obj1.x = 7
-        //       assert.commandWorked(coll1.update({_id: 2}, {$set: {x: 8}}));
-        //       assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 8}]);
-        //
-        //       endCurrentTransactionIfOpen();
-        //       assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 8}]);
-        //   }
-        // },
+        {
+          name: "retry on NotMaster with object change",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+              let obj1 = {_id: 1, x: 5};
+              let obj2 = {_id: 2, x: 5};
+              assert.commandWorked(coll1.insert(obj1));
+              assert.commandWorked(coll1.insert(obj2));
+              assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 5}]);
+              obj1.x = 7;
+              assert.commandWorked(coll1.update({_id: 2}, {$set: {x: 8}}));
+              assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 8}]);
+
+              endCurrentTransactionIfOpen();
+              assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 8}]);
+          }
+        },
         {
           name: "implicit collection creation with stepdown",
           test: function() {
@@ -724,14 +1071,14 @@
                                               "OperationFailed",
                                               ErrorCodes.NotMaster,
                                               "NotMaster");
-              assert.commandFailed(coll1.insert({_id: 1}));
+              assert.throws(() => coll1.insert({_id: 1}));
           }
         },
         {
           name: "implicit collection creation with ordinary error",
           test: function() {
               failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.OperationFailed});
-              assert.commandFailed(coll1.insert({_id: 1}));
+              assert.throws(() => coll1.insert({_id: 1}));
           }
         },
         {
@@ -771,7 +1118,7 @@
               failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
 
               endCurrentTransactionIfOpen();
@@ -785,7 +1132,7 @@
               failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.OperationFailed});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandFailed(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandFailed(coll1.update({_id: 1}, {$inc: {x: 1}}));
           }
         },
         {
@@ -795,7 +1142,7 @@
               failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NoSuchTransaction});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
 
               endCurrentTransactionIfOpen();
@@ -809,7 +1156,7 @@
               failCommandWithFailPoint(["update"], {closeConnection: true});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
 
               endCurrentTransactionIfOpen();
@@ -824,9 +1171,9 @@
                                        {errorCode: ErrorCodes.NotMaster, mode: {times: 2}});
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {y: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {y: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1, y: 1}]);
 
               endCurrentTransactionIfOpen();
@@ -844,9 +1191,9 @@
               });
               assert.commandWorked(coll1.insert({_id: 1}));
               assert.eq(coll1.find().toArray(), [{_id: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {x: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1}]);
-              assert.commandWorked(coll1.update({_id: 1}, {$set: {y: 1}}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {y: 1}}));
               assert.eq(coll1.find().toArray(), [{_id: 1, x: 1, y: 1}]);
 
               endCurrentTransactionIfOpen();
@@ -907,6 +1254,7 @@
         {
           name: "commit transaction with WriteConcernError and normal ordinary error",
           test: function() {
+              // We retry on write concern errors and this doesn't return OperationFailed again.
               failCommandWithErrorAndWCENoRun("commitTransaction",
                                               ErrorCodes.OperationFailed,
                                               "OperationFailed",
@@ -917,10 +1265,30 @@
               assert.eq(coll1.find().itcount(), 1);
               assert.eq(coll2.find().itcount(), 1);
 
-              // 'commitTransaction' only fails the first time and is retried due to the WCE.
               endCurrentTransactionIfOpen();
               assert.eq(coll1.find().itcount(), 1);
               assert.eq(coll2.find().itcount(), 1);
+          }
+        },
+        {
+          name: "commit transaction with WriteConcernError and normal ordinary error twice",
+          test: function() {
+              failCommandWithErrorAndWCENoRun("commitTransaction",
+                                              ErrorCodes.OperationFailed,
+                                              "OperationFailed",
+                                              ErrorCodes.NotMaster,
+                                              "NotMaster");
+              // After commitTransaction fails, fail it again with just the ordinary error.
+              attachPostCmdFunction("commitTransaction", function() {
+                  failCommandWithFailPoint(["commitTransaction"],
+                                           {errorCode: ErrorCodes.OperationFailed});
+              });
+              assert.commandWorked(coll1.insert({_id: 1}));
+              assert.commandWorked(coll2.insert({_id: 1}));
+              assert.eq(coll1.find().itcount(), 1);
+              assert.eq(coll2.find().itcount(), 1);
+
+              assert.throws(() => endCurrentTransactionIfOpen());
           }
         },
         {
@@ -949,7 +1317,6 @@
               assert.eq(coll1.find().itcount(), 1);
               assert.eq(coll2.find().itcount(), 1);
 
-              // 'commitTransaction' only fails the first time and is retried due to the WCE.
               endCurrentTransactionIfOpen();
               assert.eq(coll1.find().itcount(), 1);
               assert.eq(coll2.find().itcount(), 1);
@@ -1000,43 +1367,79 @@
               assert.eq(coll2.find().itcount(), 1);
           }
         },
-        // TODO(SERVER-38937): fix this test case and uncomment.
-        // {
-        //   name: "commitTransaction fails with SERVER-38856",
-        //   test: function() {
-        //       assert.commandWorked(testDB.createCollection(collName1));
-        //       failCommandWithFailPoint(["create"],
-        //                   {writeConcernError: {code: ErrorCodes.NotMaster, codeName:
-        //                   "NotMaster"}});
-        //
-        //       // After commitTransaction fails, abort the transaction and drop the collection
-        //       // as if the transaction were being retried on a different node.
-        //       attachPostCmdFunction("commitTransaction", function() {
-        //           abortCurrentTransaction();
-        //           assert.commandWorked(mongoRunCommandOriginal.apply(
-        //               testDB.getMongo(), [dbName, {drop: collName2}, 0]));
-        //       });
-        //       failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster,
-        //       "NotMaster");
-        //       assert.commandWorked(coll1.insert({_id: 1, x: 2}));
-        //       assert.commandWorked(coll2.insert({_id: 2}));
-        //       assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 4}}));
-        //
-        //       endCurrentTransactionIfOpen();
-        //
-        //       assert.docEq(coll1.find().toArray(), [{_id: 1, x: 6}]);
-        //       assert.docEq(coll2.find().toArray(), [{_id: 2}]);
-        //   }
-        // },
+        {
+          name: "commitTransaction fails with SERVER-38856",
+          test: function() {
+              assert.commandWorked(testDB.createCollection(collName1));
+              failCommandWithFailPoint(
+                  ["create"],
+                  {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+
+              // After commitTransaction fails, abort the transaction and drop the collection
+              // as if the transaction were being retried on a different node.
+              attachPostCmdFunction("commitTransaction", function() {
+                  abortCurrentTransaction();
+                  assert.commandWorked(mongoRunCommandOriginal.apply(
+                      testDB.getMongo(), [dbName, {drop: collName2}, 0]));
+              });
+              failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster, "NotMaster");
+              assert.commandWorked(coll1.insert({_id: 1, x: 2}));
+              assert.commandWorked(coll2.insert({_id: 2}));
+              assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 4}}));
+
+              endCurrentTransactionIfOpen();
+
+              assert.docEq(coll1.find().toArray(), [{_id: 1, x: 6}]);
+              assert.docEq(coll2.find().toArray(), [{_id: 2}]);
+          }
+        },
     ];
 
-    jsTestLog("=-=-=-=-=-= Testing with 'txn override' by itself. =-=-=-=-=-=");
-    load("jstests/libs/txns/txn_override.js");
-    txnOverrideTests.forEach(runTest);
+    TestData.networkErrorAndTxnOverrideConfig = {};
+    TestData.sessionOptions = new SessionOptions();
+    TestData.overrideRetryAttempts = 3;
 
-    jsTestLog("=-=-=-=-=-= Testing with 'auto retry on network error'. =-=-=-=-=-=");
-    load("jstests/libs/override_methods/auto_retry_on_network_error.js");
-    txnOverridePlusRetryOnNetworkErrorTests.forEach(runTest);
+    let session = conn.startSession(TestData.sessionOptions);
+    let testDB = session.getDatabase(dbName);
+
+    load("jstests/libs/override_methods/network_error_and_txn_override.js");
+
+    jsTestLog("=-=-=-=-=-= Testing with 'retry on network error' by itself. =-=-=-=-=-=");
+    TestData.sessionOptions = new SessionOptions({retryWrites: true});
+    TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = true;
+    TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = false;
+
+    session = conn.startSession(TestData.sessionOptions);
+    testDB = session.getDatabase(dbName);
+    let coll1 = testDB[collName1];
+    let coll2 = testDB[collName2];
+
+    retryOnNetworkErrorTests.forEach((testCase) => runTest("retryOnNetworkErrorTests", testCase));
+
+    jsTestLog("=-=-=-=-=-= Testing with 'txn override' by itself. =-=-=-=-=-=");
+    TestData.sessionOptions = new SessionOptions({retryWrites: false});
+    TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = false;
+    TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = true;
+
+    session = conn.startSession(TestData.sessionOptions);
+    testDB = session.getDatabase(dbName);
+    coll1 = testDB[collName1];
+    coll2 = testDB[collName2];
+
+    txnOverrideTests.forEach((testCase) => runTest("txnOverrideTests", testCase));
+
+    jsTestLog("=-=-=-=-=-= Testing 'both txn override and retry on network error'. =-=-=-=-=-=");
+    TestData.sessionOptions = new SessionOptions({retryWrites: true});
+    TestData.networkErrorAndTxnOverrideConfig.retryOnNetworkErrors = true;
+    TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions = true;
+
+    session = conn.startSession(TestData.sessionOptions);
+    testDB = session.getDatabase(dbName);
+    coll1 = testDB[collName1];
+    coll2 = testDB[collName2];
+
+    txnOverridePlusRetryOnNetworkErrorTests.forEach(
+        (testCase) => runTest("txnOverridePlusRetryOnNetworkErrorTests", testCase));
 
     rst.stopSet();
 })();

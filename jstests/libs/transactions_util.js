@@ -58,7 +58,32 @@ var TransactionsUtil = (function() {
         return false;
     }
 
+    // Make a deep copy of an object for retrying transactions. We make deep copies of object and
+    // array literals but not custom types like DB and DBCollection because they could have been
+    // modified before a transaction aborts. This function is adapted from the implementation of
+    // Object.extend() in src/mongo/shell/types.js.
+    function deepCopyObject(dst, src) {
+        for (var k in src) {
+            var v = src[k];
+            if (typeof(v) == "object" && v !== null) {
+                if (v.constructor === ObjectId) {  // convert ObjectId properly
+                    eval("v = " + tojson(v));
+                } else if (v instanceof NumberLong) {  // convert NumberLong properly
+                    eval("v = " + tojson(v));
+                } else if (Object.getPrototypeOf(v) === Object.prototype) {
+                    v = deepCopyObject({}, v);
+                } else if (Array.isArray(v)) {
+                    v = deepCopyObject([], v);
+                }
+            }
+            var desc = Object.getOwnPropertyDescriptor(src, k);
+            desc.value = v;
+            Object.defineProperty(dst, k, desc);
+        }
+        return dst;
+    }
+
     return {
-        commandSupportsTxn, commandTypeCanSupportTxn,
+        commandSupportsTxn, commandTypeCanSupportTxn, deepCopyObject,
     };
 })();

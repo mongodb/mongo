@@ -705,7 +705,7 @@ DBCollection.prototype.findAndModify = function(args) {
 
         const session = this.getDB().getSession();
         if (serverSupportsRetryableWrites && session.getOptions().shouldRetryWrites() &&
-            session._serverSession.canRetryWrites(cmd)) {
+            _ServerSession.canRetryWrites(cmd)) {
             cmd = session._serverSession.assignTransactionNumber(cmd);
         }
     }

@@ -337,8 +337,8 @@ jsTestOptions = function() {
             disableImplicitSessions: TestData.disableImplicitSessions || false,
             setSkipShardingPartsOfPrepareTransactionFailpoint:
                 TestData.setSkipShardingPartsOfPrepareTransactionFailpoint || false,
-            retryingOnNetworkError: TestData.retryingOnNetworkError,
             roleGraphInvalidationIsFatal: TestData.roleGraphInvalidationIsFatal || false,
+            networkErrorAndTxnOverrideConfig: TestData.networkErrorAndTxnOverrideConfig || {},
         });
     }
     return _jsTestOptions;

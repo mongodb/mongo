@@ -120,7 +120,7 @@ executor:
     shell_options:
       eval: >-
         testingReplication = true;
-        load("jstests/libs/override_methods/auto_retry_on_network_error.js");
+        load('jstests/libs/override_methods/network_error_and_txn_override.js');
         db = connect(TestData.connectionString);
         load("jstests/libs/override_methods/enable_sessions.js");
         load("jstests/libs/override_methods/set_read_and_write_concerns.js");
@@ -129,6 +129,8 @@ executor:
           alwaysInjectTransactionNumber: true
           defaultReadConcernLevel: "majority"
           logRetryAttempts: true
+          networkErrorAndTxnOverrideConfig:
+            retryOnNetworkErrors: true
           overrideRetryAttempts: 3
           sessionOptions:
             readConcern:

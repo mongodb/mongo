@@ -1,5 +1,5 @@
-// Sanity test for the override logic in txn_override.js. We use the profiler to check that
-// operation is not visible immediately, but is visible after the transaction commits.
+// Sanity test for the override logic in network_error_and_txn_override.js. We use the profiler to
+// check that operation is not visible immediately, but is visible after the transaction commits.
 
 (function() {
     'use strict';

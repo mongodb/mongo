@@ -13,7 +13,8 @@
         return;
     }
 
-    load("jstests/libs/override_methods/auto_retry_on_network_error.js");
+    TestData.networkErrorAndTxnOverrideConfig = {retryOnNetworkErrors: true};
+    load('jstests/libs/override_methods/network_error_and_txn_override.js');
     load("jstests/replsets/rslib.js");
 
     function getThreadName(db) {

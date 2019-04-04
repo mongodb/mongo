@@ -109,8 +109,9 @@
                 commandObjUnwrapped = commandObj;
             }
 
+            let readConcern;
             if (commandObjUnwrapped.hasOwnProperty("readConcern")) {
-                let readConcern = commandObjUnwrapped.readConcern;
+                readConcern = commandObjUnwrapped.readConcern;
 
                 if (typeof readConcern !== "object" || readConcern === null ||
                     (readConcern.hasOwnProperty("level") &&
@@ -118,14 +119,12 @@
                     throw new Error("Cowardly refusing to override read concern of command: " +
                                     tojson(commandObj));
                 }
-
-                // We create a copy of the readConcern object to avoid mutating the parameter the
-                // caller specified.
-                readConcern = Object.assign({}, readConcern, kDefaultReadConcern);
-                commandObjUnwrapped.readConcern = readConcern;
-            } else {
-                commandObjUnwrapped.readConcern = kDefaultReadConcern;
             }
+
+            // We create a copy of the readConcern object to avoid mutating the parameter the
+            // caller specified.
+            readConcern = Object.assign({}, readConcern, kDefaultReadConcern);
+            commandObjUnwrapped.readConcern = readConcern;
         }
 
         if (shouldForceWriteConcern) {
@@ -139,8 +138,9 @@
                 commandObjUnwrapped = commandObj;
             }
 
+            let writeConcern;
             if (commandObjUnwrapped.hasOwnProperty("writeConcern")) {
-                let writeConcern = commandObjUnwrapped.writeConcern;
+                writeConcern = commandObjUnwrapped.writeConcern;
 
                 if (typeof writeConcern !== "object" || writeConcern === null ||
                     (writeConcern.hasOwnProperty("w") &&
@@ -148,14 +148,12 @@
                     throw new Error("Cowardly refusing to override write concern of command: " +
                                     tojson(commandObj));
                 }
-
-                // We create a copy of the writeConcern object to avoid mutating the parameter the
-                // caller specified.
-                writeConcern = Object.assign({}, writeConcern, kDefaultWriteConcern);
-                commandObjUnwrapped.writeConcern = writeConcern;
-            } else {
-                commandObjUnwrapped.writeConcern = kDefaultWriteConcern;
             }
+
+            // We create a copy of the writeConcern object to avoid mutating the parameter the
+            // caller specified.
+            writeConcern = Object.assign({}, writeConcern, kDefaultWriteConcern);
+            commandObjUnwrapped.writeConcern = writeConcern;
         }
 
         return func.apply(conn, makeFuncArgs(commandObj));

@@ -5,7 +5,7 @@
  * https://github.com/mongodb/specifications/blob/master/source/sessions/driver-sessions.rst#abstract
  */
 var {
-    DriverSession, SessionOptions, _DummyDriverSession, _DelegatingDriverSession,
+    DriverSession, SessionOptions, _DummyDriverSession, _DelegatingDriverSession, _ServerSession,
 } = (function() {
     "use strict";
 
@@ -310,7 +310,7 @@ var {
             if (jsTest.options().alwaysInjectTransactionNumber &&
                 serverSupports(kWireVersionSupportingRetryableWrites) &&
                 driverSession.getOptions().shouldRetryWrites() &&
-                driverSession._serverSession.canRetryWrites(cmdObj)) {
+                _ServerSession.canRetryWrites(cmdObj)) {
                 cmdObj = driverSession._serverSession.assignTransactionNumber(cmdObj);
             }
 
@@ -597,83 +597,6 @@ var {
             return cmdObj;
         };
 
-        this.canRetryWrites = function canRetryWrites(cmdObj) {
-            let cmdName = Object.keys(cmdObj)[0];
-
-            // If the command is in a wrapped form, then we look for the actual command name inside
-            // the query/$query object.
-            if (cmdName === "query" || cmdName === "$query") {
-                cmdObj = cmdObj[cmdName];
-                cmdName = Object.keys(cmdObj)[0];
-            }
-
-            if (cmdObj.hasOwnProperty("autocommit")) {
-                return false;
-            }
-
-            if (!isAcknowledged(cmdObj)) {
-                return false;
-            }
-
-            if (cmdName === "insert") {
-                if (!Array.isArray(cmdObj.documents)) {
-                    // The command object is malformed, so we'll just leave it as-is and let the
-                    // server reject it.
-                    return false;
-                }
-
-                // Both single-statement operations (e.g. insertOne()) and multi-statement
-                // operations (e.g. insertMany()) can be retried regardless of whether they are
-                // executed in order by the server.
-                return true;
-            } else if (cmdName === "update") {
-                if (!Array.isArray(cmdObj.updates)) {
-                    // The command object is malformed, so we'll just leave it as-is and let the
-                    // server reject it.
-                    return false;
-                }
-
-                const hasMultiUpdate = cmdObj.updates.some(updateOp => updateOp.multi);
-                if (hasMultiUpdate) {
-                    // Operations that modify multiple documents (e.g. updateMany()) cannot be
-                    // retried.
-                    return false;
-                }
-
-                // Both single-statement operations (e.g. updateOne()) and multi-statement
-                // operations (e.g. bulkWrite()) can be retried regardless of whether they are
-                // executed in order by the server.
-                return true;
-            } else if (cmdName === "delete") {
-                if (!Array.isArray(cmdObj.deletes)) {
-                    // The command object is malformed, so we'll just leave it as-is and let the
-                    // server reject it.
-                    return false;
-                }
-
-                // We use bsonWoCompare() in order to handle cases where the limit is specified as a
-                // NumberInt() or NumberLong() instance.
-                const hasMultiDelete = cmdObj.deletes.some(
-                    deleteOp => bsonWoCompare({_: deleteOp.limit}, {_: 0}) === 0);
-                if (hasMultiDelete) {
-                    // Operations that modify multiple documents (e.g. deleteMany()) cannot be
-                    // retried.
-                    return false;
-                }
-
-                // Both single-statement operations (e.g. deleteOne()) and multi-statement
-                // operations (e.g. bulkWrite()) can be retried regardless of whether they are
-                // executed in order by the server.
-                return true;
-            } else if (cmdName === "findAndModify" || cmdName === "findandmodify") {
-                // Operations that modify a single document (e.g. findOneAndUpdate()) can be
-                // retried.
-                return true;
-            }
-
-            return false;
-        };
-
         this.assignTxnInfo = function assignTxnInfo(cmdObj) {
             // We will want to reset the transaction state to 'inactive' if a normal operation
             // follows a committed or aborted transaction.
@@ -833,6 +756,80 @@ var {
             return res;
         };
     }
+
+    ServerSession.canRetryWrites = function canRetryWrites(cmdObj) {
+        let cmdName = Object.keys(cmdObj)[0];
+
+        // If the command is in a wrapped form, then we look for the actual command name inside the
+        // query/$query object.
+        if (cmdName === "query" || cmdName === "$query") {
+            cmdObj = cmdObj[cmdName];
+            cmdName = Object.keys(cmdObj)[0];
+        }
+
+        if (cmdObj.hasOwnProperty("autocommit")) {
+            return false;
+        }
+
+        if (!isAcknowledged(cmdObj)) {
+            return false;
+        }
+
+        if (cmdName === "insert") {
+            if (!Array.isArray(cmdObj.documents)) {
+                // The command object is malformed, so we'll just leave it as-is and let the server
+                // reject it.
+                return false;
+            }
+
+            // Both single-statement operations (e.g. insertOne()) and multi-statement operations
+            // (e.g. insertMany()) can be retried regardless of whether they are executed in order
+            // by the server.
+            return true;
+        } else if (cmdName === "update") {
+            if (!Array.isArray(cmdObj.updates)) {
+                // The command object is malformed, so we'll just leave it as-is and let the server
+                // reject it.
+                return false;
+            }
+
+            const hasMultiUpdate = cmdObj.updates.some(updateOp => updateOp.multi);
+            if (hasMultiUpdate) {
+                // Operations that modify multiple documents (e.g. updateMany()) cannot be retried.
+                return false;
+            }
+
+            // Both single-statement operations (e.g. updateOne()) and multi-statement operations
+            // (e.g. bulkWrite()) can be retried regardless of whether they are executed in order by
+            // the server.
+            return true;
+        } else if (cmdName === "delete") {
+            if (!Array.isArray(cmdObj.deletes)) {
+                // The command object is malformed, so we'll just leave it as-is and let the server
+                // reject it.
+                return false;
+            }
+
+            // We use bsonWoCompare() in order to handle cases where the limit is specified as a
+            // NumberInt() or NumberLong() instance.
+            const hasMultiDelete =
+                cmdObj.deletes.some(deleteOp => bsonWoCompare({_: deleteOp.limit}, {_: 0}) === 0);
+            if (hasMultiDelete) {
+                // Operations that modify multiple documents (e.g. deleteMany()) cannot be retried.
+                return false;
+            }
+
+            // Both single-statement operations (e.g. deleteOne()) and multi-statement operations
+            // (e.g. bulkWrite()) can be retried regardless of whether they are executed in order by
+            // the server.
+            return true;
+        } else if (cmdName === "findAndModify" || cmdName === "findandmodify") {
+            // Operations that modify a single document (e.g. findOneAndUpdate()) can be retried.
+            return true;
+        }
+
+        return false;
+    };
 
     function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
         var driverSessionConstructor = function(client, options = defaultOptions) {
@@ -1101,5 +1098,6 @@ var {
         SessionOptions: SessionOptions,
         _DummyDriverSession: DummyDriverSession,
         _DelegatingDriverSession: DelegatingDriverSession,
+        _ServerSession: ServerSession,
     };
 })();

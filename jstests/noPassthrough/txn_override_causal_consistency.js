@@ -1,6 +1,6 @@
 /**
- * Verifies the txn_override passthrough respects the causal consistency setting on TestData when
- * starting a transaction.
+ * Verifies the network_error_and_txn_override passthrough respects the causal consistency setting
+ * on TestData when starting a transaction.
  *
  * @tags: [requires_replication, uses_transactions]
  */
@@ -71,6 +71,8 @@
 
         for (let cmd of cmds) {
             if (isCausal) {
+                assert(cmd.hasOwnProperty("$clusterTime"),
+                       "Expected " + tojson(cmd) + " to have a $clusterTime.");
                 assert(cmd.hasOwnProperty("readConcern"),
                        "Expected " + tojson(cmd) + " to have a read concern.");
                 assert(cmd.readConcern.hasOwnProperty("afterClusterTime"),
@@ -124,10 +126,13 @@
     }
 
     // Load the txn_override after creating the spy, so the spy will see commands after being
-    // transformed by the override. Also load auto_retry_on_network_error because several suites use
+    // transformed by the override. Also configure network error retries because several suites use
     // both.
-    load("jstests/libs/txns/txn_override.js");
-    load("jstests/libs/override_methods/auto_retry_on_network_error.js");
+    TestData.networkErrorAndTxnOverrideConfig = {
+        wrapCRUDinTransactions: true,
+        retryOnNetworkErrors: true
+    };
+    load("jstests/libs/override_methods/network_error_and_txn_override.js");
 
     TestData.logRetryAttempts = true;
 
@@ -136,6 +141,7 @@
 
     function runTest() {
         for (let isCausal of[false, true]) {
+            jsTestLog("Testing with isCausal = " + isCausal);
             TestData.sessionOptions = {causalConsistency: isCausal};
 
             // Commands that accept read and write concern allowed in a transaction.

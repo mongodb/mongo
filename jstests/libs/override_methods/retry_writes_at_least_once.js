@@ -13,26 +13,15 @@
 
     const kExtraRetryProbability = 0.2;
 
-    // Store a session to access ServerSession#canRetryWrites.
-    let _serverSession;
-
     const mongoRunCommandOriginal = Mongo.prototype.runCommand;
     const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
     Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
-        if (typeof _serverSession === "undefined") {
-            _serverSession = this.startSession()._serverSession;
-        }
-
         return runWithRetries(this, cmdObj, mongoRunCommandOriginal, arguments);
     };
 
     Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(
         dbName, metadata, cmdObj) {
-        if (typeof _serverSession === "undefined") {
-            _serverSession = this.startSession()._serverSession;
-        }
-
         return runWithRetries(this, cmdObj, mongoRunCommandWithMetadataOriginal, arguments);
     };
 
@@ -47,7 +36,7 @@
         }
 
         const isRetryableWriteCmd = RetryableWritesUtil.isRetryableWriteCmdName(cmdName);
-        const canRetryWrites = _serverSession.canRetryWrites(cmdObj);
+        const canRetryWrites = _ServerSession.canRetryWrites(cmdObj);
 
         let res = clientFunction.apply(mongo, clientFunctionArguments);
 

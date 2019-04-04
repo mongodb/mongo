@@ -149,7 +149,9 @@ var workerThread = (function() {
                     };
                     Object.assign(TestData, newOptions);
 
-                    load('jstests/libs/override_methods/auto_retry_on_network_error.js');
+                    assert(!TestData.hasOwnProperty('networkErrorAndTxnOverrideConfig'), TestData);
+                    TestData.networkErrorAndTxnOverrideConfig = {retryOnNetworkErrors: true};
+                    load('jstests/libs/override_methods/network_error_and_txn_override.js');
                 }
 
                 // Operations that run after a "dropDatabase" command has been issued may fail with

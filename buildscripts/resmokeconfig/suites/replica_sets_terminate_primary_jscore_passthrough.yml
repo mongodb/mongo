@@ -112,6 +112,9 @@ selector:
   - assumes_read_concern_unchanged
   # "Cowardly refusing to override write concern of command: ..."
   - assumes_write_concern_unchanged
+  ## The next tag corresponds to long running-operations, as they may exhaust their number
+  # of retries and result in a network error being thrown.
+  - operations_longer_than_stepdown_interval
 
 executor:
   archive:
@@ -124,7 +127,7 @@ executor:
       # TODO SERVER-33229: Remove override of startParallelShell
       eval: >-
         testingReplication = true;
-        load("jstests/libs/override_methods/auto_retry_on_network_error.js");
+        load('jstests/libs/override_methods/network_error_and_txn_override.js');
         db = connect(TestData.connectionString);
         load("jstests/libs/override_methods/enable_sessions.js");
         load("jstests/libs/override_methods/set_read_and_write_concerns.js");
@@ -134,6 +137,8 @@ executor:
           alwaysInjectTransactionNumber: true
           defaultReadConcernLevel: "majority"
           logRetryAttempts: true
+          networkErrorAndTxnOverrideConfig:
+            retryOnNetworkErrors: true
           overrideRetryAttempts: 3
           sessionOptions:
             readConcern:

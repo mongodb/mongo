@@ -24,6 +24,8 @@ selector:
   - jstests/core/bulk_legacy_enforce_gle.js
   - jstests/core/capped5.js
   - jstests/core/commands_with_uuid.js
+  - jstests/core/dbcase.js
+  - jstests/core/dbcase2.js
   - jstests/core/explain_execution_error.js
   - jstests/core/expr.js
   - jstests/core/find9.js
@@ -265,6 +267,9 @@ selector:
   - jstests/core/cursora.js
   - jstests/core/bench_test1.js
 
+  # Does not support tojson of command objects.
+  - jstests/core/SERVER-23626.js
+
   exclude_with_any_tags:
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged
@@ -278,9 +283,11 @@ executor:
         var testingReplication = true;
         load('jstests/libs/override_methods/enable_sessions.js');
         load('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
-        load('jstests/libs/txns/txn_override.js');
+        load('jstests/libs/override_methods/network_error_and_txn_override.js');
       global_vars:
         TestData:
+          networkErrorAndTxnOverrideConfig:
+            wrapCRUDinTransactions: true
           sessionOptions:
             # Tests in this suite only read from primaries and only one node is electable, so causal
             # consistency is not required to read your own writes.

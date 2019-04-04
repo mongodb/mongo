@@ -108,6 +108,8 @@ selector:
   - jstests/core/bulk_legacy_enforce_gle.js
   - jstests/core/capped5.js
   - jstests/core/commands_with_uuid.js
+  - jstests/core/dbcase.js
+  - jstests/core/dbcase2.js
   - jstests/core/explain_execution_error.js
   - jstests/core/expr.js
   - jstests/core/find9.js
@@ -190,9 +192,9 @@ selector:
   # because it is not the first op of the transaction.
   - jstests/core/delx.js
 
-  # benchRun bypasses the txn_override.js so it doesn't run under the same transaction and can
-  # cause test to timeout because of the 3 hr transactions lifetime setting and moveChunk
-  # getting blocked trying to acquire collection X lock while doing chunk refresh.
+  # benchRun bypasses the network_error_and_txn_override.js so it doesn't run under the same
+  # transaction and can cause test to timeout because of the 3 hr transactions lifetime setting and
+  # moveChunk getting blocked trying to acquire collection X lock while doing chunk refresh.
   - jstests/core/bench_test*.js
 
   ##
@@ -384,6 +386,9 @@ selector:
   - jstests/core/rename_stayTemp.js
   - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
 
+  # Does not support tojson of command objects.
+  - jstests/core/SERVER-23626.js
+
   exclude_with_any_tags:
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged
@@ -407,9 +412,11 @@ executor:
         ImplicitlyShardAccessCollSettings.setMode(ImplicitlyShardAccessCollSettings.Modes.kHashedMoveToSingleShard);
         load('jstests/libs/override_methods/enable_sessions.js');
         load('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
-        load('jstests/libs/txns/txn_override.js');
+        load('jstests/libs/override_methods/network_error_and_txn_override.js');
       global_vars:
         TestData:
+          networkErrorAndTxnOverrideConfig:
+            wrapCRUDinTransactions: true
           sessionOptions:
             # Tests in this suite only read from primaries and only one node is electable, so causal
             # consistency is not required to read your own writes.
